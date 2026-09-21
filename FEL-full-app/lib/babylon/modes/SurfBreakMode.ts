@@ -46,15 +46,19 @@ const CUTBACK_RATE = 6;
 let baseFov: number | null = null;
 
 export const POCKET = { min: 2, max: 9 };
-/** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against. */
-export const MAX_FORWARD_SPEED = 12;
+/** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against.
+ *  BOARD-SPEED (2026-09-21): it rides the shared pace now (9 × BOARD_PACE = 14.4), so the next pace change reaches surf too. */
+export const MAX_FORWARD_SPEED = 9 * BOARD_PACE;
 /** The plain X grab on a wave, as a named shape for the trick layer: an indy on a surfboard (TRICK POSE). */
 const SURF_GRAB: BoardTrick = { id: 'surf_grab', label: 'GRAB', discipline: 'surf', kind: 'air', dir: null, btn: 'X', spinDeg: 0, flipDeg: 0, grab: 'indy', difficulty: 1.4, airSec: 0.3, clip: 'board_grab' };
 /** How far past the bottom of the face the rider may drift before the rail holds them (m) — the wave catches up anyway. */
 export const FLAT_LEASH = 8;
 /** Wave-relative drift (m/s): stalled on the flat the wave gains this much on you; the face's slide under the lip; the
  *  stick's trim up / drop down; the buried rail's drive. */
-export const DRIFT = { flat: -1.7, slide: 0.9, trim: 0.6, climb: 2.4, drop: 2.2, rail: 2.6 };
+/** BOARD-SPEED (2026-09-21): what the RIDER does — trim up, drop in, drive off the rail — moves with the shared pace
+ *  (+18.5% with skate and snow). What the WAVE does (flat / slide / trim) does not: the wave is the wave. */
+const RIDE_PACE = BOARD_PACE / 1.35;
+export const DRIFT = { flat: -1.7, slide: 0.9, trim: 0.6, climb: 2.4 * RIDE_PACE, drop: 2.2 * RIDE_PACE, rail: 2.6 * RIDE_PACE };
 export const BARREL_HOLD_SEC = 1.5;
 export const BARREL_BONUS = 250;
 /** Carve depth at which the rider commits and starts SPENDING flow. */

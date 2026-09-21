@@ -193,6 +193,31 @@ export function buildBoardRideIdle(scene: Scene, sk: Skeleton): AnimationGroup |
   ]);
 }
 
+/**
+ * STANDING ON THE BOARD (ANIM-READABILITY, 2026-09-21). The tree's `idle` and `cruise` were the SAME clip, so a rider
+ * waiting at the spawn sat in the full ride crouch, breathing, exactly as he does at 9 m/s — nothing on screen said
+ * "stopped". A stopped rider stands UP on the deck: knees only soft (hips 0.12 m under bind against the ride's 0.26),
+ * the chest nearly upright, the hands hanging, and the weight rocking slowly heel to toe, which is what anyone waiting
+ * on a board actually does. Same stance yaw and the same feet over the trucks, so the first push folds down out of it
+ * through the crossfade with the soles never leaving the deck.
+ */
+export function buildBoardStandIdle(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 3.2;
+  const legs = (d: number): Bones => ({
+    LeftUpLeg: [-20 - d, 0, 8], LeftLeg: [34 + d * 1.4, 0, 0],
+    RightUpLeg: [-17 - d, 0, -10], RightLeg: [30 + d * 1.4, 0, 0],
+  });
+  const torso = (x: number, r: number): Bones => ({ Spine: [x, 0, r], Spine1: [2, 0, r * 0.5], Neck: [-3, 0, 0] });
+  const HANG_L: [number, number, number] = [-0.06, -0.52, 0.04];
+  const HANG_R: [number, number, number] = [0.06, -0.52, 0.00];
+  return buildPoseClip(scene, sk, 'board_stand_idle', T, [
+    deckKey(0, { ...legs(0), ...torso(5, 0) }, HANG_L, HANG_R, -0.12),
+    deckKey(T * 0.3, { ...legs(2), ...torso(7, 2) }, [-0.07, -0.51, 0.07], [0.06, -0.52, 0.02], -0.135),      // onto the toes
+    deckKey(T * 0.7, { ...legs(1), ...torso(4, -2) }, [-0.05, -0.52, 0.02], [0.07, -0.51, -0.03], -0.125),   // back on the heels
+    deckKey(T, { ...legs(0), ...torso(5, 0) }, HANG_L, HANG_R, -0.12),
+  ]);
+}
+
 // HOLD LOOPS (ANIM-READABILITY, 2026-09-07). The carve, the tuck and the grab were keyed as one-way transitions —
 // stance at t=0, the pose at t=T — and played as LOOPS, so every cycle snapped the rider back upright: measured on the
 // snowboard baseline as a 0.60 m hand jump every 0.6 s for the whole run (the tuck is the throttle there), 0.5 s on a
@@ -356,6 +381,32 @@ export function buildBoardLand(scene: Scene, sk: Skeleton): AnimationGroup | nul
       [-0.42, 0.06, 0.10], [0.42, 0.04, -0.06], -0.14),
     deckKey(T * 0.35, { LeftUpLeg: [-66, 0, 7], LeftLeg: [98, 0, 0], RightUpLeg: [-62, 0, -9], RightLeg: [94, 0, 0], Spine: [40, 0, 0], Spine1: [12, 0, 0], Neck: [-16, 0, 0] },
       [-0.28, -0.30, 0.24], [0.30, -0.28, 0.18], -0.40),
+    deckKey(T, { LeftUpLeg: [-26, 0, 7], LeftLeg: [42, 0, 0], RightUpLeg: [-22, 0, -9], RightLeg: [38, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
+      [-0.38, -0.16, 0.16], [0.39, -0.18, 0.10], -0.16),
+  ]);
+}
+
+/**
+ * THE SKETCHY LANDING (ANIM-READABILITY, 2026-09-21). The tree had two landing states and one clip, so a landing the
+ * judge called sketchy — and docked — looked exactly like a stomped one: the score said something the body did not. A
+ * sketchy landing is the one where the rider is NOT over the board: the compression goes deeper and lasts longer, the
+ * chest is thrown toward the nose and pitched off to the toe side, and the arms windmill — back arm up and behind, front
+ * arm out low, then they trade as he fights it back. The feet stay on the trucks throughout (he rode away), and the last
+ * key is the clean landing's last key, so both landings hand the ride the same pose.
+ */
+export function buildBoardLandSketchy(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 0.62;
+  return buildPoseClip(scene, sk, 'board_land_sketchy', T, [
+    deckKey(0, { LeftUpLeg: [-34, 0, 7], LeftLeg: [52, 0, 0], RightUpLeg: [-30, 0, -9], RightLeg: [48, 0, 0], Spine: [24, 0, 6], Spine1: [6, 0, 3], Neck: [-6, 0, 0] },
+      [-0.42, 0.06, 0.10], [0.42, 0.04, -0.06], -0.14),
+    // the slam: deeper than the clean land, the chest dumped forward and off to the toe side, arms thrown out to catch it
+    deckKey(T * 0.25, { LeftUpLeg: [-72, 0, 9], LeftLeg: [106, 0, 0], RightUpLeg: [-66, 0, -11], RightLeg: [100, 0, 0], Spine: [50, 0, 16], Spine1: [14, 0, 8], Neck: [-18, 0, 0] },
+      [-0.44, -0.12, 0.26], [0.34, 0.30, -0.22], -0.46),
+    // the fight: the body swings back past centre to the heel side, the arms trade
+    deckKey(T * 0.55, { LeftUpLeg: [-56, 0, 6], LeftLeg: [84, 0, 0], RightUpLeg: [-52, 0, -8], RightLeg: [80, 0, 0], Spine: [26, 0, -14], Spine1: [6, 0, -7], Neck: [-8, 0, 0] },
+      [-0.36, 0.28, -0.16], [0.44, -0.14, 0.20], -0.34),
+    deckKey(T * 0.8, { LeftUpLeg: [-38, 0, 7], LeftLeg: [58, 0, 0], RightUpLeg: [-34, 0, -9], RightLeg: [54, 0, 0], Spine: [20, 0, 5], Spine1: [5, 0, 2], Neck: [-6, 0, 0] },
+      [-0.42, -0.04, 0.16], [0.40, -0.08, 0.04], -0.22),
     deckKey(T, { LeftUpLeg: [-26, 0, 7], LeftLeg: [42, 0, 0], RightUpLeg: [-22, 0, -9], RightLeg: [38, 0, 0], Spine: [14, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] },
       [-0.38, -0.16, 0.16], [0.39, -0.18, 0.10], -0.16),
   ]);

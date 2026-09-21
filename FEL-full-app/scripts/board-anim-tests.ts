@@ -86,6 +86,28 @@ ok('push is the authored board push, not the walk cycle', () => {
   assert.ok(isResolvable('board_push'));
 });
 
+console.log('\nE2. recognizable on sight (ANIM-READABILITY, 2026-09-21)');
+ok('every state a player can tell apart by eye plays its own clip', () => {
+  const clipOf = (i: Partial<typeof BASE>, prev: Parameters<typeof chooseBoardClip>[1] = null) => chooseBoardClip({ ...BASE, ...i }, prev).clip;
+  const seen = {
+    idle: clipOf({}), cruise: clipOf({ speed01: 0.6 }), carveL: clipOf({ speed01: 0.6, lean: -0.8 }), carveR: clipOf({ speed01: 0.6, lean: 0.8 }),
+    tuck: clipOf({ tucking: true, speed01: 0.6 }), push: clipOf({ pushing: true }), ollie: clipOf({ popping: true, airborne: true }),
+    air: clipOf({ airborne: true }), grab: clipOf({ airborne: true, grabHeld: true }), flip: clipOf({ airborne: true, flipping: true }),
+    grind: clipOf({ grinding: true }), manual: clipOf({ manual: true }),
+    landClean: clipOf({ landing: 'clean' }), landSketchy: clipOf({ landing: 'sketchy' }), bail: clipOf({ bailing: true }),
+  };
+  const names = Object.values(seen);
+  assert.equal(new Set(names).size, names.length, 'two readable states share a clip: ' + JSON.stringify(seen));
+  for (const n of names) assert.ok(isResolvable(n), n + ' resolves');
+  assert.notEqual(seen.air, 'board_tuck', 'a plain air is not the grounded speed tuck');
+});
+ok('a creeping board does not stand up and crouch every frame', () => {
+  assert.equal(chooseBoardClip({ ...BASE, speed01: 0.12 }, 'idle').state, 'idle');
+  assert.equal(chooseBoardClip({ ...BASE, speed01: 0.12 }, 'cruise').state, 'cruise');
+  assert.equal(chooseBoardClip({ ...BASE, speed01: 0.05 }, 'cruise').state, 'idle');
+  assert.equal(chooseBoardClip({ ...BASE, speed01: 0.2 }, 'idle').state, 'cruise');
+});
+
 console.log('\nF. one-shots settle');
 type Played = { clip: string; loop: boolean; onEnd?: () => void };
 const mockAnimator = (log: Played[]) => ({ play: (clip: string, o: { loop?: boolean; onEnd?: () => void } = {}) => { log.push({ clip, loop: !!o.loop, onEnd: o.onEnd }); } }) as never;
@@ -95,20 +117,20 @@ ok('every one-shot state has a settle target and carries its own onEnd', () => {
   tree.update({ ...BASE, airborne: true, flipping: true });
   assert.equal(log[0].clip, 'skate_kickflip'); assert.equal(log[0].loop, false); assert.ok(log[0].onEnd, 'one-shot has the tree\'s onEnd');
   tree.update({ ...BASE, airborne: true });          // loop states carry none (neverBindPose leaves loops alone)
-  assert.equal(log[1].clip, 'board_tuck'); assert.equal(log[1].onEnd, undefined);
+  assert.equal(log[1].clip, 'board_air'); assert.equal(log[1].onEnd, undefined);   // ANIM-READABILITY: the plain air is the open air pose, not the speed tuck
 });
 ok('a flip that runs out mid-air holds the tuck and does not re-fire while the trigger holds', () => {
   const log: Played[] = []; const tree = new BoardAnimTree(mockAnimator(log));
   const flip = { ...BASE, airborne: true, flipping: true };
   tree.update(flip); assert.equal(log.length, 1);
   log[0].onEnd!();                                    // natural end
-  assert.equal(log.length, 2); assert.equal(log[1].clip, 'board_tuck'); assert.equal(log[1].loop, true);
+  assert.equal(log.length, 2); assert.equal(log[1].clip, 'board_air'); assert.equal(log[1].loop, true);
   tree.update(flip); tree.update(flip);               // still flipping: no kickflip loop
   assert.equal(log.length, 2);
   tree.update({ ...BASE, airborne: true });           // trigger dropped → tuck already current, nothing new
   assert.equal(log.length, 2);
   tree.update(BASE);                                  // landed → idle
-  assert.equal(log[2].clip, 'board_ride_idle');
+  assert.equal(log[2].clip, 'board_stand_idle');
   tree.update(flip);                                  // a NEW flip fires again
   assert.equal(log[3].clip, 'skate_kickflip');
 });
@@ -124,7 +146,7 @@ ok('a mode beat (bail) plays once, settles into the idle, and the cleared beat r
   const log: Played[] = []; const tree = new BoardAnimTree(mockAnimator(log));
   const bail = { ...BASE, speed01: 0.6, bailing: true };
   tree.update(bail); assert.equal(log[0].clip, 'skate_bail');
-  log[0].onEnd!(); assert.equal(log[1].clip, 'board_ride_idle');   // AFTER bail = idle
+  log[0].onEnd!(); assert.equal(log[1].clip, 'board_stand_idle');   // AFTER bail = idle (he gets UP)
   tree.update(bail); assert.equal(log.length, 2);
   tree.clearBeat('bail');
   assert.equal(tree.update({ ...BASE, speed01: 0.6 }), 'cruise');

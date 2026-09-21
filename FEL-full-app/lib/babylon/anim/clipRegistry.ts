@@ -68,6 +68,7 @@ export const REAL_CLIPS = new Set<string>([
   'board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck',
   'board_grab', 'board_air', 'board_grind', 'board_land', 'board_push',
   'skate_kickflip', 'skate_bail', 'board_manual', 'skate_ollie',
+  'board_stand_idle', 'board_land_sketchy',   // ANIM-READABILITY (2026-09-21)
   // REGISTRY DRIFT, CLOSED (2026-09-18). 42 authored clips had no entry here — the whole HOOPS handle kit
   // (shammgod, yoyo, snatch-back, the ankle breakers), the layup/finish kit, the hard defensive slides, the
   // elbow strikes and three dunk finishes. They still PLAYED, because installSafePlay's second clause accepts

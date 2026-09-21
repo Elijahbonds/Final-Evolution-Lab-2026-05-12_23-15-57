@@ -35,7 +35,7 @@ import { buildVolleyBlock, buildVolleyReady, buildVolleySpike, buildVolleyShuffl
 import { buildKeeperDive, buildKeeperSet, buildSoccerKick, buildKeeperDiveHold, buildKeeperRise } from './soccer';
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
-  buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush,
+  buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush, buildBoardStandIdle, buildBoardLandSketchy,
   buildSkateKickflip, buildSkateBail,
   buildBoardManual, buildSkateOllie,   // VENICE-SKATE-THPS (2026-09-09): the manual had no clip and the pop had no body
 } from './boardSuite';
@@ -149,6 +149,8 @@ export function registerAuthoredClips(
     ['board_air', () => buildBoardAir(scene, skeleton)],
     ['board_grind', () => buildBoardGrind(scene, skeleton)],
     ['board_land', () => buildBoardLand(scene, skeleton)],
+    ['board_stand_idle', () => buildBoardStandIdle(scene, skeleton)],       // ANIM-READABILITY (2026-09-21): stopped ≠ cruising
+    ['board_land_sketchy', () => buildBoardLandSketchy(scene, skeleton)],   // ANIM-READABILITY (2026-09-21): a sketchy landing looks sketchy
     ['board_push', () => buildBoardPush(scene, skeleton)],   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
     ['skate_kickflip', () => buildSkateKickflip(scene, skeleton)],
     ['skate_bail', () => buildSkateBail(scene, skeleton)],

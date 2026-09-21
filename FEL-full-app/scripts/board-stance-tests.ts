@@ -63,7 +63,7 @@ function pose(clip: string, at = 0.5): boolean {
   return true;
 }
 
-const RIDE = ['board_ride_idle', 'board_tuck', 'board_grind', 'board_air'];
+const RIDE = ['board_ride_idle', 'board_tuck', 'board_grind', 'board_air', 'board_stand_idle', 'board_land_sketchy'];
 
 for (const clip of RIDE) {
   ok(pose(clip), `${clip} exists as a real animation group`);
@@ -111,13 +111,30 @@ function ankleY(side: 'Left' | 'Right'): number {
   return n.getAbsolutePosition().y - rootNode.getAbsolutePosition().y;
 }
 const DECK_TOP = 0.03;   // BoardSync parks the deck here, root-local
-for (const clip of ['board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck', 'board_grind']) {
+for (const clip of ['board_ride_idle', 'board_carve_left', 'board_carve_right', 'board_tuck', 'board_grind', 'board_stand_idle', 'board_land_sketchy']) {
   if (!pose(clip, 0.5)) { ok(false, `${clip}: clip missing`); continue; }
   const lo = Math.min(ankleY('Left'), ankleY('Right'));
   console.log(`  ${clip.padEnd(18)} lowest ankle ${lo.toFixed(3)} (deck top ${DECK_TOP})`);
   ok(lo > DECK_TOP, `${clip}: the rider stands ON the deck, not through it (ankle ${lo.toFixed(3)} vs deck ${DECK_TOP})`);
   ok(lo < 0.30, `${clip}: and not hovering above it (ankle ${lo.toFixed(3)})`);
 }
+
+// RECOGNIZABLE ON SIGHT (ANIM-READABILITY, 2026-09-21). Two states used to share a clip with a neighbour; the new clips
+// have to differ from that neighbour by something the eye can see from the chase cam, measured here on the rig.
+function hipsY(): number { const n = boneNode(rig.skeleton, 'Hips'); n!.computeWorldMatrix(true); return n!.getAbsolutePosition().y - (rootNode?.getAbsolutePosition?.().y ?? 0); }
+function wristSpan(): number { const l = worldPos('LeftHand'), r = worldPos('RightHand'); return Math.hypot(l.x - r.x, l.y - r.y, l.z - r.z); }
+pose('board_ride_idle', 0); const rideHips = hipsY();
+pose('board_stand_idle', 0); const standHips = hipsY();
+console.log(`  stand vs ride      hips ${standHips.toFixed(3)} vs ${rideHips.toFixed(3)}`);
+ok(standHips - rideHips >= 0.10, `a stopped rider STANDS: hips ${(standHips - rideHips).toFixed(3)} m above the ride crouch (want >= 0.10)`);
+pose('board_land', 0.35); const cleanHips = hipsY(), cleanSpan = wristSpan();
+pose('board_land_sketchy', 0.25); const sketchHips = hipsY(), sketchSpan = wristSpan();
+console.log(`  sketchy vs clean   hips ${sketchHips.toFixed(3)} vs ${cleanHips.toFixed(3)}   wrists ${sketchSpan.toFixed(3)} vs ${cleanSpan.toFixed(3)}`);
+ok(sketchHips < cleanHips - 0.03, `a sketchy landing slams deeper than a clean one (${sketchHips.toFixed(3)} vs ${cleanHips.toFixed(3)})`);
+ok(sketchSpan > cleanSpan + 0.15, `and the arms are thrown out to catch it (wrist span ${sketchSpan.toFixed(3)} vs ${cleanSpan.toFixed(3)})`);
+pose('board_tuck', 0); const tuckSpan = wristSpan();
+pose('board_air', 0); const airSpan = wristSpan();
+ok(airSpan > tuckSpan + 0.2, `the plain air is OPEN, not the speed tuck (wrist span ${airSpan.toFixed(3)} vs ${tuckSpan.toFixed(3)})`);
 
 // The bail must BREAK the stance -- holding a textbook ride pose through a
 // crash is what makes a fall read as choreography.

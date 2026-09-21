@@ -55,7 +55,13 @@ export interface BoardMoveTuning {
 // FASTER (owner, 2026-09-15: "make the normal movement speed faster on board sports" — ~35%, skate + snow + surf). The
 // weight stays: the push still fades with speed and a coasting board still rolls to rest. What moves is the pace a
 // board settles at — the THPS cruise — and the ceiling above it, so the boost (+40% on top) still reads as a surge.
-export const BOARD_PACE = 1.35;
+//
+// FASTER AGAIN (owner, 2026-09-21: "faster normal board move speed skate/snow/surf"). 1.35 -> 1.6, +18.5% on every
+// cruise, ceiling and push, and skate's held-forward push cadence now carries to 0.86 of cruise (was 0.8) — the pace a
+// player actually rides at is the pace the stick HOLDS. Measured, stick held forward from a stand: 4 s covers 30.4 m
+// (was 24.9) and the hold averages 8.75 m/s (was 7.1), 98% of the new 8.96 cruise. Still a ramp: the stroke is a Δv over
+// 0.42 s and fades with speed, so nothing steps (largest frame-to-frame gain 0.14 m/s).
+export const BOARD_PACE = 1.6;
 export const SKATE_TUNING: BoardMoveTuning = {
   pushAccel: 3.1 * BOARD_PACE, pushCooldownSec: 0.6, pumpGain: 1.6 * BOARD_PACE, cruiseSpeed: 5.6 * BOARD_PACE,
   maxSpeed: 10.5 * BOARD_PACE, carveTurnRate: 2.4, carveHold: 1.0, scrubRate: 0.9, drag: 0.26,
@@ -70,7 +76,7 @@ export const SKATE_TUNING: BoardMoveTuning = {
   // (it taxes cruise too). At 0.22 the two-push economy returns to 0.610 of cruise —
   // the 0.609 it had before the weight pass — and roll-to-rest goes 5.6 s -> 7.3 s
   // (avg 0.98 -> 0.75 m/s^2, against ~0.1-0.3 for a real board on flat concrete).
-  strokeSec: 0.42, pushFade: 0.72, autoPushUntil: 0.8, rollResist: 0.22, brakeDecel: 7, scrubPerSec: true,
+  strokeSec: 0.42, pushFade: 0.72, autoPushUntil: 0.86, rollResist: 0.22, brakeDecel: 7, scrubPerSec: true,
 };
 // Snow keeps more of its speed than skate — gravity is doing the work and a slope should feel fast — but the same
 // quarter comes off the top so a rider is not outrunning the run.
@@ -88,6 +94,17 @@ export const SURF_TUNING: BoardMoveTuning = {
   maxSpeed: 12 * BOARD_PACE, carveTurnRate: 2.8, carveHold: 1.03, scrubRate: 0.6, drag: 0.19, scrubPerSec: true,
 };
 
+/** WALL-UNSTUCK (2026-09-21): how long after a touch the wall still owns the nose, the slowest a bounce leaves at, and the
+ *  speed a glance never drags a moving board below. */
+export const WALL_HOLD_SEC = 0.25;
+export const WALL_BOUNCE_MIN = 2.6;
+export const WALL_SLIDE_MIN = 3;
+/** BAIL HONESTY (2026-09-21): the speed at which riding straight into a wall stops being a bump and becomes a slam the
+ *  body has to answer for. Below it the bounce is the whole story; at or above it the mode owes the player a bail —
+ *  a fall he can read, then gets up from. Set under the skate cruise (8.96) so a cruising rider who aims at a wall and
+ *  holds it gets the fall, and a rider who drifts into one at walking pace does not. */
+export const WALL_SLAM_SPEED = 7;
+
 export class BoardMovement {
   vel = Vector3.Zero();
   yaw = 0;
@@ -101,6 +118,13 @@ export class BoardMovement {
   /** The SHARED boost's ramp, 0..1 (BoostKit — FINISH-RELEASE, 2026-09-14). While it is up the board is driven forward and
    *  the speed ceiling lifts to +40%, so a boost is a real surge, not flat out reached sooner. Set by the mode each frame. */
   boostK = 0;
+
+  /** WALL-UNSTUCK: the last wall touched (its normal) and the seconds the board still counts as on it. */
+  private wallNx = 0;
+  private wallNz = 0;
+  private wallT = 0;
+  /** BAIL HONESTY: the last contact was a head-on hit fast enough to be a fall, not a bump. */
+  private wallSlam = false;
 
   constructor(private tune: BoardMoveTuning = SKATE_TUNING) {}
 
@@ -137,27 +161,48 @@ export class BoardMovement {
    *   · a glancing hit swings the nose along the wall (a touch off it) and keeps most of the speed — you scrape along;
    *   · a head-on hit (within ~37°) bounces the nose back off the wall and keeps a third — you are knocked away, never stuck.
    * Returns what happened, or null when the board is already leaving the wall.
+   *
+   * WALL-UNSTUCK (2026-09-21): the turn alone still glued a rider who HELD the stick toward the wall. The steer re-aimed
+   * the nose into it every frame, every frame was a fresh glance, and every glance took its speed tax — measured, stick
+   * held into the fence: 17–31 contacts in 5 s and the board dragged down to 1.2 m/s, scraping. A scrape is now ONE
+   * contact: the tax is paid once when the board first meets the wall, never again while it stays on it, and for a beat
+   * after a touch the steer cannot put the nose back into that wall (see update) — the board slides off along it at the
+   * speed it has. A corner (two walls at once) has no "along", so it bounces from a shallower angle.
    */
   wall(nx: number, nz: number): 'glance' | 'bounce' | null {
+    const corner = nx !== 0 && nz !== 0;
     const l = Math.hypot(nx, nz); if (!(l > 0)) return null;
     nx /= l; nz /= l;
+    this.wallSlam = false;
+    const scraping = this.wallT > 0;                    // still on the wall from a moment ago: no second tax
+    this.wallNx = nx; this.wallNz = nz; this.wallT = WALL_HOLD_SEC;
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     const into = -(fx * nx + fz * nz);                 // 1 = straight at the wall, 0 = along it
     if (into <= 0.02) return null;
     const speed = this.speed;
     let dx: number, dz: number, keep: number, kind: 'glance' | 'bounce';
-    if (into > 0.8) {
+    if (into > (corner ? 0.5 : 0.8)) {
       dx = fx + 2 * into * nx; dz = fz + 2 * into * nz;   // mirror the heading off the wall
-      keep = Math.max(1.5, speed * 0.35); kind = 'bounce';
+      keep = Math.max(WALL_BOUNCE_MIN, speed * 0.45); kind = 'bounce';
+      this.wallSlam = !scraping && speed >= WALL_SLAM_SPEED;   // BAIL HONESTY: rode into it, hard, from clear air
     } else {
       dx = fx + into * nx + 0.2 * nx; dz = fz + into * nz + 0.2 * nz;   // along the wall, nudged off it
-      keep = speed * (1 - 0.45 * into); kind = 'glance';
+      keep = scraping ? speed : Math.max(Math.min(speed, WALL_SLIDE_MIN), speed * (1 - 0.3 * into)); kind = 'glance';
     }
     this.yaw = Math.atan2(dx, dz);
     this.strokeLeft = kind === 'bounce' ? 0 : this.strokeLeft;
     this.vel.set(Math.sin(this.yaw) * keep, 0, Math.cos(this.yaw) * keep);
     return kind;
   }
+
+  /** True for a beat after the board touched a wall. */
+  get onWall(): boolean { return this.wallT > 0; }
+
+  /** BAIL HONESTY (2026-09-21): true when the last `wall()` was a fresh head-on hit at speed — the mode owes the player a
+   *  readable fall for it. The board is already turned back off the wall and holding WALL_BOUNCE_MIN, so whatever the
+   *  mode does with the bail, the rider gets up facing away from what he hit and rides off it. Never true twice for one
+   *  scrape: a board sliding along a wall is not falling. */
+  get slammedWall(): boolean { return this.wallSlam; }
 
   /** Stance switch: instant, small speed tax (switch riding is harder). */
   switchStance(): void {
@@ -218,6 +263,14 @@ export class BoardMovement {
     this.balance.update(dt, lean, this.speed01);
     const carveCommit = Math.abs(lean);
     this.yaw += steer * t.carveTurnRate * stanceMult * dt * (0.4 + 0.6 * Math.min(1, this.speed / 4));
+    // WALL-UNSTUCK: for a beat after a touch the steer cannot aim the nose back INTO that wall — the board slides along
+    // it, a touch off. Steering away is untouched, so the way off a wall is always the stick away from it.
+    if (this.wallT > 0) {
+      this.wallT = Math.max(0, this.wallT - dt);
+      const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+      const into = -(fx * this.wallNx + fz * this.wallNz);
+      if (into > -0.1) this.yaw = Math.atan2(fx + (into + 0.1) * this.wallNx, fz + (into + 0.1) * this.wallNz);
+    }
 
     // ── THE HILL TAKES A STALLED BOARD (WALLS + SPEED, 2026-09-15) ──
     // Speed here follows the facing, and gravity only fed the component ALONG the facing — so a board turned across the

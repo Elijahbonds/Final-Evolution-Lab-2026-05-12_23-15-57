@@ -404,7 +404,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       _validateChar.dispose(); // Clean up validation placeholder
       // carveAccel 0: the momentum model below owns the velocity; the Rider's own 4.95 m/s² forward creep was the only
       // thing that moved a stick-held rider (0.33 m in 4 s on the baseline probe) and it scaled with frame time
-      rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5 });
+      rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5, maxSpeed: SKATE_TUNING.maxSpeed * 1.4 });   // BOARD-SPEED: the Rider's flat 16 clipped the boost (ceiling × 1.4) — the momentum model owns the cap
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
@@ -1081,9 +1081,26 @@ export const SkateRunMode: ModeDefinition = (() => {
         rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
         if (!fenceHit && kind) {
           fenceHit = true;
-          SoundKit.play('impact', { pitch: kind === 'bounce' ? 0.8 : 1.1, volume: kind === 'bounce' ? 0.4 : 0.22 });
-          ctx.feel?.impact?.(kind === 'bounce' ? 0.3 : 0.12);
-          if (kind === 'bounce') bannerFlash(ctx, 'EDGE OF THE PARK', 700);
+          // BAIL HONESTY (2026-09-21). A rider who rode a cruising 9 m/s straight into the fence got a thud, a banner and
+          // a bounce — and kept the exact ride pose through all of it. The hit was in the sound and the camera and never
+          // in the body, so the one collision a player can cause on purpose was the one thing in the mode he could not
+          // read. A slam is a bail now: the same fall the mode already plays for a blown landing, the pot burns, the
+          // board settles against the wall instead of pinballing off it, and the beat ends in the stand idle facing away
+          // from the fence — get up, push, ride on. No reset, no respawn: he never leaves the spot he crashed at.
+          if (move.slammedWall && bailBeatT <= 0) {
+            combo.bail();
+            mbus.report({ kind: 'miss' });
+            bannerFlash(ctx, 'SLAMMED', 900);
+            SoundKit.play('miss');
+            bailBeatT = BAIL_BEAT_SEC;
+            move.vel.scaleInPlace(0.15);   // a fallen rider does not keep sliding at speed (as the blown landing does)
+            rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+            bailPunch(ctx);
+          } else {
+            SoundKit.play('impact', { pitch: kind === 'bounce' ? 0.8 : 1.1, volume: kind === 'bounce' ? 0.4 : 0.22 });
+            ctx.feel?.impact?.(kind === 'bounce' ? 0.3 : 0.12);
+            if (kind === 'bounce') bannerFlash(ctx, 'EDGE OF THE PARK', 700);
+          }
         }
       } else fenceHit = false;
       ctx.setHud({ time: Math.ceil(timeLeft) });
@@ -1100,7 +1117,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
       // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), SKATE_TUNING.maxSpeed, dt);   // the momentum ceiling, not the Rider's clearance cap (BOARD-SPEED)
     },
 
     dispose() { trickLayer?.dispose(); trickLayer = null; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },

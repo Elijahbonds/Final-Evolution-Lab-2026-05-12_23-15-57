@@ -47,16 +47,21 @@ const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: n
   tuck:          { clip: 'board_tuck', loop: true, fadeSec: 0.22 },
   ollie:         { clip: 'skate_ollie', loop: false, fadeSec: 0.05 },   // VENICE-SKATE-THPS: plant -> pop -> hang; the pop had no body before
 
-  air_tuck:      { clip: 'board_tuck', loop: true, fadeSec: 0.12 },
+  // ANIM-READABILITY (2026-09-21): the plain air was 'board_tuck' — the grounded SPEED tuck (spine folded 46°, head down,
+  // hands behind the hips). On a plain ollie or a straight air that is a racing crouch falling through the sky, and it
+  // was also the one clip a grounded snow tuck and an air shared, so leaving the lip changed nothing on the body. Every
+  // trick def already names 'board_air' for the ollie and the straight air (BoardTricks), and BoardPosture's air window
+  // opens the chest for exactly this reason ("a tucked-forward air reads as a fall"). The state keeps its name.
+  air_tuck:      { clip: 'board_air', loop: true, fadeSec: 0.12 },
   air_grab:      { clip: 'board_grab', loop: true, fadeSec: 0.12 },
   air_flip:      { clip: 'skate_kickflip', loop: false, fadeSec: 0.06 },
   air_spin:      { clip: 'board_air', loop: true, fadeSec: 0.12 },
   grind:         { clip: 'board_grind', loop: true, fadeSec: 0.08 },
   manual:        { clip: 'board_manual', loop: true, fadeSec: 0.12 },   // VENICE-SKATE-THPS: was the ride idle — the THPS link looked exactly like coasting
   land_clean:    { clip: 'board_land', loop: false, fadeSec: 0.08 },
-  land_sketchy:  { clip: 'board_land', loop: false, fadeSec: 0.08 },
+  land_sketchy:  { clip: 'board_land_sketchy', loop: false, fadeSec: 0.08 },   // ANIM-READABILITY (2026-09-21): was the clean land — the judge said sketchy and the body said stomped
   bail:          { clip: 'skate_bail', loop: false, fadeSec: 0.05 },
-  idle:          { clip: 'board_ride_idle', loop: true, fadeSec: 0.2 },
+  idle:          { clip: 'board_stand_idle', loop: true, fadeSec: 0.3 },   // ANIM-READABILITY (2026-09-21): was the ride idle — stopped looked exactly like cruising
   celebrate:     { clip: 'board_land', loop: false, fadeSec: 0.15 },   // SHARED-ANIM-BUS: was the hoops score celebrate (→ karate uppercut) on a board; a rider stomps the landing
 };
 
@@ -64,6 +69,10 @@ const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: n
  *  frame, and each flip restarts the animator's crossfade from weight 0 (measured as a 0.33 m hand snap per flip). */
 export const CARVE_ON = 0.4;
 const CARVE_OFF = 0.3;
+/** Rolling hysteresis (ANIM-READABILITY, 2026-09-21): idle and cruise are different clips now, so a board creeping along
+ *  the old single 0.15 line would stand up and crouch every frame. Crouch into the ride above 0.15, stand below 0.08. */
+export const ROLL_ON = 0.15;
+const ROLL_OFF = 0.08;
 
 export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null = null): { state: BoardAnimState; clip: string; loop: boolean; fadeSec: number } {
   let state: BoardAnimState;
@@ -81,7 +90,7 @@ export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null =
   } else if (i.pushing) state = 'push';
   else if (Math.abs(i.lean) > (inCarve ? CARVE_OFF : CARVE_ON) && i.speed01 > 0.2) state = i.lean < 0 ? 'carve_left' : 'carve_right';
   else if (i.tucking) state = 'tuck';
-  else if (i.speed01 > 0.15) state = 'cruise';
+  else if (i.speed01 > (prev === 'idle' || prev === null ? ROLL_ON : ROLL_OFF)) state = 'cruise';
   else state = 'idle';
   return { state, ...CLIP_FOR[state] };
 }

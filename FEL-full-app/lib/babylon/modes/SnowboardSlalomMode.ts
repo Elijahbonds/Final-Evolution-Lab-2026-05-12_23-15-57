@@ -92,6 +92,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let trickLayer: BoardTrickLayer | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let bailBeatT = 0, landBeatT = 0, airT = 0;
+  /** BAIL HONESTY (2026-09-21): true while the board is against the edge of the piste, so one slam is one fall. */
+  let edgeHit = false;
   const BAIL_BEAT_SEC = 0.9, LAND_BEAT_SEC = 0.4;
   function wipePunch(ctx: ModeContext): void {
     if (elapsed < wipeLatchUntil) return;
@@ -109,7 +111,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     ctx.juice.flash('#fff6dd', 100);
     console.info('[SNOW-JUICE] finish punch');
   }
-  const move = new BoardMovement(tuneForVenue(SNOW_TUNING, readBoardVenue('snow')));   // Phase 12: carve weight + slope energy
+  const snowTune = tuneForVenue(SNOW_TUNING, readBoardVenue('snow'));
+  const move = new BoardMovement(snowTune);   // Phase 12: carve weight + slope energy
   let mbus = new MomentumBus();
   // BOOST (FINISH-RELEASE, 2026-09-14): the shared BoostKit. The mode's own 0..100 meter was spent by TUCKING past 0.85
   // — a boost you could not choose to hold back, on the same trigger as the speed tuck. Spins, gates and grinds pay it
@@ -190,7 +193,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // ray missed once the snow was > 4.5 m below and the floor clamp fired every frame below −0.5. A longer ray, a floor
       // under the run's lowest point and the stick-down glue keep the rider on the snow (owner sign-off 2026-09-07).
       const pisteBottomY = -Math.sin(SLOPE_PITCH) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', { hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6 });
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', {
+        hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6,
+        // BOARD-SPEED (2026-09-21): the Rider's own flat 16 m/s cap sat UNDER the momentum model's ceiling (17 × pace), so
+        // both earlier pace passes were invisible on a straight descent — the hill already ran the board into the 16 wall
+        // ("descends at 12–16 m/s straight"). The momentum model owns the ceiling; the Rider's cap only has to clear it.
+        maxSpeed: snowTune.maxSpeed * 1.4,
+      });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => {
         if (b === 'land') {
           landBeatT = LAND_BEAT_SEC;
@@ -211,7 +220,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }, 'SNOW-PP');
       trickLayer?.dispose();
       trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
-      bailBeatT = 0; landBeatT = 0; airT = 0;
+      bailBeatT = 0; landBeatT = 0; airT = 0; edgeHit = false;
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; gateStreak = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
@@ -478,7 +487,21 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         // board pointed off-piste, so the momentum model drove it into the edge every frame and the rider stuck there.
         if (move.wall(-Math.sign(rig.char.root.position.x), 0) && !rig.rider.grinding) rig.char.root.rotation.y = move.yaw;
         rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
-      }
+        // BAIL HONESTY (2026-09-21): a rider who straight-lines off the piste into the edge at descent speed used to get
+        // turned back onto the run in the ride pose, silently — the rock and the yeti both cost him a fall, and the edge,
+        // the one he hits hardest, cost him nothing to read. It is the same wipe those two play, latched so one slam is
+        // one fall, and it settles him on the piste pointing back down it: no reset, no respawn, push and go.
+        if (move.slammedWall && !edgeHit && bailBeatT <= 0) {
+          tricks.score = Math.max(0, tricks.score - ROCK_PENALTY);
+          rig.rider.vel.scaleInPlace(0.35); move.vel.scaleInPlace(0.35);
+          wipePunch(ctx);
+          EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
+          bailBeatT = BAIL_BEAT_SEC;
+          ctx.setHud({ score: tricks.score, banner: `OFF THE PISTE! -${ROCK_PENALTY}` });
+          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        }
+        edgeHit = true;
+      } else edgeHit = false;
 
       if (nextGate >= world.markers.length) {
         ended = true;
@@ -493,7 +516,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
       // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), snowTune.maxSpeed, dt);   // the momentum ceiling, not the Rider's clearance cap (BOARD-SPEED)
     },
 
     dispose() {
