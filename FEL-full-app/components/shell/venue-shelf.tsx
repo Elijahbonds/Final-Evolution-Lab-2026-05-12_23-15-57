@@ -30,7 +30,7 @@ function venueModeKey(href?: string): string | null {
   return slug ? ROUTE_TO_MODE[slug] ?? slug : null;
 }
 
-export function VenueShelf() {
+export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } = {}) {
   const [mastery, setMastery] = useState<Record<string, { tierIndex: number }>>({});
 
   useEffect(() => {
@@ -46,13 +46,19 @@ export function VenueShelf() {
   const soon = VENUES.length - live;
 
   return (
-    <section className="mt-12">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="fel-heading text-[19px] font-bold text-white">Venues</h2>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
+    <section className={heading ? 'mt-12' : ''}>
+      {heading ? (
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="fel-heading text-[19px] font-bold text-white">{heading}</h2>
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
+            {live} live{soon > 0 && ` · ${soon} coming`}
+          </span>
+        </div>
+      ) : (
+        <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
           {live} live{soon > 0 && ` · ${soon} coming`}
-        </span>
-      </div>
+        </p>
+      )}
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {VENUES.map((venue, i) => {

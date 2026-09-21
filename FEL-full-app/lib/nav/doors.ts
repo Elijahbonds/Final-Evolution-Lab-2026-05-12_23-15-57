@@ -12,6 +12,7 @@ export interface Door { href: string; label: string; tab: 'play' | 'train' | 'pr
 
 export const DOORS: Door[] = [
   // PLAY — the rooms around the games rather than the games themselves.
+  { href: '/venues', label: 'Venues', tab: 'play' },
   { href: '/arena', label: 'Arena', tab: 'play' },
   { href: '/ladder', label: 'Ladder', tab: 'play' },
   { href: '/story', label: 'Story', tab: 'play' },
