@@ -76,7 +76,7 @@ const RIVAL_PACE = 1.16;
 /** Racer ids in the item system: 0 is the player, rivals are 1..FIELD. */
 const PLAYER_ID = 0;
 
-interface RivalKit { item: HeldItem | null; itemAt: number; shieldT: number; stunT: number; zipT: number; nextRow: number; lastHeading: number; roll: number; lap: number; home: number; cool: number; alongside: boolean }
+interface RivalKit { item: HeldItem | null; itemAt: number; shieldT: number; stunT: number; zipT: number; nextRow: number; lastHeading: number; roll: number; lap: number; home: number; cool: number; touch: boolean; alongside: boolean }
 
 let baseFov: number | null = null;
 
@@ -172,7 +172,7 @@ export function makeAeroAcesMode(): ModeDefinition {
     rivals = makeField(FIELD, tune.top, tier.edge);
     // planes are wide: spread the lanes, and put the grid behind the player in two staggered rows
     rivals.forEach((r, i) => { r.lane *= 3.2; r.dist = -10 - i * 7; });
-    rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, alongside: false }));
+    rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, touch: false, alongside: false }));
     S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0 };
     rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
   }
@@ -550,15 +550,15 @@ export function makeAeroAcesMode(): ModeDefinition {
         const rposes = rivals.map((r, i) => ({ dist: r.dist, lateral: r.lane + Math.sin(race.time * 0.5 + r.phase) * 3, speed: r.speed + (rivalKits[i].stunT > 0 ? -5 : 0) }));
         const me = { dist: pDist, lateral: pLat, speed: flight.speed, boosting: boost.k > 0.35 || S.zipT > 0 };
         const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
-        const cools = rivalKits.map((k) => k.cool);
-        for (const ev of resolveContact(me, rposes, lapLen, cools, dt)) {
+        const cools = rivalKits.map((k) => k.cool), touches = rivalKits.map((k) => k.touch);
+        for (const ev of resolveContact(me, rposes, lapLen, cools, dt, touches)) {
           const r = rivals[ev.i];
           flight.pos.addInPlace(right.scale(ev.playerShove * 2)); r.lane += ev.rivalShove * 2;
           if (ev.kind === 'punt') { flight.speed *= ev.playerKeep; hitRival(ctx, ev.i, true); S.events.punts++; say(`PUNTED ${r.name}`, 0.9); }
           else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) say('SHIELD HELD', 0.5); else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
           else { flight.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
         }
-        rivalKits.forEach((k, i) => { k.cool = cools[i]; });
+        rivalKits.forEach((k, i) => { k.cool = cools[i]; k.touch = touches[i]; });
         const was = rivalKits.map((k) => k.alongside);
         for (const i of nearMisses(me, rposes, lapLen, was)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
         rivalKits.forEach((k, i) => { k.alongside = was[i]; });

@@ -40,6 +40,8 @@ export const CONTACT = {
   puntSpinSec: 1.3,
   /** Seconds before the same pair can bump again. */
   cooldownSec: 0.55,
+  /** How far apart a pair must get, as a multiple of the overlap box, before their contact counts as over. */
+  releaseScale: 1.4,
   /** A near miss: alongside inside this lateral gap, outside the overlap, closing at this speed. */
   nearMissLat: 3.4, nearMissClosing: 2.5, nearMissAlong: 4,
 } as const;
@@ -101,18 +103,32 @@ export interface ContactEvent {
   playerKeep: number; rivalKeep: number;
 }
 
-/** Resolve the player against every rival. `cooldowns` (per rival, seconds left) is read and written. */
+/**
+ * Resolve the player against every rival. `cooldowns` (per rival, seconds left) is read and written; `touching` latches
+ * a contact that has not ended yet and is read and written the same way.
+ *
+ * A BUMP IS AN EVENT, NOT A BUZZ (2026-09-20, owner: "fix the aero ace and karting modes"). The cooldown alone let a
+ * pair grind: a side bump shoves them 2.2 m apart, but a rival's lane eases back at laneRate 2.4 m/s, so inside the
+ * 0.55 s cooldown it has already come 1.3 m back in and the boxes overlap again. Measured flying one aero race with
+ * the throttle pinned: 27 bumps in 70 s, the last six of them against MOTA back to back. Contact now fires on the
+ * RISING EDGE and re-arms only once the pair is properly clear — the same hysteresis the gesture triggers use.
+ */
 export function resolveContact(
   player: Racer & { boosting: boolean }, rivals: readonly Racer[], lapLength: number, cooldowns: number[], dt: number,
+  touching: boolean[] = [],
 ): ContactEvent[] {
   const out: ContactEvent[] = [];
   for (let i = 0; i < rivals.length; i++) {
     cooldowns[i] = Math.max(0, (cooldowns[i] ?? 0) - dt);
-    if (cooldowns[i] > 0) continue;
     const r = rivals[i];
     const along = alongGap(player.dist, r.dist, lapLength);   // + = rival ahead
     const lat = r.lateral - player.lateral;
+    // The release box is wider than the overlap box, so a pair sitting exactly on the edge cannot chatter.
+    if (Math.abs(along) >= CONTACT.halfLen * 2 * CONTACT.releaseScale || Math.abs(lat) >= CONTACT.halfWid * 2 * CONTACT.releaseScale) touching[i] = false;
+    if (cooldowns[i] > 0) continue;
     if (Math.abs(along) >= CONTACT.halfLen * 2 || Math.abs(lat) >= CONTACT.halfWid * 2) continue;
+    if (touching[i]) continue;   // the same contact, still going: one bump, not one a frame
+    touching[i] = true;
     cooldowns[i] = CONTACT.cooldownSec;
     const side = lat >= 0 ? -1 : 1;   // the player is shoved away from the rival
     const closing = player.speed - r.speed;

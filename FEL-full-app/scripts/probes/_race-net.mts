@@ -1,0 +1,14 @@
+import { chromium } from 'playwright-core';
+const PORT = process.env.PORT ?? '3011';
+const MODE = process.env.MODE ?? 'velocitykart';
+const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
+const b = await chromium.launch({ executablePath: EXE, args: ['--use-gl=angle','--use-angle=metal','--enable-webgl','--ignore-gpu-blocklist'] });
+const p = await (await b.newContext({ viewport: { width: 1100, height: 700 } })).newPage();
+const bad: string[] = [];
+p.on('response', (r) => { if (r.status() >= 400) bad.push(`${r.status()} ${r.request().method()} ${r.url()}`); });
+await p.goto(`http://localhost:${PORT}/dev/mode/${MODE}`, { waitUntil: 'domcontentloaded' });
+await p.waitForSelector('canvas', { timeout: 90000 });
+await p.waitForTimeout(12000);
+console.log(`${MODE}: ${bad.length} failing requests`);
+[...new Set(bad)].forEach((x) => console.log('  ' + x));
+await b.close();

@@ -42,6 +42,7 @@ import {
 import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
 import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
 import { locate } from '../racing/racingLine';
+import { edgeLimit, edgeReturn } from '../racing/courseEdge';   // the outside of the course: off-road is a cost, not a door out
 import { steerLane, resolveContact, nearMisses, personalityFor, CONTACT } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, bumps and punts
 import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, ITEM_KINDS, ITEM_LABEL, type Balloon, type HeldItem, type Missile, type Mine, type ItemKind, type Target } from '../racing/AeroItems';   // the kart's items are the flyers' items on the road
 import { AeroPickups } from '../racing/aeroPickups';
@@ -103,6 +104,10 @@ let rivalKarts: TransformNode[] = [];
 let rivalHome: number[] = [];
 let rivalStun: number[] = [];
 let rivalCool: number[] = [];
+/** Which rivals the player is still touching — a grind along a rival is ONE bump, not one a frame. */
+let rivalTouch: boolean[] = [];
+/** Throttles the "back to the track" nudge's sound and shake while the ground is pulling the kart in. */
+let edgeCool = 0;
 let rivalAlongside: boolean[] = [];
 interface RivalKit { item: HeldItem | null; itemAt: number; shieldT: number; zipT: number; nextRow: number; lap: number }
 let rivalKits: RivalKit[] = [];
@@ -640,7 +645,7 @@ function tickField(ctx: ModeContext, dt: number): void {
   const rposes = rivals.map((r) => ({ dist: r.dist, lateral: r.lane, speed: r.speed }));
   if (!S.air.airborne && race.time > 3 && state.speed > 4) {   // not off the grid: the field launches through the player's spot in the first seconds
     const right = new Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
-    for (const ev of resolveContact({ ...player, boosting: boost.k > 0.35 || S.zipT > 0 }, rposes, lapLen, rivalCool, dt)) {
+    for (const ev of resolveContact({ ...player, boosting: boost.k > 0.35 || S.zipT > 0 }, rposes, lapLen, rivalCool, dt, rivalTouch)) {
       const r = rivals[ev.i];
       state.pos.addInPlace(right.scale(ev.playerShove)); r.lane += ev.rivalShove;
       if (ev.kind === 'punt') { state.speed *= ev.playerKeep; hitRival(ctx, ev.i, 'PUNTED', true); S.events.punts++; ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), 'PUNT!', '#fbbf24'); }
@@ -860,7 +865,7 @@ return {
     // the standings you are carrying INTO this round — the reason a third race matters
     const cupAtStart = cupForCourse(course.id);
     cupLine = cupAtStart ? cupProgress(cupAtStart, loadResults(), 'me').headline : '';
-    rivalHome = rivals.map((r) => r.lane); rivalStun = rivals.map(() => 0); rivalCool = rivals.map(() => 0); rivalAlongside = rivals.map(() => false);
+    rivalHome = rivals.map((r) => r.lane); rivalStun = rivals.map(() => 0); rivalCool = rivals.map(() => 0); rivalTouch = rivals.map(() => false); edgeCool = 0; rivalAlongside = rivals.map(() => false);
     rivalKits = rivals.map(() => ({ item: null, itemAt: 0, shieldT: 0, zipT: 0, nextRow: 0, lap: 0 }));
     // ITEM ROWS: three balloons across the road on every leg, 62% of the way along it (the boost pads sit at 40% of every
     // other leg), the kinds cycling so a row always offers a choice
@@ -918,6 +923,8 @@ return {
       state: () => {
         const at = state && circuit ? locate(circuit.line, state.pos.x, state.pos.z) : null;
         return {
+          // The race loop itself, so a probe can tell a race that FINISHED from one that merely stopped reporting.
+          lap: race.lap, laps: course.laps, next: race.next, time: +race.time.toFixed(2), finished: race.finished, done: S.done,
           along: +playerDist.toFixed(1), lateral: at ? +at.lateral.toFixed(2) : 0, speed: state ? +state.speed.toFixed(1) : 0,
           heading: state ? +state.heading.toFixed(3) : 0, tangentYaw: at ? +Math.atan2(at.tangent.x, at.tangent.z).toFixed(3) : 0, onRoad: state ? onTrack(state.pos, course) : true,
           place: rivals.length ? playerPosition(playerDist, rivals) : 1, item: S.held, events: { ...S.events },
@@ -985,7 +992,25 @@ return {
     // DESCENT's 96 m drop the kart would have held its starting height and flown, then sunk through the road on
     // the way back up. The line is the road, so the line's height is the kart's height.
     if (circuit) {
-      const at = locate(circuit.line, state.pos.x, state.pos.z);
+      let at = locate(circuit.line, state.pos.x, state.pos.z);
+
+      // ── THE OUTSIDE OF THE COURSE ───────────────────────────────────────────────────────────────────────
+      // Measured by steering off with the throttle pinned: the kart reached 76 m from the line, still making
+      // race distance at the on-road rate, with nothing to stop it. Past the verge the ground pulls it back —
+      // harder the further out it is, settling a few metres over rather than pinning it. Not a wall, not a
+      // respawn: leaving the line still costs time and grip, it just no longer leads out of the world.
+      const pull = edgeReturn(at.lateral, edgeLimit(circuit.halfWidth), dt);
+      if (pull !== 0) {
+        state.pos.subtractInPlace(new Vector3(at.tangent.z, 0, -at.tangent.x).scale(pull));
+        at = locate(circuit.line, state.pos.x, state.pos.z);   // the height below is read off the corrected place
+        edgeCool -= dt;
+        if (edgeCool <= 0) {
+          edgeCool = 0.8;
+          SoundKit.play('rattle', { pitch: 0.7, volume: 0.3 });
+          ctx.juice.shake(0.06, 110);
+          ctx.juice.callout('BACK TO THE TRACK', '#fca5a5', 600);
+        }
+      } else edgeCool = 0;
       const roadY = at.point.y;
       const lineLen = circuit.line.length;
 

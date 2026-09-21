@@ -71,3 +71,52 @@ describe('contact', () => {
     expect(nearMisses({ dist: 100, lateral: 0, speed: 19, }, [{ dist: 101, lateral: 3.1, speed: 18 }], LAP, [])).toEqual([]);     // not a pass
   });
 });
+
+describe('a bump is an event, not a buzz', () => {
+  // Measured flying one aero race with the throttle pinned: 27 bumps in 70 s, the last six against MOTA back to back.
+  // A pair that stays overlapped must bump ONCE, however long they grind along each other.
+  const grind = (frames: number) => {
+    const cd: number[] = [], touch: boolean[] = [];
+    let n = 0;
+    for (let k = 0; k < frames; k++) {
+      n += resolveContact({ dist: 100, lateral: 0, speed: 20, boosting: false }, [{ dist: 101, lateral: 1.5, speed: 20 }], LAP, cd, 1 / 60, touch).length;
+    }
+    return n;
+  };
+
+  it('fires once while the pair stays overlapped, however long', () => {
+    expect(grind(1)).toBe(1);
+    expect(grind(600)).toBe(1);   // ten seconds of grinding
+  });
+
+  it('fires again once they have separated and come back together', () => {
+    const cd: number[] = [], touch: boolean[] = [];
+    const hit = (lateral: number) => resolveContact({ dist: 100, lateral: 0, speed: 20, boosting: false }, [{ dist: 101, lateral, speed: 20 }], LAP, cd, 1 / 60, touch).length;
+    expect(hit(1.5)).toBe(1);
+    for (let k = 0; k < 60; k++) hit(9);       // clearly apart, and long enough for the cooldown
+    expect(hit(1.5)).toBe(1);                  // a second, separate contact
+  });
+
+  it('does not re-arm on a hair of separation', () => {
+    const cd: number[] = [], touch: boolean[] = [];
+    const hit = (lateral: number) => resolveContact({ dist: 100, lateral: 0, speed: 20, boosting: false }, [{ dist: 101, lateral, speed: 20 }], LAP, cd, 1 / 60, touch).length;
+    expect(hit(2.6)).toBe(1);                              // inside the overlap box (halfWid * 2 = 2.7)
+    for (let k = 0; k < 60; k++) hit(2.8);                 // just outside it, but not clear
+    expect(hit(2.6)).toBe(0);                              // still the same contact: no chatter
+    for (let k = 0; k < 60; k++) hit(CONTACT.halfWid * 2 * CONTACT.releaseScale + 0.1);
+    expect(hit(2.6)).toBe(1);                              // properly clear, so it counts again
+  });
+
+  it('keeps each rival on its own latch', () => {
+    const cd: number[] = [], touch: boolean[] = [];
+    const rivals = [{ dist: 101, lateral: 1.5, speed: 20 }, { dist: 99, lateral: -1.5, speed: 20 }];
+    const first = resolveContact({ dist: 100, lateral: 0, speed: 20, boosting: false }, rivals, LAP, cd, 1 / 60, touch);
+    expect(first).toHaveLength(2);
+    expect(new Set(first.map((e) => e.i)).size).toBe(2);
+  });
+
+  it('is unchanged for callers that pass no latch', () => {
+    // The old two-call-site signature still type-checks and still resolves a contact.
+    expect(resolveContact({ dist: 100, lateral: 0, speed: 20, boosting: false }, [{ dist: 101, lateral: 1.5, speed: 20 }], LAP, [], 1 / 60)).toHaveLength(1);
+  });
+});
