@@ -24,6 +24,10 @@ const ROOT = join(__dirname, '..', '..');
 /** Files that are reached some way other than an import, each with the reason. */
 const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/modes/registry.ts': 'the mode registry — loaded by key at runtime, not by a static import',
+  // Test support. Tests are deliberately NOT counted as consumers (a module used only by its own test is still
+  // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
+  // source. Counting tests generally would blind the check; excusing this one file by name does not.
+  'lib/testing/sourceScan.ts': 'test support — imported by the rule tests that scan source, and tests are not counted as consumers',
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */
@@ -54,41 +58,45 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/coach/triage.ts',
   'lib/coach-interfaces.ts',
   'lib/coach-service.ts',
-  // Engine and platform pieces.
-  'lib/babylon/anim/bvh.ts',
+  // Engine and platform pieces. bvh.ts and recognisable.ts came off on 2026-09-21: they were never orphaned,
+  // the checker just could not see the .mts scripts importing them. sourceScan.ts moved to NOT_IMPORTED.
   'lib/babylon/anim/mocapClip.ts',
-  'lib/babylon/anim/recognisable.ts',
   'lib/babylon/avatar/AvatarBuilder.ts',
   'lib/babylon/error-boundary.tsx',
   'lib/babylon/network/NetworkInputSource.ts',
   'lib/babylon/nutrition/FoodScan.tsx',
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
-  'lib/babylon/ui/CaptionRegion.tsx',
   'lib/locomotion/moves/MoveGraph.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',
   'lib/env.ts',
-  'lib/input-schemes.board.ts',
   'lib/mode-menu.ts',
   'lib/offline-cache.ts',
   'lib/profile/dashboard.ts',
   'lib/story/progression-gates.ts',
   'lib/stream/StreamSession.ts',
-  'lib/testing/sourceScan.ts',
-  'lib/theme-tokens.ts',
   'lib/voice/VoiceRoom.ts',
 ];
 
+/**
+ * Source files under a tree.
+ *
+ * `.mts` AND `.mjs` COUNT (fixed 2026-09-21). The filter was /\.tsx?$/, which silently skipped 373 of this
+ * repo's script and probe files — every scripts/probes/_*.mts among them. A module imported only from one of
+ * those read as an orphan: lib/babylon/anim/recognisable.ts sat on the backlog for days while
+ * scripts/probes/_scorecard.mts was importing it at line 14. A checker that cannot see a third of the tree
+ * reports confident nonsense, which is worse than not checking.
+ */
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of readdirSync(dir)) {
     if (e.startsWith('.') || e === 'node_modules' || e === 'generated') continue;
     const p = join(dir, e);
     if (statSync(p).isDirectory()) { walk(p, out); continue; }
-    if (!/\.tsx?$/.test(p)) continue;
-    if (/\.(test|spec)\.tsx?$/.test(p)) continue;
-    if (/\.d\.ts$/.test(p)) continue;
+    if (!/\.(tsx?|mts|mjs|cjs)$/.test(p)) continue;
+    if (/\.(test|spec)\.(tsx?|mts)$/.test(p)) continue;
+    if (/\.d\.(ts|mts)$/.test(p)) continue;
     out.push(p);
   }
   return out;
@@ -100,7 +108,7 @@ function allSources(): string[] {
     ...walk(join(ROOT, 'lib')),
     ...walk(join(ROOT, 'app')),
     ...walk(join(ROOT, 'components')),
-    ...walk(join(ROOT, 'scripts')).filter((p) => /\.tsx?$/.test(p)),
+    ...walk(join(ROOT, 'scripts')),
   ];
 }
 

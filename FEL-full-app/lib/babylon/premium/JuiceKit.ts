@@ -5,6 +5,7 @@
 import { Matrix, Vector3 } from '@babylonjs/core';
 import type { Scene, TargetCamera } from '@babylonjs/core';
 import { vibrate } from './Haptics';
+import { captions } from '../core/captions';
 
 /** Alpha at the frame's edge, where light spills in. */
 export const FLASH_EDGE = 0.46;
@@ -150,6 +151,11 @@ export class JuiceKit {
 
   /** Center banner for beats (FIRST DOWN!, WAVE CLEAR, LIFT CABLE GRIND!). */
   banner(text: string, accent = '#22d3ee', ms = 1100): void {
+    // THE CAPTION BUS IS FED HERE, once, for every mode (2026-09-21). captions.cue() had ZERO call sites in this
+    // tree and CaptionRegion rendered for nobody: the accessibility work was not missing, it was unplugged at
+    // both ends. Cueing from the shared juice channel rather than from N modes means a mode cannot forget — the
+    // same reason the QA trace wraps these methods instead of asking each mode to report itself.
+    captions.cue(text, 'feedback');
     const el = document.createElement('div');
     el.textContent = text;
     el.style.cssText =
@@ -167,6 +173,9 @@ export class JuiceKit {
    *  Deliberately quieter than banner(): a refusal informs, it does not celebrate. One at a time. */
   private calloutEl: HTMLDivElement | null = null;
   callout(text: string, color = '#cbd5e1', ms = 700): void {
+    // A callout is the answer to a press that could not act ("NO BALL", "WAIT FOR THE QUESTION"). A player who
+    // cannot see it has to guess why nothing happened, so it is announced like the banner is.
+    captions.cue(text, 'feedback');
     this.calloutEl?.remove();
     const el = document.createElement('div');
     el.textContent = text;
