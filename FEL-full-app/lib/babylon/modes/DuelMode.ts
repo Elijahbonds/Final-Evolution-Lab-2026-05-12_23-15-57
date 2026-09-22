@@ -28,11 +28,11 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS } from '../core/FightCore';
 import {
-  StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove,
-} from '../core/StrikeSystem';
+  StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove, bookMoveset, stringRule } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
-import { XButtonReader } from '../core/StormCombat';   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
+import { XButtonReader } from '../core/StormCombat';
+import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { CombatAnimTree } from '../anim/combatTree';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
@@ -52,6 +52,14 @@ import { styleMoveset } from '../combat/loadout';
 
 export type DuelWeapon = 'fists' | 'staff' | 'blade';
 const WEAPON_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
+  fists: () => bookMoveset(KARATE_ATTACKS),        // phase 4: empty hands read the Storm book
+  staff: () => stringRule(staffMoveset(STAFF_ATTACKS)),   // phase 4: a weapon keeps its own moves under the string rule
+  blade: () => stringRule(bladeMoveset()),
+};
+/** Phase 4: the RIVAL keeps the plain movesets. Measured with the string rule on him: his brain requests a random id
+ *  every tick, so every swing chained into the next and the hero was knocked down twice and never got a press in (4 swings
+ *  of 37). The rival's chaining is phase 10's call, made deliberately, not a side effect of the hero's upgrade. */
+const RIVAL_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
   fists: () => karateMoveset(KARATE_ATTACKS),
   staff: () => staffMoveset(STAFF_ATTACKS),
   blade: () => bladeMoveset(),
@@ -150,6 +158,7 @@ export const DuelMode: ModeDefinition = (() => {
 
   const setPhase = (p: Phase): void => { phase = p; phaseSec = 0; };
   const now = (): number => performance.now();
+  const book = new StringBook(); const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };   // phase 4
   const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
   let guardUp = false;
   function banner(ctx: ModeContext, text: string, ms = 900): void {
@@ -259,7 +268,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false;
+    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset();
     // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
     player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
@@ -334,7 +343,7 @@ export const DuelMode: ModeDefinition = (() => {
       myWeapon = (['fists', 'staff', 'blade'] as const).find((w) => w === readWeapon().id) ?? 'fists';
       meStrike = new StrikeController(styled(myWeapon));
       showWeapons(ctx);
-      foeStrike = new StrikeController(WEAPON_MOVESET[foeWeapon]());   // the rival fights unstyled
+      foeStrike = new StrikeController(RIVAL_MOVESET[foeWeapon]());   // the rival fights unstyled
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meMove.moveMode = 'eightWay'; foeMove.moveMode = 'eightWay';
       meMove.lockTarget = rival.root.position; foeMove.lockTarget = player.root.position;
@@ -403,12 +412,18 @@ export const DuelMode: ModeDefinition = (() => {
         return;
       }
 
-      const moveIds = Object.keys(styled(myWeapon));
+      const moveIds = myWeapon === 'fists' ? ['jab', 'kick', 'heavy'] : Object.keys(styled(myWeapon));   // phase 4: the book's ids beyond these three are reached through the string, not a button
       const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
       const trySwing = (id: string) => {
         if (meStrike.request(id, now())) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
         else refuse(ctx, 'RECOVERING');   // MECHANICS PASS: a swing refused mid-recovery is said, not swallowed
       };
+      if (myWeapon === 'fists') {
+        // phase 4: empty hands read the Storm book — the string picks the link (jab → cross → rising dragon…)
+        const key = e.btn === 'A' ? 'jab' : e.btn === 'B' ? 'kick' : e.btn === 'Y' ? 'heavy' : null;
+        if (key) { const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = wish(ctx); const to = rival.root.position.subtract(player.root.position); to.y = 0; const d = (w.x * to.x + w.z * to.z) / Math.max(1e-3, Math.hypot(to.x, to.z) * Math.hypot(w.x, w.z)); return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n'; };
+          const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); } else refuse(ctx, 'RECOVERING'); return; }
+      }
       if (e.btn === 'A') trySwing(moveIds[0]);
       if (e.btn === 'B') trySwing(moveIds[1]);
       if (e.btn === 'Y') trySwing(moveIds[2]);
@@ -468,7 +483,7 @@ export const DuelMode: ModeDefinition = (() => {
         const nrv = nerve(standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN)));
         const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * dt);
         if (dist <= WEAPON_RANGE[foeWeapon] && chance(1.2 * nrv.aggression)) {
-          const ids = Object.keys(WEAPON_MOVESET[foeWeapon]());
+          const ids = Object.keys(RIVAL_MOVESET[foeWeapon]());
           foeStrike.request(ids[Math.floor(Math.random() * ids.length)], now());
         }
         if (meStrike.busy && chance(2.1 / Math.max(0.5, nrv.mistake))) { foeDef.pressBlock(now(), Math.random() < 0.3); foeState.pressBlock(now()); }

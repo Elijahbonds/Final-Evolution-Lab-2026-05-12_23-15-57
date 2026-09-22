@@ -18,6 +18,7 @@ import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core'
 import type { Mesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import type { AttackDef } from './FightCore';
 import { boneNode, findBone } from '../anim/boneLookup';
+import { MOVES, STRIKE_TIMING, attackFromMove, type HordeMove } from './HordeDynamics';   // phase 4: the book
 
 // ── Moves with frame data ──────────────────────────────────────────────────
 export interface CombatMove {
@@ -25,8 +26,11 @@ export interface CombatMove {
   startupSec: number;
   activeSec: number;
   recoverySec: number;
-  cancelInto: string[];       // move ids this can chain into
-  cancelWindowSec: number;    // window after active-end
+  cancelInto: string[];       // move ids this can chain into — '*' = any (the Storm string rule, phase 4)
+  cancelWindowSec: number;    // window after active-end (ignored under '*': the window runs to the end of recovery)
+  /** Phase 4: the cancel POINT (s from the press). Under '*' a press from here on cancels into the next link; before it,
+   *  the press waits. Defaults to active-end. */
+  cancelAtSec?: number;
   weight: 'light' | 'medium' | 'heavy' | 'finisher';
   tags: string[];             // stance gating (StanceSystem.moveTags)
 }
@@ -76,11 +80,20 @@ export class StrikeInstance {
   /** Can this strike be canceled into `nextId` right now? Window: from
    *  active-end through cancelWindowSec of recovery. */
   canCancelInto(nextId: string): boolean {
+    if (this.move.cancelInto.includes('*')) {
+      // THE STRING RULE (phase 4): past the cancel point every move is a link, until the swing is done. Measured before it:
+      // a mash of one button on showdown / duel produced 8 swings of 40 presses, because jab could only cancel into kick
+      // or heavy and a heavy into nothing.
+      if (this.phase === 'done') return false;
+      return this.t >= (this.move.cancelAtSec ?? this.move.startupSec + this.move.activeSec);
+    }
     if (!this.move.cancelInto.includes(nextId)) return false;
     if (this.phase !== 'recovery') return false;
     const cancelStart = this.move.startupSec + this.move.activeSec;
     return this.t <= cancelStart + this.move.cancelWindowSec;
   }
+  /** Phase 4: ms of this swing still to run (the queue outlives the whole swing under the string rule). */
+  get remainingMs(): number { const m = this.move; return Math.max(0, (m.startupSec + m.activeSec + m.recoverySec - this.t) * 1000); }
 
   get inCancelWindow(): boolean {
     if (this.phase !== 'recovery') return false;
@@ -126,7 +139,9 @@ export class StrikeController {
       return true;
     }
     this.buffered = moveId;
-    this.bufferUntil = nowMs + QUEUE_MS;
+    // the queue outlives the swing it was pressed in (the horde's rule): a press at the start of a heavy used to die 280 ms
+    // before anything could take it
+    this.bufferUntil = nowMs + Math.max(QUEUE_MS, this.current.remainingMs + 60);
     return false;
   }
 
@@ -177,6 +192,30 @@ export const FISTS: WeaponDef = {
   moveset: {},                // filled by karateMoveset() below
   buildProp: () => { throw new Error('fists have no prop'); },
 };
+
+/** Phase 4: the horde's book as a StrikeSystem moveset — one CombatMove per HordeMove, timings from STRIKE_TIMING scaled
+ *  by the move's speed, damage from attackFromMove, and the string rule ('*') on every one. jab / kick / heavy keep their
+ *  ids, so a rival brain that requests by those names is unchanged. */
+export function bookMoveset(karate: Record<'jab' | 'kick' | 'heavy', AttackDef>): Record<string, CombatMove> {
+  const out: Record<string, CombatMove> = {};
+  for (const m of Object.values(MOVES) as HordeMove[]) {
+    const base = m.weight === 'light' ? karate.jab : m.weight === 'medium' ? karate.kick : karate.heavy;
+    const a = attackFromMove(m, base);
+    const t = STRIKE_TIMING[m.weight];
+    const startupSec = Math.max(MIN_STARTUP_SEC, t.hitAt / m.speed);
+    const activeSec = m.weight === 'light' ? 0.08 : m.weight === 'medium' ? 0.1 : 0.12;
+    const cancelAtSec = t.cancelAt / m.speed;
+    const recoverySec = Math.max(0.12, cancelAtSec - startupSec - activeSec + (m.weight === 'finisher' ? 0.3 : m.weight === 'heavy' ? 0.22 : 0.12));
+    out[m.id] = { atk: { ...a, line: a.line ?? 'vertical' }, startupSec, activeSec, recoverySec, cancelInto: ['*'], cancelWindowSec: 0, cancelAtSec, weight: m.weight, tags: [m.weight === 'light' ? 'jab' : m.weight === 'medium' ? 'kick' : 'heavy'] };
+  }
+  return out;
+}
+/** Phase 4: a weapon moveset under the string rule — every move cancels into any other past its cancel point. */
+export function stringRule(moveset: Record<string, CombatMove>): Record<string, CombatMove> {
+  const out: Record<string, CombatMove> = {};
+  for (const [id, m] of Object.entries(moveset)) out[id] = { ...m, cancelInto: ['*'], cancelAtSec: m.startupSec + m.activeSec * 0.5 };
+  return out;
+}
 
 /** Build the empty-hand moveset from FightCore's karate table. */
 export function karateMoveset(karate: Record<'jab' | 'kick' | 'heavy', AttackDef>): Record<string, CombatMove> {

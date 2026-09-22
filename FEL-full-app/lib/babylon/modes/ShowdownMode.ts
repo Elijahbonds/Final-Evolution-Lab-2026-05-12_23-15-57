@@ -34,7 +34,8 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX } from '../core/FightCore';
-import { StrikeController, karateMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
+import { StrikeController, karateMoveset, bookMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
+import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4: the Storm strings on showdown
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
@@ -115,6 +116,9 @@ export const ShowdownMode: ModeDefinition = (() => {
   let hitFlashT = 0;
 
   const MOVES = karateMoveset(KARATE_ATTACKS);
+  const book = new StringBook();   // phase 4: A/B/Y × the stick × the string so far → the move (the horde's sixteen)
+  const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };
+  let stringLabels: string[] = [];
   const WEIGHT_BY_MOVE: Record<string, CombatMove['weight']> =
     Object.fromEntries(Object.entries(MOVES).map(([id, m]) => [id, m.weight]));
 
@@ -308,7 +312,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     }
     banner(ctx, playerWon ? 'ROUND — YOU' : 'ROUND — RIVAL', 1600);
     setTimeout(() => {
-      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false;
+      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = [];
       player.root.position.set(0, 0, 4); rival.root.position.set(0, 0, -4);
       faceEachOther();
       setPhase('fighting');
@@ -349,7 +353,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       // shared their move table — the kind of bug that surfaces as "the rival's combo cancelled mine". Each
       // gets its own now, and the player's carries the school they picked on the start-up screen; the rival
       // fights the unstyled set, so a style is something YOU brought rather than a difficulty dial.
-      meStrike = new StrikeController(styleMoveset(karateMoveset(KARATE_ATTACKS), blendTraits(readBlend()), MIN_STARTUP_SEC));
+      meStrike = new StrikeController(styleMoveset(bookMoveset(KARATE_ATTACKS), blendTraits(readBlend()), MIN_STARTUP_SEC));   // phase 4: the book, styled
       foeStrike = new StrikeController(karateMoveset(KARATE_ATTACKS));
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meDef = new DefenseController(); foeDef = new DefenseController();
@@ -391,11 +395,20 @@ export const ShowdownMode: ModeDefinition = (() => {
       // SCORECARD FEEL (2026-09-15): a thrown strike was a clip and nothing you heard until it landed (38 % of presses had a
       // sound or a beat) — the swing is heard as it leaves, and a press buffered behind a swing says so with a tick
       const swingSfx = (ok: boolean, pitch: number): void => { SoundKit.play(ok ? 'whoosh' : 'uiTick', ok ? { pitch, volume: 0.35 } : { pitch: 0.8, volume: 0.25 }); };
-      if (e.pressed && e.btn === 'A') swingSfx(meStrike.request('jab', now()), 1.5);
-      if (e.pressed && e.btn === 'B') swingSfx(meStrike.request('kick', now()), 1.1);
+      // phase 4: the string decides the move — jab, jab, jab is JAB → CROSS → RISING DRAGON, a back-stick A the sweep, a press
+      // during a swing is a link past the cancel point or a queued one before it (StrikeSystem's string rule)
+      const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = wish(ctx); const to = rival.root.position.subtract(player.root.position); to.y = 0; const d = (w.x * to.x + w.z * to.z) / Math.max(1e-3, Math.hypot(to.x, to.z) * Math.hypot(w.x, w.z)); return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n'; };
+      const pressBook = (key: 'jab' | 'kick' | 'heavy', pitch: number) => {
+        const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing });
+        const ok = meStrike.request(mv.id, now());
+        swingSfx(ok, pitch);
+        if (ok) { stringLabels.push(mv.label); console.info(`[SD-STORM] link ${mv.id} string ${book.history.length}`); if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); } }
+      };
+      if (e.pressed && e.btn === 'A') pressBook('jab', 1.5);
+      if (e.pressed && e.btn === 'B') pressBook('kick', 1.1);
       if (e.pressed && e.btn === 'Y') {
         if (chakra.full) tryUltimate(ctx);
-        else swingSfx(meStrike.request('heavy', now()), 0.85);
+        else pressBook('heavy', 0.85);
       }
       if (e.pressed && e.btn === 'L1') {
         const w = wish(ctx);

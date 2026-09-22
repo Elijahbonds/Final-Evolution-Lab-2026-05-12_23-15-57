@@ -43,12 +43,19 @@ await p.evaluate(`(() => {
   const under = (n, root) => { for (let c = n; c; c = c.parent) if (c === root) return true; return false; };
   const LOOP = /guard|stance|step|shuffle|run|walk|idle|block|floor|windup/;
   window.__HD = { rows: [], marks: [] };
+  { const orig = console.info.bind(console); console.info = (...a) => { try { const t = String(a[0] ?? ''); if (/JUICE\] hit|JUICE\] heavy|-JUICE\] dragon|LAUNCHED|knockdown|RING OUT/.test(t)) window.__HD.marks.push({ t: performance.now(), label: 'log:' + t.slice(0, 60) }); } catch {} orig(...a); }; }   // combat pass phase 5: hit lines as timed marks
   s.onAfterRenderObservable.add(() => {
     const h = window.__FEL_DEV__.hero(); if (!h) return; const hr = topOf(h);
     const shots = s.animationGroups.filter((g) => g.isPlaying && g.targetedAnimations[0] && under(g.targetedAnimations[0].target, hr) && !LOOP.test(g.name))
       .map((g) => { const a = g.animatables && g.animatables[0]; return [g.name, a ? +(a.weight < 0 ? 1 : a.weight).toFixed(2) : 1, a ? +a.masterFrame.toFixed(1) : 0]; });
     const rp = hr.getAbsolutePosition(); const md = s.metadata && s.metadata.karateNeo;
-    window.__HD.rows.push({ t: performance.now(), x: +rp.x.toFixed(3), z: +rp.z.toFixed(3), yaw: +(hr.rotation.y * 180 / Math.PI).toFixed(1), shots, tele: md ? JSON.parse(JSON.stringify(md)) : null, ban: ((document.body.innerText.match(/"banner":\s*"([^"]*)"/) || [])[1] || '') });
+    // combat pass phase 5: the RIVAL's body too — the nearest other skinned root (bound once), its root and hips, and the HUD's
+    // hp / foeHp so a hit can be found in the rows and the body's answer to it measured (root travel, hips dip)
+    if (!window.__HDfoe) { let best = null, bd = 1e9; for (const m of s.meshes) { if (!m.skeleton || under(m, hr)) continue; const r = topOf(m); if (r === hr) continue; const d = r.getAbsolutePosition().subtract(rp).length(); if (d > 0.5 && d < bd) { bd = d; best = r; } } if (best) window.__HDfoe = best; }
+    const fr = window.__HDfoe; let foe = null;
+    if (fr) { const fp = fr.getAbsolutePosition(); let hips = null; for (const m of s.meshes) { if (m.skeleton && (topOf(m) === fr)) { const b = m.skeleton.bones.find((bn) => /hips|pelvis/i.test(bn.name)); if (b) { const tn = b.getTransformNode ? b.getTransformNode() : null; hips = tn ? tn.getAbsolutePosition().y : null; } break; } } foe = { x: +fp.x.toFixed(3), y: +fp.y.toFixed(3), z: +fp.z.toFixed(3), hips: hips === null ? null : +hips.toFixed(3) }; }
+    const txt = document.body.innerText; const hpM = txt.match(/"hp":\s*([0-9.]+)/), fhM = txt.match(/"foeHp":\s*([0-9.]+)/);
+    window.__HD.rows.push({ t: performance.now(), x: +rp.x.toFixed(3), z: +rp.z.toFixed(3), yaw: +(hr.rotation.y * 180 / Math.PI).toFixed(1), shots, tele: md ? JSON.parse(JSON.stringify(md)) : null, ban: ((txt.match(/"banner":\s*"([^"]*)"/) || [])[1] || ''), foe, hp: hpM ? +hpM[1] : null, foeHp: fhM ? +fhM[1] : null });
     if (window.__HD.rows.length > 20000) window.__HD.rows.shift();
   });
 })()`);
@@ -64,6 +71,15 @@ for (const a of SCRIPT) {
   if (k === 'wait') await p.waitForTimeout(Number(rest[0]));
   else if (k === 'L') { const [x, y] = rest[0].split(',').map(Number); await setL(x, y); await p.waitForTimeout(Number(rest[1])); await setL(0, 0); }
   else if (k === 'Lset') { const [x, y] = rest[0].split(',').map(Number); await setL(x, y); }
+  else if (k === 'perfect') {   // combat pass phase 6: perfect:<ms>[:<btn>] — poll the fight seam and press <btn> (X) when the rival's strike
+    // lands inside 100 ms: the last-instant read. The horde publishes karateNeo.nextLandIn; the duels publish metadata.fight.landsIn().
+    const until = Date.now() + Number(rest[0]); const btn = rest[1] ?? 'X'; let lastTap = 0; let taps = 0;
+    while (Date.now() < until) {
+      const n = await ev(`(() => { const md = window.__FEL_DEV__ && window.__FEL_DEV__.scene && window.__FEL_DEV__.scene.metadata; if (!md) return -1; if (md.karateNeo && typeof md.karateNeo.nextLandIn === 'number') return md.karateNeo.nextLandIn; if (md.fight && typeof md.fight.landsIn === 'function') return md.fight.landsIn(); return -1; })()`) as number;
+      if (typeof n === 'number' && n >= 0 && n <= 0.1 && Date.now() - lastTap > 700) { lastTap = Date.now(); taps++; await mark('perfect-tap'); await tap(btn); } else await p.waitForTimeout(16);
+    }
+    console.log(`perfect: ${taps} timed ${btn} presses`);
+  }
   else if (k === 'tap') await tap(rest[0]);
   else if (k === 'down') { await mark(`press:${rest[0]}`); await press(rest[0], true); }
   else if (k === 'up') await press(rest[0], false);
@@ -247,6 +263,37 @@ for (let i = 0; i < presses.length; i++) {
 console.log(`frames ${rows.length} over ${((rows[rows.length - 1].t - T0) / 1000).toFixed(1)}s · errors ${errs.length} ${errs.slice(0, 3).join(' | ')}`);
 console.log(`strike presses ${presses.length} · swings started ${starts.length} · eaten ${eaten} · press→clip ms: ${lat.map((x) => x.toFixed(0)).join(',')}  (median ${lat.length ? [...lat].sort((a, b) => a - b)[Math.floor(lat.length / 2)].toFixed(0) : '-'})`);
 console.log(`swing starts: ${starts.map((s) => `${f(s.t)} ${s.clip}`).join(' · ')}`);
+{ // combat pass phase 5: HIT REACTIONS on the bones. A drop in foeHp is a hit I landed: how far did his root travel and how far
+  // did his hips dip in the next 300 ms? A drop in hp is a hit on me: how far did my root travel?
+  const R = rows as unknown as { t: number; x: number; z: number; foe: { x: number; y: number; z: number; hips: number | null } | null; hp: number | null; foeHp: number | null }[];
+  const foeHits: string[] = [], meHits: string[] = [];
+  const hitMarks = data.marks.filter((m) => /^log:\[(KVS|MC|SD|DUEL|KE)-JUICE\] (hit|heavy|dragon)/.test(m.label));
+  for (const m of hitMarks) {
+    const b = R.find((r) => r.t >= m.t); if (!b || !b.foe) continue;
+    const win = R.filter((r) => r.t >= b.t && r.t <= b.t + 300 && r.foe); if (win.length < 3) continue;
+    const travel = Math.hypot(win[win.length - 1].foe!.x - b.foe.x, win[win.length - 1].foe!.z - b.foe.z);
+    const hips = win.map((r) => r.foe!.hips).filter((v): v is number => v !== null); const dip = hips.length ? Math.max(...hips) - Math.min(...hips) : 0;
+    const lift = win.map((r) => r.foe!.y); const air = Math.max(...lift) - b.foe.y;
+    foeHits.push(`${f(b.t)} ${m.label.replace(/^log:\[\w+-JUICE\] /, '')} root ${travel.toFixed(2)}m hips ${(dip * 100).toFixed(0)}cm${air > 0.08 ? ` AIR ${air.toFixed(2)}m` : ''}`);
+  }
+  for (let i = 1; i < R.length; i++) {
+    const a = R[i - 1], b = R[i];
+    if (a.foeHp !== null && b.foeHp !== null && b.foeHp < a.foeHp && b.foe) {
+      const win = R.filter((r) => r.t >= b.t && r.t <= b.t + 300 && r.foe); if (win.length < 3) continue;
+      const travel = Math.hypot(win[win.length - 1].foe!.x - b.foe.x, win[win.length - 1].foe!.z - b.foe.z);
+      const hips = win.map((r) => r.foe!.hips).filter((v): v is number => v !== null); const dip = hips.length ? Math.max(...hips) - Math.min(...hips) : 0;
+      const lift = win.map((r) => r.foe!.y); const air = Math.max(...lift) - b.foe.y;
+      foeHits.push(`${f(b.t)} −${(a.foeHp - b.foeHp).toFixed(0)}hp root ${travel.toFixed(2)}m hips ${(dip * 100).toFixed(0)}cm${air > 0.08 ? ` AIR ${air.toFixed(2)}m` : ''}`);
+    }
+    if (a.hp !== null && b.hp !== null && b.hp < a.hp) {
+      const win = R.filter((r) => r.t >= b.t && r.t <= b.t + 300); if (win.length < 3) continue;
+      const travel = Math.hypot(win[win.length - 1].x - b.x, win[win.length - 1].z - b.z);
+      meHits.push(`${f(b.t)} −${(a.hp - b.hp).toFixed(0)}hp root ${travel.toFixed(2)}m`);
+    }
+  }
+  if (foeHits.length) console.log(`hits on him (${foeHits.length}): ${foeHits.join(' · ')}`);
+  if (meHits.length) console.log(`hits on me (${meHits.length}): ${meHits.join(' · ')}`);
+}
 // speed + turn under each L segment
 for (const m of data.marks.filter((m) => /^L:|^Lset:/.test(m.label))) {
   const seg = rows.filter((r) => r.t >= m.t + 250 && r.t <= m.t + 700);
