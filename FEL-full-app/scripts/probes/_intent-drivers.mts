@@ -159,6 +159,67 @@ export const INTENT_DRIVERS: Record<string, string> = {
     }, 16);
   `),
 
+  // TENNIS (net/precision pass, 2026-09-22): play the point — steer to the incoming landing off the mode's QA seam
+  // (scene.metadata.tennis), swing at the contact aimed inside the lines (alternating sides), R1 on an aerial read.
+  tennis: loop(`
+    let side = 1, swungAt = -1;
+    setInterval(() => {
+      const s = Q.scene && Q.scene(); const st = s && s.metadata && s.metadata.tennis ? s.metadata.tennis.state() : null; if (!st) return;
+      if (!st.awaitingHuman || !st.shot) { stick(0, 0); return; }
+      const dx = st.shot.toX - st.footX;
+      if (st.flightT < 0.9) { stick(clamp(dx * 1.2) * st.steerSign, 0); return; }
+      if (st.flightT >= 0.93 && swungAt !== st.shot.toZ + ':' + st.flightT.toFixed(2)) {
+        swungAt = st.shot.toZ + ':' + st.flightT.toFixed(2);
+        if (st.aerial) btn(5, 60); else { stick(side * 0.5, 0); btn(A, 60); side = -side; }
+        setTimeout(() => stick(0, 0), 200);
+      }
+    }, 16);
+  `),
+
+  // VOLLEYBALL: no seam — read the ball mesh. On my side (the human spawns at +z) steer under the ball's x and HIT when it
+  // comes down into reach; B to BLOCK when their ball crosses high near the net.
+  volleyball: loop(`
+    let lastHit = 0, lastBlock = 0;
+    setInterval(() => {
+      const s = Q.scene && Q.scene(); const h = Q.hero && Q.hero(); if (!s || !h) return;
+      const ball = s.getMeshByName('ball'); if (!ball) return;
+      let r = h; while (r.parent) r = r.parent; const q = r.getAbsolutePosition(), b = ball.position;
+      const now = performance.now();
+      const mine = b.z > 0.2;
+      if (mine) {
+        stick(clamp((b.x - q.x) * 1.5), clamp((b.z - q.z) * 0.8));
+        const near = Math.hypot(b.x - q.x, b.z - q.z) < 1.6;
+        if (near && b.y < 2.6 && now - lastHit > 450) { lastHit = now; btn(A, 60); }
+      } else {
+        stick(clamp((b.x - q.x) * 0.6), 0);
+        if (b.z > -3 && b.z < 0 && b.y > 2.4 && now - lastBlock > 1500) { lastBlock = now; btn(B, 60); }
+      }
+    }, 16);
+  `),
+
+  // PENALTY (the Breakaway): run at the goal off the seam (scene.metadata.soccer), strike from 3 m out aimed at a corner;
+  // in the keeper round, dive on the stick when their kick is away.
+  penalty: loop(`
+    let corner = 1, struck = -1, keepSince = 0, dove = -1;
+    setInterval(() => {
+      const s = Q.scene && Q.scene(); const st = s && s.metadata && s.metadata.soccer ? s.metadata.soccer.state() : null; if (!st) return;
+      const now = performance.now();
+      if (st.phase === 'break') {
+        keepSince = 0;
+        if (struck === st.round) { stick(0, 0); return; }
+        if (st.z < 3.2) { stick(0, -1); return; }                    // run at the goal
+        struck = st.round; stick(corner * 0.8, -1); btn(A, 60); corner = -corner; setTimeout(() => stick(0, 0), 200);
+        return;
+      }
+      if (st.phase === 'keep') {                                        // their kick: dive on the stick 1.15 s after it starts
+        if (!keepSince) keepSince = now;
+        if (dove !== st.round && now - keepSince > 1150) { dove = st.round; stick(Math.random() < 0.5 ? -1 : 1, 0); setTimeout(() => stick(0, 0), 350); }
+        return;
+      }
+      keepSince = 0; stick(0, 0);
+    }, 16);
+  `),
+
   // FREE RUN: the low line — steer onto the boxes, VAULT at a box, JUMP each gap edge, SLIDE the bar, a FLIP or TWIST
   // in every real air (the course runs along +z; gaps are where one ground slab ends short of the next)
   freerun: loop(`

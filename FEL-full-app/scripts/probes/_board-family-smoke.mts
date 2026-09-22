@@ -7,11 +7,16 @@
 
 import { chromium, type Page } from 'playwright-core';
 import fs from 'node:fs';
+import { INTENT_DRIVERS } from './_intent-drivers.mts';   // net/precision phase 5: DRIVER=intent plays the mode while the body is sampled
 import { chromiumExe } from './_chromium.mts';
 
 const PORT = process.argv[2] ?? '3009';
 const OUT = process.argv[3] ?? '/tmp/board-family';
 const MODES = (process.argv[4] ?? 'surf,snowboard,bigair').split(',');
+// DRIVER=intent: install the mode's intent driver (under ?agent=1) instead of holding the stick forward — the body is
+// sampled while the mode is PLAYED (a swing, a spike, a strike), not while it stands
+const INTENT = process.env.DRIVER === 'intent';
+const HOLD_MS = Number(process.env.HOLD_MS ?? 12000);
 fs.mkdirSync(OUT, { recursive: true });
 
 async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
@@ -19,7 +24,7 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const onMsg = (t: string) => { if (/ERROR|MISSING|Error|WARN/i.test(t)) logs.push(t.slice(0, 200)); };
   p.on('console', (m) => onMsg(m.text()));
   p.on('pageerror', (e) => logs.push('PAGEERROR ' + String(e).slice(0, 200)));
-  await p.goto(`http://127.0.0.1:${PORT}/dev/mode/${mode}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  await p.goto(`http://127.0.0.1:${PORT}/dev/mode/${mode}${INTENT ? '?agent=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await p.waitForSelector('canvas', { timeout: 240000 });
   for (let i = 0; i < 120; i++) {
     const txt = await p.evaluate(() => document.body.innerText);
@@ -54,8 +59,9 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
       if (rows.length > 20000) rows.shift();
     });
   });
-  await p.evaluate(() => { const pad = (window as any).__PAD; if (pad) { pad.axes[1] = -1; pad.timestamp = Date.now(); } });
-  await p.waitForTimeout(12000);
+  if (INTENT && INTENT_DRIVERS[mode]) await p.evaluate(INTENT_DRIVERS[mode]);
+  else await p.evaluate(() => { const pad = (window as any).__PAD; if (pad) { pad.axes[1] = -1; pad.timestamp = Date.now(); } });
+  await p.waitForTimeout(HOLD_MS);
   await p.screenshot({ path: `${OUT}/${mode}.png` });
   const rows: any[] = await p.evaluate(() => (window as any).__BF?.rows ?? []);
   const arms = rows.filter((r) => r.eL != null);
