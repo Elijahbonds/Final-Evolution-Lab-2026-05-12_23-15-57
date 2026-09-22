@@ -42,7 +42,8 @@ import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
-import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
+import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';
+import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // phase 8: bullet time on R2, a clock per rig   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { ResourceMeter, CHAKRA } from '../core/ResourceMeter';
 import { CombatAnimTree } from '../anim/combatTree';
 import { MomentumBus } from '../core/MomentumBus';
@@ -151,6 +152,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   const HIT_STOP_MS = { light: 28, medium: 45, heavy: 70, finisher: 70 } as const;
   let foeLaunchedSec = 0;   // phase 5: a launcher lifts him; the air string is open while it runs
   const xBtn = new XButtonReader();   // phase 3: the Storm X — showdown's X used to be the block alone; the dash was a chi buy on L1
+  const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
   let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
   let hazardTick = 0;
   let guardUp = false;                 // the hold has passed DASH.tapSec and the block is raised
@@ -202,12 +204,14 @@ export const ShowdownMode: ModeDefinition = (() => {
         banner(ctx, mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!');
         break;
       case 'parried':
+        if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
         SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });   // the parry ping is the one sound; the feel thud is gone
         ctx.juice.shake(0.05, 80);
         (mine ? foeChakra : chakra).gain('parry');
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
       case 'guardImpacted':
+        if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
         SoundKit.play('impact', { pitch: 1.9, volume: 0.6 });   // the GI stinger is the one sound; the feel thud is replaced by the latched hit-stop + shake
         heavyPunch(ctx, 'guard impact');
         (mine ? foeChakra : chakra).gain('guardImpact');
@@ -218,7 +222,8 @@ export const ShowdownMode: ModeDefinition = (() => {
       case 'hit': {
         const w = move.weight;
         const scale = Math.max(0.4, 1 - 0.12 * atkState.combo);
-        const dealt = Math.round(move.atk.dmg * scale);
+        const dealt = Math.round(move.atk.dmg * scale * (mine && focus.active ? FOCUS.damageMult : 1));   // phase 8: a Focus strike lands harder
+        if (mine) focus.gain(FOCUS.hitGain);
         defState.hp = Math.max(0, defState.hp - dealt);
         defState.stunSec = Math.max(defState.stunSec, move.atk.stunSec);
         atkState.combo += 1; atkState.comboTimer = 1.1;
@@ -340,7 +345,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     }
     banner(ctx, playerWon ? 'ROUND — YOU' : 'ROUND — RIVAL', 1600);
     setTimeout(() => {
-      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = []; foeLaunchedSec = 0; rival.root.position.y = 0;
+      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = []; foeLaunchedSec = 0; rival.root.position.y = 0; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
       player.root.position.set(0, 0, 4); rival.root.position.set(0, 0, -4);
       faceEachOther();
       setPhase('fighting');
@@ -420,7 +425,8 @@ export const ShowdownMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }
+      if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // phase 8: MATRIX FOCUS   // MODE-STICK-FACE: R stick → the director's look orbit
       if (phase !== 'fighting' || !meState.controllable) return;
       if (e.t !== 'button') return;
 
@@ -477,6 +483,15 @@ export const ShowdownMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      // phase 8 — MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock (his animator, brain, swings,
+      // movement), me on mine. `sdtRoom` / `sdtHero` below are the two clocks; nothing else in this update reads `dt` for a body.
+      const wasFocus = focus.active;
+      if (focusHeld && !focus.active && phase === 'fighting') { if (focus.start()) { ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35); SoundKit.play('whoosh', { pitch: 0.7, volume: 0.5 }); console.info(`[MATRIX] sd focus on at ${Math.round(focus.value)}`); } }
+      else if (!focusHeld && focus.active) focus.stop();
+      if (focus.tick(dt) || (wasFocus && !focus.active)) { ctx.juice.tint(null); SoundKit.play('whoosh', { pitch: 0.6, volume: 0.4 }); console.info(`[MATRIX] sd focus off after ${focus.heldSec.toFixed(2)} s`); }
+      if (wasFocus !== focus.active) { rival.animator.setTimeScale(focus.worldScale); player.animator.setTimeScale(focus.heroScale); }
+      { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
+      const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
       arenaHandle?.tick(dt);
       if (arena.hazards.length) { hazardTick += dt; if (hazardTick >= 0.2) { hazardTick = 0; for (const [st, c] of [[meState, player], [foeState, rival]] as const) { const h = hazardAt(c.root.position, arena); if (h) { st.hp = Math.max(0, st.hp - h.dps * 0.2); console.info(`[ARENA] showdown ${c === player ? 'you' : 'rival'} in the fire`); } } } }   // phase 7
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
@@ -496,7 +511,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (parryFlash > 0) { parryFlash -= dt; if (parryFlash <= 0) { meAnim.clearBeat('parry_flash', 'guard_impact'); } }
       if (giFlash > 0) { giFlash -= dt; if (giFlash <= 0) { meAnim.clearBeat('parry_flash', 'guard_impact'); } }
       chakra.update(dt); foeChakra.update(dt);
-      meState.tick(dt); foeState.tick(dt);
+      meState.tick(sdtHero); foeState.tick(sdtRoom);   // phase 8: a clock per rig
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ── ultimate cinematic beat ──
@@ -536,7 +551,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       // ── strikes: advance, resolve at active-frame open ──
       const opened = meStrike.update(dt, now());
       if (opened.startedActive) resolveActiveStrike(ctx, true);
-      const foeOpened = foeStrike.update(dt, now());
+      const foeOpened = foeStrike.update(sdtRoom, now());
       if (foeOpened.startedActive) {
         // substitution window: if the player substituted, this strike finds nothing
         if (now() < meSubstituted) {
@@ -552,9 +567,9 @@ export const ShowdownMode: ModeDefinition = (() => {
         const dist = to.length();
         if (!foeStrike.busy && dist > 2) {
           const dir = to.normalize();
-          foeMove.update(dt, dir.x, -dir.z, dist > 6);
+          foeMove.update(sdtRoom, dir.x, -dir.z, dist > 6);
         } else {
-          foeMove.update(dt, 0, 0, false);
+          foeMove.update(sdtRoom, 0, 0, false);
           // AI RATES ARE PER SECOND NOW, NOT PER FRAME.
           //
           // These were `Math.random() < 0.02` evaluated once per rendered frame, which makes the rival's
@@ -567,7 +582,7 @@ export const ShowdownMode: ModeDefinition = (() => {
           // the swing rate up, `mistake` cuts the reactive block down. Behind on rounds it comes forward more
           // and guards less.
           const nrv = nerve(standingOf(foeRounds, myRounds, 2, Math.min(1, Math.max(myRounds, foeRounds) / 2)));
-          const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * dt);
+          const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * sdtRoom);   // phase 8: the rival's nerve runs on the room clock
           if (!foeStrike.busy && dist <= 2 && chance(1.2 * nrv.aggression)) {
             foeStrike.request(['jab', 'kick', 'heavy'][Math.floor(Math.random() * 3)], now());
           }
@@ -575,7 +590,7 @@ export const ShowdownMode: ModeDefinition = (() => {
           if (meStrike.busy && chance(1.8 / Math.max(0.5, nrv.mistake))) { foeDef.pressBlock(now(), false); foeState.pressBlock(now()); }
           else if (foeState.blockHeld && chance(1.2)) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         }
-        rival.root.position.addInPlace(foeMove.vel.scale(dt));
+        rival.root.position.addInPlace(foeMove.vel.scale(sdtRoom));
         arenaClamp(rival.root.position, arena); if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }
       }
 

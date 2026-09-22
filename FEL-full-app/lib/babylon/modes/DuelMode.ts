@@ -32,6 +32,7 @@ import {
 import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
 import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';
+import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // phase 8: bullet time on R2, a clock per rig
 import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { CombatAnimTree } from '../anim/combatTree';
 import { SoundKit } from '../audio/SoundKit';
@@ -184,6 +185,7 @@ export const DuelMode: ModeDefinition = (() => {
   let foeLaunchedSec = 0;   // phase 5
   const book = new StringBook(); const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };   // phase 4
   const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
+  const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
   let guardUp = false;
   function banner(ctx: ModeContext, text: string, ms = 900): void {
     ctx.setHud({ banner: text });
@@ -229,6 +231,7 @@ export const DuelMode: ModeDefinition = (() => {
         banner(ctx, mine ? 'GUARD BREAK!' : 'GUARD SHATTERED!');
         break;
       case 'parried':
+        if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
         SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
         // A PARRY IS THE NEAR MISS. Reach decides this fight, so reading a swing and answering it is the
         // skill the mode is about -- and it was worth nothing to the meter.
@@ -236,6 +239,7 @@ export const DuelMode: ModeDefinition = (() => {
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
       case 'guardImpacted':
+        if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
         // THE Duel skill: unmistakable stinger + flash + camera beat
         SoundKit.play('impact', { pitch: 2.1, volume: 0.7 });   // the GI stinger is the one sound; the feel thud is replaced by the latched hit-stop + shake
         SoundKit.play('uiTick', { pitch: 1.8, volume: 0.5 });
@@ -247,7 +251,8 @@ export const DuelMode: ModeDefinition = (() => {
       case 'hit': {
         const w = move.weight;
         const scale = Math.max(0.4, 1 - 0.12 * atkState.combo);
-        const dealt = Math.round(move.atk.dmg * scale);
+        const dealt = Math.round(move.atk.dmg * scale * (mine && focus.active ? FOCUS.damageMult : 1));   // phase 8: a Focus strike lands harder
+        if (mine) focus.gain(FOCUS.hitGain);
         defState.hp = Math.max(0, defState.hp - dealt);
         defState.stunSec = Math.max(defState.stunSec, move.atk.stunSec);
         atkState.combo += 1; atkState.comboTimer = 1.1;
@@ -293,7 +298,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset();
+    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
     // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
     player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
@@ -403,7 +408,8 @@ export const DuelMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }
+      if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // phase 8: MATRIX FOCUS   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t !== 'button') return;
       // phase 3: the X RELEASE is the dash / the guard coming down — it has to be read before the pressed-only gate below
       if (e.btn === 'X' && !e.pressed) {
@@ -467,6 +473,15 @@ export const DuelMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      // phase 8 — MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock (his animator, brain, swings,
+      // movement), me on mine. `sdtRoom` / `sdtHero` below are the two clocks; nothing else in this update reads `dt` for a body.
+      const wasFocus = focus.active;
+      if (focusHeld && !focus.active && phase === 'fighting') { if (focus.start()) { ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35); SoundKit.play('whoosh', { pitch: 0.7, volume: 0.5 }); console.info(`[MATRIX] dl focus on at ${Math.round(focus.value)}`); } }
+      else if (!focusHeld && focus.active) focus.stop();
+      if (focus.tick(dt) || (wasFocus && !focus.active)) { ctx.juice.tint(null); SoundKit.play('whoosh', { pitch: 0.6, volume: 0.4 }); console.info(`[MATRIX] dl focus off after ${focus.heldSec.toFixed(2)} s`); }
+      if (wasFocus !== focus.active) { rival.animator.setTimeScale(focus.worldScale); player.animator.setTimeScale(focus.heroScale); }
+      { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
+      const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
       if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
       if (phaseSec > BUDGET_SEC[phase]) {
@@ -478,7 +493,7 @@ export const DuelMode: ModeDefinition = (() => {
 
       hitT = Math.max(0, hitT - dt);
       if (hitT === 0) { meHitBy = null; foeHitBy = null; }
-      meState.tick(dt); foeState.tick(dt);
+      meState.tick(sdtHero); foeState.tick(sdtRoom);   // phase 8: a clock per rig
       if (meState.blockHeld && meDef.blocking) { /* guard held */ }
       if (meState.blockHeld && !(stickX || true)) { /* noop */ }
 
@@ -496,7 +511,7 @@ export const DuelMode: ModeDefinition = (() => {
         const want = WEAPON_RANGE[foeWeapon] * 0.85;
         const radial = dist > want + 0.3 ? 1 : dist < want - 0.5 ? -1 : 0;
         const orbit = Math.sin(phaseSec * 0.7) > 0 ? 0.6 : -0.6;
-        foeMove.updateWithSelf(dt, orbit, radial, false, rival.root.position);
+        foeMove.updateWithSelf(sdtRoom, orbit, radial, false, rival.root.position);
         // AI RATES ARE PER SECOND NOW, NOT PER FRAME.
         //
         // These were `Math.random() < 0.02` evaluated once per rendered frame, which makes the rival's
@@ -509,7 +524,7 @@ export const DuelMode: ModeDefinition = (() => {
         // the swing rate up, `mistake` cuts the reactive block down. Behind on rounds it comes forward more
         // and guards less.
         const nrv = nerve(standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN)));
-        const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * dt);
+        const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * sdtRoom);   // phase 8: the rival's nerve runs on the room clock
         if (dist <= WEAPON_RANGE[foeWeapon] && chance(1.2 * nrv.aggression)) {
           const ids = Object.keys(RIVAL_MOVESET[foeWeapon]());
           foeStrike.request(ids[Math.floor(Math.random() * ids.length)], now());
@@ -517,13 +532,13 @@ export const DuelMode: ModeDefinition = (() => {
         if (meStrike.busy && chance(2.1 / Math.max(0.5, nrv.mistake))) { foeDef.pressBlock(now(), Math.random() < 0.3); foeState.pressBlock(now()); }
         else if (foeState.blockHeld && chance(1.5)) { foeDef.releaseBlock(); foeState.releaseBlock(); }
       } else {
-        foeMove.updateWithSelf(dt, 0, 0, false, rival.root.position);
+        foeMove.updateWithSelf(sdtRoom, 0, 0, false, rival.root.position);
       }
-      rival.root.position.addInPlace(foeMove.vel.scale(dt));
+      rival.root.position.addInPlace(foeMove.vel.scale(sdtRoom));
 
       // strike resolution at active-frame open
       if (meStrike.update(dt, now()).startedActive) resolveActive(ctx, true);
-      if (foeStrike.update(dt, now()).startedActive) resolveActive(ctx, false);
+      if (foeStrike.update(sdtRoom, now()).startedActive) resolveActive(ctx, false);
       if (checkRingOut(ctx)) return;
 
       // edge warning
