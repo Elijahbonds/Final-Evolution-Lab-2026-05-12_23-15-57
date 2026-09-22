@@ -594,6 +594,8 @@ export class DefenderBrain implements AIBehavior {
   /** Ball still this long → the on-ball defender steps UP into the handler
    *  instead of holding the cushion. */
   static readonly PRESS_AFTER_SEC = 0.6;
+  /** Phase 10: how far off a standing shooter the on-ball man settles (m). Outside the poke's 1.1 m, inside contest range. */
+  static readonly ARMS_LENGTH = 1.25;
 
   /**
    * @param markIndex which opponent this defender is assigned to. Null keeps the
@@ -717,10 +719,19 @@ export class DefenderBrain implements AIBehavior {
     const beaten = onBall && distXZ(ball, hoop) < distXZ(self, hoop) - 0.4 && handlerDist > 0.8;
     // sticky: a closeout that started keeps going until he is on the man (measured without it: closeout ↔ onball flipping
     // every frame as the distance crossed 2.6 m, and the tree with it)
-    const closingOut = onBall && !beaten && (this.closingOut ? handlerDist > 1.5 : handlerDist > 2.6 && handlerSpeed < 0.9);
+    const closingOut = onBall && !beaten && (this.closingOut ? handlerDist > DefenderBrain.ARMS_LENGTH + 0.1 : handlerDist > 2.6 && handlerSpeed < 0.9);   // Phase 10: sticky down to arm's length, not 1.5 m
     this.closingOut = closingOut;
     const lever = beaten ? 0.6 : press ? 0.12 : onBall ? 0.35 + Math.min(1, handlerSpeed / 6) * 0.25 : 0.30;
     let denyPoint = Vector3.Lerp(anchor, hoop, lever);
+    // THE CLOSE-OUT FINISHES AT ARM'S LENGTH (Phase 10). Against a STANDING handler the deny point sat a third of the way
+    // to the hoop — 2 m off a shooter at the arc — so a catch-and-shoot held for 1.2 s was released at contest 0.1
+    // (measured: 1v1 mean 0.31, 3v3 0.12; contestLevel is 1 - d/2.2). 2K's on-ball man is at arm's length on a set
+    // shooter. Clamped to ARMS_LENGTH off the ball, which sits just outside the poke's 1.1 m so standing there is
+    // pressure, not a free steal. A moving handler keeps the old lever (contain first).
+    if (onBall && !beaten && !press && handlerSpeed < 0.9) {
+      const armLever = DefenderBrain.ARMS_LENGTH / Math.max(0.5, Vector3.Distance(anchor, hoop));
+      if (lever > armLever) denyPoint = Vector3.Lerp(anchor, hoop, armLever);
+    }
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
 
@@ -926,6 +937,7 @@ export class ShotArc {
    *  on any other shot. A banked ball is a quadratic Bezier from → glass → rim: it goes UP AND OUT to the square, kisses
    *  it and drops, instead of the straight parabola every shot in the game shared. */
   private glass: Vector3 | null = null;
+  private glassKissed = false;   // Phase 8: the square's touch, queued once per banked flight
   /** RIM PLAY (2026-09-18): the ball's time ON the iron after the flight arrives — planned at the release from the shot's
    *  profile (RimPlay.planRimPlay). With a play the flight ends at the play's `arrive` (the first contact), then the
    *  dwell runs for `duration` and its touches are queued for the mode (`takeTouches`). Without one, the old behaviour. */
@@ -937,7 +949,6 @@ export class ShotArc {
   start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0, bank: Vector3 | null = null, play: RimPlay | null = null): void {
     this.from.copyFrom(from);
     this.made = made; this.shotStyle = style;
-  private glassKissed = false;   // Phase 8: the square's touch, queued once per banked flight
     this.glass = bank ? bank.clone() : null; this.glassKissed = false;
     this.play = play; this.playT = 0; this.inPlay = false; this.touchQ.length = 0; this.touchN = 0;
     this.to.copyFrom(play ? play.arrive : rim);
@@ -971,6 +982,7 @@ export class ShotArc {
         ball.z = this.from.z + (this.glass.z - this.from.z) * u;
         ball.y = this.from.y + (this.glass.y - this.from.y) * u + Math.sin(u * Math.PI) * this.apex * 0.55;
       } else {
+        if (!this.glassKissed) { this.glassKissed = true; this.touchQ.push({ t: 0, on: 'glass', strength01: 0.55 }); }   // Phase 8: the kiss — the modes drain it like any rim touch (the thud, the graze)
         const u = (k - BANK_K) / (1 - BANK_K);
         ball.x = this.glass.x + (this.to.x - this.glass.x) * u;
         ball.z = this.glass.z + (this.to.z - this.glass.z) * u;
@@ -982,7 +994,6 @@ export class ShotArc {
     ball.y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * this.apex;
     }
     if (this.t >= 1) {
-        if (!this.glassKissed) { this.glassKissed = true; this.touchQ.push({ t: 0, on: 'glass', strength01: 0.55 }); }   // Phase 8: the kiss — the modes drain it like any rim touch (the thud, the graze)
       if (this.play && (this.play.keys.length || this.play.touches.length)) {
         // arrived ON the iron: the dwell starts (its t 0 touches fire now)
         this.inPlay = true; this.playT = 0;

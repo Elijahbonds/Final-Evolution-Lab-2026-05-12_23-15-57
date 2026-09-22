@@ -82,6 +82,7 @@ export class AgentControlSource implements ControlSource {
     out.turbo = src.turbo ?? false;
     out.intense = src.intense ?? false;
     out.brace = src.brace ?? false;
+    out.glass = src.glass ?? false;   // Phase 8: a probe can call glass (R1 held) — the bank's route through the bridge
     out.takeCharge = src.takeCharge ?? false;
 
     // Edge fields: delivered on exactly one frame, matching LocalInputSource.

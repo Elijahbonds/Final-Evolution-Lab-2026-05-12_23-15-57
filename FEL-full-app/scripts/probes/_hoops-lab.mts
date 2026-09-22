@@ -261,7 +261,7 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 // CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
 const wantDefence = PLAY === 'defence' || PLAY === 'charge';
-const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick', 'posthook', 'pausin', 'cuts'];   // what PLAY can name
+const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick', 'posthook', 'pausin', 'cuts', 'catch', 'camp', 'bank'];   // what PLAY can name
 await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
@@ -518,6 +518,28 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);
     }
     else if (play === 'jumper') await agent(`a.do('shoot', { charge: ${CHARGE} })`);   // from the reset spot, no drive
+    else if (play === 'bank') {
+      // Phase 8 — THE BANK: out to the wing (the square's band is 12–62° off the board's normal, 1.2–6.8 m), then the
+      // jumper with glass HELD through the squeeze (R1 = `glass` on the slot; the bridge passes it now). The mode logs
+      // `called glass`, the arc queues the kiss (`glass kiss`), and the ring still plans the drop.
+      await agent(`a.act({ moveX: ${n % 2 ? 0.8 : -0.8}, moveY: 0.35, sprint: true }, 1100)`);
+      await agent(`a.act({ moveX: 0, moveY: 0, glass: true, actionHeld: ${CHARGE} }, ${Math.round(600 * CHARGE)})`);
+      await agent(`a.act({ moveX: 0, moveY: 0, glass: true, actionHeld: 0, action: true }, 80)`);
+      await agent(`a.act({ moveX: 0, moveY: 0, glass: true }, 400)`);
+    }
+    else if (play === 'catch') {
+      // Phase 10 — THE CLOSE-OUT: the jumper play shoots the instant the ball is checked, so the defender is still at his
+      // spot and every release logged `contest 0.00`. A catch-and-shoot gives him HOLD_MS (1200) to close before the
+      // squeeze; the release line's contest is what the close-out earned.
+      await agent(`a.act({ moveX: 0, moveY: 0 }, ${Number(process.env.HOLD_MS ?? 1200)})`);
+      await agent(`a.do('shoot', { charge: ${CHARGE} })`);
+    }
+    else if (play === 'camp') {
+      // Phase 10 — THREE SECONDS: into the paint and stand there; the ref should call it (`[X-REF] three_seconds`)
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true }, 1500)`);
+      await agent(`a.act({ moveX: 0, moveY: 0 }, 4200)`);
+      await agent(`a.do('shoot', { charge: ${CHARGE} })`);
+    }
     else if (play === 'dunk') {
       // THE STICK IS STILL DOWN WHEN THE TRIGGER GOES. `do('sprint')` then `do('shoot')` is TWO queued intents, and
       // the second one lets go of the stick — so by the squeeze the sprint is over, `sprintOk` is false and the
