@@ -70,6 +70,22 @@ const RUN_SEC = 90;
 const BANK_SETTLE_SEC = 0.45;
 /** A bank at or above this is the run's big moment and is cued as one. */
 const BIG_BANK_PTS = 500;
+/**
+ * SKATE-MAJOR (2026-09-21): the tallest solid a grounded board rolls up in one frame. Above it the face is a wall the
+ * board is turned off (and, at speed, slammed into). 0.45 m: over the manual pads (0.32, a kerb you ride onto) and under
+ * everything else in the plaza (bench 0.52, planter 0.70, table 0.78, ledge 0.90, bin 1.05, pyramid 1.3, wallride 3.2).
+ */
+const STEP_UP_M = 0.45;
+/** A face at least this tall (m) above the wheels can SLAM a rider (the bail); anything lower is a bonk he bounces off. */
+const SLAM_FACE_M = 0.5;
+/** The ollie's deck: nose up through the pop (radians, the manual's sign — negative is nose up) for this share of the pop
+ *  beat, then level for the hang. The deck used to stay dead flat under a rider whose front foot was dragging up the
+ *  nose, so the freeze-frame of every ollie had the board floating level under lifted feet. */
+const OLLIE_NOSE_UP = -0.42;
+const OLLIE_NOSE_SHARE = 0.55;
+/** The body on a wall ride: rolled with the deck so the feet stay on it (the deck is WALL_RIDE.boardRoll flat on the wall,
+ *  the body a little less so it reads as pressing into the wall rather than lying on it). Radians. */
+const WALL_BODY_ROLL = 0.95;
 // Imported from the world builder so the invisible clamp and the visible fence
 // are the SAME number by construction -- they were 33 and 35 (the ground's own
 // half-width), so the rider stopped two metres short of a fence that was not
@@ -229,6 +245,10 @@ export const SkateRunMode: ModeDefinition = (() => {
     if (!w) return false;
     wallRide = startWallRide(w, { x: pos.x, y: pos.y, z: pos.z }, { x: v.x, y: v.y, z: v.z });
     trickLayer?.clear();
+    // SKATE-MAJOR: the same X press that asked for the wall threw a GRAB a frame earlier (the air branch of onInput), and
+    // the grab was still HELD through the whole ride — measured, 57 of 60 detached-feet air frames were board_grab on the
+    // wall. The wall takes the board: the grab is banked and released the way a release would.
+    if (air.state.grabHeld) { trickLayer?.release(); const pts = air.releaseGrab(); if (pts > 0) combo.add('GRAB', pts, 'air'); }
     combo.add('WALL RIDE', WALL_RIDE.pts, 'grind');
     bannerFlash(ctx, 'WALL RIDE', 700);
     SoundKit.play('powerUp', { volume: 0.4, pitch: 1.15 }); ctx.feel?.impact?.(0.25);
@@ -291,14 +311,22 @@ export const SkateRunMode: ModeDefinition = (() => {
       const p = stepWallRide(wallRide, dt);
       const side = wallSide(wallRide);
       rig.char.root.position.set(p.x, p.y, p.z);
-      rig.char.root.rotation.y = p.yaw; rig.char.root.rotation.z = -side * 0.3;
+      // SKATE-MAJOR: the BODY rolls with the deck. The deck was rolled 77° flat onto the wall while the root leaned 17°
+      // the OTHER way (into the wall), so the rider hung beside a board standing on its edge with his feet a foot off it.
+      // A wall ride is the whole rider on the wall: root rolled toward the deck's roll, the deck the rest of the way.
+      rig.char.root.rotation.y = p.yaw; rig.char.root.rotation.z = side * WALL_BODY_ROLL;
       move.yaw = p.yaw; move.vel.set(Math.sin(p.yaw) * wallRide.speed, 0, Math.cos(p.yaw) * wallRide.speed);
       rig.rider.vel.set(move.vel.x, wallRide.vy, move.vel.z); rig.rider.grounded = false;
-      if (trickLayer) trickLayer.overridePose = { boardRoll: side * WALL_RIDE.boardRoll };
+      if (trickLayer) trickLayer.overridePose = { boardRoll: side * (WALL_RIDE.boardRoll - WALL_BODY_ROLL) };
       if (p.done) {
         const v = wallRideExitVel(wallRide);
         endWallRide();
+        // the HEADING follows the push-off (SKATE-MAJOR). Only the velocity was set here, and speed follows the facing,
+        // so the next momentum step dropped the push-off and the rider left the wall still running along it, 0.22 m off
+        // the face — the second-session finding (BOARD-WALL-UNSTUCK-SECOND-SESSION-FINDINGS #3), now folded in.
+        move.yaw = Math.atan2(v.x, v.z); airEntryYaw = move.yaw;
         move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
+        rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
         console.info('[SKATE-WALL] off the wall');
       }
       return;
@@ -365,6 +393,43 @@ export const SkateRunMode: ModeDefinition = (() => {
     ctx.juice.slowMo(SLOW_SCALE, SLOW_SEC * 1000);
     console.info(`[SKATE-SLOWMO] ${why} (${slowCount})`);
   }
+  /**
+   * A WALL the board met this frame — the fence, or (SKATE-MAJOR) an interior solid too tall to roll up: `nx, nz` is the
+   * face's normal, pointing back into the park. The momentum model turns the board off it and the body answers: a scrape,
+   * a bounce, or at speed the SLAM.
+   *
+   * BAIL HONESTY (2026-09-21). A rider who rode a cruising 9 m/s straight into the fence got a thud, a banner and a
+   * bounce — and kept the exact ride pose through all of it. The hit was in the sound and the camera and never in the
+   * body, so the one collision a player can cause on purpose was the one thing in the mode he could not read. A slam is
+   * a bail now: the same fall the mode already plays for a blown landing, the pot burns, the board settles against the
+   * wall instead of pinballing off it, and the beat ends in the stand idle facing away from what he hit — get up, push,
+   * ride on. No reset, no respawn: he never leaves the spot he crashed at. One cue per contact (`fenceHit`), released
+   * on the first frame that touches nothing.
+   */
+  function hitWall(ctx: ModeContext, nx: number, nz: number, what: string, tall = true): void {
+    const kind = move.wall(nx, nz);
+    if (!rig.rider.grinding && rig.rider.grounded) rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
+    rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+    if (fenceHit || !kind) return;
+    fenceHit = true;
+    // `tall`: a face under knee height (a manual pad, a stair) is a BONK the board bounces off, never a slam
+    if (tall && move.slammedWall && bailBeatT <= 0) {
+      combo.bail();
+      mbus.report({ kind: 'miss' });
+      bannerFlash(ctx, 'SLAMMED', 900);
+      SoundKit.play('miss');
+      bailBeatT = BAIL_BEAT_SEC;
+      move.vel.scaleInPlace(0.15);   // a fallen rider does not keep sliding at speed (as the blown landing does)
+      rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+      bailPunch(ctx);
+      console.info(`[SKATE-SOLID] slam into ${what}`);
+    } else {
+      SoundKit.play('impact', { pitch: kind === 'bounce' ? 0.8 : 1.1, volume: kind === 'bounce' ? 0.4 : 0.22 });
+      ctx.feel?.impact?.(kind === 'bounce' ? 0.3 : 0.12);
+      if (kind === 'bounce') bannerFlash(ctx, what === 'the fence' ? 'EDGE OF THE PARK' : 'BONK', 700);
+      console.info(`[SKATE-SOLID] ${kind} off ${what} at ${move.speed.toFixed(1)} m/s`);
+    }
+  }
   /** A bail: hit-stop + shake + ONE low thud + dust. Heavier than a clean land. Latched once per touchdown. */
   function bailPunch(ctx: ModeContext): void {
     if (bailLatch) return;
@@ -404,7 +469,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       _validateChar.dispose(); // Clean up validation placeholder
       // carveAccel 0: the momentum model below owns the velocity; the Rider's own 4.95 m/s² forward creep was the only
       // thing that moved a stick-held rider (0.33 m in 4 s on the baseline probe) and it scaled with frame time
-      rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5, maxSpeed: SKATE_TUNING.maxSpeed * 1.4 });   // BOARD-SPEED: the Rider's flat 16 clipped the boost (ceiling × 1.4) — the momentum model owns the cap
+      // stepUp (SKATE-MAJOR): a solid taller than a kerb is a wall, not an elevator (GroundRide.RiderCfgOverrides.stepUp)
+      rig = await buildRig(ctx, CFG.heroUrl, VENICE_PATROL_RAIL.spawn.clone(), 0, world.ground, '#22d3ee', 'skateboard', { carveAccel: 0, grindSpeed: 6.5, maxSpeed: SKATE_TUNING.maxSpeed * 1.4, stepUp: STEP_UP_M });   // BOARD-SPEED: the Rider's flat 16 clipped the boost (ceiling × 1.4) — the momentum model owns the cap
       rig.char.animator.play(SPORT_CLIP.boardIdle, { loop: true });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
@@ -423,7 +489,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SKATE-PP');
       trickLayer?.dispose();
-      trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board, { bodySpin: false });   // after the posture layer: the grab hand is the last word
+      trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board, { bodySpin: false, deckFollowsFeet: true });   // after the posture layer: the grab hand is the last word; the deck is already under the feet (deckUnderFeet)
       {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown; skate?: unknown } }).__FEL_DEV__;
         if (dev && process.env.NODE_ENV === 'development') dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
@@ -440,6 +506,8 @@ export const SkateRunMode: ModeDefinition = (() => {
           grinding: rig.rider.grinding !== null, grindNeedle: grindCh?.needle ?? null, grindHeld: grindCh?.heldSec ?? null,
           manual: manualCh?.active ?? false, manualNeedle: manualCh?.needle ?? null, manualHeld: manualCh?.heldSec ?? null,
           railD: railDistance(), slow: slowT, slows: slowCount, pop: popBeatT > 0, boardPitch, deck: { ...deckLift }, grab: air.state.grabHeld ?? null,
+          wall: !!wallRide, lip: !!lipStall, bailing: bailBeatT > 0,   // SKATE-MAJOR: the wall, the lip and the fall, for the probe
+          chainNow: air.state.chain.map((t) => t.label),
           // the golden goal rail, live: a probe has to be able to LINE UP with it, and a rail that patrols is
           // somewhere different every second
           patrol: { a: { ...patrolRail.line.a }, b: { ...patrolRail.line.b } },
@@ -512,7 +580,11 @@ export const SkateRunMode: ModeDefinition = (() => {
       // MANUAL, DIRECTLY. The flick pair stays (it is the THPS link and it chains beautifully), but it was the ONLY
       // door in, and a pair of opposite flicks inside one window is a test of the input rather than of the trick.
       // B is a plain manual, B with the stick forward is a nose manual, and B again is the revert out.
-      if (e.t === 'button' && e.pressed && e.btn === 'B') {
+      // ON THE GROUND ONLY (SKATE-MAJOR, 2026-09-21). This returned for every B, so B in the air — the 360 flip, the
+      // indy, the melon, the backside 180: a third of the skate vocabulary — never reached the trick branch below.
+      // Measured on the baseline probe: three mid-air B presses, three `[SKATE-MANUAL] refused {grounded: false}`,
+      // zero tricks. In the air, B is a trick; the manual is a ground link and is asked for from the ground.
+      if (e.t === 'button' && e.pressed && e.btn === 'B' && rig?.rider.grounded && !wallRide && !lipStall) {
         manualWanted = stickY < -0.4 ? 'nosemanual' : 'manual';
         return;
       }
@@ -551,9 +623,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         // (the rider WAS grounded a moment ago), so without it every ollie would immediately re-pop itself.
         const canPop = (rig.rider.grounded || coyote.ok) && !air.state.airborne;
         if (g && g.id === 'ollie' && canPop) {
-          rig.rider.jump(olliePower());
+          // `late` (SKATE-MAJOR): the Rider's own grounded guard used to swallow the press the coyote window accepted
+          rig.rider.jump(olliePower(), !rig.rider.grounded);
           airEntryYaw = rig.char.root.rotation.y;
           air.launch();
+          popBeatT = POP_BEAT_SEC; apexDone = false; lastVy = rig.rider.vel.y;   // the pop is the same body beat as the button's
           SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         } else if (g && !rig.rider.grounded) {
           // mid-air: real rotation physics + combo chain entry
@@ -598,8 +672,11 @@ export const SkateRunMode: ModeDefinition = (() => {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
         }
         if (e.btn === 'A') {
-          if (rig.rider.grounded) {
-            rig.rider.jump(olliePower());
+          // COYOTE on the button too (SKATE-MAJOR): the flick path forgave a press 110 ms after the wheels left a lip;
+          // the button — the keyboard's and the touch deck's only pop — did not, so the same late press off a ledge was
+          // spent as a mid-air OLLIE trick with no height under it.
+          if (rig.rider.grounded || (coyote.ok && !air.state.airborne)) {
+            rig.rider.jump(olliePower(), !rig.rider.grounded);
             airEntryYaw = rig.char.root.rotation.y;
             air.launch();
             popBeatT = POP_BEAT_SEC;   // VENICE-SKATE-THPS: the pop is a BODY beat now (plant -> pop -> hang)
@@ -697,7 +774,23 @@ export const SkateRunMode: ModeDefinition = (() => {
         const r = grindCh.update(dt, stickX, move.speed01);
         // the fail-out: a slipped grind drops you off the rail AND holds the magnet off, so a rail you just fell from
         // does not immediately catch you again on the way down (VENICE-SKATE-THPS)
-        if (r.slipped) { grindCh = null; rig.rider.dismount(); relockUntil = performance.now() + RELOCK_MS; console.info('[SKATE-GRIND] slipped off'); bannerFlash(ctx, 'SLIPPED OFF', 600); }
+        if (r.slipped) {
+          // A SLIP IS A FALL (SKATE-MAJOR, 2026-09-21). Losing the needle used to hop the rider 2.5 m/s UP off the rail —
+          // the same exit a clean dismount gets — and the touchdown then graded a CLEAN landing on a zero-rotation air:
+          // the balance meter was decorative, because failing it cost nothing the player could see. The rider now drops
+          // off the side the needle tipped to, the pot burns, and the body plays the bail.
+          const side = grindCh.needle >= 0 ? 1 : -1;
+          grindCh = null;
+          rig.rider.dismount('slip', side);
+          relockUntil = performance.now() + RELOCK_MS;
+          combo.bail();
+          mbus.report({ kind: 'miss' });
+          bailBeatT = BAIL_BEAT_SEC;
+          move.vel.set(rig.rider.vel.x, 0, rig.rider.vel.z); move.yaw = Math.atan2(move.vel.x, move.vel.z) || move.yaw;
+          bailLatch = false; bailPunch(ctx);
+          console.info('[SKATE-GRIND] slipped off');
+          bannerFlash(ctx, 'SLIPPED OFF', 800);
+        }
         else if (r.pts > 0) combo.accrue('GRIND', Math.round(r.pts), 'grind');   // ANTI-MASH: a held grind is ONE link that pays while it is held
       }
       // ── the manual link (VENICE-SKATE-THPS) ──
@@ -761,12 +854,19 @@ export const SkateRunMode: ModeDefinition = (() => {
       // a pitch nudge: holding the throttle through an ollie was tilting the flip axis into a sketchy landing.
       coyote.update(rig.rider.grounded);   // one feed per frame, from the flag the ollie test reads
       if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickX, 0);
-      if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15) {
+      if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15 && bailBeatT > 0) {
+        // a rider who was ALREADY falling (a slipped grind, a slam) hitting the ground is the bail landing, not a landing
+        // to grade — grading it read "touchdown clean" and paid a land punch on top of the fall (SKATE-MAJOR)
+        air.land();
+      } else if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15) {
         // touchdown: grade the landing
         const res = resolveLanding(air, move.balance, {
           error01: air.landingError01(), slopeMismatch01: 0, speed01: move.speed01,
         });
         const chainPts = res.chain.reduce((sum, t) => sum + t.basePts, 0);
+        // a grab still held at touchdown (a B-grab has no release button of its own) is banked here, after the grade has
+        // taxed it — it used to stay "held" on the ground and its points were never paid (SKATE-MAJOR)
+        if (air.state.grabHeld) { trickLayer?.release(); const gp = air.releaseGrab(); if (gp > 0 && res.grade !== 'bail') combo.add('GRAB', gp, 'air'); }
         bailLatch = false;                       // A+ P0: a fresh touchdown gets one bail punch at most
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
@@ -848,6 +948,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         const line = rig.rider.grinding;
         const patrol = line.gapId === patrolRail.gapId;
         grindAskedAt = -1;
+        // the rail takes the board: a grab still held from the air is banked and let go (SKATE-MAJOR — it used to ride the
+        // whole grind with the deck hauled up to the hand and the free arm out straight)
+        if (air.state.grabHeld) { trickLayer?.release(); const gp = air.releaseGrab(); if (gp > 0) combo.add('GRAB', gp, 'air'); }
         grindCh = new BalanceChannel('grind', move.balance);
         grindCh.start(move.speed01);
         combo.add(line.bonus >= 260 ? 'TRANSFER GRIND' : 'GRIND', line.bonus, 'grind');
@@ -874,6 +977,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // is the foot drag; both only with wheels down. In the air the board is ballistic — no steer bends the velocity,
       // the judged spin turns the body. A bail holds every input for its beat.
       const grounded = rig.rider.grounded, bailing = bailBeatT > 0;
+      let touchedWall = false;   // the fence or a solid this frame — the contact latch below is released when neither is touched
       let drive = grounded && !bailing && !rig.rider.grinding && !manualCh?.active ? -stickY : 0;   // no kick from inside a manual
       if (drive < 0 && performance.now() < brakeMuteUntil) drive = 0;   // the manual link's own back-tap must not drag the line to a stop
       const steer = grounded && !bailing ? stickX : 0;
@@ -912,6 +1016,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       } else if (grounded) { lastGoodPos = (lastGoodPos ?? new Vector3()).copyFrom(pos); lastGoodYaw = move.yaw; }
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       rig.rider.update(dt, steer, 0);              // GroundRide owns snap/air/grind-line
+      // SKATE-MAJOR: a solid the wheels could not roll up is a wall — the same wall the fence is (the body answers below)
+      if (rig.rider.solidHit) { const s = rig.rider.solidHit; touchedWall = true; hitWall(ctx, s.nx, s.nz, s.mesh.name, s.top - rig.char.root.position.y >= SLAM_FACE_M); }
       if (rig.rider.grinding) {
         // the rail owns the yaw; the momentum model follows it so the dismount rolls away DOWN the rail, not back
         // toward the pre-grind heading (a 1-frame yaw snap on every rail exit)
@@ -928,8 +1034,9 @@ export const SkateRunMode: ModeDefinition = (() => {
       tickWalls(ctx, dt);   // WALL RIDES + LIP TRICKS: a wall or a lip owns the body while the moment lasts
       if (rig.rider.grounded) lastGroundY = rig.char.root.position.y;
       // the deck rides its back trucks through a manual — nose up, and it eases in and out so the link reads as a beat
-      const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30) : 0;
-      boardPitch += (wantPitch - boardPitch) * Math.min(1, 9 * dt);
+      const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30)
+        : popBeatT > POP_BEAT_SEC * (1 - OLLIE_NOSE_SHARE) ? OLLIE_NOSE_UP : 0;   // SKATE-MAJOR: the pop lifts the nose
+      boardPitch += (wantPitch - boardPitch) * Math.min(1, (popBeatT > 0 ? 16 : 9) * dt);
       // ANIM-RESIDUAL: the deck under the feet. Read off the last rendered frame (the root's and the feet's world matrices
       // are from the same frame, so the root-local midpoint is consistent); the ground reading is the stance's own.
       {
@@ -987,6 +1094,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         grinding: rig.rider.grinding !== null, manual: manualCh?.active ?? false,
         landing: landingBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0,
         popping: popBeatT > 0,
+        wallRiding: wallRide ? wallSide(wallRide) : 0,   // SKATE-MAJOR: the wall has a body of its own
       });
       if (landingBeatT > 0) { landingBeatT -= dt; if (landingBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
       if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree.clearBeat('bail'); }
@@ -1076,33 +1184,10 @@ export const SkateRunMode: ModeDefinition = (() => {
         // bled to a stop against the edge (measured: 0.03 m in 1.5 s, holding forward). BoardMovement.wall swings the
         // nose along the fence on a glancing hit and bounces it back off on a head-on one; the root follows the heading.
         const nx = hitX ? -Math.sign(rig.char.root.position.x) : 0, nz = hitZ ? -Math.sign(rig.char.root.position.z) : 0;
-        const kind = move.wall(nx, nz);
-        if (!rig.rider.grinding && rig.rider.grounded) rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
-        rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
-        if (!fenceHit && kind) {
-          fenceHit = true;
-          // BAIL HONESTY (2026-09-21). A rider who rode a cruising 9 m/s straight into the fence got a thud, a banner and
-          // a bounce — and kept the exact ride pose through all of it. The hit was in the sound and the camera and never
-          // in the body, so the one collision a player can cause on purpose was the one thing in the mode he could not
-          // read. A slam is a bail now: the same fall the mode already plays for a blown landing, the pot burns, the
-          // board settles against the wall instead of pinballing off it, and the beat ends in the stand idle facing away
-          // from the fence — get up, push, ride on. No reset, no respawn: he never leaves the spot he crashed at.
-          if (move.slammedWall && bailBeatT <= 0) {
-            combo.bail();
-            mbus.report({ kind: 'miss' });
-            bannerFlash(ctx, 'SLAMMED', 900);
-            SoundKit.play('miss');
-            bailBeatT = BAIL_BEAT_SEC;
-            move.vel.scaleInPlace(0.15);   // a fallen rider does not keep sliding at speed (as the blown landing does)
-            rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
-            bailPunch(ctx);
-          } else {
-            SoundKit.play('impact', { pitch: kind === 'bounce' ? 0.8 : 1.1, volume: kind === 'bounce' ? 0.4 : 0.22 });
-            ctx.feel?.impact?.(kind === 'bounce' ? 0.3 : 0.12);
-            if (kind === 'bounce') bannerFlash(ctx, 'EDGE OF THE PARK', 700);
-          }
-        }
-      } else fenceHit = false;
+        touchedWall = true;
+        hitWall(ctx, nx, nz, 'the fence');
+      }
+      if (!touchedWall) fenceHit = false;
       ctx.setHud({ time: Math.ceil(timeLeft) });
       // Snap once more on the first PLAYED frame. The load-time snapTo is
       // correct when it runs and stale by the time it matters: between load and

@@ -33,7 +33,31 @@ export interface RiderCfgOverrides {
   /** Top speed ALONG a rail (m/s). A grind scrubs — riding a 4 m rail at 8 m/s is over in 0.5 s and reads as a bump,
    *  not a trick (VENICE-SKATE-THPS). Omit for the historic behaviour (the run's own speed, floored at 6). */
   grindSpeed?: number;
+  /**
+   * SKATE-MAJOR (2026-09-21): the tallest step a GROUNDED board rolls up in one frame (m). This rider has no horizontal
+   * collision — one downward ray from 1.5 m above the wheels — so riding into any solid under 1.5 m tall snapped the
+   * root onto its top in ONE frame: measured on the plaza, 121 of 168 approaches to its solids were a single-frame lift
+   * of 0.45–1.49 m (the picnic table 0.78, a ledge 0.90, a bin 1.05). An elevator, not a ledge — and the rail magnet then
+   * handed the lifted rider a free grind on top of it. Above this step the top face is a WALL: the wheels stay where they
+   * were and `solidHit` reports the face so the mode can turn the board off it (BoardMovement.wall) and, at speed, bail.
+   * Ramps are untouched — the steepest bank in the plaza rises 0.22 m in a boosted frame. 0 (the default) keeps the old
+   * behaviour for the snow and surf riders, whose worlds have no interior solids.
+   */
+  stepUp?: number;
 }
+
+/** A solid the wheels could not roll up this frame: the face's normal (planar, pointing back at the rider), the mesh and
+ *  the height of the top the rider was refused. */
+export interface SolidHit { nx: number; nz: number; mesh: AbstractMesh; top: number }
+/** SKATE-MAJOR: a rise under this (m) is a kerb the wheels take whatever its face; above it the slope test applies. 0.25:
+ *  over the lip every tilted-slab bank starts with (the outer ramps' slabs are 0.6 m thick and their foot sits 0.20 m up,
+ *  the bowl's 0.16 — measured, 0.12 refused a real bank), under the manual pads (0.32) and the stair set (0.34). */
+export const KERB_M = 0.25;
+/** The steepest rise-over-run a grounded board rides up. 1.2 (≈50°) clears every bank in the game (spine 0.56, bowl 0.55,
+ *  outer banks 0.46, pyramid 0.36) and refuses every face a board would actually bonk. */
+export const MAX_RIDE_SLOPE = 1.2;
+/** How far a refused move is pushed back out of the face (m) — enough that a body inside a footprint walks out of it. */
+export const WALL_PUSH_M = 0.03;
 
 export class Rider {
   public vel = Vector3.Zero();
@@ -43,8 +67,10 @@ export class Rider {
   private down = new Vector3(0, -1, 0);
   /** M42: frames since the raycast last found ground — drives the hard clamp */
   private missedRaycasts = 0;
+  /** SKATE-MAJOR: the solid the wheels met this frame (see RiderCfgOverrides.stepUp), cleared every update. */
+  public solidHit: SolidHit | null = null;
 
-  private cfg: { gravity: number; carveAccel: number; maxSpeed: number; drag: number; snapHeight: number; hardFloorY: number; missThreshold: number; rayLength: number; stickDown: number; grindSpeed: number };
+  private cfg: { gravity: number; carveAccel: number; maxSpeed: number; drag: number; snapHeight: number; hardFloorY: number; missThreshold: number; rayLength: number; stickDown: number; grindSpeed: number; stepUp: number };
 
   constructor(
     private scene: Scene,
@@ -61,6 +87,7 @@ export class Rider {
       grindSpeed: 0,        // 0 = the historic rule below (max(6, run speed))
       rayLength: 6,         // flat parks; the snow piste passes ~80 (it drops ~56 m over the run)
       stickDown: 0,         // flat parks: no glue; the snow piste passes 0.6 (see RiderCfgOverrides.stickDown)
+      stepUp: 0,            // 0 = the historic elevator; skate passes 0.45 (see RiderCfgOverrides.stepUp)
       ...overrides,
     };
     if (!groundMeshes.length) {
@@ -74,7 +101,10 @@ export class Rider {
 
   /** steer: -1..1 · pump: 0..1 (R2) · dt seconds */
   update(dt: number, steer: number, pump: number): void {
+    this.solidHit = null;
     if (this.grinding) { this.updateGrind(dt); return; }
+    const wasGrounded = this.grounded;
+    const prevX = this.root.position.x, prevY = this.root.position.y, prevZ = this.root.position.z;
 
     // forward accel with pump, lateral carve with steer
     const yaw = this.root.rotation.y;
@@ -101,6 +131,28 @@ export class Rider {
     if (hit?.hit && hit.pickedPoint) {
       this.missedRaycasts = 0;
       const groundY = hit.pickedPoint.y;
+      // SKATE-MAJOR: a top face the board cannot roll up is a WALL — further above the wheels than a step, or, past a
+      // kerb's height, steeper than any bank (rise over this frame's run beyond MAX_RIDE_SLOPE: the plaza's steepest
+      // bank is 0.56, the wallride's leaned face 6.2, a box face infinite). The slope test is what keeps a slow board off
+      // a near-vertical face: at 3 m/s the leaned wallride rose 0.31 m a frame, under the step, and was climbed.
+      // The move is not reverted — a reverted move pinned a rider already inside a footprint for the rest of the run
+      // (measured: 80 s against the wallride). The component INTO the face is removed, the rest of the move stands (a
+      // scrape slides along), and a hair of push-out clears a body that is already inside the face.
+      const run = Math.hypot(this.root.position.x - prevX, this.root.position.z - prevZ);
+      const rise = groundY - prevY;
+      const wall = this.cfg.stepUp > 0 && wasGrounded && hit.pickedMesh
+        && (rise > this.cfg.stepUp || (rise > KERB_M && run > 1e-4 && rise > run * MAX_RIDE_SLOPE));
+      if (wall) {
+        const n = faceNormalToward(hit.pickedMesh as AbstractMesh, prevX, prevY, prevZ);
+        const dx = this.root.position.x - prevX, dz = this.root.position.z - prevZ;
+        const into = -(dx * n.x + dz * n.z);                            // how far this frame's move went INTO the face
+        const keepX = dx + (into > 0 ? into * n.x : 0), keepZ = dz + (into > 0 ? into * n.z : 0);
+        this.root.position.set(prevX + keepX + n.x * WALL_PUSH_M, prevY, prevZ + keepZ + n.z * WALL_PUSH_M);
+        this.vel.y = 0;
+        this.grounded = true;
+        this.solidHit = { nx: n.x, nz: n.z, mesh: hit.pickedMesh as AbstractMesh, top: groundY };
+        return;
+      }
       // glued: a grounded rider descending a pitched piste stays on it (the surface falls away faster than one frame of
       // gravity); a jump sets grounded=false first, so the pop is never eaten
       const glued = this.grounded && this.cfg.stickDown > 0 && this.root.position.y - groundY <= this.cfg.stickDown;
@@ -133,8 +185,10 @@ export class Rider {
     }
   }
 
-  jump(power: number): void {
-    if (!this.grounded) return;
+  /** `late` (SKATE-MAJOR): the mode's coyote window said the press still counts although the wheels have just left — the
+   *  guard here used to swallow exactly the press the window had accepted, so a late ollie off a lip never popped. */
+  jump(power: number, late = false): void {
+    if (!this.grounded && !late) return;
     this.vel.y = 5 + power * 5.5;
     this.grounded = false;
   }
@@ -183,12 +237,47 @@ export class Rider {
     this.root.rotation.z = Math.sin(performance.now() / 180) * 0.06;  // balance wobble
   }
 
-  dismount(): void {
+  /**
+   * Leave the rail. The END of a rail is a hop off it (the historic 2.5 m/s). A `slip` (SKATE-MAJOR) is a FALL: the
+   * balance went, so the body drops off the side the needle tipped to (`side`, −1 / +1 across the rail) with no hop —
+   * a slipped grind used to pop 2.5 m/s UP off the rail, exactly like a clean dismount, and then graded a clean landing.
+   */
+  dismount(slip: 'end' | 'slip' = 'end', side = 1): void {
     if (!this.grinding) return;
+    const line = this.grinding;
     this.grinding = null;
-    this.vel.y = 2.5;
+    if (slip === 'slip') {
+      const along = line.b.subtract(line.a); along.y = 0; along.normalize();
+      const across = new Vector3(along.z, 0, -along.x).scale(side * 1.4);   // off the side, not down the rail
+      this.vel.x = this.vel.x * 0.35 + across.x; this.vel.z = this.vel.z * 0.35 + across.z;
+      this.vel.y = 0.4;
+    } else this.vel.y = 2.5;
     this.grounded = false;
   }
+}
+
+/**
+ * The face of `mesh` that a point just outside it is nearest to, as a planar unit normal pointing OUT of the mesh toward
+ * that point — read off the mesh's own bounding box in its local frame, so a rotated ledge, a leaned wallride or a bank's
+ * back face all answer with the face the rider actually met. A corner (outside on both axes) answers with the axis the
+ * point is further outside on.
+ */
+export function faceNormalToward(mesh: AbstractMesh, x: number, y: number, z: number): Vector3 {
+  const wm = mesh.getWorldMatrix();
+  const inv = wm.clone().invert();
+  const lp = Vector3.TransformCoordinates(new Vector3(x, y, z), inv);
+  const bb = mesh.getBoundingInfo().boundingBox;
+  const min = bb.minimum, max = bb.maximum;
+  // signed distance OUTSIDE each face (positive = outside that face)
+  const outXmin = min.x - lp.x, outXmax = lp.x - max.x, outZmin = min.z - lp.z, outZmax = lp.z - max.z;
+  const cands: [number, Vector3][] = [
+    [outXmin, new Vector3(-1, 0, 0)], [outXmax, new Vector3(1, 0, 0)], [outZmin, new Vector3(0, 0, -1)], [outZmax, new Vector3(0, 0, 1)],
+  ];
+  cands.sort((a, b) => b[0] - a[0]);
+  const local = cands[0][1];
+  const n = Vector3.TransformNormal(local, wm); n.y = 0;
+  if (n.lengthSquared() < 1e-9) return new Vector3(0, 0, 1);
+  return n.normalize();
 }
 
 function closestT(a: Vector3, b: Vector3, p: Vector3): number {

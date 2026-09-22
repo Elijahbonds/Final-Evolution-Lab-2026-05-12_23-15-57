@@ -132,9 +132,15 @@ pose('board_land_sketchy', 0.25); const sketchHips = hipsY(), sketchSpan = wrist
 console.log(`  sketchy vs clean   hips ${sketchHips.toFixed(3)} vs ${cleanHips.toFixed(3)}   wrists ${sketchSpan.toFixed(3)} vs ${cleanSpan.toFixed(3)}`);
 ok(sketchHips < cleanHips - 0.03, `a sketchy landing slams deeper than a clean one (${sketchHips.toFixed(3)} vs ${cleanHips.toFixed(3)})`);
 ok(sketchSpan > cleanSpan + 0.15, `and the arms are thrown out to catch it (wrist span ${sketchSpan.toFixed(3)} vs ${cleanSpan.toFixed(3)})`);
-pose('board_tuck', 0); const tuckSpan = wristSpan();
-pose('board_air', 0); const airSpan = wristSpan();
-ok(airSpan > tuckSpan + 0.2, `the plain air is OPEN, not the speed tuck (wrist span ${airSpan.toFixed(3)} vs ${tuckSpan.toFixed(3)})`);
+// SKATE-MAJOR (2026-09-21): "open" was a wrist SPAN, which only the shoulder-height T could pass. The tuck is a fold —
+// hips low, hands down and back by the hips; the air stands taller with the hands up at chest height and ahead of the
+// body. Measured as heights, which is what separates them from the chase cam.
+function handHeight(): number { const l = worldPos('LeftHand'), r = worldPos('RightHand'); return (l.y + r.y) / 2 - (rootNode?.getAbsolutePosition?.().y ?? 0); }
+pose('board_tuck', 0); const tuckHips = hipsY(), tuckHands = handHeight();
+pose('board_air', 0); const airHips = hipsY(), airHands = handHeight();
+console.log(`  air vs tuck        hips ${airHips.toFixed(3)} vs ${tuckHips.toFixed(3)}   hands ${airHands.toFixed(3)} vs ${tuckHands.toFixed(3)}`);
+ok(airHips > tuckHips + 0.08, `the plain air stands taller than the speed tuck (hips ${airHips.toFixed(3)} vs ${tuckHips.toFixed(3)})`);
+ok(airHands > tuckHands + 0.12, `and carries the hands higher than the tuck's hands-by-the-hips (${airHands.toFixed(3)} vs ${tuckHands.toFixed(3)})`);
 
 // ARMS ALIVE (ANIM-READABILITY, 2026-09-21). "Dead arms" is a clip whose hands never move: the rider rides a loop with
 // the arms bolted on. Every clip a rider LIVES in — the two idles, the carves, the push, the grind — has to move its
@@ -161,6 +167,44 @@ for (const clip of ['board_ride_idle', 'board_stand_idle', 'board_carve_left', '
   const travel = wristTravel(clip);
   console.log(`  ${clip.padEnd(18)} wrist travel ${Number.isNaN(travel) ? 'CLIP MISSING' : travel.toFixed(3)}`);
   ok(travel > 0.03, `${clip}: the arms are alive, not bolted on (wrist travel ${travel.toFixed(3)} m, want > 0.03)`);
+}
+
+// FEET OVER THE TRUCKS IN THE AIR (SKATE-MAJOR, 2026-09-21). The air family had no foot targets, so the stance yaw put the
+// two feet side by side ACROSS the deck (measured live: 0.24 m across, 0.05 m along) — a rider in the air on a plank with
+// his feet together. Same rule as the ground stance: spread along the deck, never across it.
+for (const clip of ['board_air', 'skate_ollie', 'skate_kickflip', 'board_grab']) {
+  for (const t of [0, 0.5, 1]) {
+    if (!pose(clip, t)) { ok(false, `${clip}: clip missing`); break; }
+    const l = worldPos('LeftFoot'), r = worldPos('RightFoot');
+    const along = Math.abs(l.z - r.z), across = Math.abs(l.x - r.x);
+    if (t === 0.5) console.log(`  ${clip.padEnd(18)} air feet: ${along.toFixed(3)} m along the deck, ${across.toFixed(3)} across`);
+    ok(along >= 0.3, `${clip} @${t}: feet over the trucks in the air (${along.toFixed(3)} m along, want >= 0.30)`);
+    ok(along > across, `${clip} @${t}: feet along the deck, not across it (${along.toFixed(3)} vs ${across.toFixed(3)})`);
+  }
+}
+
+// NO T ON THE BOARD (SKATE-MAJOR, 2026-09-21). The live probe's "stiff-T" read is a measurable shape: BOTH hands at
+// shoulder height (within 0.14 m) and reaching 0.32 m or more from their shoulders — the scarecrow. Measured on the
+// baseline run: 211 such frames, 99 of them the grind, 51 the ollie, 38 the landings, the rest the air and its fades.
+// Every clip a rider is seen in is sampled through its length here; the bail is exempt (flailing straight is the truth
+// of a fall) and so is the grab (one hand is on the deck, the other is the style arm, by design).
+function handRel(side: 'Left' | 'Right'): { dy: number; dh: number } {
+  const sh = worldPos(`${side}Arm`), hd = worldPos(`${side}Hand`);
+  return { dy: hd.y - sh.y, dh: Math.hypot(hd.x - sh.x, hd.z - sh.z) };
+}
+const T_LEVEL = 0.14, T_REACH = 0.32;
+for (const clip of ['board_ride_idle', 'board_stand_idle', 'board_carve_left', 'board_carve_right', 'board_push', 'board_tuck', 'board_grind', 'board_manual', 'board_air', 'skate_ollie', 'skate_kickflip', 'board_land', 'board_land_sketchy']) {
+  let tFrames = 0, worst = '';
+  const line: string[] = [];
+  for (const t of [0, 0.15, 0.3, 0.5, 0.65, 0.8, 1]) {
+    if (!pose(clip, t)) { ok(false, `${clip}: clip missing`); break; }
+    const L = handRel('Left'), R = handRel('Right');
+    const isT = Math.abs(L.dy) < T_LEVEL && Math.abs(R.dy) < T_LEVEL && L.dh > T_REACH && R.dh > T_REACH;
+    if (isT) { tFrames++; worst = `t ${t}: L dy ${L.dy.toFixed(2)} reach ${L.dh.toFixed(2)} · R dy ${R.dy.toFixed(2)} reach ${R.dh.toFixed(2)}`; }
+    if (t === 0.5) line.push(`L dy ${L.dy.toFixed(2)} reach ${L.dh.toFixed(2)} · R dy ${R.dy.toFixed(2)} reach ${R.dh.toFixed(2)}`);
+  }
+  console.log(`  ${clip.padEnd(18)} hands@0.5 ${line[0] ?? '?'}${tFrames ? `   T at ${tFrames} sample(s)` : ''}`);
+  ok(tFrames === 0, `${clip}: never holds both hands out at shoulder height (the T) — ${worst}`);
 }
 
 // The bail must BREAK the stance -- holding a textbook ride pose through a

@@ -25,6 +25,10 @@ export interface BoardTrickLayerOpts {
   /** Half the deck: width (x) and length (z), metres. */
   deckHalfW?: number;
   deckHalfL?: number;
+  /** SKATE-MAJOR (2026-09-21): the mode already keeps the deck under the feet in the air (skate's deckUnderFeet), so a
+   *  grab's `boardLift` on top of that hauled the deck 0.28 m ABOVE the feet — measured, both soles 0.20–0.24 m under
+   *  the deck top through every indy. With this the lift is the feet's job and the layer only tweaks the deck's angle. */
+  deckFollowsFeet?: boolean;
 }
 
 export class BoardTrickLayer {
@@ -44,9 +48,11 @@ export class BoardTrickLayer {
   private readonly bodySpin: boolean;
   private readonly halfW: number;
   private readonly halfL: number;
+  private readonly deckFollowsFeet: boolean;
 
   constructor(private scene: Scene, skeleton: Skeleton, private root: TransformNode, private board: TransformNode, opts: BoardTrickLayerOpts = {}) {
     this.bodySpin = opts.bodySpin ?? true;
+    this.deckFollowsFeet = opts.deckFollowsFeet ?? false;
     this.halfW = opts.deckHalfW ?? 0.13;
     this.halfL = opts.deckHalfL ?? 0.42;
     this.arms = { Left: armChain(skeleton, 'Left'), Right: armChain(skeleton, 'Right') };
@@ -96,7 +102,7 @@ export class BoardTrickLayer {
     const a = this.applied;
     a.yaw = this.bodySpin ? p.bodyYaw : 0;
     a.tilt = p.bodyTilt;
-    a.bx = p.boardPitch; a.by = p.boardYaw; a.bz = p.boardRoll; a.lift = p.boardLift;
+    a.bx = p.boardPitch; a.by = p.boardYaw; a.bz = p.boardRoll; a.lift = this.deckFollowsFeet ? 0 : p.boardLift;
     this.root.rotation.y += a.yaw; this.root.rotation.x += a.tilt;
     this.board.rotation.x += a.bx; this.board.rotation.y += a.by; this.board.rotation.z += a.bz; this.board.position.y += a.lift;
     return p;
@@ -138,7 +144,9 @@ export class BoardTrickLayer {
       const sh = free.shoulder.getAbsolutePosition();
       const across = sh.subtract(shoulderW); across.y = 0;
       if (across.lengthSquared() > 1e-6) across.normalize();
-      const reachTo = sh.add(across.scale(0.42)).add(new Vector3(0, 0.36, 0));
+      // SKATE-MAJOR: 0.42 across + 0.36 up was a 0.55 m reach — the whole arm, locked straight, pointing at the sky; the
+      // style arm is up and BENT (0.42 m: ~100° at the elbow)
+      const reachTo = sh.add(across.scale(0.30)).add(new Vector3(0, 0.30, 0));
       reachArm(free, reachTo, across.add(new Vector3(0, -0.3, 0)), g.weight * 0.85);
     }
   }

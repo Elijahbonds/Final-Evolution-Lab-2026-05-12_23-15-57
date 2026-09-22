@@ -35,6 +35,7 @@ ok('every reachable state -> resolvable clip', () => {
     { ...BASE, landing: 'clean' }, { ...BASE, landing: 'sketchy' },
     { ...BASE, bailing: true }, { ...BASE, celebrating: true },
     { ...BASE, tucking: true },
+    { ...BASE, airborne: true, wallRiding: 1 }, { ...BASE, airborne: true, wallRiding: -1 },   // SKATE-MAJOR: the wall has a body
   ];
   const seen = new Set<string>();
   for (const i of probes) {
@@ -43,7 +44,7 @@ ok('every reachable state -> resolvable clip', () => {
     assert.ok(c.fadeSec > 0, `${c.state} hard-cut`);
     seen.add(c.state);
   }
-  assert.equal(seen.size, 16, `all 16 states, got ${seen.size}`);
+  assert.equal(seen.size, 18, `all 18 states, got ${seen.size}`);
 });
 
 console.log('\nB. priorities');
@@ -80,6 +81,13 @@ ok('tuck is a state; a carve rises out of it; air beats it', () => {
   assert.equal(chooseBoardClip({ ...BASE, tucking: true, speed01: 0.6, lean: -0.8 }).state, 'carve_left');
   assert.equal(chooseBoardClip({ ...BASE, tucking: true, airborne: true }).state, 'air_tuck');
   assert.equal(chooseBoardClip({ ...BASE, tucking: true, grinding: true }).state, 'grind');
+});
+ok('a wall ride leans the body into the wall, and a grab thrown before it does not ride the wall (SKATE-MAJOR)', () => {
+  assert.equal(chooseBoardClip({ ...BASE, airborne: true, wallRiding: 1 }).state, 'wallride_right');
+  assert.equal(chooseBoardClip({ ...BASE, airborne: true, wallRiding: -1 }).clip, 'board_carve_left');
+  assert.equal(chooseBoardClip({ ...BASE, airborne: true, wallRiding: 1, grabHeld: true }).state, 'wallride_right');
+  assert.equal(chooseBoardClip({ ...BASE, airborne: true, wallRiding: 1, bailing: true }).state, 'bail');
+  assert.equal(chooseBoardClip({ ...BASE, airborne: true, wallRiding: 1, grinding: true }).state, 'grind');
 });
 ok('push is the authored board push, not the walk cycle', () => {
   assert.equal(chooseBoardClip({ ...BASE, pushing: true }).clip, 'board_push');

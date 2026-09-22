@@ -16,7 +16,7 @@ import type { CharacterAnimator } from './CharacterAnimator';
 export type BoardAnimState =
   | 'cruise' | 'push' | 'carve_left' | 'carve_right' | 'tuck'
   | 'ollie' | 'air_tuck' | 'air_grab' | 'air_flip' | 'air_spin'
-  | 'grind' | 'manual'
+  | 'grind' | 'manual' | 'wallride_left' | 'wallride_right'
   | 'land_clean' | 'land_sketchy' | 'bail'
   | 'idle' | 'celebrate';
 
@@ -37,6 +37,10 @@ export interface BoardAnimInput {
   popping?: boolean;
   /** Grounded speed tuck (snow's throttle, surf's buried rail). A carve wins over it — a racer rises to turn. */
   tucking?: boolean;
+  /** SKATE-MAJOR (2026-09-21): on a wall, and which side of the rider the wall is (+1 right, −1 left). The wall ride had
+   *  no state of its own, so whatever the air happened to be playing — measured, the GRAB the same X press had thrown
+   *  a frame earlier — rode the wall for its whole length with the feet nowhere near the deck. */
+  wallRiding?: -1 | 0 | 1;
 }
 
 const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
@@ -58,6 +62,10 @@ const CLIP_FOR: Record<BoardAnimState, { clip: string; loop: boolean; fadeSec: n
   air_spin:      { clip: 'board_air', loop: true, fadeSec: 0.12 },
   grind:         { clip: 'board_grind', loop: true, fadeSec: 0.08 },
   manual:        { clip: 'board_manual', loop: true, fadeSec: 0.12 },   // VENICE-SKATE-THPS: was the ride idle — the THPS link looked exactly like coasting
+  // SKATE-MAJOR: the body on a wall is a carve INTO the wall — the deck is flat on it and the rider is rolled with it
+  // (SkateRunMode rolls the root), so the lean the carve clip carries is the press against the wall
+  wallride_left:  { clip: 'board_carve_left', loop: true, fadeSec: 0.1 },
+  wallride_right: { clip: 'board_carve_right', loop: true, fadeSec: 0.1 },
   land_clean:    { clip: 'board_land', loop: false, fadeSec: 0.08 },
   land_sketchy:  { clip: 'board_land_sketchy', loop: false, fadeSec: 0.08 },   // ANIM-READABILITY (2026-09-21): was the clean land — the judge said sketchy and the body said stomped
   bail:          { clip: 'skate_bail', loop: false, fadeSec: 0.05 },
@@ -83,6 +91,7 @@ export function chooseBoardClip(i: BoardAnimInput, prev: BoardAnimState | null =
   else if (i.landing === 'clean') state = 'land_clean';
   else if (i.grinding) state = 'grind';
   else if (i.manual) state = 'manual';
+  else if (i.wallRiding) state = i.wallRiding > 0 ? 'wallride_right' : 'wallride_left';
   // the pop beat wins over the air pose it leads into, but never over a trick the player actually threw
   else if (i.popping && !i.grabHeld && !i.flipping && !i.spinning) state = 'ollie';
   else if (i.airborne) {
