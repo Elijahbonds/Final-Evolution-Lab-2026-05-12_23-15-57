@@ -13,10 +13,22 @@
 //
 // WHAT THEY ATTACH TO. A bone's transform node, so skinning is not involved — the mesh is parented to the node the
 // animation already drives. Nothing here touches the body's geometry, its skeleton, or the GLB.
+//
+// HOW BIG THEY ARE (CLOTHING-SOFT-RESIDUAL C2/C3/C4, 2026-09-21). The QA eye's "teal mesh clip through the shirt's
+// shoulder", "teal shard detached on the lower-right leg" and "right-arm shoulder elongation" on the TRUE dunk body were
+// these tubes: sized in metres off a reference body and centred by a fraction, the upper-arm sleeve was 0.30 m long on a
+// 0.28 m upper arm (it started INSIDE the shoulder and stood out of the tee's sleeve), and the shin sleeve's fixed 0.155 m
+// top ran under a calf wider than that. A tube is now described by where it sits on its segment (accessoryFit.TUBE_SPANS)
+// and its rings are MEASURED off the body's skin at those fractions plus an ease — on whatever body it is hung on. A body
+// that cannot be read yet (a spawn-in tween at scale 0.001, a rig before its first pose) gets the reference sizes and a
+// refit on the first frame it can be; a tube a shown top covers is trimmed to start past the top's edge, or hidden, by
+// bodyMask.trimTubesUnderTops once the wardrobe is known.
 import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, Quaternion, Vector3 } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
-import { boneNode } from '../anim/boneLookup';
+import { bareBoneName, boneNode } from '../anim/boneLookup';
 import { applyFabric } from './fabric';
+import { TUBE_SPANS, tubeFit, type TubeFit, type TubeSpan } from './accessoryFit';
+import { isBodyMesh, isShrunk, scheduleBodyMask, skinnedWorld } from './bodyMask';
 
 export type AccessoryId = 'headband' | 'wristbands' | 'armsleeve' | 'legsleeve' | 'crewsocks' | 'chain';
 export const ACCESSORY_IDS: readonly AccessoryId[] = ['headband', 'wristbands', 'armsleeve', 'legsleeve', 'crewsocks', 'chain'];
@@ -30,6 +42,20 @@ export interface AccessorySet {
   accent: Color3;
   /** The shooting/sleeve side. */
   side: Side;
+}
+
+/** What a limb tube carries in `mesh.metadata.felAccessory.tube`, for the trim under a shown top (bodyMask). */
+export interface TubeMeta {
+  kind: keyof typeof TUBE_SPANS;
+  /** the parent and child joints it lives between */
+  from: string; to: string;
+  /** the span it was BUILT for, and the span it shows now (the trim moves `span`, never `built`) */
+  built: TubeSpan; span: TubeSpan;
+  /** joint-to-joint metres when built, its ring radii (m, world) and whether they were read off the skin */
+  seg: number; r0: number; r1: number; measured: boolean;
+  /** its bone-local position when built (the trim offsets from here) */
+  pos0: [number, number, number];
+  hidden: string | null;
 }
 
 /**
@@ -51,12 +77,12 @@ export function rigScale(skeleton: Skeleton): number {
   } catch { return 1; }
 }
 
-/** A tube around a limb: the shape almost every one of these is. */
-function sleeve(scene: Scene, name: string, top: number, bottom: number, length: number, mat: PBRMaterial, k = 1): Mesh {
-  const m = MeshBuilder.CreateCylinder(name, { diameterTop: top * k, diameterBottom: bottom * k, height: length * k, tessellation: 12, cap: Mesh.NO_CAP }, scene);
-  m.material = mat; m.isPickable = false; m.receiveShadows = false;
-  return m;
-}
+/** Frames a tube waits for a shrunk or unposed body to become readable before it settles for the reference sizes. */
+const REFIT_WAIT_FRAMES = 180;
+/** The reference-body diameters (m, parent end → child end) a tube falls back to when the skin cannot be read. */
+const TUBE_DEFAULTS: Record<keyof typeof TUBE_SPANS, [number, number]> = {
+  armsleeve: [0.105, 0.082], armsleeve2: [0.082, 0.070], legsleeve: [0.125, 0.10], crewsocks: [0.10, 0.092],
+};
 
 function band(scene: Scene, name: string, diameter: number, thickness: number, mat: PBRMaterial, k = 1): Mesh {
   const m = MeshBuilder.CreateTorus(name, { diameter: diameter * k, thickness: thickness * k, tessellation: 14 }, scene);
@@ -81,6 +107,7 @@ function accessoryMaterial(scene: Scene, name: string, color: Color3, kind: 'jer
 export function attachAccessories(scene: Scene, skeleton: Skeleton, root: TransformNode | null, set: AccessorySet, tag = 'acc'): () => void {
   const made: { dispose(): void }[] = [];
   const mats: PBRMaterial[] = [];
+  let disposed = false;
   // MEASURE THE RIG, DO NOT ASSUME IT. Every number below was read off the kit body, and the anti-clone rule spawns
   // NPCs on ROSTER bodies whose bones are scaled differently — so on rc46 a headband sat high and thick and a forearm
   // sleeve landed past the hand. One factor, taken from the shoulder span, scales every size and offset with the body.
@@ -116,20 +143,114 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
    * a forearm sleeve ended up floating past a hand. Written as a fraction of the way from one joint to the next they
    * land correctly on any humanoid, at any scale, and the tube is aimed along the segment it wraps.
    */
-  const onSegment = (from: string, to: string, t: number, mesh: Mesh): boolean => {
+  const joints = (from: string, to: string): { a: TransformNode; b: TransformNode; pa: Vector3; pb: Vector3 } | null => {
     const a: TransformNode | null = boneNode(skeleton, from), b: TransformNode | null = boneNode(skeleton, to);
-    if (!a || !b) { mesh.dispose(); return false; }
+    if (!a || !b) return null;
     a.computeWorldMatrix(true); b.computeWorldMatrix(true);
-    const pa = a.getAbsolutePosition(), pb = b.getAbsolutePosition();
-    const world = Vector3.Lerp(pa, pb, t);
-    const inv = Matrix.Invert(a.getWorldMatrix());
-    mesh.parent = a;
-    mesh.position.copyFrom(Vector3.TransformCoordinates(world, inv));
-    // aim the tube down the segment, in the bone's own space
-    const axis = Vector3.TransformNormal(pb.subtract(pa).normalize(), inv).normalize();
+    return { a, b, pa: a.getAbsolutePosition(), pb: b.getAbsolutePosition() };
+  };
+  /** Hang `mesh` on `parent` with its local +y running from world `p0` to `p1`, centred between them. */
+  const placeAlong = (parent: TransformNode, p0: Vector3, p1: Vector3, mesh: Mesh): void => {
+    const inv = Matrix.Invert(parent.getWorldMatrix());
+    mesh.parent = parent;
+    mesh.position.copyFrom(Vector3.TransformCoordinates(Vector3.Center(p0, p1), inv));
+    // aim the tube down its line, in the bone's own space
+    const axis = Vector3.TransformNormal(p1.subtract(p0).normalize(), inv).normalize();
     mesh.rotationQuaternion = Quaternion.FromUnitVectorsToRef(new Vector3(0, 1, 0), axis, new Quaternion());
+  };
+  const placeOnSegment = (j: NonNullable<ReturnType<typeof joints>>, t: number, mesh: Mesh): void => {
+    const c = Vector3.Lerp(j.pa, j.pb, t), d = j.pb.subtract(j.pa).scale(0.01);
+    placeAlong(j.a, c.subtract(d), c.add(d), mesh);
+  };
+  const onSegment = (from: string, to: string, t: number, mesh: Mesh): boolean => {
+    const j = joints(from, to);
+    if (!j) { mesh.dispose(); return false; }
+    placeOnSegment(j, t, mesh);
     made.push(mesh);
     return true;
+  };
+
+  // THE SKIN THE TUBES ARE MEASURED ON: the kit body's skin mesh under this root, CPU-skinned once in the pose it holds
+  // now (the same math bodyMask measures the garments with). A roster rig without a `Body` mesh, or a body still shrunk
+  // in its spawn-in tween, reads null and the tube takes the reference sizes (and a refit later, below).
+  const bodyMesh = root ? ((root.getChildMeshes(false).find((m) => isBodyMesh(m.name) && (m as Mesh).skeleton) as Mesh | undefined) ?? null) : null;
+  let skin: Float32Array | null | undefined;
+  const skinP = (): Float32Array | null => {
+    if (skin !== undefined) return skin;
+    try { skin = bodyMesh && !bodyMesh.isDisposed() && !isShrunk(bodyMesh) ? (skinnedWorld(bodyMesh)?.P ?? null) : null; } catch { skin = null; }
+    return skin;
+  };
+  // THE LIMB'S OWN SKIN, BY ITS WEIGHTS. A slab across the upper arm near the armpit cuts the torso too, one across the ankle
+  // cuts the instep, one across the elbow the forearm — and the skin is continuous into all of them, so a radius read off
+  // "every point in the slab" ran out to the cap (14 cm rings on every tube, measured on the dev body). The skin that
+  // belongs to a segment is the skin that rides its parent bone: vertices with at least LIMB_WEIGHT on it. Low enough to
+  // reach the joint at the far end (the elbow's skin is half ForeArm, the ankle's half Foot — at 0.4 the ring at 97 % of the
+  // upper arm found under eight points and every arm tube fell back to the reference sizes), high enough that the instep
+  // (Foot) and the flank (Spine) stay out.
+  const LIMB_WEIGHT = 0.25;
+  const limbCache = new Map<string, Float32Array | null>();
+  const limbPoints = (bone: string): Float32Array | null => {
+    const P = skinP(); if (!P || !bodyMesh?.skeleton) return null;
+    const hit = limbCache.get(bone); if (hit !== undefined) return hit;
+    const mi = bodyMesh.getVerticesData('matricesIndices'), mw = bodyMesh.getVerticesData('matricesWeights');
+    const mie = bodyMesh.getVerticesData('matricesIndicesExtra'), mwe = bodyMesh.getVerticesData('matricesWeightsExtra');
+    if (!mi || !mw) { limbCache.set(bone, null); return null; }
+    const want = new Set<number>(); bodyMesh.skeleton.bones.forEach((b, i) => { if (bareBoneName(b.name) === bone) want.add(i); });
+    if (!want.size) { limbCache.set(bone, null); return null; }
+    const out: number[] = [];
+    for (let v = 0; v < P.length / 3; v++) {
+      let w = 0;
+      for (let k = 0; k < 4; k++) { if (want.has(mi[v * 4 + k])) w += mw[v * 4 + k]; if (mie && mwe && want.has(mie[v * 4 + k])) w += mwe[v * 4 + k]; }
+      if (w >= LIMB_WEIGHT) out.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]);
+    }
+    const arr = out.length ? new Float32Array(out) : null;
+    limbCache.set(bone, arr);
+    return arr;
+  };
+  type TubeKind = keyof typeof TUBE_SPANS;
+  interface TubeSpec { kind: TubeKind; name: string; from: string; to: string; mat: PBRMaterial }
+  const tubes: { spec: TubeSpec; mesh: Mesh; fitted: boolean }[] = [];
+  const measure = (spec: TubeSpec, P: Float32Array | null): TubeFit | null => {
+    const j = P ? joints(spec.from, spec.to) : null;
+    const limb = j ? limbPoints(spec.from) : null;
+    return j && limb ? tubeFit(limb, j.pa, j.pb, TUBE_SPANS[spec.kind]) : null;
+  };
+  /** A tube between two joints: its rings the fit's — centred on the limb's skin, which is not the bone (the calf sits behind
+   *  the shin) — or the reference sizes on the bone; its length the span's share of the LIVE joint-to-joint distance. */
+  const buildTube = (spec: TubeSpec, fit: TubeFit | null): Mesh | null => {
+    const j = joints(spec.from, spec.to);
+    if (!j) return null;
+    const seg = Vector3.Distance(j.pa, j.pb);
+    if (!(seg > 0.02)) return null;
+    const span = TUBE_SPANS[spec.kind];
+    const Wm = j.a.getWorldMatrix().m; const s = Math.hypot(Wm[0], Wm[1], Wm[2]) || 1;   // bone-local units per world metre
+    const [dTop, dBot] = TUBE_DEFAULTS[spec.kind];
+    // a measured ring outside 0.6–1.4× the reference is a slab that read the next body part (a roster rig's ankle ring came
+    // out 10 cm — the instep, on a rig whose shin weights run into the foot; its calf ring 9.6): that ring takes the
+    // reference size instead. The kit male measures inside the band on every tube (arm 6.9/5.6, shin 7.4/4.5 cm).
+    const sane = (r: number | undefined, ref: number): number => { const d = ref * k; return r != null && r * 2 >= d * 0.6 && r * 2 <= d * 1.4 ? r * 2 : d; };
+    const top = (fit ? sane(fit.r0, dTop) : dTop * k) / s, bottom = (fit ? sane(fit.r1, dBot) : dBot * k) / s;
+    const p0 = fit ? new Vector3(fit.c0.x, fit.c0.y, fit.c0.z) : Vector3.Lerp(j.pa, j.pb, span.from);
+    const p1 = fit ? new Vector3(fit.c1.x, fit.c1.y, fit.c1.z) : Vector3.Lerp(j.pa, j.pb, span.to);
+    const length = Vector3.Distance(p0, p1) / s;
+    const m = MeshBuilder.CreateCylinder(spec.name, { diameterTop: top, diameterBottom: bottom, height: length, tessellation: 16, cap: Mesh.NO_CAP }, scene);
+    m.material = spec.mat; m.isPickable = false; m.receiveShadows = false;
+    placeAlong(j.a, p0, p1, m);
+    const meta: TubeMeta = { kind: spec.kind, from: spec.from, to: spec.to, built: { ...span }, span: { ...span }, seg, r0: top * s / 2, r1: bottom * s / 2, measured: !!fit, pos0: [m.position.x, m.position.y, m.position.z], hidden: null };
+    m.metadata = { ...(m.metadata ?? {}), felAccessory: { tube: meta } };
+    made.push(m);
+    return m;
+  };
+  // Built at the reference sizes NOW and measured AFTER the first render (below). The skin is only worth reading after a
+  // render: measured at spawn, and inside a frame before the mode's own arm IK has run, the joints stood 8 cm from where
+  // the skinning matrices (the previous frame's final pose) put the skin, and the arm's rings read nothing at all.
+  const tube = (spec: TubeSpec): void => {
+    const m = buildTube(spec, null);
+    if (m) tubes.push({ spec, mesh: m, fitted: false });
+  };
+  const tubeLine = (t: { spec: TubeSpec; mesh: Mesh; fitted: boolean }): string => {
+    const meta = (t.mesh.metadata as { felAccessory?: { tube?: TubeMeta } })?.felAccessory?.tube;
+    return `${t.spec.kind} ${meta ? `${(meta.r0 * 100).toFixed(1)}/${(meta.r1 * 100).toFixed(1)} cm on ${(meta.seg * 100).toFixed(0)} cm` : '?'} ${t.fitted ? 'measured' : 'reference'}`;
   };
 
   try {
@@ -151,20 +272,17 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
           onSegment(`${s}ForeArm`, `${s}Hand`, 0.86, m);
         }
       } else if (id === 'armsleeve') {
-        // THE SHOOTING SLEEVE: shoulder to wrist on ONE arm, tapering, and it is a compression fabric so it is dark
+        // THE SHOOTING SLEEVE: below the deltoid to the elbow, then the elbow to above the wrist, on ONE arm — a compression
+        // fabric, so it is dark. It never starts inside the shoulder (TUBE_SPANS): the eye's teal clip through the tee.
         const s = set.side;
-        const m = sleeve(scene, `${tag}_armsleeve`, 0.115, 0.082, 0.30, mat('armsleeve', dark, 'sock'), k);
-        onSegment(`${s}Arm`, `${s}ForeArm`, 0.52, m);
-        const m2 = sleeve(scene, `${tag}_armsleeve2`, 0.082, 0.070, 0.22, mat('armsleeve2', dark, 'sock'), k);
-        onSegment(`${s}ForeArm`, `${s}Hand`, 0.46, m2);
+        tube({ kind: 'armsleeve', name: `${tag}_armsleeve`, from: `${s}Arm`, to: `${s}ForeArm`, mat: mat('armsleeve', dark, 'sock') });
+        tube({ kind: 'armsleeve2', name: `${tag}_armsleeve2`, from: `${s}ForeArm`, to: `${s}Hand`, mat: mat('armsleeve2', dark, 'sock') });
       } else if (id === 'legsleeve') {
         const s = set.side === 'Left' ? 'Right' : 'Left';   // the opposite leg to the sleeve arm: it reads as deliberate
-        const m = sleeve(scene, `${tag}_legsleeve`, 0.155, 0.115, 0.26, mat('legsleeve', dark, 'sock'), k);
-        onSegment(`${s}Leg`, `${s}Foot`, 0.42, m);
+        tube({ kind: 'legsleeve', name: `${tag}_legsleeve`, from: `${s}Leg`, to: `${s}Foot`, mat: mat('legsleeve', dark, 'sock') });
       } else if (id === 'crewsocks') {
         for (const s of ['Left', 'Right'] as const) {
-          const m = sleeve(scene, `${tag}_sock_${s}`, 0.10, 0.092, 0.15, mat(`sock_${s}`, new Color3(0.94, 0.94, 0.92), 'sock'), k);
-          onSegment(`${s}Leg`, `${s}Foot`, 0.80, m);
+          tube({ kind: 'crewsocks', name: `${tag}_sock_${s}`, from: `${s}Leg`, to: `${s}Foot`, mat: mat(`sock_${s}`, new Color3(0.94, 0.94, 0.92), 'sock') });
         }
       } else if (id === 'chain') {
         // A CHAIN HANGS ON THE CHEST. At 0.15 m on the NECK bone it read as a white surgical collar in the frame —
@@ -182,10 +300,41 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
     }
   } catch { /* a rig that cannot take them simply does not get them */ }
 
+  // A TUBE THE SKIN COULD NOT SIZE YET is rebuilt on the first frame it can be (a materialise tween is ~20 frames; a rig
+  // poses on its first render), then the wardrobe's trim runs again over the rebuilt tubes.
+  // THE TUBES ARE MEASURED AFTER A RENDER — the joints and the skinning matrices agree only then (bodyMask measures the
+  // garments at the same moment for the same reason) — on the first frame the body is at its real size, then rebuilt on
+  // the limb's own skin and handed to the wardrobe's trim. A body that cannot be read in REFIT_WAIT_FRAMES keeps the
+  // reference sizes and says so.
+  if (bodyMesh && tubes.some((t) => !t.fitted)) {
+    let waited = 0;
+    const late = (): void => {
+      try {
+        if (disposed || bodyMesh.isDisposed()) return;
+        skin = undefined; limbCache.clear();
+        const P = isShrunk(bodyMesh) ? null : skinP();
+        let changed = false, pending = false;
+        for (const t of tubes) {
+          if (t.fitted || t.mesh.isDisposed()) continue;
+          const fit = P ? measure(t.spec, P) : null;
+          if (!fit) { pending = true; continue; }
+          const nm = buildTube(t.spec, fit); if (!nm) { t.fitted = true; continue; }
+          const i = made.indexOf(t.mesh); if (i >= 0) made.splice(i, 1);
+          t.mesh.dispose(); t.mesh = nm; t.fitted = true; changed = true;
+        }
+        if (changed) { console.info(`[FEL-ACC] ${tag}: measured after ${waited + 1} frame(s) — ${tubes.map(tubeLine).join(' · ')}`); scheduleBodyMask([bodyMesh]); }
+        if (pending && waited++ < REFIT_WAIT_FRAMES) scene.onAfterRenderObservable.addOnce(late);
+        else if (pending) console.warn(`[FEL-ACC] ${tag}: ${tubes.filter((t) => !t.fitted).map((t) => t.spec.kind).join(', ')} kept the reference sizes — the skin could not be read in ${REFIT_WAIT_FRAMES} frames (${P ? `${P.length / 3} skin points, shrunk ${isShrunk(bodyMesh)}` : 'no skin'})`);
+      } catch (e) { console.warn(`[FEL-ACC] ${tag}: refit skipped: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
+    };
+    scene.onAfterRenderObservable.addOnce(late);
+  }
+
   return () => {
+    disposed = true;
     for (const m of made) { try { m.dispose(); } catch { /* already gone with the scene */ } }
     for (const m of mats) { try { m.dispose(); } catch { /* already gone */ } }
-    made.length = 0; mats.length = 0;
+    made.length = 0; mats.length = 0; tubes.length = 0;
   };
 }
 

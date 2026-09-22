@@ -177,7 +177,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const onPhonePad = useCallback((e: Parameters<InputBus['emit']>[0]) => { bus?.emit(e); }, [bus]);
 
   return (
-    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
+    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent" data-fel-slam={typeof hud.slamBeat === 'string' && hud.slamBeat ? hud.slamBeat : 'off'}>
+      {/* data-fel-slam (above): where the flight is against the SLAM window ('cue' | 'open' | 'beat' | 'catch' | 'off'), mirrored
+          from DunkMode's `slamBeat` so a harness can press ON the beat instead of on a stopwatch (CLOTHING-SOFT-RESIDUAL R2). */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* HUD bezel — judged contest scoreboard (M47) */}

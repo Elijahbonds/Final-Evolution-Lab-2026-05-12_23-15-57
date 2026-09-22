@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeBodyMask, fitWaistband, WAIST_FIT, EDGE_FLARE, edgeFlareWeights, isBodyMesh, maskSlotOf, openEdgePoints, SHOE_RIM_DEPTH, shoeRimPoints, type MaskSurface } from './bodyMask';
+import { computeBodyMask, edgeMargins, fitWaistband, WAIST_FIT, EDGE_FLARE, edgeFlareWeights, isBodyMesh, maskSlotOf, openEdgePoints, SHOE_RIM_DEPTH, shoeRimPoints, TOP_EDGE_MARGIN, type MaskSurface } from './bodyMask';
 
 /** An open tube along y: `rings` rings of `seg` vertices from y0 to y1, radius r, outward normals. Optional seam split:
  *  the first column is duplicated (a UV seam), the way the MPFB garments arrive. */
@@ -47,6 +47,23 @@ describe('bodyMask', () => {
     }
     expect(res.trisAfter).toBeLessThan(res.trisBefore);
     expect(res.indices.length / 3).toBe(res.trisAfter);
+  });
+
+  it('a top keeps a wide band of skin drawn at its hem and cuffs (the arms overhead ride the tee up), the neckline its narrow one (CLOTHING-SOFT-RESIDUAL C1/C3)', () => {
+    const body = tube(0.10, -0.5, 0.8, 53, 16);     // rings every 2.5 cm
+    const tee = tube(0.12, 0, 0.4, 9, 16, true);    // hem at 0, neck at 0.4
+    const res = computeBodyMask({ bodyP: body.P, bodyN: body.N, bodyInd: body.ind, slots: [{ slot: 'tops', surfaces: [tee] }] });
+    const at = (y: number) => { const vs: number[] = []; for (let v = 0; v < body.P.length / 3; v++) if (Math.abs(body.P[v * 3 + 1] - y) < 1e-6) vs.push(v); return vs; };
+    expect(at(0.025).length).toBe(16);
+    expect(at(0.025).every((v) => !res.hidden[v])).toBe(true);    // 2.5 cm over the hem: drawn (it was hidden at 1 cm)
+    expect(at(0.2).every((v) => !!res.hidden[v])).toBe(true);     // mid-tee: hidden
+    expect(at(0.375).every((v) => !!res.hidden[v])).toBe(true);   // 2.5 cm under the neckline: hidden, the neck keeps 1 cm
+    expect(TOP_EDGE_MARGIN).toBeGreaterThanOrEqual(0.05);
+    const em = edgeMargins(openEdgePoints([tee]), 'tops', 0.01, [tee]);
+    expect(em.max).toBe(TOP_EDGE_MARGIN);
+    expect(Array.from(em.of).filter((m) => m === 0.01).length).toBe(16);   // the neck ring
+    expect(Array.from(em.of).filter((m) => m === TOP_EDGE_MARGIN).length).toBe(16);   // the hem ring
+    expect(edgeMargins(openEdgePoints([tee]), 'shorts', 0.01, [tee]).max).toBe(0.01);   // only tops widen
   });
 
   it('keeps a limb that hangs beside the garment facing INTO it, hides skin poking out through it', () => {

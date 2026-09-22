@@ -25,11 +25,25 @@
 // container's geometry are untouched: the body takes a unique geometry once, and its loaded indices are kept on the mesh
 // so every re-mask starts from the full body.
 import { BoundingInfo, Matrix, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, IndicesArray, Mesh } from '@babylonjs/core';
+import type { AbstractMesh, IndicesArray, Mesh, TransformNode } from '@babylonjs/core';
+import { boneNode } from '../anim/boneLookup';
+import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
 
 /** How far under a garment (from its open edge, metres) the skin must be before it is hidden. Tops and shorts leave a
  *  band at the hem so a garment that rides up never opens a hole into the body. */
 export const MASK_MARGIN: Record<string, number> = { tops: 0.01, shorts: 0.01, shoes: 0 };
+/**
+ * A TOP'S HEM AND CUFFS KEEP A WIDER BAND (CLOTHING-SOFT-RESIDUAL C1/C3, 2026-09-21). With the arms overhead at the rim the
+ * tee rides up the torso and its sleeves ride up the arms, and the skin that comes out from under them had been hidden:
+ * measured on the Lab tee at the resolve, 12 hidden skin vertices stood exposed past the tee's edges (Hips 5, RightArm 4,
+ * LeftArm 3) — the QA eye's "waist fleck / gap at the shirt↔shorts seam" on CONTACT and the landing, and its "shoulder
+ * joint gap arm↔torso". So the skin within this of the hem, the cuffs and the armholes stays drawn (the tee stands 1.3 cm
+ * off it with a depth bias, so it does not show through); the neckline keeps MASK_MARGIN — the chest and the shoulders
+ * under a close neck are where a shrug would poke the skin through.
+ */
+export const TOP_EDGE_MARGIN = 0.05;
+/** The neckline: open-edge points in the top quarter of the garment's height within this of its axis. */
+const NECK_RADIUS = 0.13;
 /** A body vertex further than this from a garment surface is not under it. */
 export const MASK_REACH = 0.045;
 /** Shoes hide only skin that rides the foot: at least this much of its weight on Foot / ToeBase (the ankle inside the
@@ -117,6 +131,23 @@ export function openEdgePoints(surfaces: MaskSurface[]): number[] {
   return out;
 }
 
+/** Each open-edge point's margin: `margin` everywhere, except a top's hem, cuffs and armholes take TOP_EDGE_MARGIN (or
+ *  `margin` when that is wider) — its neckline (top quarter, within NECK_RADIUS of the axis) keeps `margin`. Pure. */
+export function edgeMargins(edges: ArrayLike<number>, slot: string, margin: number, surfaces: MaskSurface[]): { of: Float64Array; max: number } {
+  const n = edges.length / 3, of = new Float64Array(n).fill(margin);
+  if (slot !== 'tops' || !n) return { of, max: margin };
+  let lo = Infinity, hi = -Infinity, cx = 0, cz = 0, cnt = 0;
+  for (const s of surfaces) for (let v = 0; v + 2 < s.P.length; v += 3) { lo = Math.min(lo, s.P[v + 1]); hi = Math.max(hi, s.P[v + 1]); cx += s.P[v]; cz += s.P[v + 2]; cnt++; }
+  if (!cnt || !(hi > lo)) return { of, max: margin };
+  cx /= cnt; cz /= cnt;
+  const wide = Math.max(margin, TOP_EDGE_MARGIN);
+  for (let e = 0; e < n; e++) {
+    const y = edges[e * 3 + 1], neck = y > lo + 0.75 * (hi - lo) && Math.hypot(edges[e * 3] - cx, edges[e * 3 + 2] - cz) < NECK_RADIUS;
+    of[e] = neck ? margin : wide;
+  }
+  return { of, max: wide };
+}
+
 /** The mask. Pure. */
 export function computeBodyMask(input: MaskInput): MaskResult {
   const { bodyP, bodyN, bodyInd } = input;
@@ -139,8 +170,11 @@ export function computeBodyMask(input: MaskInput): MaskResult {
       }
     });
     const edges = margin > 0 ? openEdgePoints(sl.surfaces) : [];
+    // a caller that names its own margin gets exactly that band (the waistband fit reads a short under a tee at 0.1 mm);
+    // the slot default widens a top's hem and cuffs
+    const em = sl.margin != null ? { of: new Float64Array(edges.length / 3).fill(margin), max: margin } : edgeMargins(edges, sl.slot, margin, sl.surfaces);
     const rim = boneRe ? shoeRimPoints(sl.surfaces) : [];
-    const EC = Math.max(margin, 0.01);
+    const EC = Math.max(margin, em.max, 0.01);
     const edgeGrid = new Map<string, number[]>();
     for (let e = 0; e < edges.length / 3; e++) { const kk = key(Math.floor(edges[e * 3] / EC), Math.floor(edges[e * 3 + 1] / EC), Math.floor(edges[e * 3 + 2] / EC)); let a = edgeGrid.get(kk); if (!a) edgeGrid.set(kk, a = []); a.push(e); }
     let n = 0;
@@ -184,10 +218,10 @@ export function computeBodyMask(input: MaskInput): MaskResult {
       // of the nearest lining triangle — 2114 foot vertices kept that way; the bone filter already confines it to the foot)
       if (!boneRe && best && !(best.s <= 0.002 || best.facing > 0.3)) { no('inFrontFacingAway'); continue; }   // in front and facing away: a limb beside the garment, not skin under it
       if (margin > 0) {
-        let near = Infinity;
+        let inMargin = false;
         const ci = Math.floor(x / EC), cj = Math.floor(y / EC), ck = Math.floor(z / EC);
-        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) { const a = edgeGrid.get(key(ci + i, cj + j, ck + k)); if (a) for (const e of a) near = Math.min(near, Math.hypot(edges[e * 3] - x, edges[e * 3 + 1] - y, edges[e * 3 + 2] - z)); }
-        if (near < margin) { no('inMargin'); continue; }
+        for (let i = -1; i <= 1 && !inMargin; i++) for (let j = -1; j <= 1 && !inMargin; j++) for (let k = -1; k <= 1 && !inMargin; k++) { const a = edgeGrid.get(key(ci + i, cj + j, ck + k)); if (a) for (const e of a) if (Math.hypot(edges[e * 3] - x, edges[e * 3 + 1] - y, edges[e * 3 + 2] - z) < em.of[e]) { inMargin = true; break; } }
+        if (inMargin) { no('inMargin'); continue; }
       }
       hidden[v] = 1; n++;
     }
@@ -620,6 +654,7 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
     const s = skinnedWorld(m as Mesh, slot === 'shoes' ? undefined : (m as { __felFlare0?: Float32Array }).__felFlare0); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
     (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ P: s.P, N: s.N, ind });
   }
+  try { trimTubesUnderTops(body, bySlot.get('tops') ?? []); } catch (e) { console.warn(`[FEL-KIT] accessory trim skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights');
   const bones = body.skeleton!.bones;
   const bodyBoneWeight = (v: number, re: RegExp) => { if (!mi || !mw) return 0; let w = 0; for (let k = 0; k < 4; k++) if (mw[v * 4 + k] > 0 && re.test(bones[mi[v * 4 + k]]?.name ?? '')) w += mw[v * 4 + k]; return w; };
@@ -632,6 +667,46 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
     // what the mask measured (probe diagnostics): the skinned height range of the body and of each slot's surfaces
     measured: { body: yRange(bodySkin.P), ...Object.fromEntries([...bySlot].map(([slot, ss]) => [slot, ss.map((x) => yRange(x.P))])) } } };
   return res;
+}
+
+/** What accessories.ts leaves on a limb tube (`metadata.felAccessory.tube`); mirrored there as TubeMeta. */
+interface TubeMetaLike { to: string; built: TubeSpan; span: TubeSpan; r0: number; r1: number; pos0: [number, number, number]; hidden: string | null }
+/**
+ * A LIMB ACCESSORY UNDER A SHOWN TOP (CLOTHING-SOFT-RESIDUAL C2, 2026-09-21). The shooting sleeve is a rigid tube on the
+ * upper arm; a sleeved tee covers the top of it, and where the two coincided the tube came through the tee at the shoulder
+ * (the eye's "green/teal interior mesh clip through the left upper-arm / shoulder of the shirt"; my own tuck frame). The
+ * wardrobe is only known here, after applyKit, so this is where a tube meets the top: along its built span, every station
+ * with a top vertex over it is covered (accessoryFit.tubeCoverage); a tube covered along most of its length is hidden, and
+ * one covered at an end is shortened to start past the top's edge with daylight (trimSpan) — a sleeve worn under a tee
+ * starts where the tee's sleeve ends. Idempotent from the tube's built span and position, so a Closet swap to a tank
+ * gives the whole tube back. Returns how many tubes were changed.
+ */
+export function trimTubesUnderTops(body: Mesh, tops: MaskSurface[]): number {
+  const rootNode = body.parent as (TransformNode & { getChildMeshes?: (direct: boolean) => AbstractMesh[] }) | null;
+  if (!rootNode?.getChildMeshes || !body.skeleton) return 0;
+  let topP: ArrayLike<number> = [];
+  if (tops.length === 1) topP = tops[0].P;
+  else if (tops.length) { const all: number[] = []; for (const s of tops) for (let i = 0; i < s.P.length; i++) all.push(s.P[i]); topP = all; }
+  let n = 0;
+  for (const m of rootNode.getChildMeshes(false)) {
+    const t = ((m.metadata ?? null) as { felAccessory?: { tube?: TubeMetaLike } } | null)?.felAccessory?.tube;
+    if (!t || m.isDisposed()) continue;
+    const a = m.parent as TransformNode | null, b = boneNode(body.skeleton, t.to);
+    if (!a || !b) continue;
+    a.computeWorldMatrix(true); b.computeWorldMatrix(true);
+    const pa = a.getAbsolutePosition(), pb = b.getAbsolutePosition(), seg = Vector3.Distance(pa, pb);
+    const want = trimSpan(t.built, tubeCoverage(topP, pa, pb, t.built, Math.max(t.r0, t.r1)), seg);
+    if (!want) { if (m.isVisible) n++; m.isVisible = false; t.span = { ...t.built }; t.hidden = 'under top'; continue; }
+    const w0 = t.built.to - t.built.from, w1 = want.to - want.from;
+    const sy = w0 > 1e-6 ? w1 / w0 : 1;
+    const shift = (want.from + want.to) / 2 - (t.built.from + t.built.to) / 2;   // of the segment, along it
+    const d = Vector3.TransformNormal(pb.subtract(pa).scale(shift), Matrix.Invert(a.getWorldMatrix()));
+    if (!m.isVisible || Math.abs(m.scaling.y - sy) > 1e-4 || t.hidden) n++;
+    m.isVisible = true; t.hidden = null; t.span = want;
+    m.scaling.y = sy;
+    m.position.set(t.pos0[0] + d.x, t.pos0[1] + d.y, t.pos0[2] + d.z);
+  }
+  return n;
 }
 
 /**

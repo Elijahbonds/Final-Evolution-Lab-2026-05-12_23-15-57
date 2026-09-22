@@ -1448,7 +1448,14 @@ export const DunkMode: ModeDefinition = (() => {
         // CLOTHING-SOFT-RESIDUAL R2: the buffer (and the SLAM! read with it) reaches back to the top of the arc — "SLAM at the top"
         const holdSec = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
         slamCueOn = !lob.live && clipTime >= openAt - holdSec && clipTime <= closeAt;
-        if ((slamCueOn || (qteWindowOpen && lob.live)) && !(wasCue || wasOpen)) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM — OR WAIT FOR THE BEAT', slamPulse: true });
+        // THE BEAT IS MACHINE-READABLE (CLOTHING-SOFT-RESIDUAL R2, 2026-09-21). `slamBeat` names where the flight is against
+        // the SLAM window — 'cue' (the read is up, a press is held for the window), 'open' (inside it), 'beat' (its centre,
+        // the NOW! call), '' (none) — and the play HUD mirrors it as `data-fel-slam` on its root. The QA eye's "ontime" runs
+        // pressed SLAM a fixed 400 ms after letting go of RUN, which landed at clip 0.39–0.54 on the RISE: 574–770 ms before
+        // the window, refused TOO EARLY every time, and then filed the frames as "through-rim". A harness that wants an
+        // on-time press waits for this to read 'beat' and presses then (scripts/probes/_r2-ontime-probe.mts); nothing about
+        // the window itself moved.
+        if ((slamCueOn || (qteWindowOpen && lob.live)) && !(wasCue || wasOpen)) ctx.setHud({ hint: lob.live ? 'CATCH IT!' : 'SLAM — OR WAIT FOR THE BEAT', slamPulse: true, slamBeat: lob.live ? 'catch' : 'cue' });
         // P2 (2026-09-16): THE BEAT ITSELF IS AUDIBLE. The read lifts at the top of the arc and every press from there
         // is taken, which is right — a 14-frame window is not a reaction test. But a player who only ever sees one
         // signal can never learn where the perfect beat is: they press on the read, take their 25-40 %, and have no way
@@ -1462,15 +1469,15 @@ export const DunkMode: ModeDefinition = (() => {
         // The rhythm lesson the opening tell was added for is kept: the window still announces itself with its own
         // word and tick. The instruction moved to the beat, where obeying it scores.
         if (qteWindowOpen && !wasOpen && !lob.live) {
-          ctx.setHud({ hint: 'WINDOW OPEN' });
+          ctx.setHud({ hint: 'WINDOW OPEN', slamBeat: 'open' });
           SoundKit.play('uiTick', { pitch: 1.55, volume: 0.4 });
         }
         if (!lob.live && !beatCalled && clipTime >= EASTBAY_TIMING.extend && clipTime <= closeAt) {
           beatCalled = true;
-          ctx.setHud({ hint: 'NOW!' });
+          ctx.setHud({ hint: 'NOW!', slamBeat: 'beat' });
           SoundKit.play('uiTick', { pitch: 1.9, volume: 0.55 });
         }
-        if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false });
+        if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false, slamBeat: '' });
         // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
         if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && openAt - slamBufferAt <= holdSec + 1e-6) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame. The hold is measured from the window's EDGE, not the frame that crossed it (a press at the top missed by one frame's overshoot, 316 ms against 310)
         // A PRESS TOO EARLY EVEN FOR THE BUFFER USED TO VANISH. The review measured three attempts out of
@@ -1889,6 +1896,8 @@ export const DunkMode: ModeDefinition = (() => {
     // single loudest complaint in the review: three attempts out of six scored nothing and explained nothing.
     slamTiming = slamReadout(at, center, qteAccuracy, half);
     if (early > 0) console.info(`[DUNK-SLAM] buffered press @${at.toFixed(2)} fired at the window (${(early * 1000).toFixed(0)} ms early, execution ${qteAccuracy.toFixed(2)})`);
+    // every accepted press, on the record (CLOTHING-SOFT-RESIDUAL R2): the probe names its frames by THIS, not by hope
+    console.info(`[DUNK-SLAM] press @${at.toFixed(2)} · window ${openAt.toFixed(2)}–${(center + half).toFixed(2)} centre ${center.toFixed(2)} · ${slamTiming.zone} ${Math.round((at - center) * 1000)} ms · execution ${qteAccuracy.toFixed(2)} · ${qteHit ? 'CLEAN' : 'IRON'}`);
     // DUNK-POSTURE S3: the slam resolves ON THE PRESS. It used to wait for the window to close (clip 1.41 — the body
     // 0.3 m off the floor on the way down), so the ball left a hand at chest height and lerped 2.7 m up into the iron on
     // its own; the "jam" the eye saw was a reach forward at knee height. Pressed inside the window the hand IS at the
@@ -2102,7 +2111,7 @@ export const DunkMode: ModeDefinition = (() => {
     // before it) is still in the follow and keeps the snap.
     if (!rimCamCut) ctx.camDirector.snapTo(player.root.position, rim);
     rimCamCut = false;
-    ctx.setHud({ slamPulse: false, hint: '' });   // DUNK-SOFTS-NAMED: no SLAM! / CATCH IT! left standing under the verdict
+    ctx.setHud({ slamPulse: false, hint: '', slamBeat: '' });   // DUNK-SOFTS-NAMED: no SLAM! / CATCH IT! left standing under the verdict
     releasePos.copyFrom(ball.getAbsolutePosition());
     aerialClip = pickAerialFinish(qteHit, qteAccuracy, ebState.inLeftHand, calledAirTrick()); resolveRealMs = performance.now(); clipTimeAtResolve = clipTime;
     // DUNK-POSTURE-LEGS (L3a): the PERFECT windmill keeps the ball in the hand through the cock-back and the sweep and lets go at
