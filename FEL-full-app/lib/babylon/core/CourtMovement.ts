@@ -39,7 +39,18 @@ export interface MovementTuning {
    *  to a WALK / JOG / SPRINT target with per-gear accel caps, a loaded first step, a speed-scaled stop, and a kick on the
    *  sprint press. Without it the old snap model (accel/decel above) runs untouched (combat, tennis, football). */
   gears?: GearTuning;
+  /** THE CUT COST (2K, Phase 5): a change of direction at pace is paid for ONCE, at the moment the stick asks for it —
+   *  a graded bleed between `minDeg` (free) and the plant threshold (the full plant-and-cut above), scaled by how
+   *  fast the body is going. A jog cut stays nearly free; a full-sprint 90° cut keeps ~1 − maxCost of its speed.
+   *  Opt-in: without it a 90° cut at a sprint is free (only the turn-rate cap slows it), which is the old behaviour. */
+  cutCost?: CutCostTuning;
 }
+export interface CutCostTuning {
+  minDeg: number;     // under this angle a redirect is free (a lane change, not a cut)
+  maxCost: number;    // fraction of speed paid for a cut at the plant threshold, at top speed
+  minSpeed01: number; // under this fraction of top speed there is nothing to pay
+}
+export const CUT_COST_HOOPS: CutCostTuning = { minDeg: 45, maxCost: 0.3, minSpeed01: 0.45 };
 
 export type Gear = 'stop' | 'walk' | 'jog' | 'sprint';
 export interface GearTuning {
@@ -97,6 +108,10 @@ export class CourtMovement {
   private plantTimer = 0;
   private plantFloor = 0;
   private cutActive = false;
+  private cutTaxed = false;    // cutCost: latched per cut so the recovery frames (velocity swinging round) are not taxed again
+  private cutGraceLeft = 0;    // cutCost: seconds a controller-authored redirect is exempt (it wrote the speed it wants)
+  /** cutCost, for a dev readout: cuts paid so far, and the last one's cost (fraction of speed) and angle (deg). */
+  cutsPaid = 0; lastCut = { cost: 0, deg: 0, speed: 0 };
   private sprintWas = false;   // gears: the sprint press edge
   private burst01 = 0;         // gears: intensity from a kick / a burst, decaying
   private gearNow: Gear = 'stop';
@@ -104,6 +119,8 @@ export class CourtMovement {
   private pausedNow = false;   // gears: PAUSIN' — the stick is ignored, the body stops on a dime
   /** gears: the next `sec` seconds accelerate at LAUNCH_BOOST× with no loaded first step (the explode after a move). */
   launchFor(sec: number): void { this.launchLeft = Math.max(this.launchLeft, sec); }
+  /** cutCost: the next `sec` seconds of steering pay no cut cost — a move wrote the velocity on purpose. */
+  cutGrace(sec: number): void { this.cutGraceLeft = Math.max(this.cutGraceLeft, sec); }
   /** gears: pausin' — while on, the stick is ignored and the body stops hard; off, movement resumes. */
   pause(on: boolean): void { this.pausedNow = on; }
   get paused(): boolean { return this.pausedNow; }
@@ -119,6 +136,7 @@ export class CourtMovement {
   update(dt: number, moveX: number, moveY: number, sprint: boolean): MovementState {
     this.plantTimer = Math.max(0, this.plantTimer - dt);
     this.launchLeft = Math.max(0, this.launchLeft - dt);
+    this.cutGraceLeft = Math.max(0, this.cutGraceLeft - dt);
     const mag = this.pausedNow ? 0 : Math.min(1, Math.hypot(moveX, moveY));   // pausin': the stick is ignored
     const t = this.tune;
 
@@ -156,6 +174,29 @@ export class CourtMovement {
         // the wanted direction, then accelerate along it.
         const maxTurn = (t.turnRateDegAtSpeed * Math.PI / 180) * dt
           * (1 - 0.55 * Math.min(1, speed / t.maxSpeed)); // slower turn at top speed
+        // THE CUT COST (Phase 5): paid once when the stick first asks for a real change of direction at pace. Graded from
+        // free at `minDeg` up to `maxCost` at the plant threshold, and by speed² so a jog cut is nearly free. Latched per
+        // cut; released once the velocity has come round to within half the free angle. A discrete cost, not a per-frame
+        // drag, so it is the same at 30 fps and 144.
+        // NOTE: `vel` is unit length here — the plant check above normalised it in place and the code below steers by
+        // `dir` and rebuilds the vector from `newSpeed`. The cut cost therefore takes the CAPTURED `speed` and hands the
+        // integrator `speedT`; it never reads `vel.length()` in this branch.
+        let speedT = speed;
+        const cc = t.cutCost;
+        if (cc) {
+          // (`Vector3.normalize()` mutates in place — the steering line below relies on that; this block reads a clone)
+          const dirNow = speed > 0.001 ? this.vel.clone().normalize() : wantDir.clone();   // (already unit length; the clone keeps this block side-effect free)
+          const angle = Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(dirNow, wantDir))));
+          const minRad = cc.minDeg * Math.PI / 180, plantRad = Math.acos(t.plantDot);
+          if (!this.cutTaxed && this.cutGraceLeft <= 0 && angle >= minRad && speed >= t.maxSpeed * cc.minSpeed01) {
+            this.cutTaxed = true;
+            const grade = Math.min(1, (angle - minRad) / Math.max(1e-3, plantRad - minRad));
+            const s01 = Math.min(1, speed / t.maxSpeed);
+            const cost = cc.maxCost * grade * s01 * s01;
+            speedT = speed * (1 - cost);
+            this.cutsPaid++; this.lastCut = { cost, deg: angle * 180 / Math.PI, speed };
+          } else if (this.cutTaxed && angle < minRad * 0.5) this.cutTaxed = false;
+        }
         let dir = speed > 0.001 ? this.vel.normalize() : wantDir.clone();
         const angle = Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(dir, wantDir))));
         if (angle > 1e-4) {
@@ -167,18 +208,18 @@ export class CourtMovement {
           // DRIBBLE PACE: a lag to the gear's target, capped per gear, loaded off the mark; a LOWER target (off the turbo,
           // easing the stick) bleeds at the gear-down rate rather than snapping; the sprint PRESS kicks a moving body.
           const g = t.gears;
-          const err = topSpeed - speed;
+          const err = topSpeed - speedT;
           if (err >= 0) {
             const launching = this.launchLeft > 0;
             const cap = (sprint ? g.sprintAccel : g.jogAccel) * (launching ? LAUNCH_BOOST : 1), tau = (sprint ? g.sprintTau : g.jogTau) * (launching ? 0.7 : 1);
-            const load = !launching && speed < g.loadBelow ? g.loadScale + (1 - g.loadScale) * (speed / g.loadBelow) : 1;   // a launch out of a move has no loaded step
-            newSpeed = Math.min(topSpeed, speed + Math.min(cap * load, err / tau) * dt);
-          } else newSpeed = Math.max(topSpeed, speed - g.gearDownDecel * dt);
-          if (sprint && !this.sprintWas && speed >= g.kickAbove) { newSpeed = Math.min(t.maxSpeed * this.speedScale, newSpeed + g.sprintKick); this.burst01 = Math.min(1, this.burst01 + 0.3); }
+            const load = !launching && speedT < g.loadBelow ? g.loadScale + (1 - g.loadScale) * (speedT / g.loadBelow) : 1;   // a launch out of a move has no loaded step
+            newSpeed = Math.min(topSpeed, speedT + Math.min(cap * load, err / tau) * dt);
+          } else newSpeed = Math.max(topSpeed, speedT - g.gearDownDecel * dt);
+          if (sprint && !this.sprintWas && speedT >= g.kickAbove) { newSpeed = Math.min(t.maxSpeed * this.speedScale, newSpeed + g.sprintKick); this.burst01 = Math.min(1, this.burst01 + 0.3); }
         } else {
           // Burst off the mark, slower cruise ramp when sprinting at pace.
-          const a = speed < 1.2 ? t.accel : (sprint ? t.sprintAccel : t.accel);
-          newSpeed = Math.min(topSpeed, speed + a * dt);
+          const a = speedT < 1.2 ? t.accel : (sprint ? t.sprintAccel : t.accel);
+          newSpeed = Math.min(topSpeed, speedT + a * dt);
         }
         this.vel.copyFrom(dir.scale(newSpeed));
       }

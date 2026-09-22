@@ -261,7 +261,7 @@ const PLAYS = ['jumper', 'layup', 'dunk'];
 // the SIDE under test is chosen by PLAY rather than by who happens to be winning.
 // CHARGE is a defensive possession too — you are standing in his way waiting to wear it.
 const wantDefence = PLAY === 'defence' || PLAY === 'charge';
-const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick', 'posthook', 'pausin'];   // what PLAY can name
+const PLAYS_ALL = ['jumper', 'layup', 'dunk', 'handle', 'trick', 'screen', 'pace', 'rstick', 'posthook', 'pausin', 'cuts'];   // what PLAY can name
 await page.evaluate(`(() => { window.__brain = ${wantDefence}; window.__def.block = ${PLAY !== 'charge'}; window.__def.charge = ${PLAY === 'charge'}; })()`);
 
 /**
@@ -410,6 +410,25 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.act({ moveX: 0, moveY: -0.5, sprint: true }, 2000)`);   // R2 held for the two escape throws — RETREATING: 6 s of jogging at the 1v1 defender ran through him (FOUL ON YOU, silent to the log) before the escapes
       await mark('end');
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);
+    }
+    else if (play === 'cuts') {
+      // THE MOMENTUM COST (Phase 5): 2K's "you cannot change direction at pace for free". Sprint up the floor, cut 90° at
+      // full pace, sprint again, then the same 90° cut from a jog. With SMOOTH=1 the rows carry the root every frame and
+      // the readout below prints the speed kept through each cut (lowest speed in the 350 ms after the mark over the
+      // speed in the 200 ms before it). Marks are in the recorder's clock.
+      const mark = async (label: string) => { const t = await page.evaluate('performance.now() - (window.__smoothT0 || 0)') as number; paceMarks.push({ t: Math.round(t), label }); };
+      if (process.env.LUCK) await page.evaluate(`(() => { const d = window.__dev(); if (d && d.luck) d.luck(${Number(process.env.LUCK)}); })()`).catch(() => {});
+      // `turbo: true` is the R2 the movement reads as the sprint gear (the jumper play does the same); `sprint` alone jogs.
+      await agent(`a.act({ moveX: 0, moveY: 0.2 }, 400)`);   // off the check-up: the first metres are the loaded step, not the cut
+      await agent(`a.act({ moveX: 0, moveY: 1, sprint: true }, 1600)`);  await mark('cut-sprint-90');   // the turbo flag parked the 1v1 hero for 2 s (measured); the sprint alone reaches the jog gear, which is the cut the rule prices
+      await agent(`a.act({ moveX: 1, moveY: 0, sprint: true }, 1000)`);  await mark('cut-sprint-90b');
+      await agent(`a.act({ moveX: 0, moveY: -1, sprint: true }, 1200)`);
+      await agent(`a.act({ moveX: -0.9, moveY: 0, sprint: false }, 1400)`); await mark('cut-jog-90');
+      await agent(`a.act({ moveX: 0, moveY: 0.9, sprint: false }, 1000)`); await mark('lane-sprint-30');
+      await agent(`a.act({ moveX: 0.5, moveY: 0.87, sprint: true }, 1000)`);
+      await mark('end');
+      const cutsPaid = await page.evaluate(`(() => { const d = window.__dev(); const c = d && (d.cuts ? d.cuts() : d.kinetic ? d.kinetic().cuts : null); return c ? JSON.stringify(c) : 'n/a'; })()`).catch(() => 'n/a');
+      console.log(`cuts paid (movement counter): ${cutsPaid}`);
     }
     else if (play === 'posthook') {
       // POST HOOK (2K20): drive in, post up (L2 via the bridge's postup), then the R stick up-right HELD in-page and let go
@@ -658,6 +677,22 @@ if (SMOOTH) {
     const starts = paceMarks.filter((x) => x.label === 'stick').map((x) => x.t);
     for (const t0 of starts.slice(0, 3)) { const line: string[] = []; for (let t = t0; t <= t0 + 4600; t += 100) { const w = sp.filter((s) => Math.abs(s.t - t) <= 50 && s.v < 12).map((s) => s.v).sort((a, b) => a - b); line.push(w.length ? w[w.length >> 1].toFixed(1) : '-'); } console.log(`STICK ${TAG} @${t0}: ${line.join(' ')}`); }
   }
+  // THE CUT READOUT (Phase 5): speed kept through each marked cut, off the hero root in the SMOOTH rows.
+  if (paceMarks.some((x) => /^cut-|^lane-/.test(x.label))) {   // Phase 5: the cut readout
+  const sp = (i: number) => { const a = rows[i - 1], b = rows[i]; if (!a || !b || !a.h || !b.h) return 0; const dt = (b.t - a.t) / 1000; if (dt <= 0) return 0; const dx = b.h[0][0] - a.h[0][0], dz = b.h[0][2] - a.h[0][2]; return Math.hypot(dx, dz) / dt; };
+  for (const m of paceMarks) {
+    if (m.label === 'end') continue;
+    const before: number[] = [], after: number[] = [];
+    for (let i = 1; i < rows.length; i++) { const t = rows[i].t; if (t >= m.t - 200 && t <= m.t) before.push(sp(i)); else if (t > m.t && t <= m.t + 350) after.push(sp(i)); }
+    const med = (a: number[]) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
+    const b = med(before); const af = after.filter((v) => v > 0); const lo = af.length >= 3 ? Math.min(...af.map((_, i) => i + 1 < af.length - 1 ? med(af.slice(i, i + 3)) : Infinity).filter((v) => isFinite(v))) : (af.length ? Math.min(...af) : 0);   // a 3-frame median: one row's jitter is not a cut
+    const vel = (t0: number, t1: number) => { const a = rows.find((r) => r.t >= t0), c = [...rows].reverse().find((r) => r.t <= t1); if (!a || !c || !a.h || !c.h || c.t <= a.t) return null; return { x: (c.h[0][0] - a.h[0][0]) / (c.t - a.t), z: (c.h[0][2] - a.h[0][2]) / (c.t - a.t) }; };
+    const vb = vel(m.t - 200, m.t), va = vel(m.t + 250, m.t + 450);
+    const deg = vb && va ? Math.round(Math.acos(Math.max(-1, Math.min(1, (vb.x * va.x + vb.z * va.z) / (Math.hypot(vb.x, vb.z) * Math.hypot(va.x, va.z) || 1)))) * 180 / Math.PI) : -1;
+    const verdict = b < 2 ? 'not moving' : deg < 0 ? '?' : `turned ${deg}°`;
+    console.log(`cut ${m.label.padEnd(16)} before ${b.toFixed(2)} m/s  low ${lo.toFixed(2)}  kept ${b > 0 ? Math.round((lo / b) * 100) : 0}%  ${verdict}  (${before.length}/${after.length} frames)`);
+  }
+}
   // DRIBBLE PACE: the hero's ground speed through the pace play, 50 ms bins, with the step marks — top speeds per gear,
   // time to 95 % of the sprint after the press, the stop's length from the sprint and from the jog
   if (paceMarks.length && paceMarks.some((x) => x.label === 'walk')) {

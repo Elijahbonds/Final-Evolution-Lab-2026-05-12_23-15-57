@@ -22,7 +22,7 @@ import { Vector3, type AbstractMesh } from '@babylonjs/core';
 import { spinBackspin } from '../visual/BallSpin';
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
-import { CourtMovement, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
+import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
   type OffenseJob, type DefenseJob, type ScreenState,
@@ -76,7 +76,7 @@ export class DribbleController {
   static readonly EXPLODE_FLOOR = 0.7;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
-    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS });   // DRIBBLE PACE: the gears are on for the ball handler
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS });   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
     this.crossoverBoost = cfg.crossoverBoost;
   }
   private crossoverBoost: number;
@@ -115,8 +115,11 @@ export class DribbleController {
   drift(dx: number, dz: number): void { this.cutTo(dx, dz, Math.max(this.movement.vel.length(), 0.1)); }
   /** HOOPS KINETIC 3v3: the slipstream / sling burst / overdrive scale the TOP SPEED, not the stick. */
   get speedScale(): number { return this.movement.speedScale; }
+  /** Phase 5 dev readout: cuts the movement has charged for, and the last one. */
+  get cuts(): { paid: number; last: { cost: number; deg: number; speed: number } } { return { paid: this.movement.cutsPaid, last: this.movement.lastCut }; }
   set speedScale(v: number) { this.movement.speedScale = v; }
   private cutTo(dx: number, dz: number, speed: number): void {
+    this.movement.cutGrace(DribbleController.CUT_BLEND_SEC + 0.2);   // Phase 5: an authored redirect keeps the speed it wrote (the drift, the momentum cross, the step-back)
     const n = Math.hypot(dx, dz) || 1;
     this.pendingCut = { x: dx / n, z: dz / n, speed, left: DribbleController.CUT_BLEND_SEC };
     this.movement.facing = Math.atan2(dx / n, dz / n);
