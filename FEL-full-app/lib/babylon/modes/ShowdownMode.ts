@@ -32,6 +32,8 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
+import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX } from '../core/FightCore';
 import { StrikeController, karateMoveset, bookMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
@@ -149,6 +151,8 @@ export const ShowdownMode: ModeDefinition = (() => {
   const HIT_STOP_MS = { light: 28, medium: 45, heavy: 70, finisher: 70 } as const;
   let foeLaunchedSec = 0;   // phase 5: a launcher lifts him; the air string is open while it runs
   const xBtn = new XButtonReader();   // phase 3: the Storm X — showdown's X used to be the block alone; the dash was a chi buy on L1
+  let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
+  let hazardTick = 0;
   let guardUp = false;                 // the hold has passed DASH.tapSec and the block is raised
   function banner(ctx: ModeContext, text: string, ms = 900): void {
     ctx.setHud({ banner: text });
@@ -224,7 +228,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (w === 'heavy' || w === 'finisher') { heavyPunch(ctx, w); console.info(mine ? '[SD-JUICE] heavy landed' : '[SD-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[SD-JUICE] hit' : '[SD-JUICE] taken'); }   // phase 5: every connect holds for its weight
         EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), w === 'heavy' ? 'glitch' : 'sparks');
         // phase 5: the knock slide (constant speed, ease-out) instead of a velocity impulse the movement damped in a frame
-        knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback);
+        knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback, (q) => { const kt = knockTo(defChar.root.position, q, arena); q.x = kt.x; q.z = kt.z; if (kt.rebound) { banner(ctx, mine ? 'OFF THE ROPES!' : 'YOU HIT THE ROPES!', 700); console.info('[ARENA] showdown off the ropes'); } });
         if (mine && move.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[SD-STORM] LAUNCHED — air string open'); }
         else if (mine && move.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5);
         else if (mine && move.slam) foeLaunchedSec = 0;
@@ -250,7 +254,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     meSubstituted = now() + 400;
     const spot = DefenseController.substitutionSpot(rival.root.position, rival.root.rotation.y);
     player.root.position.copyFrom(spot);
-    if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }   // phase 3: the dojo floor, not a 24 m box
+    arenaClamp(player.root.position, arena); if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }   // phase 3: the dojo floor, not a 24 m box
     mbus.report({ kind: 'steal', weight: 14 });
     SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
     EffectsKit.burst(ctx.scene, spot.add(new Vector3(0, 1.2, 0)), 'glitch');
@@ -352,7 +356,9 @@ export const ShowdownMode: ModeDefinition = (() => {
       // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
       mbus = ctx.momentum;
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
-      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, look: readPlaceLook('showdown') });   // PLACE: the splash's pick
+      arena = readCombatArena('showdown'); console.info(`[ARENA] showdown · ${describeArena(arena)}`);   // phase 7
+      modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena, look: readPlaceLook('showdown') });   // PLACE: the splash's pick
+      arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 4), startClip: 'karate_idle_stance', modeId: 'showdown-me',
@@ -471,6 +477,8 @@ export const ShowdownMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      arenaHandle?.tick(dt);
+      if (arena.hazards.length) { hazardTick += dt; if (hazardTick >= 0.2) { hazardTick = 0; for (const [st, c] of [[meState, player], [foeState, rival]] as const) { const h = hazardAt(c.root.position, arena); if (h) { st.hp = Math.max(0, st.hp - h.dps * 0.2); console.info(`[ARENA] showdown ${c === player ? 'you' : 'rival'} in the fire`); } } } }   // phase 7
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
       if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
       if (phaseSec > BUDGET_SEC[phase]) {
@@ -523,7 +531,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         meMove.update(dt, 0, 0, false);
       }
       player.root.position.addInPlace(meMove.vel.scale(dt));
-      if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }
+      arenaClamp(player.root.position, arena); if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }
 
       // ── strikes: advance, resolve at active-frame open ──
       const opened = meStrike.update(dt, now());
@@ -568,7 +576,7 @@ export const ShowdownMode: ModeDefinition = (() => {
           else if (foeState.blockHeld && chance(1.2)) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         }
         rival.root.position.addInPlace(foeMove.vel.scale(dt));
-        if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }
+        arenaClamp(rival.root.position, arena); if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }
       }
 
       // ── support assist lifecycle ──
@@ -626,7 +634,7 @@ export const ShowdownMode: ModeDefinition = (() => {
 
     dispose() {
 
-      modeVenue?.dispose?.(); modeVenue = null;
+      modeVenue?.dispose?.(); modeVenue = null; arenaHandle?.dispose(); arenaHandle = null;
       support?.dispose(); wallMesh?.dispose();
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();

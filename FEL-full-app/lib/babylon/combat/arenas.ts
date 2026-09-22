@@ -12,8 +12,8 @@
 
 import type { VenueMood } from '../scene/moods';
 
-export type CombatModeId = 'karate' | 'karate_vs' | 'mixedcombat' | 'duel';
-export const COMBAT_MODE_IDS: readonly CombatModeId[] = ['karate', 'karate_vs', 'mixedcombat', 'duel'];
+export type CombatModeId = 'karate' | 'karate_vs' | 'mixedcombat' | 'duel' | 'showdown';
+export const COMBAT_MODE_IDS: readonly CombatModeId[] = ['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown'];   // phase 7: showdown fights in the arenas too
 
 /** A wall as a segment on the floor with an INWARD normal (into the arena), `height` metres tall. */
 export interface ArenaWall { a: { x: number; z: number }; b: { x: number; z: number }; nx: number; nz: number; height: number; label: string }
@@ -193,7 +193,7 @@ const GAUNTLET: CombatArena = {
 
 const DOJO: CombatArena = {
   id: 'dojo', name: 'Sovereign Dojo', sub: 'THE SHRINE COURTYARD · LOW STONE WALLS ON FOUR SIDES', tint: '#FF2D55',
-  modes: ['karate_vs', 'mixedcombat'], ready: true,
+  modes: ['karate_vs', 'mixedcombat', 'showdown'], ready: true,
   shape: { kind: 'box', halfX: 5, halfZ: 5 }, edge: 'wall',
   walls: perimeterWalls({ kind: 'box', halfX: 5, halfZ: 5 }, 2.4, 'courtyard wall'),
   pillars: [], hazards: [],
@@ -204,7 +204,7 @@ const DOJO: CombatArena = {
 
 const CAGE: CombatArena = {
   id: 'cage', name: 'Neon Cage', sub: 'AN OCTAGON OF ROPES · THEY BOUNCE BACK', tint: '#22d3ee',
-  modes: ['karate', 'karate_vs', 'mixedcombat'], ready: true,
+  modes: ['karate', 'karate_vs', 'mixedcombat', 'showdown', 'duel'], ready: true,   // phase 7
   shape: { kind: 'disc', radius: 6.4 }, edge: 'ropes',
   walls: perimeterWalls({ kind: 'disc', radius: 6.4 }, 3, 'cage', 8, Math.PI / 8, Math.PI * 2 + Math.PI / 8),
   pillars: [], hazards: [],
@@ -215,7 +215,7 @@ const CAGE: CombatArena = {
 
 const FOUNDRY: CombatArena = {
   id: 'foundry', name: 'The Foundry', sub: 'STEEL WALLS · FOUR PILLARS · TWO FIRE PITS', tint: '#ff7b3d',
-  modes: ['karate', 'karate_vs', 'mixedcombat'], ready: true,
+  modes: ['karate', 'karate_vs', 'mixedcombat', 'showdown'], ready: true,   // phase 7 (not the duel: the steel box's corner is 9.2 m out — past what the duel camera's pullback can frame, fight-balance-tests)
   shape: { kind: 'box', halfX: 7, halfZ: 6 }, edge: 'wall',
   walls: perimeterWalls({ kind: 'box', halfX: 7, halfZ: 6 }, 3.2, 'steel wall'),
   pillars: [

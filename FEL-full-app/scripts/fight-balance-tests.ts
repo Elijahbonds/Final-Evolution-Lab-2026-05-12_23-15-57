@@ -130,6 +130,7 @@ const MODE_CAM: Record<CombatModeId, string> = {
   karate_vs: 'fight',           // KarateVSMode camPreset
   mixedcombat: 'fight',         // MixedCombatMode camPreset
   duel: 'duel',                 // DuelMode camPreset
+  showdown: 'fight',             // ShowdownMode camPreset (phase 7: showdown fights in the arenas)
 };
 /** How far from the origin a fighter can get: a disc's rim, or a box's CORNER. */
 const worstReach = (a: CombatArena): number =>
