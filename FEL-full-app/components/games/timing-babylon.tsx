@@ -65,16 +65,29 @@ export function makeTimingHost(opts: TimingHostOpts) {
       const resultSink = async (r: SessionResult) => {
         if (endedRef.current) return;
         endedRef.current = true;
-        const hits = Number(r.stats?.hits ?? 0);
-        const rounds = Number(r.stats?.rounds ?? 0);
+        // net/precision pass phase 10: the card reads the MODE's line. `won` used to be `outcome === 'GREAT'` and the headline
+        // `hits/rounds CLEAN` — an outcome and stats none of these five modes send — so no run here was ever a win.
+        const st = r.stats ?? {};
+        const n = (k: string, d = 0) => Number(st[k] ?? d);
+        const o = r.outcome;
+        const won = o === 'win' || o === 'WIN' || o === 'SHOOTOUT_WIN' || o === 'GREAT'
+          || (o === 'CARD_IN' && n('overPar', 99) <= 0)
+          || (o === 'DERBY_END' && n('homers') >= 3)
+          || (o === 'MATCH_END' && n('hits') >= Math.ceil(n('rounds', 1) * 0.6));
+        const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
+          : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
+          : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
+          : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
+          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
+          : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
         const result: GameResult = {
           score: r.score,
           stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: 0,
-          won: r.outcome === 'GREAT', // GREAT = hit ≥60% of rounds cleanly
+          opponentScore: modeKey === 'penalty' ? n('themGoals') : 0,
+          won,
           duration: r.durationSec,
-          headline: rounds ? `${hits}/${rounds} CLEAN · ${r.score} PTS` : `${r.score} PTS`,
-          maxCombo: hits,
+          headline,
+          maxCombo: n('hits'),
         };
         onEnd(result);
       };
