@@ -60,7 +60,11 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const clips: Record<string, number> = {};
   for (const r of rows) for (const c of r.clips ?? []) clips[c] = (clips[c] ?? 0) + 1;
   const board = Object.entries(clips).filter(([k]) => /^board_|^skate_/.test(k)).sort((a, b) => b[1] - a[1]);
-  return { mode, frames: rows.length, armFrames: arms.length, tee, boardClips: board, errors: logs.slice(0, 6) };
+  // phase 5: WHICH clip the T-pose frames sat under (a locked T is a clip that never reached the arms or a bind pose)
+  const teeBy: Record<string, number> = {};
+  for (const r of arms) if (r.eL > 160 && r.eR > 160) for (const c of (r.clips?.length ? r.clips : ['<none>'])) teeBy[c] = (teeBy[c] ?? 0) + 1;
+  const allClips = Object.entries(clips).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  return { mode, frames: rows.length, armFrames: arms.length, tee, teeBy, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
 }
 
 async function main() {

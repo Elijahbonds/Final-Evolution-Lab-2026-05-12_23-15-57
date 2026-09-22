@@ -19,6 +19,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { mountPostureLayer } from '../anim/PostureLayer';
 import { BOARD_POSTURE, BOARD_LEGS, type BoardWindow } from '../core/BoardPosture';
 import { airTrickFor, heldTrickDir, scoreTrick, type BoardTrick } from '../core/BoardTricks';   // boards pass phase 3: the family's trick table on big air
+import { ComboChain } from '../core/ComboChain';   // phase 4: the THPS loop — a landed line is a link, a crash burns the pot
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -113,6 +114,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     stickX: 0, stickY: 0,    // phase 3: the held direction picks the named trick (the board family's grammar)
     named: [] as BoardTrick[],   // the tricks thrown this air, scored on the landing
     bonus: 0,                    // points the named tricks earned across the session (the core scores rotation only)
+    chain: new ComboChain(undefined, 'air'),   // phase 4: the run's combo — links across attempts, a crash burns the pot
   };
 
   const reset = (): void => {
@@ -145,6 +147,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     if (S.done) return;
     S.done = true;
     if (S.score >= opts.winScore) finishPunch(ctx);
+    S.chain.bank(); S.bonus = S.chain.banked;   // phase 4: the run's open pot banks with the run
     ctx.end(S.score >= opts.winScore ? 'win' : 'complete', S.score, {
       points: S.score, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt,
     });
@@ -220,10 +223,16 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const landed01 = grade === 'crash' ? 0 : grade === 'sketchy' ? 0.5 : 1;
         const line = S.named.map((t) => t.label).join(' → ');
         const linePts = S.named.reduce((sum, t) => sum + scoreTrick(t, landed01), 0);
-        S.bonus += linePts; S.named = [];
+        S.named = [];
+        // phase 4 — THE COMBO LOOP: a landed line is a link (the Nth pays N×, repeats decay), a crash burns the open pot,
+        // the pot banks when the run ends. `bonus` = what has banked + the open pot; the banner reads the multiplier.
+        let lost = 0;
+        if (grade === 'crash') { lost = S.chain.bail(); if (lost > 0) console.info(`[AIR-COMBO] crash — pot lost ${lost}`); }
+        else if (linePts > 0) { S.chain.add(line, linePts, 'air'); console.info(`[AIR-COMBO] link ${S.chain.multiplier}× pot ${S.chain.pot}`); }
+        S.bonus = S.chain.banked + S.chain.pot;
         if (line) console.info(`[AIR-TRICK] landed ${grade}: ${line} +${linePts}`);
         // a landing with no spin scores nothing now (pointsNeedTrick) — so it says so, rather than a CLEAN over a zero
-        say(line ? `${line} — ${GRADE_LABEL[grade]}${linePts > 0 ? ` +${linePts}` : ''}` : turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
+        say(line ? `${line} — ${GRADE_LABEL[grade]}${grade === 'crash' ? (lost > 0 ? ` — POT LOST ${lost}` : '') : S.chain.multiplier > 1 ? ` ${S.chain.multiplier}× · POT ${S.chain.pot}` : linePts > 0 ? ` +${linePts}` : ''}` : turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(

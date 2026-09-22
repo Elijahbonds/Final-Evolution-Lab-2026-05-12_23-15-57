@@ -10,6 +10,11 @@ import fs from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:3061';
 const MODE = process.env.MODE ?? 'skateboard';
 const MAXMS = Number(process.env.MAXMS ?? 80000);
+// phase 4: BANK_GAP=1 skips every 6th press cycle (a 2.8 s quiet spell on the ground) so the combo's BANK can be seen
+const BANK_GAP = process.env.BANK_GAP === '1';
+// the mode's own landing / combo ledger lines, tallied (the banner hides bails by design; the log does not)
+const LOG_RE = /\[(AIR-TRICK|AIR-COMBO|SKATE-LAND|SNOW-LAND|SURF-LAND)\]/;
+const ledger: string[] = [];
 const exe = (() => {
   const root = process.env.HOME + '/Library/Caches/ms-playwright';
   const dir = fs.readdirSync(root).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
@@ -18,7 +23,7 @@ const exe = (() => {
 const b = await chromium.launch({ executablePath: exe, args: ['--use-gl=angle', '--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 let errors = 0; const errs: string[] = [];
-p.on('console', (m) => { if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(m.text())) { errors++; if (errs.length < 4) errs.push(m.text().slice(0, 140)); } });
+p.on('console', (m) => { if (LOG_RE.test(m.text())) ledger.push(m.text().slice(0, 160)); if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(m.text())) { errors++; if (errs.length < 4) errs.push(m.text().slice(0, 140)); } });
 p.on('pageerror', (e) => { errors++; errs.push('PAGEERROR ' + e.message.slice(0, 150)); });
 await p.addInitScript(`(() => {
   const pad = { index: 0, id: 'fake-dualshock', connected: true, mapping: 'standard', axes: [0,0,0,0], timestamp: 0,
@@ -47,6 +52,7 @@ await p.evaluate(`(() => {
   const BTNS = [1, 2, 3];                            // B, X, Y
   let i = 0;
   window.__BTI = setInterval(() => {
+    if (${BANK_GAP} && i % 6 === 5) { i++; return; }   // the quiet cycle: nothing thrown, the open combo runs out and banks
     const dir = DIRS[(i / 3 | 0) % DIRS.length];
     const btn = BTNS[i % BTNS.length];
     i++;
@@ -65,5 +71,6 @@ await p.evaluate('clearInterval(window.__BTI)');
 const names = Object.keys(bt.labels).filter((l) => l && l.length > 1);
 console.log('mode: ' + MODE);
 console.log('distinct trick labels seen (' + names.length + '): ' + JSON.stringify(names));
+console.log('ledger lines: ' + ledger.length + (ledger.length ? ' :: ' + ledger.slice(-10).join(' | ') : ''));
 console.log('errors: ' + errors + (errs.length ? ' :: ' + errs.join(' | ') : ''));
 await b.close();

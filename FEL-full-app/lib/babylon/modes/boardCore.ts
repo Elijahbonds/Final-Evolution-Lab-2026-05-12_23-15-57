@@ -5,6 +5,7 @@
 // with no world — buildRig demands ground meshes up front.
 
 import { MomentumBus } from '../core/MomentumBus';
+import { REPEAT_DECAY, REPEAT_NO_MULT, moveKey } from '../core/ComboChain';   // boards pass phase 4: skate's anti-mash decay on the family's other boards
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBoard, type BoardKind } from '../visual/meshyProps';
 import { buildSkateDeck } from '../visual/deckMesh';
@@ -95,6 +96,16 @@ export interface TrickMachineOpts {
 
 export class TrickMachine {
   score = 0; combo = 0; comboPts = 0;
+  /** phase 4: how long a landed combo stays open on the ground — a new trick inside it is the next link (THPS: the manual
+   *  / revert that keeps a line alive; here the board has no manual so the window is the link). Banks when it runs out. */
+  static readonly LINK_GRACE_SEC = 1.6;
+  private graceT = 0;
+  /** phase 4: the labels landed in the combo so far — the repeat decay's memory and the line the bank names */
+  private links: { key: string; rep: number }[] = [];
+  /** phase 4 (measured): the multiplier counts links whose move was not repeated to death — ComboChain's REPEAT_NO_MULT rule.
+   *  Without it a masher rotating the whole table reached 16× in 50 s on snow; with it the 4th+ repeat pays its decayed
+   *  points at the multiplier the fresh links earned. */
+  private get multiplier(): number { return Math.max(1, this.links.filter((l) => l.rep < REPEAT_NO_MULT).length); }
   /**
    * The shared Game-Breaker layer (2026-09-13).
    *
@@ -162,30 +173,44 @@ export class TrickMachine {
       const clean = t.turns === 0 || this.spun >= needed;
       this.rig.char.root.rotation.z = 0;
       if (clean) {
-        this.combo++;
-        this.comboPts += t.pts * this.combo;
+        // phase 4 — REPEAT DECAY (ComboChain's table): the same trick again pays 75 %, then 50, 25, 10, then nothing and is
+        // no link at all (skate's masher lesson: a mashed METHOD × 8 must not out-score a played line). A trick that pays
+        // nothing is answered, not silently dropped.
+        const rep = this.links.filter((l) => l.key === moveKey(t.name)).length;
+        const paid = Math.round(t.pts * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
+        this.graceT = TrickMachine.LINK_GRACE_SEC;
+        if (paid <= 0) { this.playClip('jump_land'); this.opts.onBeat?.('land'); return `${t.name} · REPEAT — NOTHING`; }
+        this.links.push({ key: moveKey(t.name), rep });
+        this.combo = this.multiplier;
+        this.comboPts += paid * this.combo;
         // the same thresholds ComboChain uses, so a 5-trick run means the same thing on either board
         if (this.combo === 5) this.momentum?.report({ kind: 'big_make' });
         else if (this.combo >= 8) this.momentum?.report({ kind: 'highlight_dunk', weight: Math.min(30, this.combo * 2) });
         this.playClip('jump_land');
         this.opts.onBeat?.('land');
         this.onHud({ combo: `${this.combo}x` });
-        return `${t.name} +${t.pts * this.combo}`;
+        return `${t.name}${rep > 0 ? ` · REPEAT ×${rep + 1}` : ''} +${paid * this.combo}${this.combo > 1 ? ` (${this.combo}×)` : ''}`;
       }
       this.bail();
       return 'BAILED';
     }
     if (!this.active && r.grounded && this.comboPts > 0) {  // bank the combo
-      this.score += this.comboPts;
+      // phase 4: the combo stays OPEN for the grace window (it used to bank the very next frame, so 2× never happened);
+      // when the window runs out the bank NAMES the line it paid (THPS: the combo reads out as it banks)
+      this.graceT -= dt;
+      if (this.graceT > 0) return null;
+      const banked = this.comboPts, line = this.links.map((l) => l.key).join(' → ');
+      this.score += banked;
       this.onHud({ score: this.score, combo: '' });
-      this.comboPts = 0; this.combo = 0;
+      this.comboPts = 0; this.combo = 0; this.links = [];
+      return `BANKED +${banked}${line ? ` · ${line}` : ''}`;
     }
     return null;
   }
 
   bail(): void {
     this.active = null; this.grabbing = false;
-    this.comboPts = 0; this.combo = 0;
+    this.comboPts = 0; this.combo = 0; this.links = []; this.graceT = 0;
     this.rig.rider.vel.scaleInPlace(0.25);
     this.playClip('skate_bail');   // SHARED-ANIM-BUS: the board's own bail (this borrowed the football tackle fall)
     this.opts.onBeat?.('bail');
@@ -193,7 +218,8 @@ export class TrickMachine {
   }
 
   bankGrind(line: GrindLine): void {
-    this.combo++;
+    this.links.push({ key: 'GRIND', rep: this.links.filter((l) => l.key === 'GRIND').length }); this.graceT = TrickMachine.LINK_GRACE_SEC;
+    this.combo = this.multiplier;
     this.comboPts += line.bonus * this.combo;
   }
 }
