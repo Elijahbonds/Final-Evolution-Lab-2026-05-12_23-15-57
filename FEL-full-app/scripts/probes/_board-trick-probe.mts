@@ -20,7 +20,7 @@ const RUN_TO_END = process.env.RUN_TO_END === '1';
 // TRACE=1 (intent runs): the hero's x / z, the QA next gate and the pad's stick at 2 Hz, printed at the end
 const TRACE = process.env.TRACE === '1';
 // the mode's own landing / combo ledger lines, tallied (the banner hides bails by design; the log does not)
-const LEDGER_TAGS = 'AIR-TRICK|AIR-COMBO|AIR-JUDGE|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SNOW-EDGE|SNOW-YETI|SNOW-END|SURF-WIPE|SURF-EDGE|SURF-PUMP|SURF-END|SKATE-SOLID|SKATE-END';
+const LEDGER_TAGS = 'AIR-TRICK|AIR-COMBO|AIR-JUDGE|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SNOW-EDGE|SNOW-YETI|SNOW-END|SURF-WIPE|SURF-EDGE|SURF-PUMP|SURF-END|SKATE-SOLID|SKATE-END|NET-SWING|NET-FOE|NET-FLOW|NET-JUICE|GOLF-STRIKE|GOLF-FLOW|GOLF-PARK|GOLF-JUICE|PARK|BREAK|PEN-JUICE|DERBY-JUICE';
 const LOG_RE = new RegExp(`\\[(${LEDGER_TAGS})\\]`);
 const ledger: string[] = [];
 const exe = (() => {

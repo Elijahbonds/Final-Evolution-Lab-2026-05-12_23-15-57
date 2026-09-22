@@ -445,6 +445,7 @@ export const GolfMode: ModeDefinition = (() => {
     // the bag: on the green the LINE is the whole shot.
     const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
     phase = 'flight';
+    console.info(`[GOLF-STRIKE] ${c.id} power ${pwr.toFixed(2)} side ${sideErr.toFixed(2)} ${onGreen() ? 'putt' : pad ? 'pad' : 'swing'}`);   // phase 4: the ledger
     // ARENA-10PHASE P4: the swing meter is over — the accuracy band used to stay on the HUD through the whole flight
     // (playtest d3d4a93's golf frame shows it mid-flight) because only backToTee cleared it
     ctx.setHud({ meterT: null, swingPhase: null, powerLock: null, hint: '' });

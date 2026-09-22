@@ -388,7 +388,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // ball aimed at the line in a wind goes wide; the HUD says the wind before every point
     if (o.cfg.touchesPerSide === 1) { const w = weather.flightWind(); if (Math.hypot(w.x, w.z) >= 0.5) { const d = windDrift(w, planned.duration); planned.to.x += d.x; planned.to.z += d.z; } }
     // the timing meter's bands for THIS flight (they scale with its duration)
-    if (toSide > 0 && o.cfg.touchesPerSide === 1) { const b = meterBandsFor(planned.duration); _ctx.setHud({ shotMeterBands: `${b.okFrom.toFixed(3)},${b.goodFrom.toFixed(3)},${b.perfectFrom.toFixed(3)}` }); }
+    // net/precision phase 4: the bands for BOTH sports — volleyball published the ramp and no bands, and the HUD draws the meter only with
+    // bands, so the three-touch sport showed no timing cue at all (bump 1.56 s / set 1.88 s / spike 0.88 s, all blind)
+    if (toSide > 0) { const b = meterBandsFor(planned.duration); _ctx.setHud({ shotMeterBands: `${b.okFrom.toFixed(3)},${b.goodFrom.toFixed(3)},${b.perfectFrom.toFixed(3)}` }); }
     // the tell describes THEIR ball; once ours is away it is stale
     if (toSide < 0 && o.cfg.touchesPerSide === 1) _ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
 
@@ -700,6 +702,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     }
     swingingNow = true;
     setTimeout(() => { swingingNow = false; }, 320);
+    // phase 4: the ledger — every swing's timing, its stretch and the touch it was (the windows are measured off this)
+    console.info(`[NET-SWING] ${q} timing ${timing} dt ${dt.toFixed(3)} reach ${lastReach.toFixed(2)} touch ${volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide)} shot ${pendingShot}`);
 
     // WHICH touch this is decides what the swing DOES. Previously every human
     // swing called rally.cross(), and cross() zeroes the touch counter, so the
