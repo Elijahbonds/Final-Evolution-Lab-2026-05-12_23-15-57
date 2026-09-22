@@ -105,21 +105,25 @@ export const INTENT_DRIVERS: Record<string, string> = {
 
   // SNOWBOARD: the LINE is the score — steer through each gate (the mode publishes the next one for QA), tricks between them
   snowboard_slalom: loop(`
-    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]]; let k = 0, t = 0, sgn = 1, lastX = null, lastCmd = 0, airT = 0;
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]]; let k = 0, t = 0, lastX = null, lastZ = null, lastCmd = 0, airT = 0;
     setInterval(() => {
       t += 16;
       const h = Q.hero && Q.hero(); const s = Q.scene && Q.scene(); if (!h) return;
       let r = h; while (r.parent) r = r.parent; const q = r.getAbsolutePosition();
       const g = s && s.metadata ? s.metadata.qaNextGate : null;
-      const want = g ? clamp((g.x - q.x) * 0.6, 0.9) : 0;
-      if (lastX !== null && Math.abs(lastCmd) > 0.25 && Math.abs(q.x - lastX) > 0.01 && Math.sign(q.x - lastX) !== Math.sign(lastCmd * sgn)) sgn = -sgn;
-      lastCmd = want; lastX = q.x;
-      stick(want * sgn, -0.75);
+      // boards phase 8: steer the HEADING — the movement model integrates yaw from the stick (1.9 rad/s), so a lateral
+      // error steer over-rotates past the gate and swings to the edge (measured: 1 gate in 60 s, two edge turns). Aim the
+      // nose at the gate, clamped to a committed carve, and steer the yaw error. yaw 0 = down the slope, +steer = +x.
+      const dz = g ? Math.max(1, g.z - q.z) : 20;
+      const wantYaw = g ? clamp(Math.atan2(g.x - q.x, dz), 0.55) : 0;
+      let dyaw = wantYaw - r.rotation.y; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+      const want = clamp(dyaw * 2.5, 1);
+      lastCmd = want; lastX = q.x; lastZ = q.z;
+      stick(want, -0.75);
       // a trick between gates: jump, then spin or grab in the air, and tuck on the straights
-      const dz = g ? Math.abs(g.z - q.z) : 99;
       if (dz > 22 && t % 2600 < 16) { airT = t; btn(A, 90); }
-      else if (airT && t - airT > 220 && t - airT < 236) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(B, 60); setTimeout(() => stick(want * sgn, -0.75), 110); }
-      else if (airT && t - airT > 460 && t - airT < 476) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(X, 60); setTimeout(() => stick(want * sgn, -0.75), 110); airT = 0; }
+      else if (airT && t - airT > 220 && t - airT < 236) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(B, 60); setTimeout(() => stick(want, -0.75), 110); }
+      else if (airT && t - airT > 460 && t - airT < 476) { const d = dirs[k++ % dirs.length]; stick(d[0], d[1]); btn(X, 60); setTimeout(() => stick(want, -0.75), 110); airT = 0; }
       hold(RT, dz > 30);
     }, 16);
   `),
@@ -140,7 +144,8 @@ export const INTENT_DRIVERS: Record<string, string> = {
       const d = Q.rawHud ? Q.rawHud() : {};
       // carve the face: a slow weave keeps the rider in the pocket instead of running straight off the shoulder
       const weave = Math.sin(t / 900) * 0.55;
-      stick(weave, -0.45);
+      // boards phase 8: the PUMP — the trim alternates drop / climb every 0.4 s on the face (the game reads the rhythm as drive)
+      stick(weave, Math.floor(t / 400) % 2 === 0 ? -0.7 : 0.7);
       hold(RT, true);                                   // trim held: speed is what every move is paid out of
       const airborne = !!(d && (d.air || d.airborne));
       if (airborne && t - lastAir > 1200) { lastAir = t; btn(Y, 70); }
@@ -149,7 +154,7 @@ export const INTENT_DRIVERS: Record<string, string> = {
         const dir = dirs[k++ % dirs.length];
         stick(dir[0], dir[1]);
         btn(B, 70);
-        setTimeout(() => stick(weave, -0.45), 140);     // back on the face; the carve itself is drawn out in update()
+        setTimeout(() => stick(weave, Math.floor(t / 400) % 2 === 0 ? -0.7 : 0.7), 140);     // back on the face; the carve itself is drawn out in update()
       }
     }, 16);
   `),

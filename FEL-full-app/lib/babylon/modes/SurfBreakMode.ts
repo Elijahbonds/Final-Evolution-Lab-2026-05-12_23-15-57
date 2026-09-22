@@ -84,6 +84,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
   /** A surf air off the lip is short — this is the hang a pop actually buys. */
   const AIR_BUDGET_SEC = 0.7;
   let stickX = 0, stickY = 0, carve = 0;
+  // phase 8 — THE PUMP: a drop→climb rhythm on the face (stick forward, then back, inside PUMP_WINDOW_SEC) is DRIVE. The
+  // grammar's 'pump down the face for speed' had no payoff of its own; the trim alone moved the rider up and down.
+  let pumpBoost = 0, pumpSign = 0, pumpAt = -9, pumps = 0;
   /** Seconds inside the current barrel with the stick or R2 working; the share that makes a barrel RIDDEN. */
   let barrelWorked = 0;
   const BARREL_WORK_SHARE = 0.35;
@@ -98,6 +101,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   const WAVE_MOVE_LOCK_SEC = 0.55;
   /** phase 7: lateral speed INTO the channel wall that is a wipe rather than a turn-back (a hard carve tops ~4 m/s). */
   const SURF_EDGE_SLAM_MS = 4.5;
+  const PUMP_WINDOW_SEC = 0.9, PUMP_DRIVE = 1.6, PUMP_DECAY = 1.1;
   const SURF_LATERAL_MAX = 7;
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
@@ -173,7 +177,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
     waveMoveRepeats.clear();   // a new wave, a fresh list
     spray?.splash(rig.char.root.position, 1.2);   // SURF OCEAN: the fall throws the water
-    console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''}`);   // A+ P0 probe: punches are checked against accepted calls
+    console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''} | u ${(rig.char.root.position.z - lipZ).toFixed(1)} x ${rig.char.root.position.x.toFixed(1)} rel ${rel.toFixed(1)} pump ${pumpBoost.toFixed(1)}`);   // A+ P0 probe: punches are checked against accepted calls
     if (wipedOut) return;
     wipedOut = true;
     tricks.bail();
@@ -193,7 +197,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // the Rider's own carve accel along that yaw put him behind the crest inside a second — 15 wipes in a row at the edge.
       // The respawn is inside the break, facing down the line.
       const inside = Math.max(-(world.bound - 12), Math.min(world.bound - 12, rig.char.root.position.x));
-      rig.char.root.position.set(inside, 0, lipZ + 6);
+      // phase 8 (measured): the respawn used the lip's z from the FRAME OF THE CALL — 1.6 s later the wave had moved 7.2 m, so
+      // the rider came back 1.2 m BEHIND the crest and wiped again, every 1.6 s, until the clock ran out (14 in a row after
+      // one buoy). The respawn reads the lip where it is now.
+      rig.char.root.position.set(inside, 0, waveLipAt(t).z + 6);
       rig.char.root.rotation.y = 0; yawTarget = 0; cutbackUntil = 0;
       // A reposition is a teleport, not motion — the camera must follow it in one
       // step rather than lerping across the gap with the rider out of frame.
@@ -291,6 +298,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
         if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
       }
       bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0; rel = 0; stickY = 0; rideLean = 0;
+      pumpBoost = 0; pumpSign = 0; pumpAt = -9; pumps = 0;
       ctx.camDirector.setPreset('surf');   // over the swell back, clear of the crest (was 'board': 2.4 m up, inside a 2.6 m wave)
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0; surging = false;
@@ -314,7 +322,19 @@ export const SurfBreakMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }   // P3: y = trim (back climbs the face, forward drops in)
+      if (e.t === 'stick' && e.side === 'L') {
+        stickX = e.x; stickY = e.y;   // P3: y = trim (back climbs the face, forward drops in)
+        // phase 8: the pump — a committed drop then a committed climb (or the reverse) inside the window is one pump
+        const sign = stickY > 0.5 ? 1 : stickY < -0.5 ? -1 : 0;
+        if (sign !== 0 && sign !== pumpSign) {
+          if (pumpSign !== 0 && t - pumpAt < PUMP_WINDOW_SEC && !wipedOut) {
+            pumpBoost = Math.min(PUMP_DRIVE * 2.5, pumpBoost + PUMP_DRIVE); pumps++;
+            console.info(`[SURF-PUMP] ${pumps} drive ${pumpBoost.toFixed(1)}`);
+            if (pumps % 3 === 0) ctx.juice.callout(`PUMP ×${pumps}`, '#7dd3fc', 500);
+          }
+          pumpSign = sign; pumpAt = t;
+        }
+      }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') carve = e.value;
       if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1
@@ -425,11 +445,17 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // hands-off the board trims itself into the face: the slide under the lip beats the trim, the trim wins lower down,
         // so an untouched rider settles a third of the way up the face (u ≈ 3, ~1.1 m up) and RIDES — not the flat
         let relTarget = u >= WAVE_FACE_LEN ? DRIFT.flat : DRIFT.slide * slope - DRIFT.trim;
-        if (stickY > 0.2) relTarget -= DRIFT.climb * stickY;
-        else if (stickY < -0.2) relTarget += DRIFT.drop * -stickY;
+        // phase 8 (measured): inside a pump rhythm the strokes are weight shifts, not a climb over the lip — a driver pumping
+        // ±0.8 every 0.4 s went over the falls 22 times in 50 s with the strokes at full trim authority
+        const strokeK = t - pumpAt < PUMP_WINDOW_SEC && pumps > 0 ? 0.4 : 1;
+        if (stickY > 0.2) relTarget -= DRIFT.climb * stickY * strokeK;
+        else if (stickY < -0.2) relTarget += DRIFT.drop * -stickY * strokeK;
         // the boost drives above the normal ceiling (scaled by its ramp, so the surge arrives and bleeds off smoothly)
         const surge = SURGE_SPEED_BONUS * 1.5 * boostKit.k;
-        relTarget += carve * DRIFT.rail + surge;
+        pumpBoost = Math.max(0, pumpBoost - pumpBoost * PUMP_DECAY * dt);   // phase 8: the pump's drive bleeds off unless fed
+        // the pump pays on the FACE and fades to nothing at its bottom (measured: a flat +4 drive ran the surfer off the face
+        // onto the flat and into the buoys — 14 wipes in 50 s of pumping). Pump down the face for speed; the flat is the flat.
+        relTarget += carve * DRIFT.rail + surge + pumpBoost * Math.max(0, 1 - u / WAVE_FACE_LEN);
         relTarget = Math.min(relTarget, MAX_FORWARD_SPEED - WAVE_SPEED + surge);
         rel += (relTarget - rel) * Math.min(1, dt * 3.2);
         rig.rider.vel.z = WAVE_SPEED + rel;

@@ -44,7 +44,10 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
     const rows: any[] = []; w.__BF = { rows };
     dev.scene.onAfterRenderObservable.add(() => {
       const wt = (g: any) => (g.weight === undefined || g.weight < 0 ? 1 : g.weight);
+      const rp = root ? root.getAbsolutePosition() : null;
       rows.push({
+        // phase 8: the root's position and the frame's dt — speed and distance are computed off these in Node
+        px: rp ? rp.x : null, py: rp ? rp.y : null, pz: rp ? rp.z : null, dt: dev.scene.getEngine().getDeltaTime() / 1000,
         eL: ang(B.LS, B.LE, B.LH), eR: ang(B.RS, B.RE, B.RH),
         clips: dev.scene.animationGroups.filter((g: any) => g.isPlaying && wt(g) > 0.02).map((g: any) => g.name),
       });
@@ -64,7 +67,18 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const teeBy: Record<string, number> = {};
   for (const r of arms) if (r.eL > 160 && r.eR > 160) for (const c of (r.clips?.length ? r.clips : ['<none>'])) teeBy[c] = (teeBy[c] ?? 0) + 1;
   const allClips = Object.entries(clips).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  return { mode, frames: rows.length, armFrames: arms.length, tee, teeBy, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
+  // phase 8: SPEED — per-frame ground speed off consecutive root positions (a teleport > 8 m in a frame is a respawn, skipped)
+  const speeds: number[] = []; let dist = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1], b = rows[i];
+    if (a.px == null || b.px == null || !b.dt || b.dt <= 0) continue;
+    const d = Math.hypot(b.px - a.px, b.pz - a.pz);
+    if (d > 8) continue;
+    speeds.push(d / b.dt); dist += d;
+  }
+  const sorted = [...speeds].sort((x, y) => x - y);
+  const speed = speeds.length ? { mean: +(speeds.reduce((s, v) => s + v, 0) / speeds.length).toFixed(2), p90: +(sorted[Math.floor(sorted.length * 0.9)] ?? 0).toFixed(2), peak: +(sorted[sorted.length - 1] ?? 0).toFixed(2), dist: +dist.toFixed(1) } : null;
+  return { mode, frames: rows.length, armFrames: arms.length, tee, teeBy, speed, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
 }
 
 async function main() {

@@ -15,8 +15,10 @@ const MAXMS = Number(process.env.MAXMS ?? 80000);
 const BANK_GAP = process.env.BANK_GAP === '1';
 // phase 7: DRIVER=intent installs the mechanics probe's intent driver (gates on snow, the face on surf) under ?agent=1
 const INTENT = process.env.DRIVER === 'intent';
+// TRACE=1 (intent runs): the hero's x / z, the QA next gate and the pad's stick at 2 Hz, printed at the end
+const TRACE = process.env.TRACE === '1';
 // the mode's own landing / combo ledger lines, tallied (the banner hides bails by design; the log does not)
-const LEDGER_TAGS = 'AIR-TRICK|AIR-COMBO|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SNOW-EDGE|SNOW-YETI|SURF-WIPE|SURF-EDGE|SKATE-SOLID';
+const LEDGER_TAGS = 'AIR-TRICK|AIR-COMBO|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SNOW-EDGE|SNOW-YETI|SURF-WIPE|SURF-EDGE|SURF-PUMP|SKATE-SOLID';
 const LOG_RE = new RegExp(`\\[(${LEDGER_TAGS})\\]`);
 const ledger: string[] = [];
 const exe = (() => {
@@ -44,6 +46,7 @@ if (INTENT) {
   if (!INTENT_DRIVERS[MODE]) throw new Error(`no intent driver for ${MODE}`);
   await p.evaluate(`(() => { window.__BT = { labels: {}, frames: 0 }; setInterval(() => { try { const m = document.body.innerText.match(/"banner"\\s*:\\s*"([^"]*)"/); if (m && m[1]) window.__BT.labels[m[1]] = (window.__BT.labels[m[1]] || 0) + 1; } catch (e) {} }, 50); window.__BTI = 0; })()`);
   await p.evaluate(INTENT_DRIVERS[MODE]);
+  if (TRACE) await p.evaluate(`(() => { window.__TR = []; setInterval(() => { try { const Q = window.__FEL_QA__, h = Q.hero && Q.hero(); if (!h) return; let r = h; while (r.parent) r = r.parent; const q = r.getAbsolutePosition(); const s = Q.scene && Q.scene(); const g = s && s.metadata ? s.metadata.qaNextGate : null; window.__TR.push([+q.x.toFixed(1), +q.z.toFixed(1), g ? +g.x.toFixed(1) : null, g ? +g.z.toFixed(1) : null, +window.__PAD.axes[0].toFixed(2), +r.rotation.y.toFixed(2)]); } catch (e) {} }, 500); })()`);
 } else await p.evaluate(`(() => {
   const pad = window.__PAD;
   const press = (i, v) => { pad.buttons[i] = { pressed: v > 0.1, touched: v > 0.1, value: v }; pad.timestamp = performance.now(); };
@@ -77,11 +80,13 @@ await p.waitForTimeout(MAXMS);
 const bt = await p.evaluate('window.__BT') as { labels: Record<string, number> };
 await p.evaluate('clearInterval(window.__BTI)');
 const names = Object.keys(bt.labels).filter((l) => l && l.length > 1);
+if (TRACE) console.log('trace [x, z, gateX, gateZ, stickX, yaw] @2Hz: ' + JSON.stringify(await p.evaluate('window.__TR')));
 console.log('mode: ' + MODE);
 console.log('distinct trick labels seen (' + names.length + '): ' + JSON.stringify(names));
 const tally: Record<string, number> = {};
-for (const l of ledger) { const m = l.match(new RegExp(`\\[(${LEDGER_TAGS})\\] (\\S+)`)); if (m) tally[`${m[1]} ${m[2]}`] = (tally[`${m[1]} ${m[2]}`] ?? 0) + 1; }
+for (const l of ledger) { const m = l.match(new RegExp(`\\[(${LEDGER_TAGS})\\] ([^|(]+?)(?: [-\\d.]+ .*| \\(.*| \\|.*)?$`)); if (m) { const w = m[2].trim(); const k = `${m[1]} ${m[1] === 'SURF-WIPE' ? w : w.split(' ')[0]}`.slice(0, 44); tally[k] = (tally[k] ?? 0) + 1; } }
 console.log('ledger tally: ' + JSON.stringify(tally));
-console.log('ledger lines: ' + ledger.length + (ledger.length ? ' :: ' + ledger.slice(-10).join(' | ') : ''));
+const LEDGER_N = Number(process.env.LEDGER_N ?? 10);   // how many of the last ledger lines to print
+console.log('ledger lines: ' + ledger.length + (ledger.length ? ' :: ' + ledger.slice(-LEDGER_N).join(' | ') : ''));
 console.log('errors: ' + errors + (errs.length ? ' :: ' + errs.join(' | ') : ''));
 await b.close();
