@@ -184,8 +184,10 @@ export const DuelMode: ModeDefinition = (() => {
   const HIT_STOP_MS = { light: 28, medium: 45, heavy: 70, finisher: 70 } as const;
   let foeLaunchedSec = 0;   // phase 5
   const book = new StringBook(); const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };   // phase 4
+  let stringLabels: string[] = [];   // phase 9: the names of the links so far, for the COMBO banner
   const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
+  let foeReadThisSwing = false, foeGuardUntil = 0;   // phase 10
   let guardUp = false;
   function banner(ctx: ModeContext, text: string, ms = 900): void {
     ctx.setHud({ banner: text });
@@ -298,7 +300,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
+    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = []; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
     // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
     player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
@@ -455,7 +457,7 @@ export const DuelMode: ModeDefinition = (() => {
         // phase 4: empty hands read the Storm book — the string picks the link (jab → cross → rising dragon…)
         const key = e.btn === 'A' ? 'jab' : e.btn === 'B' ? 'kick' : e.btn === 'Y' ? 'heavy' : null;
         if (key) { const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = wish(ctx); const to = rival.root.position.subtract(player.root.position); to.y = 0; const d = (w.x * to.x + w.z * to.z) / Math.max(1e-3, Math.hypot(to.x, to.z) * Math.hypot(w.x, w.z)); return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n'; };
-          const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing, air: foeLaunchedSec > 0 }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); } else refuse(ctx, 'RECOVERING'); return; }
+          const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing, air: foeLaunchedSec > 0 }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); stringLabels.push(mv.label); if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); } } else refuse(ctx, 'RECOVERING'); return; }   // phase 9: the string is named
       }
       if (e.btn === 'A') trySwing(moveIds[0]);
       if (e.btn === 'B') trySwing(moveIds[1]);
@@ -529,8 +531,16 @@ export const DuelMode: ModeDefinition = (() => {
           const ids = Object.keys(RIVAL_MOVESET[foeWeapon]());
           foeStrike.request(ids[Math.floor(Math.random() * ids.length)], now());
         }
-        if (meStrike.busy && chance(2.1 / Math.max(0.5, nrv.mistake))) { foeDef.pressBlock(now(), Math.random() < 0.3); foeState.pressBlock(now()); }
-        else if (foeState.blockHeld && chance(1.5)) { foeDef.releaseBlock(); foeState.releaseBlock(); }
+        // phase 10 — ONE READ PER WIND-UP (see showdown / FightCore): a 0.3 read on my startup, the guard stamped 200 ms early
+        // (a block, not a free parry) and held 0.6 s; one read in ten is a true GUARD IMPACT attempt on the press itself.
+        const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
+        if (!meWinding) foeReadThisSwing = false;
+        if (meWinding && !foeReadThisSwing) {
+          foeReadThisSwing = true;
+          const r = Math.random();
+          if (r < 0.3 / Math.max(0.5, nrv.mistake)) { const gi = r < 0.03; foeDef.pressBlock(gi ? now() : now() - 200, gi); foeState.pressBlock(gi ? now() : now() - 200); foeGuardUntil = now() + 600; console.info(`[DL-AI] read the wind-up — ${gi ? 'guard impact' : 'guard'}`); }
+        }
+        if (foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
       } else {
         foeMove.updateWithSelf(sdtRoom, 0, 0, false, rival.root.position);
       }

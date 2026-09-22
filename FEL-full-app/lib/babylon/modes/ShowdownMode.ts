@@ -153,6 +153,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   let foeLaunchedSec = 0;   // phase 5: a launcher lifts him; the air string is open while it runs
   const xBtn = new XButtonReader();   // phase 3: the Storm X — showdown's X used to be the block alone; the dash was a chi buy on L1
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
+  let foeReadThisSwing = false, foeGuardUntil = 0;   // phase 10: one block read per wind-up, held for a beat
   let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
   let hazardTick = 0;
   let guardUp = false;                 // the hold has passed DASH.tapSec and the block is raised
@@ -330,7 +331,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     })();
   }
 
-  function endRound(ctx: ModeContext, playerWon: boolean): void {
+  function endRound(ctx: ModeContext, playerWon: boolean, reason = 'K.O.'): void {   // phase 9: the round says why
     if (phase === 'matchOver') return;
     if (playerWon) myRounds++; else foeRounds++;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
@@ -343,7 +344,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       ctx.end(playerWon ? 'SHOWDOWN_WON' : 'SHOWDOWN_LOST', myRounds * 100 - foeRounds * 40, { foeRounds });
       return;
     }
-    banner(ctx, playerWon ? 'ROUND — YOU' : 'ROUND — RIVAL', 1600);
+    banner(ctx, `${reason} — ROUND ${myRounds + foeRounds} — ${playerWon ? 'YOU' : 'RIVAL'}`, 1600);   // phase 9: the same grammar the duel reads (K.O. — ROUND n — YOU)
     setTimeout(() => {
       meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = []; foeLaunchedSec = 0; rival.root.position.y = 0; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
       player.root.position.set(0, 0, 4); rival.root.position.set(0, 0, -4);
@@ -587,8 +588,17 @@ export const ShowdownMode: ModeDefinition = (() => {
             foeStrike.request(['jab', 'kick', 'heavy'][Math.floor(Math.random() * 3)], now());
           }
           // reactive block
-          if (meStrike.busy && chance(1.8 / Math.max(0.5, nrv.mistake))) { foeDef.pressBlock(now(), false); foeState.pressBlock(now()); }
-          else if (foeState.blockHeld && chance(1.2)) { foeDef.releaseBlock(); foeState.releaseBlock(); }
+          // phase 10 — ONE READ PER WIND-UP (FightCore's RivalFightBrain rule). Rolling 1.8/s for the whole of my swing blocked
+          // most lights and, because the press landed inside PARRY_WINDOW_MS of the hit, PARRIED them for free: three runs of
+          // strings landed nothing but ultimates. The rival reads my startup once (0.3, cut by his nerve's `mistake`), the
+          // guard he raises is stamped 200 ms early — a block, never a lucky parry — and held for 0.6 s.
+          const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
+          if (!meWinding) foeReadThisSwing = false;
+          if (meWinding && !foeReadThisSwing) {
+            foeReadThisSwing = true;
+            if (Math.random() < 0.3 / Math.max(0.5, nrv.mistake)) { foeDef.pressBlock(now() - 200, false); foeState.pressBlock(now() - 200); foeGuardUntil = now() + 600; console.info('[SD-AI] read the wind-up — guard'); }
+          }
+          if (foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         }
         rival.root.position.addInPlace(foeMove.vel.scale(sdtRoom));
         arenaClamp(rival.root.position, arena); if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }
