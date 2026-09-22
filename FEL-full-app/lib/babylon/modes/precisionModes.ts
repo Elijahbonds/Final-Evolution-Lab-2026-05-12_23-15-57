@@ -1402,7 +1402,7 @@ export const PenaltyMode: ModeDefinition = (() => {
   // stacking off a flow gauge, the bank off the glass, the rainbow flick, the slide-cancel curler; the keeper comes off
   // his line, slide-tackles, vaults for the top corners and parry-kicks a save back at you (an overdrive if you hit it
   // again). Pure reads in core/Breakaway; the shootout format around it (their kick, sudden death) is untouched.
-  const brk = { on: false, clock: 0, flow: 0, kineticAt: -1e9, run: { vx: 0, vz: 0 }, wall: 0 as 1 | -1 | 0, wallSec: 0, slideSec: -1, slideCool: 0, vaultT: -1, vault: null as { from: Vector3; dir: Vector3 } | null, counterLive: false, struck: false, shotKind: 'strike' as ShotKind, lastHigh: false, lastAimSign: 1, stylePts: 0, keeperSlide: null as { t: number; dir: Vector3 } | null, keeperCool: 0, hudClock: -1, hudFlow: -1, hudKin: '' };
+  const brk = { lastAimX: 0, on: false, clock: 0, flow: 0, kineticAt: -1e9, run: { vx: 0, vz: 0 }, wall: 0 as 1 | -1 | 0, wallSec: 0, slideSec: -1, slideCool: 0, vaultT: -1, vault: null as { from: Vector3; dir: Vector3 } | null, counterLive: false, struck: false, shotKind: 'strike' as ShotKind, lastHigh: false, lastAimSign: 1, stylePts: 0, keeperSlide: null as { t: number; dir: Vector3 } | null, keeperCool: 0, hudClock: -1, hudFlow: -1, hudKin: '' };
   const brkStats = { shots: 0, wallRuns: 0, banks: 0, rainbows: 0, curlers: 0, overdrives: 0, kinetic: 0, slides: 0, tackled: 0, clocks: 0, parries: 0, rebounds: 0 };
   const me2 = () => ({ x: me.root.position.x, z: me.root.position.z });
   const vel2 = () => ({ x: brk.run.vx, z: brk.run.vz });
@@ -1484,7 +1484,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
     const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: 0, rand: Math.random() });
     vel.scaleInPlace(prof.speedMult);
-    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = Math.sign(target.x || 0.01); brk.counterLive = false; brk.slideSec = -1;
+    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = Math.sign(target.x || 0.01); brk.lastAimX = target.x; brk.counterLive = false; brk.slideSec = -1;
     if (brk.wall !== 0) { brk.wall = 0; me.root.position.y = 0; }
     brk.stylePts += kind === 'strike' ? 0 : kind === 'rainbow' ? 15 : kind === 'overdrive' ? 15 : 10; if (kinetic) brk.stylePts += 5;
     brkStats.shots++; if (kind === 'bank') brkStats.banks++; if (kind === 'rainbow') brkStats.rainbows++; if (kind === 'curler') brkStats.curlers++; if (kind === 'overdrive') brkStats.overdrives++; if (kinetic) brkStats.kinetic++;
@@ -1492,7 +1492,11 @@ export const PenaltyMode: ModeDefinition = (() => {
     meAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
     if (kind === 'rainbow') { const dir = keeper.root.position.subtract(me.root.position); dir.y = 0; dir.normalize(); brk.vault = { from: me.root.position.clone(), dir }; brk.vaultT = 0; }
     const aimSign = brk.lastAimSign; const correct = Math.random() < keeperReadProb(aimSign, shotHistory, 0);
-    keeperTargetX = keeper.root.position.x + (correct ? aimSign : -aimSign) * 2.0;
+    // net/precision phase 6 — A READ THAT IS RIGHT REACHES THE BALL. The dive went 2.0 m toward the read side from wherever he
+    // stood; a corner sits at 3.0, past his reach even when he read it, so a random corner beat him as surely as a read one
+    // (the masher's shootout: 5 of 5). Right = he goes to the shot's line (inside the post); wrong = the other way.
+    keeperTargetX = correct ? Math.max(-2.9, Math.min(2.9, brk.lastAimX)) : keeper.root.position.x - aimSign * 2.0;
+    console.info(`[BREAK] keeper read ${correct ? 'RIGHT' : 'WRONG'} aim ${brk.lastAimX.toFixed(1)} dive to ${keeperTargetX.toFixed(1)}`);
     kickIn = kind === 'rainbow' ? 0.2 : KICK_CONTACT_SEC * 0.6;
     pendingKick = () => {
       SoundKit.play('whoosh'); ctx.feel?.impact?.(0.3 + prof.power01 * 0.3);
@@ -1565,6 +1569,7 @@ export const PenaltyMode: ModeDefinition = (() => {
   /** The kick decided (was inline in the flight branch): the score, the pips, the juice, the banner, their kick next. */
   function resolveKick(ctx: ModeContext, outcome: ReturnType<typeof judgeKick>, bannerOverride?: string): void {
     const saved = outcome === 'saved';
+    console.info(`[BREAK] judge ${outcome} ball x ${ball.position.x.toFixed(1)} keeper x ${keeper.root.position.x.toFixed(1)}`);   // phase 6: the ledger
     if (saved) lastSaveBy = 'them';
     const scored = outcome === 'goal';
     shotHistory.push(brk.on ? brk.lastAimSign : Math.sign(reticle.pos.x || 0.01));   // the keeper remembers

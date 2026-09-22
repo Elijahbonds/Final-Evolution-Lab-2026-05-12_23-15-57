@@ -212,6 +212,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let meSwing = false, meServe = false, meBlock = false, foeSwing = false;
   /** The serve: the ball leaves on the clip's contact beat (the trophy → overhead), not at the toss. */
   let serveIn = 0, serveTotal = 0, serveAim = 0; let serveFrom: Vector3 | null = null;
+  /** phase 6: where the foe's feet are (x across the court); it runs to the landing at a skill-scaled speed */
+  const foeFoot = { x: 0 };
+  // measured on the first cut (5.7–5.9 m/s, no reaction time): the foe reached EVERY ball (reach 0.00 on 62 of 62 returns) — a
+  // wall with feet. A player reads the ball before moving (0.35 s) and covers ~4 m/s: a perfect drive to the far corner
+  // (5 m, a 0.9 s flight) leaves him 2 m short — stretched or beaten. That is what placement is for.
+  const FOE_FOOT_BASE = 1.6, FOE_FOOT_SKILL = 3.0;   // m/s: 0.78 → 3.9, 0.82 → 4.1
+  // the read takes longer on a better-struck ball (Wii: a PERFECT is the shot that beats the foe): 0.3 s on a late one, 0.65 on a perfect
+  let foeReactSec = 0.35;
   let ended = false;
   let restSec = 0;                 // pause between points
   let heroStreak = 0;              // M107: consecutive points won → tension/hype
@@ -486,6 +494,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     let q: SwingQuality = roll > skill ? 'miss'
       : roll > skill * 0.75 ? 'late'
       : roll > skill * 0.45 ? 'good' : 'perfect';
+    // net/precision phase 6 — THE FOE HAS FEET. The roll above was the whole return, taken wherever the ball landed; the
+    // foe's body never moved, so placement meant nothing and no driver ever won a game. The foe now runs to the landing
+    // (see the frame step) and its return is graded through the SAME reach model the human plays under.
+    if (ball) {
+      const foeReach = reachOf(foeFoot.x, ball.position.x);
+      const before = q;
+      const stretched = gradeAfterStretch(q === 'miss' ? 'miss' : q, foeReach);
+      q = stretched === 'early' ? 'late' : stretched;
+      console.info(`[NET-FOE] reach ${foeReach.toFixed(2)} ${before} -> ${q}`);
+      if (q === 'miss' && before !== 'miss') { awardPoint(ctx, 0, foeReach > MAX_REACH_M ? 'THEY COULD NOT REACH IT' : 'THEY WERE STRETCHED'); return; }
+    }
 
     // A bump and a set are routine CONTROL touches. Errors in volleyball happen
     // on the attack and the serve-receive, not on the second ball -- and the
@@ -704,6 +723,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     setTimeout(() => { swingingNow = false; }, 320);
     // phase 4: the ledger — every swing's timing, its stretch and the touch it was (the windows are measured off this)
     console.info(`[NET-SWING] ${q} timing ${timing} dt ${dt.toFixed(3)} reach ${lastReach.toFixed(2)} touch ${volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide)} shot ${pendingShot}`);
+    foeReactSec = q === 'perfect' ? 0.65 : q === 'good' ? 0.45 : 0.3;   // phase 6: the foe reads a better ball later
 
     // WHICH touch this is decides what the swing DOES. Previously every human
     // swing called rally.cross(), and cross() zeroes the touch counter, so the
@@ -818,6 +838,11 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true, look: readPlaceLook(o.venueId) });   // PLACE: the splash's pick (tennis / volleyball)   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
       if (o.beach) beach = buildBeach(ctx.scene);   // P5: sand to the horizon, the sea past the far baseline
       if (o.cfg.touchesPerSide > 1) readableNet = buildReadableNet(ctx.scene, o.cfg);   // volleyball: a net you can see
+      // phase 6: a QA seam for BOTH nets (the cage's was tennis-only, so no driver could play volleyball — it never swung)
+      (ctx.scene.metadata ??= {}).net = {
+        state: () => ({ awaitingHuman, flightT, shot: shot ? { toX: shot.to.x, toZ: shot.to.z, duration: shot.duration } : null, footX: foot.x, foeX: foeFoot.x,
+          touch: incomingTouch, touches: rally.touches, ended, steerSign: Math.sign(ctx.camDirector.rightFlat().x || 1) }),
+      };
       if (o.cage) {   // PARKOUR TENNIS: the glass, and the dev seam
         for (const g of glassMeshes) g.dispose(); glassMeshes = []; buildCage(ctx);
         mult = 1; style = 0; aerialNow = null; incomingMeteor = false; Object.assign(cageStats, { bounces: 0, wallRuns: 0, smashes: 0, meteors: 0, rallies: 0, liveSaves: 0 });
@@ -841,7 +866,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.groundLock?.track(foe.root, foe.skeleton);
       foeTree = new NetAnimTree(foe.animator, clips);
       foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; };
-      meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null;
+      meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null; foeFoot.x = 0;
 
       // Real characters are in — drop the venue's placeholder bodies, or every
       // player is on the court twice.
@@ -1011,7 +1036,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         const bodyRightX = Math.cos(me.root.rotation.y);
         // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
         meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });
-        foeTree.update({ move: 0, swing: foeSwing, serve: false, block: false });
+        // phase 6: the foe's FEET — toward the incoming landing while the ball comes to them, back toward the middle after
+        {
+          const toFoe = !!shot && shot.to.z < 0 && flightT < 1 && flightT * shot.duration >= foeReactSec;   // he moves once he has read it
+          const target = toFoe ? shot!.to.x : foeFoot.x * 0.85;   // a slow drift back to the middle (he does not teleport home)
+          const speed = FOE_FOOT_BASE + FOE_FOOT_SKILL * Math.max(SKILL_FLOOR, Math.min(SKILL_CEIL, o.aiSkill));
+          const dx = target - foeFoot.x, stepF = Math.sign(dx) * Math.min(Math.abs(dx), speed * dt);
+          foeFoot.x = Math.max(-o.cfg.halfWidth * 0.95, Math.min(o.cfg.halfWidth * 0.95, foeFoot.x + stepF));
+          foe.root.position.x = foeFoot.x;
+          const foeRightX = Math.cos(foe.root.rotation.y);
+          foeTree.update({ move: Math.abs(stepF) > 0.002 ? (stepF * foeRightX > 0 ? 1 : -1) : 0, swing: foeSwing, serve: false, block: false });
+        }
       }
 
       if (splittingNow > 0) splittingNow = Math.max(0, splittingNow - dt);

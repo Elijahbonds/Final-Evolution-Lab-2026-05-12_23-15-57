@@ -170,7 +170,7 @@ export const INTENT_DRIVERS: Record<string, string> = {
       if (st.flightT < 0.9) { stick(clamp(dx * 1.2) * st.steerSign, 0); return; }
       if (st.flightT >= 0.93 && swungAt !== st.shot.toZ + ':' + st.flightT.toFixed(2)) {
         swungAt = st.shot.toZ + ':' + st.flightT.toFixed(2);
-        if (st.aerial) btn(5, 60); else { stick(side * 0.5, 0); btn(A, 60); side = -side; }
+        if (st.aerial) btn(5, 60); else { stick(side * 0.75, 0); btn(A, 60); side = -side; }   // aim for the corners (0.85+ is the cage bank)
         setTimeout(() => stick(0, 0), 200);
       }
     }, 16);
@@ -178,7 +178,7 @@ export const INTENT_DRIVERS: Record<string, string> = {
 
   // VOLLEYBALL: no seam — read the ball mesh. On my side (the human spawns at +z) steer under the ball's x and HIT when it
   // comes down into reach; B to BLOCK when their ball crosses high near the net.
-  volleyball: loop(`
+  volleyball_mesh_v1: loop(`
     let lastHit = 0, lastBlock = 0;
     setInterval(() => {
       const s = Q.scene && Q.scene(); const h = Q.hero && Q.hero(); if (!s || !h) return;
@@ -193,6 +193,25 @@ export const INTENT_DRIVERS: Record<string, string> = {
       } else {
         stick(clamp((b.x - q.x) * 0.6), 0);
         if (b.z > -3 && b.z < 0 && b.y > 2.4 && now - lastBlock > 1500) { lastBlock = now; btn(B, 60); }
+      }
+    }, 16);
+  `),
+
+  // VOLLEYBALL (net/precision phase 6): the net seam (scene.metadata.net) — steer under the incoming landing, A at the
+  // contact for each of the three touches (aimed across on the spike), B to BLOCK when their spike comes.
+  volleyball: loop(`
+    let swungAt = '', side = 1, blockedAt = '';
+    setInterval(() => {
+      const s = Q.scene && Q.scene(); const st = s && s.metadata && s.metadata.net ? s.metadata.net.state() : null; if (!st) return;
+      if (!st.awaitingHuman || !st.shot) { stick(0, 0); return; }
+      const key = st.shot.toX.toFixed(2) + ':' + st.shot.toZ.toFixed(2);
+      const dx = st.shot.toX - st.footX;
+      if (st.flightT < 0.88) { stick(clamp(dx * 1.4) * st.steerSign, 0); return; }
+      if (st.flightT >= 0.92 && swungAt !== key) {
+        swungAt = key;
+        const spike = st.touches >= 2;
+        stick(spike ? side * 0.6 : 0, 0); btn(A, 60); if (spike) side = -side;
+        setTimeout(() => stick(0, 0), 200);
       }
     }, 16);
   `),
