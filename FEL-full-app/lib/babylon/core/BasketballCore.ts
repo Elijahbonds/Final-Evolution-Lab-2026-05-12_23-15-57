@@ -937,7 +937,8 @@ export class ShotArc {
   start(from: Vector3, rim: Vector3, made: boolean, style: ShotStyle, apexAdd = 0, bank: Vector3 | null = null, play: RimPlay | null = null): void {
     this.from.copyFrom(from);
     this.made = made; this.shotStyle = style;
-    this.glass = bank ? bank.clone() : null;
+  private glassKissed = false;   // Phase 8: the square's touch, queued once per banked flight
+    this.glass = bank ? bank.clone() : null; this.glassKissed = false;
     this.play = play; this.playT = 0; this.inPlay = false; this.touchQ.length = 0; this.touchN = 0;
     this.to.copyFrom(play ? play.arrive : rim);
     if (!made && !play) {              // clang point on the front of the iron
@@ -981,6 +982,7 @@ export class ShotArc {
     ball.y = this.from.y + (this.to.y - this.from.y) * k + Math.sin(k * Math.PI) * this.apex;
     }
     if (this.t >= 1) {
+        if (!this.glassKissed) { this.glassKissed = true; this.touchQ.push({ t: 0, on: 'glass', strength01: 0.55 }); }   // Phase 8: the kiss — the modes drain it like any rim touch (the thud, the graze)
       if (this.play && (this.play.keys.length || this.play.touches.length)) {
         // arrived ON the iron: the dwell starts (its t 0 touches fire now)
         this.inPlay = true; this.playT = 0;

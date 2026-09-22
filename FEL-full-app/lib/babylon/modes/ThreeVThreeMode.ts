@@ -952,6 +952,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             (arcQuality === 'early' ? 0.8 : arcQuality === 'late' ? -0.8 : arcQuality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
             arcQuality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
             arc.play,   // RIM PLAY: planned at the release
+            true,       // Phase 9: my shot — the iron's name goes on the banner
           );
           if (finishFoul) {   // HOOPS-MOVE-KIT-A M2: fouled in the air on a miss — the ref calls it
             finishFoul = false;
@@ -1720,7 +1721,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.setHud({ score: myScore, banner: finish === 'alleyoop' ? 'ALLEY-OOP!' : 'ASSISTED BUCKET' });
     } else {
       SoundKit.play('miss');
-      ctx.setHud({ banner: 'MISS' });
+      ctx.setHud({ banner: `MISS${rimPlaySuffix(mateArc.play)}` });   // Phase 9: the iron the pass's shot found
     }
     lastPasserWasMe = false;
     bannerClearLater(ctx, 800);
@@ -1788,7 +1789,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     else if (quality === 'brick') ctx.setHud({ banner: `WAY LATE${tag}` });
     // no clear here: the arc's make/miss banner replaces it and owns the timeout
     // the ball flies — score/possession resolve when it lands (update loop)
-    arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : v3.play);   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
+    arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, v3.play);   // Phase 8: a bank has rim play too   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
     startBoxOut('mine');   // O2: the shot is up — the defenders seal their men, the offense crashes
   }
 
@@ -2366,13 +2367,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    * AWAY; a contested shot misses short. With six bodies on the floor this matters more than in 1v1,
    * because where the ball goes is what decides who had a chance at it.
    */
-  function deflectMiss(shooterPos: Vector3, q01: number, short: number, lateral: number, play: RimPlay | null = null): void {
+  function deflectMiss(shooterPos: Vector3, q01: number, short: number, lateral: number, play: RimPlay | null = null, mine = false): void {
     if (play) {
       // RIM PLAY (2026-09-18): the flight ended ON the iron and the dwell already showed the miss — the ball leaves from
       // wherever the dwell left it, with the play's exit (the touches rang the iron as they happened)
       ballSim.launch(ball.position.clone(), play.exitVel.clone());
       if (play.kind === 'airball') SoundKit.play('crowdGroan', { volume: 0.3 });
       console.info(`[3V3-RIM] ${play.kind} — ${play.label}`);
+      if (mine && play.label) ctx0?.setHud({ banner: play.label });   // Phase 9: 1v1 already names the iron on a miss; 3v3 only logged it
       return;
     }
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
@@ -2405,7 +2407,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** …and the touches while it is there: the iron's rattle and the ring's spring, the glass's thud. */
   function rimTouches(a: ShotArc): void {
     for (const t of a.takeTouches()) {
-      if (t.on === 'glass') SoundKit.play('thud', { pitch: 1.5, volume: 0.35 });
+      if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3V3-RIM] glass kiss`); }
       else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
     }
   }

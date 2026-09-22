@@ -596,7 +596,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** …and the touches while it is there: the iron's rattle and the ring's spring, the glass's thud. */
   function rimTouches(): void {
     for (const t of arc.takeTouches()) {
-      if (t.on === 'glass') SoundKit.play('thud', { pitch: 1.5, volume: 0.35 });
+      if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[1V1-RIM] glass kiss`); }
       else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
     }
   }
@@ -1924,7 +1924,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       short: contest * 0.8 + Math.max(0, range - 7) * 0.12,
       lateral: (Math.random() - 0.5) * 0.9,
     };
-    const rivalVerdict = rimVerdictFor(foe.root.position, Math.min(0.98, rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake)), shotMiss.quality01, shotMiss.short, shotMiss.lateral);
+    // Phase 8: the rival banks from the wing — inside the square's band, a third of his jumpers go off the glass, with the bank's edge
+    const rivalBank = style !== 'layup' && inBankBand(foe.root.position, RIM_FLOOR, BOARD_NORMAL) && roll() < 0.34 ? bankPoint(foe.root.position, RIM, BOARD_NORMAL) : null;
+    if (rivalBank) console.info('[1V1-RIM] rival calls glass');
+    const rivalVerdict = rimVerdictFor(foe.root.position, Math.min(0.98, rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake) + (rivalBank ? BANK_PCT_BONUS : 0)), shotMiss.quality01, shotMiss.short, shotMiss.lateral);
     const made = rivalVerdict.made;
     arcPoints = style === 'layup' ? 2 : isThree(foe.root.position, RIM) ? 3 : 2;
     // The RIVAL's miss has to be readable too. Measured with a probe: every rim contact in a 150 s run
@@ -1932,7 +1935,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // through to the default short bias — so the iron answered identically every single time, which is
     // the exact failure the rim work existed to fix. His miss now comes off the contest and the range:
     // a hand in his face or a shot past his limit is short off the front, an open look sprays.
-    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest), null, rivalVerdict.play);   // a strong contest ALTERS the release; RIM PLAY
+    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest), rivalBank, rivalVerdict.play);   // a strong contest ALTERS the release; RIM PLAY
     console.info(`[1V1-DEF] rival release ${style} contest ${contest.toFixed(2)} handUp ${ground > 0} pct ${rivalShotPct(range, contest, style).toFixed(2)}`);
     // the read at the release, before the arc lands — same as the hero's GREEN / CONTESTED tags
     if (contest >= 0.5) bannerFlash(ctx, ground > 0 ? 'CONTESTED — HAND UP!' : 'CONTESTED!', 500);
@@ -2670,7 +2673,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // front. LATE is long, off the back. A brick sprays laterally. A hand in the face pushes it short on
     // top of whatever the timing did, which is why a contested miss comes back at you.
     carrying = false;
-    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : verdict.play);   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
+    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, verdict.play);   // Phase 8: a bank rattles, rolls, or goes in and out like any shot — the glass is the route, not the verdict   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
     // O2: the shot is up — the rival SEALS me (the box-out between me and the rim, his chest on me) until the ball comes down
     if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); foeSealing = true; console.info('[1V1-OFF] box out (the rival seals me)'); }
   }

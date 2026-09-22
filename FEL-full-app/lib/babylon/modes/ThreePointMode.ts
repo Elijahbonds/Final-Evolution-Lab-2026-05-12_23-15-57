@@ -266,6 +266,7 @@ const bio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE, role: 'offense', hasBall: 
 let shotWin: ShotWindow = 'none', shotSec = 0;
 let releaseIn = -1;                        // seconds until the ball leaves the hand (the jumpshot's release frame); −1 = none pending
 let pendingMade = false;
+let pendingPerfect = false;   // Phase 9: the release's grade, for the result banner at the rim
 /** RIM PLAY (2026-09-18): planned at the fire from the timing, started with the arc at the release frame. */
 let pendingPlay: RimPlay | null = null;
 /** The jumpshot's pace on the release: the timing decision is the press, the ball leaves at the clip's release frame
@@ -358,7 +359,14 @@ const standings = (): Shooter[] =>
 /** A rack's last ball is the money ball — 2 points instead of 1. */
 const isMoneyBall = (i: number): boolean => i === BALLS_PER_RACK - 1;
 
+/** Phase 9: a banner pushed once used to be cleared by the next frame's pushHud (banner ?? null) — the shootout's
+ *  "MISS — FRONT RIM" lived for one frame, invisible (and never reached the caption bus). It holds for this long now. */
+const BANNER_HOLD_SEC = 0.9;
+let bannerText: string | null = null, bannerUntil = 0;
 function pushHud(ctx: ModeContext, banner?: string): void {
+  const now = performance.now() / 1000;
+  if (banner !== undefined) { bannerText = banner; bannerUntil = now + BANNER_HOLD_SEC; }
+  else if (now >= bannerUntil) bannerText = null;
   ctx.setHud({
     score: S.pts,
     rack: `${Math.min(S.rack + 1, RACKS)}/${RACKS}`,
@@ -391,7 +399,7 @@ function pushHud(ctx: ModeContext, banner?: string): void {
     need: S.round === 'final' && !S.finalistsPosting && S.phase !== 'standings' && S.phase !== 'done'
       ? Math.max(0, ...S.field.filter((f) => !f.isPlayer).map((f) => f.score)) + 1
       : null,
-    banner: banner ?? null,
+    banner: bannerText,
   });
 }
 
@@ -466,7 +474,11 @@ function fire(ctx: ModeContext, power?: number): void {
     if (money) SoundKit.play('crowdGroan');
   }
   S.charge = 0;
-  pushHud(ctx, made ? `${perfect ? 'PERFECT' : 'GOOD'}${S.streak >= FIRE_STREAK ? ' · ON FIRE' : ''}` : 'MISS');
+  // Phase 9: the release says what the TIMING was (the ball is still in the air); the ring's answer goes on the banner
+  // when the ball gets there (the rim-contact sites below) — measured before: "MISS — OFF THE LEFT IRON" at the release and
+  // "OFF THE LEFT IRON" again at the iron, two banners for one shot
+  pushHud(ctx, perfect ? 'PERFECT' : err < goodBand() ? 'GOOD' : signed < 0 ? 'EARLY' : 'LATE');
+  pendingPerfect = perfect;
 }
 
 /** The make's landing beat: a soft shake, a short flash on a PERFECT or the money ball, and the hoop answers. Latched once per ball.
@@ -872,10 +884,10 @@ export const ThreePointMode: ModeDefinition = {
       } else {
         const r = arc.step(dt, ball.position, ball);
         for (const t of arc.takeTouches()) {   // RIM PLAY: the iron answers every touch of the dwell
-          if (t.on === 'glass') SoundKit.play('thud', { pitch: 1.5, volume: 0.35 });
+          if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3PT-RIM] glass kiss`); }
           else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
         }
-        if (r === 'made') { if (arc.play?.label) pushHud(ctx, arc.play.label); contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
+        if (r === 'made') { pushHud(ctx, `${pendingPerfect ? 'SPLASH' : 'GOOD'}${rimPlaySuffix(arc.play)}${S.streak >= FIRE_STREAK ? ' · ON FIRE' : ''}`); contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
         else if (r === 'missed') {
           missClank(ctx);                             // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
           // A shootout is nothing but shooting feedback, and the ball used to vanish to the next rack the
@@ -889,7 +901,7 @@ export const ThreePointMode: ModeDefinition = {
             : resolveRim(RIM, toShooter, forcedMissProfile(q01, { short: shotErr < 0 ? 0.8 : -0.8 }), 0.05);
           ballSim?.launch(hit.contact, hit.outVel);
           rimOut = RIM_OUT_SEC;
-          pushHud(ctx, hit.label);
+          pushHud(ctx, `MISS — ${hit.label}`);
           console.info(`[3PT-RIM] ${hit.kind} — ${hit.label} (err ${shotErr.toFixed(2)})`);
         }
       }
