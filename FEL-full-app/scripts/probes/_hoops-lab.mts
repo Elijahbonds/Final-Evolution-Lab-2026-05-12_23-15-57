@@ -237,7 +237,7 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
     const clips = (s.animationGroups || []).filter((g) => g.isPlaying).map((g) => g.name);
     // BEHIND THE BACK: a hand in the body frame with z < -0.22 (behind the hips' plane) between the waist and the head
     const behind = (r) => { if (!r || !r.root) return ''; const m = r.root.getWorldMatrix().clone().invert(); const out = []; for (const [k, n] of [['rh', r.rh], ['lh', r.lh]]) { if (!n) continue; const w = n.getAbsolutePosition(); const l = w.constructor.TransformCoordinates(w, m); const z = Math.abs(l.z) > 20 ? l.z / 100 : l.z; if (z < -0.22 && l.y > 0.6 && l.y < 1.6) out.push(k); } return out.join('+'); };
-    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, feet: { h: [P(hero.lf), P(hero.rf), P(hero.hips)], f: foe ? [P(foe.lf), P(foe.rf), P(foe.hips)] : null }, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe), gap: +Math.min(99, ...bodies().map((b) => Math.hypot(b.x - hero.root.position.x, b.z - hero.root.position.z))).toFixed(2) });
+    rows.push({ t: Math.round(performance.now() - t0), wall: Date.now(), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, feet: { h: [P(hero.lf), P(hero.rf), P(hero.hips)], f: foe ? [P(foe.lf), P(foe.rf), P(foe.hips)] : null }, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe), gap: +Math.min(99, ...bodies().map((b) => Math.hypot(b.x - hero.root.position.x, b.z - hero.root.position.z))).toFixed(2) });
   });
   return 'recording'; })()`).then((r) => console.log('[LAB] smooth', r));
 const started = await agent('a.start(30000)');
@@ -383,21 +383,31 @@ for (let n = 0; n < POSSESSIONS; n++) {
         const flick = (at, x, y) => { setTimeout(() => R(x, y), at); setTimeout(() => R(x * 0.9, y * 0.9), at + 30); setTimeout(() => R(0, 0), at + 90); };
         const sweep = (at) => { for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; setTimeout(() => R(Math.cos(a) * 0.95, Math.sin(a) * 0.95), at + i * 28); } setTimeout(() => R(0, 0), at + 300); };
         window.__stickPlan = [];
-        const throwIt = (at, name, expect, x, y, kind) => { window.__stickPlan.push({ at, name, expect }); if (kind === 'sweep') sweep(at); else flick(at, x, y); };
-        // ball right: +x is TOWARD the ball hand
+        const planT0 = Date.now(); window.__stickPlans = window.__stickPlans || [];
+        const throwIt = (at, name, expect, x, y, kind) => { window.__stickPlan.push({ at, name, expect, wall: planT0 + at }); window.__stickPlans.push({ at, name, expect, wall: planT0 + at }); if (kind === 'sweep') sweep(at); else flick(at, x, y); };
+        // ball right: +x is TOWARD the ball hand. HANDLE decides what the gated throws should produce (Phase 4).
+        const H = ${Number(process.env.HANDLE ?? 50)};
         throwIt(400,  'hesi',          'hesi',          1, 0);
         throwIt(900,  'between_legs',  'between_legs', -1, 0);
         throwIt(1400, 'crossover',     'crossover',    -0.75, -0.75);
         throwIt(1900, 'in_and_out',    'in_and_out',    0, -1);
         throwIt(2400, 'behind_back',   'behind_back',  -0.75, 0.75);
         throwIt(2900, 'stepback',      'stepback',      0, 1);
-        throwIt(3500, 'size_up',       'size_up',       0.75, -0.75);
-        throwIt(4100, 'spin(sweep)',   'spin',          0, 0, 'sweep');
+        throwIt(3300, 'cross-after-sb','crossover',    -0.75, -0.75);   // the step-back is a LINK: this should read chain 2
+        throwIt(3800, 'size_up',       'size_up',       0.75, -0.75);
+        throwIt(4300, 'spin(sweep)',   'spin',          0, 0, 'sweep');
+        // R2 held from 4800 (the bridge's sprint): the escapes
+        throwIt(5500, 'snatchback',    H >= 80 ? 'snatchback' : 'stepback', 0, 1);     // 1.2 s after the sweep: the spin's lock has let go     // refused by name under 80 → the plain step-back plays
+        throwIt(6000, 'momentum_cross','momentum_cross', -0.75, -0.75);
         return 'armed';
       })()`);
+      if (process.env.LUCK) await page.evaluate(`(() => { const d = window.__dev(); if (d && d.luck) d.luck(${Number(process.env.LUCK)}); })()`).catch(() => {});   // Phase 4: LUCK=0.99 keeps the 1v1 AI's hands off the ball so the whole plan reaches the reader
+      // The left stick under the throws: a jog in, then ACROSS, then back out — 4.8 s straight at the rim camped the paint
+      // and the ref called three seconds before the escapes could be thrown (measured: every 1v1 possession, "three_seconds → foe").
       await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1500)`);
-      await agent(`a.act({ moveX: 0, moveY: 0.35 }, 1500)`);
-      await agent(`a.act({ moveX: 0, moveY: 0.5 }, 1700)`);
+      await agent(`a.act({ moveX: 0.6, moveY: 0.1 }, 1500)`);
+      await agent(`a.act({ moveX: -0.3, moveY: -0.4 }, 1800)`);
+      await agent(`a.act({ moveX: 0, moveY: -0.5, sprint: true }, 2000)`);   // R2 held for the two escape throws — RETREATING: 6 s of jogging at the 1v1 defender ran through him (FOUL ON YOU, silent to the log) before the escapes
       await mark('end');
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);
     }
@@ -683,20 +693,30 @@ const final = await hud();
 // logged what it did (`[X-STICK] <kind> <dir8> (ball R|L) → <move> [side]`). Matched IN ORDER — every throw in the
 // 2K set produces a move, so the i-th throw is the i-th log line — and reported as expected vs got, which is the
 // number the remap is judged on. A dropped throw shifts everything after it, and the mismatch shows it.
-const stickPlan = (await page.evaluate('window.__stickPlan || []').catch(() => [])) as { name: string; expect: string }[];
-const stickGot = log.filter((l) => /-STICK\] (flick|sweep)/.test(l)).map((l) => { const m = /-STICK\] (\w+)(?: (\w+))?(?: \(ball (\w)\))? → (\w+)/.exec(l); return m ? { kind: m[1], dir8: m[2] ?? '', hand: m[3] ?? '?', move: m[4] } : null; }).filter((x): x is NonNullable<typeof x> => !!x);
-// A rotation's entry sample crosses the flick ring before the sweep resolves, so a sweep throw produces TWO lines: a
-// spurious flick, then the sweep. Matching by position alone shifted every throw after it. Each throw now consumes
-// the next line OF ITS OWN KIND (sweep → sweep, flick → flick) and the extras are reported, not hidden.
-let cursor = 0;
-const stickTally = stickPlan.map((p) => {
+const stickPlan = (await page.evaluate('window.__stickPlans || window.__stickPlan || []').catch(() => [])) as { name: string; expect: string; wall?: number }[];
+const stickGot = log.filter((l) => /-STICK\] (flick|sweep)/.test(l)).map((l) => { const m = /^(\d+) .*-STICK\] (\w+)(?: (\w+))?(?: \(ball (\w)\))? → (\w+)/.exec(l); return m ? { wall: +m[1], kind: m[2], dir8: m[3] ?? '', hand: m[4] ?? '?', move: m[5], used: false } : null; }).filter((x): x is NonNullable<typeof x> => !!x);
+// Phase 4: matched by WALL TIME, not position. Every throw (of every possession — `__stickPlans` keeps them all) looks for
+// the first unused line of its own kind inside −60 … +450 ms of when it fired. A possession that ended early simply
+// leaves its later throws unreached, and the tally says so ("reached") instead of shifting the next possession onto them.
+// The spurious entry flick before a sweep is still an extra (reported, not hidden).
+const perThrow = new Map<string, { name: string; expect: string; reached: number; ok: number; got: Record<string, number> }>();
+for (const p of stickPlan) {
   const kind = /sweep/.test(p.name) ? 'sweep' : 'flick';
-  let j = cursor; while (j < stickGot.length && stickGot[j].kind !== kind) j++;
-  const hit = stickGot[j]; if (hit) cursor = j + 1;
-  return { name: p.name, expect: p.expect, got: hit?.move ?? '(no move)', hand: hit?.hand ?? '?', ok: hit?.move === p.expect };
-});
-const stickExtras = stickGot.length - stickTally.filter((t) => t.got !== '(no move)').length;
-const stickOk = stickTally.filter((t) => t.ok).length;
+  const hit = p.wall ? stickGot.find((g) => !g.used && g.kind === kind && g.wall >= p.wall! - 60 && g.wall <= p.wall! + 450) : undefined;
+  if (hit) hit.used = true;
+  const row = perThrow.get(p.name) ?? { name: p.name, expect: p.expect, reached: 0, ok: 0, got: {} };
+  // The 2K map is BALL-HAND relative and the snatchback / momentum cross switch hands, so a throw written for the right
+  // hand means its mirror once the ball is left: right flick = hesi (R) / between-the-legs (L), up-left = crossover (R) /
+  // size-up (L). The expectation follows the hand the mode reported.
+  const MIRROR: Record<string, string> = { hesi: 'between_legs', between_legs: 'hesi', crossover: 'size_up', size_up: 'crossover', momentum_cross: 'size_up' };
+  const want = hit && hit.hand === 'L' ? (MIRROR[p.expect] ?? p.expect) : p.expect;
+  if (hit) { row.reached++; row.got[hit.move + (hit.hand === 'L' ? '(L)' : '')] = (row.got[hit.move + (hit.hand === 'L' ? '(L)' : '')] ?? 0) + 1; if (hit.move === want) row.ok++; }
+  perThrow.set(p.name, row);
+}
+const stickTally = [...perThrow.values()].map((r) => ({ name: r.name, expect: r.expect, got: Object.entries(r.got).sort((x, y) => y[1] - x[1]).map(([m, n]) => `${m}×${n}`).join(' ') || '(no move)', reached: r.reached, okN: r.ok, hand: stickGot.find((g) => g.used)?.hand ?? '?', ok: r.reached > 0 && r.ok === r.reached }));
+const stickReached = stickTally.reduce((n, t) => n + t.reached, 0), stickOkN = stickTally.reduce((n, t) => n + t.okN, 0);
+const stickExtras = stickGot.filter((g) => !g.used).length;
+const stickOk = stickTally.filter((t) => t.ok).length;   // throws whose every reached instance matched
 const out = {
   tag: TAG, mode: MODE, charge: CHARGE, play: PLAY,
   possessions: rows.length,
@@ -707,12 +727,12 @@ const out = {
   handleMoves, tricks, refCalls, chargesTaken, screensCalled, stickTally, stickOk, stickExtras, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
-  rows, log: log.slice(-200),
+  recT0, rows, log: log.slice(-600),
   defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]|-SHOT\]|-MOVE\]|-STICK\]|-HANDLE\]|-PACE\]|-CONTACT\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);
 console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · planted ${((def?.plantedMs ?? 0) / 1000).toFixed(1)}s, closest ${(def?.closestWhilePlanted ?? 99).toFixed(2)}m (CHARGE_RANGE is BODY_STANDOFF + 0.5) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
-if (stickPlan.length) { console.log(`stick vs 2K: ${stickOk}/${stickPlan.length}${stickExtras > 0 ? ` (+${stickExtras} extra moves the throws did not ask for)` : ''}`); for (const t of stickTally) console.log(`  ${t.ok ? 'ok ' : 'XX '} ${t.name.padEnd(14)} expect ${t.expect.padEnd(14)} got ${t.got}${t.hand !== '?' ? ` (ball ${t.hand})` : ''}`); }
+if (stickPlan.length) { console.log(`stick vs 2K: ${stickOkN}/${stickReached} of the throws that reached the reader (${stickPlan.length} thrown over ${rows.length} possessions${stickExtras > 0 ? `, +${stickExtras} extra moves the throws did not ask for` : ''})`); for (const t of stickTally) console.log(`  ${t.ok ? 'ok ' : t.reached ? 'XX ' : '-- '} ${t.name.padEnd(14)} expect ${t.expect.padEnd(14)} got ${t.got.padEnd(22)} reached ${t.reached}${t.reached ? ` ok ${t.okN}` : ''}`); }
 console.log(`→ ${OUT}/hoops-lab-${TAG}.json`);
 await browser.close();

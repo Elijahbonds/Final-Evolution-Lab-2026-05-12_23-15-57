@@ -47,7 +47,9 @@ export type HandleMove =
   // THE 2K17 STICK VOCABULARY (owner, 2026-09-17): momentum moves keep (and add) pace, the pause freezes it, the roll spins out of a behind-the-back
   | 'momentum_cross'
   | 'momentum_btb'
-  | 'steezo_roll';
+  | 'steezo_roll'
+  // THE 2K STEP-BACK (Phase 4, 2026-09-22): a plain down flick, everyone's, and a chain LINK — a step-back into a cross is a real combo
+  | 'stepback';
 
 /**
  * The handle a move needs before you have it at all.
@@ -75,6 +77,7 @@ export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
   momentum_cross: 30,   // the 2K17 momentum crossover: a wide cut that keeps the run — the first stick move you earn
   momentum_btb: 50,     // momentum behind the back: the ball wrapped at pace without the slow-down
   steezo_roll: 74,      // the roll: behind the back rolled straight into the spin
+  stepback: 0,          // 2K gives everyone the step-back; what the handle gates is what you chain INTO it
 };
 
 /**
@@ -106,6 +109,7 @@ export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => 
   momentum_cross: (d) => `bball_crossover_${d}`,     // the capture's cross, played FAST and wide by the movement
   momentum_btb: (d) => `bball_behind_back_${d}`,
   steezo_roll: (d) => `bball_behind_back_${d}`,      // the wrap; the mode's spin follows
+  stepback: () => 'bball_stepback_gather',             // the hop off the rim; the mode moves the feet
 };
 
 /** The clip for a move, or null when the mode renders it another way. */
@@ -211,7 +215,7 @@ export const MAX_CHAIN = 4;
  */
 /** The moves that may repeat back-to-back: the 2K17 momentum spam — a cross into a cross into a cross, each one carrying pace. */
 /** The moves only the RIGHT STICK produces (StickHandle.stickMoveFor) — moveFromContext never names them. */
-export const STICK_ONLY: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross', 'momentum_btb', 'steezo_roll']);
+export const STICK_ONLY: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross', 'momentum_btb', 'steezo_roll', 'stepback']);
 export const MOMENTUM_REPEATABLE: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross']);
 export function canChain(next: HandleMove, state: ChainState, handle: number): boolean {
   if (!hasMove(next, handle)) return false;

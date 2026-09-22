@@ -109,7 +109,7 @@ import {
   moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP,
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
   type ChainState, type HandleMove,
-  hasMove, MOVE_HANDLE,   // the stick's snatchback is gated on the same rating doMove gates on
+  hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -131,7 +131,7 @@ import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 // HOOPS KINETIC (owner brief 2026-09-18): the parry-vault, the momentum drift and its ankle-breaker, the footstool board, the drive-by steal.
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, FOOTSTOOL, footstoolRead, DRIVE_BY, driveByRead } from '../core/HoopsKinetic';
-import { StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
+import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
@@ -443,6 +443,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   let handle = BASELINE_HANDLE;
   /** What just happened in my hands, and how long ago — a chain, not a sequence of separate presses. */
   let chain: ChainState = { ...CHAIN_IDLE };
+  /** Phase 4: the chain as it stood before the last stick flick, and when — a sweep resolving inside FLICK_RETRACT_SEC of it
+   *  retracts that flick (a rotation's entry sample crosses the flick ring before the 140° accumulates; measured +3–5 per run). */
+  let chainBeforeFlick: ChainState | null = null, flickAt = -Infinity, flickMove = '';
   /** Seconds left of the spin's gather window: a shot pressed inside it skips the load and rises at once. */
   let spinGather = 0;
   /** TRIPLE THREAT: the jab's clocks and how many lies he has already seen this possession. */
@@ -701,7 +704,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // rim — measured live: the "defender" parked at (0, 0.3) and never
         // marked anyone, in every game this mode has ever played.
         ball: () => ball.getAbsolutePosition(), hoop: () => RIM, allies: () => [], foes: () => [me.root.position],
-      }, (foeBrain = new DefenderBrain(0.7))), false);
+      }, (foeBrain = new DefenderBrain(0.7, null, roll))), false);
 
       // Phase 4: Havok contact bodies. If the physics wasm is unavailable
       // the mode falls back to the kinematic path unchanged.
@@ -1176,14 +1179,24 @@ export const OneVOneMode: ModeDefinition = (() => {
             console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(meCarry?.side ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
             // THE 2K PRO STICK (2026-09-18): the size-up (a package animation in place, no travel), the L2 step-back dribble
             // (a hop off the rim that arms the step-back jumper), the L2 spin — none of them a chain move
-            if (pick.move === 'size_up') { meAnimTree.beat(sizeUpClip(sizeUpN++, pick.side ?? 'right'), { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
+            if (pick.move === 'size_up') { const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', handle); console.info(`[1V1-HANDLE] size-up ${suClip} (handle ${handle})`); meAnimTree.beat(suClip, { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
             if (pick.move === 'stepback') {
+              // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
+              // into a cross reads as a combo and the tier is real. It is rated 0 — the gate is what you chain into it.
+              chain = resolveHandleMove('stepback', chain, handle, { present: false, closing: false, set: true, within: false }, roll).chain;
+              console.info(`[1V1-HANDLE] link stepback (chain ${chain.length}, handle ${handle})`);
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
               meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
               continue;
             }
             if (pick.move === 'snatchback') {
+              // The snatchback is a real move in the vocabulary (snatch_back, 80) and it LINKS — and, thrown deep against a closing
+              // man, it can break ankles like anything else at its price. The stepback hop + the cross below is its body.
+              const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE }, roll);
+              chain = sno.chain;
+              console.info(`[1V1-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
+              reactToBreak(ctx, sno);
               // THE SNATCHBACK (2K: step-back with R2, steezo's staple): the hop off the rim AND the ball to the other hand
               // in the same beat — the cross is what makes it an escape rather than a set-up for the jumper
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
@@ -1192,7 +1205,11 @@ export const OneVOneMode: ModeDefinition = (() => {
               meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
               continue;
             }
-            if (pick.move === 'spin') { if (spinCooldown <= 0) startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, pick.side ?? undefined); continue; }
+            if (pick.move === 'spin') {
+              if (chainBeforeFlick && performance.now() / 1000 - flickAt < FLICK_RETRACT_SEC) { chain = chainBeforeFlick; console.info(`[1V1-HANDLE] retract ${flickMove} — the rotation's entry flick`); }
+              chainBeforeFlick = null;
+              if (spinCooldown <= 0) startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, pick.side ?? undefined); continue;
+            }
             if (pick.move === 'momentum_cross') meDribble.momentumCross(pick.side ?? 'right', sprintOk);
             else if (pick.move === 'momentum_btb') meDribble.momentumBtb(pick.side ?? 'right', sprintOk);
             else if (pick.move === 'hesi') meDribble.hesitate();
@@ -1211,6 +1228,7 @@ export const OneVOneMode: ModeDefinition = (() => {
                 continue;
               }
               meDribble.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (carrying && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, sideS); } }); }
+            if (g.kind === 'flick') { chainBeforeFlick = chain; flickAt = performance.now() / 1000; flickMove = pick.move; }
             doMove(ctx, pick.move, pick.side ?? undefined);
             SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
           }
@@ -1510,6 +1528,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               mbus.report({ kind: 'turnover', weight: -10 }); momentum = Math.round(mbus.score01 * 100);
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'FOUL ON YOU — THEIR BALL', 900);
+              console.info('[1V1-REF] offensive foul: ran through the defender → foe');   // the one possession change the lab could not see (Phase 4)
               defPhase = 'over';
               later(900, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
             } else if (possession === 'defense' && defPhase !== 'over' && c.attacker === 'foe' && meDribble.vel.length() < 1.0) {
@@ -2659,6 +2678,41 @@ export const OneVOneMode: ModeDefinition = (() => {
    * The ankles are decided HERE rather than at the crossover, because depth is the skill: a single
    * crossover should rarely break anyone and a three-deep chain at a real handle should look inevitable.
    */
+  /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome): void {
+    if (outcome.broke === 'none') return;
+    const tier = outcome.tier;
+    const odds = outcome.odds;
+
+    swing('ankle_break');
+    SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
+    SoundKit.play('crowdCheer', { volume: 0.55 });
+    EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
+    ctx.setHud({ momentum });
+
+    if (outcome.broke === 'hard') {
+      // "ankle breakers" — he goes DOWN, and has to get up. The same floored state the poster dunk uses,
+      // so there is one way a body ends up on this floor and one way it comes back.
+      foeFloored = true;
+      foeStunSec = ANKLE_BREAK_STUN_SEC * 1.8;
+      // HE SLIPPED, HE WAS NOT PUNCHED. This played the poster dunk's karate knockdown — a man taking a blow —
+      // for a defender whose feet went out from under him going for a ball that was not there. The slip is its
+      // own clip now: the foot slides out, the hand reaches back for the floor, and he sits there watching you go.
+      foeAnimTree.beat(ANKLE_SLIP_CLIP, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
+      ctx.feel?.impact?.(0.55);
+      ctx.juice.shake(0.09, 140);
+      bannerFlash(ctx, 'ANKLES — HE IS DOWN!', 1100);
+      console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
+    } else {
+      foeStunSec = ANKLE_BREAK_STUN_SEC;
+      foeAnimTree.beat(ANKLE_STUMBLE_CLIP);   // …and the softer one is a STUMBLE, not a hit react: he caught it, late
+      ctx.feel?.impact?.(0.35);
+      bannerFlash(ctx, tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!');
+      console.info(`[1V1-HANDLE] ankle break, chain ${chain.length} handle ${handle} odds ${odds.toFixed(2)}`);
+    }
+  }
+
   function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right'): void {   // STICK HANDLE: the stick's side wins over the defender read
     // THE DECISION IS SHARED (HandleSystem.resolveHandleMove); what stays here is the RENDERING — this
     // mode's clips, banners and defender. 3v3 renders the same outcome its own way, so a tuning change to
@@ -2746,36 +2800,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    if (outcome.broke === 'none') return;
-    const odds = outcome.odds;
-
-    swing('ankle_break');
-    SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
-    SoundKit.play('crowdCheer', { volume: 0.55 });
-    EffectsKit.burst(ctx.scene, foe.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
-    ctx.setHud({ momentum });
-
-    if (outcome.broke === 'hard') {
-      // "ankle breakers" — he goes DOWN, and has to get up. The same floored state the poster dunk uses,
-      // so there is one way a body ends up on this floor and one way it comes back.
-      foeFloored = true;
-      foeStunSec = ANKLE_BREAK_STUN_SEC * 1.8;
-      // HE SLIPPED, HE WAS NOT PUNCHED. This played the poster dunk's karate knockdown — a man taking a blow —
-      // for a defender whose feet went out from under him going for a ball that was not there. The slip is its
-      // own clip now: the foot slides out, the hand reaches back for the floor, and he sits there watching you go.
-      foeAnimTree.beat(ANKLE_SLIP_CLIP, { settleTo: { clip: 'karate_floor_hold' } });
-      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
-      ctx.feel?.impact?.(0.55);
-      ctx.juice.shake(0.09, 140);
-      bannerFlash(ctx, 'ANKLES — HE IS DOWN!', 1100);
-      console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
-    } else {
-      foeStunSec = ANKLE_BREAK_STUN_SEC;
-      foeAnimTree.beat(ANKLE_STUMBLE_CLIP);   // …and the softer one is a STUMBLE, not a hit react: he caught it, late
-      ctx.feel?.impact?.(0.35);
-      bannerFlash(ctx, tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!');
-      console.info(`[1V1-HANDLE] ankle break, chain ${chain.length} handle ${handle} odds ${odds.toFixed(2)}`);
-    }
+    reactToBreak(ctx, outcome);
   }
 
   /** The two bodies as the loose ball sees them: a jumper reaches higher, a floored body cannot reach at all. */

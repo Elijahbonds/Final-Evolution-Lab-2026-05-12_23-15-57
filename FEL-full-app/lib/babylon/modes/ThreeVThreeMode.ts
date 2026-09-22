@@ -57,7 +57,7 @@ import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
-import { StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
+import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { clankOffRim } from '../anim/ballRig';
@@ -116,7 +116,7 @@ import {
   moveClip, ANKLE_STUMBLE_CLIP,
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse, type ChainState, type HandleMove,
   moveRate, moveFadeSec,   // MOVE PACE
-  hasMove, MOVE_HANDLE,   // the stick's snatchback is gated on the same rating doMove gates on
+  hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
 } from '../core/HandleSystem';   // the vocabulary 1v1 had and this mode did not
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -339,6 +339,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** The handle drives the vocabulary and the chain window (HandleSystem) — 3v3 never had either. */
   let handle = BASELINE_HANDLE;
   let chain: ChainState = { ...CHAIN_IDLE };
+  /** Phase 4: the chain as it stood before the last stick flick, and when — a sweep resolving inside FLICK_RETRACT_SEC of it
+   *  retracts that flick (a rotation's entry sample crosses the flick ring before the 140° accumulates; measured +3–5 per run). */
+  let chainBeforeFlick: ChainState | null = null, flickAt = -Infinity, flickMove = '';
   let posting = false;                                                               // the seal I hold (the path into the fade / the hook / the quick spin)
   let spin: { plan: SpinPlan; t: number; beat: boolean } | null = null;              // M6: the pivot in flight
   let spinCooldown = 0, spinArmed = 0;   // M6: a body I meet ARMS the spin; the stick swung across throws it
@@ -1069,14 +1072,24 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;
           console.info(`[3V3-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(carries.get(me)?.side ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${me.drib.vel.length().toFixed(1)} m/s`);
           // THE 2K PRO STICK (remapped 2026-09-22, relative to the ball hand — docs/SPEC-STICK-2K-DECODE.md): the size-up, the step-back on DOWN, the spin on a ROTATION, the snatchback with R2
-          if (pick.move === 'size_up') { me.tree.beat(sizeUpClip(sizeUpN++, pick.side ?? 'right'), { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
+          if (pick.move === 'size_up') { const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', handle); console.info(`[3V3-HANDLE] size-up ${suClip} (handle ${handle})`); me.tree.beat(suClip, { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
           if (pick.move === 'stepback') {
+            // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
+            // into a cross reads as a combo and the tier is real. It is rated 0 — the gate is what you chain into it.
+            chain = resolveHandleMove('stepback', chain, handle, { present: false, closing: false, set: true, within: false }, roll).chain;
+            console.info(`[3V3-HANDLE] link stepback (chain ${chain.length}, handle ${handle})`);
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
             me.tree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 });
             continue;
           }
           if (pick.move === 'snatchback') {
+            // The snatchback is a real move in the vocabulary (snatch_back, 80) and it LINKS — and, thrown deep against a closing
+            // man, it can break ankles like anything else at its price. The stepback hop + the cross below is its body.
+            const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll);
+            chain = sno.chain;
+            console.info(`[3V3-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
+            reactToBreak(ctx, sno, nfS, 'snatch_back');
             // THE SNATCHBACK (2K: step-back with R2): the hop off the rim AND the ball to the other hand in the same beat
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
@@ -1084,7 +1097,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             me.tree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
             continue;
           }
-          if (pick.move === 'spin') { if (spinCooldown <= 0) startSpin(ctx, nfS ? nfS.char.root.position : null, pick.side ?? undefined); continue; }
+          if (pick.move === 'spin') {
+            if (chainBeforeFlick && performance.now() / 1000 - flickAt < FLICK_RETRACT_SEC) { chain = chainBeforeFlick; console.info(`[3V3-HANDLE] retract ${flickMove} — the rotation's entry flick`); }
+            chainBeforeFlick = null;
+            if (spinCooldown <= 0) startSpin(ctx, nfS ? nfS.char.root.position : null, pick.side ?? undefined); continue;
+          }
           if (pick.move === 'momentum_cross') me.drib.momentumCross(pick.side ?? 'right', sprintOk);
           else if (pick.move === 'momentum_btb') me.drib.momentumBtb(pick.side ?? 'right', sprintOk);
           else if (pick.move === 'hesi') me.drib.hesitate();
@@ -1103,6 +1120,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
                 continue;
               }
               me.drib.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (iAmCarrier && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, (nearestLiveFoe()?.char.root.position ?? null), sideS); } }); }
+          if (g.kind === 'flick') { chainBeforeFlick = chain; flickAt = performance.now() / 1000; flickMove = pick.move; }
           doMove(ctx, pick.move, pick.side ?? undefined);
           SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
         }
@@ -2501,6 +2519,35 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    * the hard-break threshold all live there. What is here is 3v3's own rendering: its nearest defender out
    * of three rather than one man, its clips, its banners.
    */
+  /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, foe: Body | null, move: HandleMove): void {
+    if (outcome.broke === 'none' || !foe) return;
+
+    swing('ankle_break');
+    ctx.setHud({ momentum });
+    SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
+    SoundKit.play('crowdCheer', { volume: 0.55 });
+    EffectsKit.burst(ctx.scene, foe.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
+    if (outcome.broke === 'hard') {
+      // the same knockdown + floor hold every other body-down in this mode uses — one way down, one way up
+      foe.floored = true;
+      foe.stunSec = ANKLE_BREAK_STUN_SEC * 1.8;
+      foe.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
+      ctx.feel?.impact?.(0.55);
+      ctx.juice.shake(0.09, 140);
+      ctx.setHud({ banner: 'ANKLES — HE IS DOWN!' });
+      bannerClearLater(ctx, 1100);
+    } else {
+      foe.stunSec = ANKLE_BREAK_STUN_SEC;
+      foe.tree.beat('bball_contact_react');
+      ctx.feel?.impact?.(0.35);
+      ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
+      bannerClearLater(ctx, 800);
+    }
+    console.info(`[3V3-HANDLE] ${move} chain ${chain.length} ${outcome.broke} odds ${outcome.odds.toFixed(2)}`);
+  }
+
   function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right'): void {   // STICK HANDLE
     const foe = nearestLiveFoe();
     const outcome = resolveHandleMove(move, chain, handle, {
@@ -2580,31 +2627,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    if (outcome.broke === 'none' || !foe) return;
-
-    swing('ankle_break');
-    ctx.setHud({ momentum });
-    SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
-    SoundKit.play('crowdCheer', { volume: 0.55 });
-    EffectsKit.burst(ctx.scene, foe.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
-    if (outcome.broke === 'hard') {
-      // the same knockdown + floor hold every other body-down in this mode uses — one way down, one way up
-      foe.floored = true;
-      foe.stunSec = ANKLE_BREAK_STUN_SEC * 1.8;
-      foe.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
-      SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
-      ctx.feel?.impact?.(0.55);
-      ctx.juice.shake(0.09, 140);
-      ctx.setHud({ banner: 'ANKLES — HE IS DOWN!' });
-      bannerClearLater(ctx, 1100);
-    } else {
-      foe.stunSec = ANKLE_BREAK_STUN_SEC;
-      foe.tree.beat('bball_contact_react');
-      ctx.feel?.impact?.(0.35);
-      ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
-      bannerClearLater(ctx, 800);
-    }
-    console.info(`[3V3-HANDLE] ${move} chain ${chain.length} ${outcome.broke} odds ${outcome.odds.toFixed(2)}`);
+    reactToBreak(ctx, outcome, foe, move);
   }
 
   function nearestLiveFoe(): Body | null {

@@ -599,7 +599,10 @@ export class DefenderBrain implements AIBehavior {
    *   between the ball and the rim and piled onto it, leaving every other
    *   attacker completely unguarded. Basketball defenders match up.
    */
-  constructor(private aggression = 0.6, private markIndex: number | null = null) {}
+  /** `rng` is the dice every read below rolls — a mode's dev luck seam (1v1: `luck(0.99)` = no poke ever lands) reaches the
+   *  brain through it, the same way the depth pass takes its rng. Measured before: LUCK=0.99 and the poke still stripped
+   *  the lab's handler 4.5 s into every possession, because this class rolled Math.random on its own. */
+  constructor(private aggression = 0.6, private markIndex: number | null = null, private rng: () => number = Math.random) {}
   /** Re-mark this defender (the scram switch, lib/babylon/core/Matchups.ts). */
   setMark(index: number | null): void { this.markIndex = index; }
   get mark(): number | null { return this.markIndex; }
@@ -724,7 +727,7 @@ export class DefenderBrain implements AIBehavior {
     for (let i = 0; i < foes.length; i++) {
       if (foes[i] === mark || distXZ(foes[i], ball) < 1.2 || foeSpeeds[i] > 0.6) continue;   // the handler and moving bodies are not screens
       const nav = navigateAround(self, denyPoint, foes[i], ball, this.over);
-      if (nav) { if (this.navigating <= 0) this.over = Math.random() < 0.6; this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
+      if (nav) { if (this.navigating <= 0) this.over = this.rng() < 0.6; this.navigating = 0.5; to.addInPlace(nav.scale(1.6)); fighting = true; break; }
     }
     this.navigating = Math.max(0, this.navigating - dt);
     this.job = fighting ? 'navigate' : helping ? 'help' : beaten ? 'recover' : closingOut ? 'closeout' : onBall ? 'onball' : 'deny';
@@ -741,7 +744,7 @@ export class DefenderBrain implements AIBehavior {
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
     const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
-      onBall && dist < 1.1 && Math.random() < this.aggression * 0.02);
+      onBall && dist < 1.1 && this.rng() < this.aggression * 0.02);
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;
   }

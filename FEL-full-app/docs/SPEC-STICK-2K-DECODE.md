@@ -99,3 +99,37 @@ Open, for Phase 4: a rotation's entry sample crosses the flick ring before the 1
 preceded by a spurious in-and-out. Either the detector defers a flick while the stick keeps turning, or the spin's
 own start cancels the flick's clip — measured, not guessed.
 
+
+## Phase 4 — the gate and the chain (2026-09-22)
+
+Phase 3 mapped the stick; four of its moves still ran outside `doMove → resolveHandleMove`, so they were neither gated
+on the handle nor links in a chain: the step-back, the snatchback (refused by name, never a link), the spin, and the
+size-up cycle. Now:
+
+- **Step-back** is a rated move (0 — everyone's, as 2K has it) and a LINK: a step-back into a cross reads chain 2 and
+  the tier is real. What the handle gates is what you chain into it.
+- **Snatchback** (80) links and, thrown deep against a closing man, breaks ankles at its price like any other move.
+  Under 80 it is refused by name (`SNATCHBACK NEEDS HANDLE 80 — YOURS 50`) and the plain step-back plays.
+- **Size-up cycle** shows only the moves you own — yoyo (52), in-and-out (40), between-the-legs (45). A baseline
+  handle never sees the yoyo; a handle that owns none of it still gets the in-and-out.
+- The **ball hand** flips the map: the snatchback and the momentum cross switch hands, and the same physical throw
+  then reads as its mirror (a right flick is the hesi with the ball right, between-the-legs with it left). The lab's
+  tally expects the mirror once the mode reports `(ball L)`.
+
+Measured (`_hoops-lab PLAY=rstick`, 5 possessions, the 2K set + the step-back pair + the two escapes under R2,
+tallied by wall time so a possession that ends early leaves its throws "unreached" instead of shifting the next one):
+
+| run | reached | notes |
+|---|---|---|
+| 3v3 handle 50 | 51/51 | snatchback refused, step-back plays 4/4; yoyo never |
+| 3v3 handle 90 | 51/51 | snatchback 5/5, hands switch, mirrors expected and met |
+| 1v1 handle 50 | 55/55 | snatchback refused, step-back plays 5/5; the step-back links (chain 2); yoyo never |
+| 1v1 handle 90 | 53/53 | snatchback 5/5; yoyo / in-and-out / between-the-legs all appear in the cycle |
+
+Lab findings on the way: the 1v1 AI's poke (`DefenderBrain`, `Math.random` per frame inside 1.1 m) ended every
+possession ~4.5 s in and the dev luck seam could not reach it — the brain takes an `rng` now and 1v1 hands it `roll`;
+the run-through foul ("FOUL ON YOU") had no console line; a jog straight at the rim for 4.8 s camps the paint and the
+ref calls three seconds before the escapes are thrown (the lab now jogs in, across, and back out). The spurious flick a
+rotation's entry sample throws before the sweep resolves (+3–5 extra moves per run) is RETRACTED now: a sweep resolving
+inside `FLICK_RETRACT_SEC` (0.3 s) of a flick restores the chain as it stood before that flick and logs
+`[X-HANDLE] retract <move>` — the spin's own beat had already overridden the clip; what lingered was the chain step.

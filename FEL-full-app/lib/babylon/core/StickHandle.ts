@@ -1,3 +1,4 @@
+import { hasMove } from './HandleSystem';
 // StickHandle — the RIGHT STICK as the dribble stick (owner, 2026-09-17: "a flip of the right stick should trigger something
 // with the character … reference the old 2K17 dribble system with the ability to momentum and momentum spam, momentum
 // behind the back, pausin', steezo roll").
@@ -28,6 +29,9 @@ export const STICK = {
   sweepRad: 2.4,     // a sweep must turn this far (≈ 140°) …
   sweepSec: 0.38,    // … inside this long, past the hold ring
 } as const;
+
+/** A sweep that resolves inside this of a flick was the same gesture: the flick was the rotation's entry sample. */
+export const FLICK_RETRACT_SEC = 0.3;
 
 export class StickHandleReader {
   private mag = 0; private ang = 0;
@@ -157,6 +161,18 @@ export function stickMoveFor(g: StickGesture, r: StickRead): { move: StickMove; 
 /** The size-up cycle: each up-diagonal flick pulls the next animation from the package (2K: "flick repeatedly for
  *  size-ups"), no travel — the yoyo, the in-and-out, the between-the-legs, then round again. */
 export const SIZE_UP_CYCLE = ['bball_yoyo', 'bball_in_and_out_{side}', 'bball_between_legs_{side}'] as const;
+/**
+ * The size-up cycle, GATED (Phase 4): yoyo (52) / in-and-out (40) / between-the-legs (45) are three rated moves, and a
+ * baseline handle (50) owns two of them. The cycle skips what you do not own, so the handle LOOKS different before it
+ * does anything different — the Iverson / Steezo read is mostly silhouette. A handle that owns none of it still gets
+ * the in-and-out: a size-up that plays nothing is a dead input, and the in-and-out is the cheapest thing in the cycle.
+ */
+const SIZE_UP_MOVE = ['yoyo', 'in_and_out', 'between_legs'] as const;
+export function sizeUpClipFor(n: number, side: 'left' | 'right', handle: number): string {
+  const owned = SIZE_UP_CYCLE.map((c, i) => ({ c, i })).filter(({ i }) => hasMove(SIZE_UP_MOVE[i], handle));
+  const pool = owned.length ? owned : [{ c: SIZE_UP_CYCLE[1], i: 1 }];
+  return pool[n % pool.length].c.replace('{side}', side);
+}
 export function sizeUpClip(n: number, side: 'left' | 'right'): string {
   return SIZE_UP_CYCLE[((n % SIZE_UP_CYCLE.length) + SIZE_UP_CYCLE.length) % SIZE_UP_CYCLE.length].replace('{side}', side);
 }
