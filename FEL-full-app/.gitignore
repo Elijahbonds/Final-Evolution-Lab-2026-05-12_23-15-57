@@ -19,3 +19,10 @@ scripts/avatar/out/
 .env
 .env.*
 !.env.example
+
+# Never in the tree, whatever `git add` is fed (2026-09-22): the worktrees share ONE node_modules through a symlink,
+# which git sees as an untracked file; shots/ is probe frames; .firebase/ is the deploy cache. A `git add -A` once
+# swept 1,141 of these into a commit.
+node_modules
+/shots/
+.firebase/

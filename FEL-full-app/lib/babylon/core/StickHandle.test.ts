@@ -26,30 +26,26 @@ describe('StickHandleReader', () => {
     expect(g.filter((x) => x.kind === 'sweep').length).toBe(1);
   });
 });
-describe('stickMoveFor (the 2K17 map)', () => {
-  it('a side flick at speed is the momentum cross; slow it is the plain crossover', () => {
-    expect(stickMoveFor({ kind: 'flick', dir: 'left', x: -1, y: 0 }, { speed01: 0.6, pressured: false, sprint: true })).toEqual({ move: 'momentum_cross', side: 'left' });
-    expect(stickMoveFor({ kind: 'flick', dir: 'right', x: 1, y: 0 }, { speed01: 0.2, pressured: false, sprint: false })).toEqual({ move: 'crossover', side: 'right' });
+describe('stickMoveFor (the 2K Pro Stick — the full table lives in StickHandle.2k.test.ts)', () => {
+  const R = { speed01: 0.2, pressured: false, sprint: false } as const;
+  it('the map is relative to the ball hand: the same flick is a hesi with the ball right and between-the-legs with it left', () => {
+    expect(stickMoveFor({ kind: 'flick', dir: 'right', dir8: 'right', x: 1, y: 0 }, { ...R, hand: 'Right' })!.move).toBe('hesi');
+    expect(stickMoveFor({ kind: 'flick', dir: 'right', dir8: 'right', x: 1, y: 0 }, { ...R, hand: 'Left' })!.move).toBe('between_legs');
   });
-  it('THE 2K PRO STICK: down is the hesi at any pace; the down-DIAGONAL is the behind-the-back — aggressive at pace or right after a move', () => {
-    expect(stickMoveFor({ kind: 'flick', dir: 'down', dir8: 'down', x: 0.2, y: 1 }, { speed01: 0.7, pressured: true, sprint: true })!.move).toBe('hesi');
-    expect(stickMoveFor({ kind: 'flick', dir: 'down', dir8: 'downright', x: 0.7, y: 0.7 }, { speed01: 0.1, pressured: true, sprint: false })).toEqual({ move: 'behind_back', side: 'right' });
-    expect(stickMoveFor({ kind: 'flick', dir: 'down', dir8: 'downleft', x: -0.7, y: 0.7 }, { speed01: 0.7, pressured: false, sprint: false })).toEqual({ move: 'momentum_btb', side: 'left' });
-    expect(stickMoveFor({ kind: 'flick', dir: 'down', dir8: 'downleft', x: -0.7, y: 0.7 }, { speed01: 0.1, pressured: false, sprint: false, sinceMoveSec: 0.3 })!.move).toBe('momentum_btb');
+  it('R2 is the escape; speed alone is not', () => {
+    expect(stickMoveFor({ kind: 'flick', dir: 'left', dir8: 'upleft', x: -0.7, y: -0.7 }, { ...R, escape: true })).toEqual({ move: 'momentum_cross', side: 'left' });
+    expect(stickMoveFor({ kind: 'flick', dir: 'left', dir8: 'upleft', x: -0.7, y: -0.7 }, { ...R, speed01: 0.9, sprint: true })).toEqual({ move: 'crossover', side: 'left' });
   });
-  it('the up-diagonals are size-ups (a cycle of package animations); L2 makes any flick a spin and a down flick a step-back; the sprint makes a side flick the escape', () => {
-    expect(stickMoveFor({ kind: 'flick', dir: 'up', dir8: 'upright', x: 0.7, y: -0.7 }, { speed01: 0.1, pressured: false, sprint: false })).toEqual({ move: 'size_up', side: 'right' });
-    expect(stickMoveFor({ kind: 'flick', dir: 'right', dir8: 'right', x: 1, y: 0 }, { speed01: 0.1, pressured: false, sprint: false, brace: true })).toEqual({ move: 'spin', side: 'right' });
-    expect(stickMoveFor({ kind: 'flick', dir: 'down', dir8: 'down', x: -0.1, y: 1 }, { speed01: 0.1, pressured: false, sprint: false, brace: true })).toEqual({ move: 'stepback', side: 'left' });
-    expect(stickMoveFor({ kind: 'flick', dir: 'left', dir8: 'left', x: -1, y: 0.05 }, { speed01: 0.1, pressured: false, sprint: true })!.move).toBe('momentum_cross');
+  it('the helpers the modes lean on', () => {
     expect(dir8Of(0.7, -0.7)).toBe('upright'); expect(dir8Of(1, 0.2)).toBe('right'); expect(dir8Of(-0.5, 0.9)).toBe('downleft');
     expect(sizeUpClip(0, 'left')).toBe('bball_yoyo'); expect(sizeUpClip(1, 'left')).toBe('bball_in_and_out_left'); expect(sizeUpClip(5, 'right')).toBe('bball_between_legs_right');
-  });
-  it('a hold is nothing (a size-up), a sweep the steezo roll, a release nothing', () => {
-    expect(stickMoveFor({ kind: 'hold', x: 1, y: 0 }, { speed01: 0.5, pressured: false, sprint: false })).toBeNull();
-    expect(stickMoveFor({ kind: 'sweep', sign: -1 }, { speed01: 0.5, pressured: true, sprint: true })).toEqual({ move: 'steezo_roll', side: 'left' });
-    expect(stickMoveFor({ kind: 'release', heldSec: 0.4 }, { speed01: 0, pressured: false, sprint: false })).toBeNull();
     expect(STICK.flick).toBeGreaterThan(STICK.hold);
+  });
+  it('a hold is nothing, a sweep the spin (the steezo roll with R2), a release nothing', () => {
+    expect(stickMoveFor({ kind: 'hold', x: 1, y: 0 }, { ...R })).toBeNull();
+    expect(stickMoveFor({ kind: 'sweep', sign: -1 }, { ...R })).toEqual({ move: 'spin', side: 'left' });
+    expect(stickMoveFor({ kind: 'sweep', sign: -1 }, { ...R, escape: true })).toEqual({ move: 'steezo_roll', side: 'left' });
+    expect(stickMoveFor({ kind: 'release', heldSec: 0.4 }, { ...R })).toBeNull();
   });
 });
 describe("pausin' (the spin dunk)", () => {

@@ -114,6 +114,15 @@
         "3011"
       ],
       "port": 3011
+    },
+    {
+      "name": "fel-dev-lane",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/elijahbonds/Developer/FEL-swarm/mode-lanes/wt-finish-release/FEL-full-app && PATH=/opt/homebrew/Cellar/node/26.8.2/bin:/usr/bin:/bin NEXT_DIST_DIR=.next-n26 npx next dev -p 3011"
+      ],
+      "port": 3011
     }
   ]
 }

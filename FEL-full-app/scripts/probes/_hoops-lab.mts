@@ -223,7 +223,8 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
   const MODE = ${JSON.stringify(MODE)};
   const skOf = (n) => { const st = [n]; while (st.length) { const x = st.pop(); if (x.skeleton) return x.skeleton; for (const c of (x.getChildren ? x.getChildren() : [])) st.push(c); } return null; };
   const bone = (sk, name) => { const b = sk ? sk.bones.find((b) => b.name.indexOf(name) === 0) : null; return b && b.getTransformNode ? b.getTransformNode() : null; };
-  const rig = (root) => { const sk = skOf(root); return { root, sk, rh: bone(sk, 'RightHand'), lh: bone(sk, 'LeftHand'), head: bone(sk, 'Head') }; };
+  // FEET (Phase 5, 2026-09-22): footplant and stride are FOOT measurements and the recorder had none — root, hands and head only. Same lookup, two more bones.
+  const rig = (root) => { const sk = skOf(root); return { root, sk, rh: bone(sk, 'RightHand'), lh: bone(sk, 'LeftHand'), head: bone(sk, 'Head'), lf: bone(sk, 'LeftFoot'), rf: bone(sk, 'RightFoot'), hips: bone(sk, 'Hips') }; };
   const clipsOf = (r) => (s.animationGroups || []).filter((g) => g.isPlaying && g.targetedAnimations && g.targetedAnimations.some((ta) => r.sk && r.sk.bones.some((b) => b.getTransformNode && b.getTransformNode() === ta.target))).map((g) => g.name);
   const P = (n) => { if (!n) return null; const p = n.getAbsolutePosition ? n.getAbsolutePosition() : n.position; return [+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)]; };
   const hero = rig(q.hero());
@@ -236,7 +237,7 @@ if (SMOOTH) await page.evaluate(`(() => { const q = window.__FEL_QA__; const s =
     const clips = (s.animationGroups || []).filter((g) => g.isPlaying).map((g) => g.name);
     // BEHIND THE BACK: a hand in the body frame with z < -0.22 (behind the hips' plane) between the waist and the head
     const behind = (r) => { if (!r || !r.root) return ''; const m = r.root.getWorldMatrix().clone().invert(); const out = []; for (const [k, n] of [['rh', r.rh], ['lh', r.lh]]) { if (!n) continue; const w = n.getAbsolutePosition(); const l = w.constructor.TransformCoordinates(w, m); const z = Math.abs(l.z) > 20 ? l.z / 100 : l.z; if (z < -0.22 && l.y > 0.6 && l.y < 1.6) out.push(k); } return out.join('+'); };
-    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe), gap: +Math.min(99, ...bodies().map((b) => Math.hypot(b.x - hero.root.position.x, b.z - hero.root.position.z))).toFixed(2) });
+    rows.push({ t: Math.round(performance.now() - t0), h: [P(hero.root), P(hero.rh), P(hero.lh), P(hero.head)], f: foe ? [P(foe.root), P(foe.rh), P(foe.lh), P(foe.head)] : null, feet: { h: [P(hero.lf), P(hero.rf), P(hero.hips)], f: foe ? [P(foe.lf), P(foe.rf), P(foe.hips)] : null }, cam: P(cam), ball: ball && ball.isEnabled() ? P(ball) : null, clips, hc: clipsOf(hero), fc: foe ? clipsOf(foe) : [], hb: behind(hero), fb: behind(foe), gap: +Math.min(99, ...bodies().map((b) => Math.hypot(b.x - hero.root.position.x, b.z - hero.root.position.z))).toFixed(2) });
   });
   return 'recording'; })()`).then((r) => console.log('[LAB] smooth', r));
 const started = await agent('a.start(30000)');
@@ -367,26 +368,36 @@ for (let n = 0; n < POSSESSIONS; n++) {
       await agent(`a.act({ moveX: 0, moveY: 1, sprint: true, turbo: true, actionHeld: 0, action: true }, 60)`);
     }
     else if (play === 'rstick') {
-      // STICK HANDLE (2K17): the right stick thrown IN-PAGE (the mode reads it off the raw stream — the bridge cannot reach it)
-      // while the left stick jogs at the defender: momentum spam (right/left/right/left), a hold (pausin') and its release,
-      // a half-circle sweep (the steezo roll), a down flick (momentum behind the back / hesi). Counted off [X-STICK] / [X-HANDLE].
+      // THE RIGHT STICK, AGAINST 2K (Phase 3, 2026-09-22): every gesture in docs/SPEC-STICK-2K-DECODE.md thrown in-page
+      // (the mode reads the stick off the raw stream — the bridge cannot reach it) while the left stick jogs at the
+      // defender. Each throw is tagged with what 2K says it should be; the mode logs `[X-STICK] gesture (ball R|L) → move`
+      // and the tally below is expected-vs-got, which is the number Phase 3 is judged on.
+      //
+      // Directions are written for the ball in the RIGHT hand; `mir` flips x for the left. The mode reports which hand
+      // the ball was in at the throw, so a throw that lands in the other hand is scored against the mirrored expectation.
       const mark = async (label: string) => { const t = await page.evaluate('performance.now() - (window.__smoothT0 || 0)') as number; paceMarks.push({ t: Math.round(t), label }); };
       await mark('stick');
       await page.evaluate(`(() => {
         const bus = window.__FEL_DEV__ && window.__FEL_DEV__.input; if (!bus) return 'no bus';
         const R = (x, y) => bus.emit({ t: 'stick', side: 'R', x, y });
         const flick = (at, x, y) => { setTimeout(() => R(x, y), at); setTimeout(() => R(x * 0.9, y * 0.9), at + 30); setTimeout(() => R(0, 0), at + 90); };
-        flick(350, 1, 0); flick(700, -1, 0); flick(1050, 1, 0); flick(1400, -1, 0);      // the momentum spam
-        setTimeout(() => R(1, 0.1), 1900); setTimeout(() => R(0.95, 0.1), 2000); setTimeout(() => R(0.95, 0.1), 2200); setTimeout(() => R(0, 0), 2450);   // pausin' … release
-        for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; setTimeout(() => R(Math.cos(a) * 0.95, Math.sin(a) * 0.95), 2800 + i * 28); }   // the sweep: the steezo roll
-        setTimeout(() => R(0, 0), 3100);
-        flick(3500, 0.2, 1);                                                              // down: momentum behind the back (hesi when slow)
-        flick(3900, 1, 0); flick(4200, -1, 0);                                            // out of it: two more
+        const sweep = (at) => { for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; setTimeout(() => R(Math.cos(a) * 0.95, Math.sin(a) * 0.95), at + i * 28); } setTimeout(() => R(0, 0), at + 300); };
+        window.__stickPlan = [];
+        const throwIt = (at, name, expect, x, y, kind) => { window.__stickPlan.push({ at, name, expect }); if (kind === 'sweep') sweep(at); else flick(at, x, y); };
+        // ball right: +x is TOWARD the ball hand
+        throwIt(400,  'hesi',          'hesi',          1, 0);
+        throwIt(900,  'between_legs',  'between_legs', -1, 0);
+        throwIt(1400, 'crossover',     'crossover',    -0.75, -0.75);
+        throwIt(1900, 'in_and_out',    'in_and_out',    0, -1);
+        throwIt(2400, 'behind_back',   'behind_back',  -0.75, 0.75);
+        throwIt(2900, 'stepback',      'stepback',      0, 1);
+        throwIt(3500, 'size_up',       'size_up',       0.75, -0.75);
+        throwIt(4100, 'spin(sweep)',   'spin',          0, 0, 'sweep');
         return 'armed';
       })()`);
       await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1500)`);
-      await agent(`a.act({ moveX: 0, moveY: 0.35 }, 1300)`);
-      await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1700)`);
+      await agent(`a.act({ moveX: 0, moveY: 0.35 }, 1500)`);
+      await agent(`a.act({ moveX: 0, moveY: 0.5 }, 1700)`);
       await mark('end');
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);
     }
@@ -668,6 +679,24 @@ const defence = rows.filter((r) => r.possession === 'defence');
 const stops = defence.filter((r) => r.conceded === 0).length;
 const byPlay = PLAYS.map((k) => { const s = off.filter((r) => r.play === k); return { play: k, n: s.length, made: s.filter((r) => r.scored > 0).length }; });
 const final = await hud();
+// THE STICK TALLY (Phase 3): the rstick play declared what 2K says each throw is (`window.__stickPlan`); the mode
+// logged what it did (`[X-STICK] <kind> <dir8> (ball R|L) → <move> [side]`). Matched IN ORDER — every throw in the
+// 2K set produces a move, so the i-th throw is the i-th log line — and reported as expected vs got, which is the
+// number the remap is judged on. A dropped throw shifts everything after it, and the mismatch shows it.
+const stickPlan = (await page.evaluate('window.__stickPlan || []').catch(() => [])) as { name: string; expect: string }[];
+const stickGot = log.filter((l) => /-STICK\] (flick|sweep)/.test(l)).map((l) => { const m = /-STICK\] (\w+)(?: (\w+))?(?: \(ball (\w)\))? → (\w+)/.exec(l); return m ? { kind: m[1], dir8: m[2] ?? '', hand: m[3] ?? '?', move: m[4] } : null; }).filter((x): x is NonNullable<typeof x> => !!x);
+// A rotation's entry sample crosses the flick ring before the sweep resolves, so a sweep throw produces TWO lines: a
+// spurious flick, then the sweep. Matching by position alone shifted every throw after it. Each throw now consumes
+// the next line OF ITS OWN KIND (sweep → sweep, flick → flick) and the extras are reported, not hidden.
+let cursor = 0;
+const stickTally = stickPlan.map((p) => {
+  const kind = /sweep/.test(p.name) ? 'sweep' : 'flick';
+  let j = cursor; while (j < stickGot.length && stickGot[j].kind !== kind) j++;
+  const hit = stickGot[j]; if (hit) cursor = j + 1;
+  return { name: p.name, expect: p.expect, got: hit?.move ?? '(no move)', hand: hit?.hand ?? '?', ok: hit?.move === p.expect };
+});
+const stickExtras = stickGot.length - stickTally.filter((t) => t.got !== '(no move)').length;
+const stickOk = stickTally.filter((t) => t.ok).length;
 const out = {
   tag: TAG, mode: MODE, charge: CHARGE, play: PLAY,
   possessions: rows.length,
@@ -675,7 +704,7 @@ const out = {
   byPlay,
   defence: defence.length, stops, stopPct: defence.length ? Math.round((stops / defence.length) * 100) : null,
   blockJumps: def?.jumps ?? 0, gathersSeen: def?.gathers ?? 0,
-  handleMoves, tricks, refCalls, chargesTaken, screensCalled, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
+  handleMoves, tricks, refCalls, chargesTaken, screensCalled, stickTally, stickOk, stickExtras, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
   rows, log: log.slice(-200),
@@ -684,5 +713,6 @@ const out = {
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));
 console.log(`\n${MODE} charge ${CHARGE} · offence ${made}/${off.length}${out.makePct !== null ? ` (${out.makePct}%)` : ''} · ${byPlay.map((b) => `${b.play} ${b.made}/${b.n}`).join(' · ')}`);
 console.log(`defence: stops ${stops}/${defence.length} · block jumps ${out.blockJumps} on ${out.gathersSeen} gathers · charges ${chargesTaken} (driver peak ${(def?.driverPeak ?? 0).toFixed(1)} m/s vs 4.2 needed) · planted ${((def?.plantedMs ?? 0) / 1000).toFixed(1)}s, closest ${(def?.closestWhilePlanted ?? 99).toFixed(2)}m (CHARGE_RANGE is BODY_STANDOFF + 0.5) · screens ${screensCalled} · score ${String(final.score)}-${String(final.foeScore)} to ${String(final.target)}`);
+if (stickPlan.length) { console.log(`stick vs 2K: ${stickOk}/${stickPlan.length}${stickExtras > 0 ? ` (+${stickExtras} extra moves the throws did not ask for)` : ''}`); for (const t of stickTally) console.log(`  ${t.ok ? 'ok ' : 'XX '} ${t.name.padEnd(14)} expect ${t.expect.padEnd(14)} got ${t.got}${t.hand !== '?' ? ` (ball ${t.hand})` : ''}`); }
 console.log(`→ ${OUT}/hoops-lab-${TAG}.json`);
 await browser.close();

@@ -83,3 +83,19 @@ The ball hand exists — `ballCarry.side`, swapped by `switchHand()` on every cr
 Every row above becomes one `[X-STICK] gesture → move` line in the lab. The pass is: each 2K gesture, thrown with the
 ball in each hand, produces the 2K move, in 1v1 and in 3v3, ≥ 95 % of throws — measured with the in-page emitter the
 lab already has (`PLAY=rstick`), before and after.
+
+## Measured (2026-09-22)
+
+Before, 1v1, six possessions: 14 throws produced effectively two moves — 12 of 14 read as `momentum_cross` because
+speed alone promoted a side flick, and the L/R/L/R spam scored a chain-4 highlight with an 0.80 ankle-break. Against
+the eight 2K gestures: 1/8.
+
+After, 3v3, six possessions: 8/8 in every possession, every line tagged with the ball hand; the rotation is the spin
+every time. 1v1: 16/16 throws that reached the reader mapped correctly, all eight gestures represented; fewer throws reached it
+because 1v1's possessions ended after three or four (the hero lost the ball, 0/6 offence, as in the before run) — a
+pre-existing 1v1 possession behaviour under the lab's jog at the defender, open by name.
+
+Open, for Phase 4: a rotation's entry sample crosses the flick ring before the 140° accumulates, so every spin is
+preceded by a spurious in-and-out. Either the detector defers a flick while the stick keeps turning, or the spin's
+own start cancels the flick's clip — measured, not guessed.
+

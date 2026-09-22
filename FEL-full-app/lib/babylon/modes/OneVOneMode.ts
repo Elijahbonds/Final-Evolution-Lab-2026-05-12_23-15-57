@@ -109,6 +109,7 @@ import {
   moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP,
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
   type ChainState, type HandleMove,
+  hasMove, MOVE_HANDLE,   // the stick's snatchback is gated on the same rating doMove gates on
 } from '../core/HandleSystem';   // Street chains x 2K brakes, gated on the handle the PRQ scan earned
 import {
   THREAT_IDLE, inTripleThreat, isJabInput, jabBiteOdds, canJab, throwJab, tickThreat, jabBurst,
@@ -266,7 +267,7 @@ const FACE_RATE = 10, FACE_RIM_RATE = 6;
 const DEFEND_FACE_RANGE = 6;
 // "SPRINT in to DUNK, ease off to LAY IT IN" is the one line this hint was missing, and the fix that made the layup
 // reachable (see the checkDriveDunk call) is worth nothing if nobody is told the choice exists.
-const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · RIGHT STICK (2K): flick LEFT/RIGHT = crossover (with R2 = the escape / momentum cross) · flick DOWN = hesi · DOWN-DIAGONAL = behind the back (after a move = the momentum wrap) · UP-DIAGONAL = size-ups · L2 + flick = SPIN · L2 + DOWN = STEP-BACK (shoot inside it = the step-back jumper) · hold the stick = PAUSIN · sweep a half circle = the STEEZO ROLL · hold L2 (F) or L1 (Q) near the block to POST UP (back to the rim: SQUARE = HOOK · stick OFF the rim + SQUARE = FADE, with R2 = SHIMMY FADE · stick AT the rim + SQUARE = DROP STEP · swing the stick across = SPIN · let go early = PUMP FAKE, then SQUARE again = UP AND UNDER) · drive into a body to SPIN off him';
+const HINT_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · RIGHT STICK (2K, relative to the ball hand): flick TOWARD the ball = hesi · AWAY = between the legs · UP-AWAY = crossover · UP = in and out · DOWN-AWAY = behind the back · DOWN = STEP-BACK (shoot inside it = the step-back jumper) · UP-TOWARD = size-ups · ROTATE = SPIN · hold R2 with any of them = the ESCAPE (crossover → momentum cross · down → the SNATCHBACK · rotate → the STEEZO ROLL) · hold the stick = PAUSIN · hold L2 (F) or L1 (Q) near the block to POST UP (back to the rim: SQUARE = HOOK · stick OFF the rim + SQUARE = FADE, with R2 = SHIMMY FADE · stick AT the rim + SQUARE = DROP STEP · swing the stick across = SPIN · let go early = PUMP FAKE, then SQUARE again = UP AND UNDER) · drive into a body to SPIN off him';
 const HINT_DEFENCE = 'STAY IN FRONT — they sidestep, you slide · HOLD L2 (F): SIT DOWN and slide faster · SQUARE (L): STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE (I): jump on the gather to BLOCK · HOLD CIRCLE (K): plant and TAKE THE CHARGE · L1: BOX OUT';
 
 type Possession = 'mine' | 'defense';
@@ -1163,10 +1164,16 @@ export const OneVOneMode: ModeDefinition = (() => {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
             if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
-            const pick = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, hand: meCarry?.side ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+            // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
+            // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
+            // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
+            const locked = !!pick0 && pick0.move === 'snatchback' && !hasMove('snatch_back', handle);
+            if (locked) refuse(ctx, `SNATCHBACK NEEDS HANDLE ${MOVE_HANDLE.snatch_back} — YOURS ${handle}`);
+            const pick = locked ? { move: 'stepback' as const, side: pick0!.side } : pick0;
             if (!pick) continue;
             if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;   // a size-up is rhythm, not the move the aggressive BTB chains off
-            console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
+            console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(meCarry?.side ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
             // THE 2K PRO STICK (2026-09-18): the size-up (a package animation in place, no travel), the L2 step-back dribble
             // (a hop off the rim that arms the step-back jumper), the L2 spin — none of them a chain move
             if (pick.move === 'size_up') { meAnimTree.beat(sizeUpClip(sizeUpN++, pick.side ?? 'right'), { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
@@ -1174,6 +1181,15 @@ export const OneVOneMode: ModeDefinition = (() => {
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
               meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
+              continue;
+            }
+            if (pick.move === 'snatchback') {
+              // THE SNATCHBACK (2K: step-back with R2, steezo's staple): the hop off the rim AND the ball to the other hand
+              // in the same beat — the cross is what makes it an escape rather than a set-up for the jumper
+              const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
+              meDribble.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
+              meCarry?.switchHand();
+              meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
               continue;
             }
             if (pick.move === 'spin') { if (spinCooldown <= 0) startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, pick.side ?? undefined); continue; }

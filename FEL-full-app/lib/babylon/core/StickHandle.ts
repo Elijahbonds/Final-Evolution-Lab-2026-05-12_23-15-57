@@ -96,34 +96,61 @@ export function dir8Of(x: number, y: number): StickDir8 {
  *    L2 + down              the STEP-BACK dribble (a squeeze inside its window is the step-back jumper)
  *    sweep                  the steezo roll · hold: PAUSIN' (the mode) · release: the explode */
 export type StickMove = 'momentum_cross' | 'momentum_btb' | 'crossover' | 'hesi' | 'in_and_out' | 'between_legs' | 'behind_back' | 'steezo_roll'
-  | 'size_up' | 'stepback' | 'spin';
+  | 'size_up' | 'stepback' | 'snatchback' | 'spin';
 export interface StickRead {
   speed01: number; pressured: boolean; sprint: boolean;
-  /** L2 / LT held (the 2K modifier: spins and step-backs). */
+  /** Which hand the ball is in. 2K's map is RELATIVE TO IT: "toward" and "away" mean the ball hand's side. Default Right. */
+  hand?: 'Left' | 'Right';
+  /** R2 / RT held: the ESCAPE — the same gesture, travelling (2K: "hold RT with the same flick for the escape version"). */
+  escape?: boolean;
+  /** L2 / LT held. Since the 2K remap it changes no stick move; it is read by the post game. */
   brace?: boolean;
-  /** Seconds since the last stick move landed (Infinity when none) — the aggressive behind-the-back needs a move before it. */
+  /** Seconds since the last stick move landed (Infinity when none). */
   sinceMoveSec?: number;
 }
 export const MOMENTUM_MIN_SPEED01 = 0.4;
 /** A behind-the-back thrown inside this much of another move is the AGGRESSIVE one (the momentum wrap). */
 export const AGGRESSIVE_BTB_SEC = 0.7;
+
+/**
+ * The 2K Pro Stick map (Phase 3 of the hoops upgrade pass, 2026-09-22; docs/SPEC-STICK-2K-DECODE.md is the reference).
+ *
+ * Written for the ball in the RIGHT hand and mirrored for the left, so "toward" is +x with the ball right and -x with
+ * it left. This is the whole difference from the old map, which was absolute: the ball hand exists in ballCarry and
+ * nothing read it, so a flick that meant "crossover" with the ball in one hand meant it in the other too, and a hesi
+ * lived on DOWN where 2K keeps the step-back.
+ *
+ *   toward      hesi              up-toward   size-up
+ *   away        between the legs  up          in and out
+ *   up-away     crossover         down-away   behind the back
+ *   down        step-back         rotation    spin
+ *
+ * R2 held is the escape of any of them: crossover → momentum cross, behind the back → momentum wrap, step-back → the
+ * SNATCHBACK (a step-back that crosses), rotation → the steezo roll. Speed alone no longer promotes a move: a flick at
+ * a jog without R2 is the plain move, as it is in 2K. L2 is no longer a stick modifier at all — the spin lives on the
+ * rotation and the step-back on down, which is what frees it.
+ */
 export function stickMoveFor(g: StickGesture, r: StickRead): { move: StickMove; side: 'left' | 'right' | null } | null {
+  const hand = r.hand ?? 'Right';
+  const toward: 'left' | 'right' = hand === 'Right' ? 'right' : 'left';
+  const away: 'left' | 'right' = hand === 'Right' ? 'left' : 'right';
+  const escape = !!r.escape;
   switch (g.kind) {
     case 'flick': {
-      const d8 = g.dir8 ?? dir8Of(g.x, g.y);
-      const side: 'left' | 'right' = g.x >= 0 ? 'right' : 'left';
-      if (r.brace) return d8 === 'down' ? { move: 'stepback', side } : { move: 'spin', side };
-      if (d8 === 'left' || d8 === 'right') return { move: r.speed01 >= MOMENTUM_MIN_SPEED01 || r.sprint ? 'momentum_cross' : 'crossover', side: d8 };
-      if (d8 === 'down') return { move: 'hesi', side: null };
-      if (d8 === 'downleft' || d8 === 'downright') {
-        const aggressive = r.speed01 >= MOMENTUM_MIN_SPEED01 || (r.sinceMoveSec ?? Infinity) <= AGGRESSIVE_BTB_SEC;
-        return { move: aggressive ? 'momentum_btb' : 'behind_back', side };
-      }
-      if (d8 === 'upleft' || d8 === 'upright') return { move: 'size_up', side };
-      return r.speed01 < 0.3 && r.pressured ? { move: 'between_legs', side } : { move: 'in_and_out', side };
+      // mirror x into the ball-right frame, then read the eight ways there
+      const tx = hand === 'Right' ? g.x : -g.x;
+      const d8 = dir8Of(tx, g.y);
+      if (d8 === 'right') return { move: 'hesi', side: null };
+      if (d8 === 'left') return { move: 'between_legs', side: away };
+      if (d8 === 'upleft') return { move: escape ? 'momentum_cross' : 'crossover', side: away };
+      if (d8 === 'up') return { move: 'in_and_out', side: toward };
+      if (d8 === 'downleft') return { move: escape ? 'momentum_btb' : 'behind_back', side: away };
+      if (d8 === 'down') return { move: escape ? 'snatchback' : 'stepback', side: away };
+      if (d8 === 'upright') return { move: 'size_up', side: toward };
+      return null;   // down-toward: no 2K dribble move lives there (the eurostep is a finish, read at the rim)
     }
     case 'hold': return null;   // a parked stick is PAUSIN' (the mode freezes the dribble on it)
-    case 'sweep': return { move: 'steezo_roll', side: g.sign > 0 ? 'right' : 'left' };
+    case 'sweep': return { move: escape ? 'steezo_roll' : 'spin', side: g.sign > 0 ? 'right' : 'left' };
     case 'release': return null;
   }
 }
