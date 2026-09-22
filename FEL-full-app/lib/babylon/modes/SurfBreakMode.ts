@@ -96,6 +96,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let waveMoveUntil = 0;
   const waveMoveRepeats = new Map<string, number>();
   const WAVE_MOVE_LOCK_SEC = 0.55;
+  /** phase 7: lateral speed INTO the channel wall that is a wipe rather than a turn-back (a hard carve tops ~4 m/s). */
+  const SURF_EDGE_SLAM_MS = 4.5;
+  const SURF_LATERAL_MAX = 7;
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
@@ -132,6 +135,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   /** The lean the tree and the body BOTH ride (the stick, or the cutback coming around). */
   let rideLean = 0;
   let bailBeatT = 0, landBeatT = 0, airT = 0, cutbackUntil = 0;
+  let edgeHit = false;   // phase 7: one edge read per contact
   let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
   // SURF OCEAN (2026-09-15): the living sea's per-frame step, and the water answering the rider
   let updateSea: (dt: number, camera: ModeContext['camera']) => void = () => {};
@@ -185,7 +189,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
     flow = 0; barrelSec = 0; inBarrel = false;
     setTimeout(() => {
       rel = 0;
-      rig.char.root.position.set(rig.char.root.position.x, 0, lipZ + 6);
+      // phase 7 (measured): a wipe AT the channel wall respawned at the wall, facing back up the line (the mirrored yaw), and
+      // the Rider's own carve accel along that yaw put him behind the crest inside a second — 15 wipes in a row at the edge.
+      // The respawn is inside the break, facing down the line.
+      const inside = Math.max(-(world.bound - 12), Math.min(world.bound - 12, rig.char.root.position.x));
+      rig.char.root.position.set(inside, 0, lipZ + 6);
+      rig.char.root.rotation.y = 0; yawTarget = 0; cutbackUntil = 0;
       // A reposition is a teleport, not motion — the camera must follow it in one
       // step rather than lerping across the gap with the rider out of frame.
       ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
@@ -425,6 +434,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
         rel += (relTarget - rel) * Math.min(1, dt * 3.2);
         rig.rider.vel.z = WAVE_SPEED + rel;
         rig.rider.update(dt, stickX, carve);
+        // phase 7 (measured): the Rider's carve accel along a sideways yaw ran the lateral speed to 24.7 m/s across the face
+        // (the intent driver's weave + a held rail); a committed carve is ~5.5 — the wave carries, it does not launch
+        if (Math.abs(rig.rider.vel.x) > SURF_LATERAL_MAX) rig.rider.vel.x = Math.sign(rig.rider.vel.x) * SURF_LATERAL_MAX;
         // NEVER OFF THE WAVE: the leash past the bottom of the face (the wave catches up anyway; this is the frame guard)
         const leash = lip.z + WAVE_FACE_LEN + FLAT_LEASH;
         if (rig.char.root.position.z > leash) { rig.char.root.position.z = leash; rel = Math.min(rel, 0); }
@@ -489,12 +501,20 @@ export const SurfBreakMode: ModeDefinition = (() => {
         if (Math.abs(rig.char.root.position.x) > edge) {
           const side = Math.sign(rig.char.root.position.x);
           rig.char.root.position.x = side * edge;
+          // phase 7 — THE EDGE DECIDES (the skate fence / snow piste rule, BAIL HONESTY 09-21): straight into the channel
+          // wall at speed is a wipe, not a silent turn-back; a glancing touch turns the board along the wave as before.
+          const into = rig.rider.vel.x * side;
+          if (!edgeHit) {
+            if (into > SURF_EDGE_SLAM_MS && !wipedOut) { console.info(`[SURF-EDGE] slam ${into.toFixed(1)} m/s`); wipeout(ctx, 'EDGE OF THE BREAK — WIPEOUT', waveLipAt(t).z); }
+            else console.info(`[SURF-EDGE] turn ${into.toFixed(1)} m/s`);
+          }
+          edgeHit = true;
           // WALLS + SPEED (2026-09-15): the edge of the break turns the board back along the wave — a clamp alone left the
           // surfer aimed at the edge, carving into it every frame and stuck there
           if (rig.rider.vel.x * side > 0) rig.rider.vel.x = -rig.rider.vel.x * 0.35;
           const r = rig.char.root.rotation.y;
           if (Math.sin(r) * side > 0) { yawTarget = r - 2 * Math.atan2(Math.sin(r), Math.cos(r)); cutbackUntil = t + 0.4; }   // mirror the heading, same winding
-        }
+        } else edgeHit = false;
       }
 
       driveAnim(dt);   // every frame, wiped out or not — the tree is the one owner of the rider's clips

@@ -126,6 +126,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   async function spawnYeti(ctx: ModeContext): Promise<void> {
     if (yetiDone || yeti) return;
     yetiDone = true;                       // one appearance per run, no matter what
+    console.info('[SNOW-YETI] spawn');
     const p = rig.char.root.position;
     const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
       position: new Vector3(p.x + 12, p.y, p.z + 6),
@@ -383,6 +384,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             ctx.camDirector.pulse(1, 0.55);
             crowd?.cheer(1);
             ctx.feel?.impact?.(0.3);
+            console.info('[SNOW-YETI] clear');
             ctx.setHud({ score: tricks.score, banner: `CLEARED THE YETI +${YETI_CLEAR_PTS}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
             despawnYeti(ctx);
@@ -393,6 +395,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             wipePunch(ctx);   // A+ P0: the yeti catch is a wipe too — same punch, same latch
             EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
             bailBeatT = BAIL_BEAT_SEC;
+            console.info('[SNOW-YETI] caught');
             ctx.setHud({ score: tricks.score, banner: `THE YETI GOT YOU -${YETI_CATCH_PENALTY}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
             despawnYeti(ctx);
@@ -501,9 +504,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           wipePunch(ctx);
           EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
           bailBeatT = BAIL_BEAT_SEC;
+          console.info('[SNOW-EDGE] slam');
           ctx.setHud({ score: tricks.score, banner: `OFF THE PISTE! -${ROCK_PENALTY}` });
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
         }
+        if (!edgeHit && !move.slammedWall) console.info('[SNOW-EDGE] turn');
         edgeHit = true;
       } else edgeHit = false;
 
