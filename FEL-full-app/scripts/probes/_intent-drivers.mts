@@ -25,7 +25,7 @@ const loop = (body: string) => `(() => { ${PAD_HELPERS} ${body} })()`;
 export const INTENT_DRIVERS: Record<string, string> = {
   // DERBY: the PCI onto the ball's crossing point, the swing as the ball reaches the contact plane (z 0.3)
   derby: loop(`
-    let prev = null, sx = 1, sy = 1, lastPci = null, lastCmd = [0, 0], swung = 0;
+    let prev = null, sx = 1, sy = 1, lastPci = null, lastCmd = [0, 0], swung = 0, aimSide = 1;
     setInterval(() => {
       const s = Q.scene && Q.scene(); if (!s) return;
       const ball = s.getMeshByName('bball'); const h = Q.rawHud();
@@ -42,7 +42,8 @@ export const INTENT_DRIVERS: Record<string, string> = {
             if (lastPci && Math.abs(lastCmd[1]) > 0.2 && Math.sign(pci[1] - lastPci[1]) === -Math.sign(lastCmd[1] * sy) && Math.abs(pci[1] - lastPci[1]) > 0.003) sy = -sy;
             lastCmd = [clamp((tx - pci[0]) * 8), clamp((ty - pci[1]) * 8)];
             stick(lastCmd[0] * sx, lastCmd[1] * sy); lastPci = pci;
-            if (ttc < 0.045 && now - swung > 900) { btn(A, 60); swung = now; }
+            // net/precision phase 7: the stick AT THE SWING is the bearing — aim a bullseye (±32°: a full stick is ~±32° at drive speed)
+            if (ttc < 0.045 && now - swung > 900) { stick(aimSide, 0); btn(A, 60); swung = now; aimSide = -aimSide; setTimeout(() => stick(0, 0), 120); }
           }
         } else stick(0, 0);
       }
@@ -52,13 +53,24 @@ export const INTENT_DRIVERS: Record<string, string> = {
 
   // GOLF: the three-click swing — start, POWER at the top of the wave, ACCURACY inside the band on the way down
   golf: loop(`
-    let last = null, cool = 0, idleT = 0;
+    let last = null, cool = 0, idleT = 0, clubTries = 0;
     setInterval(() => {
       const h = Q.rawHud(), ph = h.swingPhase, m = typeof h.meterT === 'number' ? h.meterT : null;
       if (cool > 0) { cool -= 16; last = m; return; }
-      if (!ph) { idleT += 16; if (idleT > 1400) { btn(A); idleT = 0; cool = 300; } last = null; return; }
+      // net/precision phase 7: CLUB and POWER for the distance. The HUD says the pin (m) and this club's full carry
+      // (aimCarry); a club whose full carry overshoots the pin by more than a third is cycled down (B) before the swing,
+      // and the power press comes at pin / carry of the meter instead of the top. (Before: a full driver, every hole — OB.)
+      const pin = typeof h.pin === 'string' ? parseFloat(h.pin) : NaN, carry = typeof h.aimCarry === 'number' ? h.aimCarry : NaN;
+      if (!ph) {
+        if (Number.isFinite(pin) && Number.isFinite(carry) && carry > pin * 1.35 && pin > 12 && clubTries < 8) { btn(B); clubTries++; cool = 350; last = null; return; }
+        idleT += 16; if (idleT > 1400) { btn(A); idleT = 0; cool = 300; clubTries = 0; } last = null; return;
+      }
+      // on the green the putter is automatic and the meter has no carry ticks: a putt's power is the distance (measured: eight
+      // 0.98 putts rode the bank out and came back further each time, 2.7 m → 4.4 m, then a pick-up)
+      const onGreen = Number.isFinite(pin) && pin < 12;
+      const want = onGreen ? clamp(0.22 + pin / 16, 0.75) : Number.isFinite(pin) && Number.isFinite(carry) && carry > 0 ? clamp(pin / carry, 0.98) : 0.96;
       idleT = 0;
-      if (ph === 'power' && m !== null && last !== null && (m >= 0.96 || (m < last && last > 0.85))) { btn(A); cool = 150; }
+      if (ph === 'power' && m !== null && last !== null && (m >= Math.max(0.3, want) || (m < last && last > 0.85))) { btn(A); cool = 150; }
       else if (ph === 'accuracy' && m !== null && last !== null && m < last && Math.abs(m - 0.28) <= 0.04) { btn(A); cool = 400; }
       last = m;
     }, 16);
