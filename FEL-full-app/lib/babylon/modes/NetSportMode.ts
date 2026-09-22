@@ -214,6 +214,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let serveIn = 0, serveTotal = 0, serveAim = 0; let serveFrom: Vector3 | null = null;
   /** phase 6: where the foe's feet are (x across the court); it runs to the landing at a skill-scaled speed */
   const foeFoot = { x: 0 };
+  /** phase 8: volleyball's RALLY FLOW — clean touches build it, a fault empties it, 70+ makes the spike KINETIC */
+  let rallyFlow = 0;
+  const FLOW_TOUCH = 25, FLOW_KILL = 35, FLOW_KINETIC = 70;
   // measured on the first cut (5.7–5.9 m/s, no reaction time): the foe reached EVERY ball (reach 0.00 on 62 of 62 returns) — a
   // wall with feet. A player reads the ball before moving (0.35 s) and covers ~4 m/s: a perfect drive to the far corner
   // (5 m, a 0.9 s flight) leaves him 2 m short — stretched or beaten. That is what placement is for.
@@ -541,10 +544,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // at exactly the same rate as a lob, which is not what the benchmark's
     // sequence is for. Receiving one degrades the return by a step.
     if (incomingTouch === 'spike') {
-      if (q === 'perfect') q = 'good';
-      else if (q === 'good') q = 'late';
-      else if (q === 'late' && Math.random() < 0.45) q = 'miss';
-      if (q === 'miss') { awardPoint(ctx, 0, 'KILL — THEY COULD NOT DIG IT'); return; }
+      // phase 8: a KINETIC spike (rally flow 70+) degrades the dig TWO steps — the set-up is what the gauge pays for
+      const steps = rallyFlow >= FLOW_KINETIC ? 2 : 1;
+      for (let i = 0; i < steps; i++) {
+        if (q === 'perfect') q = 'good';
+        else if (q === 'good') q = 'late';
+        else if (q === 'late' && Math.random() < 0.45) q = 'miss';
+      }
+      if (q === 'miss') { rallyFlow = Math.min(100, rallyFlow + FLOW_KILL); ctx.setHud({ flow: rallyFlow }); awardPoint(ctx, 0, steps === 2 ? 'KINETIC KILL' : 'KILL — THEY COULD NOT DIG IT'); return; }
     }
 
     // PARKOUR TENNIS: a ball off the glass is harder to read — the answer slips a step a third of the time
@@ -723,6 +730,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     setTimeout(() => { swingingNow = false; }, 320);
     // phase 4: the ledger — every swing's timing, its stretch and the touch it was (the windows are measured off this)
     console.info(`[NET-SWING] ${q} timing ${timing} dt ${dt.toFixed(3)} reach ${lastReach.toFixed(2)} touch ${volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide)} shot ${pendingShot}`);
+    // phase 8: the three-touch sport's gauge — a clean touch builds RALLY FLOW; the HUD's shared gauge draws it
+    if (o.cfg.touchesPerSide > 1) {
+      rallyFlow = q === 'perfect' || q === 'good' ? Math.min(100, rallyFlow + FLOW_TOUCH) : Math.max(0, rallyFlow - FLOW_TOUCH);
+      ctx.setHud({ flow: rallyFlow, kinetic: rallyFlow >= FLOW_KINETIC ? 'KINETIC' : '' });
+      console.info(`[NET-FLOW] ${rallyFlow}`);
+    }
     foeReactSec = q === 'perfect' ? 0.65 : q === 'good' ? 0.45 : 0.3;   // phase 6: the foe reads a better ball later
 
     // WHICH touch this is decides what the swing DOES. Previously every human
@@ -866,7 +879,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.groundLock?.track(foe.root, foe.skeleton);
       foeTree = new NetAnimTree(foe.animator, clips);
       foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; };
-      meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null; foeFoot.x = 0;
+      meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
+      if (o.cfg.touchesPerSide > 1) ctx.setHud({ flow: 0 });
 
       // Real characters are in — drop the venue's placeholder bodies, or every
       // player is on the court twice.

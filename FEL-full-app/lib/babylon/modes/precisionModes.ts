@@ -309,6 +309,9 @@ export const GolfMode: ModeDefinition = (() => {
   let flag: AbstractMesh | null = null;
   let ended = false;
   const TOTAL = 3;
+  /** phase 8: the golfer's RHYTHM gauge (the shared FLOW chip): clean strikes build it, at 70+ the strike is steadier (path error halved) */
+  let golfFlow = 0;
+  const GOLF_FLOW_CLEAN = 35, GOLF_FLOW_RHYTHM = 70, GOLF_FLOW_FORGIVE = 0.5;
   const PREVIEW_SEC = 1.8;
   const ACCURACY_CENTER = GH_ACC_CENTER;         // wave value to hit on the way down (one source with the drawn band: core/golfHud)
   const ACCURACY_HALF = GH_ACC_HALF;
@@ -446,6 +449,14 @@ export const GolfMode: ModeDefinition = (() => {
     const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
     phase = 'flight';
     console.info(`[GOLF-STRIKE] ${c.id} power ${pwr.toFixed(2)} side ${sideErr.toFixed(2)} ${onGreen() ? 'putt' : pad ? 'pad' : 'swing'}`);   // phase 4: the ledger
+    // phase 8: RHYTHM — a clean strike (the path inside 0.2) builds the gauge, a hook / slice empties it; at 70+ the strike is IN RHYTHM
+    const inRhythm = golfFlow >= GOLF_FLOW_RHYTHM;
+    golfFlow = Math.abs(sideErr) <= 0.2 ? Math.min(100, golfFlow + GOLF_FLOW_CLEAN) : 0;
+    ctx.setHud({ flow: golfFlow, kinetic: golfFlow >= GOLF_FLOW_RHYTHM ? 'IN RHYTHM' : '' });
+    // measured on the first cut: rhythm as EXTRA CARRY (x1.08) sent a club chosen for the distance out of bounds four times on
+    // the par 4 — a steadier golfer is not a longer one. In rhythm = a steadier strike: the path error is halved (forgiveness).
+    if (inRhythm) sideErr *= GOLF_FLOW_FORGIVE;
+    console.info(`[GOLF-FLOW] ${golfFlow}${inRhythm ? ' (struck in rhythm: path error halved)' : ''}`);
     // ARENA-10PHASE P4: the swing meter is over — the accuracy band used to stay on the HUD through the whole flight
     // (playtest d3d4a93's golf frame shows it mid-flight) because only backToTee cleared it
     ctx.setHud({ meterT: null, swingPhase: null, powerLock: null, hint: '' });
