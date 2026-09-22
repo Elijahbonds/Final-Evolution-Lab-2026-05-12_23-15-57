@@ -38,7 +38,9 @@ import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the sha
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
 import { stepSpeedFov } from '../core/SpeedFov';
-import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: the run-up's loop + stride rate
+import { BoardAnimTree } from '../anim/boardTree';   // boards pass phase 5: the family's one clip owner on big air too
+import { airBoardFeed, AIR_LAND_BEAT_SEC, AIR_BAIL_BEAT_SEC } from './airBoardFeed';
+import { dressBoard } from '../visual/meshyProps';   // phase 5: a snowboard under the rider (there was none)
 
 export interface AirSessionModeOpts {
   modeId: string;
@@ -70,6 +72,10 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   // each other's athlete the moment both had been mounted in one session.
   let athlete: SpawnedCharacter | null = null;
   let posture: { dispose(): void } | null = null;
+  // phase 5: the tree is the one owner of the rider's clips (the mode used to play sprint / jump_up / idle_stand itself)
+  let animTree: BoardAnimTree | null = null;
+  let board: import('@babylonjs/core').Mesh | null = null;
+  let landBeatT = 0, bailBeatT = 0, lastLanding: 'clean' | 'sketchy' = 'clean', grabThisAir = false, lastCrash = false;
   let props: VenuePropsHandle | null = null; let propsGone = false;
   let core: AirSessionCore | null = null;
   let launchPad: Mesh | null = null;
@@ -175,9 +181,17 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       launchPad.position.set(0, 0.25, -12);
 
       athlete = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
-        position: new Vector3(0, 0, 0), startClip: 'idle_stand', modeId: opts.modeId,
+        position: new Vector3(0, 0, 0), startClip: 'board_ride_idle', modeId: opts.modeId,   // phase 5: on the board from frame one
       });
-      neverBindPose(athlete.animator, 'idle_stand');
+      neverBindPose(athlete.animator, 'board_ride_idle');
+      animTree = new BoardAnimTree(athlete.animator);
+      // phase 5: THE BOARD. The rider had nothing under the feet — the family's rig builder (boardCore.buildRig) puts a
+      // 0.84 m plate under the root and dresses it with the baked snowboard scan; the same here, by hand, since this mode
+      // has no Rider (the core owns its vertical motion).
+      board = MeshBuilder.CreateBox(`${opts.modeId}_board`, { width: 0.26, height: 0.06, depth: 0.84 }, ctx.scene);
+      board.parent = athlete.root; board.position.y = 0.03;
+      board.material = padMat;   // the dressed scan covers the plate; the plate shares the kicker's material rather than adding one (the StandardMaterial ratchet)
+      void dressBoard(board, 'snowboard', 'snow');
       installSafePlay(athlete.animator, opts.modeId);
       ctx.groundLock.track(athlete.root, athlete.skeleton);
       ctx.heroRef.current = athlete.root;
@@ -199,7 +213,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const st = core?.state ?? null;
         const phase = st?.phase ?? 'Run';
         const spinning = phase === 'Air' && Math.abs(st?.spinTurns ?? 0) > 0.05;
-        const w: BoardWindow = phase === 'Air' ? (spinning ? 'spin' : 'air')
+        const w: BoardWindow = phase === 'Air' ? (grabThisAir ? 'grab' : spinning ? 'spin' : 'air')
           : phase === 'Land' ? 'land'
           : phase === 'Run' ? 'cruise' : 'idle';
         const { pose, legs } = { pose: BOARD_POSTURE[w], legs: BOARD_LEGS[w] };
@@ -216,6 +230,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
       core = opts.makeSession((grade, rotations) => {
         if (grade === 'stuck' || grade === 'clean') S.combo += 1; else S.combo = 0;
+        // phase 5: the landing on the BODY — the tree's land / sketchy / bail beat, cleared by the clock below
+        grabThisAir = false; lastCrash = grade === 'crash';
+        if (grade === 'crash') { bailBeatT = AIR_BAIL_BEAT_SEC; landBeatT = 0; } else { lastLanding = grade === 'sketchy' ? 'sketchy' : 'clean'; landBeatT = AIR_LAND_BEAT_SEC; }
         if (grade === 'stuck' || grade === 'clean') { boost.earn('landingClean', grade === 'stuck' ? 1.5 : 1); if (Math.abs(rotations) >= 0.5) boost.earn(Math.abs(rotations) >= 1.5 ? 'trickBig' : 'trickSmall'); }
         if (S.best === null || GRADE_RANK[grade] > GRADE_RANK[S.best]) S.best = grade;
         const turns = Math.abs(rotations);
@@ -297,7 +314,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
           const t = airTrickFor('snow', heldTrickDir(S.stickX, S.stickY), btn, 1.2);
           if (!t || t.kind !== 'air') return;
           if (S.named.some((n) => n.id === t.id)) { say(`${t.label} · REPEAT`, 0.5); return; }
-          S.named.push(t); say(t.label, 0.7); console.info(`[AIR-TRICK] ${t.id} (${btn} ${heldTrickDir(S.stickX, S.stickY) ?? 'neutral'})`);
+          S.named.push(t); if (t.grab !== 'none') grabThisAir = true; say(t.label, 0.7); console.info(`[AIR-TRICK] ${t.id} (${btn} ${heldTrickDir(S.stickX, S.stickY) ?? 'neutral'})`);
         };
         if (e.btn === 'A' && phase === 'Air') { core.trick(); nameTrick('A'); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 }); }
         else if (e.btn === 'Y' && phase === 'Air') { nameTrick('B'); SoundKit.play('whoosh', { pitch: 1.0, volume: 0.35 }); }
@@ -326,12 +343,15 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         0,
       );
 
-      const loco = st.phase === 'Run' ? locoPick({ speed: Math.max(st.speed, 0.61) }) : null;   // the run-up never idles mid-approach
-      const clip = loco ? loco.clip
-        : st.phase === 'Air' ? 'jump_up'
-        : 'idle_stand';
-      athlete.animator.play(clip, { loop: true });
-      if (loco) athlete.animator.setPlaybackScale(clip, loco.rate);
+      // phase 5: the board tree is the one owner of the clips (was: the sprint loop on the run-in, `jump_up` held through
+      // the whole air — 391/729 T-arm frames — and the stand idle on the landing)
+      if (landBeatT > 0) { landBeatT -= dt; if (landBeatT <= 0) animTree?.clearBeat('land_clean', 'land_sketchy'); }
+      if (bailBeatT > 0) { bailBeatT -= dt; if (bailBeatT <= 0) animTree?.clearBeat('bail'); }
+      animTree?.update(airBoardFeed({
+        phase: st.phase, speed: st.speed, maxRunSpeed: BIG_AIR_TUNING.maxRunSpeed, spinTurns: st.spinTurns ?? 0,
+        boostHeld, grabHeld: grabThisAir, landBeat: landBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0,
+        finished: (st.finished || st.phase === 'Done') && !lastCrash,
+      }));
 
       // The core owns score/attempt/finished — mirroring them here rather than
       // re-deriving them keeps the HUD honest and the end condition single-sourced.
@@ -364,6 +384,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       // instance's objects out from under it (see ThreePointMode for the bug
       // this prevents: the scene renders, and nothing ever moves).
       if (disposeCount < loadCount) return;
+      board?.dispose(); board = null; animTree = null;
       athlete?.dispose(); athlete = null;
       propsGone = true; props?.dispose(); props = null;
       posture?.dispose(); posture = null;
