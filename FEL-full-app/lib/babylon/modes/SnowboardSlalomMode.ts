@@ -517,7 +517,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         SoundKit.play('whistle');
         finishPunch(ctx);   // A+ P0: run FINISHED — hit-stop + shake + short flash, once; the whistle stays
         const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));
-        return ctx.end('FINISHED', tricks.score + timeBonus, { gatesHit, elapsed: Math.round(elapsed) });
+        return ctx.end('FINISHED', tricks.score + timeBonus, { gatesHit, gates: world.markers.length, elapsed: Math.round(elapsed), tricksLanded: tricks.landed, bestCombo: tricks.bestCombo });
       }
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, gate ?? null);

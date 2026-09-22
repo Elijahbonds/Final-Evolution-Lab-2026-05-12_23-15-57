@@ -120,6 +120,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     stickX: 0, stickY: 0,    // phase 3: the held direction picks the named trick (the board family's grammar)
     named: [] as BoardTrick[],   // the tricks thrown this air, scored on the landing
     bonus: 0,                    // points the named tricks earned across the session (the core scores rotation only)
+    judgeBest: 0,                // phase 9: the best JUDGES read of the session (0–10)
     chain: new ComboChain(undefined, 'air'),   // phase 4: the run's combo — links across attempts, a crash burns the pot
   };
 
@@ -132,6 +133,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   const pushHud = (ctx: ModeContext): void => {
     const st = core?.state;
     ctx.setHud({
+      judge: S.judgeBest > 0 ? S.judgeBest.toFixed(1) : null,   // phase 9: the session's best judge read
       score: (st?.score ?? 0) + S.bonus,   // phase 3: the core's rotation points + the named line
       attempt: `${Math.min((st?.attempt ?? 0) + 1, opts.attempts)}/${opts.attempts}`,
       phase: st?.phase ?? 'Run',
@@ -155,7 +157,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     if (S.score >= opts.winScore) finishPunch(ctx);
     S.chain.bank(); S.bonus = S.chain.banked;   // phase 4: the run's open pot banks with the run
     ctx.end(S.score >= opts.winScore ? 'win' : 'complete', S.score, {
-      points: S.score, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt,
+      points: S.score, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt, judgeBest: Math.round(S.judgeBest * 10) / 10,
     });
   };
 
@@ -240,6 +242,14 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const landed01 = grade === 'crash' ? 0 : grade === 'sketchy' ? 0.5 : 1;
         const line = S.named.map((t) => t.label).join(' → ');
         const linePts = S.named.reduce((sum, t) => sum + scoreTrick(t, landed01), 0);
+        // phase 9 — THE JUDGE: one 0–10 read per landing (SSX / a judged big-air final). A crash is a 0.0 whatever was
+        // thrown. On the banner beside the grade, and the session keeps its best.
+        const lineDiff = S.named.reduce((m, t) => Math.max(m, t.difficulty), 0);
+        // weights (measured on the first cut: a SKETCHY 720 + rodeo read 7.5 — the landing counted too little): the landing is
+        // half the score (stuck 5 / clean 4.2 / sketchy 1.5), the rotation up to 2.5, the line up to 2.5
+        const judge = grade === 'crash' ? 0 : Math.min(10, (grade === 'stuck' ? 5 : grade === 'clean' ? 4.2 : 1.5) + Math.min(2.5, Math.abs(rotations) * 1.25) + Math.min(2.5, lineDiff));
+        S.judgeBest = Math.max(S.judgeBest, judge);
+        console.info(`[AIR-JUDGE] ${judge.toFixed(1)} (${grade}, ${Math.abs(rotations).toFixed(1)} rot, line ${lineDiff.toFixed(1)})`);
         S.named = [];
         // phase 4 — THE COMBO LOOP: a landed line is a link (the Nth pays N×, repeats decay), a crash burns the open pot,
         // the pot banks when the run ends. `bonus` = what has banked + the open pot; the banner reads the multiplier.
@@ -250,6 +260,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         if (line) console.info(`[AIR-TRICK] landed ${grade}: ${line} +${linePts}`);
         // a landing with no spin scores nothing now (pointsNeedTrick) — so it says so, rather than a CLEAN over a zero
         say(line ? `${line} — ${GRADE_LABEL[grade]}${grade === 'crash' ? (lost > 0 ? ` — POT LOST ${lost}` : '') : S.chain.multiplier > 1 ? ` ${S.chain.multiplier}× · POT ${S.chain.pot}` : linePts > 0 ? ` +${linePts}` : ''}` : turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
+        S.banner += ` · JUDGES ${judge.toFixed(1)}`;   // phase 9: the read rides the landing banner
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(

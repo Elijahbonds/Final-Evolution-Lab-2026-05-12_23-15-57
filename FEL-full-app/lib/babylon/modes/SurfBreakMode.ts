@@ -409,7 +409,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       if (timeLeft <= 0) {
         ended = true;
         SoundKit.play('whistle');
-        return ctx.end('SESSION_END', tricks.score, { bestFlow: Math.round(flow), barrels });
+        return ctx.end('SESSION_END', tricks.score, { bestFlow: Math.round(flow), barrels, tricksLanded: tricks.landed, bestCombo: tricks.bestCombo, pumps });
       }
 
       if (!wipedOut) {

@@ -96,6 +96,8 @@ export interface TrickMachineOpts {
 
 export class TrickMachine {
   score = 0; combo = 0; comboPts = 0;
+  /** phase 9: what the run landed and its best chain — the result card reads these (it read coins and a chain that never existed) */
+  landed = 0; bestCombo = 0;
   /** phase 4: how long a landed combo stays open on the ground — a new trick inside it is the next link (THPS: the manual
    *  / revert that keeps a line alive; here the board has no manual so the window is the link). Banks when it runs out. */
   static readonly LINK_GRACE_SEC = 1.6;
@@ -194,7 +196,7 @@ export class TrickMachine {
         this.graceT = TrickMachine.LINK_GRACE_SEC;
         if (paid <= 0) { this.playClip('jump_land'); this.opts.onBeat?.('land'); return `${t.name} · REPEAT — NOTHING`; }
         this.links.push({ key: moveKey(t.name), rep });
-        this.combo = this.multiplier;
+        this.combo = this.multiplier; this.landed++; this.bestCombo = Math.max(this.bestCombo, this.combo);
         this.comboPts += paid * this.combo;
         // the same thresholds ComboChain uses, so a 5-trick run means the same thing on either board
         if (this.combo === 5) this.momentum?.report({ kind: 'big_make' });
