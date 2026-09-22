@@ -440,7 +440,13 @@ export const KarateVSMode: ModeDefinition = (() => {
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
       if (!mine) foeImpactAt = null;   // it landed or it did not; either way nothing is incoming now
       let outcome = resolveStrike(atk, dist, defState, now());
-      if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';   // STORM: the dash's / the roll's i-frames — he swings through where I was
+      if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';
+      if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
+        // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
+        // (DodgeRead), so it pays the same: the counter window, Focus, the beat. Measured before: the whiff was silent.
+        const r = dodgeReward(0);
+        if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx.feel?.impact?.(0.3); ctx.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[KVS-DEF] perfect dodge (dash)'); }
+      }   // STORM: the dash's / the roll's i-frames — he swings through where I was
 
       switch (outcome) {
         case 'whiff': break;
@@ -627,6 +633,8 @@ export const KarateVSMode: ModeDefinition = (() => {
       meAnim = newFighterAnim(new CombatAnimTree(player.animator));
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
+      // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => (foeImpactAt === null ? -1 : Math.max(0, (foeImpactAt - now()) / 1000)) };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
       mePosture?.dispose(); foePosture?.dispose();
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / GUARD_MAX), 'KVS-PP');

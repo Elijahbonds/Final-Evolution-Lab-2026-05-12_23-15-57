@@ -210,7 +210,7 @@ export const DuelMode: ModeDefinition = (() => {
     sc.current!.consumeHit();
 
     const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
-    if (!mine && meMove.dashIFrames) { console.info('[DL-STORM] step i-frames — whiff'); return; }   // phase 3
+    if (!mine && meMove.dashIFrames) { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[DL-STORM] step i-frames — whiff · perfect dodge'); return; }   // phase 6: the read opens him   // phase 3
     const action = defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
     const outcome = applyDefenseOutcome(action, atkState, defState, move.atk);
 
@@ -369,6 +369,8 @@ export const DuelMode: ModeDefinition = (() => {
       meStrike = new StrikeController(styled(myWeapon));
       showWeapons(ctx);
       foeStrike = new StrikeController(RIVAL_MOVESET[foeWeapon]());   // the rival fights unstyled
+      // phase 6 seam: seconds until the rival's swing lands (−1 = nothing in flight) — the probe's perfect driver reads it
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => { const c = foeStrike.current; return c && c.phase === 'startup' ? c.secToActive : -1; } };
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meMove.moveMode = 'eightWay'; foeMove.moveMode = 'eightWay';
       meMove.lockTarget = rival.root.position; foeMove.lockTarget = player.root.position;

@@ -179,7 +179,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     // SUBSTITUTION check first (defender spent chi to not be here)
     if (!mine && meSubstituted > now()) { /* player already teleported */ }
 
-    if (!mine && meMove.dashIFrames) { console.info('[SD-STORM] dash i-frames — whiff'); return; }   // phase 3: the dash's first beat cannot be hit
+    if (!mine && meMove.dashIFrames) { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[SD-STORM] dash i-frames — whiff · perfect dodge'); return; }   // phase 6: the read opens him   // phase 3: the dash's first beat cannot be hit
     const action = defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
     const outcome = applyDefenseOutcome(action, atkState, defState, move.atk);
     meter.gain('hitLanded');
@@ -379,6 +379,8 @@ export const ShowdownMode: ModeDefinition = (() => {
       // fights the unstyled set, so a style is something YOU brought rather than a difficulty dial.
       meStrike = new StrikeController(styleMoveset(bookMoveset(KARATE_ATTACKS), blendTraits(readBlend()), MIN_STARTUP_SEC));   // phase 4: the book, styled
       foeStrike = new StrikeController(karateMoveset(KARATE_ATTACKS));
+      // phase 6 seam: seconds until the rival's swing lands (−1 = nothing in flight) — the probe's perfect driver reads it
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => { const c = foeStrike.current; return c && c.phase === 'startup' ? c.secToActive : -1; } };
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);

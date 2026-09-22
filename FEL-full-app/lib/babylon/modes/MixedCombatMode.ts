@@ -474,7 +474,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
       const toDef = defChar.root.position.subtract(atkChar.root.position);
       const lateral = Math.abs(toDef.x * -Math.cos(committedYaw) + toDef.z * Math.sin(committedYaw));
       let outcome = resolveStrike(atk, dist, defState, now(), lateral);
-      if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';   // STORM: the dash's / the roll's i-frames
+      if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';
+      if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
+        // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
+        // (DodgeRead), so it pays the same: the counter window, Focus, the beat. Measured before: the whiff was silent.
+        const r = dodgeReward(0);
+        if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx.feel?.impact?.(0.3); ctx.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[MC-DEF] perfect dodge (dash)'); }
+      }   // STORM: the dash's / the roll's i-frames
       switch (outcome) {
         case 'whiff': break;
         case 'stepped': {
@@ -676,6 +682,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       meAnim = newFighterAnim(new CombatAnimTree(player.animator));
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
+      // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => (foeImpactAt === null ? -1 : Math.max(0, (foeImpactAt - now()) / 1000)) };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
       mePosture?.dispose(); foePosture?.dispose();
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / GUARD_MAX), 'MC-PP');

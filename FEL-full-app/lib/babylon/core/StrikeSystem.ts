@@ -105,6 +105,8 @@ export class StrikeInstance {
   /** True while the strike can still register its hit (active frames,
    *  once). consumeHit() marks it spent. */
   get hitLive(): boolean { return this.phase === 'active' && !this.hitRegistered; }
+  /** Phase 6: seconds until this swing's active window opens (0 once it has) — the defender's read. */
+  get secToActive(): number { return Math.max(0, this.move.startupSec - this.t); }
   consumeHit(): void { this.hitRegistered = true; }
 }
 
