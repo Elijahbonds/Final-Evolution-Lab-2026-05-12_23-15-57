@@ -132,6 +132,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   /** The lean the tree and the body BOTH ride (the stick, or the cutback coming around). */
   let rideLean = 0;
   let bailBeatT = 0, landBeatT = 0, airT = 0, cutbackUntil = 0;
+  let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
   // SURF OCEAN (2026-09-15): the living sea's per-frame step, and the water answering the rider
   let updateSea: (dt: number, camera: ModeContext['camera']) => void = () => {};
   let spray: SurfSpray | null = null;
@@ -161,7 +162,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       airborne,
       grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
       grinding: rig.rider.grinding !== null, manual: false,
-      landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0, tucking: carve > 0.5,
+      landing: landBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0, tucking: carve > 0.5,
     });
   }
 
@@ -258,7 +259,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       // the board for the first 6 s), and glue the rider to the face on the way down it (the wave face falls away faster
       // than one frame of gravity, exactly like the pitched piste — see RiderCfgOverrides.stickDown).
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0, -50 + POCKET.min + 3), 0, world.ground, '#ffd75e', 'surfboard', { stickDown: 0.9, rayLength: 8, carveAccel: 9 * BOARD_PACE, maxSpeed: 16 * BOARD_PACE });   // WALLS + SPEED: +35% across the face
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land') { landBeatT = LAND_BEAT_SEC; spray?.splash(rig.char.root.position, 0.5); } else { bailBeatT = BAIL_BEAT_SEC; spray?.splash(rig.char.root.position, 1); } } });
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => { if (b === 'land' || b === 'land_sketchy') { landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean'; spray?.splash(rig.char.root.position, b === 'land' ? 0.5 : 0.8); } else { bailBeatT = BAIL_BEAT_SEC; spray?.splash(rig.char.root.position, 1); } } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {

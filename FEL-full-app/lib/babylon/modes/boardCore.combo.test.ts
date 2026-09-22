@@ -55,6 +55,20 @@ describe('TrickMachine combo loop (phase 4)', () => {
     expect(land(TRICKS.grab)).toBe('GRAB +90');                     // the repeat memory went with the combo
   });
 
+  // phase 6 — the landing read: the fraction of the turn completed at touchdown (0.95 clean / 0.7 sketchy / below = bail)
+  it('a spin cut short lands sketchy for half, and shorter still is the bail', () => {
+    const { land } = fake();
+    expect(land(TRICKS.spin, 1.2)).toBe('360 +140');                    // 2.2 turns/s × 1.2 s: the full turn
+    expect(land(TRICKS.flipA, 0.35)).toBe('SKETCHY KICKFLIP +120 (2×)');   // 0.77 of the flip: half of 120 at 2×
+    expect(land(TRICKS.spin, 0.2)).toBe('BAILED');                      // 0.44 of the turn
+  });
+  it('a grab poked rather than held lands sketchy', () => {
+    const { land } = fake();
+    expect(land(TRICKS.grab, 0.2)).toBe('SKETCHY GRAB +45');            // held 0.2 s (0.8 of the 0.25 s a clean grab needs)
+    expect(land(TRICKS.spin, 1.2)).toBe('360 +280 (2×)');                // the sketchy grab still counted as a link
+    expect(land(TRICKS.grab, 0.05)).toBe('BAILED');                      // 0.05 s: a poke too short even for sketchy (0.1 s)
+  });
+
   it('letting the window run out banks, and the next trick starts a fresh 1× line', () => {
     const { land, ride } = fake();
     land(TRICKS.grab);

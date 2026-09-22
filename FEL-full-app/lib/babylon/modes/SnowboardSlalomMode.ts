@@ -92,6 +92,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let trickLayer: BoardTrickLayer | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let bailBeatT = 0, landBeatT = 0, airT = 0;
+  let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
   /** BAIL HONESTY (2026-09-21): true while the board is against the edge of the piste, so one slam is one fall. */
   let edgeHit = false;
   const BAIL_BEAT_SEC = 0.9, LAND_BEAT_SEC = 0.4;
@@ -201,10 +202,10 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         maxSpeed: snowTune.maxSpeed * 1.4,
       });
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => {
-        if (b === 'land') {
-          landBeatT = LAND_BEAT_SEC;
+        if (b === 'land' || b === 'land_sketchy') {
+          landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean';   // phase 6: the body reads the grade
           // SCORECARD FEEL (2026-09-15): a landed trick pops at the rider — the run measured 4.5 juice beats a minute
-          ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2.1, 0)), 'STOMPED', '#a7f3d0');
+          ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2.1, 0)), b === 'land' ? 'STOMPED' : 'SKETCHY', b === 'land' ? '#a7f3d0' : '#fcd34d');
         } else bailBeatT = BAIL_BEAT_SEC;
       } });
       animTree = new BoardAnimTree(rig.char.animator);
@@ -361,6 +362,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             wipePunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud (replaces impact SFX + feel.impact, which doubled the thud); dust kept
             EffectsKit.burst(ctx.scene, p.clone(), 'dust');
             bailBeatT = BAIL_BEAT_SEC;   // the tree plays the bail and holds it for the beat
+            console.info('[SNOW-ROCK] hit');
             ctx.setHud({ score: tricks.score, banner: `ROCK! -${ROCK_PENALTY}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
             break;
@@ -422,12 +424,14 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             // clean line reads as a line (the run measured 1.5 juice beats a minute)
             gateStreak++;
             ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), gateStreak >= 3 ? `+100 · ${gateStreak} IN A ROW` : '+100', '#7dd3fc');
+            console.info(`[SNOW-GATE] hit ${gatesHit}`);
             ctx.setHud({ banner: 'GATE ✓', score: tricks.score });
             crowd?.cheer(0.5);
           } else {
             SoundKit.play('miss', { volume: 0.3 });
             if (gateStreak >= 3) ctx.juice.callout(`STREAK OVER — ${gateStreak}`, '#94a3b8', 700);
             gateStreak = 0;
+            console.info('[SNOW-GATE] miss');
             ctx.setHud({ banner: 'MISSED GATE' });
           }
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
@@ -450,7 +454,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         airborne: !rig.rider.grounded && (airT > 0.1 || rig.rider.vel.y > 0.5),
         grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
         grinding: rig.rider.grinding !== null, manual: false,
-        landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0, tucking: tuck > 0.5,
+        landing: landBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0, tucking: tuck > 0.5,
       });
       // THE POSTURE LAYER'S OWN READ. Same signals as the tree, in the shape BoardPosture wants: without this the
       // layer would sit on the idle stance for the whole run and the mount would be decoration.

@@ -13,7 +13,7 @@ const MAXMS = Number(process.env.MAXMS ?? 80000);
 // phase 4: BANK_GAP=1 skips every 6th press cycle (a 2.8 s quiet spell on the ground) so the combo's BANK can be seen
 const BANK_GAP = process.env.BANK_GAP === '1';
 // the mode's own landing / combo ledger lines, tallied (the banner hides bails by design; the log does not)
-const LOG_RE = /\[(AIR-TRICK|AIR-COMBO|SKATE-LAND|SNOW-LAND|SURF-LAND)\]/;
+const LOG_RE = /\[(AIR-TRICK|AIR-COMBO|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SURF-WIPE)\]/;
 const ledger: string[] = [];
 const exe = (() => {
   const root = process.env.HOME + '/Library/Caches/ms-playwright';
@@ -71,6 +71,9 @@ await p.evaluate('clearInterval(window.__BTI)');
 const names = Object.keys(bt.labels).filter((l) => l && l.length > 1);
 console.log('mode: ' + MODE);
 console.log('distinct trick labels seen (' + names.length + '): ' + JSON.stringify(names));
+const tally: Record<string, number> = {};
+for (const l of ledger) { const m = l.match(/\[(BOARD-LAND|SNOW-GATE|SNOW-ROCK|SURF-WIPE)\] (\S+)/); if (m) tally[`${m[1]} ${m[2]}`] = (tally[`${m[1]} ${m[2]}`] ?? 0) + 1; }
+console.log('ledger tally: ' + JSON.stringify(tally));
 console.log('ledger lines: ' + ledger.length + (ledger.length ? ' :: ' + ledger.slice(-10).join(' | ') : ''));
 console.log('errors: ' + errors + (errs.length ? ' :: ' + errs.join(' | ') : ''));
 await b.close();

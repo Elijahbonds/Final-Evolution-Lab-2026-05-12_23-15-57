@@ -89,7 +89,7 @@ export interface TrickMachineOpts {
    *  direct plays used to be cut a frame later by the mode's per-frame play (ANIM-READABILITY, 2026-09-07). */
   anim?: 'self' | 'external';
   /** A clean landing or a bail happened this frame (external anim drives its beat window from this). */
-  onBeat?: (beat: 'land' | 'bail') => void;
+  onBeat?: (beat: 'land' | 'land_sketchy' | 'bail') => void;
   /** The shared Game-Breaker bus. Pass one and deep combos light the building, as they do on a skateboard. */
   momentum?: MomentumBus;
 }
@@ -99,6 +99,12 @@ export class TrickMachine {
   /** phase 4: how long a landed combo stays open on the ground — a new trick inside it is the next link (THPS: the manual
    *  / revert that keeps a line alive; here the board has no manual so the window is the link). Banks when it runs out. */
   static readonly LINK_GRACE_SEC = 1.6;
+  /** phase 6 — THE LANDING READ: the fraction of the turn (or of a grab's hold) completed at touchdown. At or above CLEAN
+   *  the trick pays in full; between SKETCHY and CLEAN it pays half, reads SKETCHY and plays the sketchy landing; below
+   *  SKETCHY it is the bail. Before this there was one line at 0.8: land it or eat the full bail, and nothing said which. */
+  static readonly LAND_CLEAN = 0.95;
+  static readonly LAND_SKETCHY = 0.7;
+  static readonly GRAB_SKETCHY = 0.4;
   private graceT = 0;
   /** phase 4: the labels landed in the combo so far — the repeat decay's memory and the line the bank names */
   private links: { key: string; rep: number }[] = [];
@@ -169,15 +175,22 @@ export class TrickMachine {
     if (this.active && r.grounded) {                     // LANDING
       const t = this.active;
       this.active = null;
-      const needed = Math.abs(t.turns) * 2 * Math.PI * 0.8;
-      const clean = t.turns === 0 || this.spun >= needed;
+      // a spin is graded on the turn it completed; a grab on how long it was held (spun += 4/s: a 0.25 s hold = 1)
+      const needed = t.turns === 0 ? 1 : Math.abs(t.turns) * 2 * Math.PI;
+      const done01 = Math.min(1, this.spun / needed);
+      // a grab's sketchy floor is lower (a 0.1 s poke): the surf air hangs ~0.4 s, and measured on the first cut every probe grab
+      // (0.11 s held) went down as a bail — a short grab is a sketchy grab, not a fall
+      const sketchyAt = t.turns === 0 ? TrickMachine.GRAB_SKETCHY : TrickMachine.LAND_SKETCHY;
+      const grade: 'clean' | 'sketchy' | 'bail' = done01 >= TrickMachine.LAND_CLEAN ? 'clean' : done01 >= sketchyAt ? 'sketchy' : 'bail';
+      console.info(`[BOARD-LAND] ${grade} ${t.name} ${done01.toFixed(2)}`);
       this.rig.char.root.rotation.z = 0;
-      if (clean) {
+      if (grade !== 'bail') {
+        const sketchy = grade === 'sketchy';
         // phase 4 — REPEAT DECAY (ComboChain's table): the same trick again pays 75 %, then 50, 25, 10, then nothing and is
         // no link at all (skate's masher lesson: a mashed METHOD × 8 must not out-score a played line). A trick that pays
         // nothing is answered, not silently dropped.
         const rep = this.links.filter((l) => l.key === moveKey(t.name)).length;
-        const paid = Math.round(t.pts * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
+        const paid = Math.round(t.pts * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)] * (sketchy ? 0.5 : 1));
         this.graceT = TrickMachine.LINK_GRACE_SEC;
         if (paid <= 0) { this.playClip('jump_land'); this.opts.onBeat?.('land'); return `${t.name} · REPEAT — NOTHING`; }
         this.links.push({ key: moveKey(t.name), rep });
@@ -187,9 +200,9 @@ export class TrickMachine {
         if (this.combo === 5) this.momentum?.report({ kind: 'big_make' });
         else if (this.combo >= 8) this.momentum?.report({ kind: 'highlight_dunk', weight: Math.min(30, this.combo * 2) });
         this.playClip('jump_land');
-        this.opts.onBeat?.('land');
+        this.opts.onBeat?.(sketchy ? 'land_sketchy' : 'land');
         this.onHud({ combo: `${this.combo}x` });
-        return `${t.name}${rep > 0 ? ` · REPEAT ×${rep + 1}` : ''} +${paid * this.combo}${this.combo > 1 ? ` (${this.combo}×)` : ''}`;
+        return `${sketchy ? 'SKETCHY ' : ''}${t.name}${rep > 0 ? ` · REPEAT ×${rep + 1}` : ''} +${paid * this.combo}${this.combo > 1 ? ` (${this.combo}×)` : ''}`;
       }
       this.bail();
       return 'BAILED';

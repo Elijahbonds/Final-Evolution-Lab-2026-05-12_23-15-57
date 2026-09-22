@@ -144,6 +144,7 @@ export function strikeStorm(): CarnivalEvent {
 export function trickGauntlet(): CarnivalEvent {
   let world: ReturnType<typeof buildSkatepark>, rig: BoardRig, tricks: TrickMachine, animTree: BoardAnimTree;
   let stickX = 0, pump = 0, airT = 0, landBeatT = 0, bailBeatT = 0;
+  let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
   const LAND_BEAT_SEC = 0.4, BAIL_BEAT_SEC = 0.8;   // board_land 0.42 s, skate_bail 0.75 s — the tree settles them when the window closes
 
   return {
@@ -155,7 +156,7 @@ export function trickGauntlet(): CarnivalEvent {
       animTree = new BoardAnimTree(rig.char.animator);
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), {
         anim: 'external',   // the tree owns the rider's clips; the machine reports beats
-        onBeat: (b) => { if (b === 'land') { landBeatT = LAND_BEAT_SEC; animTree.clearBeat('land_clean', 'land_sketchy'); } else { bailBeatT = BAIL_BEAT_SEC; animTree.clearBeat('bail'); } },
+        onBeat: (b) => { if (b === 'land' || b === 'land_sketchy') { landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean'; animTree.clearBeat('land_clean', 'land_sketchy'); } else { bailBeatT = BAIL_BEAT_SEC; animTree.clearBeat('bail'); } },
       });
       stickX = 0; pump = 0; airT = 0; landBeatT = 0; bailBeatT = 0;
       ctx.setHud({ hint: 'POP, flip in the air — stick sideways + TRICK spins — chain combos before you land' });
@@ -186,7 +187,7 @@ export function trickGauntlet(): CarnivalEvent {
         airborne: !grounded && (airT > 0.05 || rig.rider.vel.y > 0.5),
         grabHeld: tricks.grabHeld, flipping: tricks.flipping, spinning: tricks.spinning,
         grinding: false, manual: false,
-        landing: landBeatT > 0 ? 'clean' : 'none', bailing: bailBeatT > 0,
+        landing: landBeatT > 0 ? lastLanding : 'none', bailing: bailBeatT > 0,
         tucking: grounded && pump > 0.5,
       });
       if (landBeatT > 0) { landBeatT -= dt; if (landBeatT <= 0) animTree.clearBeat('land_clean', 'land_sketchy'); }
