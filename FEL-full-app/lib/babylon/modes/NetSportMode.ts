@@ -357,10 +357,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (side === 0) gameWinPunch(ctx, netPop);   // A+ P0: was juice.impact(..., { slow: true }) — the forbidden slowMo; same punch without it
       else ctx.juice.flash('#FF3366', 260);
       flash(ctx, side === 0 ? 'GAME! — YOU WIN' : 'YOU LOSE', 2500);
+      // net/precision phase 9: the end is a ledger line (and the card reads both sides' score)
+      const mine = tennisScore ? tennisScore.games[0] : volleyScore!.points[0], theirs = tennisScore ? tennisScore.games[1] : volleyScore!.points[1];
+      console.info(`[NET-END] ${side === 0 ? 'WIN' : 'LOSS'} ${mine}-${theirs} style ${style} streak ${heroStreak}`);
       ctx.end(
         side === 0 ? 'WIN' : 'LOSS',
-        tennisScore ? tennisScore.games[0] : volleyScore!.points[0],
-        { streak: heroStreak, style },
+        mine,
+        { streak: heroStreak, style, theirs },
       );
       return;
     }

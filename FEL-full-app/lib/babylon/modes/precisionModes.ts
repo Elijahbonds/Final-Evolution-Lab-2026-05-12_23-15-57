@@ -753,7 +753,7 @@ export const GolfMode: ModeDefinition = (() => {
             settling = true;
             setTimeout(() => {
               ctx.setHud({ banner: '', board: null, boardTitle: '' });
-              if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps }); }
+              if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[GOLF-END] card in ${overPar > 0 ? '+' : ''}${overPar} pickUps ${pickUps} pts ${pts}`); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps }); }
               else nextShot(ctx);
             }, 1600);
           };
@@ -822,7 +822,7 @@ export const GolfMode: ModeDefinition = (() => {
             ctx.setHud({ banner: '', board: null, boardTitle: '' });
             if (round >= TOTAL) {
               ended = true; SoundKit.play('whistle');
-              ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps });
+              console.info(`[GOLF-END] card in ${overPar > 0 ? '+' : ''}${overPar} pickUps ${pickUps} pts ${pts}`); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps });
             } else nextShot(ctx);
           }, 2600);   // long enough to read the card
         }
@@ -1033,7 +1033,7 @@ export const DerbyMode: ModeDefinition = (() => {
     ctx.setHud({ score: pts, banner, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
     setTimeout(() => ctx.setHud({ banner: '' }), 900);
     console.info(`[PARK] ${verdict} ${lastDetail} +${gained}`);
-    if (roundOver) { ended = true; SoundKit.play('whistle'); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); }
+    if (roundOver) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); }
   }
 
   // THE BATTING CAMERA LOOKS OUT TO THE OUTFIELD (owner, 2026-09-15: "face outfield so we can see the pitcher and our
@@ -1359,10 +1359,10 @@ export const DerbyMode: ModeDefinition = (() => {
         // the whiff names the pitch — The Show tells you what beat you
         ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}`, outs: tally.outs });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        if (whiffOut) { ended = true; SoundKit.play('whistle'); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); return; }
+        if (whiffOut) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); return; }
       }
       if (!flying && !incoming && !pending) {
-        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); return ctx.end('DERBY_END', pts, { pitches: TOTAL, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }); }
+        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); return ctx.end('DERBY_END', pts, { pitches: TOTAL, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }); }
         pending = true;
         setTimeout(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
@@ -1681,6 +1681,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       if (won) SoundKit.play('crowdCheer');
       ctx.setHud({ banner: won ? `LEVEL AFTER ${SD_CAP} — YOURS ON ${decidedBy === 'style' ? 'STYLE' : decidedBy === 'later-save' ? 'THE LATER SAVE' : 'NERVE'}` : `LEVEL AFTER ${SD_CAP} — THEIRS ON THE LATER SAVE` });
       // stats are numbers: decidedBy 1 = style, 2 = the later save, 3 = nerve
+      console.info(`[PEN-END] ${won ? 'WIN' : 'LOSS'} ${goals}-${themGoals} style ${stylePts} sd ${sdRounds}`);
       ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts, { goals, stylePts, themGoals, sdRounds, decidedBy: decidedBy === 'style' ? 1 : decidedBy === 'later-save' ? 2 : 3 });
       return;
     }
@@ -1689,6 +1690,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       SoundKit.play('whistle');
       const won = s.winner === 'you';
       if (won) SoundKit.play('crowdCheer');
+      console.info(`[PEN-END] ${won ? 'WIN' : 'LOSS'} ${goals}-${themGoals} style ${stylePts}`);
       ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts,
         { goals, stylePts, themGoals, sdRounds: Math.max(0, round - REGULATION_KICKS) });
       return;
