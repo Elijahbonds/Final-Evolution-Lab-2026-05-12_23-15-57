@@ -70,6 +70,10 @@ export class Rider {
   /** SKATE-MAJOR: the solid the wheels met this frame (see RiderCfgOverrides.stepUp), cleared every update. */
   public solidHit: SolidHit | null = null;
 
+  /** The last ground height the ray found (null until the first hit): the ray's second origin and the clamp's target. */
+  private lastGroundY: number | null = null;
+  /** A frame longer than this integrates gravity over this much only — a load stall is not a fall (BOARDS PASS). */
+  static readonly MAX_GRAVITY_STEP_SEC = 0.05;
   private cfg: { gravity: number; carveAccel: number; maxSpeed: number; drag: number; snapHeight: number; hardFloorY: number; missThreshold: number; rayLength: number; stickDown: number; grindSpeed: number; stepUp: number };
 
   constructor(
@@ -124,13 +128,24 @@ export class Rider {
     }
 
     // gravity + ground snap via raycast (the anti-float fix)
-    this.vel.y += this.cfg.gravity * dt;
+    // BOARDS PASS (2026-09-22) — THE FALL THROUGH THE WORLD. A stalled frame at load (the first frames compile for a
+    // second or more) integrated gravity over that whole dt, so the body dropped through the piste before the ray had ever
+    // hit; from under the surface a ray cast 1.5 m above the wheels sees nothing, and after `missThreshold` misses the
+    // clamp took him to `hardFloorY` — on the snow that is the mountain's BOTTOM (−148 m), where he rode the whole run
+    // (measured: y −148.6 for 24 s, gates still counting on x/z). Three rules: the gravity step is capped (a stall is not
+    // a fall); the ray starts from the higher of the body and the LAST GROUND it stood on, so a body under the surface
+    // finds it again; and the clamp goes to that last ground when there is one, not the world's floor.
+    const gdt = Math.min(dt, Rider.MAX_GRAVITY_STEP_SEC);
+    this.vel.y += this.cfg.gravity * gdt;
     this.root.position.addInPlace(this.vel.scale(dt));
-    const ray = new Ray(this.root.position.add(new Vector3(0, 1.5, 0)), this.down, this.cfg.rayLength);
+    const rayFromY = Math.max(this.root.position.y, this.lastGroundY ?? -Infinity) + 1.5;
+    const ray = new Ray(new Vector3(this.root.position.x, rayFromY, this.root.position.z), this.down, this.cfg.rayLength + Math.max(0, rayFromY - this.root.position.y - 1.5));
     const hit = this.scene.pickWithRay(ray, (m) => this.groundMeshes.includes(m as AbstractMesh));
     if (hit?.hit && hit.pickedPoint) {
       this.missedRaycasts = 0;
       const groundY = hit.pickedPoint.y;
+      this.lastGroundY = groundY;
+      if (this.root.position.y < groundY - 0.05) { this.root.position.y = groundY; if (this.vel.y < 0) this.vel.y = 0; }   // under the surface: back up onto it (the tunnelling case)
       // SKATE-MAJOR: a top face the board cannot roll up is a WALL — further above the wheels than a step, or, past a
       // kerb's height, steeper than any bank (rise over this frame's run beyond MAX_RIDE_SLOPE: the plaza's steepest
       // bank is 0.56, the wallride's leaned face 6.2, a box face infinite). The slope test is what keeps a slow board off
@@ -177,8 +192,9 @@ export class Rider {
     // clamp directly. Falling through the world forever becomes impossible.
     const belowHardFloor = this.root.position.y < this.cfg.hardFloorY - 0.5;
     if (this.missedRaycasts >= this.cfg.missThreshold || belowHardFloor) {
-      console.warn(`[FEL-SPAWN] Rider: ${this.missedRaycasts} missed raycasts (y=${this.root.position.y.toFixed(2)}) — hard-clamping to floor`);
-      this.root.position.y = this.cfg.hardFloorY;
+      const floorY = this.lastGroundY ?? this.cfg.hardFloorY;   // the last snow he stood on, not the mountain's bottom
+      console.warn(`[FEL-SPAWN] Rider: ${this.missedRaycasts} missed raycasts (y=${this.root.position.y.toFixed(2)}) — hard-clamping to ${this.lastGroundY !== null ? 'the last ground' : 'floor'} ${floorY.toFixed(2)}`);
+      this.root.position.y = floorY;
       this.vel.y = 0;
       this.grounded = true;
       this.missedRaycasts = 0;

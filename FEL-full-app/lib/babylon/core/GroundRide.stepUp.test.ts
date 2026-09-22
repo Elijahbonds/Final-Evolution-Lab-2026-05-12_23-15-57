@@ -186,3 +186,33 @@ describe('Rider.stepUp — the interior solids', () => {
     w.dispose();
   });
 });
+
+// BOARDS PASS (2026-09-22): the fall through the world
+describe('Rider on a pitched piste — a stalled frame is not a fall', () => {
+  function piste() {
+    const engine = new NullEngine(); const scene = new Scene(engine);
+    const ground = MeshBuilder.CreateGround('piste', { width: 40, height: 800 }, scene);
+    ground.rotation.x = 0.22; const c = 380; ground.position.set(0, -Math.sin(0.22) * c, Math.cos(0.22) * c); ground.isPickable = true;
+    ground.computeWorldMatrix(true); ground.refreshBoundingInfo();
+    const root = new TransformNode('rider', scene); root.position.set(0, 0.2, 4);
+    const rider = new Rider(scene, root, [ground], { hardFloorY: -150, rayLength: 80, stickDown: 0.6 });
+    return { scene, root, rider };
+  }
+  it('a 1.2 s first frame leaves the rider ON the snow, not 148 m under it', () => {
+    const { root, rider } = piste();
+    rider.update(1.2, 0, 0);                       // the load stall
+    for (let i = 0; i < 10; i++) rider.update(1 / 60, 0, 0);
+    const surface = -Math.tan(0.22) * root.position.z;
+    expect(root.position.y).toBeGreaterThan(surface - 0.6);
+    expect(root.position.y).toBeLessThan(surface + 1.0);
+    expect(root.position.y).toBeGreaterThan(-20);
+  });
+  it('a body already under the surface finds the snow again instead of the world floor', () => {
+    const { root, rider } = piste();
+    for (let i = 0; i < 30; i++) rider.update(1 / 60, 0, 0);   // stood on the snow once: the last ground is known
+    root.position.y -= 6;                                     // punched under it
+    for (let i = 0; i < 12; i++) rider.update(1 / 60, 0, 0);
+    const surface = -Math.tan(0.22) * root.position.z;
+    expect(Math.abs(root.position.y - surface)).toBeLessThan(1.0);
+  });
+});
