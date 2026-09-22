@@ -18,6 +18,7 @@ import type { Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { mountPostureLayer } from '../anim/PostureLayer';
 import { BOARD_POSTURE, BOARD_LEGS, type BoardWindow } from '../core/BoardPosture';
+import { airTrickFor, heldTrickDir, scoreTrick, type BoardTrick } from '../core/BoardTricks';   // boards pass phase 3: the family's trick table on big air
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -109,6 +110,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     bannerT: 0,
     done: false,
     lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+    stickX: 0, stickY: 0,    // phase 3: the held direction picks the named trick (the board family's grammar)
+    named: [] as BoardTrick[],   // the tricks thrown this air, scored on the landing
+    bonus: 0,                    // points the named tricks earned across the session (the core scores rotation only)
   };
 
   const reset = (): void => {
@@ -120,7 +124,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   const pushHud = (ctx: ModeContext): void => {
     const st = core?.state;
     ctx.setHud({
-      score: st?.score ?? 0,
+      score: (st?.score ?? 0) + S.bonus,   // phase 3: the core's rotation points + the named line
       attempt: `${Math.min((st?.attempt ?? 0) + 1, opts.attempts)}/${opts.attempts}`,
       phase: st?.phase ?? 'Run',
       speed: st ? Number(st.speed.toFixed(1)) : 0,
@@ -212,8 +216,14 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         if (grade === 'stuck' || grade === 'clean') { boost.earn('landingClean', grade === 'stuck' ? 1.5 : 1); if (Math.abs(rotations) >= 0.5) boost.earn(Math.abs(rotations) >= 1.5 ? 'trickBig' : 'trickSmall'); }
         if (S.best === null || GRADE_RANK[grade] > GRADE_RANK[S.best]) S.best = grade;
         const turns = Math.abs(rotations);
+        // phase 3: the named line scores on the landing (THPS: a bail pays nothing; sketchy pays part) and is READ
+        const landed01 = grade === 'crash' ? 0 : grade === 'sketchy' ? 0.5 : 1;
+        const line = S.named.map((t) => t.label).join(' → ');
+        const linePts = S.named.reduce((sum, t) => sum + scoreTrick(t, landed01), 0);
+        S.bonus += linePts; S.named = [];
+        if (line) console.info(`[AIR-TRICK] landed ${grade}: ${line} +${linePts}`);
         // a landing with no spin scores nothing now (pointsNeedTrick) — so it says so, rather than a CLEAN over a zero
-        say(turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
+        say(line ? `${line} — ${GRADE_LABEL[grade]}${linePts > 0 ? ` +${linePts}` : ''}` : turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(
@@ -246,6 +256,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
     onInput(ctx: ModeContext, e: FelInput): void {
       if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (e.t === 'stick' && e.side === 'L') { S.stickX = e.x; S.stickY = e.y; }          // phase 3: the held direction
       if (e.t === 'button' && e.btn === 'R1') { boostHeld = e.pressed; return; }   // BOOST: the shared held R1
       if (S.done || !core) return;
       const phase = core.state.phase;
@@ -269,7 +280,19 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       }
 
       if (e.t === 'button' && e.pressed) {
-        if (e.btn === 'A' && phase === 'Air') { core.trick(); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 }); }
+        // phase 3 — THE BOARD FAMILY'S GRAMMAR (BoardTricks, snow): the held direction + the button is a NAMED trick — A spins
+        // (and names the spin: 540 right, 720 left, a straight air neutral), Y is a grab by direction (method up, stalefish
+        // left, tail grab right, indy down), X the big spins (cork 720 right, rodeo left). Before: A spun, B stomped, and
+        // the mode named nothing (the trick probe saw two prompts in 50 s of presses).
+        const nameTrick = (btn: 'A' | 'B' | 'Y'): void => {
+          const t = airTrickFor('snow', heldTrickDir(S.stickX, S.stickY), btn, 1.2);
+          if (!t || t.kind !== 'air') return;
+          if (S.named.some((n) => n.id === t.id)) { say(`${t.label} · REPEAT`, 0.5); return; }
+          S.named.push(t); say(t.label, 0.7); console.info(`[AIR-TRICK] ${t.id} (${btn} ${heldTrickDir(S.stickX, S.stickY) ?? 'neutral'})`);
+        };
+        if (e.btn === 'A' && phase === 'Air') { core.trick(); nameTrick('A'); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 }); }
+        else if (e.btn === 'Y' && phase === 'Air') { nameTrick('B'); SoundKit.play('whoosh', { pitch: 1.0, volume: 0.35 }); }
+        else if (e.btn === 'X' && phase === 'Air') { nameTrick('Y'); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 }); }
         else if (e.btn === 'B' && phase === 'Air') { core.stick(); SoundKit.play('thud', { pitch: 1.1, volume: 0.35 }); }
         else if ((e.btn === 'A' || e.btn === 'B') && phase !== 'Run') refuse(ctx, 'WAIT FOR THE RUN-UP');
         // MECHANICS PASS (2026-09-15): SPIN and STOMP are air verbs, and on the run-up they did nothing and said nothing
