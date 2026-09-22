@@ -15,10 +15,12 @@ const MAXMS = Number(process.env.MAXMS ?? 80000);
 const BANK_GAP = process.env.BANK_GAP === '1';
 // phase 7: DRIVER=intent installs the mechanics probe's intent driver (gates on snow, the face on surf) under ?agent=1
 const INTENT = process.env.DRIVER === 'intent';
+// phase 10: RUN_TO_END=1 waits (up to MAXMS) for the mode's own end and prints its outcome + score off __FEL_QA__.result()
+const RUN_TO_END = process.env.RUN_TO_END === '1';
 // TRACE=1 (intent runs): the hero's x / z, the QA next gate and the pad's stick at 2 Hz, printed at the end
 const TRACE = process.env.TRACE === '1';
 // the mode's own landing / combo ledger lines, tallied (the banner hides bails by design; the log does not)
-const LEDGER_TAGS = 'AIR-TRICK|AIR-COMBO|AIR-JUDGE|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SNOW-EDGE|SNOW-YETI|SURF-WIPE|SURF-EDGE|SURF-PUMP|SKATE-SOLID';
+const LEDGER_TAGS = 'AIR-TRICK|AIR-COMBO|AIR-JUDGE|SKATE-LAND|BOARD-LAND|SNOW-GATE|SNOW-ROCK|SNOW-EDGE|SNOW-YETI|SNOW-END|SURF-WIPE|SURF-EDGE|SURF-PUMP|SURF-END|SKATE-SOLID|SKATE-END';
 const LOG_RE = new RegExp(`\\[(${LEDGER_TAGS})\\]`);
 const ledger: string[] = [];
 const exe = (() => {
@@ -36,7 +38,7 @@ await p.addInitScript(`(() => {
     buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   window.__PAD = pad; navigator.getGamepads = () => [pad];
 })()`);
-await p.goto(`${BASE}/dev/mode/${MODE}${INTENT ? '?agent=1' : ''}`, { waitUntil: 'domcontentloaded' });
+await p.goto(`${BASE}/dev/mode/${MODE}${INTENT || RUN_TO_END ? '?agent=1' : ''}`, { waitUntil: 'domcontentloaded' });
 await p.waitForSelector('canvas', { timeout: 240000 });
 await p.waitForTimeout(9000);
 const start = p.locator('text=/^START$/').first();
@@ -76,7 +78,11 @@ if (INTENT) {
     setTimeout(() => { press(btn, 0); }, 430);
   }, 1400);
 })()`);
-await p.waitForTimeout(MAXMS);
+if (RUN_TO_END) {
+  const t0 = Date.now(); let res: unknown = null;
+  while (Date.now() - t0 < MAXMS) { res = await p.evaluate('window.__FEL_QA__ && window.__FEL_QA__.result ? window.__FEL_QA__.result() : null'); if (res) break; await p.waitForTimeout(500); }
+  console.log('run end: ' + (res ? JSON.stringify(res) + ' after ' + Math.round((Date.now() - t0) / 1000) + ' s' : 'NOT ENDED in ' + Math.round(MAXMS / 1000) + ' s'));
+} else await p.waitForTimeout(MAXMS);
 const bt = await p.evaluate('window.__BT') as { labels: Record<string, number> };
 await p.evaluate('clearInterval(window.__BTI)');
 const names = Object.keys(bt.labels).filter((l) => l && l.length > 1);

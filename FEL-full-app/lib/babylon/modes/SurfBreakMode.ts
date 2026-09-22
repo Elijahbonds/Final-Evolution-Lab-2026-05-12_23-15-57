@@ -40,6 +40,8 @@ import { REPEAT_DECAY } from '../core/ComboChain';   // the same THPS repeat dec
 import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, rail spray, splashes
 
 const RUN_SEC = 90;
+/** phase 10: the score that wins a session without a barrel */
+const SURF_WIN_SCORE = 800;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
 const CUTBACK_RATE = 6;
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
@@ -409,7 +411,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
       if (timeLeft <= 0) {
         ended = true;
         SoundKit.play('whistle');
-        return ctx.end('SESSION_END', tricks.score, { bestFlow: Math.round(flow), barrels, tricksLanded: tricks.landed, bestCombo: tricks.bestCombo, pumps });
+        // phase 10: the session is WON on a ridden barrel or the score par — it ended 'SESSION_END' with no win before
+        const won = barrels >= 1 || tricks.score >= SURF_WIN_SCORE;
+        console.info(`[SURF-END] ${won ? 'win' : 'complete'} barrels ${barrels} score ${tricks.score}`);
+        return ctx.end(won ? 'win' : 'complete', tricks.score, { bestFlow: Math.round(flow), barrels, tricksLanded: tricks.landed, bestCombo: tricks.bestCombo, pumps });
       }
 
       if (!wipedOut) {

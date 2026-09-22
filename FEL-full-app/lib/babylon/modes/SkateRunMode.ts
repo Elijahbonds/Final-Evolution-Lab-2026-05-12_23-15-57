@@ -66,6 +66,8 @@ import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 
 const RUN_SEC = 90;
+/** phase 10: the banked score that wins the run */
+const SKATE_WIN_SCORE = 1500;
 /** Skate 3 banks the moment you roll away clean; the delay is the revert window. */
 const BANK_SETTLE_SEC = 0.45;
 /** A bank at or above this is the run's big moment and is cued as one. */
@@ -108,6 +110,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   let settleT = 0;
   /** Latched while the rider is against the fence, so the cue fires once per contact rather than every frame. */
   let fenceHit = false;
+  let landedTotal = 0;   // phase 10: tricks landed across the run (the card reads it)
   /** Heading when the wheels left the ground — decides switch stance on landing. */
   let airEntryYaw = 0;
   /** Has the camera been snapped since play actually began? */
@@ -754,7 +757,11 @@ export const SkateRunMode: ModeDefinition = (() => {
         // in the air, on a rail or in a manual loses the pot, exactly as a bail would.
         if (combo.active && rig.rider.grounded && !grindCh && !manualCh && !air.state.airborne) combo.bank();
         const finalScore = combo.banked + coins.collected * 5;
-        return ctx.end('RUN_COMPLETE', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo });
+        // phase 10: the run is WON on the banked par (the card's old twin used 2000 for LEGENDARY RUN; the Babylon run banks
+        // less per line since the repeat decay, so the par sits at 1500) — it ended 'RUN_COMPLETE' with no win before
+        const won = finalScore >= SKATE_WIN_SCORE;
+        console.info(`[SKATE-END] ${won ? 'win' : 'complete'} banked ${combo.banked} coins ${coins.collected} best ${combo.bestCombo}x`);
+        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: combo.links.length + landedTotal });
       }
       const gained = coins.update(dt, rig.char.root.position);
       if (gained > 0) {
@@ -868,6 +875,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // taxed it — it used to stay "held" on the ground and its points were never paid (SKATE-MAJOR)
         if (air.state.grabHeld) { trickLayer?.release(); const gp = air.releaseGrab(); if (gp > 0 && res.grade !== 'bail') combo.add('GRAB', gp, 'air'); }
         bailLatch = false;                       // A+ P0: a fresh touchdown gets one bail punch at most
+        landedTotal += res.chain.length;   // phase 10: the card reads how many tricks the run landed
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');

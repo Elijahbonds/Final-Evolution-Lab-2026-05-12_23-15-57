@@ -73,7 +73,10 @@ export function makeAirHost(modeKey: string, title: string) {
             opponentScore: 0,
             won: r.outcome === 'win',
             duration: r.durationSec,
-            headline: r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
+            // boards pass phase 10: big air reads its judge; the vault keeps its line
+            headline: r.stats?.judgeBest !== undefined
+              ? `${r.outcome === 'win' ? 'STOMPED THE FINAL' : 'FINAL OVER'} · JUDGES BEST ${Number(r.stats.judgeBest).toFixed(1)}`
+              : r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
           } satisfies GameResult);
         },
       }).then((s) => {

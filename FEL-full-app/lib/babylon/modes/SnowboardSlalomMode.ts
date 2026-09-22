@@ -43,6 +43,8 @@ import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 
+/** phase 10: the share of the gates that makes the run a GATE CRASHER (the win) */
+const GATE_CRASHER_SHARE = 0.5;
 const YETI_SPAWN_GATE = 5;                 // bursts out after this gate clears
 const YETI_CHASE_SEC = 8;
 const YETI_CLEAR_PTS = 150;
@@ -517,7 +519,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         SoundKit.play('whistle');
         finishPunch(ctx);   // A+ P0: run FINISHED — hit-stop + shake + short flash, once; the whistle stays
         const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));
-        return ctx.end('FINISHED', tricks.score + timeBonus, { gatesHit, gates: world.markers.length, elapsed: Math.round(elapsed), tricksLanded: tricks.landed, bestCombo: tricks.bestCombo });
+        // phase 10 — GATE CRASHER: the title is the win condition. Half the gates or better (15 of 30) is the crash; fewer is
+        // a finished run. Before this the run ended 'FINISHED' whatever happened and the card said 0 COINS.
+        const crashed = gatesHit >= Math.ceil(world.markers.length * GATE_CRASHER_SHARE);
+        console.info(`[SNOW-END] ${crashed ? 'win' : 'complete'} gates ${gatesHit}/${world.markers.length} score ${tricks.score + timeBonus}`);
+        return ctx.end(crashed ? 'win' : 'complete', tricks.score + timeBonus, { gatesHit, gates: world.markers.length, elapsed: Math.round(elapsed), tricksLanded: tricks.landed, bestCombo: tricks.bestCombo });
       }
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, gate ?? null);

@@ -67,15 +67,24 @@ export function makeBoardHost(opts: BoardHostOpts) {
       const resultSink = async (r: SessionResult) => {
         if (endedRef.current) return;
         endedRef.current = true;
-        const coins = Number(r.stats?.coinsCollected ?? 0);
-        const combo = Number(r.stats?.combo ?? 1);
+        // boards pass phase 10: the card reads the MODE's line. It used to say `0 COINS · x1 CHAIN` for every board (snow has no
+        // coins; `combo` was never a stat) and `won: false` for every run — the modes end 'win' / 'complete' now.
+        const st = r.stats ?? {};
+        const n = (k: string, d = 0) => Number(st[k] ?? d);
+        const won = r.outcome === 'win';
+        const combo = n('bestCombo', 1);
+        const headline = modeKey === 'snowboard_slalom'
+          ? `${won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)} GATES · ${n('tricksLanded')} TRICKS · x${combo} BEST`
+          : modeKey === 'surf'
+            ? `${won ? 'EPIC SESSION' : 'SESSION OVER'} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`
+            : `${won ? 'LEGENDARY RUN' : 'RUN OVER'} · x${combo} BEST CHAIN · ${n('tricksLanded')} TRICKS · ${n('coinsCollected')} COINS`;
         const result: GameResult = {
           score: r.score,
           stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
           opponentScore: 0,
-          won: false, // score run — the clock always runs out, no win/lose gate
+          won,
           duration: r.durationSec,
-          headline: `${coins} COINS · x${combo} CHAIN`,
+          headline,
           maxCombo: Math.round(combo),
         };
         onEnd(result);
