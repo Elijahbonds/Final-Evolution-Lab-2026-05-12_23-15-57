@@ -17,7 +17,7 @@ import { AI_BLOCK_RANGE, aiBlockChance } from './HoopsDefense';
  *  under the landing spot for 100+ frames, roots 0.23 m apart). Metres per second and the distance carried. */
 export const VICTIM_SLIDE = { mps: 3.2, dist: 0.95 } as const;
 /** One frame of the slide: how far to move this frame given what is left. */
-export function slideStep(left: number, dt: number, mps = VICTIM_SLIDE.mps): number { return Math.max(0, Math.min(left, mps * Math.max(0, dt))); }
+export function slideStep(left: number, dt: number, mps: number = VICTIM_SLIDE.mps): number { return Math.max(0, Math.min(left, mps * Math.max(0, dt))); }
 
 /** How far in front of the ring's centre the ROOT stops when the ball meets the iron: the ring's radius + a bent arm. */
 /** The least the drop carries forward from the resolve point (m). */

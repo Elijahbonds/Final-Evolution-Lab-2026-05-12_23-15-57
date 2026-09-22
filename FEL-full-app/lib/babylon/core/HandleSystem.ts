@@ -195,6 +195,11 @@ export interface ChainState {
 
 export const CHAIN_IDLE: ChainState = { last: null, since: Infinity, length: 0 };
 
+/** THE BITE (Phase 6): a 'shook' defender's feet go the wrong way — his root lunges toward the fake this far, this fast,
+ *  under the stumble clip. Measured before: the stumble was a clip on a root that never moved, so a broken defender
+ *  and a standing one were the same body from the waist down. */
+export const ANKLE_BITE = { mps: 2.6, dist: 0.45 } as const;
+
 /**
  * How many moves a single chain can run to before it is spent.
  *

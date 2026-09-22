@@ -404,10 +404,19 @@ for (let n = 0; n < POSSESSIONS; n++) {
       if (process.env.LUCK) await page.evaluate(`(() => { const d = window.__dev(); if (d && d.luck) d.luck(${Number(process.env.LUCK)}); })()`).catch(() => {});   // Phase 4: LUCK=0.99 keeps the 1v1 AI's hands off the ball so the whole plan reaches the reader
       // The left stick under the throws: a jog in, then ACROSS, then back out — 4.8 s straight at the rim camped the paint
       // and the ref called three seconds before the escapes could be thrown (measured: every 1v1 possession, "three_seconds → foe").
+      if (process.env.STICK_PATH === 'close') {
+        // Phase 6: straight at the defender — the ankle-break roll needs him inside SHAKE_RANGE and closing; the possession
+        // ends on three seconds ~4.8 s in, after the chain has run (measured: the across path rolled 0 breaks in 10 possessions)
+        await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1500)`);
+        await agent(`a.act({ moveX: 0, moveY: 0.35 }, 1500)`);
+        await agent(`a.act({ moveX: 0, moveY: 0.5 }, 1800)`);
+        await agent(`a.act({ moveX: 0, moveY: 0.5, sprint: true }, 2000)`);
+      } else {
       await agent(`a.act({ moveX: 0, moveY: 0.6 }, 1500)`);
       await agent(`a.act({ moveX: 0.6, moveY: 0.1 }, 1500)`);
       await agent(`a.act({ moveX: -0.3, moveY: -0.4 }, 1800)`);
-      await agent(`a.act({ moveX: 0, moveY: -0.5, sprint: true }, 2000)`);   // R2 held for the two escape throws — RETREATING: 6 s of jogging at the 1v1 defender ran through him (FOUL ON YOU, silent to the log) before the escapes
+      await agent(`a.act({ moveX: 0, moveY: -0.5, sprint: true }, 2000)`);
+      }   // R2 held for the two escape throws — RETREATING: 6 s of jogging at the 1v1 defender ran through him (FOUL ON YOU, silent to the log) before the escapes
       await mark('end');
       await agent(`a.do('shoot', { charge: ${CHARGE} })`);
     }
@@ -762,7 +771,7 @@ const out = {
   handleMoves, tricks, refCalls, chargesTaken, screensCalled, stickTally, stickOk, stickExtras, driverPeakSpeed: +(def?.driverPeak ?? 0).toFixed(2),
   plantedMs: def?.plantedMs ?? 0, closestWhilePlanted: +(def?.closestWhilePlanted ?? 99).toFixed(2),
   finalScore: [final.score ?? null, final.foeScore ?? null], target: final.target ?? null,
-  recT0, rows, log: log.slice(-600),
+  recT0, rows, log: log.slice(-2500),
   defLog: log.filter((l) => /-DEF\]|-DUNK\]|-REF\]|-SHOT\]|-MOVE\]|-STICK\]|-HANDLE\]|-PACE\]|-CONTACT\]/.test(l)).map((l) => l.replace(/^\d+ /, '')),   // suite pass: the release diagnostics, unsliced
 };
 fs.writeFileSync(`${OUT}/hoops-lab-${TAG}.json`, JSON.stringify(out, null, 1));

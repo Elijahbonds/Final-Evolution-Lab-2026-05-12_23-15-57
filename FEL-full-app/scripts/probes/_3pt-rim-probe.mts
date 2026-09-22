@@ -4,11 +4,13 @@
 // a shot missed, so EARLY and LATE looked identical. This taps Space at random times (so the timing
 // error takes both signs) and counts the named rim deflections.
 //
-// env: BASE (http://localhost:3061) MAXMS (120000)
+// env: BASE (http://localhost:3061) MAXMS (120000) TIMED=1 (Phase 7: press at the meter's target instead of at random —
+//      the green share is the bar for THE RIM DECIDES) LEAD (bar units the press is thrown early to cover input latency, 0.015)
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 const BASE = process.env.BASE ?? 'http://localhost:3061';
 const MAXMS = Number(process.env.MAXMS ?? 120000);
+const TIMED = process.env.TIMED === '1'; const LEAD = Number(process.env.LEAD ?? 0.015); const TARGET = 0.72;   // core/shootoutHud SHOT_TARGET
 const exe = (() => {
   const root = process.env.HOME + '/Library/Caches/ms-playwright';
   const dir = fs.readdirSync(root).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
@@ -30,13 +32,32 @@ const start = p.locator('text=/^START$/').first();
 if (await start.count()) { await start.click(); await p.waitForTimeout(3000); }
 await p.locator('canvas').first().click({ position: { x: 640, y: 400 } }).catch(() => {});
 const t0 = Date.now();
-while (Date.now() - t0 < MAXMS) {
-  await p.keyboard.press('Space');
-  // deliberately irregular so the timing error takes both signs
-  await p.waitForTimeout(700 + Math.floor(Math.random() * 900));
+if (TIMED) {
+  // Phase 7: the meter is on the HUD (`meter` = S.barT while shooting); press when it is a hair before the target
+  let presses = 0;
+  while (Date.now() - t0 < MAXMS) {
+    // the release bar's needle (ReleaseBar in three-point-babylon.tsx): `left: <t*100>%` on the 4 px white div. __FEL_QA__ only
+    // exists under ?agent=1, which would take the keyboard away, so the DOM is the meter here.
+    // /dev/mode renders the raw HUD as text (`"meter": 0.54`), not the React ReleaseBar — the meter is read off that text
+    const m = await p.evaluate(() => { const t = document.body.innerText || ''; const mm = /"meter": ?([0-9.]+)/.exec(t); return mm ? parseFloat(mm[1]) : null; }).catch(() => null);
+    if (m !== null && m >= TARGET - LEAD - 0.012 && m <= TARGET - LEAD + 0.012) { await p.keyboard.press('Space'); presses++; await p.waitForTimeout(650); }
+    else await p.waitForTimeout(6);
+  }
+  console.log('timed presses: ' + presses);
+} else {
+  while (Date.now() - t0 < MAXMS) {
+    await p.keyboard.press('Space');
+    // deliberately irregular so the timing error takes both signs
+    await p.waitForTimeout(700 + Math.floor(Math.random() * 900));
+  }
 }
 const kinds = new Map<string, number>();
 for (const r of rim) { const k = (r.match(/\] (\w+) —/) ?? [])[1] ?? '?'; kinds.set(k, (kinds.get(k) ?? 0) + 1); }
+// Phase 7: the ring's answers and the planned dwell kinds (`[3PT-RIM] ring YES|no …` / `[3PT-RIM] plan <kind>`)
+const rings = rim.filter((r) => /\] ring /.test(r)); const yes = rings.filter((r) => / ring YES/.test(r)).length;
+const plans = new Map<string, number>(); for (const r of rim) { const k = (r.match(/\] plan (\w+)/) ?? [])[1]; if (k) plans.set(k, (plans.get(k) ?? 0) + 1); }
+if (rings.length) console.log(`ring: ${yes}/${rings.length} made (${Math.round((100 * yes) / rings.length)}%)  swish share of makes: ${plans.get('swish') ?? 0}/${yes}`);
+if (plans.size) console.log('plans: ' + JSON.stringify(Object.fromEntries(plans)));
 console.log('=== 3PT RIM CONTACTS (' + rim.length + ')');
 for (const r of rim.slice(0, 16)) console.log('  ' + r);
 console.log('kinds: ' + JSON.stringify(Object.fromEntries(kinds)));

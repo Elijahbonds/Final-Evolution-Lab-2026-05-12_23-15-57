@@ -106,7 +106,7 @@ import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionA
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
-  moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP,
+  moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
   type ChainState, type HandleMove,
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
@@ -458,7 +458,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let jabEligible = false;
   /** A body planted chest-to-chest for a contact dunk, waiting to go down at the flush. */
   let posterVictim: { kind: ReturnType<typeof dunkKindFor>; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;
-  let victimSlide: { dir: Vector3; left: number } | null = null;   // DUNK-FANATIC: the released victim slides clear of my landing   // SHOWTIME: the plant and the fall line, so he rides the flight
+  let victimSlide: { dir: Vector3; left: number; mps?: number } | null = null;   // DUNK-FANATIC: the released victim slides clear of my landing   // SHOWTIME: the plant and the fall line, so he rides the flight
   let showtimePress = false, showtimeCam = false;
   let camSnapPending = false;   // POLISH: a reset asks the camera to cut, not chase
   let ring: PlayerRingHandle | null = null;   // PLAYER RING: who you are, and how much turbo is left   // SHOWTIME: SQUARE in the air (raw, so a pad, a key and a probe all reach it), and whether the side camera is on
@@ -856,7 +856,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (meFloored && meStunSec === 0) { meFloored = false; meAnimTree.beat('karate_get_up'); }   // D1: posterized by the rival, back up
       bumpAge += dt;   // D2: the strip window's clock
       if (foeBlockJumpAge !== Infinity) { foeBlockJumpAge += dt; if (foeBlockJumpAge >= JUMP_SEC) foeBlockJumpAge = Infinity; }   // D1: the AI's contest jump
-      if (victimSlide) { const step = slideStep(victimSlide.left, dt); foe.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
+      if (victimSlide) { const step = slideStep(victimSlide.left, dt, victimSlide.mps ?? undefined); foe.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
       if (foeHandUp) { foeHandUpLeft -= dt; if (foeHandUpLeft <= 0) { foeHandUp = false; foeAnimTree.releaseHold(); } }
 
       // ── the ball in flight (either end's shot) ──
@@ -1196,7 +1196,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE }, roll);
               chain = sno.chain;
               console.info(`[1V1-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
-              reactToBreak(ctx, sno);
+              reactToBreak(ctx, sno, pick.side ?? 'right');
               // THE SNATCHBACK (2K: step-back with R2, steezo's staple): the hop off the rim AND the ball to the other hand
               // in the same beat — the cross is what makes it an escape rather than a set-up for the jumper
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
@@ -2679,7 +2679,7 @@ export const OneVOneMode: ModeDefinition = (() => {
    * crossover should rarely break anyone and a three-deep chain at a real handle should look inevitable.
    */
   /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
-  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome): void {
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, moveDir: 'left' | 'right' = 'right'): void {
     if (outcome.broke === 'none') return;
     const tier = outcome.tier;
     const odds = outcome.odds;
@@ -2707,6 +2707,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     } else {
       foeStunSec = ANKLE_BREAK_STUN_SEC;
       foeAnimTree.beat(ANKLE_STUMBLE_CLIP);   // …and the softer one is a STUMBLE, not a hit react: he caught it, late
+      // THE BITE (Phase 6): his feet went with the fake — the root lunges toward the side the ball LEFT, under the stumble
+      { const f = meDribble.facing; const right = new Vector3(Math.cos(f), 0, -Math.sin(f)); const bite = right.scale(moveDir === 'right' ? -1 : 1);
+        victimSlide = { dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[1V1-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
       ctx.feel?.impact?.(0.35);
       bannerFlash(ctx, tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!');
       console.info(`[1V1-HANDLE] ankle break, chain ${chain.length} handle ${handle} odds ${odds.toFixed(2)}`);
@@ -2800,7 +2803,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    reactToBreak(ctx, outcome);
+    reactToBreak(ctx, outcome, moveDir);
   }
 
   /** The two bodies as the loose ball sees them: a jumper reaches higher, a floored body cannot reach at all. */

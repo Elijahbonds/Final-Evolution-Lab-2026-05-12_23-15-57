@@ -113,7 +113,7 @@ import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPl
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
-  moveClip, ANKLE_STUMBLE_CLIP,
+  moveClip, ANKLE_STUMBLE_CLIP, ANKLE_BITE,
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse, type ChainState, type HandleMove,
   moveRate, moveFadeSec,   // MOVE PACE
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
@@ -369,7 +369,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   /** The man being dunked ON — held chest to chest through the flight, dropped at the flush. */
   let posterVictim: { body: Body; kind: ContactDunkKind; released: boolean; plant?: Vector3; fall?: Vector3; reacted?: boolean } | null = null;
-  let victimSlide: { body: Body; dir: Vector3; left: number } | null = null;   // DUNK-FANATIC: the released victim slides clear of the landing   // SHOWTIME: the plant and the fall line
+  let victimSlide: { body: Body; dir: Vector3; left: number; mps?: number } | null = null;   // DUNK-FANATIC: the released victim slides clear of the landing   // SHOWTIME: the plant and the fall line
   let showtimePress = false, showtimeCam = false;   // SHOWTIME: SQUARE in the air (raw), and the side camera
   let ring: PlayerRingHandle | null = null;   // PLAYER RING
   /** What the contact made this dunk. Captured AT THE BUMP because `driveContest` is cleared on
@@ -744,7 +744,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       net?.tick(me.slot.intent);   // no-op without ?net=
       for (const b of everyBody()) { b.slot.poll(dt); b.stunSec = Math.max(0, b.stunSec - dt); if (b.jumpAge !== Infinity) { b.jumpAge += dt; b.char.root.position.y = jumpY(b.jumpAge); if (b.jumpAge >= JUMP_SEC) { b.jumpAge = Infinity; b.char.root.position.y = 0; } } }
       if (myJumpAge !== Infinity) myJumpAge += dt;
-      if (victimSlide) { const step = slideStep(victimSlide.left, dt); victimSlide.body.char.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
+      if (victimSlide) { const step = slideStep(victimSlide.left, dt, victimSlide.mps ?? undefined); victimSlide.body.char.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
       if (riseHop && !finish && !dunking) {   // DEFENSE-LOOK: the jump shot's hop
         riseHop.t += dt;
         me.char.root.position.y = Math.max(0, Math.sin(Math.min(1, riseHop.t / riseHop.dur) * Math.PI) * JUMPER_HOP_APEX);
@@ -1090,7 +1090,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll);
             chain = sno.chain;
             console.info(`[3V3-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
-            reactToBreak(ctx, sno, nfS, 'snatch_back');
+            reactToBreak(ctx, sno, nfS, 'snatch_back', pick.side ?? 'right');
             // THE SNATCHBACK (2K: step-back with R2): the hop off the rim AND the ball to the other hand in the same beat
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
@@ -2521,7 +2521,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    * of three rather than one man, its clips, its banners.
    */
   /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
-  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, foe: Body | null, move: HandleMove): void {
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, foe: Body | null, move: HandleMove, moveDir: 'left' | 'right' = 'right'): void {
     if (outcome.broke === 'none' || !foe) return;
 
     swing('ankle_break');
@@ -2542,6 +2542,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     } else {
       foe.stunSec = ANKLE_BREAK_STUN_SEC;
       foe.tree.beat('bball_contact_react');
+      // THE BITE (Phase 6): his feet went with the fake — the root lunges toward the side the ball LEFT, under the stumble
+      if (foe) { const f = me.drib.facing; const right = new Vector3(Math.cos(f), 0, -Math.sin(f)); const bite = right.scale(moveDir === 'right' ? -1 : 1);
+        victimSlide = { body: foe, dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[3V3-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
       ctx.feel?.impact?.(0.35);
       ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
       bannerClearLater(ctx, 800);
@@ -2563,10 +2566,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
     // THE MOVE ITSELF — see the note in 1v1's doMove. Twelve moves shared the tree's one crossover state, so
     // nothing here had a body of its own. The ball ends on the side away from the man guarding you.
+    let moveDir: 'left' | 'right' = dirHint ?? 'right';   // Phase 6: the bite needs the move's side after this block
     if (foe) {
       const toHim = foe.char.root.position.subtract(me.char.root.position);
       const right = bodyRight(me.char.root.rotation.y);
-      const clip = moveClip(move, dirHint ?? ((toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right'));
+      moveDir = dirHint ?? ((toHim.x * right.x + toHim.z * right.z) > 0 ? 'left' : 'right');
+      const clip = moveClip(move, moveDir);
       const turboMove = !!me.slot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS
       if (clip) me.tree.beat(clip, { fadeSec: moveFadeSec(turboMove), speedRatio: moveRate(turboMove) });
     }
@@ -2628,7 +2633,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    reactToBreak(ctx, outcome, foe, move);
+    reactToBreak(ctx, outcome, foe, move, moveDir);
   }
 
   function nearestLiveFoe(): Body | null {
