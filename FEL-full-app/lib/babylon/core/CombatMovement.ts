@@ -132,8 +132,8 @@ export class CombatMovement {
 
   /** Dash-cancel: a fast directional burst with i-frames. Returns false if
    *  on cooldown (modes gate the resource spend on this returning true). */
-  dash(dirX: number, dirZ: number): boolean {
-    if (!this.dashReady) return false;
+  dash(dirX: number, dirZ: number, force = false): boolean {
+    if (!this.dashReady && !force) return false;   // phase 3: the chakra dash (a double tap) lands mid-burst by definition — it forces
     const d = new Vector3(dirX, 0, dirZ);
     if (d.lengthSquared() < 0.01) d.copyFrom(Vector3.Forward());
     this.dashDir = d.normalize();

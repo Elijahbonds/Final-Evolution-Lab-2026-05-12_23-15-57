@@ -39,6 +39,7 @@ import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
+import { XButtonReader } from '../core/StormCombat';   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { ResourceMeter, CHAKRA } from '../core/ResourceMeter';
 import { CombatAnimTree } from '../anim/combatTree';
 import { MomentumBus } from '../core/MomentumBus';
@@ -119,6 +120,8 @@ export const ShowdownMode: ModeDefinition = (() => {
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   function now(): number { return performance.now(); }
+  const xBtn = new XButtonReader();   // phase 3: the Storm X — showdown's X used to be the block alone; the dash was a chi buy on L1
+  let guardUp = false;                 // the hold has passed DASH.tapSec and the block is raised
   function banner(ctx: ModeContext, text: string, ms = 900): void {
     ctx.setHud({ banner: text });
     setTimeout(() => ctx.setHud({ banner: '' }), ms);
@@ -148,6 +151,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     // SUBSTITUTION check first (defender spent chi to not be here)
     if (!mine && meSubstituted > now()) { /* player already teleported */ }
 
+    if (!mine && meMove.dashIFrames) { console.info('[SD-STORM] dash i-frames — whiff'); return; }   // phase 3: the dash's first beat cannot be hit
     const action = defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
     const outcome = applyDefenseOutcome(action, atkState, defState, move.atk);
     meter.gain('hitLanded');
@@ -304,7 +308,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     }
     banner(ctx, playerWon ? 'ROUND — YOU' : 'ROUND — RIVAL', 1600);
     setTimeout(() => {
-      meState.resetRound(); foeState.resetRound();
+      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false;
       player.root.position.set(0, 0, 4); rival.root.position.set(0, 0, -4);
       faceEachOther();
       setPhase('fighting');
@@ -404,20 +408,31 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (e.pressed && e.btn === 'R1') trySubstitution(ctx);
       if (e.pressed && e.btn === 'SELECT') callAssist(ctx);
       if (e.pressed && e.btn === 'X') {
-        // block press — with stick flicked TOWARD the rival = guard impact attempt
+        // STORM X (phase 3): the press starts the read. A flick TOWARD the rival on the press is still the guard impact
+        // (Soul Calibur's read lives on the press); otherwise the block waits for the HOLD (DASH.tapSec) and a release
+        // inside it is the dash — free, with i-frames — or, doubled, the chakra dash at the rival.
+        xBtn.press(now() / 1000);
         const to = rival.root.position.subtract(player.root.position);
         const w = wish(ctx);
         const flick = (w.x * to.x + w.z * to.z) > 0.3;
-        meDef.pressBlock(now(), flick);
-        meState.pressBlock(now());
-        SoundKit.play('impact', { pitch: flick ? 1.6 : 1.3, volume: 0.18 });   // MECHANICS PASS: the guard going up is heard
-        if (flick) ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450);
+        if (flick) { meDef.pressBlock(now(), true); meState.pressBlock(now()); guardUp = true; SoundKit.play('impact', { pitch: 1.6, volume: 0.18 }); ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450); }
       }
-      if (!e.pressed && e.btn === 'X') { meDef.releaseBlock(); meState.releaseBlock(); }
+      if (!e.pressed && e.btn === 'X') {
+        const g = xBtn.release(now() / 1000);
+        if (guardUp || g === 'held') { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; }
+        if (g === 'tap' || g === 'double') {
+          const to = rival.root.position.subtract(player.root.position); to.y = 0;
+          const w = wish(ctx);
+          const useStick = g === 'tap' && Math.hypot(w.x, w.z) > 0.25;
+          const dir = useStick ? w : (to.lengthSquared() > 1e-4 ? to.normalize() : w);
+          if (meState.controllable && meMove.dash(dir.x, dir.z, g === 'double')) { SoundKit.play('whoosh', { pitch: g === 'double' ? 1.35 : 1.2, volume: 0.45 }); if (g === 'double') ctx.camDirector.pulse(0.25, 0.3); console.info(`[SD-STORM] ${g === 'double' ? 'chakra dash' : 'dash'}`); }
+        }
+      }
     },
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
       if (phaseSec > BUDGET_SEC[phase]) {
         console.warn(`[FEL-WATCHDOG] showdown stuck in "${phase}"`);
         if (phase === 'ultimate') { ctx.camDirector.setPreset('fight'); setPhase('fighting'); }

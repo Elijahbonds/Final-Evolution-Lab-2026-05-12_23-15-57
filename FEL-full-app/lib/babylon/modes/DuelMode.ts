@@ -32,6 +32,7 @@ import {
 } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
+import { XButtonReader } from '../core/StormCombat';   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { CombatAnimTree } from '../anim/combatTree';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
@@ -149,6 +150,8 @@ export const DuelMode: ModeDefinition = (() => {
 
   const setPhase = (p: Phase): void => { phase = p; phaseSec = 0; };
   const now = (): number => performance.now();
+  const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
+  let guardUp = false;
   function banner(ctx: ModeContext, text: string, ms = 900): void {
     ctx.setHud({ banner: text });
     setTimeout(() => ctx.setHud({ banner: '' }), ms);
@@ -174,6 +177,7 @@ export const DuelMode: ModeDefinition = (() => {
     sc.current!.consumeHit();
 
     const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
+    if (!mine && meMove.dashIFrames) { console.info('[DL-STORM] step i-frames — whiff'); return; }   // phase 3
     const action = defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
     const outcome = applyDefenseOutcome(action, atkState, defState, move.atk);
 
@@ -255,7 +259,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound();
+    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false;
     // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
     player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
@@ -364,7 +368,20 @@ export const DuelMode: ModeDefinition = (() => {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
-      if (e.t !== 'button' || !e.pressed) return;
+      if (e.t !== 'button') return;
+      // phase 3: the X RELEASE is the dash / the guard coming down — it has to be read before the pressed-only gate below
+      if (e.btn === 'X' && !e.pressed) {
+        const g = xBtn.release(now() / 1000);
+        if (guardUp || g === 'held') { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; }
+        if (g === 'tap' || g === 'double') {
+          const to = rival.root.position.subtract(player.root.position); to.y = 0;
+          const w = wish(ctx);
+          const useStick = g === 'tap' && Math.hypot(w.x, w.z) > 0.25;
+          const dir = useStick ? w : (to.lengthSquared() > 1e-4 ? to.normalize() : w);
+          if (meState.controllable && meMove.dash(dir.x, dir.z, g === 'double')) { SoundKit.play('whoosh', { pitch: g === 'double' ? 1.35 : 1.2, volume: 0.45 }); console.info(`[DL-STORM] ${g === 'double' ? 'closing step' : 'step'}`); }
+        }
+      }
+      if (!e.pressed) return;
 
       if (phase === 'weaponSelect') {
         if (e.btn === 'A') myWeapon = 'fists';
@@ -395,20 +412,20 @@ export const DuelMode: ModeDefinition = (() => {
       if (e.btn === 'A') trySwing(moveIds[0]);
       if (e.btn === 'B') trySwing(moveIds[1]);
       if (e.btn === 'Y') trySwing(moveIds[2]);
-      if (e.btn === 'X') {
+      if (e.btn === 'X' && e.pressed) {
+        // STORM X (phase 3): a flick TOWARD the rival on the press is the guard impact (the read lives on the press); else the
+        // block waits for the HOLD and a release inside DASH.tapSec is the step — doubled, the closing step at the rival
+        xBtn.press(now() / 1000);
         const to = rival.root.position.subtract(player.root.position);
         const w = wish(ctx);
         const flick = (w.x * to.x + w.z * to.z) > 0.3;
-        meDef.pressBlock(now(), flick);
-        meState.pressBlock(now());
-        // MECHANICS PASS: the guard was silent 6 of 7 presses — raising it is heard, and a flick at the rival names the attempt
-        SoundKit.play('impact', { pitch: flick ? 1.6 : 1.3, volume: 0.18 });
-        if (flick) ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450);
+        if (flick) { meDef.pressBlock(now(), true); meState.pressBlock(now()); guardUp = true; SoundKit.play('impact', { pitch: 1.6, volume: 0.18 }); ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450); }
       }
     },
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
       if (phaseSec > BUDGET_SEC[phase]) {
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME');
         else if (phase === 'weaponSelect') { meStrike.swapMoveset(styled(myWeapon)); startRound(ctx); }
