@@ -31,6 +31,8 @@ export interface CombatMove {
   /** Phase 4: the cancel POINT (s from the press). Under '*' a press from here on cancels into the next link; before it,
    *  the press waits. Defaults to active-end. */
   cancelAtSec?: number;
+  /** Phase 5: the book's launcher / air-link / slam flags, so a StrikeSystem mode can lift a body the way VS does. */
+  launch?: boolean; air?: boolean; slam?: boolean;
   weight: 'light' | 'medium' | 'heavy' | 'finisher';
   tags: string[];             // stance gating (StanceSystem.moveTags)
 }
@@ -206,7 +208,7 @@ export function bookMoveset(karate: Record<'jab' | 'kick' | 'heavy', AttackDef>)
     const activeSec = m.weight === 'light' ? 0.08 : m.weight === 'medium' ? 0.1 : 0.12;
     const cancelAtSec = t.cancelAt / m.speed;
     const recoverySec = Math.max(0.12, cancelAtSec - startupSec - activeSec + (m.weight === 'finisher' ? 0.3 : m.weight === 'heavy' ? 0.22 : 0.12));
-    out[m.id] = { atk: { ...a, line: a.line ?? 'vertical' }, startupSec, activeSec, recoverySec, cancelInto: ['*'], cancelWindowSec: 0, cancelAtSec, weight: m.weight, tags: [m.weight === 'light' ? 'jab' : m.weight === 'medium' ? 'kick' : 'heavy'] };
+    out[m.id] = { atk: { ...a, line: a.line ?? 'vertical' }, startupSec, activeSec, recoverySec, cancelInto: ['*'], cancelWindowSec: 0, cancelAtSec, launch: !!m.launch, air: !!m.air, slam: !!m.slam, weight: m.weight, tags: [m.weight === 'light' ? 'jab' : m.weight === 'medium' ? 'kick' : 'heavy'] };
   }
   return out;
 }

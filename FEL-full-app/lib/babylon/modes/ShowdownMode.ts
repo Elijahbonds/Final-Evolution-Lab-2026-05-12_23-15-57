@@ -40,7 +40,7 @@ import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
-import { XButtonReader } from '../core/StormCombat';   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
+import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { ResourceMeter, CHAKRA } from '../core/ResourceMeter';
 import { CombatAnimTree } from '../anim/combatTree';
 import { MomentumBus } from '../core/MomentumBus';
@@ -124,6 +124,30 @@ export const ShowdownMode: ModeDefinition = (() => {
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
   function now(): number { return performance.now(); }
+  /** Phase 5 — THE KNOCK SLIDE (VS's G3 rule): a hit carries the body out at a constant speed with an ease-out, the
+   *  distance setting the duration, so a big hit reads bigger. It used to be a velocity impulse added to the movement's
+   *  velocity, which the movement model then damped on its own terms — the distance a hit carried was whatever the damping
+   *  left, not the attack's knockback. */
+  const KNOCK_SPEED = 9;   // m/s
+  function knockSlide(ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, clamp?: (q: Vector3) => void): void {
+    const dir = char.root.position.subtract(fromPos); dir.y = 0;
+    if (dir.lengthSquared() < 1e-4 || meters <= 0) return;
+    dir.normalize();
+    const from = char.root.position.clone();
+    const to = from.add(dir.scale(meters)); if (clamp) clamp(to);
+    const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCK_SPEED) * 1000);
+    const t0 = now();
+    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
+      const u = Math.min(1, (now() - t0) / ms);
+      const k = 1 - (1 - u) * (1 - u);
+      char.root.position.x = from.x + (to.x - from.x) * k;
+      char.root.position.z = from.z + (to.z - from.z) * k;
+      if (u >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
+    });
+  }
+  /** Phase 5 — SOUL CALIBUR WEIGHT (the horde's rule): the connect holds for a beat that grows with the weight. */
+  const HIT_STOP_MS = { light: 28, medium: 45, heavy: 70, finisher: 70 } as const;
+  let foeLaunchedSec = 0;   // phase 5: a launcher lifts him; the air string is open while it runs
   const xBtn = new XButtonReader();   // phase 3: the Storm X — showdown's X used to be the block alone; the dash was a chi buy on L1
   let guardUp = false;                 // the hold has passed DASH.tapSec and the block is raised
   function banner(ctx: ModeContext, text: string, ms = 900): void {
@@ -197,13 +221,13 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (mine) foeHitBy = w === 'finisher' ? 'finisher' : w; else meHitBy = w === 'finisher' ? 'finisher' : w;
         hitFlashT = 0.3;
         ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
-        if (w === 'heavy' || w === 'finisher') heavyPunch(ctx, w); else console.info('[SD-JUICE] hit');
+        if (w === 'heavy' || w === 'finisher') { heavyPunch(ctx, w); console.info(mine ? '[SD-JUICE] heavy landed' : '[SD-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[SD-JUICE] hit' : '[SD-JUICE] taken'); }   // phase 5: every connect holds for its weight
         EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), w === 'heavy' ? 'glitch' : 'sparks');
-        // knockback via movement velocity impulse
-        const dir = defChar.root.position.subtract(atkChar.root.position); dir.y = 0;
-        if (dir.lengthSquared() > 1e-4) {
-          (mine ? foeMove : meMove).vel.addInPlace(dir.normalize().scale(move.atk.knockback * 3));
-        }
+        // phase 5: the knock slide (constant speed, ease-out) instead of a velocity impulse the movement damped in a frame
+        knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback);
+        if (mine && move.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[SD-STORM] LAUNCHED — air string open'); }
+        else if (mine && move.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5);
+        else if (mine && move.slam) foeLaunchedSec = 0;
         ctx.setHud(mine
           ? { foeHp: defState.hp, combo: atkState.combo >= 2 ? atkState.combo : 0 }
           : { hp: defState.hp, foeCombo: atkState.combo >= 2 ? atkState.combo : 0 });
@@ -312,7 +336,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     }
     banner(ctx, playerWon ? 'ROUND — YOU' : 'ROUND — RIVAL', 1600);
     setTimeout(() => {
-      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = [];
+      meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = []; foeLaunchedSec = 0; rival.root.position.y = 0;
       player.root.position.set(0, 0, 4); rival.root.position.set(0, 0, -4);
       faceEachOther();
       setPhase('fighting');
@@ -399,7 +423,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       // during a swing is a link past the cancel point or a queued one before it (StrikeSystem's string rule)
       const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = wish(ctx); const to = rival.root.position.subtract(player.root.position); to.y = 0; const d = (w.x * to.x + w.z * to.z) / Math.max(1e-3, Math.hypot(to.x, to.z) * Math.hypot(w.x, w.z)); return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n'; };
       const pressBook = (key: 'jab' | 'kick' | 'heavy', pitch: number) => {
-        const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing });
+        const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing, air: foeLaunchedSec > 0 });
         const ok = meStrike.request(mv.id, now());
         swingSfx(ok, pitch);
         if (ok) { stringLabels.push(mv.label); console.info(`[SD-STORM] link ${mv.id} string ${book.history.length}`); if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); } }
@@ -445,6 +469,7 @@ export const ShowdownMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
       if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
       if (phaseSec > BUDGET_SEC[phase]) {
         console.warn(`[FEL-WATCHDOG] showdown stuck in "${phase}"`);

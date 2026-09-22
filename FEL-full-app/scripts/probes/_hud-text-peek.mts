@@ -1,0 +1,12 @@
+import { chromium } from 'playwright-core';
+import { chromiumExe } from './_chromium.mts';
+const BASE = process.env.BASE ?? 'http://localhost:3011'; const MODE = process.env.MODE ?? 'showdown';
+const b = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--use-gl=angle', '--enable-webgl'] });
+const p = await b.newPage({ viewport: { width: 1100, height: 700 } });
+await p.goto(`${BASE}/dev/mode/${MODE}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+await p.waitForSelector('canvas', { timeout: 240000 }); await p.waitForTimeout(6000);
+const start = p.locator('text=/^START$/').first(); if (await start.count()) await start.click().catch(() => {});
+await p.waitForTimeout(3000);
+const t = await p.evaluate(() => (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 700));
+console.log('TEXT:', t); console.log('has banner key:', /banner/.test(t), 'has hp key:', /"hp"/.test(t));
+await b.close();

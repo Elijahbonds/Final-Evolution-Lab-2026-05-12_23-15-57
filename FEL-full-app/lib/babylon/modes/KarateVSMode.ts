@@ -501,7 +501,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           if (process.env.NODE_ENV === 'development' && mine) console.info(`[KVS-ROUTE] landed ${landed.join('>')}`);
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
           ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
-          if (special || key === 'heavy') heavyPunch(ctx, special ? 'dragon' : 'heavy'); else console.info('[KVS-JUICE] hit');
+          if (special || key === 'heavy') { heavyPunch(ctx, special ? 'dragon' : 'heavy'); console.info(mine ? '[KVS-JUICE] heavy landed' : '[KVS-JUICE] heavy taken'); } else { ctx.juice.hitStop(key === 'kick' ? 45 : 28); console.info(mine ? '[KVS-JUICE] hit' : '[KVS-JUICE] taken'); }   // phase 5: every connect holds for its weight (the horde's rule)
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
           beatHit(!mine, mine && move?.slam ? 'finisher' : mine && move?.launch ? 'heavy' : special ? 'finisher' : WEIGHT_OF[key]);
           if (mine && move?.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[KVS-STORM] LAUNCHED — air string open'); } else if (mine && move?.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5); else if (mine && move?.slam) foeLaunchedSec = 0;   // STORM: the launcher puts him up, air links keep him there, the spike brings him down   // the DRAGON launches (knockdown → floor → get up)

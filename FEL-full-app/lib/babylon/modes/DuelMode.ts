@@ -31,7 +31,7 @@ import {
   StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove, bookMoveset, stringRule } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
-import { XButtonReader } from '../core/StormCombat';
+import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';
 import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
 import { CombatAnimTree } from '../anim/combatTree';
 import { SoundKit } from '../audio/SoundKit';
@@ -45,7 +45,7 @@ import { weaponById, readWeapon, equipWeapon } from '../combat/arsenal';
 import type { Mesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
-import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeArena, type CombatArena } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeArena, type CombatArena, knockTo } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
@@ -158,6 +158,30 @@ export const DuelMode: ModeDefinition = (() => {
 
   const setPhase = (p: Phase): void => { phase = p; phaseSec = 0; };
   const now = (): number => performance.now();
+  /** Phase 5 — THE KNOCK SLIDE (VS's G3 rule): a hit carries the body out at a constant speed with an ease-out, the
+   *  distance setting the duration, so a big hit reads bigger. It used to be a velocity impulse added to the movement's
+   *  velocity, which the movement model then damped on its own terms — the distance a hit carried was whatever the damping
+   *  left, not the attack's knockback. */
+  const KNOCK_SPEED = 9;   // m/s
+  function knockSlide(ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, clamp?: (q: Vector3) => void): void {
+    const dir = char.root.position.subtract(fromPos); dir.y = 0;
+    if (dir.lengthSquared() < 1e-4 || meters <= 0) return;
+    dir.normalize();
+    const from = char.root.position.clone();
+    const to = from.add(dir.scale(meters)); if (clamp) clamp(to);
+    const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCK_SPEED) * 1000);
+    const t0 = now();
+    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
+      const u = Math.min(1, (now() - t0) / ms);
+      const k = 1 - (1 - u) * (1 - u);
+      char.root.position.x = from.x + (to.x - from.x) * k;
+      char.root.position.z = from.z + (to.z - from.z) * k;
+      if (u >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
+    });
+  }
+  /** Phase 5 — SOUL CALIBUR WEIGHT (the horde's rule): the connect holds for a beat that grows with the weight. */
+  const HIT_STOP_MS = { light: 28, medium: 45, heavy: 70, finisher: 70 } as const;
+  let foeLaunchedSec = 0;   // phase 5
   const book = new StringBook(); const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };   // phase 4
   const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
   let guardUp = false;
@@ -231,12 +255,13 @@ export const DuelMode: ModeDefinition = (() => {
         hitT = 0.3;
         ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
         ctx.momentum.report(mine ? { kind: 'clean_hit', weight: w === 'heavy' || w === 'finisher' ? 16 : 9 } : { kind: 'blunder', weight: -8 });
-        if (w === 'heavy' || w === 'finisher') heavyPunch(ctx, w); else console.info('[DUEL-JUICE] hit');
-        // knockback drives the ring-out game
-        const dir = defChar.root.position.subtract(atkChar.root.position); dir.y = 0;
-        if (dir.lengthSquared() > 1e-4) {
-          (mine ? foeMove : meMove).vel.addInPlace(dir.normalize().scale(move.atk.knockback * 3.2));
-        }
+        if (w === 'heavy' || w === 'finisher') { heavyPunch(ctx, w); console.info(mine ? '[DUEL-JUICE] heavy landed' : '[DUEL-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[DUEL-JUICE] hit' : '[DUEL-JUICE] taken'); }   // phase 5
+        // phase 5: the knock slide drives the ring-out game — a drop edge lets the slide run past the rim (knockTo only clamps
+        // to walls / pillars there), and checkRingOut reads the position every frame
+        knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback, (q) => { const kt = knockTo(defChar.root.position, q, arena); q.x = kt.x; q.z = kt.z; });
+        if (mine && move.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[DL-STORM] LAUNCHED — air string open'); }
+        else if (mine && move.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5);
+        else if (mine && move.slam) foeLaunchedSec = 0;
         ctx.setHud(mine ? { foeHp: defState.hp } : { hp: defState.hp });
         if (checkRingOut(ctx)) return;
         if (defState.hp <= 0) endRound(ctx, mine, mine ? 'K.O.' : 'K.O. — YOU');
@@ -422,7 +447,7 @@ export const DuelMode: ModeDefinition = (() => {
         // phase 4: empty hands read the Storm book — the string picks the link (jab → cross → rising dragon…)
         const key = e.btn === 'A' ? 'jab' : e.btn === 'B' ? 'kick' : e.btn === 'Y' ? 'heavy' : null;
         if (key) { const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = wish(ctx); const to = rival.root.position.subtract(player.root.position); to.y = 0; const d = (w.x * to.x + w.z * to.z) / Math.max(1e-3, Math.hypot(to.x, to.z) * Math.hypot(w.x, w.z)); return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n'; };
-          const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); } else refuse(ctx, 'RECOVERING'); return; }
+          const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing, air: foeLaunchedSec > 0 }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); } else refuse(ctx, 'RECOVERING'); return; }
       }
       if (e.btn === 'A') trySwing(moveIds[0]);
       if (e.btn === 'B') trySwing(moveIds[1]);
@@ -440,6 +465,7 @@ export const DuelMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
       if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
       if (phaseSec > BUDGET_SEC[phase]) {
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME');

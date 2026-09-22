@@ -53,9 +53,9 @@ await p.evaluate(`(() => {
     // hp / foeHp so a hit can be found in the rows and the body's answer to it measured (root travel, hips dip)
     if (!window.__HDfoe) { let best = null, bd = 1e9; for (const m of s.meshes) { if (!m.skeleton || under(m, hr)) continue; const r = topOf(m); if (r === hr) continue; const d = r.getAbsolutePosition().subtract(rp).length(); if (d > 0.5 && d < bd) { bd = d; best = r; } } if (best) window.__HDfoe = best; }
     const fr = window.__HDfoe; let foe = null;
-    if (fr) { const fp = fr.getAbsolutePosition(); let hips = null; for (const m of s.meshes) { if (m.skeleton && (topOf(m) === fr)) { const b = m.skeleton.bones.find((bn) => /hips|pelvis/i.test(bn.name)); if (b) { const tn = b.getTransformNode ? b.getTransformNode() : null; hips = tn ? tn.getAbsolutePosition().y : null; } break; } } foe = { x: +fp.x.toFixed(3), y: +fp.y.toFixed(3), z: +fp.z.toFixed(3), hips: hips === null ? null : +hips.toFixed(3) }; }
-    const txt = document.body.innerText; const hpM = txt.match(/"hp":\s*([0-9.]+)/), fhM = txt.match(/"foeHp":\s*([0-9.]+)/);
-    window.__HD.rows.push({ t: performance.now(), x: +rp.x.toFixed(3), z: +rp.z.toFixed(3), yaw: +(hr.rotation.y * 180 / Math.PI).toFixed(1), shots, tele: md ? JSON.parse(JSON.stringify(md)) : null, ban: ((txt.match(/"banner":\s*"([^"]*)"/) || [])[1] || ''), foe, hp: hpM ? +hpM[1] : null, foeHp: fhM ? +fhM[1] : null });
+    if (fr) { const fp = fr.getAbsolutePosition(); let hips = null, hx = null, hz = null; for (const m of s.meshes) { if (m.skeleton && (topOf(m) === fr)) { const b = m.skeleton.bones.find((bn) => /hips|pelvis/i.test(bn.name)); if (b) { const tn = b.getTransformNode ? b.getTransformNode() : null; if (tn) { const hp = tn.getAbsolutePosition(); hips = hp.y; hx = hp.x; hz = hp.z; } } break; } } foe = { x: +fp.x.toFixed(3), y: +fp.y.toFixed(3), z: +fp.z.toFixed(3), hips: hips === null ? null : +hips.toFixed(3), hx: hx === null ? null : +hx.toFixed(3), hz: hz === null ? null : +hz.toFixed(3) }; }
+    const txt = document.body.innerText; const hpM = txt.match(/"hp":\\s*([0-9.]+)/), fhM = txt.match(/"foeHp":\\s*([0-9.]+)/);
+    window.__HD.rows.push({ t: performance.now(), x: +rp.x.toFixed(3), z: +rp.z.toFixed(3), yaw: +(hr.rotation.y * 180 / Math.PI).toFixed(1), shots, tele: md ? JSON.parse(JSON.stringify(md)) : null, ban: ((txt.match(/"banner":\\s*"([^"]*)"/) || [])[1] || ''), foe, hp: hpM ? +hpM[1] : null, foeHp: fhM ? +fhM[1] : null });
     if (window.__HD.rows.length > 20000) window.__HD.rows.shift();
   });
 })()`);
@@ -239,6 +239,8 @@ for (const a of SCRIPT) {
   }
 }
 type Row = { t: number; x: number; z: number; yaw: number; shots: [string, number, number][]; tele: Record<string, unknown> | null };
+const foeName = await ev('window.__HDfoe ? (window.__HDfoe.name + " @" + window.__HDfoe.getAbsolutePosition().x.toFixed(1) + "," + window.__HDfoe.getAbsolutePosition().z.toFixed(1)) : "(none)"').catch(() => '?');
+console.log(`rival bound: ${foeName}`);
 const data = await ev('window.__HD') as { rows: Row[]; marks: { t: number; label: string }[] };
 await b.close();
 fs.mkdirSync(OUT, { recursive: true });
@@ -267,11 +269,12 @@ console.log(`swing starts: ${starts.map((s) => `${f(s.t)} ${s.clip}`).join(' · 
   // did his hips dip in the next 300 ms? A drop in hp is a hit on me: how far did my root travel?
   const R = rows as unknown as { t: number; x: number; z: number; foe: { x: number; y: number; z: number; hips: number | null } | null; hp: number | null; foeHp: number | null }[];
   const foeHits: string[] = [], meHits: string[] = [];
-  const hitMarks = data.marks.filter((m) => /^log:\[(KVS|MC|SD|DUEL|KE)-JUICE\] (hit|heavy|dragon)/.test(m.label));
+  const hitMarks = data.marks.filter((m) => /^log:\[(KVS|MC|SD|DUEL|KE)-JUICE\] (hit$|hit |heavy landed)/.test(m.label));
   for (const m of hitMarks) {
     const b = R.find((r) => r.t >= m.t); if (!b || !b.foe) continue;
     const win = R.filter((r) => r.t >= b.t && r.t <= b.t + 300 && r.foe); if (win.length < 3) continue;
-    const travel = Math.hypot(win[win.length - 1].foe!.x - b.foe.x, win[win.length - 1].foe!.z - b.foe.z);
+    const F = (r: typeof b) => { const q = r.foe as unknown as { x: number; z: number; hx?: number | null; hz?: number | null }; return typeof q.hx === 'number' && typeof q.hz === 'number' ? { x: q.hx, z: q.hz } : { x: q.x, z: q.z }; };
+    const travel = Math.hypot(F(win[win.length - 1]).x - F(b).x, F(win[win.length - 1]).z - F(b).z);   // off the HIPS: a wrapped root never moves, the hips always do
     const hips = win.map((r) => r.foe!.hips).filter((v): v is number => v !== null); const dip = hips.length ? Math.max(...hips) - Math.min(...hips) : 0;
     const lift = win.map((r) => r.foe!.y); const air = Math.max(...lift) - b.foe.y;
     foeHits.push(`${f(b.t)} ${m.label.replace(/^log:\[\w+-JUICE\] /, '')} root ${travel.toFixed(2)}m hips ${(dip * 100).toFixed(0)}cm${air > 0.08 ? ` AIR ${air.toFixed(2)}m` : ''}`);

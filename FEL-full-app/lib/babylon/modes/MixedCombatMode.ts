@@ -529,7 +529,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
           if (mine) focus.gain(FOCUS.hitGain);
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
           ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
-          if (special || key === 'heavy') heavyPunch(ctx, special ? 'special' : 'heavy'); else console.info('[MC-JUICE] hit');
+          if (special || key === 'heavy') { heavyPunch(ctx, special ? 'special' : 'heavy'); console.info(mine ? '[MC-JUICE] heavy landed' : '[MC-JUICE] heavy taken'); } else { ctx.juice.hitStop(key === 'kick' ? 45 : 28); console.info(mine ? '[MC-JUICE] hit' : '[MC-JUICE] taken'); }   // phase 5: every connect holds for its weight (the horde's rule)
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
           beatHit(!mine, mine && move?.slam ? 'finisher' : mine && move?.launch ? 'heavy' : special ? 'finisher' : WEIGHT_OF[key]);
           if (mine && move?.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[MC-STORM] LAUNCHED — air string open'); } else if (mine && move?.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5); else if (mine && move?.slam) foeLaunchedSec = 0;   // STORM   // the DRAGON launches (knockdown → floor → get up)
