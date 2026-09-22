@@ -109,6 +109,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
 import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
+import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
@@ -1756,7 +1757,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
     arcQuality = quality;
-    arcMade = Math.random() < Math.min(0.98, pct);
+    const v3 = rimVerdictFor(me.char.root.position, Math.min(0.98, pct),
+      quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2,
+      (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
+      quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0);
+    arcMade = v3.made;
     // D1: the AI's block at the release (a hand up or a jump inside range) — the ball knocked LOOSE from my hand
     const blockChance = near ? aiBlockChance(currentShot?.style ?? 'jumper', nearDist, nearUp, near.vel.length() < 1.0) : 0;
     console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade}`);
@@ -1783,12 +1788,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     else if (quality === 'brick') ctx.setHud({ banner: `WAY LATE${tag}` });
     // no clear here: the arc's make/miss banner replaces it and owns the timeout
     // the ball flies — score/possession resolve when it lands (update loop)
-    arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : rimPlayFor(
-      me.char.root.position, arcMade,
-      quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2,
-      (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
-      quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
-    ));   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
+    arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : v3.play);   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
     startBoxOut('mine');   // O2: the shot is up — the defenders seal their men, the offense crashes
   }
 
@@ -2384,6 +2384,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
   /** RIM PLAY (2026-09-18): the ball's time on the iron, planned at the release from what the shot earned — a make rattles,
    *  rolls or drops clean; a miss goes in and out, rolls off, kicks off the back, comes off the glass, or airballs. */
+  /** THE RIM DECIDES (Phase 7): the meter and the contest set the make RATE (pct); the ring's geometry decides THIS shot —
+   *  one error drawn so that P(made) == pct, and the dwell planned from that same error, so the scoreboard and the iron
+   *  cannot disagree. Finishes at the rim (dunks, layups, put-backs) keep their own resolution: a layup is a placement,
+   *  not a shot at the ring. */
+  function rimVerdictFor(shooterPos: Vector3, pct: number, q01: number, short: number, lateral: number): RimVerdict {
+    const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
+    const v = rimDecides(RIM, toShooter, pct, q01, { short, lateral });
+    console.info(`[3V3-RIM] ring ${v.made ? 'YES' : 'no'} radial ${v.radial.toFixed(3)} m at pct ${pct.toFixed(2)}`);
+    console.info(`[3V3-RIM] plan ${v.play.kind}${v.play.duration ? ` ${v.play.duration.toFixed(2)} s` : ''}`);
+    return v;
+  }
   function rimPlayFor(shooterPos: Vector3, made: boolean, q01: number, short: number, lateral: number): RimPlay {
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
     const prof = made ? forcedMakeProfile(q01, { short, lateral }) : maybeAirball(forcedMissProfile(q01, { short, lateral }), q01);

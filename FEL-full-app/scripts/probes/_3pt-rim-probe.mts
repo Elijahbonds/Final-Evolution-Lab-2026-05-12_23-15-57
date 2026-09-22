@@ -18,7 +18,7 @@ const exe = (() => {
 })();
 const b = await chromium.launch({ executablePath: exe, args: ['--use-gl=angle', '--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
-const rim: string[] = []; let errors = 0;
+const rim: string[] = []; let errors = 0; const banners = new Map<string, number>();   // Phase 9: what the shootout SAYS
 p.on('console', (m) => {
   const x = m.text();
   if (/\[3PT-RIM\]/.test(x)) rim.push(x);
@@ -42,13 +42,14 @@ if (TIMED) {
     const m = await p.evaluate(() => { const t = document.body.innerText || ''; const mm = /"meter": ?([0-9.]+)/.exec(t); return mm ? parseFloat(mm[1]) : null; }).catch(() => null);
     if (m !== null && m >= TARGET - LEAD - 0.012 && m <= TARGET - LEAD + 0.012) { await p.keyboard.press('Space'); presses++; await p.waitForTimeout(650); }
     else await p.waitForTimeout(6);
+    if (presses % 1 === 0) { const b = await p.evaluate(() => { const mm = /"banner": ?"([^"]*)"/.exec(document.body.innerText || ''); return mm ? mm[1] : ''; }).catch(() => ''); if (b) banners.set(b, (banners.get(b) ?? 0) + 1); }
   }
   console.log('timed presses: ' + presses);
 } else {
   while (Date.now() - t0 < MAXMS) {
     await p.keyboard.press('Space');
     // deliberately irregular so the timing error takes both signs
-    await p.waitForTimeout(700 + Math.floor(Math.random() * 900));
+    for (let w = 0; w < 7; w++) { await p.waitForTimeout(100 + Math.floor(Math.random() * 130)); const b = await p.evaluate(() => { const mm = /"banner": ?"([^"]*)"/.exec(document.body.innerText || ''); return mm ? mm[1] : ''; }).catch(() => ''); if (b) banners.set(b, (banners.get(b) ?? 0) + 1); }
   }
 }
 const kinds = new Map<string, number>();
@@ -58,6 +59,7 @@ const rings = rim.filter((r) => /\] ring /.test(r)); const yes = rings.filter((r
 const plans = new Map<string, number>(); for (const r of rim) { const k = (r.match(/\] plan (\w+)/) ?? [])[1]; if (k) plans.set(k, (plans.get(k) ?? 0) + 1); }
 if (rings.length) console.log(`ring: ${yes}/${rings.length} made (${Math.round((100 * yes) / rings.length)}%)  swish share of makes: ${plans.get('swish') ?? 0}/${yes}`);
 if (plans.size) console.log('plans: ' + JSON.stringify(Object.fromEntries(plans)));
+if (banners.size) console.log('banners: ' + JSON.stringify(Object.fromEntries([...banners.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14))));
 console.log('=== 3PT RIM CONTACTS (' + rim.length + ')');
 for (const r of rim.slice(0, 16)) console.log('  ' + r);
 console.log('kinds: ' + JSON.stringify(Object.fromEntries(kinds)));

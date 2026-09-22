@@ -64,6 +64,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';   // a shootout miss you can READ
+import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
@@ -406,8 +407,17 @@ function fire(ctx: ModeContext, power?: number): void {
   // A tilt charge nudges the odds but never replaces timing — a phone player and
   // a keyboard player are judged on the same window.
   const powerBonus = typeof power === 'number' ? (1 - Math.abs(power - 0.75)) * 0.05 : 0;
-  const made = err < perfectBand() || (err < goodBand() && Math.random() < 0.55 + powerBonus);
   const perfect = err < perfectBand();
+  // THE RIM DECIDES (Phase 7): the bands are the timing's grade and set the make RATE (a perfect release 0.97, the good
+  // window 0.55 + the tilt, outside it a brick's 0.04); the ring's geometry decides this shot, and its dwell is planned
+  // from the same error, so what you see on the iron is what the scoreboard says. The meter grade above is unchanged.
+  const pct3 = perfect ? 0.97 : err < goodBand() ? 0.55 + powerBonus : 0.04;
+  const q01 = perfect ? 0.95 : Math.max(0.15, 1 - err / Math.PI);
+  const bias = { short: signed < 0 ? 0.8 : -0.8 };
+  const toShooter3 = player.root.position.subtract(RIM); toShooter3.y = 0;
+  const verdict3: RimVerdict = rimDecides(RIM, toShooter3, pct3, q01, bias);
+  const made = verdict3.made;
+  console.info(`[3PT-RIM] ring ${made ? 'YES' : 'no'} radial ${verdict3.radial.toFixed(3)} m at pct ${pct3.toFixed(2)}`);
 
   const worth = isMoneyBall(S.ballIdx) ? 2 : 1;
   if (made) {
@@ -425,10 +435,7 @@ function fire(ctx: ModeContext, power?: number): void {
   releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
   pendingMade = made;
   {   // RIM PLAY: what this timing earned on the iron — early is short, late is long; a make inside the good window can rattle
-    const toShooter = player.root.position.subtract(RIM); toShooter.y = 0;
-    const q01 = perfect ? 0.95 : Math.max(0.15, 1 - err / Math.PI);
-    const bias = { short: signed < 0 ? 0.8 : -0.8 };
-    pendingPlay = planRimPlay(RIM, toShooter, made ? forcedMakeProfile(q01, bias) : maybeAirball(forcedMissProfile(q01, bias), q01), made);
+    pendingPlay = verdict3.play;
     console.info(`[3PT-RIM] plan ${pendingPlay.kind}${pendingPlay.duration ? ` ${pendingPlay.duration.toFixed(2)} s` : ''}`);
   }
   S.phase = 'flight';

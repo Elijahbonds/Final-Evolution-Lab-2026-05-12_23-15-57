@@ -100,6 +100,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';              // the miss meets the iron it earned
+import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
@@ -574,6 +575,17 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** RIM PLAY (2026-09-18): the ball's time on the iron, planned at the release from what the shot earned — a make rattles,
    *  rolls or drops clean; a miss goes in and out, rolls off, kicks off the back, comes off the glass, or airballs. */
+  /** THE RIM DECIDES (Phase 7): the meter and the contest set the make RATE (pct); the ring's geometry decides THIS shot —
+   *  one error drawn so that P(made) == pct, and the dwell planned from that same error, so the scoreboard and the iron
+   *  cannot disagree. Finishes at the rim (dunks, layups, put-backs) keep their own resolution: a layup is a placement,
+   *  not a shot at the ring. */
+  function rimVerdictFor(shooterPos: Vector3, pct: number, q01: number, short: number, lateral: number): RimVerdict {
+    const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
+    const v = rimDecides(RIM, toShooter, pct, q01, { short, lateral });
+    console.info(`[1V1-RIM] ring ${v.made ? 'YES' : 'no'} radial ${v.radial.toFixed(3)} m at pct ${pct.toFixed(2)}`);
+    console.info(`[1V1-RIM] plan ${v.play.kind}${v.play.duration ? ` ${v.play.duration.toFixed(2)} s` : ''}`);
+    return v;
+  }
   function rimPlayFor(shooterPos: Vector3, made: boolean, q01: number, short: number, lateral: number): RimPlay {
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
     const prof = made ? forcedMakeProfile(q01, { short, lateral }) : maybeAirball(forcedMissProfile(q01, { short, lateral }), q01);
@@ -1907,19 +1919,20 @@ export const OneVOneMode: ModeDefinition = (() => {
     // sooner), and `mistake` DIVIDES the make chance, because a forced shot is a worse shot. Down big and
     // late he shoots more often and makes fewer, which is what chasing a game looks like.
     const nrv = nerve(rivalStanding());
-    const made = Math.random() < rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake);
+    shotMiss = {
+      quality01: Math.max(0.15, 0.85 - contest * 0.5 - Math.max(0, range - 6) * 0.05),
+      short: contest * 0.8 + Math.max(0, range - 7) * 0.12,
+      lateral: (Math.random() - 0.5) * 0.9,
+    };
+    const rivalVerdict = rimVerdictFor(foe.root.position, Math.min(0.98, rivalShotPct(range, contest, style) / Math.max(0.5, nrv.mistake)), shotMiss.quality01, shotMiss.short, shotMiss.lateral);
+    const made = rivalVerdict.made;
     arcPoints = style === 'layup' ? 2 : isThree(foe.root.position, RIM) ? 3 : 2;
     // The RIVAL's miss has to be readable too. Measured with a probe: every rim contact in a 150 s run
     // came back "front — SHORT", because only the hero's release recorded a profile and the AI fell
     // through to the default short bias — so the iron answered identically every single time, which is
     // the exact failure the rim work existed to fix. His miss now comes off the contest and the range:
     // a hand in his face or a shot past his limit is short off the front, an open look sprays.
-    shotMiss = {
-      quality01: Math.max(0.15, 0.85 - contest * 0.5 - Math.max(0, range - 6) * 0.05),
-      short: contest * 0.8 + Math.max(0, range - 7) * 0.12,
-      lateral: (Math.random() - 0.5) * 0.9,
-    };
-    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest), null, rimPlayFor(foe.root.position, made, shotMiss.quality01, shotMiss.short, shotMiss.lateral));   // a strong contest ALTERS the release; RIM PLAY
+    arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest), null, rivalVerdict.play);   // a strong contest ALTERS the release; RIM PLAY
     console.info(`[1V1-DEF] rival release ${style} contest ${contest.toFixed(2)} handUp ${ground > 0} pct ${rivalShotPct(range, contest, style).toFixed(2)}`);
     // the read at the release, before the arc lands — same as the hero's GREEN / CONTESTED tags
     if (contest >= 0.5) bannerFlash(ctx, ground > 0 ? 'CONTESTED — HAND UP!' : 'CONTESTED!', 500);
@@ -2607,7 +2620,13 @@ export const OneVOneMode: ModeDefinition = (() => {
     const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier(), shotContest) + (banked ? BANK_PCT_BONUS : 0);
     arcPoints = isThree(me.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
-    const made = Math.random() < Math.min(0.98, pct);
+    shotMiss = {
+      quality01: quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2,
+      short: (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
+      lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
+    };
+    const verdict = rimVerdictFor(me.root.position, Math.min(0.98, pct), shotMiss.quality01, shotMiss.short, shotMiss.lateral);
+    const made = verdict.made;
     // D1: the AI's block at the release — a hand up (or a jump) inside range; the ball is knocked LOOSE from the hand
     const blockChance = foeStunSec > 0 || foeFloored ? 0 : aiBlockChance(currentShot?.style ?? 'jumper', foeDist, foeUp, foeVelLast.length() < 1.0);
     console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)}`);
@@ -2650,13 +2669,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     // What this shot earned, handed to the iron when the arc gets there. EARLY is rushed — short, off the
     // front. LATE is long, off the back. A brick sprays laterally. A hand in the face pushes it short on
     // top of whatever the timing did, which is why a contested miss comes back at you.
-    shotMiss = {
-      quality01: quality === 'perfect' ? 0.95 : quality === 'early' || quality === 'late' ? 0.55 : 0.2,
-      short: (quality === 'early' ? 0.8 : quality === 'late' ? -0.8 : quality === 'brick' ? 0.3 : 0) + shotContest * 0.7,
-      lateral: quality === 'brick' ? (Math.random() < 0.5 ? -0.7 : 0.7) : 0,
-    };
     carrying = false;
-    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : rimPlayFor(me.root.position, made, shotMiss.quality01, shotMiss.short, shotMiss.lateral));   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
+    arc.start(ball.getAbsolutePosition(), RIM, made, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, banked ? null : verdict.play);   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
     // O2: the shot is up — the rival SEALS me (the box-out between me and the rim, his chest on me) until the ball comes down
     if (foeStunSec === 0 && !foeFloored && distXZ(foe.root.position, RIM_FLOOR) < BOX_OUT_RANGE) { foeBrain?.boxOut(me.root.position); foeSealing = true; console.info('[1V1-OFF] box out (the rival seals me)'); }
   }
