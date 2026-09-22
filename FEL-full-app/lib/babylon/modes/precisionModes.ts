@@ -637,7 +637,7 @@ export const GolfMode: ModeDefinition = (() => {
           const raw = meter.stop(); const err = Math.abs(raw - ACCURACY_CENTER);
           const clean = err <= ACCURACY_HALF;
           strike(ctx, power, clean ? 0 : Math.sign(raw - ACCURACY_CENTER) * Math.min(1, (err - ACCURACY_HALF) * 3));   // early hooks, late slices
-        }
+        } else if (phase === 'flight') refuse(ctx, sim.ball.rolling ? 'ROLLING OUT' : 'BALL IN THE AIR — flick the stick');   // net/precision phase 3: the one silent press on the mode (7 %)
       }
       // PARKOUR GOLF: Y before the swing is the SPRINGBOARD hop (power off the launch position); LT on the green is the SLIDE PUTT
       if (e.t === 'button' && e.btn === 'Y' && e.pressed) {
@@ -1590,7 +1590,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       gallery?.cheer(0.25);               // a save is THEIR moment
     }
     ctx.setHud({
-      score: `${goals}–${themGoals}`, ...kicksHud(),
+      score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals
       banner: bannerOverride ?? (scored
         ? `${frameKind ? `OFF THE ${frameKind.toUpperCase()} — IN! ` : ''}GOOOAL!${feints > 0 ? ` +${feints * FEINT_STYLE_PTS} style` : ''}`
       : frameKind ? `OFF THE ${frameKind.toUpperCase()}!` : outcome === 'short' ? 'SCUFFED IT — SHORT' : saved ? 'SAVED' : outcome === 'over' ? 'OVER THE BAR' : 'WIDE'),
@@ -1770,7 +1770,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       round = 0; goals = 0; stylePts = 0; ended = false;
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       SoundKit.startAmbient('stadium');
-      ctx.setHud({ score: '0–0' });
+      ctx.setHud({ score: 0 });   // net/precision phase 3: the score is the NUMBER the result reports; the kicks panel draws the board
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).soccer = {   // BREAKAWAY probes
           state: () => ({ phase, clock: brk.clock, flow: brk.flow, wall: brk.wall, counterLive: brk.counterLive, struck: brk.struck, x: me.root.position.x, y: me.root.position.y, z: me.root.position.z, vx: brk.run.vx, vz: brk.run.vz, keeperX: keeper.root.position.x, keeperZ: keeper.root.position.z, keeperSliding: !!brk.keeperSlide, rainbowReady: phase === 'break' && brk.vaultT < 0 && rainbowRead(me2(), vel2(), { x: keeper.root.position.x, z: keeper.root.position.z }), slideSec: brk.slideSec, ...brkStats, goals, themGoals, round, ended, ballActive: pball.active, ballZ: ball.position.z }),
@@ -1965,7 +1965,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
             ctx.setHud({
-              score: `${goals}–${themGoals}`, ...kicksHud(), dive: '',
+              score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals dive: '',
               banner: r.saved ? (timing === 'perfect' ? 'SAVED! — read it perfectly' : 'SAVED!')
                 : r.why === 'wrong_way' ? (keepPlan.feint ? 'THEM: SOLD YOU — the run-up was a feint' : 'THEM: WRONG WAY')
                 : r.why === 'too_slow' ? 'THEM: BURIES IT — dive as he strikes'

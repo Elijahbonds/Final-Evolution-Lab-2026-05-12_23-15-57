@@ -41,7 +41,12 @@ const ROUTES: Spec[] = [
   { slug: 'aeroaces', path: '/play/aero-aces' }, { slug: 'velocitykart', path: '/play/velocity-kart' }, { slug: 'brainbrawl', path: '/play/brain-brawl' },
 ];
 const pick = (process.env.MODES ?? 'all').split(',');
-const MODES = pick[0] === 'all' ? ROUTES : ROUTES.filter((r) => pick.includes(r.slug));
+// DEV=1 (net/precision pass, 2026-09-22): the /play routes redirect to /login for a fresh browser now, so the probe can run on
+// the dev harness route instead — the same mode, the same #fel-ready and __FEL_QA__ (the route key is the registry key; the
+// derby's is `derby`, the shootout's `penalty`)
+const DEV = process.env.DEV === '1';
+const MODES0 = pick[0] === 'all' ? ROUTES : ROUTES.filter((r) => pick.includes(r.slug));
+const MODES = DEV ? MODES0.map((r) => ({ ...r, path: `/dev/mode/${r.slug}` })) : MODES0;
 
 // standard-mapping pad indices
 const IDX: Record<string, number> = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, LT: 6, RT: 7, DPAD_UP: 12, DPAD_DOWN: 13, DPAD_LEFT: 14, DPAD_RIGHT: 15 };
