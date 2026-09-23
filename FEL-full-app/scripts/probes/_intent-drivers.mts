@@ -282,4 +282,52 @@ export const INTENT_DRIVERS: Record<string, string> = {
       }
     }, 16);
   `),
+  // RACING PASS (2026-09-23): the three racers that had no driver. Each reads the mode's own probe seam and races the line:
+  // KART — throttle held, steer onto the line's heading (plus a lateral pull), hold DRIFT (X) into a corner the heading
+  // error says is sharp, tap BOOST (R1) on a straight, fire what the balloons gave.
+  velocitykart: loop(`
+    const L1 = 4, R1 = 5; let drift = false, lastBoost = 0, lastFire = 0;
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    setInterval(() => {
+      const s = Q.scene && Q.scene(); const k = s && s.metadata && s.metadata.kart; if (!k) return; const st = k.state();
+      if (st.done) { hold(RT, false); hold(X, false); stick(0, 0); return; }
+      const err = wrap((st.tangentYaw || 0) - (st.heading || 0));
+      stick(clamp(err * 1.4 - st.lateral * 0.08), 0); hold(RT, true);
+      const wantDrift = Math.abs(err) > 0.32 && st.speed > 12;
+      if (wantDrift !== drift) { drift = wantDrift; hold(X, drift); }
+      const now = performance.now();
+      if (!drift && Math.abs(err) < 0.08 && now - lastBoost > 2500) { btn(R1, 400); lastBoost = now; }
+      if (st.item && now - lastFire > 1500) { btn(A); lastFire = now; }
+    }, 33);
+  `),
+  // AERO — the DKR line-follower (_aero-dkr-eye): yaw onto the line's tangent, pitch to the line's height, GAS held, fire
+  // what the balloons gave, a STUNT on a long straight, BOOST (R1) when lined up.
+  aeroaces: loop(`
+    const R1 = 5; let lastFire = 0, lastStunt = 0, lastBoost = 0;
+    setInterval(() => {
+      const s = Q.scene && Q.scene(); const a = s && s.metadata && s.metadata.aero; if (!a) return; const st = a.state();
+      if (st.done) { hold(RT, false); stick(0, 0); return; }
+      hold(RT, true);
+      let err = 0;
+      if (st.tangent && st.pos) {
+        err = Math.atan2(st.tangent.x, st.tangent.z) - st.heading; err = Math.atan2(Math.sin(err), Math.cos(err));
+        stick(clamp(err * 2.2 - st.lateral * 0.06), clamp((st.lineY - st.pos.y) * 0.12));
+      }
+      const now = performance.now();
+      if (st.item && now - lastFire > 1500) { btn(A); lastFire = now; }
+      if (Math.abs(err) < 0.05 && now - lastStunt > 9000) { btn(B); lastStunt = now; }
+      else if (Math.abs(err) < 0.1 && now - lastBoost > 3000) { btn(R1, 400); lastBoost = now; }
+    }, 33);
+  `),
+  // SPRINT — hands off until the HUD says Go (a tap before it is a false start), then alternate the d-pad on a 115 ms
+  // cadence (the carnival A+ recipe: 115 ms wins in ~11.5 s, 200 ms wins faster on the rhythm reward, 420 ms never finishes).
+  sprint: loop(`
+    const LEFT = 14, RIGHT = 15; let side = 0, last = 0;
+    const CAD = Number(window.__SPRINT_CADENCE_MS || 200);
+    setInterval(() => {
+      const h = Q.rawHud ? Q.rawHud() : {}; if (h.phase !== 'Go' && h.phase !== 'Run') return;
+      const now = performance.now(); if (now - last < CAD) return; last = now;
+      btn(side ? RIGHT : LEFT, 50); side ^= 1;
+    }, 8);
+  `),
 };
