@@ -32,3 +32,40 @@ Inventory: `~/Claude/outbox/finish-release/meshy-2026-09-22/INVENTORY.md`.
   decimation ratchets.
 9 Presentation — the pickers (Closet, rivals), names on the cards, the sheet's names in the HUD where a rival is named.
 10 Ship — every mode's smoke green with the new bodies, the one deploy, the summary.
+
+## Landed (2026-09-22)
+
+| phase | commit | what |
+|---|---|---|
+| 1+2 | 13b76ee | inventory + plan; `/dev/model` viewer; `_model-sheet.mts`; the route test: the shipped Meshy rig is REJECTED by Gate 0 (Spine01/Spine02/neck, A-pose bind) → route B, `skin-transfer.py` onto the T-posed 22-joint donor |
+| 3 | bed5449 | `batch-meshy22.sh`: all 22 onto the FEL rig, two tier packs, a manifest — 0 errors |
+| 4 | measurement | the contact sheet: 22 of 22 clean (22 joints, 1.78 m, 238 clips, 0 locked-T frames) |
+| 5 | 0582fd3 | `batch-vehicles.sh` + `vehicleBody.ts`: the 10 planes and karts baked (~4 MB each from 35–61 MB), seated on the kart and aircraft roots |
+| 6 | 05aeee8 | converted bodies as the hero in five sports: every sport clip plays, 60 fps, no locked T; the smoke gained `HERO=` and a perf sample |
+| 7 | 7301321 | the cast: 22 into the roster, `MODE_CAST` for 25 modes (rivals and crowd draw from a mode's cast first); the owner chose rivals + crowd by look, heroes stay the player's body |
+| 7b | 7cf5f22 | the 22 pass the shipped-avatar gate (float32 skins, sibling manifests) |
+| 8 | measurement | performance with the cast in the crowded modes (table below) |
+| 9 | in 7301321 | the sheet reads the cast (`cast-sheet.py`); the Closet / rival pickers were not touched: heroes stay the player's body, so there is nothing new to pick |
+| 10 | pending | every enabled mode's smoke with the new bodies; the one deploy |
+
+### Phase 8 — performance with the cast (0.6 / 1K pack, 15 s under the intent drivers)
+
+| mode | fps median / p10 | active meshes max | skinned vertices max |
+|---|---|---|---|
+| threevthree | 60 / 59.9 | 121 | 241,180 |
+| volleyball | 60 / 59.9 | 115 | 322,452 |
+| skateboard | 60 / 59.9 | 170 | 218,805 |
+| carnival | 60 / 59.9 | 31 | 48,878 |
+| dunkduel | 60 / 59.9 | 93 | 151,972 |
+| onevone | 60 / 59.9 | 100 | 158,556 |
+
+The budget holds in every crowded mode; the decimation does not ratchet. No pre-cast skinned-vertex baseline exists (the
+sample was added to the smoke in phase 6, after the cast bodies were already the roster).
+
+### Phase 10 — every enabled mode with the new bodies
+(pending: the all-modes smoke)
+
+### Open
+- the plane bodies carry a pilot sculpted into the cockpit; the hero sits on the seat anchor over it
+- the Meshy running / walking clips were not imported: the bodies play the FEL clip set on the same rig; the Meshy clips would need a retarget onto the 22-bone rig
+- 7301321 was pushed with one red test (the shipped-avatar gate); 7cf5f22 fixed it before anything deployed
