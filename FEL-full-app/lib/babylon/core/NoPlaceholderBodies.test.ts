@@ -104,3 +104,17 @@ describe('THE CAPSULE STAND-INS ARE NEVER ON SCREEN', () => {
     expect(venue).toMatch(/showPlaceholders\(\)/);
   });
 });
+
+describe('no placeholder PLACE either', () => {
+  it('the stub palms/lamps are hidden from mount when a kit is declared, not only after it loads', () => {
+    // PLACE-TRUE-BODY (2026-09-22): hiding them in the kit's .then() left the cylinder-and-cone palms on screen for the
+    // whole async load, so early frames and early captures showed a placeholder Venice
+    const src = fs.readFileSync(path.join(ROOT, 'lib/babylon/core/NexusVenue.ts'), 'utf8');
+    const hideAt = src.indexOf('setStubs(false)');
+    const loadAt = src.indexOf('mountVenueProps(ctx.scene, propSet');
+    expect(hideAt).toBeGreaterThan(-1);
+    expect(loadAt).toBeGreaterThan(hideAt);
+    // and a failed kit still gets its stubs back rather than an empty boardwalk
+    expect(src).toMatch(/fallback\('failed to load'\)/);
+  });
+});

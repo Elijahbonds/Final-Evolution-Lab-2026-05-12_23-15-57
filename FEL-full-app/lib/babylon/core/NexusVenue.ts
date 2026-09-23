@@ -296,11 +296,27 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
     .filter((p) => p.kind === 'palm' || (p.kind === 'lamp' && !p.color))
     .map((p) => built.root.getChildTransformNodes(true).find((n) => n.name === `prop_${p.kind}_${p.position[0]}_${p.position[2]}`))
     .filter((n): n is TransformNode => !!n);
-  if (propSet) void mountVenueProps(ctx.scene, propSet, built.root).then((h) => {
-    if (propsGone) { h?.dispose(); return; }
-    props = h;
-    if (h && h.count > 0) { const stubs = stubNodes(); for (const n of stubs) n.setEnabled(false); if (stubs.length) console.info(`[NEXUS] ${modeId}: ${stubs.length} placeholder palms/lamps hidden under the "${propSet}" kit`); }
-  });
+  // PLACE-TRUE-BODY (2026-09-22): the stubs are HIDDEN FROM THE FIRST FRAME when a kit is declared, not after it loads.
+  // Hiding them only once mountVenueProps resolved left the cylinder-and-cone "lollipop" palms on screen for the whole
+  // async load — every early frame, every capture that fired before the kit landed, and every mount whose kit was slow —
+  // which is the PLACEHOLDER Venice the eye kept refusing. Same shape as the placeholder bodies below: built hidden, and
+  // brought back only as the FALLBACK when the kit genuinely fails (no handle, zero props, or a rejected load).
+  const setStubs = (on: boolean): number => { const stubs = stubNodes(); for (const n of stubs) n.setEnabled(on); return stubs.length; };
+  if (propSet) {
+    const hidden = setStubs(false);
+    if (hidden) console.info(`[NEXUS] ${modeId}: ${hidden} placeholder palms/lamps hidden from mount (the "${propSet}" kit is declared)`);
+    const fallback = (why: string) => {
+      if (propsGone) return;
+      const shown = setStubs(true);
+      if (shown) console.warn(`[NEXUS] ${modeId}: the "${propSet}" kit ${why} — ${shown} stub palms/lamps restored as the fallback`);
+    };
+    void mountVenueProps(ctx.scene, propSet, built.root).then((h) => {
+      if (propsGone) { h?.dispose(); return; }
+      props = h;
+      if (h && h.count > 0) console.info(`[NEXUS] ${modeId}: "${propSet}" kit on — placeholder palms/lamps stay hidden`);
+      else fallback('loaded no props');
+    }, () => fallback('failed to load'));
+  }
 
   // M104: hand the shot back to the mode's follow-cam. The venue's ArcRotate
   // camera stays in the scene (its scenery is unaffected by which camera
