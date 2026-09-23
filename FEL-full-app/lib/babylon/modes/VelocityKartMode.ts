@@ -60,7 +60,7 @@ import { buildTrackside, type TracksideHandle } from '../racing/trackside';   //
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall,
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
@@ -168,6 +168,8 @@ const S = {
   events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 },
   // THE START (racing pass phase 4): the countdown, and the burnout's seconds of lost drive after a too-early throttle
   start: newStart() as StartState, burnT: 0,
+  /** Seconds the nose has pointed back down the line (racing pass phase 5: WRONG WAY, as the plane already had). */
+  wrongT: 0,
 };
 let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
@@ -701,6 +703,8 @@ function pushHud(ctx: ModeContext): void {
     lap: `${Math.min(race.lap, course.laps)}/${course.laps}`,
     time: race.time.toFixed(1),
     start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
+    // THE GAP under the place (phase 5): seconds to the kart ahead, or the lead
+    gap: rivals.length ? gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist })), state.speed) : '',
     toGate: Math.round(dist),
     drift: state.drifting ? Math.round(driftQuality(state) * 100) : 0,
     pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
@@ -787,7 +791,7 @@ return {
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
     S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 };
-    S.start = newStart(); S.burnT = 0;
+    S.start = newStart(); S.burnT = 0; S.wrongT = 0;
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
@@ -1046,6 +1050,10 @@ return {
     // the way back up. The line is the road, so the line's height is the kart's height.
     if (circuit) {
       let at = locate(circuit.line, state.pos.x, state.pos.z);
+      // WRONG WAY (racing pass phase 5): the nose pointed back down the line, moving, for over a second — the plane
+      // had this and the kart did not (a spin-out's own turn is exempt)
+      if (S.spinT <= 0 && state.speed > 3 && Math.sin(state.heading) * at.tangent.x + Math.cos(state.heading) * at.tangent.z < -0.35) S.wrongT += dt; else S.wrongT = 0;
+      if (S.wrongT > 1.2 && S.bannerT <= 0) { say('WRONG WAY', 0.8); SoundKit.play('miss', { volume: 0.35 }); }
 
       // ── THE OUTSIDE OF THE COURSE ───────────────────────────────────────────────────────────────────────
       // Measured by steering off with the throttle pinned: the kart reached 76 m from the line, still making
@@ -1229,7 +1237,10 @@ return {
     if (res.gate) {
       SoundKit.play('score', { pitch: res.lap ? 1.2 : 1 });
       ctx.feel.impact(0.22);
-      say(res.lap ? `LAP ${Math.min(race.lap, course.laps)}` : 'CHECKPOINT', 0.7);
+      // FINAL LAP is its own sting (phase 5): the lap that decides the race is announced as that, not as a number
+      const finalLap = res.lap && !res.finished && race.lap === course.laps;
+      say(finalLap ? 'FINAL LAP!' : res.lap ? `LAP ${Math.min(race.lap, course.laps)}` : 'CHECKPOINT', finalLap ? 1.2 : 0.7);
+      if (finalLap) { SoundKit.play('whistle', { pitch: 1.3 }); ctx.juice.callout('FINAL LAP', '#fde047', 900); }
       if (res.lap) { ctx.juice.flash('#fde68a', 90); ctx.juice.shake(0.04, 110); } else ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), 'CHECKPOINT', '#7dd3fc');
       tintMarks();
     }

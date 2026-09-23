@@ -53,7 +53,13 @@ export function makeSprintHost(modeKey: string, title: string) {
       let stop: (() => void) | null = null;
       let disposed = false;
 
-      runMode(MODES[modeKey], {
+      // DEFERRED like every other host (racing pass phase 5, 2026-09-23). Booted straight from the effect, React's
+      // development double-mount left the FIRST harness running: its cleanup ran before runMode resolved (no stop to
+      // call yet), and once it resolved the owner check saw the second mount's token and skipped the teardown. Two
+      // harnesses then fed the one module-level SprintMode — every d-pad stride stepped the core twice, the second
+      // step read as the same side, and every stride was a STUMBLE (measured through /dev/race/sprint: 51 stumbles,
+      // 0.6 m). The phantom mount's timer is cleared before it ever boots.
+      const startTimer = setTimeout(() => { if (disposed) return; runMode(MODES[modeKey], {
         canvas,
         input: bus,
         onPhase: (p, d) => {
@@ -82,9 +88,11 @@ export function makeSprintHost(modeKey: string, title: string) {
         stop = s;
       })
         .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      }, 0);
 
       return () => {
         disposed = true;
+        clearTimeout(startTimer);
         if (canvasOwner.get(canvas) === token) stop?.();
       };
     }, []);   // mount once — see onEndRef above

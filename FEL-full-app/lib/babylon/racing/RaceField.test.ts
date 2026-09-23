@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { aroundCall,
+import { aroundCall, gapLine,
   buildRaceLine, pointAt, bendAt, makeField, stepRival, standings, playerPosition, ordinal,
   rivalPlacement, fieldFor, RIVAL_NAMES, BAND_LIMIT, type Rival, type RaceLine,
 } from './RaceField';
@@ -182,5 +182,13 @@ describe('aroundCall (racing pass phase 3: R3 reads who is around you)', () => {
   });
   it('a standing start does not read as a minute', () => {
     expect(aroundCall([{ name: 'VOSS', gap: 10 }], 0)).toBe('VOSS 1.0 s AHEAD · NOBODY BEHIND');
+  });
+});
+
+describe('gapLine (racing pass phase 5: the gap under the place)', () => {
+  it('reads the seconds to the rival ahead, or the lead', () => {
+    expect(gapLine([{ name: 'VOSS', gap: 24 }, { name: 'KEELE', gap: -8 }], 20)).toBe('1.2 s TO VOSS');
+    expect(gapLine([{ name: 'VOSS', gap: -42 }, { name: 'KEELE', gap: -8 }], 20)).toBe('LEAD 0.4 s');
+    expect(gapLine([], 20)).toBe('');
   });
 });

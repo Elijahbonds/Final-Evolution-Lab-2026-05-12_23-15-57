@@ -85,6 +85,8 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         <div className="fel-panel px-3 py-1.5">
           <div className="text-[10px] tracking-wider text-white/60">PLACE</div>
           <div className="fel-stat text-3xl text-[var(--fel-gold)]">{hnode(hud.pos, '—')}</div>
+          {/* RACING PASS phase 5: the gap — seconds to the plane ahead, or the lead */}
+          {hud.gap ? <div className={`text-[10px] font-bold ${String(hud.gap).startsWith('LEAD') ? 'text-[#86efac]' : 'text-white/80'}`}>{String(hud.gap)}</div> : null}
         </div>
         <div className="flex flex-col items-center gap-1">
           <span className="fel-panel px-4 py-1.5 fel-stat text-xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>

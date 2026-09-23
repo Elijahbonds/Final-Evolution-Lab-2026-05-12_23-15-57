@@ -40,7 +40,7 @@ import type { FelInput } from '../core/InputBus';
 import { readCourse, startRace, stepRace, type RaceProgress } from '../core/RaceCourse';
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
-  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall,
+  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
@@ -158,6 +158,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       lap: `${Math.min(race.lap, circuit.course.laps)}/${circuit.course.laps}`,
       pos: `${ordinal(place)} / ${rivals.length + 1}`,
       place,
+      gap: gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist() })), flight.speed),   // phase 5: the gap under the place
       item: S.held ? `${ITEM_LABEL[S.held.kind]}${S.held.level > 1 ? ` ×${S.held.level}` : ''}` : '',
       itemKind: S.held?.kind ?? '',
       itemLevel: S.held?.level ?? 0,

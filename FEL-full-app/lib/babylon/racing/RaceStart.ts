@@ -15,7 +15,7 @@
 
 export const COUNT_BEAT_SEC = 1;
 /** Seconds of settle before the first beat (the course name is on screen). */
-export const COUNT_LEAD_SEC = 1.2;
+export const COUNT_LEAD_SEC = 0.6;
 /** The rocket window, in seconds BEFORE GO. */
 export const ROCKET_EARLIEST = 2.0;
 export const ROCKET_LATEST = 1.2;

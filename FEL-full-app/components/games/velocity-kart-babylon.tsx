@@ -87,6 +87,8 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
         <div className="flex flex-col items-center gap-1">
           <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
           {hud.pos ? <span className="fel-panel px-3 py-0.5 text-xs font-bold text-[var(--fel-gold)]">{String(hud.pos)}</span> : null}
+          {/* RACING PASS phase 5: the gap — seconds to the kart ahead, or the lead */}
+          {hud.gap ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${String(hud.gap).startsWith('LEAD') ? 'text-[#86efac]' : 'text-white/80'}`}>{String(hud.gap)}</span> : null}
         </div>
         <div className="fel-panel px-3 py-1.5 text-right">
           <div className="text-[10px] tracking-wider text-white/60">LAP {hnode(hud.lap, '—')}</div>

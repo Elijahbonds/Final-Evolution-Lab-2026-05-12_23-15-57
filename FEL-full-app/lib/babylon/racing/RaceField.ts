@@ -246,3 +246,14 @@ export function aroundCall(rivals: readonly { name: string; gap: number }[], spe
   const back = behind ? `${behind.name} ${s(behind.gap)} BEHIND` : 'NOBODY BEHIND';
   return `${front} · ${back}`;
 }
+
+/** THE GAP under the place (racing pass phase 5): the one number a racer reads after the place — seconds to the rival
+ *  ahead, or the lead over the one behind. "1.2 s TO VOSS", "LEAD 2.1 s". Same seconds rule as aroundCall. */
+export function gapLine(rivals: readonly { name: string; gap: number }[], speed: number): string {
+  if (!rivals.length) return '';
+  const v = Math.max(10, Math.abs(speed));
+  const ahead = rivals.filter((r) => r.gap > 0).sort((a, b) => a.gap - b.gap)[0];
+  if (ahead) return `${(ahead.gap / v).toFixed(1)} s TO ${ahead.name}`;
+  const behind = rivals.slice().sort((a, b) => b.gap - a.gap)[0];
+  return `LEAD ${(Math.abs(behind.gap) / v).toFixed(1)} s`;
+}
