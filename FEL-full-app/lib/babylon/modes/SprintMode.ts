@@ -268,8 +268,10 @@ return {
     runner.animator.play(loco.clip, { loop: true });
     runner.animator.setPlaybackScale(loco.clip, loco.rate);
 
-    // The rival only runs once the gun has gone.
-    if (st.phase === 'Run' || st.phase === 'Finish') {
+    // The rival runs once the gun has gone — from GO (racing pass phase 10). It waited for 'Run', which the core enters
+    // on the PLAYER's first stride, so a runner who never pressed stood at GO for ever with the pacer frozen beside
+    // them and the race's own end ("the race ends for everyone") unreachable: measured, an idle sprint never ended.
+    if (st.phase === 'Go' || st.phase === 'Run' || st.phase === 'Finish') {
       S.rivalDist = Math.min(RACE_DIST, S.rivalDist + RIVAL_SPEED * dt);
       rival.root.position.z = -S.rivalDist;
       const rivalLoco = locoPick({ speed: RIVAL_SPEED });

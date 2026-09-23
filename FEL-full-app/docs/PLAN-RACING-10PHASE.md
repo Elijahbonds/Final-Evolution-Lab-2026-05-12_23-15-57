@@ -32,3 +32,40 @@ lane), `_board-family-smoke.mts` (bodies: T-frames, clips, perf).
   measured: beats per minute, silent boosts.
 9 Results that read — the finish card: place, time, medal, the ghost delta, the cup standings; every callout on the caption bus.
 10 Score loop + ship — every race run to the end under a driver, the one deploy, the summary.
+
+## Landed (2026-09-23)
+
+| phase | commit | what |
+|---|---|---|
+| 1 | c377961 | baseline + `_race-lab.mts` + kart / plane / sprint intent drivers: kart OUT 4th, plane WIN, free run P1 "complete", sprint win 9.83 s; 0 % silent except the sprint masher (13 %) |
+| 2 | 44247e9 | `docs/SPEC-RACING-DECODE.md`: MK8 / DKR / Mirror's Edge + Titanfall 2 / Track & Field decoded; a fifteen-row gap table |
+| 3 | 1488c9c | stick clicks (InputBus LS / RS, keys V / R): L3 LOOK BACK (a camera cut) on kart, plane, free run; R3 who-is-around-you (kart, plane) and LOCK-ON (free run); the empty boost says what fills it; the sprint answers every press |
+| 4 | 4b04cdb | the start: `racing/RaceStart.ts` countdown + ROCKET START on "2" / BURNOUT on "3" for kart and plane (planes launch at GO); the sprint's reaction time on the finish |
+| 5 | c4f5779 | the race read: `/dev/race/<key>` (shipping hosts, no login); the gap under the place; kart WRONG WAY + FINAL LAP; the sprint host's double harness (every stride a STUMBLE in dev) |
+| 6 | 3e7c9ca | the field: the kart field raced gate chords (off the road on 13–50 % of a lap) → the road; standings by progress along the road (`lapProgress`, both seams at the line); rivals capped at the road's holdable corner speed; kart field +0.15 over the tier, plane pace 1.22 / corner bite 0.1 |
+| 7 | f440e3f | the SLIPSTREAM (`racing/Slipstream.ts`) on kart and plane; every Free Run track x lane under the lane runner |
+| 8 | a68c3de | the MINI-TURBO (`racing/MiniTurbo.ts`: blue / orange / purple sparks, a zip on release); the plane's silent gates chime and pop; the sprint's DIP at the tape |
+| 9 | f3a12e7 | results that read: the kart can be won and its DNF says DNF; Free Run is won by finishing first (not by grade); the sprint says whether you beat the pacer |
+| 10 | this commit | every racer run to the end under the drivers, the mechanics probe, the body smoke; the one deploy |
+
+### Phase 10 — every racer to its end
+
+| mode | intent driver | idle | fps (median / p10) | juice beats / min | errors |
+|---|---|---|---|---|---|
+| velocitykart | dnf 1326, P4, 120 s | dnf 0, 123 s | 60 / 59.9 | 118 | 0 |
+| aeroaces | FINISHED 420, P4, 171 s | OUT 50, 203 s | 60 / 59.9 | 21.1 | 0 |
+| freerun | win 2600, P1, 19 s | timeout 0, 171 s | 60 / 59.9 | 47.4 | 0 |
+| sprint | win 1199, 10 s | dnf 0, 18 s | 60 / 59.9 | 78 | 0 |
+
+Idle after the phase 10 fixes (kart DNF scored 1274 before; an idle sprint never ended). Mechanics probe (IDLE / DELIBERATE / MASHER / INTENT):
+0 % silent on every driver in all four. Body smoke (15 s under the drivers): kart / plane / sprint 0 locked-T; Free Run's straight-elbow
+frames sit under freerun_air_hold / run (the air-hold pose already on record), 60 fps in all four.
+
+The intent kart row ran before the DNF-score fix (it scores 0 now). Fixed in phase 10: an idle sprint never ended (the pacer waited for the player's first stride) and a kart DNF was paid on the clock (1274 for never leaving the grid).
+
+### Open
+- the Free Run route tiers run backwards from the brief: HIGH (the "fastest, precision" line) is the slowest on three of four tracks and LOW the fastest on two (phase 7's table) — a course-design call for the owner
+- the kart intent driver is 20–30 % off an ideal clean kart and spends 3–18 % of a race on the grass; its losses on the twisty courses measure the driver. A simulated ideal clean kart without boost beats the best PRO rival by 3.1–5.6 s on every course
+- the plane's Red Rock Canyon is now the hard circuit (the skilled driver 4th of 8 in a 130 m pack) while Neon Skyline still goes to a driver with no items by 10 m
+- the brief's HUD asks not built: the reticle speed ring (Free Run has a speed bar), on-character flow trails, the perimeter speed vignette
+- items are not weighted by place (the decode's gap 12)
