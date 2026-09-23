@@ -232,3 +232,17 @@ export function fieldFor(course: Course, topSpeed: number, grip: number): { coun
   const tight = tightestCorner(course) < holdable * 0.7;
   return { count: tight ? 3 : 5, difficulty: 0.5 };
 }
+
+/** R3 — WHO IS AROUND YOU (racing pass, 2026-09-23). The nearest rival ahead and behind as seconds at your own speed, in
+ *  one line a player reads at a glance: "VOSS 1.4 s AHEAD · KEELE 0.6 s BEHIND", "LEADING · …", "… · NOBODY BEHIND".
+ *  `gap` is metres along the course, positive = the rival is ahead. Seconds use at least 10 m/s so a standing start does
+ *  not read as a minute. */
+export function aroundCall(rivals: readonly { name: string; gap: number }[], speed: number): string {
+  const v = Math.max(10, Math.abs(speed));
+  const ahead = rivals.filter((r) => r.gap > 0).sort((a, b) => a.gap - b.gap)[0];
+  const behind = rivals.filter((r) => r.gap <= 0).sort((a, b) => b.gap - a.gap)[0];
+  const s = (m: number) => `${(Math.abs(m) / v).toFixed(1)} s`;
+  const front = ahead ? `${ahead.name} ${s(ahead.gap)} AHEAD` : 'LEADING';
+  const back = behind ? `${behind.name} ${s(behind.gap)} BEHIND` : 'NOBODY BEHIND';
+  return `${front} · ${back}`;
+}

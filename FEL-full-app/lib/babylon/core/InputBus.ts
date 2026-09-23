@@ -9,8 +9,10 @@ export type FelInput =
   | { t: 'dpad'; dir: 'up' | 'down' | 'left' | 'right'; pressed: boolean; src?: 'key' }
   /** `src: 'key'` on a BUTTON marks the keyboard's two shoulder keys (SHIFT = R1, F = L1). The hoops slot reads the
    *  tagged pair as its two TRIGGER verbs (turbo / post-up + intense D) because a keyboard has no analog triggers;
-   *  every other reader sees the plain R1 / L1 it always did. A pad's shoulders carry no src. */
-  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START'; pressed: boolean; src?: 'key' }
+   *  every other reader sees the plain R1 / L1 it always did. A pad's shoulders carry no src.
+   *  LS / RS (racing pass, 2026-09-23) are the STICK CLICKS — L3 / R3. The pad profiles always read them; the bus never
+   *  emitted them, so the Free Run brief's L3 look-back / R3 lock-on had no input to hang on. */
+  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS'; pressed: boolean; src?: 'key' }
   | { t: 'trigger'; side: 'L' | 'R'; value: number };
 
 import { HAPTIC } from '../premium/Haptics';
@@ -25,9 +27,9 @@ import { mergePads } from '@/lib/input/padMerge';
 
 type Listener = (e: FelInput) => void;
 type SlotListener = (e: FelInput, slot: number) => void;
-type FelButton = 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START';
+type FelButton = 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS';
 type PadDirName = 'up' | 'down' | 'left' | 'right';
-const FEL_BUTTONS: readonly FelButton[] = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'SELECT', 'START'];
+const FEL_BUTTONS: readonly FelButton[] = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'SELECT', 'START', 'LS', 'RS'];
 const DPAD_DIRS: readonly PadDirName[] = ['up', 'down', 'left', 'right'];
 
 /** One connected local pad, as the connect chips show it: `P{slot + 1} {name}`. */
@@ -80,6 +82,9 @@ const KEYMAP: Record<string, FelInput> = {
   // (the plant / box-out) everywhere else.
   f: { t: 'button', btn: 'L1', pressed: true, src: 'key' },
   c: { t: 'button', btn: 'SELECT', pressed: true },
+  // racing pass (2026-09-23): the stick clicks. V = L3 (look back, held), R = R3 (lock-on / who is around you).
+  v: { t: 'button', btn: 'LS', pressed: true },
+  r: { t: 'button', btn: 'RS', pressed: true },
   escape: { t: 'button', btn: 'START', pressed: true },
 };
 // Dunk keyboard hotfix (2026-09-07): the ARROWS are the L stick too. They were d-pad only, so on a mode whose d-pad

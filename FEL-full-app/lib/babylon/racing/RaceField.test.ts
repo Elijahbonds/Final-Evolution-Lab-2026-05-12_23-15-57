@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import {
+import { aroundCall,
   buildRaceLine, pointAt, bendAt, makeField, stepRival, standings, playerPosition, ordinal,
   rivalPlacement, fieldFor, RIVAL_NAMES, BAND_LIMIT, type Rival, type RaceLine,
 } from './RaceField';
@@ -169,5 +169,18 @@ describe('the standings a player reads', () => {
   it('ordinals read like a human wrote them', () => {
     expect([1, 2, 3, 4, 11, 12, 13, 21, 22].map(ordinal)).toEqual(
       ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd']);
+  });
+});
+
+describe('aroundCall (racing pass phase 3: R3 reads who is around you)', () => {
+  it('names the nearest rival ahead and behind in seconds at your speed', () => {
+    expect(aroundCall([{ name: 'VOSS', gap: 28 }, { name: 'KEELE', gap: -12 }, { name: 'ARIN', gap: 90 }], 20)).toBe('VOSS 1.4 s AHEAD · KEELE 0.6 s BEHIND');
+  });
+  it('leading and last read as such', () => {
+    expect(aroundCall([{ name: 'VOSS', gap: -5 }], 25)).toBe('LEADING · VOSS 0.2 s BEHIND');
+    expect(aroundCall([{ name: 'VOSS', gap: 50 }], 25)).toBe('VOSS 2.0 s AHEAD · NOBODY BEHIND');
+  });
+  it('a standing start does not read as a minute', () => {
+    expect(aroundCall([{ name: 'VOSS', gap: 10 }], 0)).toBe('VOSS 1.0 s AHEAD · NOBODY BEHIND');
   });
 });

@@ -59,7 +59,7 @@ import { buildTrackside, type TracksideHandle } from '../racing/trackside';   //
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor,
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
@@ -714,6 +714,7 @@ function pushHud(ctx: ModeContext): void {
 function finish(ctx: ModeContext): void {
   if (S.done) return;
   S.done = true;
+  ctx.camDirector.rearView = false;   // the end card is never framed backwards
   const medal = medalFor(course, race.time, race.finished);
   const place = rivals.length ? playerPosition(playerDist, rivals) : 1;
   // RECORD THE ROUND. Only a finished race counts toward a cup — a DNF is not a result, and letting one score zero
@@ -940,9 +941,15 @@ return {
   },
 
   onInput(ctx: ModeContext, e: FelInput): void {
-    void ctx;
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }
+    // RACING PASS phase 3 — the stick clicks. L3 held = LOOK BACK (handled before the done gate so a release on the end
+    // card still lets go); R3 = who is around you, in seconds.
+    if (e.t === 'button' && e.btn === 'LS') { ctx.camDirector.rearView = e.pressed && !S.done; return; }
     if (S.done) return;
+    if (e.t === 'button' && e.btn === 'RS') {
+      if (e.pressed) { ctx.juice.callout(aroundCall(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist })), state?.speed ?? 0), '#e2e8f0', 1400); SoundKit.play('uiTick', { pitch: 1.1, volume: 0.35 }); }
+      return;
+    }
     if (e.t === 'stick' && e.side === 'L') { S.input.steer = e.x; S.stickY = e.y; return; }
     // SCORECARD CONTROLS (2026-09-15): gas, brake and drift changed a number and nothing a player hears (76 % of presses
     // silent). A kart answers the pedal: the engine revs as the throttle goes down, the tyres squeal on the brake, the
@@ -1151,6 +1158,8 @@ return {
     boostFx?.update(dt, boost, bev);
     if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
     if (bev.full) say('BOOST READY', 0.8);
+    // RACING PASS phase 3: an empty press already ticks and flags the HUD pill; it now also SAYS what fills the tank
+    if (bev.denied) ctx.juice.callout('BOOST EMPTY — DRIFT (X) TO FILL IT', '#94a3b8', 900);
 
     // the edge of the world: a wall you hit rather than an invisible stop. ±400 (was 260: the stadium oval runs to z 382 and the boardwalk pier
     // runs out to z 332, so the wall stood ACROSS the road there; the world ground is sized off the same number)

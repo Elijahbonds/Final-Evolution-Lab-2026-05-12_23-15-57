@@ -40,7 +40,7 @@ import type { FelInput } from '../core/InputBus';
 import { readCourse, startRace, stepRace, type RaceProgress } from '../core/RaceCourse';
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
-  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace,
+  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
@@ -258,6 +258,7 @@ export function makeAeroAcesMode(): ModeDefinition {
   function finish(ctx: ModeContext): void {
     if (S.done) return;
     S.done = true;
+    ctx.camDirector.rearView = false;   // the end card is never framed backwards
     const place = playerPosition(playerDist(), rivals);
     const podium = place <= 3;
     SoundKit.play(race.finished ? (podium ? 'crowdCheer' : 'score') : 'miss');
@@ -347,7 +348,13 @@ export function makeAeroAcesMode(): ModeDefinition {
 
     onInput(ctx: ModeContext, e: FelInput): void {
       if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }
+      // RACING PASS phase 3 — L3 held = LOOK BACK, R3 = who is around you (as the kart)
+      if (e.t === 'button' && e.btn === 'LS') { ctx.camDirector.rearView = e.pressed && !S.done; return; }
       if (S.done || !flight) return;
+      if (e.t === 'button' && e.btn === 'RS') {
+        if (e.pressed) { ctx.juice.callout(aroundCall(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist() })), flight.speed), '#e2e8f0', 1400); SoundKit.play('uiTick', { pitch: 1.1, volume: 0.35 }); }
+        return;
+      }
       if (e.t === 'stick' && e.side === 'L') {
         S.stickX = e.x; S.stickY = e.y;
         S.input.steer = e.x;
@@ -594,6 +601,8 @@ export function makeAeroAcesMode(): ModeDefinition {
       boostFx?.update(dt, boost, bev);
       if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
       if (bev.full) say('BOOST READY', 0.8);
+      // RACING PASS phase 3: an empty press says what fills the tank (it already ticked and lit the HUD pill)
+      if (bev.denied) ctx.juice.callout('BOOST EMPTY — STUNTS, FLYING LOW, CLOSE PASSES FILL IT', '#94a3b8', 900);
 
       // ── the race: checkpoints, laps, the finish clock ──
       const leader = S.graceLeft === null ? fieldLeaderDone(rivals, line, circuit.course.laps) : null;

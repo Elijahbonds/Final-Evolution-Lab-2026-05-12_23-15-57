@@ -56,6 +56,9 @@ import { RIVALS, makeRivals, stepRival, alongside, stumble, hazardVictims, slamV
 import { trackById, type FreeRunTrack } from '../nexus/freeRunTracks';
 
 const CAPSULE_H = 1.7, CAPSULE_R = 0.32;
+/** R3 LOCK-ON (racing pass): how far along the course a runner can be locked, and how far a locked drive-by reaches
+ *  (alongside is 2.2 m along / 2.6 m across; a lock stretches it to a lunge's worth). */
+const LOCK_RANGE_M = 30, LOCK_STRIKE_ALONG_M = 4.5, LOCK_STRIKE_LATERAL_M = 4;
 /** Seconds at the start line before the clock runs on its own; the run is called at this many times the course par. */
 const START_GRACE_SEC = 4, RUN_CAP_PAR = 3;
 const JUMP_V = 6.4, VAULT_V = 4.6, WALLRUN_SEC = 1.1, WALLKICK_V = 6.8, WALLKICK_PUSH = 5.2, SLIDE_SEC = 0.7, DOWN_SEC = 1.3;
@@ -105,6 +108,9 @@ interface St {
   draft: number; draftSaid: boolean;
   /** An incoming lunge: the rival and the clock it lands at (B inside the window parries it). */
   lunge: { r: Rival; at: number } | null;
+  /** R3 LOCK-ON (racing pass, 2026-09-23): the rival the drive-by aims at — it reaches a locked runner that is near but
+   *  not quite alongside, which is what the brief's "R3 lock-on nearest racer" is for. */
+  lockOn: Rival | null;
   race: { driveBys: number; parries: number; hitsTaken: number; slingshots: number; hazardHits: number; slamHits: number; place: number; deltaSec: number };
 }
 const states = new WeakMap<Scene, St>();
@@ -452,7 +458,7 @@ export const FreeRunMode: ModeDefinition = (() => {
   /** The run was called: what is banked stands (the pot in hand banks too — you did not bail), no time or route bonus. */
   function outOfTime(ctx: ModeContext, S: St): void {
     if (S.finished) return;
-    S.finished = true; S.phase = 'done';
+    S.finished = true; S.phase = 'done'; ctx.camDirector.rearView = false; S.lockOn = null;
     S.combo.bank();
     const total = S.combo.banked;
     SoundKit.play('whistle'); SoundKit.play('miss');
@@ -465,7 +471,7 @@ export const FreeRunMode: ModeDefinition = (() => {
 
   function finish(ctx: ModeContext, S: St): void {
     if (S.finished) return;
-    S.finished = true; S.phase = 'done';
+    S.finished = true; S.phase = 'done'; ctx.camDirector.rearView = false; S.lockOn = null;
     S.combo.bank();
     const tb = timeBonus(S.runSec, S.tier);
     const rb = S.highTouched ? S.tier.routeBonus : 0;
@@ -531,7 +537,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         grindRail: null, grindEndAt: 0, surfSec: 0, dashSec: 0, ltHeld: false, rtHeld: false, swing: null, anchorNear: null,
         wallApproachDeg: 0, wallDist: 99, vaultDist: 99, gateAggs: new Map(), pieceMesh: new Map(), springLatch: -9, slideEndAt: -9, rsTricked: false,
         stats: { rebounds: 0, perfectVaults: 0, grinds: 0, surfs: 0, springs: 0, gates: 0, grapples: 0, bursts: 0, slams: 0, kicks: 0, flowBursts: 0 },
-        rivals: makeRivals(), rivalRigs: [], draft: 0, draftSaid: false, lunge: null,
+        rivals: makeRivals(), rivalRigs: [], draft: 0, draftSaid: false, lunge: null, lockOn: null,
         race: { driveBys: 0, parries: 0, hitsTaken: 0, slingshots: 0, hazardHits: 0, slamHits: 0, place: 1, deltaSec: 0 },
       };
       states.set(ctx.scene, S); live.add(S);
@@ -608,13 +614,28 @@ export const FreeRunMode: ModeDefinition = (() => {
         } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y')) void begin(ctx, S);
         return;
       }
+      // RACING PASS phase 3 — the stick clicks the brief maps: L3 held = LOOK BACK (the release is read in any phase so it
+      // always lets go), R3 = LOCK-ON the nearest runner (again on the same one lets go)
+      if (e.t === 'button' && e.btn === 'LS') { ctx.camDirector.rearView = e.pressed && S.phase === 'run'; return; }
       if (S.phase !== 'run') return;
       if (e.t !== 'button' || !e.pressed) return;
+      if (e.btn === 'RS') {
+        const p = S.hero.root.position;
+        const near = S.rivals.filter((q) => !q.finished && Math.abs(q.z - p.z) < LOCK_RANGE_M).sort((a, b) => Math.abs(a.z - p.z) - Math.abs(b.z - p.z))[0];
+        if (!near) { S.lockOn = null; refuse(ctx, 'LOCK-ON — NOBODY IN RANGE'); return; }
+        if (S.lockOn === near) { S.lockOn = null; ctx.juice.callout('LOCK RELEASED', '#94a3b8', 600); SoundKit.play('uiTick', { pitch: 0.8, volume: 0.3 }); return; }
+        S.lockOn = near; const dz = near.z - p.z;
+        ctx.juice.callout(`LOCKED — ${near.name} ${Math.abs(dz).toFixed(0)} m ${dz >= 0 ? 'AHEAD' : 'BEHIND'}`, '#f472b6', 1100);
+        SoundKit.play('uiTick', { pitch: 1.4, volume: 0.4 });
+        return;
+      }
       const verbs = verbsFor(S.state, S.speed, S.env);
       if (e.btn === 'L1') { if (!grapple(ctx, S)) refuse(ctx, 'GRAPPLE — NO ANCHOR IN REACH'); return; }
       if (e.btn === 'R1') {   // RIVALS: the DRIVE-BY — a strike in passing that never stops the run
         const p = S.hero.root.position;
-        const r = S.rivals.find((q) => !q.finished && q.stumble <= 0 && alongside(q, { x: p.x, z: p.z }));
+        // R3: a LOCKED runner is reachable a little further out than one merely alongside
+        const locked = S.lockOn && !S.lockOn.finished && S.lockOn.stumble <= 0 && Math.abs(S.lockOn.z - p.z) < LOCK_STRIKE_ALONG_M && Math.abs(S.lockOn.x - p.x) < LOCK_STRIKE_LATERAL_M ? S.lockOn : null;
+        const r = locked ?? S.rivals.find((q) => !q.finished && q.stumble <= 0 && alongside(q, { x: p.x, z: p.z }));
         if (!r) { refuse(ctx, 'DRIVE-BY — NO RUNNER BESIDE YOU'); return; }
         stumble(r); S.speed += RIVALS.driveBySpeedGain; S.kinetic.add(KINETIC.hit); S.race.driveBys++;
         S.combo.add('DRIVE-BY', 60, 'air'); say(ctx, `DRIVE-BY — ${r.name}`); SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); ctx.feel?.impact?.(0.35); ctx.juice.hitStop(40);

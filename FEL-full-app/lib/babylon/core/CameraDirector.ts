@@ -342,7 +342,12 @@ export class CameraDirector {
   /** The current look orbit (radians) — 0 when the stick is centred and settled. */
   get lookYawRad(): number { return this.lookYaw; }
   /** True while the stick is held or its orbit is still settling — the follow lag runs at catch-up so the eye sees it. */
-  private get lookLive(): boolean { return this.lookHold > 0 || Math.abs(this.lookYaw) > 0.02 || Math.abs(this.lookPitch) > 0.02; }
+  private get lookLive(): boolean { return this.rearView || this.lookHold > 0 || Math.abs(this.lookYaw) > 0.02 || Math.abs(this.lookPitch) > 0.02; }
+  /** LOOK BACK (racing pass, 2026-09-23): held L3 turns the follow camera round to face back down the course — Mario
+   *  Kart's look-behind, the Free Run brief's "L3 rear view". A flag, not an orbit: it is on for exactly as long as the
+   *  button is held, it overrides the R-stick look while it is, and letting go returns to whatever the look was. */
+  public rearView = false;
+  private rearWas = false;
   /** Drop the look at once — a mode's hard cut (the dunk's takeoff → rimCamCut) must not inherit a half-decayed orbit. */
   resetLook(): void { this.lookYaw = 0; this.lookPitch = 0; this.lookHold = 0; }
   // ── MODE-STICK-FACE family (2026-09-07): a camera-relative stick whose basis LATCHES while the stick is held ──
@@ -556,7 +561,8 @@ export class CameraDirector {
       if (back.lengthSquared() < 0.01) back.set(0, 0, 1); else back.normalize();
     }
 
-    if (this.lookYaw !== 0) back = rotateY(back, -this.lookYaw);   // R-stick orbit around the subject (measured: −yaw turns the view right)
+    const yaw = this.rearView ? Math.PI : this.lookYaw;   // LOOK BACK overrides the R-stick orbit while L3 is held
+    if (yaw !== 0) back = rotateY(back, -yaw);   // R-stick orbit around the subject (measured: −yaw turns the view right)
 
     const separation = cfg.fitTwo && objective ? Vector3.Distance(subject, objective) : 0;
     // E26: cap the separation pull-back — uncapped, a full-court 3v3
@@ -637,6 +643,9 @@ export class CameraDirector {
     } else {
       next = Vector3.Lerp(this.camera.position, finalPos, lag);
     }
+    // LOOK BACK is a CUT, both ways (measured: through the slewed orbit the kart's camera had turned 38° a second after L3
+    // went down — a look-behind has to be there the frame you ask, as Mario Kart's is)
+    if (this.rearView !== this.rearWas) { next = finalPos.clone(); this.rearWas = this.rearView; }
     // the ground floor is enforced on the RESULT too: the clamp above floors the target, and the lerp toward a target
     // over a ridge walks the eased camera THROUGH the ridge (measured on the summit's switchbacks: the frame was the
     // sky dome's trees seen from under the snow)
@@ -751,7 +760,8 @@ export class CameraDirector {
       // below the framing minimum — up close, look AT him.
       const sep = Math.hypot(this.camera.position.x - subject.x, this.camera.position.z - subject.z);
       const leadScale = Math.max(0, Math.min(1, (sep - 1.0) / (FRAMING_MIN_DISTANCE - 1.0)));
-      const lead = cfg.lookAhead * leadScale;
+      // LOOK BACK: the lead points past the subject, down the course behind them — what the look-back is FOR
+      const lead = cfg.lookAhead * leadScale * (this.rearView ? -1 : 1);
       ahead = chest
         .add(flat.scale(lead))
         .add(new Vector3(0, dir.y * lead * VERTICAL_LEAD_SHARE, 0));

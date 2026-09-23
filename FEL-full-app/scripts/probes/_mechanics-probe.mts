@@ -49,7 +49,7 @@ const MODES0 = pick[0] === 'all' ? ROUTES : ROUTES.filter((r) => pick.includes(r
 const MODES = DEV ? MODES0.map((r) => ({ ...r, path: `/dev/mode/${r.slug}` })) : MODES0;
 
 // standard-mapping pad indices
-const IDX: Record<string, number> = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, LT: 6, RT: 7, DPAD_UP: 12, DPAD_DOWN: 13, DPAD_LEFT: 14, DPAD_RIGHT: 15 };
+const IDX: Record<string, number> = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, LT: 6, RT: 7, LS: 10, RS: 11, DPAD_UP: 12, DPAD_DOWN: 13, DPAD_LEFT: 14, DPAD_RIGHT: 15 };
 type Verb = { label: string; idx: number; holdMs: number };
 function verbsFor(slug: string): Verb[] {
   const cfg = MODE_VERBS[slug] ?? MODE_VERBS.default;
@@ -136,7 +136,7 @@ async function session(m: Spec, driver: 'idle' | 'deliberate' | 'masher' | 'inte
         if (v) await press(p, v.idx, v.holdMs);
         await p.waitForTimeout(1000);
       } else {
-        const idx = [0, 1, 2, 3, 0, 1, 7, 5, 14, 15][Math.floor(Math.random() * 10)];
+        const idx = [0, 1, 2, 3, 0, 1, 7, 5, 14, 15, 10, 11][Math.floor(Math.random() * 12)];   // racing pass: the stick clicks are buttons too
         await pad(p, `p.axes[0] = ${(Math.random() * 2 - 1).toFixed(2)}; p.axes[1] = ${(Math.random() * 2 - 1).toFixed(2)}`);
         await press(p, idx, 40);
         await p.waitForTimeout(80);

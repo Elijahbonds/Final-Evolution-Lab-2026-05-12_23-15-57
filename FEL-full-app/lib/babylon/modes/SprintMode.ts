@@ -18,6 +18,7 @@ import { VenueKit } from '../visual/VenueKit';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { MOOD_TO_FAMILY } from '../visual/Backdrops';
 import { SoundKit } from '../audio/SoundKit';
+import { refuse } from '../core/Refusal';   // racing pass phase 3: every press answered
 import { makeSprintRace, SPRINT_TUNING } from '../../feel/cores/sprint-skin';
 import type { SprintCore } from '../../feel/cores/sprint-core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -58,6 +59,8 @@ const S = {
   banner: '',
   bannerT: 0,
   lastSide: null as 'L' | 'R' | null,
+  /** Triggers held (a squeeze is answered once, not every frame the bus re-emits it). */
+  trigL: false, trigR: false,
   /** Clean alternating strides in a row (the rhythm streak). */
   streak: 0,
   lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
@@ -65,7 +68,7 @@ const S = {
 
 const reset = (): void => {
   S.done = false; S.stumbles = 0; S.rivalDist = 0; S.graceLeft = null;
-  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0;
+  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0; S.trigL = false; S.trigR = false;
   finishLatch = false;
 };
 
@@ -181,6 +184,16 @@ return {
   onInput(ctx: ModeContext, e: FelInput): void {
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
     if (S.done || !core) return;
+    // RACING PASS phase 3: the face buttons, the shoulders, the clicks and the triggers answered NOTHING — 13 % of the
+    // masher's presses were silent, the only silent presses in the racing suite. The race is the d-pad; every other press
+    // now says so (a trigger once per squeeze — the bus re-emits a held trigger every frame).
+    if (e.t === 'button' && e.pressed) { refuse(ctx, 'THE D-PAD RUNS — ALTERNATE ← →'); return; }
+    if (e.t === 'trigger') {
+      const side = e.side === 'L' ? 'trigL' : 'trigR';
+      const down = e.value >= 0.5;
+      if (down && !S[side]) refuse(ctx, 'THE D-PAD RUNS — ALTERNATE ← →');
+      S[side] = down; return;
+    }
     if (e.t !== 'dpad' || !e.pressed) return;
     if (e.dir !== 'left' && e.dir !== 'right') return;
 
