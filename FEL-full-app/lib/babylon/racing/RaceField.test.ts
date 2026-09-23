@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { aroundCall, gapLine,
+import { aroundCall, gapLine, lapProgress,
   buildRaceLine, pointAt, bendAt, makeField, stepRival, standings, playerPosition, ordinal,
   rivalPlacement, fieldFor, RIVAL_NAMES, BAND_LIMIT, type Rival, type RaceLine,
 } from './RaceField';
@@ -190,5 +190,35 @@ describe('gapLine (racing pass phase 5: the gap under the place)', () => {
     expect(gapLine([{ name: 'VOSS', gap: 24 }, { name: 'KEELE', gap: -8 }], 20)).toBe('1.2 s TO VOSS');
     expect(gapLine([{ name: 'VOSS', gap: -42 }, { name: 'KEELE', gap: -8 }], 20)).toBe('LEAD 0.4 s');
     expect(gapLine([], 20)).toBe('');
+  });
+});
+
+describe('stepRival holdAt (racing pass phase 6: the physics cap)', () => {
+  it('a rival never carries more than the road holds into a corner, and runs free on a straight', () => {
+    const line = buildRaceLine(courseById('stadium-oval')!);
+    const [r] = makeField(1, 26, 1);
+    r.speed = 26; r.dist = 100;
+    for (let i = 0; i < 120; i++) stepRival(r, line, 1 / 60, 100, { topSpeed: 26, holdAt: () => 14 }, i / 60);
+    expect(r.speed).toBeLessThanOrEqual(14.01);
+    const [q] = makeField(1, 26, 1); q.speed = 20; q.dist = 100;
+    for (let i = 0; i < 240; i++) stepRival(q, line, 1 / 60, q.dist, { topSpeed: 26, holdAt: () => 99 }, i / 60);
+    expect(q.speed).toBeGreaterThan(20);
+  });
+});
+
+describe('lapProgress (racing pass phase 6: progress along the road, both seams at the line)', () => {
+  const L = 1000, G = 9;
+  it('on the grid, just short of the line, reads slightly negative', () => {
+    expect(lapProgress(986, L, 1, 0, G)).toBe(-14);
+  });
+  it('mid-lap is laps plus along', () => {
+    expect(lapProgress(400, L, 1, 4, G)).toBe(400);
+    expect(lapProgress(400, L, 2, 4, G)).toBe(1400);
+  });
+  it('past the line a frame before the gate counts it is still the end of THIS lap, not a lap down', () => {
+    expect(lapProgress(3, L, 2, G - 1, G)).toBe(2003);
+  });
+  it('just after the gate counts it, the next lap starts where the last ended', () => {
+    expect(lapProgress(5, L, 3, 0, G)).toBe(2005);
   });
 });

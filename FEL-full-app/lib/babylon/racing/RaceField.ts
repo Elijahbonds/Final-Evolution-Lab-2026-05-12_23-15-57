@@ -48,6 +48,18 @@ export function buildRaceLine(course: Course): RaceLine {
   return { pts, cum, lapLength, loop: course.loop };
 }
 
+/** A race line through a drawn road's own points (racing pass phase 6). `buildRaceLine` joins the course's GATES with
+ *  straight chords — 7 to 12 of them on a 750–1300 m kart lap — and measured against the road that line left the tarmac
+ *  on 13–50 % of every lap, up to 29 m out, and ran 2–7 % shorter than the road: the kart field cut every corner across
+ *  the grass. Aero Aces already built its field's line from the circuit; this is that, shared. */
+export function raceLineFromPoints(points: readonly Vector3[], loop: boolean): RaceLine {
+  const pts = points.map((p) => p.clone());
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Vector3.Distance(pts[i - 1], pts[i]));
+  const lapLength = cum[cum.length - 1] + (loop ? Vector3.Distance(pts[pts.length - 1], pts[0]) : 0);
+  return { pts, cum, lapLength, loop };
+}
+
 /** Where `dist` metres along the line puts you, and which way you are pointing there. */
 export function pointAt(line: RaceLine, dist: number): { pos: Vector3; heading: number } {
   const { pts, cum, lapLength, loop } = line;
@@ -137,6 +149,11 @@ export interface FieldSpec {
   topSpeed: number;
   /** How much a corner slows a rival, 0..1 of pace at a hairpin. */
   cornerBite?: number;
+  /** THE PHYSICS CAP (racing pass phase 6): the speed the ROAD lets a vehicle hold at `dist` (grip over the corner's
+   *  radius). Given, a rival never takes a corner faster than the player's own vehicle could — the bend formula alone
+   *  let the kart field carry 1–2 m/s more through the twisty courses than a kart can, and a clean driver lost them by
+   *  100–240 m. Omitted (Aero Aces), the bend formula stands. */
+  holdAt?: (dist: number) => number;
 }
 
 /**
@@ -151,7 +168,10 @@ export function stepRival(r: Rival, line: RaceLine, dt: number, playerDist: numb
   const base = spec.topSpeed * (0.62 + r.skill * 0.42);
   // corners cost, the same trade the player is making
   const bend = bendAt(line, r.dist);
-  const cornered = base * (1 - bite * bend);
+  let cornered = base * (1 - bite * bend);
+  // the road's own limit, looked a car-length ahead: a rival brakes for the corner it is about to take, and the better
+  // drivers carry a little more of it (0.93–1.0 of the holdable speed)
+  if (spec.holdAt) cornered = Math.min(cornered, spec.holdAt(r.dist + 8) * (0.93 + 0.07 * r.skill));
   // a slow wobble so nobody runs a metronome
   const wobble = 1 + Math.sin(t * 0.6 + r.phase) * 0.045;
   // the band: bounded, symmetric, weak enough to out-drive
@@ -256,4 +276,16 @@ export function gapLine(rivals: readonly { name: string; gap: number }[], speed:
   if (ahead) return `${(ahead.gap / v).toFixed(1)} s TO ${ahead.name}`;
   const behind = rivals.slice().sort((a, b) => b.gap - a.gap)[0];
   return `LEAD ${(Math.abs(behind.gap) / v).toFixed(1)} s`;
+}
+
+/** PROGRESS ALONG THE ROAD (racing pass phase 6): laps plus where the racer projects onto a looped line whose zero is
+ *  the finish line. Two seams need care, both measured on the kart: on the grid (before the first gate, the racer sits
+ *  just short of zero, `along` ≈ length) and at the line (the racer wraps past zero a frame BEFORE the finish gate counts
+ *  the lap — unhandled, the finishing frame read a lap down and a race led from the front ended "4th / 4").
+ *  `next` / `lap` are RaceCourse's progress; `gateCount` the course's gates (the last one is the line). */
+export function lapProgress(along: number, length: number, lap: number, next: number, gateCount: number): number {
+  let d = along;
+  if (next === 0 && d > length * 0.5) d -= length;
+  if (next === gateCount - 1 && d < length * 0.25) d += length;
+  return (lap - 1) * length + d;
 }

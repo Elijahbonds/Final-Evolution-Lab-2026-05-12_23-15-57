@@ -40,7 +40,7 @@ import type { FelInput } from '../core/InputBus';
 import { readCourse, startRace, stepRace, type RaceProgress } from '../core/RaceCourse';
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
-  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine,
+  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine, lapProgress,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
@@ -74,7 +74,12 @@ const BANANA_RESPAWN_SEC = 10;
 /** The field is paced against the plane's top speed ×this. RaceField's spread (0.62 + skill × 0.42 of pace) was tuned for
  *  karts that lose time in every corner; a plane on the line with a few bananas out-flew the whole normal field by a lap
  *  (measured: 1st by 20 s, every rival 25–28 m/s against 32). Kart-racer AI has to be in the mirror. */
-const RIVAL_PACE = 1.16;
+// 1.22 (racing pass phase 6, was 1.16): measured over five circuits, the best rival flew 3.5–6 % slower than a pilot
+// racing the line with the items and the boost, and a pilot with NO items, stunts or boost still won two of them (NEON
+// SKYLINE by 309 m). The field now holds a pilot who only flies the line.
+const RIVAL_PACE = 1.22;
+/** How much a bend slows an aero rival (0..1 of pace at a hairpin) — racing pass phase 6, see the rivals' step. */
+const RIVAL_CORNER_BITE = 0.1;
 /** Racer ids in the item system: 0 is the player, rivals are 1..FIELD. */
 const PLAYER_ID = 0;
 
@@ -139,9 +144,9 @@ export function makeAeroAcesMode(): ModeDefinition {
   /** The player's distance along the race: laps done + distance into this one. */
   function playerDist(): number {
     if (!flight || !line) return 0;
-    let d = locate(circuit.line, flight.pos.x, flight.pos.z).dist;
-    if (race.next === 0 && d > circuit.line.length * 0.5) d -= circuit.line.length;   // closing on the line to end a lap
-    return (race.lap - 1) * circuit.line.length + d;
+    // RaceField.lapProgress (racing pass phase 6): the grid seam this always handled, and the frame the plane wraps past
+    // zero before the finish gate counts the lap (the kart's finish froze a lap down on it)
+    return lapProgress(locate(circuit.line, flight.pos.x, flight.pos.z).dist, circuit.line.length, race.lap, race.next, circuit.course.gates.length);
   }
 
   function lineFromCircuit(c: AeroCircuit): RaceLine {
@@ -568,7 +573,10 @@ export function makeAeroAcesMode(): ModeDefinition {
         k.shieldT = Math.max(0, k.shieldT - dt); k.zipT = Math.max(0, k.zipT - dt);
         // INTENT (RACE CONTACT): a blocker crosses in front of you, a bumper leans on your wing, a clean pilot steps round a slower plane
         if (k.stunT <= 0) r.lane = steerLane({ lane: r.lane, dist: r.dist, speed: r.speed, personality: personalityFor(i), home: k.home }, { dist: pDist, lateral: pLat, speed: flight!.speed }, rivals.filter((_, j) => j !== i).map((o) => ({ dist: o.dist, lateral: o.lane, speed: o.speed })), circuit.corridor, lapLen, dt);
-        stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: 0.3 }, race.time);
+        // cornerBite 0.1 (racing pass phase 6, was 0.3): an arcade plane turns at close to full speed, so a field that
+        // lifted 30 % for every bend lost the twisty circuits by itself — measured, a driver flying the line with NO items,
+        // stunts or boost won NEON SKYLINE by 332 m while RED ROCK was a real race. The corners are the pilot's, not a tax.
+        stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
         if (k.stunT > 0) { k.stunT = Math.max(0, k.stunT - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
         // a rival flying a balloon row picks up an item
         const inLap = ((r.dist % lapLen) + lapLen) % lapLen;

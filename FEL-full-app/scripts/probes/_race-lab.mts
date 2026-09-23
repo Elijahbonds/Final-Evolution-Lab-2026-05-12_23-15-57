@@ -52,6 +52,8 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
       window.__RL.trace.push({ v: s.speed, lat: s.lateral, on: s.onRoad, place: s.place ?? (s.race && s.race.place), lap: s.lap }); } catch (e) {} }, 500);
   })()`);
   if (process.env.START) await p.evaluate(`window.__START = '${process.env.START}'`);   // phase 4: the driver's start timing
+  if (process.env.PLAIN === '1') await p.evaluate('window.__PLAIN = 1');   // phase 6: the line alone, no skill verbs
+  if (process.env.LANE) await p.evaluate(`window.__LANE = '${process.env.LANE}'`);   // phase 7: the Free Run lane the driver runs
   if (DRIVER === 'intent') {
     if (!INTENT_DRIVERS[mode]) throw new Error(`no intent driver for ${mode}`);
     await p.evaluate(INTENT_DRIVERS[mode]);

@@ -41,7 +41,7 @@ import {
 } from '../core/RaceCourse';
 import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
 import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
-import { locate } from '../racing/racingLine';
+import { locate, pointAlong, cornerRadiusAt, holdableSpeed } from '../racing/racingLine';
 import { edgeLimit, edgeReturn } from '../racing/courseEdge';   // the outside of the course: off-road is a cost, not a door out
 import { steerLane, resolveContact, nearMisses, personalityFor, CONTACT } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, bumps and punts
 import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, ITEM_KINDS, ITEM_LABEL, type Balloon, type HeldItem, type Missile, type Mine, type ItemKind, type Target } from '../racing/AeroItems';   // the kart's items are the flyers' items on the road
@@ -60,7 +60,7 @@ import { buildTrackside, type TracksideHandle } from '../racing/trackside';   //
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine,
+  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine, raceLineFromPoints, lapProgress,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
@@ -140,6 +140,8 @@ let tier = profileFor(DEFAULT_TIER);
 let kartSpec: KartSpec = KART_STARTER;
 /** The edge of the world the kart can drive to — inside the world ground and outside every course. */
 const WORLD_WALL = 400;
+/** How far above the tier's edge the kart field is paced (racing pass phase 6, measured — see the field's build). */
+const KART_FIELD_EDGE = 0.15;
 /** The world ground's relief under (x, z), for the courses that have any — what the kart rides off the road. */
 let worldHeight: ((x: number, z: number) => number) | null = null;
 let race: RaceProgress = startRace();
@@ -602,6 +604,14 @@ function hitRival(ctx: ModeContext, i: number, what: string, byPlayer: boolean):
   console.info(`[RACE] ${rivals[i].name} ${what.toLowerCase()}${byPlayer ? ' by you' : ''}`);
 }
 /** One frame of the field: intent, pace, stun, items, placement, then contact with the player. */
+/** The speed the road lets the kart hold at a distance along it (racing pass phase 6: the field's physics cap). The rival
+ *  line is built through the circuit's own points, so a rival's distance IS a circuit distance. */
+function holdAtRoad(dist: number): number {
+  if (!circuit) return Infinity;
+  const L = circuit.line.length;
+  return holdableSpeed(cornerRadiusAt(circuit.line, ((dist % L) + L) % L), kartSpec.grip);
+}
+
 function tickField(ctx: ModeContext, dt: number): void {
   if (!state || !line || !kart) return;
   const lapLen = line.lapLength;
@@ -616,7 +626,7 @@ function tickField(ctx: ModeContext, dt: number): void {
     k.shieldT = Math.max(0, k.shieldT - dt); k.zipT = Math.max(0, k.zipT - dt);
     // INTENT: the lane the personality wants (a blocker crosses in front of you, a bumper leans on you, a clean one steps round a slower car)
     if (rivalStun[i] <= 0) r.lane = steerLane({ lane: r.lane, dist: r.dist, speed: r.speed, personality: personalityFor(i), home: rivalHome[i] }, player, others.filter((_, j) => j !== i), halfW, lapLen, dt);
-    stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1) }, race.time);
+    stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
     if (rivalStun[i] > 0) { rivalStun[i] = Math.max(0, rivalStun[i] - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
     // a rival crossing an item row picks up an item, and uses it when it makes sense
     const inLap = ((r.dist % lapLen) + lapLen) % lapLen;
@@ -879,12 +889,18 @@ return {
     else console.warn('[FEL-KART] seated pose could not be built — the driver stands');
 
     // the field: one simplified kart per rival, tinted so they are telling apart at speed
-    line = buildRaceLine(course);
+    // THE FIELD RACES THE ROAD (racing pass phase 6). It raced `buildRaceLine(course)` — straight chords between the
+    // gates, off the tarmac on 13–50 % of every lap (29 m out on the summit's switchbacks) and 2–7 % shorter than the
+    // road, so the rivals cut every corner across the grass. The circuit's own line is the road.
+    line = circuit ? raceLineFromPoints(circuit.line.pts, course.loop) : buildRaceLine(course);
     // THE TIER drives the field's pace. `fieldFor` still decides how MANY rivals a course can hold (a tight
     // circuit cannot take eight karts whatever the difficulty), but how fast they run is the player's pick.
     const shape = fieldFor(course, kartSpec.vMax, kartSpec.grip);
     tier = readProfile();
-    rivals = makeField(shape.count, kartSpec.vMax, tier.edge);
+    // +KART_FIELD_EDGE (racing pass phase 6): on the road — no longer cutting corners across the grass — a PRO field at the
+    // tier's own edge let a clean driver at top speed pull 200 m clear in 50 s on STADIUM OVAL. One notch up: rookie runs
+    // where the kart's fixed 0.5 used to, legend at the ceiling.
+    rivals = makeField(shape.count, kartSpec.vMax, Math.min(1, tier.edge + KART_FIELD_EDGE));
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
     for (const rk of rivalKarts) void dressVehicle(ctx.scene, rk, 'kart', 'rival', { hide: rk.getChildMeshes(), y: KART_GROUND_Y });   // phase 5: the field wears the fifth body
     playerDist = 0;
@@ -956,6 +972,14 @@ return {
           // The race loop itself, so a probe can tell a race that FINISHED from one that merely stopped reporting.
           lap: race.lap, laps: course.laps, next: race.next, time: +race.time.toFixed(2), finished: race.finished, done: S.done,
           start: S.start.go ? S.start.outcome : `count ${S.start.beat}`,
+          // THE LINE AHEAD (racing pass phase 6, dev seam): the yaw to a point a speed-scaled look-ahead down the line,
+          // and the speed the corner coming up can be held at — what a driver who reads the road knows
+          ...(() => {
+            if (!state || !circuit || !at) return {};
+            const v = Math.max(8, state.speed), p = pointAlong(circuit.line, at.dist + Math.max(10, v * 0.75)).pos;
+            const r = cornerRadiusAt(circuit.line, at.dist + v * 1.1);
+            return { aheadYaw: +Math.atan2(p.x - state.pos.x, p.z - state.pos.z).toFixed(3), cornerR: Math.round(r), holdV: +holdableSpeed(r, kartSpec.grip).toFixed(1), halfWidth: circuit.halfWidth };
+          })(),
           along: +playerDist.toFixed(1), lateral: at ? +at.lateral.toFixed(2) : 0, speed: state ? +state.speed.toFixed(1) : 0,
           heading: state ? +state.heading.toFixed(3) : 0, tangentYaw: at ? +Math.atan2(at.tangent.x, at.tangent.z).toFixed(3) : 0, onRoad: state ? onTrack(state.pos, course) : true,
           place: rivals.length ? playerPosition(playerDist, rivals) : 1, item: S.held, events: { ...S.events },
@@ -1154,14 +1178,19 @@ return {
     // 56 m up with the chase camera under the terrain. state.pos.y is the road (or the air over it) every frame.
     kart.position.set(state.pos.x, state.pos.y + KART_RIDE_Y, state.pos.z);
 
-    // THE FIELD MOVES. playerDist is measured as distance TRAVELLED rather than progress along the line, so
-    // a player who cuts a corner does not get credited for the metres they skipped — the standings read the
-    // same racing line the rivals run.
-    playerDist += state.speed * dt;
+    // THE FIELD MOVES. playerDist is PROGRESS ALONG THE ROAD (racing pass phase 6), laps plus where the kart projects
+    // onto the circuit line — the axis the rivals now run. It was distance TRAVELLED, which counted every weave and
+    // every metre on the grass: measured on SUMMIT CLIMB, the HUD read 1st to the end of a race the kart never
+    // finished (a missed checkpoint, called OUT while "leading"). Cutting a corner still earns nothing the gates
+    // do not allow. Aero Aces measures its pilot the same way.
+    // Both seams at the line are RaceField.lapProgress's (tested): the grid, and the frame the kart wraps past zero
+    // before the finish gate counts the lap — unhandled, a race led from the front ended "4th / 4" on six courses.
+    if (circuit) playerDist = lapProgress(locate(circuit.line, state.pos.x, state.pos.z).dist, circuit.line.length, race.lap, race.next, course.gates.length);
+    else playerDist += state.speed * dt;
     // THE GHOST RIDES THE SAME DISTANCE AXIS as the standings: progress is travelled distance over the whole race,
     // so the delta and the placing can never disagree about where the player is.
     if (ghostRec && state) {
-      const full = Math.max(1, courseLength(course) * course.laps);
+      const full = Math.max(1, (circuit ? circuit.line.length : courseLength(course)) * course.laps);
       const progress = Math.min(1, playerDist / full);
       ghostRec.sample({ progress, t: race.time * 1000, x: state.pos.x, y: state.pos.y, z: state.pos.z });
       ghostDelta = deltaMs(bestGhost, progress, race.time * 1000);

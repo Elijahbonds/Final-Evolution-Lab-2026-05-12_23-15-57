@@ -251,59 +251,89 @@ export const INTENT_DRIVERS: Record<string, string> = {
     }, 16);
   `),
 
-  // FREE RUN: the low line — steer onto the boxes, VAULT at a box, JUMP each gap edge, SLIDE the bar, a FLIP or TWIST
-  // in every real air (the course runs along +z; gaps are where one ground slab ends short of the next)
+  // FREE RUN (racing pass phase 7, 2026-09-23): the LANE RUNNER from _freerun-flow.mts, in the page. The first driver
+  // (2026-09-15) predated the three lanes and the seam: it read box meshes, steered by flipping a sign when the runner
+  // moved the wrong way, and fell 19–47 times a run on the auto-started course. This one reads the seam's pieces and
+  // runs ONE lane (window.__LANE, default mid) with RT held: A at a gap edge, a vault at the graded lead, onto a rail and a
+  // spring; the high lane's shaft run OBLIQUE at the far wall for the vector rebound; LT under a bar; X on a hazard; Y on
+  // a full kinetic meter; LB at an anchor; B in a lunge window (the parry-vault), RB beside a runner (the drive-by), A on
+  // a full draft (the slingshot); a right-stick flick in the air.
   freerun: loop(`
-    let sgn = 1, lastX = null, lastCmd = 0, flip = 0;
-    const pieces = () => { const s = Q.scene && Q.scene(); return s ? s.meshes.filter((m) => m.metadata && m.metadata.freerun).map((m) => ({ kind: m.metadata.freerun, x: m.position.x, z: m.position.z, w: m.getBoundingInfo().boundingBox.extendSize.x * 2, d: m.getBoundingInfo().boundingBox.extendSize.z * 2 })) : []; };
-    let P0 = null, lastPress = 0;
+    const LB = 4, RB = 5, LT = 6; const LANE = window.__LANE || 'mid'; const LX = { low: -6, mid: 0, high: 6 };
+    let lastTap = 0, lt = false, sign = 1, wallSide = 0, begun = false;
+    const tap = (i) => btn(i, 50);
     setInterval(() => {
-      const h = Q.hero && Q.hero(); if (!h) return; let r = h; while (r.parent) r = r.parent; const q = r.getAbsolutePosition();
-      if (!P0 || !P0.length) { P0 = pieces(); if (!P0.length) { btn(A); return; } }
-      const now = performance.now();
-      const vault = P0.filter((v) => v.kind === 'vault' && v.z - q.z > -0.2 && v.z - q.z < 9).sort((a, b) => a.z - b.z)[0];
-      const tx = vault ? clamp(vault.x, 2.5) : 0;
-      if (lastX !== null && Math.abs(lastCmd) > 0.2 && Math.abs(q.x - lastX) > 0.004 && Math.sign(q.x - lastX) !== Math.sign(lastCmd * sgn)) sgn = -sgn;
-      lastCmd = clamp((tx - q.x) * 0.5, 0.6); stick(lastCmd * sgn, -1); lastX = q.x;
-      if (now - lastPress < 350) return;
-      // a line is TRICKS ALONG THE ROUTE: between obstacles, jump and throw one (the run's own clock pays the route home)
-      if (q.y < 0.2 && now - lastPress > 1200 && !P0.some((pc) => pc.kind === 'vault' && pc.z - q.z > 0 && pc.z - q.z < 4)) {
-        btn(A); lastPress = now; setTimeout(() => btn((flip++ % 2) ? Y : X, 60), 200); return;
+      const sc = Q.scene && Q.scene(); const f = sc && sc.metadata && sc.metadata.freerun; if (!f) return; const st = f.state();
+      if (st.phase === 'pick') { if (!begun) { begun = true; tap(A); } return; }
+      if (st.phase !== 'run') { hold(RT, false); hold(LT, false); stick(0, 0); return; }
+      hold(RT, true);
+      const z = st.z, x = st.x, now = performance.now(), pieces = st.pieces || [];
+      const ahead = pieces.filter((q) => q.z + q.d / 2 > z - 0.5 && q.z - q.d / 2 < z + 14 && (q.route === LANE || (LANE === 'high' && q.kind === 'wall') || (LANE === 'mid' && q.kind === 'anchor')));
+      let tx = LX[LANE];
+      const vault = ahead.find((q) => q.kind === 'vault' && q.z > z);
+      const bar = ahead.find((q) => q.kind === 'bar' && q.z > z - 0.5);
+      const rail = ahead.find((q) => q.kind === 'rail' && q.z + q.d / 2 > z);
+      const spring = ahead.find((q) => q.kind === 'spring' && q.z > z);
+      const walls = ahead.filter((q) => q.kind === 'wall' && Math.abs(q.z - z) < q.d / 2 + 2);
+      if (vault) tx = vault.x; if (rail) tx = rail.x; if (spring && !rail) tx = spring.x;
+      const inShaft = LANE === 'high' && walls.length >= 2;
+      if (inShaft) { if (st.stats.rebounds !== wallSide) { wallSide = st.stats.rebounds; sign = -sign; } tx = sign > 0 ? 8.3 : 3.7; }
+      stick(inShaft ? sign * 0.75 : clamp((tx - x) * 0.35), -1);
+      const gap = pieces.find((q) => q.kind === 'gap' && q.d > 0 && q.z - q.d / 2 - z > -0.2 && q.z - q.d / 2 - z < 1.3);
+      if (st.state === 'ground' && gap && now - lastTap > 250) { tap(A); lastTap = now; }
+      if (st.state === 'ground') {
+        if (inShaft && st.wallDeg >= 18 && st.wallDeg <= 72 && st.wallDist < 1.4 && now - lastTap > 250) { tap(A); lastTap = now; }
+        else if (vault && st.vaultDist < 90 && st.vaultDist / Math.max(0.5, st.speed) <= 0.19 && now - lastTap > 400) { tap(A); lastTap = now; }
+        else if (rail && !vault && rail.z - rail.d / 2 - z < 1.6 && rail.z - rail.d / 2 - z > -0.2 && now - lastTap > 500) { tap(A); lastTap = now; }
+        const hz = pieces.find((q) => q.kind === 'hazard' && q.z - z > -0.3 && q.z - z < 1.5 && Math.abs(q.x - x) < 1.2);
+        if (hz && now - lastTap > 300) { tap(X); lastTap = now; }
+        if (st.kinetic >= 50 && now - lastTap > 300 && !vault && !rail) { tap(Y); lastTap = now; }
       }
-      for (const pc of P0) {
-        const dz = pc.z - pc.d / 2 - q.z, inX = Math.abs(q.x - pc.x) < pc.w / 2 - 0.2;
-        const gapEdge = pc.kind === 'ground' && !P0.some((g) => g.kind === 'ground' && Math.abs(g.z - g.d / 2 - (pc.z + pc.d / 2)) < 0.05) && (pc.z + pc.d / 2 - q.z) > 0 && (pc.z + pc.d / 2 - q.z) < 0.9;
-        if ((pc.kind === 'vault' && inX && dz > 0 && dz < 1.3) || (gapEdge && q.y > -0.3)) {
-          btn(A); lastPress = now;
-          setTimeout(() => btn((flip++ % 2) ? Y : X, 60), 180);   // a trick in the air
-          return;
-        }
-        if (pc.kind === 'bar' && dz > 0.2 && dz < 1.3 && q.y < 0.2) { btn(B); lastPress = now; return; }
-      }
-    }, 16);
+      if (st.anchor && (st.state === 'ground' || st.state === 'air') && now - lastTap > 200) { tap(LB); lastTap = now; }
+      if (st.race && st.race.lunge && Math.abs(st.race.lunge.inSec) <= 0.2 && now - lastTap > 150) { tap(B); lastTap = now; }
+      const beside = (st.rivals || []).find((r) => !r.finished && r.stumble <= 0 && Math.abs(r.z - z) < 2.0 && Math.abs(r.x - x) < 2.4 && Math.abs(r.x - x) > 0.3);
+      if (beside && st.state === 'ground' && now - lastTap > 400) { tap(RB); lastTap = now; }
+      if (st.race && st.race.draft >= 1 && st.state === 'ground' && now - lastTap > 300) { tap(A); lastTap = now; }
+      const nearBar = !!bar && bar.z - z < 2.2 && bar.z - z > -0.6;
+      if (nearBar !== lt) { lt = nearBar; hold(LT, lt); }
+      if (st.state === 'air' && now - lastTap > 300 && st.speed > 4 && Math.random() < 0.3) { P.axes[3] = -1; touch(); setTimeout(() => { P.axes[3] = 0; touch(); }, 60); lastTap = now; }
+    }, 40);
   `),
   // RACING PASS (2026-09-23): the three racers that had no driver. Each reads the mode's own probe seam and races the line:
   // KART — throttle held, steer onto the line's heading (plus a lateral pull), hold DRIFT (X) into a corner the heading
   // error says is sharp, tap BOOST (R1) on a straight, fire what the balloons gave.
   velocitykart: loop(`
-    const L1 = 4, R1 = 5; let drift = false, lastBoost = 0, lastFire = 0;
+    const LT = 6, R1 = 5; let drift = false, lastFire = 0, boosting = false;
     const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  // THE START (racing pass phase 4): the HUD's \`start\` is the beat on screen. window.__START picks the driver's timing —
-  // 'rocket' (default: throttle down 150 ms after "2" lands), 'early' (held from the first beat: a burnout), 'late' (on "1").
-  let beat = '', beatAt = 0;
-  const startGas = (h) => { if (h.start !== beat) { beat = h.start; beatAt = performance.now(); } const m = window.__START || 'rocket';
-    return m === 'early' ? true : m === 'late' ? beat === '1' : (beat === '2' && performance.now() - beatAt > 150) || beat === '1'; };
+    // THE START (racing pass phase 4): the HUD's \`start\` is the beat on screen. window.__START picks the driver's timing —
+    // 'rocket' (default: throttle down 150 ms after "2" lands), 'early' (held from the first beat: a burnout), 'late' (on "1").
+    let beat = '', beatAt = 0;
+    const startGas = (h) => { if (h.start !== beat) { beat = h.start; beatAt = performance.now(); } const m = window.__START || (window.__PLAIN ? 'late' : 'rocket');
+      return m === 'early' ? true : m === 'late' ? beat === '1' : (beat === '2' && performance.now() - beatAt > 150) || beat === '1'; };
+    // RACING PASS phase 6: a driver who READS THE ROAD — steer at the seam's look-ahead point (aheadYaw), lift and brake for
+    // a corner faster than it can be held (holdV), drift the tight ones (the boost it banks is the reward), burn the boost
+    // on a straight, fire what the balloons gave. The phase 1 driver chased the tangent under the kart and spent a
+    // quarter of the race on the grass.
     setInterval(() => {
       const h = Q.rawHud ? Q.rawHud() : {}; if (h.start) { hold(RT, startGas(h)); stick(0, 0); return; }
       const s = Q.scene && Q.scene(); const k = s && s.metadata && s.metadata.kart; if (!k) return; const st = k.state();
-      if (st.done) { hold(RT, false); hold(X, false); stick(0, 0); return; }
-      const err = wrap((st.tangentYaw || 0) - (st.heading || 0));
-      stick(clamp(err * 1.4 - st.lateral * 0.08), 0); hold(RT, true);
-      const wantDrift = Math.abs(err) > 0.32 && st.speed > 12;
+      if (st.done) { hold(RT, false); hold(X, false); hold(LT, false); hold(R1, false); stick(0, 0); return; }
+      const err = wrap((st.aheadYaw ?? st.tangentYaw ?? 0) - (st.heading || 0));
+      const holdV = st.holdV || 99, over = st.speed > holdV * 1.04;
+      // window.__PLAIN: the same line and braking with NO skill verbs (no drift, boost, items, rocket) — the contrast that
+      // says whether the skills, not the line alone, decide the race
+      const PLAIN = !!window.__PLAIN;
+      // drift only a real hairpin, from the middle of the road, and ease the steering while the rear is out (a full-gain
+      // steer in a slide carried the kart wide into the snow on SUMMIT CLIMB: 19 % of the race off the road)
+      const edge = Math.abs(st.lateral || 0) / Math.max(1, st.halfWidth || 9);
+      const wantDrift = !PLAIN && (st.cornerR || 999) < 42 && st.speed > 16 && Math.abs(err) > 0.12 && edge < 0.5;
+      stick(clamp(err * (drift ? 1.7 : 2.4) - (edge > 0.7 ? Math.sign(st.lateral) * 0.3 : 0)), 0);
       if (wantDrift !== drift) { drift = wantDrift; hold(X, drift); }
+      hold(RT, !over || drift); hold(LT, !drift && st.speed > holdV * 1.18);
+      const wantBoost = !PLAIN && (st.cornerR || 0) > 110 && Math.abs(err) < 0.1 && Number(h.boost) > 25 && !over;
+      if (wantBoost !== boosting) { boosting = wantBoost; hold(R1, boosting); }
       const now = performance.now();
-      if (!drift && Math.abs(err) < 0.08 && now - lastBoost > 2500) { btn(R1, 400); lastBoost = now; }
-      if (st.item && now - lastFire > 1500) { btn(A); lastFire = now; }
+      if (!PLAIN && st.item && now - lastFire > 1500) { btn(A); lastFire = now; }
     }, 33);
   `),
   // AERO — the DKR line-follower (_aero-dkr-eye): yaw onto the line's tangent, pitch to the line's height, GAS held, fire
@@ -313,7 +343,7 @@ export const INTENT_DRIVERS: Record<string, string> = {
   // THE START (racing pass phase 4): the HUD's \`start\` is the beat on screen. window.__START picks the driver's timing —
   // 'rocket' (default: throttle down 150 ms after "2" lands), 'early' (held from the first beat: a burnout), 'late' (on "1").
   let beat = '', beatAt = 0;
-  const startGas = (h) => { if (h.start !== beat) { beat = h.start; beatAt = performance.now(); } const m = window.__START || 'rocket';
+  const startGas = (h) => { if (h.start !== beat) { beat = h.start; beatAt = performance.now(); } const m = window.__START || (window.__PLAIN ? 'late' : 'rocket');
     return m === 'early' ? true : m === 'late' ? beat === '1' : (beat === '2' && performance.now() - beatAt > 150) || beat === '1'; };
     setInterval(() => {
       const h = Q.rawHud ? Q.rawHud() : {}; if (h.start) { hold(RT, startGas(h)); stick(0, 0); return; }
@@ -326,6 +356,7 @@ export const INTENT_DRIVERS: Record<string, string> = {
         stick(clamp(err * 2.2 - st.lateral * 0.06), clamp((st.lineY - st.pos.y) * 0.12));
       }
       const now = performance.now();
+      if (window.__PLAIN) return;   // the line alone: no items, stunts or boost (see the kart's __PLAIN)
       if (st.item && now - lastFire > 1500) { btn(A); lastFire = now; }
       if (Math.abs(err) < 0.05 && now - lastStunt > 9000) { btn(B); lastStunt = now; }
       else if (Math.abs(err) < 0.1 && now - lastBoost > 3000) { btn(R1, 400); lastBoost = now; }
