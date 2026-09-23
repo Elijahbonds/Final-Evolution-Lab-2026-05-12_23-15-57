@@ -44,6 +44,7 @@ import {
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
+import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy plane bodies over the toy primitives
 import { refuse } from '../core/Refusal';
 import {
   ARCADE_TRAINER, arcadeFrom, spawnArcade, stepArcade, startStunt, dodging, spinOut, wallTurn, forwardOf,
@@ -175,6 +176,7 @@ export function makeAeroAcesMode(): ModeDefinition {
     rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, touch: false, alongside: false }));
     S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0 };
     rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
+    for (const rp of rivalPlanes) void dressVehicle(scene, rp.root, 'plane', 'rival', { hide: rp.parts });   // phase 5: the field wears the fifth body
   }
 
   function resetPickups(): void {
@@ -294,6 +296,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       resetPickups();
 
       player = buildToyPlane(ctx.scene, 'player', '#e63946', '#ffd166');
+      { const pl = player; void dressVehicle(ctx.scene, pl.root, 'plane', readPlane().id, { hide: pl.parts }); }   // phase 5: the garage pick's body
       // THE PILOT IN THE OPEN COCKPIT: the hero, seated, chest up out of the rim. Parented to the seat, so the plane
       // carries the body through every roll and loop with no second copy of the attitude maths.
       pilot = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 0), yawRad: 0, startClip: 'idle_stand' });

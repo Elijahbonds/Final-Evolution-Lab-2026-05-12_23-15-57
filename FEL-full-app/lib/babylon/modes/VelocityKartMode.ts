@@ -63,6 +63,7 @@ import {
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
+import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -814,6 +815,8 @@ return {
     road = buildRoad(ctx);
     marks = buildMarks(ctx);
     kart = buildKart(ctx);
+    // models pass phase 5: the garage pick's Meshy body mounts under the root; the primitives hide when it arrives (and stay if it never does)
+    { const k = kart; void dressVehicle(ctx.scene, k, 'kart', kartId, { hide: k.getChildMeshes(), y: KART_GROUND_Y }); }
 
     state = spawnKart(course.start.at, course.start.heading);
     if (circuit) state.pos.y = circuit.surfaceAt(state.pos.x, state.pos.z);
@@ -857,6 +860,7 @@ return {
     tier = readProfile();
     rivals = makeField(shape.count, kartSpec.vMax, tier.edge);
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
+    for (const rk of rivalKarts) void dressVehicle(ctx.scene, rk, 'kart', 'rival', { hide: rk.getChildMeshes(), y: KART_GROUND_Y });   // phase 5: the field wears the fifth body
     playerDist = 0;
     // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
     ghostRec = new GhostRecorder();

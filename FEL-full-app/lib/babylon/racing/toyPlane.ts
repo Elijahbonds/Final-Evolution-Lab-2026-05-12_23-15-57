@@ -26,6 +26,8 @@ export interface ToyPlane {
   /** The scarf's anchor at the pilot's neck (local to root). */
   scarfAnchor: TransformNode;
   body: PBRMaterial;
+  /** the primitive parts (models pass phase 5: a dressed Meshy body hides them) */
+  parts: Mesh[];
   dispose(): void;
 }
 
@@ -129,6 +131,7 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
 
   return {
     root, prop, seat, scarfAnchor, body,
+    parts,
     dispose() { for (const p of parts) p.dispose(); model.dispose(); root.dispose(); },
   };
 }
