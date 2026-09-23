@@ -89,6 +89,31 @@ export function jumpSwats(k: number, jumpAgeSec: number, dist: number): boolean 
  *  of ten timed jumps. A 0.75 s jump (JUMP_SEC) is still in the air, hand up, at 0.62. */
 export const SWAT_JUMP_MAX_SEC = 0.62;
 
+/**
+ * THE CONTEST READ (HOOPS-DEPTH S5, 2026-09-23). 2K27 grades every contest on an eight-tier, colour-coded scale and draws it
+ * under the shooter as an arc; a player learns what a contest IS from that read. FEL's release said CONTESTED at ≥ 0.5, WIDE
+ * OPEN at ≤ 0.15 and nothing in between — the band the make chance actually moves through (contestedPct bites up to
+ * CONTEST_PCT_BITE across it). Five tiers, and the number: what the release names is what contestedPct charged for.
+ */
+export type ContestTier = 'wideOpen' | 'open' | 'light' | 'contested' | 'smothered';
+export const CONTEST_TIERS: readonly { min: number; tier: ContestTier; label: string }[] = [
+  { min: 0.75, tier: 'smothered', label: 'SMOTHERED' },
+  { min: 0.5, tier: 'contested', label: 'CONTESTED' },
+  { min: 0.35, tier: 'light', label: 'LIGHT CONTEST' },
+  { min: 0.15, tier: 'open', label: 'OPEN' },
+  { min: 0, tier: 'wideOpen', label: 'WIDE OPEN' },
+];
+export function contestTier(contest01: number): { tier: ContestTier; label: string; pct: number } {
+  const c = Math.max(0, Math.min(1, Number.isFinite(contest01) ? contest01 : 0));
+  const row = CONTEST_TIERS.find((r) => c >= r.min) ?? CONTEST_TIERS[CONTEST_TIERS.length - 1];
+  return { tier: row.tier, label: row.label, pct: Math.round(c * 100) };
+}
+/** The release's contest tag: ` — CONTESTED 62%`; the open tiers carry no number (nothing was charged for). */
+export function contestTag(contest01: number): string {
+  const t = contestTier(contest01);
+  return t.tier === 'wideOpen' || t.tier === 'open' ? ` — ${t.label}` : ` — ${t.label} ${t.pct}%`;
+}
+
 /** The make chance under a contest: a hand in the shot costs up to CONTEST_PCT_BITE of it. */
 export function contestedPct(pct: number, contest01: number): number {
   return Math.max(0, pct * (1 - CONTEST_PCT_BITE * Math.max(0, Math.min(1, contest01))));

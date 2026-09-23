@@ -105,6 +105,7 @@ import {   // HOOPS-MOVE-KIT-A
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package (the 1v1's, on the team game)
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
+  contestTag,   // HOOPS-DEPTH S5
 } from '../core/HoopsDefense';
 import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
@@ -1790,7 +1791,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     ctx.setHud({ shotType: '' });
     // SHOT FEEDBACK (same contract as 1v1): the release names the quality and
     // the contest at the moment you let go — before the arc decides anything.
-    const tag = (shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '') + (banked ? ' — OFF THE GLASS' : '');
+    const tag = contestTag(shotContest) + (banked ? ' — OFF THE GLASS' : '');   // HOOPS-DEPTH S5: five tiers + the number charged
     if (quality === 'perfect') ctx.setHud({ banner: `GREEN!${tag}` });
     else if (quality === 'early') ctx.setHud({ banner: `EARLY${tag}` });
     else if (quality === 'late') ctx.setHud({ banner: `LATE${tag}` });

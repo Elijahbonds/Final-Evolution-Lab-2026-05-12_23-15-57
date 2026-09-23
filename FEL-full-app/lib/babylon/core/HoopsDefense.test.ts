@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, SWAT_JUMP_MAX_SEC, contestedPct, alteredApex, aiHandsUp, facingCos,
+  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, SWAT_JUMP_MAX_SEC, contestedPct, alteredApex, aiHandsUp, facingCos, contestTier, contestTag,
   HAND_UP_CONTEST, HAND_UP_RANGE, BUMP_STRIP_WINDOW_SEC, BUMP_STRIP_EXPOSURE, AI_BLOCK_RANGE, AI_BLOCK_BASE, CONTEST_PCT_BITE, ALTER_APEX_ADD,
 } from './HoopsDefense';
 import { STEAL_EXPOSURE_MIN, BLOCK_WINDOW_SEC } from './BasketballCore';
@@ -51,6 +51,20 @@ describe('D1 — the block', () => {
     expect(jumpSwats(0.5, 0.6, 1.0)).toBe(true);                         // the hang: a jump timed on the gather tell is 0.6 s old when the flight reaches the rim
     expect(jumpSwats(0.5, SWAT_JUMP_MAX_SEC + 0.01, 1.0)).toBe(false);   // …and on the way down it is over
     expect(jumpSwats(0.3, 0.1, AI_BLOCK_RANGE + 0.2)).toBe(false);       // out of reach
+  });
+});
+
+describe('S5 — the contest read (HOOPS-DEPTH)', () => {
+  it('five tiers over the band the make chance moves through, and the number is what was charged', () => {
+    expect(contestTier(0).tier).toBe('wideOpen'); expect(contestTier(0.14).tier).toBe('wideOpen');
+    expect(contestTier(0.15).tier).toBe('open'); expect(contestTier(0.34).tier).toBe('open');
+    expect(contestTier(0.35).tier).toBe('light'); expect(contestTier(0.5).tier).toBe('contested'); expect(contestTier(0.74).tier).toBe('contested');
+    expect(contestTier(0.75).tier).toBe('smothered'); expect(contestTier(1).tier).toBe('smothered'); expect(contestTier(3).pct).toBe(100);
+    expect(contestTag(0.62)).toBe(' — CONTESTED 62%'); expect(contestTag(0.9)).toBe(' — SMOTHERED 90%');
+    expect(contestTag(0.05)).toBe(' — WIDE OPEN'); expect(contestTag(0.2)).toBe(' — OPEN');   // nothing charged worth a number
+    expect(contestTier(Number.NaN).tier).toBe('wideOpen');
+    // the tiers climb with the bite: a higher tier never costs less
+    let last = 1; for (const c of [0, 0.15, 0.35, 0.5, 0.75, 1]) { const p = contestedPct(1, c); expect(p).toBeLessThanOrEqual(last + 1e-9); last = p; }
   });
 });
 

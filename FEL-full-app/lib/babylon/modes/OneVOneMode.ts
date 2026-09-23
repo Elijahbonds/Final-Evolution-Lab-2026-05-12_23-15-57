@@ -171,6 +171,7 @@ import {   // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7 the running hook, M8 the 
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE,
+  contestTag, contestTier,   // HOOPS-DEPTH S5
 } from '../core/HoopsDefense';
 import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
 import { MomentumBus } from '../core/MomentumBus';
@@ -1946,8 +1947,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.start(ball.getAbsolutePosition(), RIM, made, style, alteredApex(contest), rivalBank, rivalVerdict.play);   // a strong contest ALTERS the release; RIM PLAY
     console.info(`[1V1-DEF] rival release ${style} contest ${contest.toFixed(2)} handUp ${ground > 0} pct ${rivalShotPct(range, contest, style).toFixed(2)}`);
     // the read at the release, before the arc lands — same as the hero's GREEN / CONTESTED tags
-    if (contest >= 0.5) bannerFlash(ctx, ground > 0 ? 'CONTESTED — HAND UP!' : 'CONTESTED!', 500);
-    else if (contest <= 0.15) bannerFlash(ctx, 'WIDE OPEN…', 500);
+    // HOOPS-DEPTH S5: the rival's release is read on the same five tiers as mine, with the number my contest charged him
+    { const t = contestTier(contest); bannerFlash(ctx, t.tier === 'wideOpen' ? 'WIDE OPEN…' : t.tier === 'open' ? 'OPEN LOOK' : `${t.label} ${t.pct}%${ground > 0 ? ' — HAND UP!' : ''}`, 500); }
   }
 
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster' | 'standing', force?: HoopsDunk): void {   // STICK HANDLE: pausin' forces its 360
@@ -2662,7 +2663,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     // the arc resolves. Quality word + contest tag: an early contested
     // fadeaway that rims out was legible as a bad shot before it landed.
     // Before this, only a perfect release said anything at all.
-    const tag = (shotContest >= 0.5 ? ' — CONTESTED' : shotContest <= 0.15 ? ' — WIDE OPEN' : '') + (banked ? ' — OFF THE GLASS' : '');
+    // HOOPS-DEPTH S5: the contest is read on five tiers with the number it charged (contestTag), not CONTESTED / WIDE OPEN / nothing
+    const tag = contestTag(shotContest) + (banked ? ' — OFF THE GLASS' : '');
     if (quality === 'perfect') {
       SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 });
       SoundKit.play('crowdCheer', { volume: 0.35 });
