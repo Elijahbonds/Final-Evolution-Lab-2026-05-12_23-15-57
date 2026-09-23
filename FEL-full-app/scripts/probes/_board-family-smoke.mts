@@ -16,6 +16,8 @@ const MODES = (process.argv[4] ?? 'surf,snowboard,bigair').split(',');
 // DRIVER=intent: install the mode's intent driver (under ?agent=1) instead of holding the stick forward — the body is
 // sampled while the mode is PLAYED (a swing, a spike, a strike), not while it stands
 const INTENT = process.env.DRIVER === 'intent';
+// HERO=/models/x.glb (models pass phase 6): the dev runner's ?hero= override — the sampled body is the given file
+const HERO = process.env.HERO ?? '';
 const HOLD_MS = Number(process.env.HOLD_MS ?? 12000);
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -24,7 +26,8 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const onMsg = (t: string) => { if (/ERROR|MISSING|Error|WARN/i.test(t)) logs.push(t.slice(0, 200)); };
   p.on('console', (m) => onMsg(m.text()));
   p.on('pageerror', (e) => logs.push('PAGEERROR ' + String(e).slice(0, 200)));
-  await p.goto(`http://127.0.0.1:${PORT}/dev/mode/${mode}${INTENT ? '?agent=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  const q = [INTENT ? 'agent=1' : '', HERO ? `hero=${encodeURIComponent(HERO)}` : ''].filter(Boolean).join('&');
+  await p.goto(`http://127.0.0.1:${PORT}/dev/mode/${mode}${q ? `?${q}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await p.waitForSelector('canvas', { timeout: 240000 });
   for (let i = 0; i < 120; i++) {
     const txt = await p.evaluate(() => document.body.innerText);
@@ -51,6 +54,9 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
       const wt = (g: any) => (g.weight === undefined || g.weight < 0 ? 1 : g.weight);
       const rp = root ? root.getAbsolutePosition() : null;
       rows.push({
+        // models pass phase 8: the frame's cost — fps, active meshes, the skinned vertices on screen (perf before / after the bodies)
+        fps: +dev.scene.getEngine().getFps().toFixed(1), active: dev.scene.getActiveMeshes().length,
+        skinned: dev.scene.meshes.reduce((n: number, m: any) => n + (m.skeleton && m.isEnabled() ? (m.getTotalVertices?.() ?? 0) : 0), 0),
         // phase 8: the root's position and the frame's dt — speed and distance are computed off these in Node
         px: rp ? rp.x : null, py: rp ? rp.y : null, pz: rp ? rp.z : null, dt: dev.scene.getEngine().getDeltaTime() / 1000,
         eL: ang(B.LS, B.LE, B.LH), eR: ang(B.RS, B.RE, B.RH),
@@ -84,7 +90,9 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   }
   const sorted = [...speeds].sort((x, y) => x - y);
   const speed = speeds.length ? { mean: +(speeds.reduce((s, v) => s + v, 0) / speeds.length).toFixed(2), p90: +(sorted[Math.floor(sorted.length * 0.9)] ?? 0).toFixed(2), peak: +(sorted[sorted.length - 1] ?? 0).toFixed(2), dist: +dist.toFixed(1) } : null;
-  return { mode, frames: rows.length, armFrames: arms.length, tee, teeBy, speed, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
+  const fpsRows = rows.filter((r) => typeof r.fps === 'number' && r.fps > 0).map((r) => r.fps as number).sort((a, b) => a - b);
+  const perf = fpsRows.length ? { fpsMedian: fpsRows[Math.floor(fpsRows.length / 2)], fpsP10: fpsRows[Math.floor(fpsRows.length * 0.1)], activeMax: Math.max(...rows.map((r) => r.active ?? 0)), skinnedMax: Math.max(...rows.map((r) => r.skinned ?? 0)) } : null;
+  return { mode, frames: rows.length, armFrames: arms.length, tee, teeBy, speed, perf, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
 }
 
 async function main() {
