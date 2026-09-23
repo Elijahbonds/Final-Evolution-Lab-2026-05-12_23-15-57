@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "m22-6d8c65ad",
+  "note": "Lakers-style tank, purple shorts, tattoos",
+  "source": "Meshy character drop 2026-09-22 (6d8c65ad-7907-4690-801f-c9d0f4acfe0f)",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor), decimate-pack.py 0.6 / 1K (scripts/meshy/batch-meshy22.sh)"
+}

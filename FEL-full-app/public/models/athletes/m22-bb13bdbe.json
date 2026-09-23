@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "m22-bb13bdbe",
+  "note": "Venice Beach tank, teal shorts",
+  "source": "Meshy character drop 2026-09-22 (bb13bdbe-6812-4c2e-bc6e-7c747cd64c83)",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor), decimate-pack.py 0.6 / 1K (scripts/meshy/batch-meshy22.sh)"
+}

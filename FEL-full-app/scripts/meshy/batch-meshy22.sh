@@ -24,6 +24,7 @@ for d in "$DROP"/*/; do
   $B -b --python scripts/meshy/skin-transfer.py -- "$src" "$DONOR" "$raw" "$H" 2048 2>&1 | grep "^WROTE\|^ARMS\|Error\|Traceback" | cut -c1-160
   $B -b --python scripts/meshy/decimate-pack.py -- "$raw" "$OUT/m22-$id8.glb" 1.0 2048 2>&1 | grep "FELDEC wrote\|Error\|Traceback" | cut -c1-160
   $B -b --python scripts/meshy/decimate-pack.py -- "$raw" "$OUT/m22-$id8.mobile.glb" 0.6 1024 2>&1 | grep "FELDEC wrote\|Error\|Traceback" | cut -c1-160
+  $B -b --python scripts/meshy/skin-float32.py -- "$OUT/m22-$id8.glb" "$OUT/m22-$id8.mobile.glb" 2>&1 | grep "float32" | cut -c1-120   # the shipped-avatar gate: float32 skins
   b1=$(stat -f%z "$OUT/m22-$id8.glb" 2>/dev/null || echo 0); b2=$(stat -f%z "$OUT/m22-$id8.mobile.glb" 2>/dev/null || echo 0)
   [ $first = 1 ] || echo ',' >> "$OUT/manifest.json"; first=0
   printf '  {"id": "%s", "source": "%s", "desktop": "m22-%s.glb", "desktopBytes": %s, "mobile": "m22-%s.mobile.glb", "mobileBytes": %s}' "$id8" "$id" "$id8" "$b1" "$id8" "$b2" >> "$OUT/manifest.json"

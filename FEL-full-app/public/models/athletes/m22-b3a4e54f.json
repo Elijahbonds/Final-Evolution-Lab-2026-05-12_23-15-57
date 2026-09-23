@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "m22-b3a4e54f",
+  "note": "Venice tee, denim shorts, shoulder bag",
+  "source": "Meshy character drop 2026-09-22 (b3a4e54f-eb98-46f4-98b2-8b7270571e82)",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor), decimate-pack.py 0.6 / 1K (scripts/meshy/batch-meshy22.sh)"
+}

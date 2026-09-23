@@ -1,0 +1,9 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "m22-c19ac82e",
+  "note": "teal singlet, black shorts over tights (a runner)",
+  "source": "Meshy character drop 2026-09-22 (c19ac82e-bb1d-459e-a1a4-6f228bb2d46f)",
+  "rig": "skin-transfer.py from public/models/elijah-meshy.glb (22 joints, T-pose donor), decimate-pack.py 0.6 / 1K (scripts/meshy/batch-meshy22.sh)"
+}
