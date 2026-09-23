@@ -16,6 +16,7 @@ const OUT = process.env.OUT ?? '/tmp/model-sheet';
 const URLS = (process.env.URLS ?? '/models/athletes/flint.glb').split(',');
 const NAMES = (process.env.NAMES ?? '').split(',').filter(Boolean);
 const SPORT = process.env.SPORT ?? 'tennis_swing';
+const STATIC = process.env.STATIC === '1';   // props / vehicles: loaded as meshes on the viewer's static path, no clips
 fs.mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ executablePath: chromiumExe(), args: ['--use-gl=angle', '--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 560, height: 720 } });
@@ -31,13 +32,17 @@ const sample = async (ms: number) => {
 for (let i = 0; i < URLS.length; i++) {
   const url = URLS[i], name = NAMES[i] ?? url.split('/').pop()!.replace(/\.glb$/, '');
   errors.length = 0;
-  await p.goto(`${BASE}/dev/model?url=${encodeURIComponent(url)}&clip=idle_stand`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await p.goto(`${BASE}/dev/model?url=${encodeURIComponent(url)}&clip=idle_stand${STATIC ? '&static=1' : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   const t0 = Date.now(); let ready: unknown = null;
   while (Date.now() - t0 < 90000) { ready = await model('M.ready ? M : null'); if (ready) break; await p.waitForTimeout(250); }
   const report = (await model('M.report ?? null')) as Record<string, unknown> | null;
   const err = (await model('M.error ?? null')) as string | null;
   const row: Record<string, unknown> = { name, url, report, error: err, ready: !!ready };
-  if (ready && !err) {
+  if (ready && !err && STATIC) {
+    await p.waitForTimeout(700);
+    await p.screenshot({ path: `${OUT}/${name}-front.png` });
+    await model('M.turn(-50)'); await p.waitForTimeout(250); await p.screenshot({ path: `${OUT}/${name}-turn.png` }); await model('M.turn(0)');
+  } else if (ready && !err) {
     await p.waitForTimeout(900);
     const idle = await sample(1000); row.idleTee = `${idle.tee}/${idle.samples}`; row.idleElbows = idle.last;
     await p.screenshot({ path: `${OUT}/${name}-front.png` });

@@ -239,7 +239,7 @@ export const CharacterLibrary = {
       const n = opponentSeq.get(scene) ?? 0; opponentSeq.set(scene, n + 1);
       rosterSeed = `opponent-${n}`;
     }
-    const rosterUrl = role === 'opponent' ? rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed) : null;
+    const rosterUrl = role === 'opponent' ? rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed, (scene.metadata?.felModeId as string | undefined) ?? null) : null;   // phase 7: the mode's cast
     let effectiveUrl = url;
     let rosterPicked = false;
     let container: AssetContainer;
