@@ -48,6 +48,7 @@ import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
 import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
+import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '../core/CourtMovement';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
 import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
@@ -699,6 +700,15 @@ export const DunkMode: ModeDefinition = (() => {
     const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
     return new Vector3((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);   // up is −y on every source
   }
+  /** HOOPS-DEPTH S1: the approach's locomotion model — the hoops gears (walk under `walkStick`, jog, HOLD = sprint), the
+   *  loaded first step, the stop that scales with pace and the cut cost, on the dunk's own top speed. `stickVel` gives the
+   *  camera-relative WORLD intent; the model takes stick space (+Y = −Z), so the world vector is folded back through the
+   *  same top speed. Reset with the attempt (`approachMove.stop()`). */
+  const approachMove = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: APPROACH_SPEED, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS });
+  function approachStep(stickWorld: Vector3, dt: number): Vector3 {
+    const st = approachMove.update(dt, stickWorld.x / APPROACH_SPEED, -stickWorld.z / APPROACH_SPEED, runHeld > 0.02);
+    return st.vel;
+  }
   /** Face the way we move (OneVOne / KarateEndless); a still hero keeps his last heading. Slewed at TURN_RATE (shortest
    *  arc) so a flick is a turn, not a snap. The root yaws by Euler — a rotationQuaternion (the replay's) would silently
    *  win over rotation.y, so it is cleared here. */
@@ -1178,7 +1188,14 @@ export const DunkMode: ModeDefinition = (() => {
       // which is screen-LEFT when the follow camera looks down −Z (Babylon is left-handed). Now the stick is
       // camera-relative (up = the camera's forward = the rim, right = screen right), its magnitude is the speed,
       // and the facing follows the velocity every approach / charge frame (the OneVOne / KarateEndless pattern).
-      const vel = stickVel(ctx);
+      // HOOPS-DEPTH S1 (2026-09-23): THE APPROACH HAS WEIGHT. The stick used to be a flat 6 m/s the frame it moved and zero
+      // the frame it let go (stickVel × APPROACH_SPEED: no ramp, no stop, no gears — measured: speed mean 0.51 / peak 6.0
+      // with nothing between), while 1v1 / 3v3 ride CourtMovement's walk / jog / sprint gears, the loaded first step,
+      // the speed-scaled stop and the cut cost. The runway now rides the same model: a soft stick walks, a pushed one
+      // jogs, HOLD (RUN) is the sprint that hands the charge its speed; a cut at pace is paid for. The charge's own
+      // hold-run ramp (holdRunSpeed) is untouched — it starts from whatever pace the approach reached.
+      const stickWorld = stickVel(ctx);
+      const vel = phase === 'approach' && !busRun ? approachStep(stickWorld, dt) : stickWorld;
       if (busRun && (phase === 'approach' || phase === 'charge')) busRunTick(ctx, dt);   // THE BUS WALL RUN owns the body
       if (phase === 'approach' && !busRun) {
         player.root.position.addInPlace(vel.scale(dt));
@@ -3133,7 +3150,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.setHud({ bannerHigh: false });
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
-    player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0;
+    player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0; approachMove.stop();
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
     armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });

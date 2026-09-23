@@ -699,6 +699,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         refuse(ctx, carrierId === 'foeTeam' ? 'NO BALL TO PASS' : 'YOUR TEAMMATE HAS IT');   // SCORECARD CONTROLS (2026-09-15)
       } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId === 'foeTeam') {
         refuse(ctx, 'NOBODY TO SCREEN FOR ON D');   // Circle is the screen call; on defence it is the charge, held
+      } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId !== 'me') {
+        // HOOPS-DEPTH phase 3 (2026-09-23): the screen call only fires while I carry (the update below), so a press while a
+        // mate had the ball reached nothing — the mechanics probe's "silent B 5/6" on 3v3. The call is answered every time.
+        refuse(ctx, 'YOUR TEAMMATE HAS IT — GET OPEN FOR THE PASS');
+      } else if (e.t === 'button' && e.btn === 'B' && e.pressed) {
+        // …and the CALL itself is heard as Circle goes down, the way the shot's gather is heard on Square below: the
+        // SCREEN COMING line rides the slot's intent (the update), which an agent-driven slot never carries from the pad.
+        SoundKit.play('uiTick', { pitch: 0.9, volume: 0.3 });
       } else if (e.t === 'dpad' && e.pressed) {
         refuse(ctx, 'MOVE WITH THE STICK');   // the d-pad is not a verb here, and a dead direction reads as a dead pad
       }
@@ -987,7 +995,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
           ctx.juice.callout('SCREEN COMING', '#fcd34d', 520);
           console.info('[3V3-OFF] screen called');
-        }
+        } else refuse(ctx, 'NO SCREENER FREE');   // HOOPS-DEPTH phase 3: a call nobody can answer still gets an answer
       }
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);

@@ -827,6 +827,14 @@ export const OneVOneMode: ModeDefinition = (() => {
         else if (e.btn === 'X' && Vector3.Distance(me.root.position, foe.root.position) > 1.7) refuse(ctx, 'TOO FAR TO REACH');
       } else if (e.t === 'button' && e.pressed && e.btn === 'B' && possession === 'mine') {
         refuse(ctx, 'NO TEAMMATE TO SCREEN');   // Circle calls a screen in 3v3; one-on-one there is nobody to call
+      } else if (e.t === 'button' && e.pressed && e.btn === 'B') {
+        // HOOPS-DEPTH phase 3 (2026-09-23): TAKE THE CHARGE is a hold read in update (takingCharge) — the press itself said
+        // nothing until a drive arrived, so a defender planting with nobody coming heard a dead button (mechanics probe:
+        // B silent 2/7). The plant is announced on the press; a body that cannot plant says why.
+        if (meStunSec > 0) refuse(ctx, 'STUNNED');
+        else if (meFloored) refuse(ctx, 'ON THE FLOOR');
+        else if (myJumpAge !== Infinity) refuse(ctx, 'IN THE AIR');
+        else { SoundKit.play('uiTick', { pitch: 0.8, volume: 0.3 }); ctx.juice.callout('PLANTED — TAKE THE CHARGE', '#cbd5e1', 420); }
       }
       // The SHOT's gather is heard as SQUARE goes down (the meter it starts is a number, which reads as nothing).
       // There is no "SHOOT ON OFFENSE" refusal on this button any more: under the 2K map Square is the STEAL when

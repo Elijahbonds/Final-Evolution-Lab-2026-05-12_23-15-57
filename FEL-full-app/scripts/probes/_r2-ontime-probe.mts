@@ -116,9 +116,18 @@ async function waitApproach(p: Page, ms = 45000): Promise<boolean> {
   return false;
 }
 async function setPropNone(p: Page): Promise<void> { for (let i = 0; i < 16; i++) { if (/\bNO PROP\b/i.test(await text(p))) return; await tap(p, 2, 100); await p.waitForTimeout(320); } }
-/** Wait for the beat to reach `want` (or any of them), polling every animation frame. */
-async function waitBeat(p: Page, want: RegExp, timeout: number): Promise<boolean> {
-  try { await p.waitForFunction(([js, re]) => new RegExp(re).test(String(eval(js))), [BEAT_JS, want.source] as [string, string], { polling: 'raf', timeout }); return true; } catch { return false; }
+/** Wait for the beat to reach `want` (or any of them), polling every animation frame. With `press`, the SAME frame that sees
+ *  it presses A in the page (no node round trip: the beat is 140 ms wide and three evaluates under CPU load took 300 ms —
+ *  measured, a press 170 ms after the window closed) and stamps `window.__r2press` with the page clock. */
+async function waitBeat(p: Page, want: RegExp, timeout: number, press = false): Promise<boolean> {
+  try {
+    await p.waitForFunction(([js, re, doPress]) => {
+      if (!new RegExp(re).test(String(eval(js)))) return false;
+      if (doPress) { const pad = (window as unknown as { __PAD?: { buttons: { pressed: boolean; value: number }[]; timestamp: number } }).__PAD; if (pad) { pad.buttons[0].pressed = true; pad.buttons[0].value = 1; pad.timestamp = performance.now(); (window as unknown as { __r2press?: number }).__r2press = performance.now(); } }
+      return true;
+    }, [BEAT_JS, want.source, press] as [string, string, boolean], { polling: 'raf', timeout });
+    return true;
+  } catch { return false; }
 }
 
 interface Shot { i: number; pt: number; file: string }
@@ -176,15 +185,23 @@ async function attempt(p: Page, rig: boolean, n: number): Promise<Record<string,
   await padSet(p, 'p.buttons[7].pressed = false; p.buttons[7].value = 0; p.axes[1] = 0');
   let pressedAtPage = -1, pressedOn = '';
   if (eye || cueSeen) {
-    let ok = true;
+    let ok = true, inPage = false;
     if (eye) await p.waitForTimeout(Number(eye[2] ?? 400));
-    else if (PRESS === 'beat') ok = await waitBeat(p, /^beat$/, 3000);
-    else if (PRESS === 'open') ok = await waitBeat(p, /^(open|beat)$/, 3000);
+    else if (PRESS === 'beat') { ok = await waitBeat(p, /^beat$/, 3000, true); inPage = ok; }
+    else if (PRESS === 'open') { ok = await waitBeat(p, /^(open|beat)$/, 3000, true); inPage = ok; }
     else if (PRESS.startsWith('fixed:')) await p.waitForTimeout(Number(PRESS.slice(6)) || 0);   // a stopwatch from the CUE, not from RUN
-    pressedOn = await beat(p);
-    pressedAtPage = await pnow(p);
-    if (!ok) log(`${prefix}: the wanted beat never showed — pressing anyway (beat now '${pressedOn}')`);
-    await tap(p, 0, eye ? 130 : 90);
+    if (inPage) {
+      // the page pressed on the frame it saw the beat; node only lets go
+      await p.waitForTimeout(90);
+      await padSet(p, 'p.buttons[0].pressed = false; p.buttons[0].value = 0');
+      pressedAtPage = ((await p.evaluate('window.__r2press')) as number) ?? -1;
+      pressedOn = PRESS;
+    } else {
+      pressedOn = await beat(p);
+      pressedAtPage = await pnow(p);
+      if (!ok) log(`${prefix}: the wanted beat never showed — pressing anyway (beat now '${pressedOn}')`);
+      await tap(p, 0, eye ? 130 : 90);
+    }
   } else log(`${prefix}: no SLAM read came up in 9 s — no press`);
   // the resolve, the landing, the verdict
   await p.waitForTimeout(3600);
