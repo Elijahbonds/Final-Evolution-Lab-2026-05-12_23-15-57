@@ -288,7 +288,13 @@ export const INTENT_DRIVERS: Record<string, string> = {
   velocitykart: loop(`
     const L1 = 4, R1 = 5; let drift = false, lastBoost = 0, lastFire = 0;
     const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  // THE START (racing pass phase 4): the HUD's \`start\` is the beat on screen. window.__START picks the driver's timing —
+  // 'rocket' (default: throttle down 150 ms after "2" lands), 'early' (held from the first beat: a burnout), 'late' (on "1").
+  let beat = '', beatAt = 0;
+  const startGas = (h) => { if (h.start !== beat) { beat = h.start; beatAt = performance.now(); } const m = window.__START || 'rocket';
+    return m === 'early' ? true : m === 'late' ? beat === '1' : (beat === '2' && performance.now() - beatAt > 150) || beat === '1'; };
     setInterval(() => {
+      const h = Q.rawHud ? Q.rawHud() : {}; if (h.start) { hold(RT, startGas(h)); stick(0, 0); return; }
       const s = Q.scene && Q.scene(); const k = s && s.metadata && s.metadata.kart; if (!k) return; const st = k.state();
       if (st.done) { hold(RT, false); hold(X, false); stick(0, 0); return; }
       const err = wrap((st.tangentYaw || 0) - (st.heading || 0));
@@ -304,7 +310,13 @@ export const INTENT_DRIVERS: Record<string, string> = {
   // what the balloons gave, a STUNT on a long straight, BOOST (R1) when lined up.
   aeroaces: loop(`
     const R1 = 5; let lastFire = 0, lastStunt = 0, lastBoost = 0;
+  // THE START (racing pass phase 4): the HUD's \`start\` is the beat on screen. window.__START picks the driver's timing —
+  // 'rocket' (default: throttle down 150 ms after "2" lands), 'early' (held from the first beat: a burnout), 'late' (on "1").
+  let beat = '', beatAt = 0;
+  const startGas = (h) => { if (h.start !== beat) { beat = h.start; beatAt = performance.now(); } const m = window.__START || 'rocket';
+    return m === 'early' ? true : m === 'late' ? beat === '1' : (beat === '2' && performance.now() - beatAt > 150) || beat === '1'; };
     setInterval(() => {
+      const h = Q.rawHud ? Q.rawHud() : {}; if (h.start) { hold(RT, startGas(h)); stick(0, 0); return; }
       const s = Q.scene && Q.scene(); const a = s && s.metadata && s.metadata.aero; if (!a) return; const st = a.state();
       if (st.done) { hold(RT, false); stick(0, 0); return; }
       hold(RT, true);

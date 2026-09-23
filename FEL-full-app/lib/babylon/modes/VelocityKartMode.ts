@@ -52,6 +52,7 @@ import {
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS } from '../visual/venuePropSets';
 import { refuse } from '../core/Refusal';
+import { newStart, stepStart, beatLabel, ROCKET_ZIP_SEC, BURNOUT_SEC, BURNOUT_THROTTLE, type StartState, type StartOutcome } from '../racing/RaceStart';   // racing pass phase 4
 import {
   boostEarnFor, crossedLip, idleAir, launch, startTrick, stepAir, type KartAirState,
 } from '../core/KartAir';
@@ -165,6 +166,8 @@ const S = {
   // ITEMS + CONTACT (2026-09-18)
   held: null as HeldItem | null, shieldT: 0, zipT: 0, spinT: 0,
   events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 },
+  // THE START (racing pass phase 4): the countdown, and the burnout's seconds of lost drive after a too-early throttle
+  start: newStart() as StartState, burnT: 0,
 };
 let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
@@ -697,6 +700,7 @@ function pushHud(ctx: ModeContext): void {
     ...boost.hud(),
     lap: `${Math.min(race.lap, course.laps)}/${course.laps}`,
     time: race.time.toFixed(1),
+    start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
     toGate: Math.round(dist),
     drift: state.drifting ? Math.round(driftQuality(state) * 100) : 0,
     pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
@@ -707,8 +711,24 @@ function pushHud(ctx: ModeContext): void {
     delta: bestGhost ? deltaLabel(ghostDelta) : '',
     chasing: bestGhost ? `PB ${(bestGhost.timeMs / 1000).toFixed(1)}s` : '',
     cup: cupLine,
-    hint: 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item',
+    hint: S.start.go ? 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item'
+      : 'THROTTLE DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" IT BOGS',
   } satisfies Record<string, HudValue>);
+}
+
+/** GO, and what the start was worth: a ROCKET is a zip of full boost, a BURNOUT a beat of lost drive, NORMAL nothing. */
+function startBeat(ctx: ModeContext, outcome: StartOutcome): void {
+  SoundKit.play('whistle');
+  if (outcome === 'rocket') {
+    S.zipT = Math.max(S.zipT, ROCKET_ZIP_SEC); say('ROCKET START!', 1.1);
+    SoundKit.play('whoosh', { pitch: 1.4, volume: 0.6 }); ctx.juice.flash('#38bdf8', 80); ctx.feel.impact(0.35);
+    if (state) EffectsKit.burst(ctx.scene, state.pos.clone(), 'sparks', 2);
+  } else if (outcome === 'burnout') {
+    S.burnT = BURNOUT_SEC; say('BURNOUT — TOO EARLY', 1.1);
+    SoundKit.play('squeak', { pitch: 0.7, volume: 0.5 }); ctx.juice.shake(0.05, 120);
+    if (state) EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust', 2);
+  } else say('GO!', 0.8);
+  console.info(`[RACE] start ${outcome}`);
 }
 
 function finish(ctx: ModeContext): void {
@@ -767,6 +787,7 @@ return {
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
     S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 };
+    S.start = newStart(); S.burnT = 0;
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
@@ -930,6 +951,7 @@ return {
         return {
           // The race loop itself, so a probe can tell a race that FINISHED from one that merely stopped reporting.
           lap: race.lap, laps: course.laps, next: race.next, time: +race.time.toFixed(2), finished: race.finished, done: S.done,
+          start: S.start.go ? S.start.outcome : `count ${S.start.beat}`,
           along: +playerDist.toFixed(1), lateral: at ? +at.lateral.toFixed(2) : 0, speed: state ? +state.speed.toFixed(1) : 0,
           heading: state ? +state.heading.toFixed(3) : 0, tangentYaw: at ? +Math.atan2(at.tangent.x, at.tangent.z).toFixed(3) : 0, onRoad: state ? onTrack(state.pos, course) : true,
           place: rivals.length ? playerPosition(playerDist, rivals) : 1, item: S.held, events: { ...S.events },
@@ -976,6 +998,24 @@ return {
     crowd?.update(dt);   // they idle and bob whether or not the race is running
     if (!state || !kart || S.done) return;
 
+    // ── THE START (racing pass phase 4, racing/RaceStart) ─────────────────────────────────────────────────────────
+    // The field launched on frame one while the course name was still on screen. Now nobody moves until GO, the clock
+    // does not run, and the throttle's timing against the beats is the first skill of the race.
+    if (!S.start.go) {
+      const st = stepStart(S.start, dt, S.input.throttle >= 0.5);
+      S.start = st.state;
+      if (st.beatChanged && S.start.beat > 0) { say(beatLabel(S.start.beat), 0.9); SoundKit.play('uiTick', { pitch: 0.85, volume: 0.55 }); ctx.juice.shake(0.02, 80); }
+      if (!st.wentGo) {
+        if (S.input.throttle >= 0.5 && Math.random() < dt * 8) EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust');   // revving on the grid
+        if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
+        ctx.camDirector.look(S.lookX, S.lookY, dt);
+        ctx.camDirector.update(kart.position, Vector3.Zero(), null);
+        pushHud(ctx);
+        return;
+      }
+      startBeat(ctx, S.start.outcome ?? 'normal');
+    }
+
     prevPos.copyFrom(state.pos);
     // AIRBORNE COUNTS AS ON-ROAD. Off-track costs grip and top speed, and a kart over a rooftop gap is off the
     // polyline by definition — taxing a jump for leaving the road is the opposite of the intent.
@@ -995,7 +1035,9 @@ return {
     if (S.zipT > 0) { S.zipT = Math.max(0, S.zipT - dt); S.input.boostK = Math.max(S.input.boostK, 1); }
     S.shieldT = Math.max(0, S.shieldT - dt); S.spinT = Math.max(0, S.spinT - dt);
     if (S.spinT > 0) { S.input.throttle *= 0.3; }
-    stepKart(state, S.input, dt, on, kartSpec);
+    // a BURNOUT (throttle down on "3") is a beat of lost drive after GO — on a copy, so a held trigger is never rewritten
+    if (S.burnT > 0) S.burnT = Math.max(0, S.burnT - dt);
+    stepKart(state, S.burnT > 0 ? { ...S.input, throttle: Math.min(S.input.throttle, BURNOUT_THROTTLE) } : S.input, dt, on, kartSpec);
 
     // ── THE ROAD HAS HEIGHT NOW, so something has to put the kart on it ──────────────────────────────────
     //

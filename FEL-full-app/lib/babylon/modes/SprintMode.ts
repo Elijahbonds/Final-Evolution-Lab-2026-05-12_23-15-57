@@ -61,6 +61,8 @@ const S = {
   lastSide: null as 'L' | 'R' | null,
   /** Triggers held (a squeeze is answered once, not every frame the bus re-emits it). */
   trigL: false, trigR: false,
+  /** THE GUN (racing pass phase 4): seconds from GO to the first clean stride — Track & Field's reaction read. */
+  reactS: null as number | null,
   /** Clean alternating strides in a row (the rhythm streak). */
   streak: 0,
   lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
@@ -68,7 +70,7 @@ const S = {
 
 const reset = (): void => {
   S.done = false; S.stumbles = 0; S.rivalDist = 0; S.graceLeft = null;
-  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0; S.trigL = false; S.trigR = false;
+  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0; S.trigL = false; S.trigR = false; S.reactS = null;
   finishLatch = false;
 };
 
@@ -108,6 +110,7 @@ function finish(ctx: ModeContext, timeS: number): void {
   finishBeat(ctx, won);
   ctx.end(won ? 'win' : 'complete', Math.max(0, Math.round((20 - timeS) * 120) - S.stumbles * 40), {
     timeS: Number(timeS.toFixed(2)), stumbles: S.stumbles, topSpeed: core?.state.topSpeed ?? 0,
+    ...(S.reactS !== null ? { reactionS: Number(S.reactS.toFixed(2)) } : {}),
   });
 }
 
@@ -166,7 +169,7 @@ return {
         else if (phase === 'Go') { say('GO!', 0.8); SoundKit.play('whistle'); }
       },
       onFinish: (timeS) => {
-        say(`${timeS.toFixed(2)}s`, 2.0);
+        say(S.reactS !== null ? `${timeS.toFixed(2)}s · REACTION ${S.reactS.toFixed(2)}s` : `${timeS.toFixed(2)}s`, 2.0);
         SoundKit.play('score');
         finish(ctx, timeS);
       },
@@ -200,7 +203,15 @@ return {
     const side: 'L' | 'R' = e.dir === 'left' ? 'L' : 'R';
     const beforeFalse = core.state.falseStarts;
     const beforeSpeed = core.state.speed;
+    const offTheGun = core.state.phase === 'Go', gunClock = core.state.timeS;
     core.step(side);
+    // THE REACTION: the first clean stride after the gun is timed and called — the start is a skill you can see
+    if (offTheGun && core.state.falseStarts === beforeFalse && S.reactS === null) {
+      S.reactS = gunClock;
+      const grade = gunClock < 0.2 ? 'LIGHTNING' : gunClock < 0.35 ? 'SHARP' : gunClock < 0.6 ? 'OK' : 'SLOW';
+      ctx.juice.callout(`${grade} START — ${gunClock.toFixed(2)} s`, gunClock < 0.35 ? '#fde047' : '#cbd5e1', 900);
+      console.info(`[SPRINT-START] reaction ${gunClock.toFixed(2)} ${grade}`);
+    }
 
     if (core.state.falseStarts > beforeFalse) {
       S.stumbles += 1;

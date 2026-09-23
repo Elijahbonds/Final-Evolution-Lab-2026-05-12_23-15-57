@@ -2,7 +2,7 @@
 // result the mode reports, the place and time off its probe seam, the callouts it made, what the player could hear and
 // read, and every console error.
 //
-//   PORT=3011 MODES=velocitykart,aeroaces,freerun,sprint DRIVER=intent|idle MAXMS=240000 OUT=<dir> QUERY='map=x'
+//   PORT=3011 MODES=velocitykart,aeroaces,freerun,sprint DRIVER=intent|idle MAXMS=240000 OUT=<dir> QUERY='map=x' START=rocket|early|late
 //     npx tsx scripts/probes/_race-lab.mts
 //
 // DRIVER=intent installs the mode's INTENT_DRIVERS entry (under ?agent=1); DRIVER=idle touches nothing (does an idle
@@ -51,6 +51,7 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
     setInterval(() => { try { const m = window.__FEL_DEV__.scene.metadata['${SEAM[mode] ?? 'none'}']; if (!m) return; const s = m.state(); if (s.done) return;
       window.__RL.trace.push({ v: s.speed, lat: s.lateral, on: s.onRoad, place: s.place ?? (s.race && s.race.place), lap: s.lap }); } catch (e) {} }, 500);
   })()`);
+  if (process.env.START) await p.evaluate(`window.__START = '${process.env.START}'`);   // phase 4: the driver's start timing
   if (DRIVER === 'intent') {
     if (!INTENT_DRIVERS[mode]) throw new Error(`no intent driver for ${mode}`);
     await p.evaluate(INTENT_DRIVERS[mode]);

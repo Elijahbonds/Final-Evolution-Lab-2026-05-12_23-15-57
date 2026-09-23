@@ -46,6 +46,7 @@ import {
 import { readPlane } from '../racing/garage';
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy plane bodies over the toy primitives
 import { refuse } from '../core/Refusal';
+import { newStart, stepStart, beatLabel, ROCKET_ZIP_SEC, BURNOUT_SEC, BURNOUT_THROTTLE, type StartState, type StartOutcome } from '../racing/RaceStart';   // racing pass phase 4
 import {
   ARCADE_TRAINER, arcadeFrom, spawnArcade, stepArcade, startStunt, dodging, spinOut, wallTurn, forwardOf,
   type Stunt,
@@ -129,6 +130,8 @@ export function makeAeroAcesMode(): ModeDefinition {
     hug: noHug(),
     /** Best chain of the run, for the end card. */
     bestChain: 0,
+    /** THE START (racing pass phase 4): the countdown, and a burnout's seconds of lost thrust after a too-early throttle. */
+    start: newStart() as StartState, burnT: 0,
   };
 
   const say = (t: string, sec = 1.1): void => { S.banner = t; S.bannerT = sec; };
@@ -163,7 +166,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       speed: Math.round(flight.speed * 3.6),
       time: race.time.toFixed(1),
       banner: S.banner,
-      hint: 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost',
+      start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
+      hint: S.start.go ? 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost'
+        : 'GAS DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" THE ENGINE BOGS',
       ...boost.hud(),
     };
     ctx.setHud(hud);
@@ -255,6 +260,27 @@ export function makeAeroAcesMode(): ModeDefinition {
     S.stunts++;
   }
 
+  /** GO, and what the start was worth: a ROCKET is a zip, a BURNOUT a beat of lost thrust, NORMAL nothing. */
+  /** A rocket start leaves the grid this far over top speed (the zip then holds it there for ROCKET_ZIP_SEC). */
+  const ROCKET_LAUNCH_MULT = 1.3;
+  function startBeat(ctx: ModeContext, outcome: StartOutcome): void {
+    SoundKit.play('whistle');
+    // A PLANE LAUNCHES FROM THE GRID. It hangs at cruise while the beats count and reaches top speed in about a second,
+    // so a zip alone moved it ~1 m against a normal start (measured at 10 s). The start sets the launch speed instead:
+    // a normal GO leaves at the floor speed, a rocket leaves above top speed, a bog stays at the floor with the thrust cut.
+    if (flight) flight.speed = outcome === 'rocket' ? tune.top * ROCKET_LAUNCH_MULT : tune.minSpeed;
+    if (outcome === 'rocket') {
+      S.zipT = Math.max(S.zipT, ROCKET_ZIP_SEC); say('ROCKET START!', 1.1);
+      SoundKit.play('whoosh', { pitch: 1.4, volume: 0.6 }); ctx.juice.flash('#38bdf8', 80); ctx.feel.impact(0.35);
+      if (flight) EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks', 2);
+    } else if (outcome === 'burnout') {
+      S.burnT = BURNOUT_SEC; say('ENGINE BOGGED — TOO EARLY', 1.1);
+      SoundKit.play('squeak', { pitch: 0.6, volume: 0.5 }); ctx.juice.shake(0.05, 120);
+      if (flight) EffectsKit.burst(ctx.scene, flight.pos.clone(), 'dust', 2);
+    } else say('GO!', 0.8);
+    console.info(`[RACE] start ${outcome}`);
+  }
+
   function finish(ctx: ModeContext): void {
     if (S.done) return;
     S.done = true;
@@ -283,7 +309,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       Object.assign(S, {
         input: { steer: 0, climb: 0, gas: 0, brake: 0, boostK: 0, bananas: 0 }, held: null, bananas: 0, shieldT: 0, zipT: 0,
         boostHeld: false, banner: '', bannerT: 0, done: false, lastPlace: 0, wrongT: 0, scrapeCool: 0, graceLeft: null,
-        hits: 0, stunts: 0, fired: 0, popped: 0, stickX: 0, stickY: 0,
+        hits: 0, stunts: 0, fired: 0, popped: 0, stickX: 0, stickY: 0, start: newStart(), burnT: 0,
       });
       boost = new BoostKit(0.25);
       circuit = circuitById(readCourse('aero').id) ?? aeroCircuits()[0];
@@ -332,6 +358,7 @@ export function makeAeroAcesMode(): ModeDefinition {
           return {
             circuit: circuit.course.id, lap: race.lap, laps: circuit.course.laps, next: race.next, gates: circuit.course.gates.length,
             time: +race.time.toFixed(2), finished: race.finished, done: S.done,
+            start: S.start.go ? S.start.outcome : `count ${S.start.beat}`,
             pos: flight ? { x: flight.pos.x, y: flight.pos.y, z: flight.pos.z } : null,
             heading: flight ? +flight.heading.toFixed(3) : 0, speed: flight ? +flight.speed.toFixed(1) : 0,
             along: at ? +at.dist.toFixed(1) : 0, lateral: at ? +at.lateral.toFixed(1) : 0, corridor: circuit.corridor,
@@ -381,6 +408,32 @@ export function makeAeroAcesMode(): ModeDefinition {
 
     update(ctx: ModeContext, dt: number): void {
       if (!flight || !player || !line || S.done) return;
+
+      // ── THE START (racing pass phase 4, racing/RaceStart): the field holds on the grid until GO; the gas's timing
+      // against the beats is worth a rocket (a zip) or a burnout (lost thrust). The planes hang on their grid spots.
+      if (!S.start.go) {
+        const st = stepStart(S.start, dt, S.input.gas >= 0.5);
+        S.start = st.state;
+        if (st.beatChanged && S.start.beat > 0) { say(beatLabel(S.start.beat), 0.9); SoundKit.play('uiTick', { pitch: 0.85, volume: 0.55 }); ctx.juice.shake(0.02, 80); }
+        if (!st.wentGo) {
+          player.root.position.copyFrom(flight.pos);
+          player.root.rotation.set(-flight.pitch, flight.heading, -flight.roll);
+          player.prop.rotation.z += (6 + 40 * S.input.gas) * dt;   // the engine revs on the grid
+          rivals.forEach((r, i) => {
+            const rp = rivalPlanes[i]; if (!rp) return;
+            const place = rivalPlacement(r, line!);
+            rp.root.position.copyFrom(place.pos);
+            rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(rp.root.position.x, rp.root.position.z) + 3);
+            rp.root.rotation.set(0, place.heading, 0);
+          });
+          if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
+          ctx.camDirector.look(S.lookX, S.lookY, dt);
+          ctx.camDirector.update(flight.pos, Vector3.Zero(), null);
+          pushHud(ctx);
+          return;
+        }
+        startBeat(ctx, S.start.outcome ?? 'normal');
+      }
       prevPos.copyFrom(flight.pos);
 
       // ── boost: the shared kit (RB), plus a blue balloon's zip holding it at full ──
@@ -394,7 +447,12 @@ export function makeAeroAcesMode(): ModeDefinition {
       // ── fly ──
       const ceiling = circuit.ceilingAt(flight.pos.x, flight.pos.z);
       const wasStunt = flight.stunt;
-      const touched = stepArcade(flight, S.input, dt, tune, circuit.floorAt, ceiling);
+      // a BURNOUT is lost thrust for a beat after GO — on a copy, so the held trigger is never rewritten
+      if (S.burnT > 0) S.burnT = Math.max(0, S.burnT - dt);
+      const touched = stepArcade(flight, S.burnT > 0 ? { ...S.input, gas: Math.min(S.input.gas, BURNOUT_THROTTLE) } : S.input, dt, tune, circuit.floorAt, ceiling);
+      // …and the plane's acceleration, not its thrust, limits the first second, so capping the gas cost ~2 m (measured):
+      // a bogged engine holds the plane at its floor speed for the bog
+      if (S.burnT > 0) flight.speed = Math.min(flight.speed, tune.minSpeed);
       // A STUNT LANDED GOES INTO THE CHAIN, and what it pays depends on what came before it.
       //
       // This used to be a flat earn: every stunt paid the same, so the twentieth roll paid like the first and the
