@@ -105,7 +105,7 @@ import {   // HOOPS-MOVE-KIT-A
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package (the 1v1's, on the team game)
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
-  contestTag,   // HOOPS-DEPTH S5
+  contestTag, aiShotRead,   // HOOPS-DEPTH S5
 } from '../core/HoopsDefense';
 import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
@@ -388,6 +388,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let meHandUp = false;                                    // D3: my grounded hand-up (X held)
   let foeHandUp: Body | null = null, foeHandUpLeft = 0;    // D3: the AI defender with a hand up on my load
   let foeBlocker: Body | null = null, foeBlockAt = -1;     // D1: the AI's contest jump timed to my green
+  let aiReadPending = false;   // HOOPS-DEPTH S5: no defender had his read on this shot yet (nobody in range at the gather)
   let meFloored = false, meStunSec = 0;                    // D1: posterized BY the rival
   let driveStolen = false;                                 // D2: my poke took the driver's ball
   let foeDunkFlight: { k: number; made: boolean | null } | null = null;
@@ -1610,6 +1611,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         }
       }
       if (iAmCarrier && shooting) {
+        if (aiReadPending) aiContestLoad(false);   // HOOPS-DEPTH S5: the closeout that arrives during the shot gets its read
         const t = shotMeter.update(dt);
         ctx.setHud({ shotMeterT: t, shotMeterGreen: hudGreen });
         meter3d?.set(t, me.char.root.position.add(new Vector3(0, 1.72, 0)));
@@ -2662,20 +2664,25 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     return foes.reduce<Body | null>((best, f) => f.stunSec > 0 || f.floored ? best : !best || distXZ(f.char.root.position, me.char.root.position) < distXZ(best.char.root.position, me.char.root.position) ? f : best, null);
   }
   /** D1/D3: the nearest defender's read on my load — a hand up inside range facing me, or a block jump timed to the green. */
-  function aiContestLoad(): void {
+  function aiContestLoad(atGather = true): void {
+    aiReadPending = false;
     const near = nearestLiveFoe();
     if (!near) return;
     const dist = distXZ(near.char.root.position, me.char.root.position);
     const facing = facingCos(near.char.root.rotation.y, near.char.root.position, me.char.root.position);
-    if (dist <= AI_BLOCK_RANGE + 0.3 && facing >= 0 && roll() < AI_BLOCK_JUMP_CHANCE) {
+    // HOOPS-DEPTH S5: out of range at the gather the read stays pending, and the nearest closeout gets it during the shot
+    const read = aiShotRead(dist, facing, atGather, roll);
+    if (atGather) console.info(`[3V3-DEF] ai reads my load at ${dist.toFixed(2)} m facing ${facing.toFixed(2)}: ${read}`);
+    if (read === 'pending') { aiReadPending = true; return; }
+    if (read === 'block') {
       foeBlocker = near; foeBlockAt = Math.max(0.05, shotMeter.greenCenter01 * shotMeter.durationSec - 0.15);
       console.info(`[3V3-DEF] ai block jump armed at ${foeBlockAt.toFixed(2)} s`);
-    } else if (aiHandsUp(dist, facing, roll)) {
+    } else if (read === 'handUp') {
       if (foeHandUp) foeHandUp.tree.releaseHold();
       foeHandUp = near; foeHandUpLeft = shotMeter.durationSec + 0.6;
-      near.tree.hold('bball_hand_up', { fadeSec: 0.1 });
-      console.info(`[3V3-DEF] ai hand up at ${dist.toFixed(2)} m`);
-    }
+      near.tree.hold('bball_hand_up', { fadeSec: atGather ? 0.1 : 0.08 });
+      console.info(`[3V3-DEF] ai hand up ${atGather ? 'at' : 'LATE, on the closeout, at'} ${dist.toFixed(2)} m`);
+    } else if (!atGather) console.info(`[3V3-DEF] ai closed out to ${dist.toFixed(2)} m, no hand`);
   }
   // ── HOOPS KINETIC 3v3 (2026-09-18) ──────────────────────────────────────────────────────────────────────────────
   /** The defender's press on an arriving driver: over him, the ball stripped on the way, landing running the other way. */

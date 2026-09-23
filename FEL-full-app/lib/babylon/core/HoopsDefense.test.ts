@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, SWAT_JUMP_MAX_SEC, contestedPct, alteredApex, aiHandsUp, facingCos, contestTier, contestTag,
+  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, SWAT_JUMP_MAX_SEC, contestedPct, alteredApex, aiHandsUp, facingCos, contestTier, contestTag, aiShotRead, AI_HAND_UP_CHANCE, AI_BLOCK_JUMP_CHANCE, HAND_UP_FACING_COS,
   HAND_UP_CONTEST, HAND_UP_RANGE, BUMP_STRIP_WINDOW_SEC, BUMP_STRIP_EXPOSURE, AI_BLOCK_RANGE, AI_BLOCK_BASE, CONTEST_PCT_BITE, ALTER_APEX_ADD,
 } from './HoopsDefense';
 import { STEAL_EXPOSURE_MIN, BLOCK_WINDOW_SEC } from './BasketballCore';
@@ -65,6 +65,28 @@ describe('S5 — the contest read (HOOPS-DEPTH)', () => {
     expect(contestTier(Number.NaN).tier).toBe('wideOpen');
     // the tiers climb with the bite: a higher tier never costs less
     let last = 1; for (const c of [0, 0.15, 0.35, 0.5, 0.75, 1]) { const p = contestedPct(1, c); expect(p).toBeLessThanOrEqual(last + 1e-9); last = p; }
+  });
+});
+
+describe('S5 — the read through the shooting motion (HOOPS-DEPTH)', () => {
+  const seq = (...v: number[]) => { let i = 0; return () => v[i++] ?? 0.99; };
+  it('at the gather: the block jump first, then the hand-up roll, in the order the modes always rolled them', () => {
+    expect(aiShotRead(1.5, 1, true, seq(AI_BLOCK_JUMP_CHANCE - 0.01))).toBe('block');
+    expect(aiShotRead(1.5, 1, true, seq(0.99, AI_HAND_UP_CHANCE - 0.01))).toBe('handUp');
+    expect(aiShotRead(1.5, 1, true, seq(0.99, 0.99))).toBe('none');
+  });
+  it('a defender still closing out at the gather is PENDING, and his read comes the frame he is in range', () => {
+    // the live miss: 3.0 m at the load (out of the 2.2 m hand-up range), 2.3 m by the release — he never raised a hand
+    let rolls = 0; const counting = () => { rolls++; return 0.01; };
+    expect(aiShotRead(3.0, 1, true, counting)).toBe('pending');
+    expect(rolls).toBe(0);                                   // out of range consumes no roll
+    expect(aiShotRead(2.5, 1, false, counting)).toBe('pending');
+    expect(aiShotRead(HAND_UP_RANGE, 1, false, seq(AI_HAND_UP_CHANCE - 0.01))).toBe('handUp');
+    expect(aiShotRead(2.0, 1, false, seq(0.99))).toBe('none');
+  });
+  it('a late closeout never arms a block jump (it would be mistimed to the green), and facing away keeps it pending', () => {
+    expect(aiShotRead(1.0, 1, false, seq(0.0, 0.0))).toBe('handUp');
+    expect(aiShotRead(1.5, HAND_UP_FACING_COS - 0.05, false, seq(0.0))).toBe('pending');
   });
 });
 

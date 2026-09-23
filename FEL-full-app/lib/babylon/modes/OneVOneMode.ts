@@ -171,7 +171,7 @@ import {   // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7 the running hook, M8 the 
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE,
-  contestTag, contestTier,   // HOOPS-DEPTH S5
+  contestTag, contestTier, aiShotRead,   // HOOPS-DEPTH S5
 } from '../core/HoopsDefense';
 import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
 import { MomentumBus } from '../core/MomentumBus';
@@ -475,7 +475,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
   // ── the DEFENSE contest package (D1–D3) ──
   let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
-  let meHandUp = false, foeHandUp = false, foeHandUpLeft = 0;   // D3: the grounded hand-up contests (mine held on X; the AI's on my load)
+  let meHandUp = false, foeHandUp = false, foeHandUpLeft = 0;
+  let aiReadPending = false;   // HOOPS-DEPTH S5: the AI has not had its read on this shot yet (it was out of range at the gather)   // D3: the grounded hand-up contests (mine held on X; the AI's on my load)
   let foeBlockJumpAge = Infinity, foeBlockAt = -1;               // D1: the AI's contest jump (timed to my green: seconds into the meter)
   let meFloored = false;                        // D1: posterized BY the rival — on the floor until the stun ends
   let foeDunkFlight: { k: number; made: boolean | null } | null = null;   // D1: the rival's dunk in the air (the posture windows ride it)
@@ -1446,6 +1447,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           }
         }
         if (shooting) {
+          if (aiReadPending) aiContestLoad(ctx, false);   // HOOPS-DEPTH S5: the closeout that arrives during the shot gets its read
           const t = shotMeter.update(dt);
           ctx.setHud({ shotMeterT: t, shotMeterGreen: hudGreen });
           meter3d?.set(t, me.root.position.add(new Vector3(0, 1.72, 0)));
@@ -2641,7 +2643,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const made = verdict.made;
     // D1: the AI's block at the release — a hand up (or a jump) inside range; the ball is knocked LOOSE from the hand
     const blockChance = foeStunSec > 0 || foeFloored ? 0 : aiBlockChance(currentShot?.style ?? 'jumper', foeDist, foeUp, foeVelLast.length() < 1.0);
-    console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)}`);
+    console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)} q ${quality} pct ${pct.toFixed(2)} made ${made}`);
     if (blockChance > 0 && roll() < blockChance) { blockedShot(ctx); return; }
     releaseBall(ball);
     // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves. HOOPS-MOVE-KIT-B: a fade / a hook keeps its
@@ -3014,18 +3016,22 @@ export const OneVOneMode: ModeDefinition = (() => {
     later(750, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
   }
   /** D1/D3: the AI's read on my load — a hand up inside range facing me (the contest), or a block jump timed to the green. */
-  function aiContestLoad(ctx: ModeContext): void {
+  function aiContestLoad(ctx: ModeContext, atGather = true): void {
+    aiReadPending = false;
     if (foeStunSec > 0 || foeFloored || dummyFoe) return;
     const dist = distXZ(me.root.position, foe.root.position);
     const facing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
-    if (dist <= AI_BLOCK_RANGE + 0.3 && facing >= 0 && roll() < AI_BLOCK_JUMP_CHANCE) {
+    const read = aiShotRead(dist, facing, atGather, roll);
+    if (atGather) console.info(`[1V1-DEF] ai reads my load at ${dist.toFixed(2)} m facing ${facing.toFixed(2)}: ${read}`);
+    if (read === 'pending') { aiReadPending = true; return; }
+    if (read === 'block') {
       foeBlockAt = Math.max(0.05, shotMeter.greenCenter01 * shotMeter.durationSec - 0.15);
       console.info(`[1V1-DEF] ai block jump armed at ${foeBlockAt.toFixed(2)} s`);
-    } else if (aiHandsUp(dist, facing, roll)) {
+    } else if (read === 'handUp') {
       foeHandUp = true; foeHandUpLeft = shotMeter.durationSec + 0.6;
-      foeAnimTree.hold('bball_hand_up', { fadeSec: 0.14 });
-      console.info(`[1V1-DEF] ai hand up at ${dist.toFixed(2)} m`);
-    }
+      foeAnimTree.hold('bball_hand_up', { fadeSec: atGather ? 0.14 : 0.08 });   // a late closeout snaps the hand up
+      console.info(`[1V1-DEF] ai hand up ${atGather ? 'at' : 'LATE, on the closeout, at'} ${dist.toFixed(2)} m`);
+    } else if (!atGather) console.info(`[1V1-DEF] ai closed out to ${dist.toFixed(2)} m, no hand`);
     void ctx;
   }
   /** D1: BLOCKED at the release — the ball knocked loose from my hand, low, back the way it came; the follow-through still

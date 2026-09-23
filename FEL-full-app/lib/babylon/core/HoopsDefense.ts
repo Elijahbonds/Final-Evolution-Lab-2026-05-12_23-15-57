@@ -129,6 +129,24 @@ export function aiHandsUp(dist: number, facingCos: number, rng: () => number): b
   return dist <= HAND_UP_RANGE && facingCos >= HAND_UP_FACING_COS && rng() < AI_HAND_UP_CHANCE;
 }
 
+/**
+ * THE AI'S READ ON A SHOT, THROUGH THE SHOOTING MOTION (HOOPS-DEPTH S5, 2026-09-23). The AI used to read the shooter ONCE, on
+ * the gather: a defender still closing out (the lab's jumper off the check: 3.0 m at the load, 2.3 m at the release) was out
+ * of hand-up range at that one frame and never raised a hand. Measured: 0 hand-ups on 20 of 20 jumpers against the real 1v1
+ * defender, every release contested by distance alone (0.16–0.42), so no shot ever read CONTESTED. The closeout that
+ * arrives DURING the shot is the contest in 2K (a late one draws the small arc). So:
+ *   · `gather`: as before, in this order — a block jump inside its range (timed to the green), else the hand-up roll;
+ *   · out of range at the gather the read stays PENDING, and every frame of the shooting motion reads again: the first
+ *     frame he is inside hand-up range facing the shooter he gets the ONE hand-up roll (no late block jump: it would be
+ *     mistimed to the green it was armed for). The hand only counts if it is up before the release (groundContest there).
+ */
+export type AiShotRead = 'block' | 'handUp' | 'none' | 'pending';
+export function aiShotRead(dist: number, facingCos: number, atGather: boolean, rng: () => number): AiShotRead {
+  if (atGather && dist <= AI_BLOCK_RANGE + 0.3 && facingCos >= 0 && rng() < AI_BLOCK_JUMP_CHANCE) return 'block';
+  if (dist > HAND_UP_RANGE || facingCos < HAND_UP_FACING_COS) return 'pending';
+  return rng() < AI_HAND_UP_CHANCE ? 'handUp' : 'none';
+}
+
 /** The cos of the angle between a body's forward (its yaw) and the bearing to a point. */
 export function facingCos(yaw: number, from: { x: number; z: number }, to: { x: number; z: number }): number {
   const dx = to.x - from.x, dz = to.z - from.z;
