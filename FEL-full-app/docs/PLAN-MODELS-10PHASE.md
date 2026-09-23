@@ -46,7 +46,7 @@ Inventory: `~/Claude/outbox/finish-release/meshy-2026-09-22/INVENTORY.md`.
 | 7b | 7cf5f22 | the 22 pass the shipped-avatar gate (float32 skins, sibling manifests) |
 | 8 | measurement | performance with the cast in the crowded modes (table below) |
 | 9 | in 7301321 | the sheet reads the cast (`cast-sheet.py`); the Closet / rival pickers were not touched: heroes stay the player's body, so there is nothing new to pick |
-| 10 | pending | every enabled mode's smoke with the new bodies; the one deploy |
+| 10 | this commit | every enabled mode's smoke with the new bodies; the one deploy |
 
 ### Phase 8 — performance with the cast (0.6 / 1K pack, 15 s under the intent drivers)
 
@@ -63,7 +63,43 @@ The budget holds in every crowded mode; the decimation does not ratchet. No pre-
 sample was added to the smoke in phase 6, after the cast bodies were already the roster).
 
 ### Phase 10 — every enabled mode with the new bodies
-(pending: the all-modes smoke)
+| mode | fps median / p10 | active meshes max | skinned vertices max | hero straight-elbow frames | errors |
+|---|---|---|---|---|---|
+| dunk | 60 / 59.9 | 100 | 151,972 | 639 / 732 | 0 |
+| karate | 60 / 59.9 | 112 | 364,376 | 137 / 729 | 0 |
+| football | 60 / 59.9 | 121 | 304,533 | 138 / 731 | 0 |
+| skateboard | 60 / 59.9 | 119 | 218,805 | 0 / 734 | 0 |
+| snowboard_slalom | 60 / 60 | 168 | 186,772 | 0 / 731 | 0 |
+| surf | 60 / 60 | 96 | 172,185 | 0 / 732 | 0 |
+| tennis | 60 / 60 | 75 | 192,937 | 0 / 733 | 0 |
+| derby | 60 / 59.9 | 110 | 232,284 | 0 / 732 | 0 |
+| penalty | 60 / 59.9 | 79 | 194,113 | 0 / 734 | 0 |
+| golf | 60 / 59.9 | 63 | 137,654 | 732 / 732 | 0 |
+| onevone | 60 / 59.9 | 101 | 158,556 | 6 / 731 | 0 |
+| threevthree | 60 / 59.9 | 126 | 241,180 | 279 / 732 | 1 |
+| carnival | 60 / 59.9 | 31 | 49,946 | 0 / 0 | 0 |
+| karate_vs | 60 / 59.9 | 71 | 189,978 | 0 / 729 | 0 |
+| mixedcombat | 60 / 59.9 | 69 | 202,438 | 0 / 730 | 0 |
+| dunkduel | 60 / 59.9 | 93 | 151,972 | 5 / 731 | 0 |
+| sprint | 60 / 59.9 | 38 | 51,089 | 734 / 734 | 0 |
+| showdown | 60 / 60 | 54 | 50,440 | 0 / 730 | 0 |
+| duel | 60 / 60 | 71 | 50,440 | 0 / 730 | 0 |
+| volleyball | 60 / 59.9 | 115 | 322,452 | 4 / 733 | 0 |
+| dance | 60 / 59.9 | 55 | 195,350 | 401 / 729 | 0 |
+| who_scene_it | 60 / 59.9 | 44 | 28,828 | 0 / 0 | 0 |
+| freerun | 60 / 59.9 | 88 | 94,368 | 245 / 728 | 0 |
+| threepoint | 60 / 59.9 | 151 | 252,232 | 731 / 731 | 0 |
+| bigair | 60 / 59.9 | 84 | 155,548 | 0 / 730 | 0 |
+| aeroaces | 60 / 59.9 | 95 | 28,828 | 0 / 734 | 0 |
+| velocitykart | 60 / 59.9 | 85 | 127,304 | 0 / 733 | 0 |
+| brainbrawl | 60 / 59.9 | 16 | 161,468 | 0 / 0 | 0 |
+
+The "straight-elbow" column is the smoke's T-pose heuristic (both elbows > 160°) on the HERO only; heroes are the player's own body and were not
+re-cast. The high counts are idle heroes with their arms hanging (dunk, sprint, threepoint, dance) and golf's address pose, not a bind pose:
+the frames show the hero posed and the cast bodies as the rivals and crowd (`ALL-MODES/*.png`). Boards, every combat mode and the hoops
+contests count 0–6.
+
+The one console line (threevthree) is the 3v3 referee's paint-clock warning to the player, not a fault.
 
 ### Open
 - the plane bodies carry a pilot sculpted into the cockpit; the hero sits on the seat anchor over it
