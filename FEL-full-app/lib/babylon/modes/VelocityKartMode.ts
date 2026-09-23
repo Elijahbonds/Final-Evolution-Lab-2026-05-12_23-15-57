@@ -53,6 +53,7 @@ import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS } from '../visual/venuePropSets';
 import { refuse } from '../core/Refusal';
 import { stepDraft, noDraft, DRAFT, type DraftState } from '../racing/Slipstream';   // racing pass phase 7
+import { stepMini, noMini, MINI_ZIP_SEC, MINI_LABEL, MINI_COLOR, type MiniState } from '../racing/MiniTurbo';   // racing pass phase 8
 import { newStart, stepStart, beatLabel, ROCKET_ZIP_SEC, BURNOUT_SEC, BURNOUT_THROTTLE, type StartState, type StartOutcome } from '../racing/RaceStart';   // racing pass phase 4
 import {
   boostEarnFor, crossedLip, idleAir, launch, startTrick, stepAir, type KartAirState,
@@ -168,9 +169,11 @@ const S = {
   graceLeft: null as number | null,
   // ITEMS + CONTACT (2026-09-18)
   held: null as HeldItem | null, shieldT: 0, zipT: 0, spinT: 0,
-  events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0 },
+  events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0, minis: 0 },
   /** SLIPSTREAM (phase 7): the wake's charge behind the rival ahead, and whether this tow has been called. */
   draft: noDraft() as DraftState, draftSaid: false,
+  /** MINI-TURBO (phase 8): the slide's clean seconds and the spark tier they have reached. */
+  mini: noMini() as MiniState,
   // THE START (racing pass phase 4): the countdown, and the burnout's seconds of lost drive after a too-early throttle
   start: newStart() as StartState, burnT: 0,
   /** Seconds the nose has pointed back down the line (racing pass phase 5: WRONG WAY, as the plane already had). */
@@ -727,6 +730,7 @@ function pushHud(ctx: ModeContext): void {
     lap: `${Math.min(race.lap, course.laps)}/${course.laps}`,
     time: race.time.toFixed(1),
     draft: Math.round(S.draft.charge * 100),   // SLIPSTREAM (phase 7): the wake's charge, 0–100
+    mini: S.mini.tier,   // MINI-TURBO (phase 8): the spark tier the slide has reached, 0–3
     start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
     // THE GAP under the place (phase 5): seconds to the kart ahead, or the lead
     gap: rivals.length ? gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist })), state.speed) : '',
@@ -815,8 +819,8 @@ return {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
-    S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0 };
-    S.draft = noDraft(); S.draftSaid = false;
+    S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0, minis: 0 };
+    S.draft = noDraft(); S.draftSaid = false; S.mini = noMini();
     S.start = newStart(); S.burnT = 0; S.wrongT = 0;
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
@@ -1249,6 +1253,18 @@ return {
       driftCallT -= dt;
       if (driftQuality(state) > 0.55 && driftCallT <= 0) { driftCallT = 0.9; ctx.juice.callout('DRIFT', '#fbbf24', 420); SoundKit.play('squeak', { pitch: 1.1, volume: 0.25 }); }
     } else driftCallT = 0;
+    // MINI-TURBO (racing pass phase 8, racing/MiniTurbo): the clean slide's sparks climb blue → orange → purple at the rear
+    // wheels, and letting go fires a zip sized by the colour reached. The drift still fills the shared BOOST meter; this
+    // is the MOMENT-TO-MOMENT pay, and the sparks are how you know what the release is worth before you let go.
+    const mt = stepMini(S.mini, state.drifting, driftQuality(state), dt);
+    S.mini = mt.state;
+    if (S.mini.tier > 0 && Math.random() < dt * 14) EffectsKit.burst(ctx.scene, state.pos.clone(), 'sparks', 0.45 + 0.2 * S.mini.tier, MINI_COLOR[S.mini.tier]);
+    if (mt.tierUp) SoundKit.play('uiTick', { pitch: 0.9 + 0.3 * mt.tierUp, volume: 0.4 });
+    if (mt.released) {
+      S.zipT = Math.max(S.zipT, MINI_ZIP_SEC[mt.released]); S.events.minis++;
+      say(MINI_LABEL[mt.released], 0.8); SoundKit.play('whoosh', { pitch: 1.1 + 0.15 * mt.released, volume: 0.5 }); ctx.juice.flash(MINI_COLOR[mt.released], 50);
+      console.info(`[RACE] mini-turbo ${mt.released}`);
+    }
     if (boostPads && boostPads.update(dt, state.pos, boost) > 0) { say('BOOST PAD', 0.5); ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.4, 0)), 'BOOST PAD', '#38bdf8'); }
     boostFx?.update(dt, boost, bev);
     if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }

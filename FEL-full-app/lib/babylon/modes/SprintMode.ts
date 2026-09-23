@@ -27,6 +27,8 @@ import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: one loco pick 
 import { stepFinishGrace } from '../racing/RaceField';   // MECHANICS PASS: the race ends for everyone
 
 const RACE_DIST = SPRINT_TUNING.raceDistanceM;   // core-owned (100m)
+/** The dip at the tape (racing pass phase 8): how close to the line it must come, and what it is worth. */
+const DIP_WINDOW_M = 2.5, DIP_BONUS_S = 0.04;
 const WIN_TIME = 13.0;                            //TUNE(elijah) sub-13 is the bar
 /** Rival pace, m/s — a credible club sprinter to race against. */
 const RIVAL_SPEED = RACE_DIST / 13.4;             //TUNE(elijah)
@@ -63,6 +65,8 @@ const S = {
   trigL: false, trigR: false,
   /** THE GUN (racing pass phase 4): seconds from GO to the first clean stride — Track & Field's reaction read. */
   reactS: null as number | null,
+  /** THE DIP (racing pass phase 8): the lean at the tape — d-pad UP inside the last metres takes a few hundredths off. */
+  dipped: false,
   /** Clean alternating strides in a row (the rhythm streak). */
   streak: 0,
   lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
@@ -70,7 +74,7 @@ const S = {
 
 const reset = (): void => {
   S.done = false; S.stumbles = 0; S.rivalDist = 0; S.graceLeft = null;
-  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0; S.trigL = false; S.trigR = false; S.reactS = null;
+  S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0; S.trigL = false; S.trigR = false; S.reactS = null; S.dipped = false;
   finishLatch = false;
 };
 
@@ -168,7 +172,8 @@ return {
         if (phase === 'Set') say('SET', 1.0);
         else if (phase === 'Go') { say('GO!', 0.8); SoundKit.play('whistle'); }
       },
-      onFinish: (timeS) => {
+      onFinish: (rawS) => {
+        const timeS = Math.max(0, rawS - (S.dipped ? DIP_BONUS_S : 0));   // the dip, if it came in time
         say(S.reactS !== null ? `${timeS.toFixed(2)}s · REACTION ${S.reactS.toFixed(2)}s` : `${timeS.toFixed(2)}s`, 2.0);
         SoundKit.play('score');
         finish(ctx, timeS);
@@ -198,6 +203,16 @@ return {
       S[side] = down; return;
     }
     if (e.t !== 'dpad' || !e.pressed) return;
+    // THE DIP AT THE TAPE (racing pass phase 8): Track & Field's last press. d-pad UP inside the final DIP_WINDOW_M metres
+    // leans the chest over the line (DIP_BONUS_S off the clock, once); earlier than that it is refused by name.
+    if (e.dir === 'up' && (core.state.phase === 'Run' || core.state.phase === 'Go')) {
+      const left = RACE_DIST - core.state.distanceM;
+      if (S.dipped) return;
+      if (left > DIP_WINDOW_M) { refuse(ctx, 'DIP AT THE TAPE — NOT YET'); return; }
+      S.dipped = true; say('DIP!', 0.6); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 }); ctx.juice.shake(0.03, 80);
+      console.info(`[SPRINT-DIP] ${left.toFixed(2)} m out`);
+      return;
+    }
     if (e.dir !== 'left' && e.dir !== 'right') return;
 
     const side: 'L' | 'R' = e.dir === 'left' ? 'L' : 'R';

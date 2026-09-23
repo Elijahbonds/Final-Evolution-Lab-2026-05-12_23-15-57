@@ -81,7 +81,10 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
           <div className="text-[10px] tracking-wider text-white/60">KM/H</div>
           <div className="fel-stat text-2xl text-[var(--fel-gold)]">{hnode(hud.speed, 0)}</div>
           {Number(hud.drift) > 0 && (
-            <div className="mt-0.5 text-sm text-[#22d3ee]">DRIFT {hnode(hud.drift, 0)}%</div>
+            // RACING PASS phase 8: the drift reads its MINI-TURBO tier — the spark colour the release will pay
+            <div className="mt-0.5 text-sm font-bold" style={{ color: ['#22d3ee', '#38bdf8', '#fb923c', '#c084fc'][Number(hud.mini) || 0] }}>
+              {['DRIFT', 'MINI', 'SUPER', 'ULTRA'][Number(hud.mini) || 0]} {hnode(hud.drift, 0)}%
+            </div>
           )}
         </div>
         <div className="flex flex-col items-center gap-1">

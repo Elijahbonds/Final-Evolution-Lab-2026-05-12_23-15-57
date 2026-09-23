@@ -377,10 +377,12 @@ export const INTENT_DRIVERS: Record<string, string> = {
   // SPRINT — hands off until the HUD says Go (a tap before it is a false start), then alternate the d-pad on a 115 ms
   // cadence (the carnival A+ recipe: 115 ms wins in ~11.5 s, 200 ms wins faster on the rhythm reward, 420 ms never finishes).
   sprint: loop(`
-    const LEFT = 14, RIGHT = 15; let side = 0, last = 0;
+    const LEFT = 14, RIGHT = 15; let side = 0, last = 0, dipped = false;
     const CAD = Number(window.__SPRINT_CADENCE_MS || 200);
     setInterval(() => {
       const h = Q.rawHud ? Q.rawHud() : {}; if (h.phase !== 'Go' && h.phase !== 'Run') return;
+      // THE DIP (racing pass phase 8): d-pad UP inside the last 2 m (the HUD's distance reads "97.3m / 100m")
+      const dm = parseFloat(String(h.distance || '0')); if (!window.__NODIP && !dipped && dm > 98) { dipped = true; btn(12, 50); }
       const now = performance.now(); if (now - last < CAD) return; last = now;
       btn(side ? RIGHT : LEFT, 50); side ^= 1;
     }, 8);

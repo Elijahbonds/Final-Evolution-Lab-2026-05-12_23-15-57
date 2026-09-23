@@ -46,6 +46,9 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
     window.__RL = { banners: {}, fps: [] };
     setInterval(() => { try { const Q = window.__FEL_QA__; const h = Q && Q.rawHud ? Q.rawHud() : null; const b = h && h.banner; if (b) window.__RL.banners[b] = (window.__RL.banners[b] || 0) + 1; } catch (e) {} }, 100);
     setInterval(() => { try { const e = window.__FEL_DEV__.scene.getEngine(); window.__RL.fps.push(Math.round(e.getFps())); } catch (e) {} }, 500);
+    // phase 8: JUICE BEATS — every QA juice / impact / sfx event, counted once (the trace keeps the last 400; new ones by time)
+    window.__RL.beats = { juice: 0, impact: 0, sfx: 0 }; window.__RL.lastT = performance.now();
+    setInterval(() => { try { const ev = window.__FEL_QA__.events(400); for (const e of ev) { if (e.t <= window.__RL.lastT) continue; if (e.kind in window.__RL.beats) window.__RL.beats[e.kind]++; } if (ev.length) window.__RL.lastT = Math.max(window.__RL.lastT, ev[ev.length - 1].t); } catch (e) {} }, 250);
     // the seam every 0.5 s: speed, off-road / off-line, place — a driver's quality separated from the field's pace
     window.__RL.trace = [];
     setInterval(() => { try { const m = window.__FEL_DEV__.scene.metadata['${SEAM[mode] ?? 'none'}']; if (!m) return; const s = m.state(); if (s.done) return;
@@ -70,7 +73,9 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   await p.waitForTimeout(1500);
   await p.screenshot({ path: `${OUT}/${mode}-${DRIVER}-end.png` });
   const seam = SEAM[mode] ? await p.evaluate(`(() => { try { const s = window.__FEL_DEV__.scene.metadata.${SEAM[mode]}.state(); delete s.pieces; delete s.verbs; return s; } catch (e) { return null; } })()`) : null;
-  const rl = await p.evaluate('window.__RL') as { banners: Record<string, number>; fps: number[]; trace: { v: number; lat: number; on?: boolean; place?: number }[] };
+  const rl = await p.evaluate('window.__RL') as { banners: Record<string, number>; fps: number[]; trace: { v: number; lat: number; on?: boolean; place?: number }[]; beats: Record<string, number> };
+  const mins = Math.max(0.1, secs / 60);
+  const beatsPerMin = rl.beats ? { juice: +(rl.beats.juice / mins).toFixed(1), impact: +(rl.beats.impact / mins).toFixed(1), sfx: +(rl.beats.sfx / mins).toFixed(1) } : null;
   const tr = rl.trace ?? [];
   const drive = tr.length ? { samples: tr.length, meanSpeed: +(tr.reduce((a, r) => a + (r.v || 0), 0) / tr.length).toFixed(1),
     offRoadPct: Math.round(100 * tr.filter((r) => r.on === false).length / tr.length), meanAbsLat: +(tr.reduce((a, r) => a + Math.abs(r.lat || 0), 0) / tr.length).toFixed(1),
@@ -79,7 +84,7 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const tally: Record<string, number> = {};
   for (const l of ledger) { const m = l.match(TAGS); const rest = l.slice(l.indexOf(']') + 1).trim().split(/[ (:]/)[0]; const k = `${m![1]} ${rest}`; tally[k] = (tally[k] ?? 0) + 1; }
   return {
-    mode, driver: DRIVER, ended: !!res, secs, result: res, drive, seam,
+    mode, driver: DRIVER, ended: !!res, secs, result: res, drive, beatsPerMin, seam,
     banners: Object.keys(rl.banners).slice(0, 30), fpsMedian: fps[Math.floor(fps.length / 2)] ?? 0, fpsP10: fps[Math.floor(fps.length * 0.1)] ?? 0,
     tally, ledgerTail: ledger.slice(-6), errors: errs.slice(0, 6),
   };

@@ -694,10 +694,19 @@ export function makeAeroAcesMode(): ModeDefinition {
       if (g.started && leader) { SoundKit.play('whistle'); say(`${leader.name} FINISHED — ${Math.ceil(g.left ?? 0)}s TO THE LINE`, 1.8); }
       else if (g.tick !== null && g.tick > 0 && g.tick <= 5) { SoundKit.play('uiTick', { pitch: 1 + (5 - g.tick) * 0.08 }); say(`FINISH IN ${g.tick}`, 0.9); }
       const res = stepRace(race, circuit.course, prevPos, flight.pos, dt);
+      // RACING PASS phase 8: a GATE between laps answered nothing — no sound, no pop (the plane measured 3.6 juice beats a
+      // minute against the kart's 58–75). A ring flown through chimes and pops, as the kart's checkpoints do.
+      if (res.gate && !res.lap) {
+        SoundKit.play('score', { pitch: 1, volume: 0.35 });
+        ctx.juice.scorePop(flight.pos.add(new Vector3(0, 3, 0)), `RING ${race.next === 0 ? circuit.course.gates.length : race.next}/${circuit.course.gates.length}`, '#7dd3fc');
+      }
       if (res.lap) {
         SoundKit.play('score', { pitch: 1.2 });
         ctx.feel.impact(0.3);
-        if (!res.finished) say(race.lap === circuit.course.laps ? 'FINAL LAP!' : `LAP ${race.lap}`, 1.1);
+        ctx.juice.flash('#fde68a', 90); ctx.juice.shake(0.04, 110);
+        const finalLap = !res.finished && race.lap === circuit.course.laps;
+        if (!res.finished) say(finalLap ? 'FINAL LAP!' : `LAP ${race.lap}`, 1.1);
+        if (finalLap) { SoundKit.play('whistle', { pitch: 1.3 }); ctx.juice.callout('FINAL LAP', '#fde047', 900); }
       }
       if (res.finished || S.graceLeft === 0) { finish(ctx); return; }
 

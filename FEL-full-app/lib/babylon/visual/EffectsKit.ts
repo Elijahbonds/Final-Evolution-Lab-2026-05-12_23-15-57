@@ -172,7 +172,7 @@ export const EffectsKit = {
    * caused this was — a shoe-scuff on a light cut and one on a planted stop are the same effect at two
    * sizes, and firing the identical puff for both is what makes particle work read as canned.
    */
-  burst(scene: Scene, at: Vector3, kind: 'dust' | 'sparks' | 'net' | 'confetti' | 'glitch', scale = 1): void {
+  burst(scene: Scene, at: Vector3, kind: 'dust' | 'sparks' | 'net' | 'confetti' | 'glitch', scale = 1, tint?: string): void {
     const cfg = {
       dust: { colors: ['#c9c2b6', '#a89f90'], count: 26, speed: 1.4, size: 0.16, life: 0.7, gy: -1.5 },
       sparks: { colors: ['#ffd75e', '#ff8f3d'], count: 20, speed: 3.2, size: 0.06, life: 0.35, gy: -3 },
@@ -187,7 +187,9 @@ export const EffectsKit = {
     const count = Math.max(4, Math.round(cfg.count * k));
     const ps = baseSystem(scene, `fx_${kind}_${Date.now()}`, count);
     ps.emitter = at.clone();
-    const c1 = Color3.FromHexString(cfg.colors[0]), c2 = Color3.FromHexString(cfg.colors[1 % cfg.colors.length]);
+    // `tint` (racing pass phase 8): one colour for the whole burst — the kart's mini-turbo tiers are the SAME sparks in
+    // blue, orange and purple, and the colour is the read
+    const c1 = Color3.FromHexString(tint ?? cfg.colors[0]), c2 = tint ? Color3.FromHexString(tint).scale(1.25) : Color3.FromHexString(cfg.colors[1 % cfg.colors.length]);
     ps.color1 = new Color4(c1.r, c1.g, c1.b, 1);
     ps.color2 = new Color4(c2.r, c2.g, c2.b, 1);
     ps.minSize = cfg.size * 0.6 * k; ps.maxSize = cfg.size * k;
