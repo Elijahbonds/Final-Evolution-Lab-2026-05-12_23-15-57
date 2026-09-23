@@ -43,11 +43,16 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const t = Number(r.stats?.timeSec ?? r.stats?.time ?? 0);
+      // RACING PASS phase 9: the headline is the race — the place first, then the clock and its medal. It read `timeSec`,
+      // which the kart never sent (its clock is `seconds`), so every result was "RACE COMPLETE", a DNF included.
+      const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
+      const place = Number(r.stats?.place ?? 0), field = Number(r.stats?.field ?? 0), medal = ['none', 'bronze', 'silver', 'gold'][Number(r.stats?.medal ?? 0)] ?? 'none';
+      const ord = place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`;
       onEnd({
         score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
         won: r.outcome === 'win', duration: r.durationSec,
-        headline: t > 0 ? `RACE OVER · ${t.toFixed(1)}s` : 'RACE COMPLETE',
+        headline: r.outcome === 'dnf' ? `DNF · ${ord} OF ${field}`
+          : place > 0 ? `${ord} OF ${field} · ${t.toFixed(1)}s${medal !== 'none' ? ` · ${medal.toUpperCase()}` : ''}` : `RACE COMPLETE · ${t.toFixed(1)}s`,
       } satisfies GameResult);
     };
 

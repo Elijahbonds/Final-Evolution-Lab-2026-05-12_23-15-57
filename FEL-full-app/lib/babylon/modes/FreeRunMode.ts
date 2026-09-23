@@ -478,12 +478,16 @@ export const FreeRunMode: ModeDefinition = (() => {
     const total = S.combo.banked + tb + rb;
     const grade = runGrade(total, S.tier);
     SoundKit.play('whistle'); SoundKit.play('crowdCheer');
-    finishPunch(ctx, S, grade === 'S' || grade === 'A');   // A+ P0: one finish punch
+    // RACING PASS phase 9: a race is WON by finishing first. It was won on the GRADE (S or A) whatever the place —
+    // measured, "FINISH · P4 · 52.5s · GRADE S" ended as a win. The grade stays on the banner and in the result.
+    const first = S.race.place === 1;
+    finishPunch(ctx, S, first);   // A+ P0: one finish punch (gold for the winner)
     EffectsKit.burst(ctx.scene, S.hero!.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
     hud(ctx, S, { banner: `FINISH · P${S.race.place} · ${S.runSec.toFixed(1)}s · GRADE ${grade}` });
-    setTimeout(() => ctx.end(grade === 'S' || grade === 'A' ? 'win' : 'complete', total, {
+    setTimeout(() => ctx.end(first ? 'win' : 'complete', total, {
       timeSec: Math.round(S.runSec * 10) / 10, tricks: S.combo.banked, timeBonus: tb, routeBonus: rb, bestCombo: S.combo.bestCombo,
       tier: S.tier.id, bails: S.bails, highLine: S.highTouched ? 1 : 0, place: S.race.place, field: S.rivals.length + 1, driveBys: S.race.driveBys, parries: S.race.parries,
+      grade: 'DCBAS'.indexOf(grade) + 1,   // details are numbers: 1 D … 5 S (the host spells it)
     }), 1400);
   }
 

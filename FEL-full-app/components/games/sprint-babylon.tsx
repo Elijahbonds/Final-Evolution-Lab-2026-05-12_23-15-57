@@ -78,7 +78,11 @@ export function makeSprintHost(modeKey: string, title: string) {
             opponentScore: 0,
             won: r.outcome === 'win',
             duration: r.durationSec,
-            headline: r.outcome === 'win' ? 'BLAZING SPEED' : 'CHASE THAT SUB-13',
+            // RACING PASS phase 9: the race and the clock — beating the pacer outside the sub-13 bar was "CHASE THAT SUB-13",
+            // the same line as losing to it
+            headline: (() => { const t = Number(r.stats?.timeS ?? 0).toFixed(2);
+              return r.outcome === 'win' ? `SUB-13 · ${t}s` : r.outcome === 'dnf' ? 'DID NOT FINISH'
+                : Number(r.stats?.beatPacer) ? `BEAT THE PACER · ${t}s — NOW SUB-13` : `THE PACER TAKES IT · ${t}s`; })(),
           } satisfies GameResult);
         },
       }).then((s) => {

@@ -37,7 +37,9 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
       const t = Number(r.stats?.timeSec ?? 0);
       const result: GameResult = {
         score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0, won, duration: r.durationSec,
-        headline: won ? `CLEAN LINE · ${t}s` : `FINISHED · ${t}s`,
+        // RACING PASS phase 9: the place, the clock and the grade — the grade used to decide the win
+        headline: (() => { const p = Number(r.stats?.place ?? 0), g = ' DCBAS'[Number(r.stats?.grade ?? 0)]?.trim() ?? ''; const ord = p === 1 ? '1ST' : p === 2 ? '2ND' : p === 3 ? '3RD' : `${p}TH`;
+          return r.outcome === 'timeout' ? `OUT OF TIME · ${t}s` : `${p > 0 ? `${ord} · ` : ''}${t}s${g ? ` · GRADE ${g}` : ''}`; })(),
       };
       onEnd(result);
     };

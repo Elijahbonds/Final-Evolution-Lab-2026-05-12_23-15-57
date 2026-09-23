@@ -799,9 +799,12 @@ function finish(ctx: ModeContext): void {
   // three laps ago and the record is the reason you went round again.
   say(beatIt ? `NEW BEST — ${race.time.toFixed(1)}s` : !race.finished ? `OUT OF TIME — ${placeTag}DNF` : medal === 'none' ? `${placeTag}FINISHED ${race.time.toFixed(1)}s` : `${placeTag}${medal.toUpperCase()} — ${race.time.toFixed(1)}s`, 2.4);
   pushHud(ctx);
-  ctx.end(race.finished ? `COMPLETE_${medal.toUpperCase()}` : 'OUT',
+  // RACING PASS phase 9: the outcome is the RACE — 'win' for first over the line, 'complete' for any other finish, 'dnf'
+  // when the clock called it. It was `COMPLETE_<MEDAL>` / 'OUT': the host looked for 'win' and so never reported a kart
+  // win, a 4th-of-4 finish read as GOLD (the medal is the clock's), and a DNF was headlined "RACE COMPLETE".
+  ctx.end(race.finished ? (place === 1 ? 'win' : 'complete') : 'dnf',
     Math.round(Math.max(0, course.gold * 2 - race.time) * 10), {
-      seconds: Number(race.time.toFixed(2)), gates: race.passed, place, field: rivals.length + 1, laps: race.lap,
+      seconds: Number(race.time.toFixed(2)), gates: race.passed, place, field: rivals.length + 1, laps: race.lap, medal: ['none', 'bronze', 'silver', 'gold'].indexOf(medal),   // details are numbers: 0 none … 3 gold
       bestDrift: Math.round(S.bestDrift * 100), offRoad: Number(S.offRoadSec.toFixed(1)),
     });
 }

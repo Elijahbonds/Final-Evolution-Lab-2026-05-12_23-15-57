@@ -115,6 +115,7 @@ function finish(ctx: ModeContext, timeS: number): void {
   ctx.end(won ? 'win' : 'complete', Math.max(0, Math.round((20 - timeS) * 120) - S.stumbles * 40), {
     timeS: Number(timeS.toFixed(2)), stumbles: S.stumbles, topSpeed: core?.state.topSpeed ?? 0,
     ...(S.reactS !== null ? { reactionS: Number(S.reactS.toFixed(2)) } : {}),
+    beatPacer: S.rivalDist < RACE_DIST ? 1 : 0,   // racing pass phase 9: the headline says whether you beat the pacer
   });
 }
 
