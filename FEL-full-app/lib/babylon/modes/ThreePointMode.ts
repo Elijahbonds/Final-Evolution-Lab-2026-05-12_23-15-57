@@ -233,6 +233,20 @@ function syncRacks(): void {
 }
 
 /** Recolour the loaded ball for whichever shot is next up. */
+/**
+ * HOOPS-DEPTH S2 (2026-09-23): THE SET. The shooter stood in `idle_stand` — arms down, knees straight, on every frame of
+ * the body smoke (731 / 731 straight-armed) — while the bar swept, and the whole jump shot (load, rise, release) played
+ * AFTER the press at 1.5×: a pop from a stand, the decision before the body. 2K's catch-and-shoot is a SET: the feet
+ * plant and the knees load as the ball arrives, and the press is the release out of that. So the catch lands in the
+ * pull-up gather (the plant + the ball to the chest, 0.3 s) and HOLDS its loaded frame while the bar sweeps; the jump
+ * shot fades out of it at the fire. `freezeAtEnd` parks the clip live so the rise fades FROM the set, not from idle.
+ */
+function setFeet(): void {
+  if (!player) return;
+  player.animator.play('bball_pullup_gather', { fadeSec: 0.1, restart: true, onEnd: () => { if (player && S.phase === 'shoot' && !S.fired) player.animator.freezeAtEnd('bball_pullup_gather'); } });
+  console.info('[3PT-SET] feet set — loaded for the release');
+}
+
 function dressBall(): void {
   syncRacks();
   const money = isMoneyBall(S.ballIdx);
@@ -439,7 +453,7 @@ function fire(ctx: ModeContext, power?: number): void {
   // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias. BIOMECH-HOOPS-WAVE1: the clip is CUT at its
   // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
   // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
-  player.animator.play('jumpshot', { speedRatio: SHOT_CLIP_SPEED, onEnd: () => { /* cut at the release; a late end holds */ } });
+  player.animator.play('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, onEnd: () => { /* cut at the release; a late end holds */ } });   // S2: the rise fades out of the SET
   releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
   pendingMade = made;
   {   // RIM PLAY: what this timing earned on the iron — early is short, late is long; a make inside the good window can rattle
@@ -802,7 +816,7 @@ export const ThreePointMode: ModeDefinition = {
       pick.t = Math.min(1, pick.t + dt / PICK_SEC); const k = pick.t * pick.t * (3 - 2 * pick.t);
       const hand = boneNode(player.skeleton, 'RightHand'); const to = hand ? hand.getAbsolutePosition() : player.root.position.add(new Vector3(0.3, 1.0, 0.3));
       pick.mesh.position.copyFrom(Vector3.Lerp(pick.from, to, k));
-      if (pick.t >= 1) { pick.mesh.setEnabled(false); pick = null; ball.setEnabled(true); ball.position.copyFrom(to); attachBallToHand(ball, player.skeleton, 'RightHand'); }
+      if (pick.t >= 1) { pick.mesh.setEnabled(false); pick = null; ball.setEnabled(true); ball.position.copyFrom(to); attachBallToHand(ball, player.skeleton, 'RightHand'); if (S.phase === 'shoot' && !S.fired) setFeet(); }   // S2: the catch is the set
     }
 
     // Standings: the staged reveal runs first (one card every 0.75s); the
@@ -857,6 +871,7 @@ export const ThreePointMode: ModeDefinition = {
         S.fired = false;
         S.barT = Math.random() * Math.PI; meterBegin();
         dressBall();
+        setFeet();   // S2: the first ball of a rack is already in hand — the arrival at the rack is its catch
         pushHud(ctx, `RACK ${S.rack + 1}`);
       }
     } else if (S.phase === 'shoot') {
