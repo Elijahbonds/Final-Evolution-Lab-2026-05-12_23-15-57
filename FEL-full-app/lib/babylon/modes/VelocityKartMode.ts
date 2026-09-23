@@ -52,6 +52,7 @@ import {
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS } from '../visual/venuePropSets';
 import { refuse } from '../core/Refusal';
+import { stepDraft, noDraft, DRAFT, type DraftState } from '../racing/Slipstream';   // racing pass phase 7
 import { newStart, stepStart, beatLabel, ROCKET_ZIP_SEC, BURNOUT_SEC, BURNOUT_THROTTLE, type StartState, type StartOutcome } from '../racing/RaceStart';   // racing pass phase 4
 import {
   boostEarnFor, crossedLip, idleAir, launch, startTrick, stepAir, type KartAirState,
@@ -167,7 +168,9 @@ const S = {
   graceLeft: null as number | null,
   // ITEMS + CONTACT (2026-09-18)
   held: null as HeldItem | null, shieldT: 0, zipT: 0, spinT: 0,
-  events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 },
+  events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0 },
+  /** SLIPSTREAM (phase 7): the wake's charge behind the rival ahead, and whether this tow has been called. */
+  draft: noDraft() as DraftState, draftSaid: false,
   // THE START (racing pass phase 4): the countdown, and the burnout's seconds of lost drive after a too-early throttle
   start: newStart() as StartState, burnT: 0,
   /** Seconds the nose has pointed back down the line (racing pass phase 5: WRONG WAY, as the plane already had). */
@@ -669,6 +672,17 @@ function tickField(ctx: ModeContext, dt: number): void {
       else { state.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, state.pos.add(right.scale(-ev.playerShove)), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
     }
     for (const i of nearMisses(player, rposes, lapLen, rivalAlongside)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
+    // SLIPSTREAM (racing pass phase 7, racing/Slipstream): tuck in behind a rival, in its lane, and the wake charges; hold it
+    // ~1 s and you are slung past. The rival AHEAD becomes a resource, not only an obstacle — Mario Kart's draft.
+    const tow = stepDraft(S.draft, { dist: playerDist, lane: player.lateral, speed: state.speed }, rivals.map((r) => ({ name: r.name, dist: r.dist, lane: r.lane })), lapLen, dt);
+    if (tow.towing && !S.draftSaid && tow.state.charge > 0.35) { S.draftSaid = true; ctx.juice.callout('SLIPSTREAM', '#a5f3fc', 500); SoundKit.play('whoosh', { pitch: 0.8, volume: 0.25 }); }
+    if (!tow.towing) S.draftSaid = false;
+    if (tow.event === 'slingshot') {
+      S.zipT = Math.max(S.zipT, DRAFT.burstSec); S.events.slingshots++; S.draftSaid = false;
+      say(`SLINGSHOT — PAST ${tow.from}`, 0.9); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.55 }); ctx.juice.flash('#22d3ee', 50);
+      console.info(`[RACE] slingshot ${tow.from}`);
+    }
+    S.draft = tow.state;
   }
   // ITEMS: balloons taken, shells and mines on the road
   stepBalloons(balloons, dt);
@@ -712,6 +726,7 @@ function pushHud(ctx: ModeContext): void {
     ...boost.hud(),
     lap: `${Math.min(race.lap, course.laps)}/${course.laps}`,
     time: race.time.toFixed(1),
+    draft: Math.round(S.draft.charge * 100),   // SLIPSTREAM (phase 7): the wake's charge, 0–100
     start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
     // THE GAP under the place (phase 5): seconds to the kart ahead, or the lead
     gap: rivals.length ? gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist })), state.speed) : '',
@@ -800,7 +815,8 @@ return {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
-    S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0 };
+    S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0 };
+    S.draft = noDraft(); S.draftSaid = false;
     S.start = newStart(); S.burnT = 0; S.wrongT = 0;
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)

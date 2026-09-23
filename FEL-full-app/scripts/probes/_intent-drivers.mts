@@ -270,6 +270,10 @@ export const INTENT_DRIVERS: Record<string, string> = {
       const z = st.z, x = st.x, now = performance.now(), pieces = st.pieces || [];
       const ahead = pieces.filter((q) => q.z + q.d / 2 > z - 0.5 && q.z - q.d / 2 < z + 14 && (q.route === LANE || (LANE === 'high' && q.kind === 'wall') || (LANE === 'mid' && q.kind === 'anchor')));
       let tx = LX[LANE];
+      // a lane that has ENDED has no floor: follow the floor ahead instead (measured, phase 7: past HYDRO-DAM's last
+      // checkpoint the low line stops, and a runner held to x −6 fell off and respawned 44 times)
+      const floorAhead = pieces.filter((q) => q.kind === 'ground' && q.z + q.d / 2 > z + 2 && q.z - q.d / 2 < z + 12);
+      if (floorAhead.length && !floorAhead.some((q) => Math.abs(q.x - tx) < q.w / 2 - 0.5)) tx = floorAhead.sort((a, b) => Math.abs(a.x - tx) - Math.abs(b.x - tx))[0].x;
       const vault = ahead.find((q) => q.kind === 'vault' && q.z > z);
       const bar = ahead.find((q) => q.kind === 'bar' && q.z > z - 0.5);
       const rail = ahead.find((q) => q.kind === 'rail' && q.z + q.d / 2 > z);
@@ -296,7 +300,10 @@ export const INTENT_DRIVERS: Record<string, string> = {
       if (st.race && st.race.draft >= 1 && st.state === 'ground' && now - lastTap > 300) { tap(A); lastTap = now; }
       const nearBar = !!bar && bar.z - z < 2.2 && bar.z - z > -0.6;
       if (nearBar !== lt) { lt = nearBar; hold(LT, lt); }
-      if (st.state === 'air' && now - lastTap > 300 && st.speed > 4 && Math.random() < 0.3) { P.axes[3] = -1; touch(); setTimeout(() => { P.axes[3] = 0; touch(); }, 60); lastTap = now; }
+      // a trick only with real height under the runner: a flip thrown on a vault hop cannot come round and lands as a BAIL
+      // (measured, phase 7: 9–43 bails a run on the low lanes, every one a trick on a short hop)
+      const under = pieces.filter((q) => Math.abs(q.x - x) < q.w / 2 && Math.abs(q.z - z) < q.d / 2 && q.kind !== 'gap').reduce((m, q) => Math.max(m, q.y + 0.5), 0);
+      if (st.state === 'air' && now - lastTap > 300 && st.speed > 4 && st.y - under > 1.6 && Math.random() < 0.3) { P.axes[3] = -1; touch(); setTimeout(() => { P.axes[3] = 0; touch(); }, 60); lastTap = now; }
     }, 40);
   `),
   // RACING PASS (2026-09-23): the three racers that had no driver. Each reads the mode's own probe seam and races the line:
@@ -327,7 +334,10 @@ export const INTENT_DRIVERS: Record<string, string> = {
       // steer in a slide carried the kart wide into the snow on SUMMIT CLIMB: 19 % of the race off the road)
       const edge = Math.abs(st.lateral || 0) / Math.max(1, st.halfWidth || 9);
       const wantDrift = !PLAIN && (st.cornerR || 999) < 42 && st.speed > 16 && Math.abs(err) > 0.12 && edge < 0.5;
-      stick(clamp(err * (drift ? 1.7 : 2.4) - (edge > 0.7 ? Math.sign(st.lateral) * 0.3 : 0)), 0);
+      // window.__TOW (racing pass phase 7): tuck into the lane of the kart 2–14 m ahead — the slipstream's wake
+      const tow = window.__TOW ? (st.rivals || []).filter((r) => r.gap > 2 && r.gap < 14).sort((a, b) => a.gap - b.gap)[0] : null;
+      const towPull = tow && edge < 0.6 ? clamp((tow.lateral - (st.lateral || 0)) * 0.12, 0.35) : 0;
+      stick(clamp(err * (drift ? 1.7 : 2.4) + towPull - (edge > 0.7 ? Math.sign(st.lateral) * 0.3 : 0)), 0);
       if (wantDrift !== drift) { drift = wantDrift; hold(X, drift); }
       hold(RT, !over || drift); hold(LT, !drift && st.speed > holdV * 1.18);
       const wantBoost = !PLAIN && (st.cornerR || 0) > 110 && Math.abs(err) < 0.1 && Number(h.boost) > 25 && !over;
@@ -353,7 +363,9 @@ export const INTENT_DRIVERS: Record<string, string> = {
       let err = 0;
       if (st.tangent && st.pos) {
         err = Math.atan2(st.tangent.x, st.tangent.z) - st.heading; err = Math.atan2(Math.sin(err), Math.cos(err));
-        stick(clamp(err * 2.2 - st.lateral * 0.06), clamp((st.lineY - st.pos.y) * 0.12));
+        // window.__TOW (phase 7): hold the lane of the plane 2–14 m ahead instead of the line's centre — the wake
+        const tow = window.__TOW ? (st.rivals || []).filter((r) => r.gap > 2 && r.gap < 14).sort((a, b) => a.gap - b.gap)[0] : null;
+        stick(clamp(err * 2.2 - (st.lateral - (tow ? tow.lateral : 0)) * 0.06), clamp((st.lineY - st.pos.y) * 0.12));
       }
       const now = performance.now();
       if (window.__PLAIN) return;   // the line alone: no items, stunts or boost (see the kart's __PLAIN)

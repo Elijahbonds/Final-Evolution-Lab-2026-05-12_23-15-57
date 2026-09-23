@@ -54,6 +54,7 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   if (process.env.START) await p.evaluate(`window.__START = '${process.env.START}'`);   // phase 4: the driver's start timing
   if (process.env.PLAIN === '1') await p.evaluate('window.__PLAIN = 1');   // phase 6: the line alone, no skill verbs
   if (process.env.LANE) await p.evaluate(`window.__LANE = '${process.env.LANE}'`);   // phase 7: the Free Run lane the driver runs
+  if (process.env.TOW === '1') await p.evaluate('window.__TOW = 1');   // phase 7: seek the slipstream behind the rival ahead
   if (DRIVER === 'intent') {
     if (!INTENT_DRIVERS[mode]) throw new Error(`no intent driver for ${mode}`);
     await p.evaluate(INTENT_DRIVERS[mode]);

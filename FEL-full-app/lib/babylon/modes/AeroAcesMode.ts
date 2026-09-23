@@ -46,6 +46,7 @@ import {
 import { readPlane } from '../racing/garage';
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy plane bodies over the toy primitives
 import { refuse } from '../core/Refusal';
+import { stepDraft, noDraft, DRAFT, type DraftState } from '../racing/Slipstream';   // racing pass phase 7
 import { newStart, stepStart, beatLabel, ROCKET_ZIP_SEC, BURNOUT_SEC, BURNOUT_THROTTLE, type StartState, type StartOutcome } from '../racing/RaceStart';   // racing pass phase 4
 import {
   ARCADE_TRAINER, arcadeFrom, spawnArcade, stepArcade, startStunt, dodging, spinOut, wallTurn, forwardOf,
@@ -121,7 +122,9 @@ export function makeAeroAcesMode(): ModeDefinition {
     boostHeld: false,
     banner: '', bannerT: 0,
     done: false,
-    events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0 },   // RACE CONTACT telemetry
+    events: { bumps: 0, punts: 0, punted: 0, nearMisses: 0, slingshots: 0 },   // RACE CONTACT telemetry
+    /** SLIPSTREAM (phase 7): the wake's charge behind the plane ahead, and whether this tow has been called. */
+    draft: noDraft() as DraftState, draftSaid: false,
     lookX: 0, lookY: 0,
     lastPlace: 0,
     wrongT: 0,
@@ -172,6 +175,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       speed: Math.round(flight.speed * 3.6),
       time: race.time.toFixed(1),
       banner: S.banner,
+      draft: Math.round(S.draft.charge * 100),   // SLIPSTREAM (phase 7): the wake's charge, 0–100
       start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
       hint: S.start.go ? 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost'
         : 'GAS DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" THE ENGINE BOGS',
@@ -185,7 +189,8 @@ export function makeAeroAcesMode(): ModeDefinition {
     // planes are wide: spread the lanes, and put the grid behind the player in two staggered rows
     rivals.forEach((r, i) => { r.lane *= 3.2; r.dist = -10 - i * 7; });
     rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, touch: false, alongside: false }));
-    S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0 };
+    S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, slingshots: 0 };
+    S.draft = noDraft(); S.draftSaid = false;
     rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
     for (const rp of rivalPlanes) void dressVehicle(scene, rp.root, 'plane', 'rival', { hide: rp.parts });   // phase 5: the field wears the fifth body
   }
@@ -639,6 +644,17 @@ export function makeAeroAcesMode(): ModeDefinition {
         const was = rivalKits.map((k) => k.alongside);
         for (const i of nearMisses(me, rposes, lapLen, was)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
         rivalKits.forEach((k, i) => { k.alongside = was[i]; });
+        // SLIPSTREAM (racing pass phase 7, racing/Slipstream): tuck in behind a rival, in its lane, and the wake charges; hold it
+        // ~1 s and you are slung past. The rival AHEAD becomes a resource, not only an obstacle — Mario Kart's draft.
+        const tow = stepDraft(S.draft, { dist: pDist, lane: pLat, speed: flight.speed }, rivals.map((r) => ({ name: r.name, dist: r.dist, lane: r.lane })), lapLen, dt);
+        if (tow.towing && !S.draftSaid && tow.state.charge > 0.35) { S.draftSaid = true; ctx.juice.callout('SLIPSTREAM', '#a5f3fc', 500); SoundKit.play('whoosh', { pitch: 0.8, volume: 0.25 }); }
+        if (!tow.towing) S.draftSaid = false;
+        if (tow.event === 'slingshot') {
+          S.zipT = Math.max(S.zipT, DRAFT.burstSec); S.events.slingshots++; S.draftSaid = false;
+          say(`SLINGSHOT — PAST ${tow.from}`, 0.9); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.55 }); ctx.juice.flash('#22d3ee', 50);
+          console.info(`[RACE] slingshot ${tow.from}`);
+        }
+        S.draft = tow.state;
       }
 
       // ── missiles and mines ──
