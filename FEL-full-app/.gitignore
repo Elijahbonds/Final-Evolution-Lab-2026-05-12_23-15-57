@@ -26,3 +26,7 @@ scripts/avatar/out/
 node_modules
 /shots/
 .firebase/
+
+# Meshy drops staged for the browser (symlinks to ~/Downloads; never tracked)
+public/models/incoming-*
+public/models/candidates/meshy22/
