@@ -869,7 +869,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (riseHop && !finish && !dunking) {
         riseHop.t += dt;
         me.root.position.y = Math.max(0, Math.sin(Math.min(1, riseHop.t / riseHop.dur) * Math.PI) * JUMPER_HOP_APEX);
-        if (riseHop.t >= riseHop.dur) { riseHop = null; me.root.position.y = 0; }
+        if (riseHop.t >= riseHop.dur) { riseHop = null; me.root.position.y = 0; meAnimTree.beat('bball_land_absorb', { fadeSec: 0.08 }); }   // HOOPS-DEPTH S4: feet-down is an absorb, not the loop
       } else if (riseHop) riseHop = null;
       // a posterized rival gets up when the stun ends (the tree held the floor)
       if (foeFloored && foeStunSec === 0) { foeFloored = false; foeAnimTree.beat('karate_get_up'); }

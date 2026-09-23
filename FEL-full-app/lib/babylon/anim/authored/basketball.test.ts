@@ -10,6 +10,7 @@ import { boneNode } from '../boneLookup';
 import {
   buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,
+  buildLandAbsorb,   // HOOPS-DEPTH S4
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
   buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
@@ -102,6 +103,15 @@ describe('basketball packages on the forge rig', () => {
     expect(Math.abs(lf.y - rf.y)).toBeLessThan(0.12);
     expect(lh.y).toBeLessThan(sh - 0.15); expect(rh.y).toBeLessThan(sh - 0.15);
     expect(Math.hypot(lh.x - rh.x, lh.z - rh.z)).toBeLessThan(0.7);
+  });
+  it('the landing absorb takes the jump on the knees with the hands still high, then stands up (HOOPS-DEPTH S4)', () => {
+    rest(); const g = buildLandAbsorb(scene, sk)!;
+    at(g, 0);
+    const kneeCatch = Math.min(pos('LeftLeg').y, pos('RightLeg').y), hipsCatch = pos('Hips').y, handCatch = pos('RightHand').y;
+    expect(kneeCatch).toBeLessThan(0.6);                                  // the knees loaded
+    at(g, 0.3);
+    expect(pos('Hips').y).toBeGreaterThan(hipsCatch + 0.04);              // the hips come back up from the absorb (the knees unload)
+    expect(pos('RightHand').y).toBeLessThan(handCatch - 0.3);            // the arms come down from the release
   });
   it('the pull-up gather brings both hands onto the ball at the hip with the knees loaded, then sets it at the chest', () => {
     rest(); const g = buildPullupGather(scene, sk)!;

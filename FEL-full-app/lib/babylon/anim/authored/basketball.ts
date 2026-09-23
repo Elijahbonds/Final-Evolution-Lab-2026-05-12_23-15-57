@@ -347,6 +347,19 @@ export function buildHandUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'bball_hand_up', 0.7, [key(0, [0.18, 2.02, 0.10], 0), key(0.35, [0.21, 2.0, 0.14], 2), key(0.7, [0.18, 2.02, 0.10], 0)]);
 }
 
+/** THE LANDING ABSORB (HOOPS-DEPTH S4, 2026-09-23). A jump shot came down from its hop straight into the loop the game asked
+ *  for — the follow-through's arms-overhead key faded into a dribble idle or a stance in one crossfade, with nothing in the
+ *  legs: the body landed like a puppet set down. 2K lands every jump on an absorb: the knees take it, the torso drops,
+ *  the arms come down, then the recovery. 0.3 s from a loaded catch (knees 46°, the hips 7 cm down, the hands still high
+ *  from the release) to the neutral stance; the tree's release runs the loop after it. */
+export function buildLandAbsorb(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_land_absorb', 0.3, [
+    { t: 0,   bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-38, 0, 10], RightUpLeg: [-38, 0, -10], LeftLeg: [46, 0, 0], RightLeg: [46, 0, 0] }, hands: { Right: [0.24, 1.58, 0.22] as V3, Left: [-0.22, 1.50, 0.18] as V3 }, hipsY: -0.07 },
+    { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-30, 0, 9],  RightUpLeg: [-30, 0, -9],  LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.26, 1.22, 0.28] as V3, Left: [-0.25, 1.16, 0.20] as V3 }, hipsY: -0.04 },
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-2, 0, 0], ...STANCE }, hands: { Right: [0.25, 1.0, 0.24] as V3, Left: OFF_HAND }, hipsY: 0 },
+  ]);
+}
+
 /** The SCREEN (HOOPS-MOVE-KIT-A O1): a wide, low, planted base, the chest tall, both hands crossed low in front of the
  *  hips (the arms in, nothing to call) — held while the screen is set; a slow breath so it never reads frozen. */
 export function buildScreenSet(scene: Scene, sk: Skeleton): AnimationGroup | null {

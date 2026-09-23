@@ -889,7 +889,8 @@ export const ThreePointMode: ModeDefinition = {
         releaseIn -= dt;
         if (releaseIn < 0) {
           const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper', 0, null, pendingPlay); pendingPlay = null; shotWin = 'release'; shotSec = 0; releaseIn = -1;
-          player.animator.play('bball_follow_through', { fadeSec: 0.08, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });   // from the release frame: arms overhead → the wrist snap → down the front
+          // HOOPS-DEPTH S4: the follow-through comes down on an ABSORB (knees, torso, arms), then the idle — it faded arms-overhead straight into idle_stand
+          player.animator.play('bball_follow_through', { fadeSec: 0.08, onEnd: () => player?.animator.play('bball_land_absorb', { fadeSec: 0.1, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) }) });   // from the release frame: arms overhead → the wrist snap → down the front
         }
       } else if (rimOut >= 0) {
         // the ball is live off the iron: let it bounce where the timing sent it, then the next ball is up
