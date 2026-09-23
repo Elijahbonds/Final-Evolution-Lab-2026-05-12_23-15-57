@@ -546,6 +546,12 @@ export class ShotMeter {
     return this.t >= 1 ? 'brick' : 'late';
   }
 }
+/** HOOPS-DEPTH S6: the follow-through a release plays — the timing band's own body (the early short arm, the late flat push;
+ *  a meter held to its end is a late release), the green one otherwise (anim/authored/basketball buildFollowThrough*). */
+export function followThroughFor(quality: ShotQuality): 'bball_follow_through' | 'bball_follow_through_early' | 'bball_follow_through_late' {
+  return quality === 'early' ? 'bball_follow_through_early' : quality === 'late' || quality === 'held' ? 'bball_follow_through_late' : 'bball_follow_through';
+}
+
 export const SHOT_QUALITY_PCT: Record<ShotQuality, number> = {
   perfect: 0.97, good: 0.8, early: 0.35, late: 0.3, brick: 0.04, held: 0.62,
 };

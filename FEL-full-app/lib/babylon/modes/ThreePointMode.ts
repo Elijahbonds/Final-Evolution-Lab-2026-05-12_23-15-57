@@ -61,7 +61,7 @@ import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';  
 import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
-import { ShotArc } from '../core/BasketballCore';
+import { ShotArc, followThroughFor } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';   // a shootout miss you can READ
 import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
@@ -162,7 +162,7 @@ export function simulateRival(skill: number, round: Round): number {
 let player: SpawnedCharacter | null = null;
 let meter3d: ShotMeter3DHandle | null = null;
 /** The bar starts (or restarts) beside the shooter with the sweet spot drawn on it — the same window `fire` grades by. */
-function meterBegin(): void { meter3d?.begin({ center: SHOT_TARGET, half: goodBand() }); }
+function meterBegin(): void { meter3d?.begin({ center: SHOT_TARGET, half: goodBand(), perfectHalf: perfectBand() }); }   // HOOPS-DEPTH S6: the PERFECT band drawn is the one fire() grades (it drew 0.35 of the good band: 0.056 against 0.06)
 /** Owner decision 2026-09-05: the contest's other shooters are ROSTER BODIES waiting behind the arc (idle, never seen
  *  shooting — D4's ruling stands); they replace the venue's capsule placeholders. */
 let rivalBodies: SpawnedCharacter[] = [];
@@ -890,7 +890,10 @@ export const ThreePointMode: ModeDefinition = {
         if (releaseIn < 0) {
           const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper', 0, null, pendingPlay); pendingPlay = null; shotWin = 'release'; shotSec = 0; releaseIn = -1;
           // HOOPS-DEPTH S4: the follow-through comes down on an ABSORB (knees, torso, arms), then the idle — it faded arms-overhead straight into idle_stand
-          player.animator.play('bball_follow_through', { fadeSec: 0.08, onEnd: () => player?.animator.play('bball_land_absorb', { fadeSec: 0.1, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) }) });   // from the release frame: arms overhead → the wrist snap → down the front
+          // HOOPS-DEPTH S6: outside the good band the body shows the miss before the rim does: short = the early short arm, long = the late push
+          const ftClip = followThroughFor(Math.abs(shotErr) < goodBand() ? 'good' : shotErr < 0 ? 'early' : 'late');
+          console.info(`[3PT-SHOT] follow-through ${ftClip} (err ${shotErr.toFixed(3)})`);
+          player.animator.play(ftClip, { fadeSec: 0.08, onEnd: () => player?.animator.play('bball_land_absorb', { fadeSec: 0.1, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) }) });   // from the release frame: arms overhead → the wrist snap → down the front
         }
       } else if (rimOut >= 0) {
         // the ball is live off the iron: let it bounce where the timing sent it, then the next ball is up

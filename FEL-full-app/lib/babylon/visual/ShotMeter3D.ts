@@ -8,10 +8,11 @@ import { Color3, Mesh, MeshBuilder, StandardMaterial, TransformNode, Vector3, ty
 export type MeterVerdict = 'perfect' | 'good' | 'early' | 'late' | 'brick' | 'held' | null;
 
 export interface ShotMeter3DHandle {
-  /** Show the bar with the green window at `center ± half` (0..1 of the bar). */
-  begin(green: { center: number; half: number }): void;
+  /** Show the bar with the green window at `center ± half` (0..1 of the bar), and the perfect band inside it at `± perfectHalf`
+   *  (default 0.35 of the half — the ShotMeter's own grade; a mode with its own bands passes the one it grades by). */
+  begin(green: { center: number; half: number; perfectHalf?: number }): void;
   /** Move the green while the bar runs (the dunk contest's window narrows with every style tap). */
-  green(green: { center: number; half: number }): void;
+  green(green: { center: number; half: number; perfectHalf?: number }): void;
   /** Each frame while the meter runs: the fill (0..1) and the point the bar hangs beside (the shooter's head). */
   set(t: number, head: Vector3): void;
   /** The release: flash the verdict on the bar where the marker stopped, then fade out. */
@@ -62,10 +63,10 @@ export function mountShotMeter3D(scene: Scene): ShotMeter3DHandle {
   const show = (on: boolean) => { shown = on; for (const p of all) p.isVisible = on; };
   const setAlpha = (k: number) => { if (k === alphaK) return; alphaK = k; mats.forEach((m, i) => { m.alpha = baseAlpha[i] * k; }); };
   const yOf = (t: number) => -H / 2 + t * H;
-  const setGreen = (g: { center: number; half: number }) => {
+  const setGreen = (g: { center: number; half: number; perfectHalf?: number }) => {
     const half = Math.max(0.012, g.half), c = Math.max(half, Math.min(1 - half, g.center));
     green.scaling.y = half * 2 * H; green.position.y = yOf(c);
-    perfect.scaling.y = half * 0.7 * H; perfect.position.y = yOf(c);
+    perfect.scaling.y = Math.min(half, g.perfectHalf ?? half * 0.35) * 2 * H; perfect.position.y = yOf(c);   // HOOPS-DEPTH S6: the band drawn IS the band graded
   };
   show(false);
   return {

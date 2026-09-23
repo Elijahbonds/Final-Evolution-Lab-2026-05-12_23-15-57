@@ -339,6 +339,34 @@ export function buildFollowThrough(scene: Scene, sk: Skeleton): AnimationGroup |
   ]);
 }
 
+/** THE RELEASE READS IN THE BODY (HOOPS-DEPTH S6, 2026-09-23). Every jump shot played the one follow-through, so an early or
+ *  late release looked exactly like a green one until the ball got to the rim. In 2K the body shows it first. An EARLY
+ *  release comes out of a low set point: the jumper was meter-paced and had not reached the top, so it is a short arm, the
+ *  ball pushed off the forehead with the elbow still bent. A LATE release is on the way down: it starts from the top, the
+ *  chest pitches forward and the hands push out flat, and the body lands heavy and straight-legged. Both come down the front
+ *  to the same stance as the green follow-through, so the absorb and the loop after them are unchanged. */
+export function buildFollowThroughEarly(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const rising: Record<string, Deg3> = { LeftUpLeg: [-10, 0, 4], RightUpLeg: [-10, 0, -4], LeftLeg: [14, 0, 0], RightLeg: [14, 0, 0] };
+  const soft: Record<string, Deg3> = { LeftUpLeg: [-12, 0, 6], RightUpLeg: [-12, 0, -6], LeftLeg: [18, 0, 0], RightLeg: [18, 0, 0] };
+  return buildPoseClip(scene, sk, 'bball_follow_through_early', 0.6, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-4, 0, 0], ...rising }, hands: { Right: [0.20, 1.60, 0.26], Left: [-0.14, 1.56, 0.24] } },   // below the top: the set point, elbows bent
+    { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  Neck: [-6, 0, 0], ...rising }, hands: { Right: [0.22, 1.60, 0.44], Left: [-0.22, 1.36, 0.30] } },   // the short arm: pushed forward off the forehead, never up
+    { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-4, 0, 0], ...soft }, hands: { Right: [0.24, 1.50, 0.40], Left: [-0.24, 1.24, 0.30] }, hipsY: -0.02 },
+    { t: 0.6,  bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  Neck: [-4, 0, 0], ...soft }, hands: { Right: [0.26, 1.18, 0.34], Left: [-0.26, 1.12, 0.30] }, hipsY: -0.04 },
+  ]);
+}
+export function buildFollowThroughLate(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const flat: Record<string, Deg3> = { LeftUpLeg: [-4, 0, 4], RightUpLeg: [-4, 0, -4], LeftLeg: [6, 0, 0], RightLeg: [6, 0, 0] };
+  const heavy: Record<string, Deg3> = { LeftUpLeg: [-18, 0, 7], RightUpLeg: [-18, 0, -7], LeftLeg: [24, 0, 0], RightLeg: [24, 0, 0] };
+  const soft: Record<string, Deg3> = { LeftUpLeg: [-12, 0, 6], RightUpLeg: [-12, 0, -6], LeftLeg: [18, 0, 0], RightLeg: [18, 0, 0] };
+  return buildPoseClip(scene, sk, 'bball_follow_through_late', 0.7, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [-6, 0, 0], ...flat }, hands: { Right: [0.18, 2.02, 0.22], Left: [-0.16, 1.92, 0.24] }, poles: { Right: UP_R, Left: UP_L } },   // the top, where the green one starts
+    { t: 0.15, bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-12, 0, 0], ...flat }, hands: { Right: [0.22, 1.80, 0.58], Left: [-0.20, 1.68, 0.48] } },   // on the way down: the chest pitches over, the ball pushed out flat
+    { t: 0.4,  bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-8, 0, 0], ...heavy }, hands: { Right: [0.24, 1.46, 0.50], Left: [-0.24, 1.34, 0.40] }, hipsY: -0.06 },   // a heavy landing
+    { t: 0.7,  bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  Neck: [-4, 0, 0], ...soft }, hands: { Right: [0.26, 1.18, 0.34], Left: [-0.26, 1.12, 0.30] }, hipsY: -0.04 },
+  ]);
+}
+
 /** The grounded HAND-UP contest (HOOPS-MOVE-KIT-A D3): the near arm straight up, the off arm out low in front, a wide low
  *  stance on the floor — verticality, no jump. Loops with a small sway; the mode HOLDS it while the contest button is held. */
 export function buildHandUp(scene: Scene, sk: Skeleton): AnimationGroup | null {

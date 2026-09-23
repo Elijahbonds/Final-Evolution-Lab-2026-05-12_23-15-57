@@ -26,6 +26,7 @@ import {
   buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildLandAbsorb,   // HOOPS-DEPTH S4
+  buildFollowThroughEarly, buildFollowThroughLate,   // HOOPS-DEPTH S6
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
 } from './basketball';
@@ -209,6 +210,8 @@ export function registerAuthoredClips(
     ['bball_layup_gather_left', () => buildLayupGather(scene, skeleton, 'left')],   // HOOPS-MOVE-KIT-A (2026-09-08): the left-hand finish (M3)
     ['bball_pullup_gather', () => buildPullupGather(scene, skeleton)],          // HOOPS-MOVE-KIT-A: the player's pull-up gather (M1)
     ['bball_land_absorb', () => buildLandAbsorb(scene, skeleton)],              // HOOPS-DEPTH S4: the jump shot comes down on its knees
+    ['bball_follow_through_early', () => buildFollowThroughEarly(scene, skeleton)],   // HOOPS-DEPTH S6: the early release's short arm
+    ['bball_follow_through_late', () => buildFollowThroughLate(scene, skeleton)],     // HOOPS-DEPTH S6: the late release's flat push and heavy landing
     ['bball_floater', () => buildFloater(scene, skeleton)],               // HOOPS-MOVE-KIT-A: the floater (M3)
     ['bball_hand_up', () => buildHandUp(scene, skeleton)],                // HOOPS-MOVE-KIT-A: the grounded hand-up contest (D3)
     ['bball_screen_set', () => buildScreenSet(scene, skeleton)],             // HOOPS-MOVE-KIT-A: the planted screen (O1)

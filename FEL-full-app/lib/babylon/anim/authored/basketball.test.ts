@@ -7,10 +7,12 @@ import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from 
 import type { AnimationGroup, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { boneNode } from '../boneLookup';
+import { followThroughFor } from '../../core/BasketballCore';
 import {
   buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,
   buildLandAbsorb,   // HOOPS-DEPTH S4
+  buildFollowThroughEarly, buildFollowThroughLate,   // HOOPS-DEPTH S6
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
   buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
@@ -103,6 +105,25 @@ describe('basketball packages on the forge rig', () => {
     expect(Math.abs(lf.y - rf.y)).toBeLessThan(0.12);
     expect(lh.y).toBeLessThan(sh - 0.15); expect(rh.y).toBeLessThan(sh - 0.15);
     expect(Math.hypot(lh.x - rh.x, lh.z - rh.z)).toBeLessThan(0.7);
+  });
+  it('an early release is a short arm and a late one a flat push with the chest over — the release reads in the body (HOOPS-DEPTH S6)', () => {
+    rest(); const green = buildFollowThrough(scene, sk)!;
+    at(green, 0.15); const gHand = pos('RightHand').clone(), gHead = pos('Head').clone(), gHips = pos('Hips').clone();
+    rest(); const early = buildFollowThroughEarly(scene, sk)!;
+    at(early, 0.12); const eHand = pos('RightHand').clone(), eHead = pos('Head').clone();
+    expect(eHand.y).toBeLessThan(gHand.y - 0.08);                 // the short arm: the ball leaves from the forehead, not overhead
+    expect(eHand.y).toBeGreaterThan(eHead.y - 0.1);               // …still up by the face, not a chest pass
+    rest(); const late = buildFollowThroughLate(scene, sk)!;
+    at(late, 0.15); const lHand = pos('RightHand').clone(), lHead = pos('Head').clone(), lHips = pos('Hips').clone();
+    expect(lHand.z - lHips.z).toBeGreaterThan(gHand.z - gHips.z + 0.08);   // the flat push: the hands out in front
+    expect(lHead.z - lHips.z).toBeGreaterThan(gHead.z - gHips.z + 0.04);   // the chest pitched over the feet
+    at(late, 0.4); const lKnee = Math.min(pos('LeftLeg').y, pos('RightLeg').y);
+    at(green, 0.4); expect(lKnee).toBeLessThan(Math.min(pos('LeftLeg').y, pos('RightLeg').y) + 0.001);   // a heavier landing than the green one
+    // all three end on the same stance, so the absorb and the loop after them do not change
+    at(early, 0.6); const eEnd = pos('RightHand').clone(); at(green, 0.7); const gEnd = pos('RightHand').clone(); at(late, 0.7);
+    expect(Vector3.Distance(eEnd, gEnd)).toBeLessThan(0.05); expect(Vector3.Distance(pos('RightHand'), gEnd)).toBeLessThan(0.05);
+    expect(followThroughFor('early')).toBe('bball_follow_through_early'); expect(followThroughFor('late')).toBe('bball_follow_through_late');
+    expect(followThroughFor('held')).toBe('bball_follow_through_late'); expect(followThroughFor('perfect')).toBe('bball_follow_through'); expect(followThroughFor('good')).toBe('bball_follow_through');
   });
   it('the landing absorb takes the jump on the knees with the hands still high, then stands up (HOOPS-DEPTH S4)', () => {
     rest(); const g = buildLandAbsorb(scene, sk)!;

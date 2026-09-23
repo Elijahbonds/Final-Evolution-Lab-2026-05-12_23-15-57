@@ -18,10 +18,11 @@ const exe = (() => {
 })();
 const b = await chromium.launch({ executablePath: exe, args: ['--use-gl=angle', '--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
-const rim: string[] = []; let errors = 0; const banners = new Map<string, number>();   // Phase 9: what the shootout SAYS
+const rim: string[] = []; const follows: { clip: string; err: number }[] = []; let errors = 0; const banners = new Map<string, number>();   // Phase 9: what the shootout SAYS
 p.on('console', (m) => {
   const x = m.text();
   if (/\[3PT-RIM\]/.test(x)) rim.push(x);
+  { const f = /\[3PT-SHOT\] follow-through (\S+) \(err (-?[0-9.]+)\)/.exec(x); if (f) follows.push({ clip: f[1], err: +f[2] }); }   // HOOPS-DEPTH S6: the body per band
   if (m.type() === 'error' && !/401 \(Unauthorized\)/.test(x)) errors++;
 });
 p.on('pageerror', (e) => { errors++; console.log('PAGEERROR', e.message.slice(0, 170)); });
@@ -60,6 +61,7 @@ const plans = new Map<string, number>(); for (const r of rim) { const k = (r.mat
 if (rings.length) console.log(`ring: ${yes}/${rings.length} made (${Math.round((100 * yes) / rings.length)}%)  swish share of makes: ${plans.get('swish') ?? 0}/${yes}`);
 if (plans.size) console.log('plans: ' + JSON.stringify(Object.fromEntries(plans)));
 if (banners.size) console.log('banners: ' + JSON.stringify(Object.fromEntries([...banners.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14))));
+if (follows.length) { const by = new Map<string, number[]>(); for (const f of follows) (by.get(f.clip) ?? by.set(f.clip, []).get(f.clip)!).push(f.err); console.log('follow-throughs (HOOPS-DEPTH S6): ' + [...by].map(([c, e]) => `${c} ${e.length} (err ${Math.min(...e).toFixed(3)}..${Math.max(...e).toFixed(3)})`).join(' · ')); }
 console.log('=== 3PT RIM CONTACTS (' + rim.length + ')');
 for (const r of rim.slice(0, 16)) console.log('  ' + r);
 console.log('kinds: ' + JSON.stringify(Object.fromEntries(kinds)));
