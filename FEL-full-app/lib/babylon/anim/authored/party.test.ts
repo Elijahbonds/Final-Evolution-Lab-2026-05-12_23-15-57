@@ -10,7 +10,9 @@ import { boneNode } from '../boneLookup';
 import { buildIdleStand } from './locomotion';
 import {
   buildPartyThink, buildPartyBuzz, buildPartyLocked, buildPartyYes, buildPartyFacepalm, buildPartyShrug, buildPartyWin, buildPartyWinIn, buildPartyLose,
+  buildPartyTalk, buildPartyPresent,
   PARTY_THINK_SEC, PARTY_BUZZ_SEC, PARTY_LOCKED_SEC, PARTY_YES_SEC, PARTY_FACEPALM_SEC, PARTY_SHRUG_SEC, PARTY_WIN_SEC, PARTY_WIN_IN_SEC, PARTY_LOSE_SEC,
+  PARTY_TALK_SEC, PARTY_PRESENT_SEC,
   PODIUM_TOP_M, PODIUM_AHEAD_M,
 } from './party';
 
@@ -43,6 +45,7 @@ const CLIPS: [string, () => AnimationGroup | null, number][] = [
   ['locked', () => buildPartyLocked(scene, sk), PARTY_LOCKED_SEC], ['yes', () => buildPartyYes(scene, sk), PARTY_YES_SEC],
   ['facepalm', () => buildPartyFacepalm(scene, sk), PARTY_FACEPALM_SEC], ['shrug', () => buildPartyShrug(scene, sk), PARTY_SHRUG_SEC],
   ['win', () => buildPartyWin(scene, sk), PARTY_WIN_SEC], ['win_in', () => buildPartyWinIn(scene, sk), PARTY_WIN_IN_SEC], ['lose', () => buildPartyLose(scene, sk), PARTY_LOSE_SEC],
+  ['talk', () => buildPartyTalk(scene, sk), PARTY_TALK_SEC], ['present', () => buildPartyPresent(scene, sk), PARTY_PRESENT_SEC],
 ];
 
 describe('the quiz podium', () => {
@@ -55,7 +58,7 @@ describe('the quiz podium', () => {
   });
 
   it('the loops close: think, locked, win and lose end where they start (no pop at the seam)', () => {
-    for (const [name, build, sec] of CLIPS.filter(([n]) => ['think', 'locked', 'win', 'lose'].includes(n))) {
+    for (const [name, build, sec] of CLIPS.filter(([n]) => ['think', 'locked', 'win', 'lose', 'talk'].includes(n))) {
       const g = fresh(build)!;
       at(g, 0); const a = [pos('LeftHand'), pos('RightHand'), pos('Head')];
       at(g, sec); const b = [pos('LeftHand'), pos('RightHand'), pos('Head')];
@@ -151,5 +154,28 @@ describe('the quiz podium', () => {
     at(g, 0);
     expect(headRest.y - pos('Head').y, 'hung').toBeGreaterThan(0.05);
     for (const s of ['Left', 'Right']) expect(Math.abs(pos(`${s}Hand`).y - PODIUM_TOP_M)).toBeLessThan(0.1);
+  });
+  // BRAINBRAWL-RESIDUAL (2026-09-24): the podiums and the host talk
+  it('TALK: the right hand comes up open in front of the chest and beats, the head nods with it', () => {
+    const g = fresh(() => buildPartyTalk(scene, sk)!);
+    const heads: number[] = [];
+    for (const t of [0.25, 0.5, 0.78, 1.05]) {
+      at(g, t);
+      const h = pos('RightHand');
+      expect(h.y, `up at the chest @${t}`).toBeGreaterThan(pos('Hips').y + 0.1);
+      expect(h.y, `below the chin @${t}`).toBeLessThan(pos('Head').y - 0.1);
+      expect((h.z - pos('Hips').z) * fwd(), `in front @${t}`).toBeGreaterThan(0.15);
+      heads.push(pos('Head').y);
+    }
+    // the beats: the head is not held still while it talks
+    expect(Math.max(...heads) - Math.min(...heads), 'the head moves on the beats').toBeGreaterThan(0.004);
+  });
+
+  it('PRESENT: one arm up and out above the shoulder toward the wheel, the other hand at the chest — never a T', () => {
+    const g = fresh(() => buildPartyPresent(scene, sk)!);
+    at(g, 0.8);
+    expect(pos('RightHand').y, 'raised above the shoulder').toBeGreaterThan(pos('RightArm').y + 0.15);
+    expect(Math.abs(pos('RightHand').x - pos('RightArm').x), 'out to the side').toBeGreaterThan(0.2);
+    expect(Math.abs(pos('LeftHand').x), 'the left hand in at the chest').toBeLessThan(Math.abs(pos('LeftArm').x));
   });
 });

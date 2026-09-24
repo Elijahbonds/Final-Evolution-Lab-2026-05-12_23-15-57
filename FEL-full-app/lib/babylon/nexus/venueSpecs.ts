@@ -392,7 +392,11 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { id: 'you', role: 'player', position: [-3, 0.5, 2], facing: Math.PI, color: '#5E5CE6' },
       { id: 'foe', role: 'foe', position: [3, 0.5, 2], facing: Math.PI },
     ],
-    camera: { alpha: -Math.PI / 2, beta: 1.12, radius: 14, target: [0, 1.5, 0], fov: 0.88 },
+    // BRAINBRAWL-RESIDUAL (2026-09-24): alpha −π/2 put this camera at z −12.6 — BEHIND the wall at z −10, so every mount warned
+    // "[NEXUS] framing: camera for "brain_brawl" sits behind the wall". The mode keeps its own gameplay camera ('court', unchanged;
+    // this one is scenery-only), so the fix is here: +π/2 stands it on the audience side, the side the play is watched from.
+    // Only this venue's entry — no shared camera preset is touched, and who_scene_it below keeps its own.
+    camera: { alpha: Math.PI / 2, beta: 1.12, radius: 14, target: [0, 1.5, 0], fov: 0.88 },
   },
 
   who_scene_it: {

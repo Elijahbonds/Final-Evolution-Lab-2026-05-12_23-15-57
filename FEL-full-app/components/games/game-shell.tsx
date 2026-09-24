@@ -12,6 +12,7 @@ import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
 import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from '@/lib/ui/fullscreen';
 import { VirtualController } from './virtual-controller';
+import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarn } from '@/lib/wallet/client';
@@ -351,6 +352,12 @@ function GameShellInner({
     [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode]
   );
 
+  // REPLAY IN PLACE (BRAINBRAWL-RESIDUAL, 2026-09-24): a game that can start its next match on the stage it already has
+  // registers a restart (replay-in-place.ts). REPLAY then clears the card and calls it — no key bump, no remount, no splash.
+  // A game that registers nothing (every other mode) remounts exactly as before.
+  const inPlace = useRef<(() => boolean) | null>(null);
+  const registerReplay = useCallback((fn: (() => boolean) | null) => { inPlace.current = fn; }, []);
+
   const replay = () => {
     setResult(null);
     setRecap(null);
@@ -358,6 +365,8 @@ function GameShellInner({
     setMpResult(null);
     setShareUrl(null);
     setShareState('idle');
+    // the next run's evidence of play starts from zero, as a remount would start it
+    if (inPlace.current?.()) { inputCount.current = 0; return; }
     setGameKey((k) => k + 1);
   };
 
@@ -540,7 +549,9 @@ function GameShellInner({
           </div>
         )}
         {profile ? (
-          <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
+          <ReplayInPlaceContext.Provider value={registerReplay}>
+            <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
+          </ReplayInPlaceContext.Provider>
         ) : (
           <div className="flex h-[60vh] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />

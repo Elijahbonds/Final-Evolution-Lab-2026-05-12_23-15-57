@@ -76,6 +76,9 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
 export const MODE_CAST: Record<string, readonly string[]> = {
   baseball: ['m22-6d8c65ad', 'm22-50acc34e', 'm22-2d171b36', 'm22-b5bcf955', 'm22-f760a342'],
   bigair: ['m22-feb2aabc', 'm22-242b6fd6', 'm22-bdb3bfb8', 'm22-350e6667'],
+  // BRAINBRAWL-RESIDUAL (2026-09-24): a quiz show's contestants, host and audience, dressed for a studio. Without a cast
+  // the P2 tint hashed onto the whole roster and landed on the shirtless beach body (feb2aabc): the eye read P2 as naked.
+  brainbrawl: ['m22-5cf665ee', 'm22-bdb3bfb8', 'm22-242b6fd6', 'm22-350e6667', 'm22-50acc34e', 'm22-f760a342', 'm22-df555984', 'm22-421d2cdb'],
   carnival: ['m22-4d4c6f8f', 'm22-242b6fd6', 'm22-5cf665ee', 'm22-c4822d61', 'm22-50acc34e', 'm22-b3a4e54f'],
   dance: ['m22-421d2cdb', 'm22-9e24fc5b', 'm22-5cf665ee', 'm22-f760a342'],
   duel: ['m22-dab1e0f7', 'm22-c19ac82e'],

@@ -88,6 +88,7 @@ export const REAL_CLIPS = new Set<string>([
   'bball_defend_slide_hard_right',
   // the quiz podium (BRAINBRAWL-MAJOR, 2026-09-24): authored/party.ts
   'party_think', 'party_buzz', 'party_locked', 'party_yes', 'party_facepalm', 'party_shrug', 'party_win', 'party_win_in', 'party_lose',
+  'party_talk', 'party_present',   // BRAINBRAWL-RESIDUAL: the podiums and the host talk
 ]);
 
 // NOTE ON THIS LIST. isResolvable() — and therefore installSafePlay's gate —

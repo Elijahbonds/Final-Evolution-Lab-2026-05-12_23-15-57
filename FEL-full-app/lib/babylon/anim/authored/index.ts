@@ -34,7 +34,7 @@ import {
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
-import { buildPartyThink, buildPartyBuzz, buildPartyLocked, buildPartyYes, buildPartyFacepalm, buildPartyShrug, buildPartyWin, buildPartyWinIn, buildPartyLose } from './party';   // BRAINBRAWL-MAJOR
+import { buildPartyThink, buildPartyBuzz, buildPartyLocked, buildPartyYes, buildPartyFacepalm, buildPartyShrug, buildPartyWin, buildPartyWinIn, buildPartyLose, buildPartyTalk, buildPartyPresent } from './party';   // BRAINBRAWL-MAJOR (+ talk/present: RESIDUAL)
 import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
 import { buildTennisReady, buildTennisServe, buildTennisSwing, buildTennisShuffle } from './tennis';
 import { buildVolleyBlock, buildVolleyReady, buildVolleySpike, buildVolleyShuffle } from './volleyball';
@@ -255,6 +255,8 @@ export function registerAuthoredClips(
     ['party_locked', () => buildPartyLocked(scene, skeleton)], ['party_yes', () => buildPartyYes(scene, skeleton)],
     ['party_facepalm', () => buildPartyFacepalm(scene, skeleton)], ['party_shrug', () => buildPartyShrug(scene, skeleton)],
     ['party_win', () => buildPartyWin(scene, skeleton)], ['party_win_in', () => buildPartyWinIn(scene, skeleton)], ['party_lose', () => buildPartyLose(scene, skeleton)],
+    // BRAINBRAWL-RESIDUAL: the podiums and the host talk
+    ['party_talk', () => buildPartyTalk(scene, skeleton)], ['party_present', () => buildPartyPresent(scene, skeleton)],
   ];
   const registered: string[] = [];
   let skipped = 0;

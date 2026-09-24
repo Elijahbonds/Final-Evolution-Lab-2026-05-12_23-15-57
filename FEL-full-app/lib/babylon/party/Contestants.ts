@@ -69,13 +69,16 @@ export class Contestants {
    * playable with fewer bodies rather than throwing out of `load()` and taking the whole mode down. A quiz
    * that runs with nobody at the podiums is the state it was already in; a quiz that will not boot is worse.
    */
-  static async spawn(scene: Scene, spots: PodiumSpot[], modeId: string): Promise<Contestants> {
+  static async spawn(scene: Scene, spots: PodiumSpot[], modeId: string, opts: { accessories?: boolean } = {}): Promise<Contestants> {
     const bodies: SpawnedCharacter[] = [];
     for (const [i, spot] of spots.entries()) {
       try {
         const c = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, {
           position: spot.at.clone(), yawRad: spot.yaw, startClip: SPORT_CLIP.idle,
           tint: spot.tint, modeId: `${modeId}-p${i + 1}`,
+          // BRAINBRAWL-RESIDUAL (2026-09-24): a quiz podium can opt out of the sports accessory deal (arm and leg sleeves,
+          // crew socks) — the eye's P2 wore sleeves sized for another body ("kept the reference sizes"). Unset = unchanged.
+          ...(opts.accessories === false ? { accessories: false } : {}),
         });
         neverBindPose(c.animator, SPORT_CLIP.idle);
         bodies.push(c);

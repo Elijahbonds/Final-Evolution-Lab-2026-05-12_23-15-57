@@ -10,14 +10,28 @@
 // verdict pill per seat. A solo lock-in lights the pick at once; a duel keeps both picks hidden until the reveal (one
 // screen, two players — P2 must not read P1's answer off it). Grid answers (the ANALYZE rotations and shape matches) were
 // "■ · ■ / · ■ · / ■ ■ ·" strings, truncated on a phone: they draw as the little grids they are. The clock is a bar too.
+//
+// BRAINBRAWL-RESIDUAL (2026-09-24):
+//   · THE CARD COVERED THE WHEEL AND THE LECTERNS (the eye: its top at ~45 % of the stage, over the wheel's lower half, the
+//     answers over both lecterns in a duel). The set now puts the wheel in the top band and the lecterns at the sides, and the
+//     card is the centre column under the wheel — 40 % wide, sized to fit between the wheel's rim and the bottom edge. The
+//     claim banner rides the card's top during the reveal instead of floating over the wheel.
+//   · A LOGIC '?' ON ITS OWN LINE: a sequence is one row of tiles now, the gap last, never wrapped.
+//   · THE ROOM TALKS: each contestant's line in a bubble over their podium (anchored to the head through the live camera),
+//     the host's line in a bubble over him while he is in view and on the card's header while the card is up.
+//   · GO AGAIN IN PLACE: the mode runs `continuous` (its finish reports a card and keeps the stage), and the shell's REPLAY
+//     calls replayBrainBrawl through ReplayInPlaceContext — round one's spin, same players, no splash, no remount.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
+import { replayBrainBrawl } from '@/lib/babylon/modes/BrainBrawlMode';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
+import { useReplayInPlace } from './replay-in-place';
 import { CATEGORIES, CATEGORY_COLOR, type Category } from '@/lib/babylon/core/BrainBrawlCore';
 
 type Hud = Record<string, HudValue>;
@@ -26,8 +40,15 @@ const OPTS = [
   { key: 'optX', face: 'C', btn: 'X', dpad: '▼', color: '#a855f7' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '◀', color: '#facc15' },
 ] as const;
 const SEAT = ['#22d3ee', '#facc15'];
+const HOST_COLOR = '#b9b2ff';
+const HOST_LINE_MS = 2600;
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
   Array.isArray(v) && v.every((r) => !!r && typeof r === 'object' && 'line' in (r as object));
+const anchorOf = (v: unknown): [number, number] | null => {
+  if (typeof v !== 'string') return null;
+  const [x, y] = v.split(',').map(Number);
+  return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : null;
+};
 
 /** An answer that is a shape (rows joined by " / ") draws as rows, not as one truncated line. */
 function OptionText({ text }: { text: string }) {
@@ -36,6 +57,41 @@ function OptionText({ text }: { text: string }) {
     <span className="grid min-w-0 gap-0 font-mono text-[11px] leading-[1.05] tracking-[0.2em] sm:text-sm">
       {text.split(' / ').map((row, i) => <span key={i} className="whitespace-pre">{row}</span>)}
     </span>
+  );
+}
+
+/** A sequence (LOGIC: numbers or shapes with the gap last) as ONE row of tiles — the '?' lit in the category's colour. */
+function SequenceRow({ line, color }: { line: string; color: string }) {
+  const tokens = line.trim().split(/\s+/);
+  const size = tokens.length <= 6 ? 'text-xl sm:text-2xl' : tokens.length <= 8 ? 'text-lg sm:text-xl' : 'text-base sm:text-lg';
+  return (
+    <div data-bb="sequence" className={`flex max-w-full flex-nowrap items-center justify-center gap-1 sm:gap-1.5 ${size}`}>
+      {tokens.map((t, i) => (
+        <span key={i} className="grid min-w-[1.6em] place-items-center rounded-md px-1 py-0.5 font-mono font-bold leading-none sm:px-1.5 sm:py-1"
+          style={t === '?' ? { background: color, color: '#111' } : { background: 'rgba(255,255,255,0.08)', color: '#fff' }}>{t}</span>
+      ))}
+    </div>
+  );
+}
+
+/** A speech bubble over a head (anchor = the head's top in % of the stage), popping in when its line changes. */
+function Bubble({ id, text, anchor, color, who }: { id: string; text: string; anchor: [number, number] | null; color: string; who: string }) {
+  return (
+    <AnimatePresence>
+      {text && anchor && (
+        <motion.div key={id} data-bb-bubble={who} initial={{ opacity: 0, scale: 0.7, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ type: 'spring', stiffness: 520, damping: 26 }}
+          className="pointer-events-none absolute z-10 origin-bottom font-mono"
+          style={{ left: `${Math.max(20, Math.min(80, anchor[0]))}%`, top: `${Math.max(16, anchor[1])}%` }}>   {/* never off the stage's edge */}
+          <div className="relative -translate-x-1/2 -translate-y-full">
+            <div className="w-max max-w-[130px] rounded-2xl border-2 bg-white px-2.5 py-1 text-center text-[11px] font-black leading-tight text-[#120c2c] shadow-lg sm:max-w-[300px] sm:px-3 sm:py-1.5 sm:text-sm" style={{ borderColor: color }}>
+              <span className="mr-1 text-[9px] font-bold tracking-wider" style={{ color }}>{who}</span>{text}
+            </div>
+            <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[8px] border-t-[10px] border-x-transparent" style={{ borderTopColor: color }} />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -49,20 +105,26 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  /** When the current match began, if it began on a REPLAY (the harness's clock started with the first one). */
+  const replayAtRef = useRef<number | null>(null);
+  const onEndRef = useRef(onEnd); onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const [hostLive, setHostLive] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const bus = new InputBus(); busRef.current = bus;
     let stop: (() => void) | null = null; let disposed = false;
+    // one sink for a finish either way: the mode reports through card() on this continuous host (end() elsewhere)
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return; endedRef.current = true;
       const won = r.outcome === 'win';
-      const result: GameResult = { score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: Number(r.stats?.p2score ?? 0), won, duration: r.durationSec, headline: won ? 'BIG BRAIN' : 'BRAWL OVER' };
-      onEnd(result);
+      const duration = replayAtRef.current !== null ? Math.round((performance.now() - replayAtRef.current) / 100) / 10 : r.durationSec;
+      const result: GameResult = { score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: Number(r.stats?.p2score ?? 0), won, duration, headline: won ? 'BIG BRAIN' : 'BRAWL OVER' };
+      onEndRef.current(result);
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;
@@ -71,10 +133,29 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
+        // GO AGAIN in place: the finish reports its card and the stage stays up for REPLAY (replayBrainBrawl)
+        continuous: true, cardSink: resultSink,
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-BRAINBRAWL] boot failed', e));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+  }, []);
+
+  // REPLAY on the shell's end card: a new match on this stage, same players, straight into round one's spin
+  const restart = useCallback((): boolean => {
+    const ok = replayBrainBrawl();
+    if (ok) { endedRef.current = false; replayAtRef.current = performance.now(); }
+    return ok;
+  }, []);
+  useReplayInPlace(restart);
+
+  // the host's line: a bubble over him while he is in view, the card's header while the card is up — for HOST_LINE_MS
+  const hostN = hnum(hud.hostN, 0);
+  useEffect(() => {
+    if (!hostN) return;
+    setHostLive(true);
+    const t = setTimeout(() => setHostLive(false), HOST_LINE_MS);
+    return () => clearTimeout(t);
+  }, [hostN]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -87,7 +168,12 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const picks = [hnum(hud.pickP1, -1), hnum(hud.pickP2, -1)];
   const showPick = (seat: number) => picks[seat] >= 0 && (revealed || (!twoP && seat === 0));
   const clockFrac = typeof hud.clockFrac === 'number' ? hud.clockFrac : null;
-  const dense = display.length >= 5;   // a 5- or 6-row grid (tier 2–3 counts) must not push the card over the top bar
+  const catColor = typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : '#ffffff';
+  const sequence = display.length === 1 && display[0].trim().endsWith('?');
+  const dense = display.length >= 5;   // a 5- or 6-row grid (tier 2–3 counts) must still fit under the wheel
+  const cardUp = phase === 'playing' && typeof hud.prompt === 'string' && !!hud.prompt;
+  const hostSay = hostLive && typeof hud.hostSay === 'string' ? hud.hostSay : '';
+  const banner = phase === 'playing' && typeof hud.banner === 'string' ? hud.banner : '';
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -113,26 +199,38 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         {typeof hud.clock === 'number' && <span className={`fel-panel px-2 py-0.5 fel-stat text-lg sm:px-3 sm:py-1 sm:text-2xl ${hud.clock <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>{hud.clock}s</span>}
       </div>
 
-      {/* the challenge card — up through the question, the answer window AND the reveal */}
-      {phase === 'playing' && typeof hud.prompt === 'string' && hud.prompt && (
-        <div data-bb="card" className="absolute inset-x-0 bottom-2 flex flex-col items-center px-2 font-mono sm:bottom-3 sm:px-3">
-          {/* the middle of the stage, not all of it: the podiums stand at ~25 % and ~75 % of the width, and the bodies on them
-              are half the reveal — a 760 px card covered both from the chest down on every question */}
-          <div className="flex w-full max-w-[760px] flex-col items-center gap-1.5 sm:w-[48%] sm:min-w-[440px] sm:gap-2">
-            <div className="fel-panel flex w-full items-center gap-3 px-3 py-1 sm:px-4">
-              <span className="shrink-0 text-[10px] font-bold tracking-widest sm:text-[11px]" style={{ color: typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : '#fff' }}>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</span>
-              <span className="min-w-0 flex-1" />
+      {/* the room talking: the contestants over their podiums, the host over his head while the card is not in front of him */}
+      {phase === 'playing' && (
+        <>
+          <Bubble id={`s1-${hnum(hud.sayN1, 0)}`} text={typeof hud.say1 === 'string' ? hud.say1 : ''} anchor={anchorOf(hud.anchor1)} color={SEAT[0]} who={twoP ? 'P1' : 'YOU'} />
+          {twoP && <Bubble id={`s2-${hnum(hud.sayN2, 0)}`} text={typeof hud.say2 === 'string' ? hud.say2 : ''} anchor={anchorOf(hud.anchor2)} color={SEAT[1]} who="P2" />}
+          {!cardUp && !(hud.phase === 'done' && isBoard(hud.board)) && <Bubble id={`h-${hostN}`} text={hostSay} anchor={anchorOf(hud.anchorHost)} color={HOST_COLOR} who={String(hnode(hud.hostName, 'HOST'))} />}
+        </>
+      )}
+
+      {/* the challenge card — the centre column under the wheel, up through the question, the answer window AND the reveal */}
+      {cardUp && (
+        <div data-bb="card" className="absolute inset-x-0 bottom-1.5 flex flex-col items-center px-2 font-mono sm:bottom-2 sm:px-3">
+          {/* between the lecterns (at ~18 % and ~82 % of the width) and under the wheel's rim (~44 % down): 40 % wide on a stage */}
+          <div className="flex w-full max-w-[620px] flex-col items-center gap-1 rounded-2xl bg-[#07051a]/75 p-1 sm:w-[40%] sm:min-w-[400px] sm:gap-1.5 sm:p-1.5">
+            {revealed && banner && <div data-bb="banner" className="fel-heading fel-panel px-4 py-1 text-center text-base font-black text-white sm:text-xl">{banner}</div>}
+            <div className="fel-panel flex w-full items-center gap-2 px-3 py-1 sm:px-4">
+              <span className="shrink-0 text-[10px] font-bold tracking-widest sm:text-[11px]" style={{ color: catColor }}>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</span>
+              {/* the host's call while the card hides him */}
+              <span data-bb="host-line" className="min-w-0 flex-1 truncate text-center text-[10px] sm:text-[11px]" style={{ color: HOST_COLOR }}>{hostSay ? `🎙 ${hostSay}` : ''}</span>
               {/* the clock as a bar: it drains in step with the number, red in the last third */}
-              <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-white/10 sm:w-24">
+              <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white/10 sm:w-20">
                 {clockFrac !== null && <span className="block h-full rounded-full transition-[width] duration-300 ease-linear" style={{ width: `${Math.round(clockFrac * 100)}%`, background: clockFrac < 0.34 ? '#ff2d78' : '#22d3ee' }} />}
               </span>
             </div>
-            <div className="fel-panel max-w-full px-4 py-1 text-center text-sm font-bold text-white sm:px-5 sm:py-2 sm:text-lg">{hud.prompt}</div>
+            <div className="fel-panel max-w-full px-4 py-1 text-center text-sm font-bold text-white sm:px-5 sm:py-1.5 sm:text-base">{String(hud.prompt)}</div>
             {display.length > 0 && !revealed && (
-              <div className={`fel-panel max-w-full px-4 py-2 text-center text-white whitespace-pre sm:px-6 sm:py-3 ${dense ? 'text-base leading-snug tracking-[0.12em] sm:text-xl' : 'text-lg leading-relaxed tracking-[0.15em] sm:text-2xl'}`}>{display.join('\n')}</div>
+              sequence
+                ? <div className="fel-panel max-w-full px-3 py-2 sm:px-4"><SequenceRow line={display[0]} color={catColor} /></div>
+                : <div data-bb="display" className={`fel-panel max-w-full px-4 py-1.5 text-center text-white whitespace-pre sm:px-6 sm:py-2 ${dense ? 'text-xs leading-[1.2] tracking-[0.12em] sm:text-sm' : 'text-lg leading-snug tracking-[0.15em] sm:text-xl'}`}>{display.join('\n')}</div>
             )}
             {typeof hud.optA === 'string' && hud.optA && (
-              <div className="grid w-full grid-cols-2 gap-1.5 sm:gap-2">
+              <div className="grid w-full grid-cols-2 gap-1.5">
                 {OPTS.map((o, idx) => {
                   const isAnswer = revealed && idx === answer;
                   const seats = [0, 1].filter((s) => showPick(s) && picks[s] === idx);
@@ -141,9 +239,9 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
                   const ring = isAnswer ? '#4ade80' : wrongPick ? '#f87171' : seats.length ? '#ffffff' : `${o.color}66`;
                   return (
                     <button key={o.key} data-bb-opt={state} onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: o.btn, pressed: true }); }}
-                      className={`fel-panel flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs text-white transition-opacity duration-200 sm:gap-3 sm:px-4 sm:py-3 sm:text-base md:text-lg ${state === 'dim' ? 'opacity-40' : ''}`}
-                      style={{ borderColor: ring, borderWidth: state === 'idle' ? undefined : 2, background: isAnswer ? 'rgba(34,197,94,0.22)' : wrongPick ? 'rgba(239,68,68,0.20)' : undefined }}>
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] font-bold text-black sm:h-8 sm:w-8 sm:text-[13px]" style={{ background: o.color }}>{o.face}</span>
+                      className={`fel-panel flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs text-white transition-opacity duration-200 sm:gap-2.5 sm:px-3 sm:py-2 sm:text-base ${state === 'dim' ? 'opacity-40' : ''}`}
+                      style={{ borderColor: ring, borderWidth: state === 'idle' ? undefined : 2, background: isAnswer ? 'rgba(22,78,44,0.92)' : wrongPick ? 'rgba(90,24,32,0.92)' : 'rgba(12,10,32,0.9)' }}>
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] font-bold text-black sm:h-7 sm:w-7 sm:text-[12px]" style={{ background: o.color }}>{o.face}</span>
                       <OptionText text={String(hnode(hud[o.key], ''))} />
                       <span className="ml-auto flex shrink-0 items-center gap-1">
                         {seats.map((s) => <span key={s} className="rounded px-1 text-[10px] font-bold text-black" style={{ background: SEAT[s] }}>{twoP ? `P${s + 1}` : 'YOU'}</span>)}
@@ -156,7 +254,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
                 })}
               </div>
             )}
-            <div className="flex min-h-[20px] items-center gap-2">
+            <div className="flex min-h-[18px] items-center gap-2">
               {!revealed && hud.answeredP1 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#22d3ee]">{twoP ? 'P1 LOCKED' : 'LOCKED'}</span>}
               {!revealed && hud.answeredP2 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#facc15]">P2 LOCKED</span>}
               {revealed && ['verdictP1', 'verdictP2'].map((k, s) => {
@@ -171,16 +269,16 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {/* banner (above the wheel's pin, not on it) + pick screen + the final board */}
-      {phase === 'playing' && typeof hud.banner === 'string' && hud.banner && (
-        <div data-bb="banner" className="pointer-events-none absolute inset-x-0 top-[13%] flex flex-col items-center gap-2 px-4 text-center font-mono">
-          <span className="fel-heading fel-panel px-5 py-1.5 text-xl font-black text-white sm:px-6 sm:py-2 sm:text-3xl" style={{ color: hud.phase === 'spin' && typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : undefined }}>{hud.banner}</span>
-          {!(typeof hud.prompt === 'string' && hud.prompt) && typeof hud.hint === 'string' && hud.hint && <span className="fel-panel px-3 py-1 text-xs text-white/70">{hud.hint}</span>}
+      {/* banner: under the wheel's rim, over the host's head (the spin, the landing, the pick, the finish) — the reveal's rides the card */}
+      {banner && !revealed && (
+        <div data-bb="banner" className="pointer-events-none absolute inset-x-0 top-[45%] flex flex-col items-center gap-2 px-4 text-center font-mono">
+          <span className="fel-heading fel-panel whitespace-pre px-5 py-1.5 text-xl font-black text-white sm:px-6 sm:py-2 sm:text-3xl" style={{ color: hud.phase === 'spin' && typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : undefined }}>{banner}</span>
+          {!cardUp && typeof hud.hint === 'string' && hud.hint && <span className="fel-panel px-3 py-1 text-xs text-white/70">{hud.hint}</span>}
         </div>
       )}
       {phase === 'playing' && hud.phase === 'done' && isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
-        <div className="pointer-events-none absolute inset-x-0 top-[44%] flex justify-center px-4 font-mono">
-          <div className="fel-panel w-full max-w-[460px] px-5 py-3">
+        <div className="pointer-events-none absolute inset-x-0 top-[56%] flex justify-center px-4 font-mono">
+          <div className="fel-panel w-full max-w-[420px] px-5 py-3">
             <div className="grid gap-1.5">
               {hud.board.map((r, i) => (
                 <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">

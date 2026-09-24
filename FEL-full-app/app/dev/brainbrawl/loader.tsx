@@ -6,24 +6,47 @@
 // the generic /dev/mode runner draws its own debug HUD — not the challenge card. The card IS half of this mode (the
 // question, the four answers, the reveal), so it has to be looked at through the SAME component /play/brain-brawl
 // mounts, with stub GameProps. Real ModeHarness, real mode, real card. Nothing here is a mock.
+//
+// BRAINBRAWL-RESIDUAL (2026-09-24): it also stands in for the shell's end card — the same ReplayInPlaceContext GameShell
+// provides, and a REPLAY button that calls it the way GameShell.replay() does — so GO AGAIN in place can be driven here.
 
+import { useCallback, useRef, useState } from 'react';
 import dynamicImport from 'next/dynamic';
 import { prqGrade } from '@/lib/prq';
 import type { GameResult } from '@/components/games/game-shell';
+import { ReplayInPlaceContext } from '@/components/games/replay-in-place';
 
 const BrainBrawl = dynamicImport(() => import('@/components/games/brainbrawl-babylon'), { ssr: false });
 
 export function DevBrainBrawlLoader() {
+  const inPlace = useRef<(() => boolean) | null>(null);
+  const register = useCallback((fn: (() => boolean) | null) => { inPlace.current = fn; }, []);
+  const [ended, setEnded] = useState<GameResult | null>(null);
+  const [remounts, setRemounts] = useState(0);
+  const onEnd = useCallback((r: GameResult) => { console.log('[dev] mode ended', JSON.stringify(r)); setEnded(r); }, []);
+  const replay = () => {
+    setEnded(null);
+    if (inPlace.current?.()) { console.log('[dev] replay in place'); return; }
+    console.log('[dev] replay by remount'); setRemounts((k) => k + 1);
+  };
   return (
     <div className="min-h-screen bg-[#07090d] p-4">
       <p className="mb-3 font-mono text-xs text-white/40">
         DEV · real BrainBrawlMode via ModeHarness · benchmark: Trivia Crack wheel × Big Brain Academy
       </p>
-      <BrainBrawl
-        grade={prqGrade(72)}
-        prq={72}
-        onEnd={(r: GameResult) => console.log('[dev] mode ended', JSON.stringify(r))}
-      />
+      <div className="relative">
+        <ReplayInPlaceContext.Provider value={register}>
+          <BrainBrawl key={remounts} grade={prqGrade(72)} prq={72} onEnd={onEnd} />
+        </ReplayInPlaceContext.Provider>
+        {ended && (
+          <div data-dev="end-card" className="absolute inset-0 z-20 flex items-center justify-center bg-black/70 font-mono">
+            <div className="rounded-xl border border-white/20 bg-[#0b0d14] px-6 py-4 text-center text-white">
+              <div className="text-lg font-black">{ended.headline} · {ended.score}</div>
+              <button data-dev="replay" onClick={replay} className="mt-3 rounded-md border border-[#00E5FF]/60 px-4 py-2 text-sm text-[#00E5FF]">REPLAY</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

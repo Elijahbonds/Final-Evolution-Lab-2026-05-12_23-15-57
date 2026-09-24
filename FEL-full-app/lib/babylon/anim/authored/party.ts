@@ -24,7 +24,7 @@ import { buildPoseClip, type Deg3 } from '../poseClip';
 type V3 = [number, number, number];
 
 export const PARTY_THINK_SEC = 3.0, PARTY_BUZZ_SEC = 0.6, PARTY_LOCKED_SEC = 2.4, PARTY_YES_SEC = 0.95, PARTY_FACEPALM_SEC = 1.4,
-  PARTY_SHRUG_SEC = 1.1, PARTY_WIN_SEC = 1.2, PARTY_WIN_IN_SEC = 0.4, PARTY_LOSE_SEC = 2.8;
+  PARTY_SHRUG_SEC = 1.1, PARTY_WIN_SEC = 1.2, PARTY_WIN_IN_SEC = 0.4, PARTY_LOSE_SEC = 2.8, PARTY_TALK_SEC = 1.6, PARTY_PRESENT_SEC = 1.5;
 /** The podium's top (metres) and how far in front of the body it stands — BrainBrawlMode builds it to these. */
 export const PODIUM_TOP_M = 1.0, PODIUM_AHEAD_M = 0.42;
 
@@ -140,4 +140,43 @@ export function buildPartyWinIn(scene: Scene, sk: Skeleton): AnimationGroup | nu
 export function buildPartyLose(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const k = (t: number, shake: number) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [20, 0, 0] as Deg3, Neck: [26, shake, 0] as Deg3, ...HIPSHOT }, hands: ON_PODIUM, poles: OUT, hipsY: -0.04 });
   return buildPoseClip(scene, sk, 'party_lose', PARTY_LOSE_SEC, [k(0, 0), k(0.7, 10), k(1.4, 0), k(2.1, -10), k(PARTY_LOSE_SEC, 0)]);
+}
+
+// BRAINBRAWL-RESIDUAL (2026-09-24): the eye's HARD 3 — "the podiums don't talk". The bubbles and the host's voice say the words;
+// these are what the body does while it says them.
+
+/**
+ * TALK: saying something across the podium — the right hand opens and beats in front of the chest on the stresses, the
+ * head nods with them, the weight shifts. Starts and ends at the relaxed stand, so it loops for a host's longer line.
+ */
+export function buildPartyTalk(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const pole = { Right: [0.7, -0.6, -0.3] as V3, Left: DOWN.Left };
+  const rest = { Right: SIDES.Right, Left: SIDES.Left };
+  const k = (t: number, right: V3, left: V3, neck: Deg3, turn: number, y = 0) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [3, turn, 0] as Deg3, Neck: neck, ...HIPSHOT }, hands: { Right: right, Left: left }, poles: pole, hipsY: y });
+  return buildPoseClip(scene, sk, 'party_talk', PARTY_TALK_SEC, [
+    k(0, rest.Right, rest.Left, [0, 0, 0], 0),
+    k(0.25, [0.20, 1.20, 0.30], [-0.22, 1.00, 0.14], [-5, 4, 0], 4),       // the hand comes up, open
+    k(0.5, [0.24, 1.14, 0.34], [-0.22, 1.00, 0.14], [4, 2, 2], 6, -0.01),   // beat — the nod
+    k(0.78, [0.16, 1.24, 0.30], [-0.24, 1.02, 0.16], [-4, -4, 0], 2),       // turn the palm, lift
+    k(1.05, [0.24, 1.12, 0.34], [-0.22, 1.00, 0.14], [5, -2, -2], 5, -0.01),   // beat
+    k(1.3, [0.22, 1.08, 0.24], rest.Left, [-2, 0, 0], 2),
+    k(PARTY_TALK_SEC, rest.Right, rest.Left, [0, 0, 0], 0),
+  ]);
+}
+
+/**
+ * PRESENT: the host's "and the wheel says…" — the right arm sweeps up and out, palm up toward the wheel behind (up and
+ * to the side: one arm, above the shoulder, never a T), the left hand at the chest, chin up. A one-shot.
+ */
+export function buildPartyPresent(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const up = { Right: [0.8, 0.2, -0.3] as V3, Left: [-0.5, -0.8, -0.2] as V3 };
+  const sweep: V3 = [0.5, 1.66, 0.16];
+  const chest: V3 = [-0.06, 1.26, 0.18];
+  return buildPoseClip(scene, sk, 'party_present', PARTY_PRESENT_SEC, [
+    { t: 0, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], ...STAND }, hands: SIDES, poles: DOWN, hipsY: 0 },
+    { t: 0.3, bones: { Hips: [0, 0, 0], Spine: [-2, -10, 0], Neck: [-8, -10, 0], ...STAND }, hands: { Right: [0.36, 1.46, 0.28], Left: chest }, poles: up, hipsY: 0 },
+    { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [-5, -14, 0], Neck: [-12, -14, 0], ...STAND }, hands: { Right: sweep, Left: chest }, poles: up, hipsY: 0.01, hold: true },
+    { t: 1.1, bones: { Hips: [0, 0, 0], Spine: [-5, -14, 0], Neck: [-12, -14, 0], ...STAND }, hands: { Right: [0.52, 1.68, 0.14], Left: chest }, poles: up, hipsY: 0.01 },
+    { t: PARTY_PRESENT_SEC, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], ...STAND }, hands: SIDES, poles: DOWN, hipsY: 0 },
+  ]);
 }
