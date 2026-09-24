@@ -38,9 +38,9 @@ const AIR: Record<string, [Dir, Btn]> = {
   lostfound: ['left', 'B'], hideseek: ['left', 'A'], behindback: ['left', 'Y'], fakeback: ['left', 'X'],
 };
 const RUNWAY: Record<string, [Btn, Dir | null]> = { selflob: ['Y', null], kickup: ['B', null], cartwheel: ['X', null], doubleup: ['A', null], backflip: ['B', 'up'] };
-const ALL = ['plain', ...Object.keys(AIR), ...Object.keys(RUNWAY).map((r) => `rw:${r}`)];
+const ALL = ['plain', 'plainJ', ...Object.keys(AIR), ...Object.keys(RUNWAY).map((r) => `rw:${r}`)];
 const TRICKS = (process.env.TRICKS ?? 'all') === 'all' ? ALL : (process.env.TRICKS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-for (const t of TRICKS) if (t !== 'plain' && t !== 'plain2' && !AIR[t] && !(t.startsWith('rw:') && RUNWAY[t.slice(3)])) throw new Error(`unknown trick ${t} (have ${ALL.join(', ')})`);
+for (const t of TRICKS) if (t !== 'plain' && t !== 'plain2' && t !== 'plainJ' && !AIR[t] && !(t.startsWith('rw:') && RUNWAY[t.slice(3)])) throw new Error(`unknown trick ${t} (have ${ALL.join(', ')})`);
 
 const RIM = { x: 0, y: 3.05, z: -10.28 };
 const JN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
@@ -149,14 +149,18 @@ async function attempt(p: Page, trick: string): Promise<Rec | null> {
   await p.waitForTimeout(400);
   const t0 = await p.evaluate('(() => { window.__rec.frames = []; window.__rec.on = true; return performance.now(); })()') as number;
   const launchedAt = async (): Promise<number | null> => p.evaluate(`(() => { const m = window.__smp.marks.find((m) => m.t >= ${t0} && /JUICE-SOFT\\] launch|\\[DUNK-LAUNCH\\]/.test(m.msg)); return m ? m.t : null; })()`) as Promise<number | null>;
+  // DUNK MOTION phase 8 (decision "triangle commits"): the self-lob is thrown STANDING (Y on the run is the attempt, the J)
+  if (trick === 'rw:selflob') { await tapBtn(p, 'Y', 60); await p.waitForTimeout(120); }
   await padSet(p, 'p.axes[1] = -1; p.buttons[7].pressed = true; p.buttons[7].value = 1');
   // plain2: the same run with GATHER (L2) held — the two-foot take-off
   if (trick === 'plain2') await padSet(p, 'p.buttons[6].pressed = true; p.buttons[6].value = 1');
-  const hold0 = Date.now(); let threw = !trick.startsWith('rw:'); let launch: number | null = null;
+  const hold0 = Date.now(); let threw = !trick.startsWith('rw:') || trick === 'rw:selflob'; let launch: number | null = null;
+  let committed = trick !== 'plainJ';   // plainJ: the plain run with the J committed on triangle early in the run
   while (Date.now() - hold0 < 3600) {
     // the double-up is only a double-up inside its window (DOUBLE_UP_WINDOW_M): press it on the game's own prompt, not on a
     // clock — at 700 ms a slower run-up was 3.39 m out, the A took off from there, and the slam after it was the ignored second press
     const dblReady = trick === 'rw:doubleup' ? /DOUBLE-UP/.test(String((await p.evaluate('window.__hud().hint || ""')) ?? '')) : true;
+    if (!committed && Date.now() - hold0 >= 350) { committed = true; await tapBtn(p, 'Y', 60); }
     if (!threw && Date.now() - hold0 >= 700 && dblReady) {
       threw = true; const [b, d] = RUNWAY[trick.slice(3)];
       if (d) { await dpad(p, d, true); await p.waitForTimeout(60); }
@@ -232,7 +236,7 @@ export interface Metrics {
   /** Frames on which an arm / leg bone turned faster than 1500°/s in the air (an authored swing too fast for a body). */
   whips: number;
   /** The run-up (last 1.5 s): frames, chicken-wing frames (an elbow at shoulder height and > 0.15 m out), mean elbow angle. */
-  runFrames: number; runWing: number; runElbowMean: number | null;
+  runFrames: number; runWing: number; ballScreenRight: number | null; runElbowMean: number | null;
   heldFrac: Record<string, number>;
   lockedElbow: number; lockedKnee: number;
   ballGapP90: number | null; ballGapMax: number | null; ballFar: number;
@@ -305,6 +309,10 @@ export function measure(rec: Rec): Metrics {
     }
     if (wing) runWing++;
   }
+  // DUNK MOTION phase 8: which side of the SCREEN the ball is on through the run-up. The run heads to −z with the camera behind,
+  // so the screen's right is world −x (the spawn renders a body as its model's mirror: the rig's Right hand is on screen LEFT)
+  const sided = run.filter((f) => f.ball && f.j[J.Hips] && Math.abs(f.ball[0] - f.j[J.Hips]![0]) > 0.05);
+  const ballScreenRight = sided.length ? +(sided.filter((f) => f.ball![0] < f.j[J.Hips]![0]).length / sided.length).toFixed(2) : null;
   // the ball against the palm while it is carried (parented to a hand / a hand socket)
   const held2 = win.filter((f) => f.ball && f.bpar && /hand|palm|socket/i.test(f.bpar));
   const gaps = held2.map((f) => { const hand = /left/i.test(f.bpar!) ? f.j[J.LeftHand] : f.j[J.RightHand]; return hand ? len(sub(f.ball!, hand)) : 0; }).sort((a, b) => a - b);
@@ -319,7 +327,7 @@ export function measure(rec: Rec): Metrics {
   return {
     trick: rec.trick, frames: win.length, fps: +fs.toFixed(1), flightMs: Math.round((landAt ?? L) - L), launchToLandMs: landAt ? Math.round(landAt - L) : null, beats, clips,
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
-    pops, whips, heldFrac: held, lockedElbow, lockedKnee, runFrames: run.length, runWing, runElbowMean: elbowN ? Math.round(elbowSum / elbowN) : null,
+    pops, whips, heldFrac: held, lockedElbow, lockedKnee, runFrames: run.length, runWing, ballScreenRight, runElbowMean: elbowN ? Math.round(elbowSum / elbowN) : null,
     ballGapP90: gaps.length ? +gaps[Math.floor(gaps.length * 0.9)].toFixed(3) : null, ballGapMax: gaps.length ? +gaps[gaps.length - 1].toFixed(3) : null, ballFar: gaps.filter((g) => g > 0.2).length,
     rimHandAtContact: handRim != null ? +handRim.toFixed(3) : null, ballRimAtContact: cF?.ball ? +len(sub(cF.ball, [RIM.x, RIM.y, RIM.z])).toFixed(3) : null,
     slam: rec.hud.filter((h) => /EARLY|LATE|ON TIME|EXECUTION|MISS/.test(h)).pop() ?? '',
@@ -377,7 +385,7 @@ async function scrubPose(p: Page, names: string[], f: Frame, view: 'side' | 'fro
 }
 const CELL_W = 250, CELL_H = 390, COLS = Number(process.env.COLS ?? 12);
 /** WIN=air (default): 0.25 s before the take-off → 0.35 s after feet-down · WIN=trick: the trick's fire → 0.3 s past the contact ·
- *  WIN=run: the last 1.5 s of the run-up (the arms while running). */
+ *  WIN=run: the last 1.5 s of the run-up (the arms while running) · WIN=gather: push 1-2 and the take-off up close. */
 const WIN = process.env.WIN ?? 'air';
 async function sheet(p: Page, rec: Rec, m: Metrics, file: string): Promise<void> {
   const L = rec.launchAt ?? rec.frames[0].t;
@@ -385,6 +393,7 @@ async function sheet(p: Page, rec: Rec, m: Metrics, file: string): Promise<void>
   let t0 = L - 250, t1 = L + land + 350;
   if (WIN === 'trick') { t0 = L + (m.beats.trick ?? 250) - 60; t1 = L + (m.beats.contact ?? land) + 300; }
   if (WIN === 'run') { t0 = L - 1500; t1 = L + 150; }   // the run-up: the dribble run into the gather and the plant
+  if (WIN === 'gather') { t0 = L - 450; t1 = L + 200; }   // DUNK MOTION phase 8: push 1-2 up close — the pick-up, the push, 1, 2, the take-off
   const picks: Frame[] = [];
   for (let k = 0; k < COLS; k++) { const t = t0 + ((t1 - t0) * k) / (COLS - 1); picks.push(rec.frames.reduce((a, f) => (Math.abs(f.t - t) < Math.abs(a.t - t) ? f : a), rec.frames[0])); }
   const a = rec.frames.find((f) => f.t >= L - 300) ?? rec.frames[0];

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fitGather, planGather } from './DunkGatherRun';
 import { GRAVITY, LOB_CATCH_RADIUS, canCatch, lobApex, lobAt, lobFlightTime, lobVelocity, runTimeToLine, runTimeToLineGather } from './DunkLob';
 
 describe('DunkLob — the self-lob arc', () => {
@@ -191,6 +192,16 @@ describe('runTimeToLineGather — the gather stride (2026-09-18)', () => {
     const t = runTimeToLineGather(0.8, 7, 7, 6, G);
     expect(t).toBeGreaterThan(0.8 / 7);
     expect(t).toBeLessThan(0.8 / 1.9 + 0.05);
+  });
+  it('DUNK MOTION phase 8: with a planned gather it ramps to the plan\'s distance, then takes exactly the gather\'s own time', () => {
+    const vEnd = 2.24, P = { ...G, planDist: (v: number) => planGather(v, vEnd).dist, planSec: (d: number, v: number) => fitGather(d, v, vEnd).sec };
+    // already at speed and exactly at the plan's distance: the whole remaining time is the gather clip at its rate
+    const plan = planGather(7, vEnd);
+    expect(runTimeToLineGather(plan.dist, 7, 7, 6, P)).toBeCloseTo(plan.sec, 2);
+    // from further out: the ramp first, then the gather — and faster than the old crawl to the carry speed
+    const t = runTimeToLineGather(6, 5, 7, 6, P);
+    expect(t).toBeGreaterThan(plan.sec); expect(t).toBeLessThan(runTimeToLineGather(6, 5, 7, 6, G));
+    let prev = 0; for (const d of [0.5, 1, 2, 3, 5, 8]) { const tt = runTimeToLineGather(d, 3, 7, 6, P); expect(tt).toBeGreaterThan(prev); prev = tt; }
   });
   it('is monotonic in distance and zero at the line', () => {
     expect(runTimeToLineGather(0, 5, 7, 6, G)).toBe(0);

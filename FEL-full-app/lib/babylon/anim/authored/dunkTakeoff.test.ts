@@ -51,6 +51,29 @@ describe('push 1-2 — two real steps into the take-off', () => {
   });
 });
 
+describe('the arms in push 1-2 — off two, BACK on the push and UP on 2 (owner, 2026-09-23)', () => {
+  it('both hands swing behind the hips on the push, bottom out on 1, and are rising on 2', () => {
+    const g = fresh(() => buildGatherTwo(scene, sk));
+    at(g, 0); const fwd = forwardOf(); const behind = (n: string) => Vector3.Dot(pos(n).subtract(pos('Hips')), fwd);
+    // back on PUSH: the arm at full extension behind a trunk leaning over the run (~0.19 m behind the hip centre is the arm's reach)
+    expect(behind('RightHand')).toBeLessThan(-0.15); expect(behind('LeftHand')).toBeLessThan(-0.15);
+    at(g, 0.12); const low = Math.max(pos('RightHand').y, pos('LeftHand').y), hipsAt1 = pos('Hips').y;
+    at(g, 0.32); const bottomL = pos('LeftHand').y, bottomR = pos('RightHand').y;
+    at(g, GATHER_SEC);
+    expect(pos('LeftHand').y).toBeGreaterThan(bottomL + 0.1); expect(pos('RightHand').y).toBeGreaterThan(bottomR + 0.1);   // UP on 2
+    expect(low).toBeLessThan(hipsAt1 + 0.05);                  // driven down to the hips on 1
+    expect(behind('LeftHand')).toBeGreaterThan(0.15);           // the off arm already coming up the front
+    g.stop();
+  });
+  it('off one the ball comes up off the dribble in FRONT and is ripped back to the hip by the plant — a different body', () => {
+    const g = fresh(() => buildGatherOne(scene, sk));
+    at(g, 0); const fwd = forwardOf(); const ahead = () => Vector3.Dot(pos('RightHand').subtract(pos('Hips')), fwd);
+    expect(ahead()).toBeGreaterThan(0.1);
+    at(g, GATHER_SEC); expect(ahead()).toBeLessThan(0);
+    g.stop();
+  });
+});
+
 describe('the one-foot take-off — knee drive, arm strike, the lead leg drops', () => {
   it('the take-off foot leaves LAST, the free knee drives to the hip, and both arms strike up on the same beat', () => {
     const g = fresh(() => buildTakeOffOne(scene, sk));

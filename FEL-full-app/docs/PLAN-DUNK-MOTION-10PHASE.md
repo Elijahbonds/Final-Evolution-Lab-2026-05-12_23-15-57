@@ -69,10 +69,19 @@ and ch. 8 (in-air kinematics, the hang-time illusion, the off-arm / off-leg as i
 | 4 | The flight belongs to the dunk | carry-up + flush per hand, trick pacing, real hand-offs, the windmill thrown once | done, d76f347 |
 | 5 | Take-off capture + running arms | the owner's real jump (capture f49–59), the wait as a cock, the chest follows the arms, the reach can't roll the arm, the dribble elbows point back | done, cad9e8a |
 | 6 | Names I: one-hand family | real-speed windmill / tomahawk captures, Jordan's cradle, the cuff, the scorpion no-look | done, 002a6ff |
-| 7 | The approach and the take-off (asks 2 + 3) | the J approach with the lean into the bend, the open body in the rise; PUSH 1-2 as two real steps; the one-foot take-off (knee drive, arm strike, the lead leg's drop) vs the two-foot capture; carry and flush by foot | the gather's feet alternate; the take-off foot leaves last; the lead knee drives then drops |
-| 8 | Right-handed (ask 4a) | the ball hand becomes the rig side that renders as the right: the dunk family's clips mirrored, the ball / hand-offs / catch / spin / the J's side follow; dribble on the approach only when the stick moves | the ball hand is the visual right on every sheet |
-| 9 | The ball's story + names II / III (ask 4b) | the Dubble Up (a helper holds the ball on his head; the dunker runs without it, jumps over, grabs it mid-air); dribble-or-not by dunk; the eastbay passes to the dominant hand; behind / around / spins; the reach roll and the rim | every named dunk against the decode |
-| 10 | Rim, hang, land; everywhere; the score loop | the flush and hang, the drop and land absorb; Dunk Duel, the rival, the 1v1 / 3v3 game dunks; the full re-measure, summary, one deploy | every number against the baseline |
+| 7 | The approach and the take-off (asks 2 + 3) | the J approach with the lean into the bend, the open body in the rise; PUSH 1-2 as two real steps; the one-foot take-off (knee drive, arm strike, the lead leg's drop) vs the two-foot capture; carry and flush by foot | done, 60c8d25 |
+| 8 | Right-handed + the approach (asks 4a, 5, 6, 7) | the dunk family mirrored onto the rig's other side at spawn (groupMirror, bind-relative); push 1-2 at the runner's own speed (DunkGatherRun: the run kept into the penultimate, a staccato contact, the plant on the line) started ON the push foot (the check-mark strides); the dribble locked to the stride and only while moving; the pick-up eased; the two-foot arms back on the push and up on 2; the J only on triangle | done (this commit) |
+| 9 | Joints and the finish (asks 8, 9) | the joint audit (each elbow and knee against its hinge read off the captures: sideways bend, hyperextension, roll continuity); a hinged arm solve (the off arm's roll flips); the off arm's job in every dunk (down and out off one hand, on the ball off two); the finish by common sense: the hand on top, the reach along the jump line, the wrist through, the let-go, the landing | every joint inside its range on every sheet |
+| 10 | The Dubble Up + names II / III (ask 4b, owner decisions round 2) | the helper from the prop ring (1–10 in a line) or a call; A on the run near the helper = the straddle-and-grab (the old hop gone); Chen's version off two from the elbow; the eastbay to the dominant hand; behind / around / spins | the Dubble Up eastbay beat by beat against Chen Dengxing's |
+| 11 | Right-handed everywhere; rim, hang, land | Dunk Duel, the rival, the 1v1 / 3v3 game dunks mirrored too (owner: "every dunk, every body"); the flush and hang, the drop and the land absorb | every dunk mode on the sheets |
+| 12 | The score loop | the full re-measure against the baseline, the summary, ONE deploy | every number against the baseline |
+
+The owner's asks grew the pass from ten phases to twelve (2026-09-23), with the same one deploy at the end:
+5. "make the off the dribble approach look fluid, look at examples of elite dunkers";
+6. "make the arms fluid with gait, back on push, up on 2 in push 1 2 … thats in a 2 foot jump";
+7. "curve the approach only when you decide to press … the top button. make the movement normal elsewhere" (decision: triangle commits);
+8. "fix the off arm on all the dunks";
+9. "fix the orientation of the joints and proper biomechanics and common sense how you would complete the dunk. analyze it".
 
 Rules (from the hoops-depth pass):
 - Commit and push each green phase with the suite count.

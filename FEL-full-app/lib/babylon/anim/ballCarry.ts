@@ -29,8 +29,10 @@ export interface BallCarryOpts {
 }
 
 export interface BallCarry {
-  /** Drive the dribble. `active` false = ball in the palm (the clip owns it). */
-  update(dtSec: number, speed01: number, active: boolean): void;
+  /** Drive the dribble. `active` false = ball in the palm (the clip owns it). `hz` (DUNK MOTION phase 8) overrides the
+   *  speed's bounce rate — a caller that locks the bounce to the stride passes its own. `releaseSec` is this let-go's fade (the shot's
+   *  0.14 s by default; the dunk's gather rips the ball away faster, so its clip's arms own the push). */
+  update(dtSec: number, speed01: number, active: boolean, hz?: number, releaseSec?: number): void;
   /** Swap the dribbling hand (crossover). */
   switchHand(): void;
   dispose(): void;
@@ -112,9 +114,12 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let pending = false;   // a frame was recorded since the last after-animations pass
   let frameDt = 0, stamp = 0;   // the recorded frame's dt, and a counter of drawn frames (the arm memo's continuity)
   let lastSpeed01 = 0;
-  let releaseLeft = 0, releaseDt = 1 / 60;   // the let-go fade (see apply)
+  let releaseLeft = 0, releaseDt = 1 / 60, releaseTotal = RELEASE_FADE_SEC;   // the let-go fade (see apply)
   let offArm: ArmChain | null = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
   const offT = new Vector3(), offPole = new Vector3();
+  // DUNK MOTION phase 8: the last reach of each arm in the ROOT's frame, so a let-go follows the body (a world point left behind
+  // pulled both arms 0.1 m back at a sprint), and the off arm's weight so it lets go too (it dropped in one frame: an 8000°/s pop)
+  const handLocal = new Vector3(), offLocal = new Vector3(); let offW = 0;
   // the thighs and knees, for the off arm's opposition swing (DUNK MOTION)
   const legNodes = (['Left', 'Right'] as const).map((sd) => ({ hip: findBone(opts.skeleton, `${sd}UpLeg`)?.getTransformNode() ?? null, knee: findBone(opts.skeleton, `${sd}Leg`)?.getTransformNode() ?? null }));
   const _inv = new Quaternion(), _d = new Vector3();
@@ -165,7 +170,11 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // re-parented to the palm — the hand jumped 0.5 m from the bounce to the clip's gather at the top of every shot
     // (measured: dribble_idle → jumpshot). The reach now fades out over RELEASE_FADE_SEC on top of the incoming clip.
     if (!active) {
-      if (releaseLeft > 0 && arm && armW > 0) { const k = releaseLeft / RELEASE_FADE_SEC; releaseLeft = Math.max(0, releaseLeft - releaseDt); reachShaped(arm, handT, pole, k * armW, releaseDt, stamp); }
+      if (releaseLeft > 0) {
+        const k = releaseLeft / releaseTotal; releaseLeft = Math.max(0, releaseLeft - releaseDt);
+        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachShaped(arm, handT, pole, k * armW, releaseDt, stamp); }
+        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, k * offW, releaseDt, stamp); }
+      }
       return;
     }
     if (!pending) return;
@@ -177,7 +186,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     toWorld(s.ball.x * sx, s.ball.y, s.ball.z + push, world);
     opts.ball.position.copyFrom(world);
     if (arm && armW > 0) {
-      toWorld(s.hand.x * sx, s.hand.y, s.hand.z + push, handT);
+      handLocal.set(s.hand.x * sx, s.hand.y, s.hand.z + push);
+      toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
       // THE ELBOWS POINT BACK (DUNK MOTION, 2026-09-23 — owner: "fix the arms when running too"). The poles here were POINTS
       // turned into directions with a HEIGHT left in them — toWorld(x, hand.y − 0.2 ≈ 0.8 m, z) − root — so the ball arm's elbow
       // was aimed mostly UP (and the off arm's, below, with its 0.85). Measured on the dunk runway (motion probe, 60 fps): both
@@ -198,12 +208,14 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       // DUNK MOTION (2026-09-23): and it swings in OPPOSITION to its own side's leg — forward and up as that knee goes back,
       // back and down beside the hip as it comes through, the way a runner's arm does — read off the leg itself, not the dribble's
       // phase (a bounce a STEP swung the arm at twice a stride's rate). The elbow points back, like the ball arm's.
+      if (!(offArm && lastSpeed01 > 0.35)) offW = 0;
       if (offArm && lastSpeed01 > 0.35) {
         const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
         const knee = kneeForward(-sx);   // + = the off side's knee ahead of its hip
         const swing = Math.max(-1, Math.min(1, -knee / 0.35));   // + = the arm forward
         const baseY = Math.max(0.9, offFloorY) + 0.04;
-        toWorld(-sx * 0.28, baseY + 0.16 * Math.max(0, swing) - 0.03 * Math.max(0, -swing), 0.10 + OFF_SWING_M * swing, offT);
+        offLocal.set(-sx * 0.28, baseY + 0.16 * Math.max(0, swing) - 0.03 * Math.max(0, -swing), 0.10 + OFF_SWING_M * swing);
+        toWorld(offLocal.x, offLocal.y, offLocal.z, offT); offW = ow;
         toWorld(-sx * OFF_ELBOW_POLE[0], OFF_ELBOW_POLE[1], OFF_ELBOW_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
         reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
       }
@@ -223,12 +235,12 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (!active) attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       phase = 0;   // the ball is at the new palm
     },
-    update(dt, speed01, wantActive) {
+    update(dt, speed01, wantActive, hz, releaseSec) {
       if (wantActive !== active) {
         active = wantActive;
         if (active) { opts.ball.setParent(null); phase = 0; releaseLeft = 0; }
         else {
-          releaseLeft = RELEASE_FADE_SEC;
+          releaseLeft = releaseTotal = Math.max(1e-3, releaseSec ?? RELEASE_FADE_SEC);
           // Hand the ball back ONLY if it is still ours to hand back: a steal
           // re-parents it to another hand and a release sets it flying, and
           // either may land in the same frame as our deactivation.
@@ -237,7 +249,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       }
       switchLeft = Math.max(0, switchLeft - dt);
       if (!active) { releaseDt = dt; return; }
-      phase = advancePhase(phase, dt, speed01, p);
+      phase = hz != null && hz > 0 ? (phase + dt * hz) - Math.floor(phase + dt * hz) : advancePhase(phase, dt, speed01, p);
       frameDt = dt; lastSpeed01 = speed01;
       pending = true;
     },

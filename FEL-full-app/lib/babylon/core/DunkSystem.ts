@@ -140,11 +140,18 @@ export function doubleUpFits(distToLine: number, speed: number): boolean {
  * The double-up is the one that changes: it is only a double-up in the window, so it is only offered in the window, and
  * when you are in it, it is the whole line.
  */
-export function runwayTeachLine(s: { distToLine: number; speed: number; ballThrown: boolean }): string {
+/** DUNK MOTION phase 8 (owner decision, 2026-09-23: "triangle commits"). On the RUN a bare Y is the attempt: the runner bends
+ *  into the J from wherever they are (the run is otherwise straight where the stick points). The self-lob is Y STANDING;
+ *  Y + up / down still throws the glass and bounce lobs on the run. */
+export const RUN_COMMIT_TEACH = 'GO UP';
+/** Runway tricks thrown from standing, not on the run. */
+export const STANDING_ONLY = new Set(['selflob']);
+export function runwayTeachLine(s: { distToLine: number; speed: number; ballThrown: boolean; committed?: boolean }): string {
   if (s.ballThrown) return 'CATCH IT — take it to the rim';
   if (doubleUpFits(s.distToLine, s.speed)) return 'DOUBLE-UP — tap A · or release to jump';
-  const moves = RUNWAY_TRICKS.filter((t) => t.teach && t.id !== 'doubleup')
+  const moves = RUNWAY_TRICKS.filter((t) => t.teach && t.id !== 'doubleup' && !STANDING_ONLY.has(t.id))
     .map((t) => `${t.btn}${t.dir === 'up' ? '+UP' : ''} ${t.teach}`);
+  if (!s.committed) moves.unshift(`Y ${RUN_COMMIT_TEACH}`);
   return `${moves.join(' · ')} — then release to jump`;
 }
 /** A dunk that catches its own toss (or a passer's) is judged on top of the flight. */

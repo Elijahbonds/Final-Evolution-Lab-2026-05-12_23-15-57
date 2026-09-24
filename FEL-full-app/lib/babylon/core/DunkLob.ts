@@ -51,7 +51,13 @@ export function runTimeToLine(dist: number, v0: number, vmax: number, accel: num
 }
 
 /** THE GATHER STRIDE (2026-09-18): the last stride into the line eases the run toward the flight's carry speed. */
-export interface GatherStride { strideSec: number; minM: number; easeSec: number; carryMps: number }
+export interface GatherStride {
+  strideSec: number; minM: number; easeSec: number; carryMps: number;
+  /** DUNK MOTION phase 8: push 1-2 at the runner's own speed (DunkGatherRun). When given, the gather starts `planDist(v)` out and
+   *  takes `planSec(d, v)` from there to the line — the first-order ease to carryMps is the old model. */
+  planDist?: (v: number) => number;
+  planSec?: (d: number, v: number) => number;
+}
 /**
  * The hold-run ramp's time to the line WITH the gather stride: inside max(minM, v · strideSec) of the line the speed eases
  * (first-order, easeSec) toward carryMps instead of ramping. Integrated at 5 ms — a toss timed on the plain ramp arrived
@@ -62,7 +68,8 @@ export function runTimeToLineGather(dist: number, v0: number, vmax: number, acce
   const step = 0.005;
   let gathering = false;
   for (let i = 0; i < 4000 && d > 0; i++) {
-    if (!gathering && d <= Math.max(g.minM, v * g.strideSec)) gathering = true;
+    if (g.planDist && g.planSec && d <= g.planDist(v)) { t += g.planSec(d, v); d = 0; break; }
+    if (!g.planDist && !gathering && d <= Math.max(g.minM, v * g.strideSec)) gathering = true;
     if (gathering) v += (g.carryMps - v) * Math.min(1, step / Math.max(1e-3, g.easeSec));
     else v = Math.min(vmax, v + accel * step);
     const dz = v * step;

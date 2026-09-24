@@ -100,3 +100,49 @@ export function limitElbowSwing(arm: ArmChain, dt: number, stamp: number, rateDe
   }
   swingMemo.set(arm.shoulder, { side, stamp });
 }
+
+// DUNK MOTION phase 8 (2026-09-23; owner: "fix the off arm on all the dunks" · "fix the orientation of the joints"). THE UPPER ARM
+// ROLLED 90° ABOUT ITS OWN AXIS IN ONE FRAME with the elbow and the hand still (the off arm reaching across the body to the ball:
+// 5600°/s). limitElbowSwing cannot see it — that is a turn about the shoulder→hand line, which moves the elbow; this is the bone
+// spinning on itself while the forearm counter-turns so the hand stays, which reads as the skin twisting round the arm. The solver
+// aims the arm with a from-to rotation, so its roll is whatever that minimal arc leaves, and the arc's axis flips when the pose it
+// starts from points far from the target. After everything has written the arm: the upper arm's roll about its own bone is limited
+// to `rateDeg`/s from last drawn frame, and the forearm is counter-turned by exactly the correction, so the elbow, the forearm and
+// the hand are where they were drawn. Pure local-space math: qU' = qU ∘ R(axis, −excess), qF' = R(axis, excess) ∘ qF, where axis
+// is where the forearm sits on the upper arm (its local position).
+// MEASURED, NOT WIRED (p8f): limiting the roll alone moves the discontinuity to the ELBOW — the forearm takes up the difference
+// locally and the skin twists there instead (off-forearm spikes 5000–8400°/s). The fix is a hinge: the elbow bends about its own
+// axis only, and the roll lives in the upper arm and the forearm's pronation. This stays as that work's building block.
+type TwistMemo = { q: Quaternion; stamp: number };
+const twistMemo = new WeakMap<TransformNode, TwistMemo>();
+/** The roll (radians) of `delta` about unit `axis`: the twist of a swing–twist decomposition. */
+export function twistAbout(delta: Quaternion, axis: Vector3): number {
+  let w = delta.w, v = delta.x * axis.x + delta.y * axis.y + delta.z * axis.z;
+  if (w < 0) { w = -w; v = -v; }
+  return 2 * Math.atan2(v, w);
+}
+/** Call after the arm's last writer this frame. `stamp` counts drawn frames (a gap starts free). Returns the roll removed (rad). */
+export function limitArmTwist(arm: ArmChain, dt: number, stamp: number, rateDeg: number): number {
+  const u = arm.shoulder, f = arm.elbow;
+  const qU = u.rotationQuaternion, qF = f.rotationQuaternion;
+  if (!qU || !qF) return 0;
+  const memo = twistMemo.get(u);
+  let removed = 0;
+  if (memo && memo.stamp === stamp - 1 && dt > 0 && f.position.lengthSquared() > 1e-10) {
+    const axis = f.position.clone().normalize();                       // the upper arm's own axis, in its local frame
+    // this frame's local rotation against last frame's, expressed about the bone's own axis: d = qPrev⁻¹ ∘ qU (local delta)
+    const d = Quaternion.Inverse(memo.q).multiply(qU);
+    const roll = twistAbout(d, axis), maxRad = (rateDeg * Math.PI / 180) * dt;
+    if (Math.abs(roll) > maxRad) {
+      removed = roll - Math.sign(roll) * maxRad;
+      const fix = Quaternion.RotationAxis(axis, -removed);
+      qU.copyFrom(qU.multiply(fix));                                     // the bone turned back on itself: the elbow does not move
+      qF.copyFrom(Quaternion.Inverse(fix).multiply(qF));                // the forearm keeps its world pose: the hand does not move
+      u.computeWorldMatrix(true); f.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+    }
+  }
+  twistMemo.set(u, { q: qU.clone(), stamp });
+  return removed;
+}
+/** Forget an arm's last drawn roll (a teleport, a respawn). */
+export function forgetArmTwist(arm: ArmChain): void { twistMemo.delete(arm.shoulder); }
