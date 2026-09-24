@@ -17,6 +17,7 @@ import { MOCAP_STYLE_CLIPS } from './mocapStyles';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
+import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall, CELEB_SPIDERMAN_SEC } from './dunkCelebrations';
 import { buildEastbay } from './eastbay';
 import { EASTBAY_TIMING } from './timing';
 import { CRADLE_BACK, SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildScorpionFlush, SCORPION_FLUSH_SEC, buildCartwheel, CARTWHEEL_SEC, CARTWHEEL_BOUNCE, buildSpin720, SPIN_720_SEC, KICK_UP_SEC, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC, FRONT_SWAP_SEC } from './dunkTricks';
@@ -861,5 +862,38 @@ describe('base clips (the forge\'s nine, built at runtime)', () => {
   it('high kick: the right foot rises above the hips', () => {
     const g = fresh(() => buildBaseClips(scene, sk).find((c) => c.name === 'high_kick')!);
     at(g, 0.28); expect(pos('RightFoot').y).toBeGreaterThan(hipsY() - 0.1);
+  });
+});
+
+// DUNK MOTION phase 12 — the celebrations, watched on the real dunkers first (owner: "look up dunkers like brandon ruffin").
+describe('the celebrations', () => {
+  it('Ruffin: the scream, a hand on the floor in the Spider-Man, then down into the splits', () => {
+    const g = fresh(() => buildCelebSpidermanSplits(scene, sk)!);
+    at(g, 0); const hipsAtRest = hipsY();
+    at(g, 0.28); expect(pos('Head').z - pos('Neck').z, 'head back: the scream').toBeLessThan(0.08);
+    at(g, 0.95);
+    expect(Math.min(pos('LeftHand').y, pos('RightHand').y), 'a hand on the floor (the wrist; the palm is flat under it)').toBeLessThan(0.25);
+    expect(pos('Hips').y, 'down in the crouch').toBeLessThan(hipsAtRest - 0.35);
+    at(g, CELEB_SPIDERMAN_SEC);
+    expect(pos('Hips').y, 'the splits: the hips near the floor').toBeLessThan(0.35);
+    expect(Math.abs(pos('LeftFoot').z - pos('RightFoot').z), 'one leg ahead, one behind').toBeGreaterThan(1.2);
+  });
+  it('Carter: "it\'s over" — the arms wide, then crossed in front, palms down', () => {
+    const g = fresh(() => buildCelebItsOver(scene, sk)!);
+    at(g, 0.25); const wide = Math.abs(pos('LeftHand').x - pos('RightHand').x);
+    at(g, 0.5); const crossed = pos('RightHand').x - pos('LeftHand').x;
+    expect(wide).toBeGreaterThan(1.0);
+    expect(Math.sign(crossed), 'crossed over').toBe(Math.sign(pos('RightArm').x - pos('LeftArm').x) * -1);
+  });
+  it('the roar: ripped down into a crouch, fists low, head up', () => {
+    const g = fresh(() => buildCelebRoar(scene, sk)!);
+    at(g, 0); const hipsAtRest = hipsY();
+    at(g, 0.2); const up = pos('RightHand').y;
+    at(g, 0.45); expect(pos('RightHand').y).toBeLessThan(up - 0.4); expect(pos('Hips').y).toBeLessThan(hipsAtRest - 0.08);
+  });
+  it('too small: the flat hand patted over the head', () => {
+    const g = fresh(() => buildCelebTooSmall(scene, sk)!);
+    at(g, 0.25); const hi = pos('RightHand').y; expect(hi).toBeGreaterThan(pos('Head').y);
+    at(g, 0.45); expect(pos('RightHand').y).toBeLessThan(hi - 0.05);
   });
 });

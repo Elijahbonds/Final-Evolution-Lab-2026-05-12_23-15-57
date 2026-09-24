@@ -18,6 +18,8 @@ import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
+import { DunkPoster } from './dunk-poster';
+import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
 type Hud = Record<string, HudValue>;
 
@@ -288,6 +290,24 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         <div className={`pointer-events-none absolute inset-x-0 ${hud.bannerHigh === true ? 'top-[13%]' : 'top-[38%]'} text-center`}>
           <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-cyan)]">{hud.banner}</span>
         </div>
+      )}
+
+      {/* DUNK MOTION phase 12 — THE SHOW: the broadcast bug while the triple cut plays (a tap skips it), the announcer's lower third,
+          and the poster of a big make, kept until the next attempt. */}
+      {typeof hud.cut === 'string' && hud.cut && (
+        <div className="pointer-events-none absolute left-3 top-[9%]">
+          <span className="fel-panel inline-flex items-center gap-2 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />{hud.cut}<span className="text-white/40">· tap to skip</span>
+          </span>
+        </div>
+      )}
+      {typeof hud.call === 'string' && hud.call && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 top-[58%] px-4 text-center">
+          <span className="fel-heading inline-block rounded-md bg-black/55 px-3 py-1 text-base font-black uppercase italic tracking-wide text-[#ffd75e]">{hud.call}</span>
+        </div>
+      )}
+      {hud.poster && typeof hud.poster === 'object' && !Array.isArray(hud.poster) && phase === 'playing' && (
+        <DunkPoster poster={hud.poster as HudPoster} onClose={() => setHud((h) => ({ ...h, poster: null }))} />
       )}
 
       {/* Venice DualShock pad: on phones (< 640 px) the hint plate sits above the pad column (the diamond stacks over the

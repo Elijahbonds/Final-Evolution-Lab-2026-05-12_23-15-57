@@ -27,6 +27,8 @@ class SoundKitImpl {
   private crowdBed: { stop(): void } | null = null;
   private musicEnabled = true;
   private sfxEnabled = true;
+  /** Sound effects are off (the announcer's voice goes quiet with them — DUNK MOTION phase 12). */
+  get muted(): boolean { return !this.sfxEnabled; }
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;

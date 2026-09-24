@@ -24,7 +24,7 @@ import {
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 import { StudioLibrary } from '../music/StudioLibrary';
-import { Color3, Color4, MeshBuilder, Space, Vector3, type Mesh } from '@babylonjs/core';
+import { Color3, Color4, MeshBuilder, Space, Tools, Vector3, type Mesh } from '@babylonjs/core';
 import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
@@ -99,7 +99,9 @@ import {
 } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
 import { rivalNerve, rivalExecution } from '../core/RivalNerve';   // the rival feels the contest too
-import { rivalTricksFor, rivalSlamOffset } from '../core/RivalPlay';   // DUNK MOTION phase 11: the rival's pad decides like a player
+import { rivalTricksFor, rivalSlamOffset } from '../core/RivalPlay';
+import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, pickCelebration, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
+import { PhoneFlashes } from '../visual/PhoneFlashes';   // DUNK MOTION phase 11: the rival's pad decides like a player
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -688,6 +690,11 @@ export const DunkMode: ModeDefinition = (() => {
   let aerialClip: string = SPORT_CLIP.dunkScoreHang;     // the finish chosen at resolve (the replay re-plays it)
   let dropToFloor = false;                    // H5: the root falls to the floor (a miss from the release; a make after the replay)
   let dropVy = 0, liveLandAt = -1;            // DUNK MOTION phase 11: the drop's speed (gravity), and when the feet came down live
+  // DUNK MOTION phase 12: the triple cut is on (the pose replay owns the body — the old re-fly stands aside); the celebration the
+  // player threw on the d-pad after the make; the stands' phones
+  let cutting = false, celebPick: CelebId | null = null, phoneFlashes: PhoneFlashes | null = null;
+  let soundGapUntil = 0;   // DUNK MOTION phase 12: the building holds its breath from the SLAM to the iron
+  let celebFace: Vector3 | null = null;   // phase 12: the celebration is for the crowd — he turns to the court (and the verdict camera) for it
   /**
    * DUNK MOTION phase 11 — THE LANDING IS LIVE (the decode's "after": the hand lets go and the body drops, absorbing with bent knees
    * and the arms coming down in front — or it keeps the rim and swings under it). The make went straight to the replay with the
@@ -698,7 +705,7 @@ export const DunkMode: ModeDefinition = (() => {
   function liveLandThenJudge(ctx: ModeContext): void {
     if (finishing) return;
     if (player.root.position.y > 0.02) { if (!dropToFloor) { dropToFloor = true; dropVy = 0; console.info(`[HANDS] off the iron — the drop from ${player.root.position.y.toFixed(2)} m`); } return; }
-    if (liveLandAt < 0) { liveLandAt = performance.now(); console.info('[HANDS] feet down, live'); return; }
+    if (liveLandAt < 0) { liveLandAt = performance.now(); if (airHeld) landNow(); console.info('[HANDS] feet down, live'); return; }   // (the land clip on the feet, here — a held trick clip must not carry past the floor)
     if (performance.now() - liveLandAt >= LIVE_LAND_BEAT_MS) { liveLandAt = -1; void finishAttempt(ctx, true); }
   }
   let replayClipNow = 0;                      // DUNK-BALL-ARMS-RIM: the replayed flight's clip second (the reach gate)
@@ -1013,6 +1020,10 @@ export const DunkMode: ModeDefinition = (() => {
     hingeObs = ctx.scene.onAfterAnimationsObservable.add(() => { if (MOTION_OFF || !player) return; const dt = motionDt(); for (const H of hinges) hingeArmApply(H, dt, ikFrame, ARM_TWIST_RATE_DEG); });
     // DUNK-BALL-ARMS-RIM: the replay puts the ball back in what it rode — the hand it was in, the body while it dribbled
     replay?.dispose(); replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : dribble?.active ? player.root : null));
+    // DUNK MOTION phase 12: the recorder keeps the body's pose as DRAWN (the hips first — they carry the clips' height)
+    { const nodes = player.skeleton.bones.map((b) => b.getTransformNode()).filter((n): n is TransformNode => !!n);
+      const hi = nodes.findIndex((n) => /Hips/.test(n.name)); if (hi > 0) nodes.unshift(...nodes.splice(hi, 1));
+      replay.setPoseNodes(nodes); }
 
     ctx.camDirector.snapTo(player.root.position, rim);
     ctx.heroRef.current = player.root;
@@ -1124,6 +1135,7 @@ export const DunkMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       // `dunkRival` because a probe cannot find the opponent by looking: the nearest body to the hero at floor height is
       // as often a courtside spectator, and one has been measured by mistake before. The mode knows which body it is.
@@ -1186,6 +1198,13 @@ export const DunkMode: ModeDefinition = (() => {
       // direction pressed while the judges scored, through the replay, or on the rival's turn went into the floor — 4 of
       // 18 SLAM presses and 3 of 8 d-pad presses silent in the rc13 capture, and nothing on screen tells the player the
       // contest simply is not his right now. RUN already said this (the trigger path below); now every input does.
+      // DUNK MOTION phase 12: after a MAKE the d-pad throws your celebration (up the roar, right "it's over", down Ruffin's Spider-Man
+      // splits, left too small) — through the landing and the triple cut
+      if (e.t === 'dpad' && e.pressed && turn === 'player' && (phase === 'resolve' || phase === 'judging') && qteHit && !celebPick) {
+        celebPick = CELEB_BY_DPAD[e.dir]; flash(ctx, `${CELEBRATIONS[celebPick].label}!`, 700); SoundKit.play('uiTick', { pitch: 1.5, volume: 0.35 });
+        console.info(`[DUNK-CELEB] thrown on the d-pad: ${celebPick}`);
+        return;
+      }
       if ((e.t === 'button' || e.t === 'dpad') && e.pressed && (phase === 'rivalTurn' || phase === 'judging' || phase === 'resolve')) {
         refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : 'THE JUDGES ARE SCORING');
         return;
@@ -1917,7 +1936,7 @@ export const DunkMode: ModeDefinition = (() => {
       // replay owns it while it plays (the sim holds its state and picks up where the replay's last frame left the ball)
       if (looseBall && !ball.parent && !lob.live && !replaying) ballSim.step(dt, 0, FLOOR_E, FLOOR_FRICTION);
       // ── A+ P8 athlete hands: the replay's clips, the fall to feet-down, the reach weight ──────────────────────────
-      if (replaying) {
+      if (replaying && !cutting) {
         // H5: the replay re-flies the recorded root at 0.5× for up to 8 s — the clips re-fly with it: the run on the floor, the
         // launch clip from the replayed takeoff (at the live flight's own clip rate: the hang slow-mo stretched it), the finish
         // where the live flight resolved. Before: idle_stand flew the whole replay.
@@ -1977,7 +1996,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (skyRoot) { skyBob += dt; skyKick = Math.max(0, skyKick - dt * 1.4); skyRoot.position.y = SKY.underY + Math.sin(skyBob * 0.9) * 0.08 + skyKick * 0.25; skyRoot.rotation.z = Math.sin(skyBob * 0.6) * 0.03 + Math.sin(skyKick * Math.PI) * 0.12; skyRoot.rotation.y = Math.sin(skyBob * 0.35) * 0.05; }
       // the building breathes with the contest every frame
       crowd.update(dt, Math.min(1, hype / 100), chain, momentum.tier === 'on_fire');
-      SoundKit.setAmbientLevel(crowd.level);
+      SoundKit.setAmbientLevel(performance.now() < soundGapUntil ? 0.03 : crowd.level);   // (phase 12: the sound gap before the impact)
 
       if (phase === 'judging') {
         for (const beat of reveal.update(dt)) {
@@ -2050,6 +2069,7 @@ export const DunkMode: ModeDefinition = (() => {
         // hold both and the subject walked out of frame. See the cut above.
         ctx.camDirector.update(player.root.position, Vector3.Zero(), rim);
       } else if (phase === 'judging') {
+        if (celebFace && !replaying) faceToward(celebFace, dt * 7);   // DUNK MOTION phase 12: he turns to the crowd to celebrate
         // THE VERDICT. The camera used to be left entirely undriven here, so it
         // froze on whatever angle the replay cam happened to end on — for the
         // full 5.1s of the reveal, which is the mode's dramatic peak. A NULL
@@ -2111,6 +2131,8 @@ export const DunkMode: ModeDefinition = (() => {
     dispose() {
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
+      phoneFlashes?.dispose(); phoneFlashes = null;
+      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();   // DUNK MOTION phase 12: the announcer stops with the mode
       meter3d?.dispose(); meter3d = null;
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
@@ -2281,6 +2303,9 @@ export const DunkMode: ModeDefinition = (() => {
     // its own; the "jam" the eye saw was a reach forward at knee height. Pressed inside the window the hand IS at the
     // rim (the extension rides the top of the arc); the release, the finish and the flush follow from there, the root
     // hangs at that height until the replay hands it back (the rim hang), the accuracy read above is unchanged.
+    // DUNK MOTION phase 12 — THE SPEED RAMP AND THE SOUND GAP: a clean slam slows the world into the iron and the building goes quiet
+    // for it; the contact (contactPunch) snaps both back — the thud, then the roar
+    if (qteHit) { soundGapUntil = performance.now() + 480; ctx.juice.slowMo(0.55, 240); }
     resolveDunk(ctx);
   }
   /** DUNK-BODY-MID: a SLAM press the window has not opened for yet. Held (the newest press wins) and fired on the frame
@@ -3541,6 +3566,44 @@ export const DunkMode: ModeDefinition = (() => {
     fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
     armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame
     hoopJuice?.punch();           // juice LOOK #1–#3: the hoop answers the make (never on a miss — this is the flush frame)
+    // DUNK MOTION phase 12: the gap ends on the iron — the roar comes in over the thud — and the glass answers how hard it was
+    soundGapUntil = 0;
+    SoundKit.play('crowdCheer', { volume: 0.45 + 0.4 * qteAccuracy });
+    hoopJuice?.shudder(0.3 + 0.7 * qteAccuracy + (aHeld ? 0.2 : 0));
+    phoneFlashes?.burst(6, 0.5);   // the phones were up for the take-off
+  }
+
+  /** DUNK MOTION phase 12 — THE ANNOUNCER: the call on the lower third and, where the browser has a voice, out loud (muted with the
+   *  game's sound; never queued behind a stale one). */
+  function announce(ctx: ModeContext, line: string): void {
+    ctx.setHud({ call: line });
+    console.info(`[DUNK-CALL] ${line}`);
+    try {
+      const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
+      if (!synth || SoundKit.muted) return;
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(line.replace(/→/g, ',').toLowerCase());
+      u.rate = 1.08; u.pitch = 0.85; u.volume = 0.85;
+      synth.speak(u);
+    } catch { /* no voice here: the lower third carries it */ }
+  }
+  /** PYRO on the big ones: sparks up off both baseline corners, and the confetti. */
+  function pyro(ctx: ModeContext): void {
+    for (const sx of [-1, 1]) EffectsKit.burst(ctx.scene, new Vector3(rim.x + sx * 6.5, 0.4, rim.z - 0.6), 'sparks', 2.4, '#ffb347');
+    EffectsKit.burst(ctx.scene, rim.add(new Vector3(0, 1.2, 1.4)), 'confetti', 1.6);
+    console.info('[DUNK-SHOW] pyro');
+  }
+  /** THE POSTER (shareable): the frozen contact frame, captured from the poster's own camera; the HUD dresses it and offers it. */
+  function capturePoster(ctx: ModeContext, meta: { title: string; by: string; total: number }): void {
+    try {
+      const cam = ctx.camera as unknown as import('@babylonjs/core').Camera;
+      // the frame as DRAWN (a read of the canvas after its render) — a separate render target flashed the canvas black for a frame and
+      // the display watchdog failed the arena on it (measured, p12f)
+      Tools.CreateScreenshot(ctx.scene.getEngine(), cam, { precision: 0.6 }, (data) => {
+        ctx.setHud({ poster: { src: data, title: meta.title, by: meta.by, total: meta.total, night } });
+        console.info(`[DUNK-SHOW] poster captured (${Math.round(data.length / 1024)} kB)`);
+      }, 'image/jpeg');
+    } catch (e) { console.warn('[DUNK-SHOW] poster capture failed', e); }
   }
 
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {
@@ -3759,11 +3822,38 @@ export const DunkMode: ModeDefinition = (() => {
     // with the ball on the ground behind him. The mode knows exactly how long this flight took --
     // `launchRealMs` to now -- so it trims to that plus a beat of run-up for context, which is the shape a
     // broadcast actually cuts.
-    const flightSec = Math.max(0, (performance.now() - launchRealMs) / 1000);
-    const replayDone = replay.play(rim, Math.min(4, flightSec + REPLAY_LEAD_IN_SEC), (netRealSec || (flushRealSec && flushRealSec + 0.2)) || undefined).then(() => { replaying = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] replay end'); });
+    // DUNK MOTION phase 12 — THE TRIPLE CUT (owner decisions: made dunks, skippable, ~2 s, a contest SHOW). It was the whole flight
+    // re-flown at 0.5× for up to eight seconds, from a runway jog, with the clips re-fired over the root. Now: the flush three times —
+    // under the rim, on the iron, from the stands — out of the RECORDED POSE, and a big one freezes on the contact frame as a poster.
+    const big = dunkTotal >= BAND_TOTAL.eruption || !!signature;
+    const theName = signature ? signature.name : named.length ? `${named.join(' → ')}` : finishBanner(qteHit, qteAccuracy, inOffHand(), calledAirTrick()).replace('!', '') || 'THE DUNK';
+    const call = announcerCall({ total: dunkTotal, name: theName, bands: BAND_TOTAL, seen: isRepeat, dunker: turn === 'rival' ? foe.name : undefined, seed: seedOf(`${theName}:${dunkTotal}:${round}:${dunkInRound}`) });
+    announce(ctx, call);
+    phoneFlashes?.burst(big ? 22 : 10, big ? 2.4 : 1.6);
+    if (big) pyro(ctx);
+    const contactSec = flushRealSec || resolveRealMs / 1000;
+    const cutDone = replay.playCuts(rim, contactSec, TRIPLE_CUT, {
+      freezeSec: big ? POSTER_SEC : 0,
+      onCut: (i, c) => { ctx.setHud({ cut: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label}` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
+      onFreeze: () => { ctx.setHud({ cut: 'THE POSTER' }); if (turn === 'player') capturePoster(ctx, { title: theName, by: signature?.by ?? '', total: dunkTotal }); },
+    }).then(() => { replaying = false; cutting = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] triple cut end'); });
     ctx.camDirector.suspended = true;
-    await Promise.race([replayDone, new Promise((r) => setTimeout(r, 3500))]);
+    await Promise.race([cutDone, new Promise((r) => setTimeout(r, (tripleCutSec() + (big ? POSTER_SEC : 0)) * 1000 + 1200))]);
+    replay.stop(); cutting = false; replaying = false;
     ctx.camDirector.suspended = false;
+    ctx.setHud({ cut: '' });
+    // back live, on the floor: the celebration (the one he threw on the d-pad, else his own, else the card's)
+    const celeb = pickCelebration({ total: dunkTotal, bands: BAND_TOTAL, chosen: turn === 'player' ? celebPick : null, rivalId: turn === 'rival' ? foe.id : null, seed: seedOf(`${theName}:${dunkTotal}`) });
+    airHeld = false;   // (on the floor: nothing may land again over what comes next)
+    if (celeb) {
+      const cz = CELEBRATIONS[celeb];
+      { const away = player.root.position.subtract(rim); away.y = 0; if (away.lengthSquared() < 0.01) away.set(0, 0, 1); celebFace = player.root.position.add(away.normalize().scale(6)); }
+      playClip(cz.clip, { fadeSec: 0.2, onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
+      console.info(`[DUNK-CELEB] ${celeb} (${cz.clip})${celebPick ? ' — thrown on the d-pad' : ''}`);
+      if (cz.by) setTimeout(() => ctx.setHud({ call: `${cz.label} — ${cz.by!.toUpperCase()}` }), 400);
+      if (celeb === 'spiderman' || celeb === 'itsover') SoundKit.play('crowdCheer', { volume: 0.55 });
+    }
+    landingClip = SPORT_CLIP.dunkLandCrouch;   // (the landing already happened, live — after the cut there is no second one)
 
     // Phase 7: STAGED REVEAL — confer, Silk, Doc, the long Prime beat,
     // then the total + eruption/hush. Not a number flash.
@@ -3823,6 +3913,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0; approachMove.stop();
     airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
+    cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
     armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;

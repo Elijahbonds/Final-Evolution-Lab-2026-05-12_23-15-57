@@ -69,7 +69,9 @@ export interface HudScoreCard { name: string; score: number | string; line: stri
  * 3-judge scorecard array — the bezel decorates them; modes stay declarative. */
 /** The rhythm cue lane (dance, A+ mission #1) — see core/danceTracks.ts. */
 export type { HudCue } from './danceTracks';
-export type HudValue = string | number | boolean | null | HudScoreCard[] | HudCue[];
+/** DUNK MOTION phase 12: a made dunk's poster — the frozen contact frame (a data URL) and what it says. */
+export interface HudPoster { src: string; title: string; by: string; total: number; night: number }
+export type HudValue = string | number | boolean | null | HudScoreCard[] | HudCue[] | HudPoster;
 
 export interface ModeContext {
   scene: Scene;

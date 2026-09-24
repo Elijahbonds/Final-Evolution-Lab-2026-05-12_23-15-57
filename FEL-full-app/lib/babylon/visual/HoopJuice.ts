@@ -84,6 +84,36 @@ export class HoopJuice {
     if (on) { this.rimRing.isVisible = true; this.net.isVisible = true; console.info('[JUICE-LOOK] rim hang: ring held down'); if (!this.obs) this.obs = this.scene.onBeforeRenderObservable.add(() => this.tick(this.scene.getEngine().getDeltaTime() / 1000)); }
     else { this.t = 0; this.holdK = 0; console.info('[JUICE-LOOK] rim hang release: the ring springs back'); }
   }
+  /**
+   * DUNK MOTION phase 12 — THE GLASS ANSWERS. A big dunk shakes the whole stand: the board and the pole rock toward the court and
+   * back, damped (5.5 Hz over ~0.9 s) — `amp01` 1 is ~2.5 cm at the board. The Meshy hoop is one mesh, so it is the stand's
+   * meshes near the rim that move (offsets from where they rest, put back exactly when it settles).
+   */
+  shudder(amp01: number): void {
+    const a = Math.max(0, Math.min(1, amp01)); if (a <= 0.01) return;
+    if (!this.shaking.length) for (const m of this.scene.meshes as AbstractMesh[]) {
+      if (!m.name.startsWith('meshy_hoop_') || m.isDisposed()) continue;
+      const bb = m.getBoundingInfo().boundingBox;
+      if (Vector3.Distance(bb.centerWorld, this.rim) < 3.2) this.shaking.push({ mesh: m, base: m.position.clone() });
+    }
+    this.shakeT = 0; this.shakeAmp = Math.max(this.shakeAmp, a);
+    console.info(`[JUICE-LOOK] the glass shudders (${a.toFixed(2)}) — ${this.shaking.length} mesh(es)`);
+    if (!this.shakeObs) this.shakeObs = this.scene.onBeforeRenderObservable.add(() => {
+      this.shakeT += this.scene.getEngine().getDeltaTime() / 1000;
+      const t = this.shakeT, d = Math.exp(-t / 0.3) * this.shakeAmp;
+      const z = 0.025 * d * Math.sin(2 * Math.PI * 5.5 * t), y = 0.006 * d * Math.sin(2 * Math.PI * 11 * t);
+      for (const s of this.shaking) { if (s.mesh.isDisposed()) continue; s.mesh.position.set(s.base.x, s.base.y + y, s.base.z + z); }
+      if (t > 0.95) this.settleShake();
+    });
+  }
+  private shaking: { mesh: AbstractMesh; base: Vector3 }[] = [];
+  private shakeT = 0; private shakeAmp = 0; private shakeObs: Observer<Scene> | null = null;
+  private settleShake(): void {
+    for (const s of this.shaking) if (!s.mesh.isDisposed()) s.mesh.position.copyFrom(s.base);
+    this.shaking = []; this.shakeAmp = 0;
+    if (this.shakeObs) { this.scene.onBeforeRenderObservable.remove(this.shakeObs); this.shakeObs = null; }
+  }
+
   /** Whether a hang is holding the ring (probe / outbox). */
   get holding(): boolean { return this.held; }
 
@@ -142,6 +172,7 @@ export class HoopJuice {
   }
 
   dispose(): void {
+    this.settleShake();
     this.restoreMaterials();
     if (this.obs) this.scene.onBeforeRenderObservable.remove(this.obs);
     this.rimRing.material?.dispose(); this.rimRing.dispose(); this.net.material?.dispose(); this.net.dispose(); this.netPivot.dispose();

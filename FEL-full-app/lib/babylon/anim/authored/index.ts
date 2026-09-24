@@ -17,6 +17,7 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildScoopLayup, buildSpinLayup, buildHangLayup, buildShimmy, buildDropStep } from './basketball';   // ACROBATIC LAYUPS + THE POST GAME (2026-09-18)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildDubbleHold, buildDubbleKneel, buildBikeRider, buildSkateRider } from './stackProp';
+import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall } from './dunkCelebrations';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildCartwheel, buildBackflip, buildDoubleUp, buildScorpion, buildScorpionFlush, buildSpin720, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
@@ -102,6 +103,11 @@ export function registerAuthoredClips(
     ['dunk_double_clutch', () => buildDoubleClutch(scene, skeleton)],
     ['dunk_360_spin', () => buildSpin360(scene, skeleton)],
     ['dunk_720_spin', () => buildSpin720(scene, skeleton)],   // phase 10b: the 720
+    // DUNK MOTION phase 12: what a dunker does on the floor after the make (Ruffin's Spider-Man splits, Carter's "it's over", the roar, too small)
+    ['dunk_celeb_spiderman_splits', () => buildCelebSpidermanSplits(scene, skeleton)],
+    ['dunk_celeb_its_over', () => buildCelebItsOver(scene, skeleton)],
+    ['dunk_celeb_roar', () => buildCelebRoar(scene, skeleton)],
+    ['dunk_celeb_too_small', () => buildCelebTooSmall(scene, skeleton)],
     ['football_juke_left', () => buildJuke(scene, skeleton, 'left')],
     ['football_juke_right', () => buildJuke(scene, skeleton, 'right')],
     ['football_spin_move', () => buildSpinMove(scene, skeleton)],
