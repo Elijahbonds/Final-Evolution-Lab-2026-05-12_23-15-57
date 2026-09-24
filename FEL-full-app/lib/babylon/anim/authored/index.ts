@@ -34,6 +34,7 @@ import {
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
 } from './basketball';
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
+import { buildPartyThink, buildPartyBuzz, buildPartyLocked, buildPartyYes, buildPartyFacepalm, buildPartyShrug, buildPartyWin, buildPartyWinIn, buildPartyLose } from './party';   // BRAINBRAWL-MAJOR
 import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
 import { buildTennisReady, buildTennisServe, buildTennisSwing, buildTennisShuffle } from './tennis';
 import { buildVolleyBlock, buildVolleyReady, buildVolleySpike, buildVolleyShuffle } from './volleyball';
@@ -249,6 +250,11 @@ export function registerAuthoredClips(
     ['baseball_swing', () => buildBatSwing(scene, skeleton)],
     ['baseball_pitch_over', () => buildPitchOver(scene, skeleton)],
     ['baseball_pitch_side', () => buildPitchSide(scene, skeleton)],
+    // The quiz podium (BRAINBRAWL-MAJOR, 2026-09-24): think, buzz in, lock in, the verdicts, the finish — see party.ts
+    ['party_think', () => buildPartyThink(scene, skeleton)], ['party_buzz', () => buildPartyBuzz(scene, skeleton)],
+    ['party_locked', () => buildPartyLocked(scene, skeleton)], ['party_yes', () => buildPartyYes(scene, skeleton)],
+    ['party_facepalm', () => buildPartyFacepalm(scene, skeleton)], ['party_shrug', () => buildPartyShrug(scene, skeleton)],
+    ['party_win', () => buildPartyWin(scene, skeleton)], ['party_win_in', () => buildPartyWinIn(scene, skeleton)], ['party_lose', () => buildPartyLose(scene, skeleton)],
   ];
   const registered: string[] = [];
   let skipped = 0;

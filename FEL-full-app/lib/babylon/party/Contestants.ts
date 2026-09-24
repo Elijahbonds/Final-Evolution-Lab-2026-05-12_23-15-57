@@ -111,7 +111,36 @@ export class Contestants {
 
   /** Everyone back to idle — between rounds, or on a reset. */
   reset(): void {
+    this.seq = this.seq.map((s) => s + 1);
     for (const b of this.bodies) b.animator.play(SPORT_CLIP.idle, { loop: true, fadeSec: 0.2 });
+  }
+
+  /** One counter per seat: every `perform` takes a new number, and a hand-off only runs if its number is still current. */
+  private seq: number[] = [];
+
+  /**
+   * Player `i` performs `clip` (BRAINBRAWL-MAJOR, 2026-09-24): a loop they settle into (`loop: true`), or a one-shot that
+   * hands over to `then` — a loop — when it ends, or to the idle without one.
+   *
+   * The CALLER names the clip. A mode that owns its own podium vocabulary (Brain Brawl's party suite) plays it through
+   * here without this shared module naming it — which would put it in every importing mode's clip closure.
+   *
+   * The hand-off is GUARDED. Babylon's AnimationGroup.stop() notifies the group's END observable, so a one-shot that is
+   * cut off by the next clip still fires its end callback when the cross-fade retires it — and neverBindPose's default
+   * callback is "back to the idle". Unguarded, a buzz interrupted by a verdict drops the verdict to the idle 0.08 s later.
+   */
+  perform(i: number, clip: string, opts: { loop?: boolean; then?: string; fadeSec?: number } = {}): void {
+    if (this.disposed) return;
+    const b = this.bodies[i];
+    if (!b) return;
+    const token = (this.seq[i] = (this.seq[i] ?? 0) + 1);
+    const fadeSec = opts.fadeSec ?? 0.12;
+    if (opts.loop) { b.animator.play(clip, { loop: true, fadeSec }); return; }
+    const next = opts.then ?? SPORT_CLIP.idle;
+    b.animator.play(clip, {
+      loop: false, fadeSec,
+      onEnd: () => { if (!this.disposed && this.seq[i] === token) b.animator.play(next, { loop: true, fadeSec: 0.2 }); },
+    });
   }
 
   private play(i: number, clip: string): void {

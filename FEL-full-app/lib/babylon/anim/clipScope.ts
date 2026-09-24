@@ -23,9 +23,9 @@ import { CLIP_ALIASES } from './clipAliases';
 
 export type ClipSuite =
   | 'core' | 'dunk' | 'hoops' | 'football' | 'combat' | 'freerun' | 'board'
-  | 'golf' | 'tennis' | 'volleyball' | 'soccer' | 'baseball';
+  | 'golf' | 'tennis' | 'volleyball' | 'soccer' | 'baseball' | 'party';
 
-export const ALL_SUITES: readonly ClipSuite[] = ['core', 'dunk', 'hoops', 'football', 'combat', 'freerun', 'board', 'golf', 'tennis', 'volleyball', 'soccer', 'baseball'];
+export const ALL_SUITES: readonly ClipSuite[] = ['core', 'dunk', 'hoops', 'football', 'combat', 'freerun', 'board', 'golf', 'tennis', 'volleyball', 'soccer', 'baseball', 'party'];
 
 /** The suite a clip NAME belongs to, by its sport prefix. Names with no sport prefix (idle_stand, run, walk, guard, the
  *  base strikes, jump_up, strafe_left, cheer, dance steps, mirrored '.M' groups) are core: every body may play them. */
@@ -42,6 +42,7 @@ export function suiteOfClip(name: string): ClipSuite {
   if (n.startsWith('volleyball_')) return 'volleyball';
   if (/^(soccer_|keeper_|penalty_)/.test(n)) return 'soccer';
   if (/^(baseball_|derby_)/.test(n)) return 'baseball';
+  if (n.startsWith('party_')) return 'party';   // the quiz podium (BRAINBRAWL-MAJOR): only a mode that names the suite builds it
   return 'core';
 }
 
@@ -92,7 +93,9 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   // The kart driver throws board tricks off a boosted ramp (KartAir reuses the BoardTrick vocabulary and rows), so
   // the board suite is what the kart's body owns. Aero has no body in the air — the stunt is the aircraft's.
   velocitykart: { suites: ['board'], borrow: [] }, aeroaces: { suites: [], borrow: [] },
-  who_scene_it: PARTY, brainbrawl: PARTY,
+  // BRAINBRAWL-MAJOR (2026-09-24): Brain Brawl's podiums own the party suite (think / buzz / locked / yes / facepalm / shrug / win /
+  // lose, authored/party.ts); Who Scene It keeps its borrowed pair until it is given the same pass
+  who_scene_it: PARTY, brainbrawl: { suites: ['party'], borrow: PARTY.borrow },
 };
 
 /** The scope for a mode, or null (unscoped: every suite) for a body no mode owns. */

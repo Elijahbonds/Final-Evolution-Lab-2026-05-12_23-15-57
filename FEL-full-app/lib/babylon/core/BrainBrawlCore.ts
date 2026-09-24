@@ -140,6 +140,9 @@ function randomShape(rnd: () => number): string[] {
 }
 const shapeText = (g: string[]) => g.map((r) => r.split('').map((c) => (c === '#' ? '■' : '·')).join(' '));
 
+// BRAINBRAWL-MAJOR (2026-09-24): the prompt said "turned 90°" with no direction while the other rotations are the distractors —
+// so the 90° answer and the 270° distractor were BOTH a 90° turn, and a player who turned it the other way was graded wrong.
+// rot90 turns CLOCKWISE (row r of the result is column r of the source read bottom-up); the prompt says so.
 function rotationChallenge(rnd: () => number, tier: Tier, id: string): Challenge {
   const g = randomShape(rnd);
   const turns = 1 + Math.floor(rnd() * 3);
@@ -153,7 +156,7 @@ function rotationChallenge(rnd: () => number, tier: Tier, id: string): Challenge
   for (const w of cands) if (w !== answerTxt && !wrong.includes(w) && wrong.length < 3) wrong.push(w);
   while (wrong.length < 3) { const w = shapeText(randomShape(rnd)).join(' / '); if (w !== answerTxt && !wrong.includes(w)) wrong.push(w); }
   const options = shuffle(rnd, [answerTxt, ...wrong]);
-  return { id, category: 'ANALYZE', kind: 'rotation', tier, prompt: `Which is this shape turned ${turns * 90}°? (rows shown left to right)`, display: shapeText(g), exposureSec: 0, options, answer: options.indexOf(answerTxt), timeLimitSec: TIME_LIMIT[tier] + 2 };
+  return { id, category: 'ANALYZE', kind: 'rotation', tier, prompt: turns === 2 ? 'Which is this shape turned 180°?' : `Which is this shape turned ${turns * 90}° clockwise?`, display: shapeText(g), exposureSec: 0, options, answer: options.indexOf(answerTxt), timeLimitSec: TIME_LIMIT[tier] + 2 };
 }
 
 function shapeMatchChallenge(rnd: () => number, tier: Tier, id: string): Challenge {
@@ -227,14 +230,67 @@ export function freshClaims(): Record<Category, number | null> {
 }
 
 /** Spin: the wheel prefers categories the spinner has not claimed; with every category claimed by someone it may land
- *  anywhere (a duel then contests the holder's claim). Returns the category and the wheel's landing angle in turns. */
-export function spinWheel(rnd: () => number, claims: Record<Category, number | null>, player: number): { category: Category; turns: number } {
+ *  anywhere (a duel then contests the holder's claim). Returns the category, the wheel's landing angle in turns from a
+ *  wheel at REST (0), and the whole turns alone — which is what a wheel that is already turned needs (`wheelLanding`). */
+export function spinWheel(rnd: () => number, claims: Record<Category, number | null>, player: number): { category: Category; turns: number; fullTurns: number } {
   const open = CATEGORIES.filter((c) => claims[c] !== player);
   const pool = open.length ? open : [...CATEGORIES];
   const category = pick(rnd, pool);
   const idx = CATEGORIES.indexOf(category);
-  const turns = 3 + Math.floor(rnd() * 3) + (idx + 0.5) / CATEGORIES.length;   // three to five full spins landing on the segment
-  return { category, turns };
+  const fullTurns = 3 + Math.floor(rnd() * 3);                         // three to five full spins…
+  const turns = fullTurns + (idx + 0.5) / CATEGORIES.length;           // …landing on the segment
+  return { category, turns, fullTurns };
+}
+
+// ── the wheel's face (BRAINBRAWL-MAJOR, 2026-09-24) ──────────────────────────────────────────────────────────────────
+// Wedge i sits on the face at a_i = (i + 0.5) / 5 · 2π (clockwise from the top, as BrainBrawlMode lays them out) and is
+// under the pin when the wheel's roll ≡ a_i (mod 2π). `turns` above is right for a wheel at rest — and the wheel is at
+// rest exactly once. The mode spun FROM wherever the last spin stopped, so from round two on the pin landed on the
+// previous wedge's angle PLUS this one's: measured on the live wheel, 4 of 5 announced categories were not the wedge
+// under the pin (base b6d66d5, /dev/brainbrawl). A spin is now aimed at an ABSOLUTE angle.
+const TAU = Math.PI * 2;
+
+/** The wheel roll (radians) that puts `category`'s wedge under the pin. */
+export function wedgeAngle(category: Category): number {
+  return ((CATEGORIES.indexOf(category) + 0.5) / CATEGORIES.length) * TAU;
+}
+
+/** Where a spin from `from` must stop: `fullTurns` whole turns forward, then on to the category's wedge. Always forward. */
+export function wheelLanding(from: number, category: Category, fullTurns: number): number {
+  let rest = (((wedgeAngle(category) - from) % TAU) + TAU) % TAU;   // forward distance to the wedge, [0, 2π)
+  if (rest > TAU - 1e-6) rest = 0;                                   // the same wedge again: a float hair short of a whole turn is none
+  return from + Math.max(0, Math.floor(fullTurns)) * TAU + rest;
+}
+
+/** The category whose wedge is under the pin at a wheel roll — what a watcher reads off the wheel. */
+export function wedgeAtPin(roll: number): Category {
+  const n = CATEGORIES.length;
+  const k = (((roll % TAU) + TAU) % TAU) / TAU * n - 0.5;
+  return CATEGORIES[((Math.round(k) % n) + n) % n];
+}
+
+// ── the reveal ────────────────────────────────────────────────────────────────────────────────────────────────────────
+export type Verdict = 'correct' | 'wrong' | 'timeout';
+
+/** Each player's verdict on a challenge: a pick that is the answer, a pick that is not, or no pick before the clock. */
+export function verdicts(answers: readonly (number | null)[], answer: number): Verdict[] {
+  return answers.map((a) => (a === null ? 'timeout' : a === answer ? 'correct' : 'wrong'));
+}
+
+/** The banner a resolved challenge earns — and it tells the truth about the claim, given who held the category BEFORE the
+ *  challenge (`before`). A duel nobody wins does not "unclaim" a category somebody holds: it STAYS with them (resolveClaim
+ *  leaves it). A holder who wins it again HOLDS it (measured: "P1 CLAIMS COMPUTE" twice in one duel, for a category P1
+ *  already had); a challenger who wins it TAKES it from the holder. */
+export function claimLine(before: number | null, category: Category, claimant: number, names: readonly string[]): string {
+  const solo = names.length < 2;
+  if (claimant >= 0) {
+    if (solo) return `${category} CLAIMED`;
+    if (before === claimant) return `${names[claimant]} HOLDS ${category}`;
+    if (before !== null) return `${names[claimant]} TAKES ${category} FROM ${names[before]}`;
+    return `${names[claimant]} CLAIMS ${category}`;
+  }
+  if (before !== null && !solo) return `${category} STAYS WITH ${names[before]}`;
+  return `${category} UNCLAIMED`;
 }
 
 /** Resolve a challenge between players: the higher score claims; a tie leaves the claim as it was. Solo: any correct
