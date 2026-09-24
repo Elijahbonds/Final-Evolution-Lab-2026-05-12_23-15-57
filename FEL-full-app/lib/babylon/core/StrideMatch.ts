@@ -109,7 +109,13 @@ export function strideKindFor(state: string): StrideKind {
     case 'speed_dribble': return 'jog';        // DRIBBLE GEARS: the jog loop is its own capture now
     case 'walk_dribble': return 'walk';
     case 'defend_slide': case 'defend_slide_right':
+    // HOOPS-DEPTH S7 (2026-09-23): the defensive states added AFTER this list (DEFENSE-LOOK 09-17, THE CRAB WALK FIX 09-19) were never
+    // on it, so they played at a fixed rate whatever the body's speed — the foot-plant probe put every planted-foot skate in a live
+    // 1v1 on a defence clip (closeout 53, backpedal 36 of 353). They are all shuffles but the closeout, which is a sprint.
+    case 'defend_slide_hard': case 'defend_slide_hard_right': case 'defend_backpedal':
+    case 'carry_slide': case 'carry_slide_right': case 'carry_back':
       return 'slide';
+    case 'closeout': return 'run';
     default:
       return 'none';
   }

@@ -3,6 +3,7 @@
 // The measured problem: a DOWN foot travelled 38% of the body's motion, because the run loop plays at one cadence at
 // every speed. These tests are about the rule that fixes it — and about not applying it where it would break timing.
 
+import { basketballClipTable } from '../anim/basketballTree';
 import { describe, it, expect } from 'vitest';
 import {
   HOOPS_STRIDE, RATE_MIN, RATE_MAX,
@@ -60,6 +61,18 @@ describe('ONLY locomotion is rate-scaled', () => {
 
   it('the defensive slides are, against their own reference', () => {
     for (const s of ['defend_slide', 'defend_slide_right']) expect(strideKindFor(s)).toBe('slide');
+  });
+
+  it('EVERY looping state that walks is matched — the list fell behind the tree once (HOOPS-DEPTH S7)', () => {
+    // defend_backpedal / closeout / the hard slides / the carry slides were added to the tree after this allowlist and
+    // played at a fixed rate: every planted-foot skate in a live 1v1 was on a defence clip
+    for (const s of ['defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'carry_slide', 'carry_slide_right', 'carry_back']) expect(strideKindFor(s), s).toBe('slide');
+    expect(strideKindFor('closeout')).toBe('run');
+    const STANDS_STILL = new Set(['idle_dribble', 'protect', 'gather', 'shot_release', 'defend_idle', 'box_out', 'watch', 'floor']);
+    for (const [state, c] of Object.entries(basketballClipTable())) {
+      if (!c.loop || STANDS_STILL.has(state)) continue;
+      expect(strideKindFor(state), `${state} loops and walks but is not stride-matched`).not.toBe('none');
+    }
   });
 
   it('A SHOT IS NOT — rate-scaling it would move the meter\'s own timing', () => {

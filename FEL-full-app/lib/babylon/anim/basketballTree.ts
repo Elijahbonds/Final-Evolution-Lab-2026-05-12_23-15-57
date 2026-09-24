@@ -382,3 +382,6 @@ export function closeoutFor(pos: { x: number; z: number }, vel: { x: number; z: 
   const sp = Math.hypot(vel.x, vel.z); if (sp < 0.4) return false;
   return (vel.x * dx + vel.z * dz) / (sp * dl) > 0.6;
 }
+
+/** The state table, read-only — for the stride-matching drift test (StrideMatch.test): a looping state that walks must be matched. */
+export function basketballClipTable(): Readonly<Record<BasketballAnimState, Readonly<{ clip: string; loop: boolean; fadeSec: number }>>> { return CLIP_FOR; }
