@@ -172,7 +172,9 @@ export interface DunkCue {
   turns?: number;                         // spinThrough: whole turns of the body (+ = the clip's own yaw sense)
 }
 export const DUNK_CUES: Record<string, DunkCue> = {
-  windmill:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },
+  // DUNK MOTION phase 4 (2026-09-23): the windmill's circle happens at the TOP of the jump and comes straight over into the
+  // flush (Wilkins). Fired at the rise, its 0.6 s capture was over by the hang and the flight waited 0.4 s for the slam.
+  windmill:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
   spin360:     { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // the turn needs the flight: rise → carry-up
   eastbay:     { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // a 1.5 s body: it has to start early
   tomahawk:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
@@ -182,7 +184,7 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   // it. The turn is the layer's, never the clip's — see anim/authored/dunkTricks.buildLostFound.
   lostfound:   { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // the behind-the-back hand-off is at 0.32 of its 0.8
   hideseek:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },
-  cradle:      { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the circle needs most of the flight
+  cradle:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // DUNK MOTION phase 4: a windmill variant — rocked at the top, straight into the flush
   clutch:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the clutch reads at the APEX, not on the way up
   behindback:  { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the ball has to go round the back and come back out before the carry-up
   fakeback:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },                 // a fake is fast: it can be thrown late and still read

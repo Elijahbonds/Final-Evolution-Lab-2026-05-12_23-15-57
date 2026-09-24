@@ -59,10 +59,13 @@ export class LimbDrag {
   }
   /** Forget the followers (the next apply starts them on the clip's pose). */
   reset(): void { this.st.clear(); }
-  /** Right after the clips evaluate: each bone becomes its follower, `k` (0..1) of the way from the clip's value. */
-  apply(dt: number, k = 1): void {
+  /** Right after the clips evaluate: each bone becomes its follower, `k` (0..1) of the way from the clip's value. A bone in
+   *  `skip` keeps its clip value exactly this frame (its follower is re-seeded there, so letting it go again is seamless) —
+   *  a hand that has to be WHERE its clip says, on the frame it says (a lob's catch). */
+  apply(dt: number, k = 1, skip?: ReadonlySet<TransformNode>): void {
     for (const { n, smooth } of this.bones) {
       const q = n.rotationQuaternion; if (!q) continue;
+      if (skip?.has(n)) { this.st.delete(n); continue; }
       let f = this.st.get(n);
       if (!f) { f = { q: q.clone(), v: Vector3.Zero() }; this.st.set(n, f); continue; }
       dragStep(f, q, smooth, dt, _out);
