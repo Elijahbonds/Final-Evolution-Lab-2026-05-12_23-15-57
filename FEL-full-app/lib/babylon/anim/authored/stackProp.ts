@@ -180,3 +180,36 @@ export function buildSkateRider(scene: Scene, sk: Skeleton): AnimationGroup | nu
     key(STACK_SEC, 48, 10, 0.54, -0.26),
   ]);
 }
+
+/**
+ * DUNK MOTION phase 10: THE DUBBLE UP's helper. He stands tall at the front of the line with the ball held up over his head in both
+ * hands, arms long, chin a touch down — the dunker's hips go over his head and the ball comes off it mid-air. A slow breath in the
+ * hold so he reads as a person waiting, not a statue.
+ */
+export function buildDubbleHold(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const key = (t: number, lift: number) => ({
+    t,
+    bones: { Neck: [4, 0, 0] as Deg3, Spine: [-3, 0, 0] as Deg3 },
+    // (owner: "have them stand tall" — the ball held UP over his head, arms long, for a jump over a standing line)
+    hands: { Left: [-0.13, 2.22 + lift, 0.06] as V3, Right: [0.13, 2.22 + lift, 0.06] as V3 },
+    poles: { Left: [-0.8, 0.1, -0.5] as V3, Right: [0.8, 0.1, -0.5] as V3 },
+  });
+  return buildPoseClip(scene, sk, 'prop_dubble_hold', STACK_SEC, [key(0, 0), key(STACK_SEC / 2, 0.012), key(STACK_SEC, 0)]);
+}
+
+/**
+ * DUNK MOTION phase 10: THE DUBBLE UP's line — kneeling on all fours, head tucked, a low table (~0.75 m) nose to tail, the way a line of
+ * people makes itself small for a dunker to go over (a line of bent-over people at hands-on-knees height was 1 m, and the first back
+ * sits half a metre after the take-off: the feet cannot rise over it that fast).
+ */
+export function buildDubbleKneel(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const key = (t: number, breathe: number) => ({
+    t,
+    bones: { Hips: [58, 0, 0] as Deg3, Spine: [18, 0, 0] as Deg3, Neck: [26, 0, 0] as Deg3 },
+    // knees on the floor under the hips, shins flat behind; hands flat on the floor under the shoulders
+    feet: { Left: [-0.14, 0.12, -0.42] as V3, Right: [0.14, 0.12, -0.42] as V3 },
+    hands: { Left: [-0.2, 0.06 + breathe, 0.55] as V3, Right: [0.2, 0.06 + breathe, 0.55] as V3 },
+    poles: { Left: [-0.4, 0.2, -0.9] as V3, Right: [0.4, 0.2, -0.9] as V3 }, hipsY: -0.42 + breathe,
+  });
+  return buildPoseClip(scene, sk, 'prop_dubble_kneel', STACK_SEC, [key(0, 0), key(STACK_SEC / 2, 0.01), key(STACK_SEC, 0)]);
+}

@@ -8,15 +8,18 @@
 // The car parks sideways under the rim's shadow, so the runway crosses its width; the takeoff line moves back for it
 // (a real over-the-car dunk is a long jump) and the flight's forward carry lands the dunker past the far door.
 
-export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris' | 'ladder' | 'bike' | 'bikeroll' | 'skate' | 'skateroll' | 'row3' | 'row5' | 'wall' | 'kangaroo';
-export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo'];
+/** DUNK MOTION phase 10: the DUBBLE UP, over 1–10 people (the owner picks the line's length in the prop ring). */
+export type DubbleKind = 'dubble1' | 'dubble2' | 'dubble3' | 'dubble4' | 'dubble5' | 'dubble6' | 'dubble7' | 'dubble8' | 'dubble9' | 'dubble10';
+export const DUBBLE_KINDS: DubbleKind[] = ['dubble1', 'dubble2', 'dubble3', 'dubble4', 'dubble5', 'dubble6', 'dubble7', 'dubble8', 'dubble9', 'dubble10'];
+export type ObstacleKind = 'car' | 'barrier' | 'crate' | 'tetris' | 'ladder' | 'bike' | 'bikeroll' | 'skate' | 'skateroll' | 'row3' | 'row5' | 'wall' | 'kangaroo' | DubbleKind;
+export const OBSTACLE_KINDS: ObstacleKind[] = ['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo', ...DUBBLE_KINDS];
 
 export interface ObstacleSpec {
   kind: ObstacleKind;
   label: string;
   /** Where the model comes from: the owner's Meshy bakes, a Kenney kit (public/models/props/<kit>/<model>.glb), or
    *  BODIES — two of the game's own characters, stacked (the TETRIS). */
-  source: { meshy: 'sedan' | 'skateboard' } | { kit: string; model: string } | { bodies: 'stack' | 'row' | 'wall' } | { built: 'ladder' | 'bike' | 'kangaroo' };
+  source: { meshy: 'sedan' | 'skateboard' } | { kit: string; model: string } | { bodies: 'stack' | 'row' | 'wall' | 'dubble' } | { built: 'ladder' | 'bike' | 'kangaroo' };
   /** For a BODIES row or wall: how many of them. */
   bodyCount?: number;
   /** Somebody is ON it — a cyclist on the bike, a skater on the board. They ride the prop and duck as you come. */
@@ -61,7 +64,58 @@ export interface ObstacleSpec {
   clearance: number;
 }
 
+// THE DUBBLE UP (owner, 2026-09-23: "look up what a dubble up eastbay is"; "try out a double up eastbay and compare it to a real one by
+// dunk chen"; "he jumps over 10 people when he does it, takes off from the elbow off 2"). Dylan Haugen's definition: a helper stands in
+// front of the basket holding the ball on his head; the dunker leaps as though his hips would pass over the helper's head, legs either
+// side of him, takes the ball just before he clears, and finishes (Chen Dengxing's: through the legs — an eastbay). Chen does it over a
+// LINE: the others kneel in a tight column in front of the helper, and he takes off two-footed from about the elbow. Owner decisions
+// (2026-09-23): the prop ring places it, 1–10 people (longer = more air, more points); A on the run is the take-off; the runner comes in
+// empty-handed. The helper stands nearest the rim with the ball on his head; the kneelers run back up the runway from him.
+/** The standing line's spacing (the rows' own, ROW_ALONG_SPACING_M, declared later in the file). */
+const ROW_ALONG_SPACING_M_DUBBLE = 0.46;
+// THE BALL IS ON THE FIRST MAN'S HEAD (owner, 2026-09-24: "put the ball on the first guys head, not the last lol"): the helper stands at the
+// RUNWAY end of the line, the dunker takes the ball off him going up, and carries it over everyone else to the rim.
+// THEY STAND TALL (owner, 2026-09-24: "have them stand tall"): the line stands nose to tail like the standing rows, and the first man holds
+// the ball UP over his head, arms extended — a ball on a head is under the feet of a jump that has to clear a line of standing heads.
+/** The man nearest the rim (metres in front of it), the line's spacing back up the runway, and the heads the feet must clear. */
+export const DUBBLE_LINE_NEAR_M = 1.6, DUBBLE_KNEEL_SPACING_M = ROW_ALONG_SPACING_M_DUBBLE, DUBBLE_KNEEL_H = 1.75;
+/** The helper stands this far beyond the last kneeler; the take-off is this far before him (the hips rise over his head in that run). */
+export const DUBBLE_HELPER_GAP_M = 0.5, DUBBLE_RUN_IN_M = 2.2;
+/** The ball's centre, held up over his head; his head's top (the hips must pass over it). */
+export const DUBBLE_BALL_Y = 2.34, DUBBLE_HEAD_TOP = 1.84;
+/** The helper, metres in front of the rim, for a line of `n` (the single helper stands where the line would start). */
+export function dubbleHelperFromRim(n: number): number { return n <= 1 ? DUBBLE_LINE_NEAR_M : DUBBLE_LINE_NEAR_M + (n - 2) * DUBBLE_KNEEL_SPACING_M + DUBBLE_HELPER_GAP_M; }
+/** Where a line of `n` takes off (ten standing ≈ 8 m: a very long jump — the contest's own). */
+export function dubbleTakeoffFromRim(n: number): number { return dubbleHelperFromRim(n) + DUBBLE_RUN_IN_M; }
+/** The kneelers' z centre (metres in front of the rim) and half-depth, between the helper and the rim (none for the single helper). */
+export function dubbleKneelSpan(n: number): { center: number; halfDepth: number } | null {
+  if (n <= 1) return null;
+  const near = DUBBLE_LINE_NEAR_M, far = DUBBLE_LINE_NEAR_M + (n - 2) * DUBBLE_KNEEL_SPACING_M;
+  return { center: (near + far) / 2, halfDepth: (far - near) / 2 + 0.28 };
+}
+/** THE DUBBLE UP'S FLIGHT: explosive off the floor so the hips pass just over his head, an arm's reach above the ball (the hand comes
+ *  DOWN onto it going up), then still rising gently over the line to the top at the rim. The apex is the rim's; the hips at the helper
+ *  set the curve's shape (1 − (1 − u)^p through the helper, u the carry's fraction). */
+export const DUBBLE_APEX_M = 1.7, DUBBLE_HIPS_AT_HELPER = 2.45, DUBBLE_HIPS_REST = 0.96;   // (over standing heads: the tucked feet ~0.55 m under the hips)
+export function dubbleArcPower(uHelper: number): number {
+  const hA = Math.min(0.95, Math.max(0.3, (DUBBLE_HIPS_AT_HELPER - DUBBLE_HIPS_REST) / DUBBLE_APEX_M));
+  const u = Math.min(0.9, Math.max(0.05, uHelper));
+  return Math.min(8, Math.max(2, Math.log(1 - hA) / Math.log(1 - u)));
+}
+export function dubbleArc(u: number, p: number): number { const x = Math.min(1, Math.max(0, u)); return 1 - Math.pow(1 - x, p); }
+function dubbleSpec(n: number): ObstacleSpec {
+  return {
+    kind: `dubble${n}` as DubbleKind, label: n === 1 ? 'DUBBLE UP' : `DUBBLE UP ×${n}`, source: { bodies: 'dubble' }, bodyCount: n,
+    scale: 1, yaw: 0, zFromRim: dubbleHelperFromRim(n), takeoffFromRim: dubbleTakeoffFromRim(n),
+    bonus: +(4 + 0.7 * n).toFixed(1), topples: false, nominalHeight: n > 1 ? 1.75 : 1.8, clearance: 0.05,
+    apexLift: 0.1,   // (the mode flies its own Dubble Up curve — DUBBLE_APEX_M / dubbleArc)
+  };
+}
+export const isDubble = (k: string | null | undefined): k is DubbleKind => !!k && (DUBBLE_KINDS as string[]).includes(k);
+export const dubbleCount = (k: DubbleKind): number => Number(k.slice(6));
+
 export const OBSTACLE_SPECS: Record<ObstacleKind, ObstacleSpec> = {
+  ...(Object.fromEntries(DUBBLE_KINDS.map((k, i) => [k, dubbleSpec(i + 1)])) as Record<DubbleKind, ObstacleSpec>),
   // DUNK-CAR-CLIP: the car parks 2.4 m out, not 2.5 — the swing leg's toe grazed the near door by up to 7 mm for 3 frames at the
   // takeoff (skinned mesh against the car mesh, probed at 4× time density); the run-up and the takeoff line are unchanged
   car: { kind: 'car', label: 'CAR', source: { meshy: 'sedan' }, scale: 1, yaw: 0, zFromRim: 2.4, takeoffFromRim: 4.3, bonus: 3, topples: false, nominalHeight: 1.46, clearance: 0.1 },

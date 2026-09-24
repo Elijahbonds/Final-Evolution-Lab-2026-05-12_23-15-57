@@ -12,7 +12,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 /** Where the rider's own root sits so his hips land on the base's shoulders (the base's shoulder ≈ 1.42, hips ≈ 0.96). */
 export const STACK_SEAT_Y = 0.46;
-import { OBSTACLE_SPECS, ROW_SPACING_M, ROW_ALONG_SPACING_M, boxProfile, type HeightProfile, type ObstacleKind, type ObstacleSpec } from '../core/DunkObstacles';
+import { OBSTACLE_SPECS, ROW_SPACING_M, ROW_ALONG_SPACING_M, DUBBLE_BALL_Y, DUBBLE_HELPER_GAP_M, DUBBLE_KNEEL_SPACING_M, DUBBLE_KNEEL_H, dubbleKneelSpan, boxProfile, type HeightProfile, type ObstacleKind, type ObstacleSpec } from '../core/DunkObstacles';
 
 export interface DunkObstacle {
   kind: ObstacleKind;
@@ -32,6 +32,8 @@ export interface DunkObstacle {
    *  prop waits at its mark until the player commits to the run, then comes. Nothing to do for a prop that stands. */
   start(): void;
   dispose(): void;
+  /** DUNK MOTION phase 10: THE DUBBLE UP — the helper (the ball on his head) and where the ball sits. Only on a dubble. */
+  dubble?: { holderZ: number; ballAnchor: TransformNode; holderRoot: TransformNode };
 }
 
 const KIT_PALETTE: Record<string, string> = { leafsGreen: '#3F9A55', grass: '#4C9E58', woodBark: '#8B5E3C', dirt: '#8A6A4A' };
@@ -178,7 +180,28 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
   let model: TransformNode | null = null;
   /** THE TETRIS is two of the game's own bodies rather than a prop file — spawned, posed and stacked here. */
   const bodies: { dispose(): void }[] = [];
-  if ('bodies' in spec.source && (spec.source.bodies === 'row' || spec.source.bodies === 'wall')) {
+  let dubble: DunkObstacle['dubble'];
+  if ('bodies' in spec.source && spec.source.bodies === 'dubble') {
+    // THE DUBBLE UP: the helper stands at the obstacle's centre — the RUNWAY end of the line (owner: "put the ball on the first guys head")
+    // — with the ball held up over his head; the line runs on from him toward the rim, standing tall, nose to tail
+    const n = spec.bodyCount ?? 1;
+    const tints = ['#f4a261', '#e76f51', '#e9c46a', '#2a9d8f', '#8ab17d'];
+    const helper = await CharacterPipeline.spawnNpc(scene, heroUrl, { position: new Vector3(rim.x, 0, centerZ), tint: '#ffd166', startClip: 'prop_dubble_hold' });
+    if (scene.isDisposed) { helper.dispose(); holder.dispose(); throw new Error('scene disposed'); }
+    helper.root.parent = holder; helper.root.rotation.y = Math.PI; helper.root.position.set(0, 0, 0);
+    neverBindPose(helper.animator, 'prop_dubble_hold'); helper.animator.play('prop_dubble_hold', { loop: true });
+    bodies.push(helper);
+    const anchor = new TransformNode(`${name}_dubble_ball`, scene); anchor.parent = holder; anchor.position.set(0, DUBBLE_BALL_Y, 0.03);
+    dubble = { holderZ: centerZ, ballAnchor: anchor, holderRoot: helper.root };
+    for (let i = 1; i < n; i++) {
+      const off = -(DUBBLE_HELPER_GAP_M + (i - 1) * DUBBLE_KNEEL_SPACING_M);   // toward the rim (−z)
+      const b = await CharacterPipeline.spawnNpc(scene, heroUrl, { position: new Vector3(rim.x, 0, centerZ + off), tint: tints[i % tints.length], startClip: 'prop_row_stand' });
+      if (scene.isDisposed) { b.dispose(); for (const d of bodies) d.dispose(); holder.dispose(); throw new Error('scene disposed'); }
+      b.root.parent = holder; b.root.rotation.y = Math.PI; b.root.position.set(0, 0, off);
+      neverBindPose(b.animator, 'prop_row_stand'); b.animator.play('prop_row_stand', { loop: true });   // they stand tall (owner, 2026-09-24)
+      bodies.push(b);
+    }
+  } else if ('bodies' in spec.source && (spec.source.bodies === 'row' || spec.source.bodies === 'wall')) {
     // A ROW runs LENGTHWISE down the runway (the line you clear the length of); a WALL stands shoulder to shoulder
     // ACROSS it (Jonathan Clark's). Same bodies, ninety degrees apart, and completely different dunks: the row is a long
     // jump over people who are bent over, the wall is a high one over people standing up.
@@ -272,6 +295,11 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
     profile = spec.rider
       ? boxProfile(centerZ, 0.42, spec.nominalHeight, 0.62)
       : sampleProfile(scene, model, 0.6, boxProfile(centerZ, 0.5, spec.nominalHeight, 0.6));
+  } else if (dubble) {
+    // the hitbox is the kneelers' backs (the feet go over them); the helper is cleared by the HIPS going over his head, which the mode
+    // judges itself (a straddle: the feet pass either side of him, so he is not in the feet's profile)
+    const span = dubbleKneelSpan(spec.bodyCount ?? 1);
+    profile = span ? boxProfile(rim.z + span.center, span.halfDepth, DUBBLE_KNEEL_H, 0.6) : { z: [centerZ + 0.01, centerZ - 0.01], h: [0, 0], halfWidth: 0.2 };
   } else if (bodies.length && 'bodies' in spec.source && (spec.source.bodies === 'row' || spec.source.bodies === 'wall')) {
     const n = spec.bodyCount ?? 3;
     const along = spec.source.bodies === 'row';
@@ -300,7 +328,7 @@ export async function spawnDunkObstacle(scene: Scene, kind: ObstacleKind, rim: {
   const nearZ = Math.max(profile.z[0], profile.z[profile.z.length - 1]) + shift0, farZ = Math.min(profile.z[0], profile.z[profile.z.length - 1]) + shift0;
   console.info(`[DUNK-PROP] ${spec.label} ${model ? 'mesh' : 'BOX STAND-IN'} at z ${centerZ.toFixed(2)} (${nearZ.toFixed(2)} … ${farZ.toFixed(2)}), top ${peak.toFixed(2)} m, half-width ${profile.halfWidth.toFixed(2)}`);
   return {
-    kind, spec, root: holder, profile, peak, nearZ, farZ,
+    kind, spec, root: holder, profile, peak, nearZ, farZ, dubble,
     tick(dt: number) {
       // A MOVING PROP IS A TIMING PROBLEM. It runs across the runway and turns around at the ends, and the HITBOX goes
       // with it (profile.centerX) — otherwise the bike would be drawn eight metres away and still clip the dunker's

@@ -37,7 +37,7 @@ const AIR: Record<string, [Dir, Btn]> = {
   eastbay: ['down', 'Y'], betweenlegs: ['down', 'B'], clutch: ['down', 'A'], doubleeastbay: ['down', 'X'],
   lostfound: ['left', 'B'], hideseek: ['left', 'A'], behindback: ['left', 'Y'], fakeback: ['left', 'X'],
 };
-const RUNWAY: Record<string, [Btn, Dir | null]> = { selflob: ['Y', null], kickup: ['B', null], cartwheel: ['X', null], doubleup: ['A', null], backflip: ['B', 'up'] };
+const RUNWAY: Record<string, [Btn, Dir | null]> = { selflob: ['Y', null], kickup: ['B', null], cartwheel: ['X', null], backflip: ['B', 'up'] };   // (the two-foot 'doubleup' hop is gone — DUNK MOTION phase 10)
 const ALL = ['plain', 'plainJ', ...Object.keys(AIR), ...Object.keys(RUNWAY).map((r) => `rw:${r}`)];
 const TRICKS = (process.env.TRICKS ?? 'all') === 'all' ? ALL : (process.env.TRICKS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 for (const t of TRICKS) if (t !== 'plain' && t !== 'plain2' && t !== 'plainJ' && !AIR[t] && !(t.startsWith('rw:') && RUNWAY[t.slice(3)])) throw new Error(`unknown trick ${t} (have ${ALL.join(', ')})`);
@@ -53,7 +53,7 @@ interface Rec { trick: string; names: string[]; frames: Frame[]; marks: { t: num
 const RECORDER = `(() => {
   const dev = window.__FEL_DEV__, scene = dev.scene;
   const S = window.__smp = { marks: [] };
-  const markRe = /^\\[(DUNK-[A-Z-]+|LOB|HANDS|JUICE-SOFT|FEL-DUNK)/;
+  const markRe = /^\\[(DUNK-[A-Z-]+|LOB|HANDS|JUICE-SOFT|FEL-DUNK|DUBBLE)/;
   for (const k of ['info', 'log', 'warn']) { const o = console[k].bind(console); console[k] = (...a) => { const s = String(a[0]); if (markRe.test(s)) S.marks.push({ t: performance.now(), msg: s.slice(0, 220) }); o(...a); }; }
   const R = window.__rec = { on: false, frames: [], names: null, rootRef: null, nodes: null, jIdx: null };
   const JN = ${JSON.stringify(JN)};
@@ -438,10 +438,12 @@ async function scrubPose(p: Page, names: string[], f: Frame, view: 'side' | 'fro
     if (S.ball && f.ball) S.ball.position.set(f.ball[0], f.ball[1], f.ball[2]);
     r.computeWorldMatrix(true); for (const n of r.getDescendants(false)) n.computeWorldMatrix && n.computeWorldMatrix(true);
     const hp = f.j[0] || f.rp; const tgt = hp.constructor === Array ? { x: hp[0], y: hp[1] + 0.3, z: hp[2] } : hp;
+    // WIDE (DUNK MOTION phase 10): a prop in the picture — the Dubble Up's helper and line are metres ahead of / under the body
+    if (${Number(process.env.WIDE ?? 1)} > 1) tgt.y = Math.max(1.1, tgt.y - 0.9);
     // SIDE: square to the run (the dunker's right) · FRONT: from the rim side, 40° off the run line, a touch above
     const side = [-rd[2], 0, rd[0]];
     const dir = view === 'side' ? side : [ rd[0] * 0.77 + side[0] * 0.64, 0, rd[2] * 0.77 + side[2] * 0.64 ];
-    const D = 5.2, c = S.cam, P = c.position.constructor;
+    const D = 5.2 * ${Number(process.env.WIDE ?? 1)}, c = S.cam, P = c.position.constructor;
     const pos = new P(tgt.x + dir[0] * D, tgt.y + (view === 'side' ? 0.15 : 0.6), tgt.z + dir[2] * D);
     if (c.setPosition && c.target) { c.target = new P(tgt.x, tgt.y, tgt.z); c.setPosition(pos); } else { c.position.copyFrom(pos); c.setTarget(new P(tgt.x, tgt.y, tgt.z)); }
     // OCCLUDERS: anything between the lens and the body (a parked prop, the backboard from the rim side) is switched off
@@ -518,6 +520,8 @@ for (const m of ms) console.log(`${pad(m.trick, 16)}` + ['LArm', 'RArm', 'LLeg',
 fs.writeFileSync(`${OUT}/metrics.json`, JSON.stringify(ms, null, 1));
 if (SCRUB && recs.length) {
   const sp = await boot(browser, false);
+  // a prop run (?prop=): the prop's bodies load asynchronously — photograph them, not an empty court (the Dubble Up's helper and line)
+  if (/prop=dubble/.test(QS)) { const t0 = Date.now(); while (Date.now() - t0 < 30000 && !(await sp.p.evaluate(`!!window.__FEL_DEV__.scene.getTransformNodeByName('dunk_obstacle_dubble_ball')`))) await sp.p.waitForTimeout(250); await sp.p.waitForTimeout(1500); }
   const info = await sp.p.evaluate(SCRUB_INIT);
   console.log('scrub', JSON.stringify(info));
   await sp.p.waitForTimeout(300);

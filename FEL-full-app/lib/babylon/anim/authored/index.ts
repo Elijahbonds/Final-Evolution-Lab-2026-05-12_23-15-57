@@ -16,7 +16,7 @@ import { buildGatherOne, buildGatherTwo, buildTakeOffOne } from './dunkTakeoff';
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
 import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildScoopLayup, buildSpinLayup, buildHangLayup, buildShimmy, buildDropStep } from './basketball';   // ACROBATIC LAYUPS + THE POST GAME (2026-09-18)
-import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildBikeRider, buildSkateRider } from './stackProp';
+import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildDubbleHold, buildDubbleKneel, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
@@ -66,6 +66,8 @@ export function registerAuthoredClips(
     ['dunk_tap', () => buildTap(scene, skeleton)],
     ['prop_row_stand', () => buildRowStand(scene, skeleton)],
     ['prop_row_crouch', () => buildRowCrouch(scene, skeleton)],
+    ['prop_dubble_hold', () => buildDubbleHold(scene, skeleton)],   // DUNK MOTION phase 10: the Dubble Up's helper
+    ['prop_dubble_kneel', () => buildDubbleKneel(scene, skeleton)],  // …and his line, on all fours
     ['prop_bike_rider', () => buildBikeRider(scene, skeleton)],
     ['prop_skate_rider', () => buildSkateRider(scene, skeleton)],
     ['dunk_score_hang', () => buildScoreHang(scene, skeleton)],

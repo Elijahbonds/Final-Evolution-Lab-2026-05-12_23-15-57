@@ -81,7 +81,7 @@ export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries(
 // cartwheel tosses the lob itself and rolls under it, the double-up is the two-foot hop gather into the takeoff.
 // None of them spend the air budget — they are judged as difficulty on top of the flight's own tricks.
 export interface RunwayTrick {
-  id: 'selflob' | 'kickup' | 'cartwheel' | 'doubleup' | 'offglass' | 'bounce' | 'backflip';
+  id: 'selflob' | 'kickup' | 'cartwheel' | 'offglass' | 'bounce' | 'backflip';
   label: string;
   btn: 'A' | 'B' | 'X' | 'Y';
   /** DUNK-GLASS-BOUNCE: a d-pad direction HELD with the button picks a variant (up + Y = off the glass, down + Y = the
@@ -102,7 +102,6 @@ export const RUNWAY_TRICKS: RunwayTrick[] = [
   { id: 'selflob', label: 'SELF-LOB', btn: 'Y', clip: 'dunk_self_lob', sec: 0.5, difficulty: 1.6, releaseAt: 0.3, runScale: 0.85, teach: 'LOB' },
   { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.55, difficulty: 2.2, releaseAt: 0.32, runScale: 0.55, teach: 'KICK-UP' },
   { id: 'cartwheel', label: 'BACK HANDSPRING', btn: 'X', clip: 'dunk_back_handspring', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7, teach: 'HANDSPRING' },
-  { id: 'doubleup', label: 'DOUBLE-UP', btn: 'A', clip: 'dunk_double_up', sec: 0.5, difficulty: 1.5, runScale: 0.6, teach: 'DOUBLE-UP' },
   // DUNK-GLASS-BOUNCE (2026-09-08): the same two-hand toss thrown AT THE GLASS (the ball comes back off the board to the
   // hand), and a two-hand throw DOWN into the floor that bounces up to the hand once or twice (WDA "Bounce Ball")
   // THE BACKFLIP (owner, 2026-09-16). B is the kick-up; B with UP held is the flip — the ball goes up ahead of you, you
@@ -123,11 +122,8 @@ export function runwayTrickById(id: RunwayTrick['id']): RunwayTrick { return RUN
 // and 4 m/s the window was ~0.26 s wide at a full run: an expert input for a move nothing teaches. 3.2 m at 3 m/s is
 // about half a second, still unmistakably "as you gather", and the runway now says DOUBLE-UP out loud while you are in
 // it (runwayTeachLine).
-export const DOUBLE_UP_WINDOW_M = 3.2, DOUBLE_UP_MIN_SPEED = 3;
-/** Is a double-up on, here, at this speed? */
-export function doubleUpFits(distToLine: number, speed: number): boolean {
-  return distToLine <= DOUBLE_UP_WINDOW_M && speed >= DOUBLE_UP_MIN_SPEED;
-}
+// (DUNK MOTION phase 10, owner decision 2026-09-23: that two-foot hop was a misreading of "double-up" — the owner's word is the DUBBLE UP,
+// over a helper holding the ball on his head (DunkObstacles). The hop is gone; A on the run is the take-off.)
 
 /**
  * THE RUNWAY TEACHES ITS OWN MOVES (owner, 2026-09-16: "teach them on the runway").
@@ -146,10 +142,10 @@ export function doubleUpFits(distToLine: number, speed: number): boolean {
 export const RUN_COMMIT_TEACH = 'GO UP';
 /** Runway tricks thrown from standing, not on the run. */
 export const STANDING_ONLY = new Set(['selflob']);
-export function runwayTeachLine(s: { distToLine: number; speed: number; ballThrown: boolean; committed?: boolean }): string {
+export function runwayTeachLine(s: { distToLine: number; speed: number; ballThrown: boolean; committed?: boolean; dubble?: boolean }): string {
   if (s.ballThrown) return 'CATCH IT — take it to the rim';
-  if (doubleUpFits(s.distToLine, s.speed)) return 'DOUBLE-UP — tap A · or release to jump';
-  const moves = RUNWAY_TRICKS.filter((t) => t.teach && t.id !== 'doubleup' && !STANDING_ONLY.has(t.id))
+  if (s.dubble) return 'DUBBLE UP — A to go up over him · the ball comes off his head in the air';   // DUNK MOTION phase 10
+  const moves = RUNWAY_TRICKS.filter((t) => t.teach && !STANDING_ONLY.has(t.id))
     .map((t) => `${t.btn}${t.dir === 'up' ? '+UP' : ''} ${t.teach}`);
   if (!s.committed) moves.unshift(`Y ${RUN_COMMIT_TEACH}`);
   return `${moves.join(' · ')} — then release to jump`;

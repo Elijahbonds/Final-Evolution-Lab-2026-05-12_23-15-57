@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { OBSTACLE_KINDS, OBSTACLE_SPECS, PROP_CAM, ROW_SPACING_M, ROW_ALONG_SPACING_M, boxProfile, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue } from './DunkObstacles';
+import { DUBBLE_KINDS, isDubble, OBSTACLE_KINDS, OBSTACLE_SPECS, PROP_CAM, ROW_SPACING_M, ROW_ALONG_SPACING_M, boxProfile, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue } from './DunkObstacles';
 
 describe('DunkObstacles — cars and other objects', () => {
   it('every kind is readable, sourced, and ordered by what it costs to clear', () => {
-    expect(OBSTACLE_KINDS).toEqual(['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo']);   // the kangaroo is the one animal left (the giraffe came out 2026-09-18)
+    expect(OBSTACLE_KINDS).toEqual(['car', 'barrier', 'crate', 'tetris', 'ladder', 'bike', 'bikeroll', 'skate', 'skateroll', 'row3', 'row5', 'wall', 'kangaroo', ...DUBBLE_KINDS]);   // + the Dubble Up over 1–10 (DUNK MOTION phase 10)   // the kangaroo is the one animal left (the giraffe came out 2026-09-18)
     expect(OBSTACLE_SPECS.car.source).toEqual({ meshy: 'sedan' });
     expect(OBSTACLE_SPECS.tetris.source).toEqual({ bodies: 'stack' });   // two of the game's own bodies, not a prop file
     expect(OBSTACLE_SPECS.car.bonus).toBeGreaterThan(OBSTACLE_SPECS.crate.bonus);
@@ -15,7 +15,9 @@ describe('DunkObstacles — cars and other objects', () => {
       expect(s.label.length, k).toBeGreaterThan(0);
       expect(s.bonus, k).toBeGreaterThan(0);
       expect(s.takeoffFromRim, k).toBeGreaterThan(s.zFromRim);           // you take off before the thing, always
-      expect(s.nominalHeight, k).toBeLessThan(1.84);                      // the dunker's apex: nothing on the card is unclearable
+      // the dunker's apex: nothing on the card is unclearable BY THE FEET (the Dubble Up's helper is cleared by the hips, a straddle — the feet
+      // pass either side of him; his kneelers are well under it)
+      if (!isDubble(k) || k !== 'dubble1') expect(s.nominalHeight, k).toBeLessThan(1.84);
     }
   });
 
