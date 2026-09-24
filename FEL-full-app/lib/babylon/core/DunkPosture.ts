@@ -65,7 +65,10 @@ export const TRICK_POSTURE: Record<string, Partial<PosturePose>> = {
   spin360:     { spine1: [-6, 0, 0], spine2: [-10, 0, 0], neck: [-6, 0, 0], head: [-4, 0, 0], shrug: 6,  forward: -2, chestAim: 0.85 },      // tall through the turn (the aim subtracts the spin)
   windmill:    { spine1: [-8, 0, 0], spine2: [-14, 0, 0], neck: [-4, 0, 0], head: [-6, 0, 0], shrug: 10, forward: -6 },                      // chest open under the swinging arm
   tomahawk:    { spine1: [-8, 0, 0], spine2: [-16, 0, 0], neck: [-6, 0, 0], head: [-8, 0, 0], shrug: 12, forward: -4 },                      // the cock-back is a thoracic extension
-  scorpion:    { spine1: [8, 0, 0],  spine2: [6, 0, 0],   neck: [-16, 0, 0], head: [-14, 0, 0], shrug: 6, forward: 4,  chestAim: 0.5, eyes: 1 },   // chest DOWN, head UP at the rim
+  // DUNK MOTION phase 6: the scorpion is a NO-LOOK (Kilganon: he watches the floor, never the rim, and ducks to dunk it behind him).
+  // This row had the audit's opposite — head UP, eyes locked on the rim at full weight — so the posture layer turned the head back
+  // to the iron on every frame the clip's own chin-down key tried to hold.
+  scorpion:    { spine1: [10, 0, 0], spine2: [8, 0, 0],   neck: [14, 0, 0],  head: [12, 0, 0],  shrug: 6, forward: 4,  chestAim: 0.4, eyes: 0 },   // chest down, CHIN down, eyes on the floor
   eastbay:     { spine1: [4, 0, 0],  spine2: [0, 0, 0],   neck: [-8, 0, 0], head: [-10, 0, 0], shrug: 4, forward: 2,  eyes: 1 },              // watching the ball under the leg
   betweenlegs: { spine1: [4, 0, 0],  spine2: [0, 0, 0],   neck: [-8, 0, 0], head: [-10, 0, 0], shrug: 4, forward: 2,  eyes: 1 },
   lostfound:   { spine1: [-2, 0, 0], spine2: [-6, 0, 0],  neck: [-4, 0, 0], head: [-4, 0, 0], shrug: 6,  forward: 0,  chestAim: 0.7 },        // the fake's hip turn reads; the chest stays on the iron

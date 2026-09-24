@@ -30,6 +30,10 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   dunk_360_eastbay: ['jumpshot', 0.8],
   dunk_360_fake_eastbay: ['dunk_360_eastbay', 1.0],
   dunk_off_board_windmill: ['dunk_finish_windmill', 1.0],
+  // DUNK MOTION phase 6: the contest's windmill / tomahawk TRICKS (the captures dunk_mc_windmill_air / _tomahawk_air stand in for these
+  // on a rig that built them; anything else falls back to the authored finish)
+  dunk_windmill_air: ['dunk_finish_windmill', 1.0],
+  dunk_tomahawk_air: ['dunk_finish_tomahawk', 1.0],
   // karate
   karate_idle_stance: ['guard', 0.8],
   karate_punch_light: ['jab', 1.1],

@@ -25,11 +25,11 @@ describe('the stance table', () => {
     expect(POSTURE.stance.hipYawKeep).toBe(1); expect(POSTURE.land.hipYawKeep).toBe(1);
     expect(POSTURE.hang.hipYawKeep).toBeLessThan(1); expect(POSTURE.extend.hipYawKeep).toBeLessThan(POSTURE.plant.hipYawKeep);
   });
-  it('every air trick has a chest / shoulders / head of its own, and the scorpion is the one chest-down shape with the eyes up', () => {
+  it('every air trick has a chest / shoulders / head of its own, and the scorpion is the chest-down NO-LOOK (eyes off the rim)', () => {
     for (const t of DUNK_TRICKS) expect(TRICK_POSTURE[t.id], t.id).toBeDefined();
     expect(TRICK_POSTURE.scorpion.spine1![0]).toBeGreaterThan(0);
-    expect(TRICK_POSTURE.scorpion.head![0]).toBeLessThan(0);
-    expect(TRICK_POSTURE.scorpion.eyes).toBe(1);
+    expect(TRICK_POSTURE.scorpion.head![0]).toBeGreaterThan(0);   // chin DOWN (DUNK MOTION phase 6: Kilganon watches the floor)
+    expect(TRICK_POSTURE.scorpion.eyes).toBe(0);
     expect(TRICK_POSTURE.spin360.spine2![0]).toBeLessThan(0);   // tall through the turn
   });
 });

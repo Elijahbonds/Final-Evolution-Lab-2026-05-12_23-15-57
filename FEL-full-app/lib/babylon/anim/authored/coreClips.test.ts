@@ -18,7 +18,7 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { CRADLE_BACK, SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -652,18 +652,20 @@ describe('dunk tricks', () => {
     expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.15);
   });
 
-  it('rock the cradle: the ball circles the head on ONE hand and finishes hammered down', () => {
+  it('rock the cradle (Jordan\'s): rocked down and back past the hip, then one arc over the top, on ONE hand', () => {
     const g = fresh(() => buildCradle(scene, sk)!);
+    at(g, 0.2);
+    // rocked DOWN: the ball hand low, by the hip, in front
+    expect(pos('RightHand').y).toBeLessThan(pos('Hips').y + 0.25);
+    at(g, CRADLE_BACK);
+    // rocked BACK past the hip, still low
+    expect(pos('RightHand').y).toBeLessThan(pos('Hips').y + 0.3);
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeGreaterThan(0.4);   // a CARRY, not a transfer
     at(g, CRADLE_ROUND);
-    // the top of the circle: behind the head, and HIGH
-    expect(pos('RightHand').z).toBeLessThan(pos('Head').z);
-    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);
-    // a CARRY, not a transfer — the off hand stays away from the ball hand the whole way
-    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeGreaterThan(0.4);
-    at(g, 0.5);
-    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeGreaterThan(0.15);
-    at(g, CRADLE_SEC);
+    // over the top, HIGH
     expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);
+    at(g, CRADLE_SEC);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.15);
   });
 
   it('double clutch: the ball travels to the waist and back up, and finishes higher than it started', () => {

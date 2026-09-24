@@ -36,10 +36,10 @@ export interface DunkTrick {
 }
 
 export const DUNK_TRICKS: DunkTrick[] = [
-  { id: 'windmill', label: 'WINDMILL', dir: 'up', btn: 'A', clip: 'dunk_off_board_windmill', difficulty: 2.4, windowCost: 0.30 },
+  { id: 'windmill', label: 'WINDMILL', dir: 'up', btn: 'A', clip: 'dunk_windmill_air', difficulty: 2.4, windowCost: 0.30 },   // DUNK MOTION phase 6: its own capture, the circle at real speed
   { id: 'spin360', label: '360', dir: 'right', btn: 'B', clip: 'dunk_360_scoop', difficulty: 2.8, windowCost: 0.34 },
   { id: 'eastbay', label: 'EASTBAY', dir: 'down', btn: 'Y', clip: 'dunk_360_eastbay', difficulty: 3.4, windowCost: 0.40 },
-  { id: 'tomahawk', label: 'TOMAHAWK', dir: 'up', btn: 'Y', clip: 'dunk_finish_tomahawk', difficulty: 2.0, windowCost: 0.24 },
+  { id: 'tomahawk', label: 'TOMAHAWK', dir: 'up', btn: 'Y', clip: 'dunk_tomahawk_air', difficulty: 2.0, windowCost: 0.24 },   // DUNK MOTION phase 6: the wind-up at real speed
     // was `dunk_360_fake_eastbay`, which aliases to the EASTBAY's own clip — the hardest trick in the list
   // played the body of a different trick. It has its own now (anim/authored/dunkTricks.buildBetweenLegs).
   { id: 'betweenlegs', label: 'BETWEEN THE LEGS', dir: 'down', btn: 'B', clip: 'dunk_between_legs', difficulty: 3.8, windowCost: 0.46 },
@@ -174,7 +174,7 @@ export interface DunkCue {
 export const DUNK_CUES: Record<string, DunkCue> = {
   // DUNK MOTION phase 4 (2026-09-23): the windmill's circle happens at the TOP of the jump and comes straight over into the
   // flush (Wilkins). Fired at the rise, its 0.6 s capture was over by the hang and the flight waited 0.4 s for the slam.
-  windmill:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
+  windmill:    { fire: 'rise', last: 'hang', facing: 'faceRim' },   // phase 6: the circle at real speed (0.85 s) needs the flight from the rise; paced to the slam
   spin360:     { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // the turn needs the flight: rise → carry-up
   eastbay:     { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // a 1.5 s body: it has to start early
   tomahawk:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
@@ -184,7 +184,7 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   // it. The turn is the layer's, never the clip's — see anim/authored/dunkTricks.buildLostFound.
   lostfound:   { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // the behind-the-back hand-off is at 0.32 of its 0.8
   hideseek:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },
-  cradle:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // DUNK MOTION phase 4: a windmill variant — rocked at the top, straight into the flush
+  cradle:      { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // DUNK MOTION phase 6: Jordan's rock — down to the hip, back, and one big arc over; it needs the flight
   clutch:      { fire: 'hang', last: 'preSlam', facing: 'faceRim' },                 // the clutch reads at the APEX, not on the way up
   behindback:  { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // the ball has to go round the back and come back out before the carry-up
   fakeback:    { fire: 'rise', last: 'preSlam', facing: 'faceRim' },                 // a fake is fast: it can be thrown late and still read

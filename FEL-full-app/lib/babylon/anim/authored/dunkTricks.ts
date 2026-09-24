@@ -78,8 +78,10 @@ export const SCORPION_SEC = 0.7, LOST_FOUND_SEC = 0.8, HIDE_SEEK_SEC = 0.8, SPIN
  * is the trick, and a body that keeps AIR_LEGS has nothing for the ball to pass through.
  */
 export const BETWEEN_LEGS_SEC = 0.8;
-/** Rock the cradle: the ball circles the head on a bent arm, then is driven down. */
-export const CRADLE_SEC = 0.75;
+/** Rock the cradle (Jordan's): the cradled ball rocked down and back past the hip, then one big arc over the top. */
+export const CRADLE_SEC = 0.9;
+/** Clip second of the rock's back swing (the pause at the bottom). */
+export const CRADLE_BACK = 0.4;
 /** Double clutch: the ball is brought all the way down to the waist at the apex and thrown back up. */
 export const CLUTCH_SEC = 0.7;
 /** The chain pieces (owner, 2026-09-16). The double eastbay is the long one: two passes have to fit inside it. */
@@ -90,8 +92,8 @@ export const WINDMILL_360_SEC = 0.9, FAKE_EASTBAY_SEC = 0.55, TAP_SEC = 0.4;
 export const TAP_STRIKE = 0.22;
 /** The clip second each hand-off lands on — the ball rig swaps hands here, as it does for the eastbay. */
 export const BEHIND_BACK_SWAP = 0.34, DOUBLE_EASTBAY_FIRST = 0.30, DOUBLE_EASTBAY_SECOND = 0.62;
-/** Clip-local second the cradle's ball passes closest to the head — the rig keeps it in the one hand. */
-export const CRADLE_ROUND = 0.34;
+/** Clip-local second the cradle's ball comes over the top of its arc. */
+export const CRADLE_ROUND = 0.8;
 /** Clip-local second the ball changes hands under the thigh (DunkMode reparents it here, as it does for lost & found). */
 export const BETWEEN_LEGS_HANDOFF = 0.34;
 
@@ -296,23 +298,24 @@ export function buildBetweenLegs(scene: Scene, sk: Skeleton): AnimationGroup | n
 }
 
 /**
- * ROCK THE CRADLE — the ball swung in a circle around the head on one bent arm, then hammered down.
+ * ROCK THE CRADLE — Jordan's (DUNK MOTION phase 6, 2026-09-23).
  *
- * One hand the whole way, which is what separates it from lost & found and between the legs: those are
- * TRANSFERS and this is a carry. The circle is keyed as four hand positions around the head rather than as
- * a bone rotation, because the arm's shape through it is the trick and a wrist spin would not read.
+ * It was authored as "the ball swung in a circle AROUND THE HEAD on one bent arm": a ring at shoulder height, out to the side,
+ * behind the head, across to the far shoulder. That is not the dunk. Rock the cradle is a windmill variant with the ball gripped
+ * between the palm and the wrist (Wikipedia, "Slam dunk"), and Jordan's — the one that named it (Maryland 1984, the 1985
+ * contest) — ROCKS the cradled ball: down in front to the hip as he rises, back past the hip, then one big arc up behind the
+ * shoulder and over the top into the rim. The arm stays bent at the bottom (the ball is on the forearm, not in the fingers), the
+ * wrist curls round it (the WristLayer cuffs it for this trick), and the ball pauses at the bottom of the rock (a HOLD) the way
+ * you would rock a cradle.
  */
 export function buildCradle(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  // RECOGNISABLE ON SIGHT (2026-09-15): the first circle hugged the head and photographed as a windmill from the rim camera.
-  // The cradle's read is a BIG ring around the head at shoulder height on a bent arm, with the trunk turning to follow it:
-  // far out to the side, round behind the head, across to the far shoulder, then hammered down.
   return buildPoseClip(scene, sk, 'dunk_cradle', CRADLE_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.28, 1.58, 0.28], Left: [-0.30, 1.30, 0.14] } },   // off one foot: the lead knee is still up
-    { t: 0.16, bones: { Hips: [0, -10, 0], Spine: [-6, -14, 4], Neck: [-4, 8, 0], ...AIR.kickBack }, hands: { Right: [0.72, 1.62, 0.02], Left: [-0.44, 1.18, -0.10] }, poles: { Right: [0.6, -0.6, -0.3] } },   // far out to the side at the shoulder, trail leg swinging back under it
-    { t: CRADLE_ROUND, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [12, 0, 0], ...AIR.kickBack }, hands: { Right: [0.08, 2.00, -0.40], Left: [-0.50, 1.26, -0.04] }, poles: { Right: [0.7, 0.4, -0.5] } },   // round BEHIND the head — the top of the ring, the free arm counterweighting
-    { t: 0.5,  bones: { Hips: [0, 12, 0], Spine: [-6, 16, -4], Neck: [2, -10, 0], ...AIR.spread }, hands: { Right: [-0.52, 1.72, -0.02], Left: [-0.46, 1.30, 0.06] }, poles: { Right: [-0.3, 0.5, -0.6] } },   // across to the far shoulder: the ring closes and the legs open out under it
-    { t: 0.62, bones: { Hips: [2, 0, 0], Spine: [2, 0, 0], Neck: [-10, 0, 0], ...AIR.kickOut }, hands: { Right: [0.10, 1.62, 0.34], Left: [-0.38, 1.40, 0.16] } },   // back in front, loaded, legs thrown forward
-    { t: CRADLE_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.02, 0.28], Left: [-0.34, 1.44, 0.06] }, poles: UP },   // hammered down through the rim, body long
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.20, 1.66, 0.30], Left: [-0.20, 1.58, 0.28] }, poles: { Right: [0.8, -0.3, 0.2], Left: [-0.8, -0.3, 0.2] } },   // the ball up the front off the take-off, the lead knee driving
+    { t: 0.2,  bones: { Hips: [6, 0, 0], Spine: [12, 6, 0], Neck: [10, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.30, 0.98, 0.24], Left: [-0.40, 1.30, 0.12] }, poles: { Right: [0.8, -0.4, -0.3], Left: [-0.8, -0.4, 0.0] } },   // ROCKED DOWN: cradled on the forearm in front of the hip, the elbow bent, the off arm out
+    { t: CRADLE_BACK, bones: { Hips: [2, 6, 0], Spine: [2, 10, 0], Neck: [2, 0, 0], ...AIR.kickBack }, hands: { Right: [0.34, 0.98, -0.20], Left: [-0.46, 1.42, 0.18] }, poles: { Right: [0.6, -0.5, -0.6], Left: [-0.8, -0.4, 0.2] }, hold: true },   // ROCKED BACK past the hip — the pause at the bottom of the rock
+    { t: 0.6,  bones: { Hips: [-2, 0, 0], Spine: [-10, 0, 0], Neck: [-6, 0, 0], ...AIR.kickBack }, hands: { Right: [0.42, 1.66, -0.20], Left: [-0.42, 1.56, 0.28] }, poles: { Right: [0.8, 0.3, -0.5], Left: [-0.8, -0.4, 0.2] } },   // the arc: up behind the shoulder, the arm long
+    { t: CRADLE_ROUND, bones: { Hips: [-4, 0, 0], Spine: [-16, 0, 0], Neck: [-10, 0, 0], ...AIR.spread }, hands: { Right: [0.20, 2.06, 0.02], Left: [-0.44, 1.52, 0.24] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // over the top, the body open under it
+    { t: CRADLE_SEC, bones: { Hips: [-4, 0, 0], Spine: [-10, 0, 0], Neck: [-12, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.02, 0.26], Left: [-0.40, 1.44, 0.16] }, poles: { Right: UP.Right } },   // over the rim, ready to flush
   ]);
 }
 

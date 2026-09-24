@@ -2332,6 +2332,14 @@ export const DunkMode: ModeDefinition = (() => {
     if (catchArm?.side !== side) { const a = arms[side]; catchArm = { side, set: new Set(a ? [a.shoulder, a.elbow] : []) }; }
     return catchArm.set;
   }
+  /** The wrist curled round a cuffed ball (the windmill, the 360 windmill, rock the cradle). */
+  const WRIST_CUFF = 42;
+  const CUFF_TRICKS = new Set(['windmill', 'windmill360', 'cradle']);
+  function cuffing(): boolean {
+    if (!airTrick || !CUFF_TRICKS.has(airTrick.trick.id) || phase !== 'cinematic') return false;
+    const ends = airTrick.t0 + (TRICK_READY_AT[airTrick.trick.id] ?? player.animator.durationOf(airTrick.trick.clip) ?? 0.8) / airTrick.rate;
+    return clipTime < ends - 0.06;
+  }
   function applyWrists(): void {
     if (!wristLayer) return;
     if (bodyW <= 0) { wristLayer.reset(); return; }
@@ -2347,6 +2355,9 @@ export const DunkMode: ModeDefinition = (() => {
       if (holds) lastBallHand = side;
       const snaps = sinceContact != null && lastBallHand === side;
       want[side] = wristFor({ holds, onBall: !holds && !!holder && Vector3.Distance(hp, bp) < 0.24, aboveShoulder: hp.y - sp.y, sinceContact: snaps ? sinceContact : null, jamming: phase === 'resolve' && qteHit && !jamContact });
+      // DUNK MOTION phase 6: the windmill family CUFFS the ball — curled against the forearm through the circle (the cradle is the
+      // cuffed windmill by definition) — instead of cocking back under it; from the trick's end the flush's wrist takes over
+      if (holds && cuffing()) want[side] = WRIST_CUFF;
       if (snaps && sinceContact! < 0.18) smooth[side] = 0.05;   // a wrist flick, not a teleport (0.03 read 1700°/s — past what a wrist does)
     }
     wristLayer.apply(motionDt(), want, bodyW, smooth);

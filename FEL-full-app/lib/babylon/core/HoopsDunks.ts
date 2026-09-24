@@ -61,7 +61,7 @@ export const TOMAHAWK: HoopsDunk = { clip: 'dunk_finish_tomahawk', label: 'TOMAH
 export const WINDMILL: HoopsDunk = { clip: 'dunk_finish_windmill', label: 'WINDMILL', sec: 0.6, flashy: true };
 /** PAUSIN' (2K21): the spin thrown into the takeoff — the 360 through the rise, flashy by definition. */
 export const PAUSIN_DUNK: HoopsDunk = { clip: 'dunk_360_spin', label: "PAUSIN'", sec: 0.7, flashy: true };
-export const CRADLE: HoopsDunk = { clip: 'dunk_cradle', label: 'CRADLE', sec: 0.75, flashy: true };
+export const CRADLE: HoopsDunk = { clip: 'dunk_cradle', label: 'CRADLE', sec: 0.9, flashy: true };   // DUNK MOTION phase 6: Jordan's rock (0.9 s)
 export const DOUBLE_CLUTCH: HoopsDunk = { clip: 'dunk_double_clutch', label: 'DOUBLE CLUTCH', sec: 0.7, flashy: true };
 export const SPIN_360: HoopsDunk = { clip: 'dunk_360_spin', label: '360', sec: 0.8, flashy: true };
 export const EASTBAY: HoopsDunk = { clip: 'dunk_360_eastbay', label: 'EASTBAY', sec: 0.95, flashy: true };
