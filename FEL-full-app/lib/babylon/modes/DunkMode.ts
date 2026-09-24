@@ -46,7 +46,9 @@ import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, arcApexT, slamB
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
 import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
-import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1: the hang wrist reach
+import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';
+import { LimbDrag } from '../anim/LimbDrag';           // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
+import { WristLayer, wristFor, handFlexAxisFromPoints, handPointsFromMeshes, flexAxisLocal, PALM_LOCAL } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '../core/CourtMovement';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
@@ -591,6 +593,8 @@ export const DunkMode: ModeDefinition = (() => {
   let armedAir: DunkTrick | null = null;
   const spin = new DunkSpin();
   let hipsNode: TransformNode | null = null, hipsBf: BindFrame | null = null;
+  /** DUNK MOTION phase 3: the limb follower and the wrists (flight only: bodyW fades them in at the take-off, out on the floor). */
+  let limbDrag: LimbDrag | null = null, wristLayer: WristLayer | null = null, bodyW = 0, lastBallHand: 'Left' | 'Right' = 'Right';
   const hipsBindInv = Quaternion.Identity(), hipsRaw = Quaternion.Identity(), hipsOut = Quaternion.Identity(); let hipsLayered = false;
   let liveTricks: { clip: string; t0: number; speed: number }[] = [], liveSpin = { turns: 0, from: 0, until: 0 };   // this attempt's air tricks, for the replay
   // ── DUNK-POSTURE (2026-09-08): the Posture Poses layer — see core/DunkPosture.ts ──────────────────────────────────
@@ -866,6 +870,13 @@ export const DunkMode: ModeDefinition = (() => {
       if (hipsNode) { const b = hipsBf.bind.get(hipsNode)?.q ?? Quaternion.Identity(); hipsBindInv.copyFrom(b).invertInPlace(); } else console.warn('[FEL-DUNK] no Hips node on this rig — the 360 turn is off');
       if (!feet.L || !feet.R) console.warn('[FEL-DUNK] no foot bones on this rig — the obstacle clear reads the root');
       setupPosture();   // DUNK-POSTURE: the thoracic chain, the clavicles and the head, and the frame's yaw sense
+      limbDrag = LimbDrag.forRig((n) => boneNode(player.skeleton, n));
+      wristLayer = new WristLayer();
+      { const bodyMeshes = player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0);
+        for (const side of ['Left', 'Right'] as const) { const h = boneNode(player.skeleton, `${side}Hand`); const b = h ? hipsBf.bind.get(h) : null; if (!h || !b) continue;
+          // the axis off the body's own hand mesh (the palm's normal, signed to the ball's side); the bones' guess only as a fallback
+          const axis = handFlexAxisFromPoints(handPointsFromMeshes(bodyMeshes, h, `${side}Hand`), side) ?? flexAxisLocal(b.p, b.q, PALM_LOCAL[side]);
+          wristLayer.add(side, h, axis); } }
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
       ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
       // spawnNpc is explicit: the rival must NEVER wear the player's identity,
@@ -2185,9 +2196,11 @@ export const DunkMode: ModeDefinition = (() => {
     const wMax = phase === 'resolve' && qteHit && (!contactLatch || hangOn) && !obstacleClipped && finishRelease < 0 ? jamWeight(jamSec, HAND_IK_MAX, HAND_IK_MAX_JAM) : HAND_IK_MAX;
     const w = wMax * handIkT * handIkT * (3 - 2 * handIkT);
     if (!player) return;
+    applyLimbDrag();       // DUNK MOTION phase 3: first, on the clips' own values — every layer after it writes on top
     postureTick();         // DUNK-POSTURE: this frame's stance (eased between windows) — the spin layer reads its hip-yaw keep
     applySpinLayer();
     applyPostureLayer();   // DUNK-POSTURE: thoracic / clavicles / head, the rim-locked chest aim, the eyes — before the reach
+    applyWrists();         // DUNK MOTION phase 3: before the reach, which aims the BALL through this frame's palm
 
     // DUNK-POSTURE-LEGS (A1): the GATHER — from the last bounce to the takeoff the off hand comes onto the ball (two hands into
     // the plant, a stride out), eased in over 0.15 s and out as the takeoff's own hands take over
@@ -2241,6 +2254,42 @@ export const DunkMode: ModeDefinition = (() => {
       catchPending = false; const hand = ball.parent as TransformNode; hand.computeWorldMatrix(true); hand.getWorldMatrix().invertToRef(_invHand); Vector3.TransformCoordinatesToRef(catchWorld, _invHand, catchFrom); ball.position.copyFrom(catchFrom);
     }
     if (catchBlend < 1 && ball.parent) { catchBlend = Math.min(1, catchBlend + (ikScene?.getEngine().getDeltaTime() ?? 16) / 80); const k = catchBlend * catchBlend * (3 - 2 * catchBlend); Vector3.LerpToRef(catchFrom, palmOffsetOf(ball, (ball.parent as TransformNode).name) as Vector3, k, ball.position); }
+  }
+  // ── DUNK MOTION phase 3 (2026-09-23): the limbs a beat behind their clips, and the wrists ─────────────────────────────
+  /** Dev: `?nomotion=1` turns both off (the A/B). */
+  const MOTION_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]nomotion=1/.test(location.search);
+  /** This frame's step on the ANIMATION clock (the hang slow-mo slows the clips, so it slows their followers with them). */
+  function motionDt(): number {
+    const raw = clamp((ikScene?.getEngine().getDeltaTime() ?? 16) / 1000, 0, 0.05);
+    const sc = phase === 'cinematic' ? (ikScene?.animationTimeScale ?? 1) : 1;
+    return raw * (Number.isFinite(sc) && sc > 0 ? sc : 1);
+  }
+  function applyLimbDrag(): void {
+    if (!limbDrag) return;
+    const flying = !MOTION_OFF && (phase === 'cinematic' || phase === 'resolve' || replaying || (airHeld && player.root.position.y > 0.02));
+    const dtR = clamp((ikScene?.getEngine().getDeltaTime() ?? 16) / 1000, 0, 0.05);
+    bodyW = clamp(bodyW + (flying ? dtR : -dtR) / 0.15, 0, 1);
+    if (bodyW <= 0) { limbDrag.reset(); return; }
+    limbDrag.apply(motionDt(), bodyW);
+  }
+  function applyWrists(): void {
+    if (!wristLayer) return;
+    if (bodyW <= 0) { wristLayer.reset(); return; }
+    const want: Partial<Record<'Left' | 'Right', number>> = {}, smooth: Partial<Record<'Left' | 'Right', number>> = {};
+    ball.computeWorldMatrix(true);
+    const bp = ball.getAbsolutePosition(), holder = ball.parent as TransformNode | null;
+    const sinceContact = jamContact && flushRealSec > 0 && !replaying ? performance.now() / 1000 - flushRealSec : null;
+    for (const side of ['Left', 'Right'] as const) {
+      const arm = arms[side]; if (!arm) continue;
+      arm.hand.computeWorldMatrix(true); arm.shoulder.computeWorldMatrix(true);
+      const hp = arm.hand.getAbsolutePosition(), sp = arm.shoulder.getAbsolutePosition();
+      const holds = holder === arm.hand;
+      if (holds) lastBallHand = side;
+      const snaps = sinceContact != null && lastBallHand === side;
+      want[side] = wristFor({ holds, onBall: !holds && !!holder && Vector3.Distance(hp, bp) < 0.24, aboveShoulder: hp.y - sp.y, sinceContact: snaps ? sinceContact : null, jamming: phase === 'resolve' && qteHit && !jamContact });
+      if (snaps && sinceContact! < 0.18) smooth[side] = 0.05;   // a wrist flick, not a teleport (0.03 read 1700°/s — past what a wrist does)
+    }
+    wristLayer.apply(motionDt(), want, bodyW, smooth);
   }
   /** DUNK-BIOMECH: the trick turn, written onto the hips AFTER the clips evaluate (before the wrist reach, which aims at
    *  the world rim). A yaw about the parent's up in the clips' own bind convention (bindFrame.keyedQ), so +1 turn here is
@@ -3109,6 +3158,7 @@ export const DunkMode: ModeDefinition = (() => {
     // un-raced promise is what knows when the root is the mode's again — then it falls to the floor and lands. The replay
     // writes a rotationQuaternion the mode never uses (it yaws by Euler), so the Euler yaw is handed back with the root.
     replaying = true; replayAir = false; replayAerial = false; replayPrevY = player.root.position.y;
+    limbDrag?.reset(); wristLayer?.reset();   // DUNK MOTION: the replay re-flies the root from the runway — the followers start again there
     // THE REPLAY IS THE FLIGHT, not the walk to the baseline. Filmed for a review (2026-09-14): the 4 s
     // buffer played whole at 0.5x was eight seconds of replay, most of it the dunker jogging up the floor
     // with the ball on the ground behind him. The mode knows exactly how long this flight took --
