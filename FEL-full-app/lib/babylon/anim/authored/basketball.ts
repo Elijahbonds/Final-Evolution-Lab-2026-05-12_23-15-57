@@ -666,12 +666,15 @@ export function buildDefendSlideHard(scene: Scene, sk: Skeleton, dir: 'left' | '
 // CAPTURED one (karate_mc_hit_react, CMU 80_10), a FIGHTER's flinch that throws both arms behind the body. The smoothness
 // recorder found every behind-the-back episode in six 3v3 possessions on that one clip. A basketball body meets contact
 // chest back, hips back, the hands coming UP IN FRONT (a ball to protect, a body to brace against), a stagger step.
+// HOOPS-DEPTH S8 (2026-09-23): the hands were set 0.47 m out from a 0.49 m arm, so the IK straightened both arms into a reach —
+// both elbows 175° on 177 of 199 frames of a live 3v3 bump (body smoke). The brace is the forearms up, elbows BENT, the hands in
+// close in front of the chest.
 export function buildContactReact(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const front = { Left: [-0.6, -0.7, 0.3] as V3, Right: [0.6, -0.7, 0.3] as V3 };
   return buildPoseClip(scene, sk, 'bball_contact_react', 0.32, [
-    { t: 0,    bones: { Hips: [0, 0, 0] as Deg3,   Spine: [4, 0, 0] as Deg3,   Neck: [-4, 0, 0] as Deg3, LeftUpLeg: [-18, 0, 6] as Deg3, RightUpLeg: [-10, 0, -6] as Deg3, LeftLeg: [26, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 }, hands: { Left: [-0.30, 1.10, 0.32] as V3, Right: [0.30, 1.10, 0.32] as V3 }, poles: front },
-    { t: 0.12, bones: { Hips: [-10, 0, 0] as Deg3, Spine: [-18, 0, 0] as Deg3, Neck: [10, 0, 0] as Deg3, LeftUpLeg: [-30, 0, 8] as Deg3, RightUpLeg: [8, 0, -6] as Deg3,   LeftLeg: [40, 0, 0] as Deg3, RightLeg: [22, 0, 0] as Deg3 }, hands: { Left: [-0.34, 1.36, 0.40] as V3, Right: [0.34, 1.36, 0.40] as V3 }, poles: front, hipsY: -0.04 },   // hit: chest back, hands up in front, a step
-    { t: 0.32, bones: { Hips: [-4, 0, 0] as Deg3,  Spine: [-6, 0, 0] as Deg3,  Neck: [2, 0, 0] as Deg3,  LeftUpLeg: [-20, 0, 6] as Deg3, RightUpLeg: [-8, 0, -6] as Deg3,  LeftLeg: [28, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 }, hands: { Left: [-0.32, 1.18, 0.34] as V3, Right: [0.32, 1.18, 0.34] as V3 }, poles: front },   // settling
+    { t: 0,    bones: { Hips: [0, 0, 0] as Deg3,   Spine: [4, 0, 0] as Deg3,   Neck: [-4, 0, 0] as Deg3, LeftUpLeg: [-18, 0, 6] as Deg3, RightUpLeg: [-10, 0, -6] as Deg3, LeftLeg: [26, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 }, hands: { Left: [-0.26, 1.18, 0.22] as V3, Right: [0.26, 1.18, 0.22] as V3 }, poles: front },
+    { t: 0.12, bones: { Hips: [-10, 0, 0] as Deg3, Spine: [-18, 0, 0] as Deg3, Neck: [10, 0, 0] as Deg3, LeftUpLeg: [-30, 0, 8] as Deg3, RightUpLeg: [8, 0, -6] as Deg3,   LeftLeg: [40, 0, 0] as Deg3, RightLeg: [22, 0, 0] as Deg3 }, hands: { Left: [-0.28, 1.36, 0.26] as V3, Right: [0.28, 1.36, 0.26] as V3 }, poles: front, hipsY: -0.04 },   // hit: chest back, hands up in front, a step
+    { t: 0.32, bones: { Hips: [-4, 0, 0] as Deg3,  Spine: [-6, 0, 0] as Deg3,  Neck: [2, 0, 0] as Deg3,  LeftUpLeg: [-20, 0, 6] as Deg3, RightUpLeg: [-8, 0, -6] as Deg3,  LeftLeg: [28, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 }, hands: { Left: [-0.27, 1.22, 0.24] as V3, Right: [0.27, 1.22, 0.24] as V3 }, poles: front },   // settling
   ]);
 }
 

@@ -79,9 +79,14 @@ export function dribbleAt(phase: number, p: DribbleParams = DEFAULT_DRIBBLE): Dr
  *
  * The author's `followDepth` is the intent and is kept exactly; only the palm moves, and only upward, and only as far
  * as it must. A body with a long enough arm is left alone.
+ *
+ * HOOPS-DEPTH S8 (2026-09-23): and the stroke's bottom stops DRIBBLE_ELBOW_HEADROOM short of the straight arm. Fitted to the
+ * lowest hand exactly, every bounce bottomed out on a locked elbow: in a live 3v3 the ball arm averaged 150-165 degrees on the
+ * dribbling loops and both arms read straight on 71 of 208 jog frames (body smoke). A dribbler's elbow stays bent at the bottom.
  */
-export function fitDribbleToReach(p: DribbleParams, lowestHandY: number): DribbleParams {
+export const DRIBBLE_ELBOW_HEADROOM = 0.1;
+export function fitDribbleToReach(p: DribbleParams, lowestHandY: number, headroom = DRIBBLE_ELBOW_HEADROOM): DribbleParams {
   if (!Number.isFinite(lowestHandY) || !Number.isFinite(p.palmY) || !Number.isFinite(p.followDepth)) return p;
-  const needed = lowestHandY + p.followDepth;
+  const needed = lowestHandY + Math.max(0, headroom) + p.followDepth;
   return needed > p.palmY ? { ...p, palmY: needed } : p;
 }

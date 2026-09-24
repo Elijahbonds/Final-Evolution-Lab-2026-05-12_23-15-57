@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DRIBBLE, dribbleAt, fitDribbleToReach } from './Dribble';
+import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, dribbleAt, fitDribbleToReach } from './Dribble';
 
 // Measured on the forged hero: shoulder 1.43 m above the root, arm 0.486 m, so the hand bottoms out near 0.944 m.
 const HERO_LOWEST = 0.944;
 
 describe('fitDribbleToReach', () => {
-  it('lifts a stroke whose bottom is below the hand and keeps the follow depth', () => {
+  it('lifts a stroke whose bottom is below the hand and keeps the follow depth — the bottom a bent elbow short of straight (HOOPS-DEPTH S8)', () => {
     const fitted = fitDribbleToReach(DEFAULT_DRIBBLE, HERO_LOWEST);
-    expect(fitted.palmY - fitted.followDepth).toBeCloseTo(HERO_LOWEST, 6);
+    expect(fitted.palmY - fitted.followDepth).toBeCloseTo(HERO_LOWEST + DRIBBLE_ELBOW_HEADROOM, 6);
+    expect(fitDribbleToReach(DEFAULT_DRIBBLE, HERO_LOWEST, 0).palmY - DEFAULT_DRIBBLE.followDepth).toBeCloseTo(HERO_LOWEST, 6);   // headroom 0: the old fit
     expect(fitted.followDepth).toBe(DEFAULT_DRIBBLE.followDepth);   // the author's intent, untouched
     expect(fitted.palmY).toBeGreaterThan(DEFAULT_DRIBBLE.palmY);
   });

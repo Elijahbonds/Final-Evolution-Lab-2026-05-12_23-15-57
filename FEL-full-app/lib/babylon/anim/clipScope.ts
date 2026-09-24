@@ -70,8 +70,10 @@ const DERBY = { suites: ['baseball'], borrow: [], omit: FIGHTER_BASE } as const;
 
 /** Keyed by the harness's `def.modeId` (what ModeHarness stamps on `scene.metadata.felModeId`). */
 export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; borrow: readonly string[]; omit?: readonly string[] }> = {
-  dunk: { suites: ['dunk'], borrow: [] },
-  dunkduel: { suites: ['dunk'], borrow: [] },
+  // HOOPS-DEPTH S8 (2026-09-23): the runway is a DRIBBLING run — the captured one (78_06, bent arms, the ball hand low) instead of the
+  // generic `run`, whose arms read straight on 631 of 733 approach frames (body smoke)
+  dunk: { suites: ['dunk'], borrow: ['bball_dribble_run'] },
+  dunkduel: { suites: ['dunk'], borrow: ['bball_dribble_run'] },
   onevone: HOOPS,
   threevthree: HOOPS,
   threepoint: { suites: ['hoops'], borrow: ['karate_hit_react', 'football_juke_left', 'dunk_celebrate_big'] },   // the make's celebration

@@ -101,7 +101,7 @@ describe('ballCarry', () => {
       const scene = new Scene(new NullEngine());
       const r = rig(scene, mirror);
       const s0 = r.shoulder.rotationQuaternion!.clone(), e0 = r.elbow.rotationQuaternion!.clone();
-      const params = { ...P, side: (mirror ? -1 : 1) * P.side, hzIdle: 1.8, hzFast: 2.8 };   // the ball on the arm's own side (the dunk runway's)
+      const params = { ...P, hzIdle: 1.8, hzFast: 2.8 };   // the carry puts the ball on the arm's own side, mirrored rig or not
       const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, params });
       let prev: Quaternion | null = null, worst = 0, miss = 0, n = 0;
       for (let f = 0; f < 150; f++) {
@@ -115,6 +115,20 @@ describe('ballCarry', () => {
       }
       expect(worst, `mirror ${mirror}`).toBeLessThan(45);     // was 98–124° in one 60 fps frame at the catch
       expect(miss / n, `mirror ${mirror}`).toBeLessThan(0.06); // the palm on top of the ball as before (4.4–4.6 cm mean)
+      carry.dispose();
+    }
+  });
+  it('dribbles on the arm side of the body, mirrored rig or not — never across the chest (HOOPS-DEPTH S8)', () => {
+    for (const mirror of [false, true]) {
+      const scene = new Scene(new NullEngine());
+      const r = rig(scene, mirror);
+      const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk });   // DEFAULT_DRIBBLE, 'Right'
+      let steps = 0; carry.update(0.016, 0.5, true);
+      while (Math.abs(carry.phase - 0.5) > 0.01 && steps++ < 400) { carry.update(1 / 240, 0, true); scene.onAfterAnimationsObservable.notifyObservers(scene); }
+      r.root.computeWorldMatrix(true); r.shoulder.computeWorldMatrix(true); r.ball.computeWorldMatrix(true);
+      const inv = Quaternion.Inverse(r.root.absoluteRotationQuaternion);
+      const local = (v: Vector3) => v.subtract(r.root.getAbsolutePosition()).applyRotationQuaternion(inv);
+      expect(Math.sign(local(r.ball.getAbsolutePosition()).x), `mirror ${mirror}`).toBe(Math.sign(local(r.shoulder.getAbsolutePosition()).x));
       carry.dispose();
     }
   });

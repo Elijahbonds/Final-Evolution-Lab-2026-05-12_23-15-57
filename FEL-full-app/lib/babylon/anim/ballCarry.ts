@@ -12,7 +12,7 @@
 import { Matrix, Quaternion, Space, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand } from './ballRig';
-import { DEFAULT_DRIBBLE, advancePhase, dribbleAt, fitDribbleToReach, type DribbleParams } from './Dribble';
+import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, advancePhase, dribbleAt, fitDribbleToReach, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, type ArmChain } from './HandIK';
 
 export interface BallCarryOpts {
@@ -113,7 +113,12 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let arm: ArmChain | null = armChain(opts.skeleton, side);
   // THE STROKE HAS TO FIT THE BODY. The dribble's bottom sat below where this body's hand can reach, so the solver
   // clamped it and the dribbling hand barely out-travelled the off hand riding the torso. See fitDribbleToReach.
-  const p = fitDribbleToReach(opts.params ?? DEFAULT_DRIBBLE, lowestHandY(arm, opts.root));
+  const lowY = lowestHandY(arm, opts.root);
+  const p = fitDribbleToReach(opts.params ?? DEFAULT_DRIBBLE, lowY);
+  // HOOPS-DEPTH S8 (2026-09-23): the off hand's "low beside the hip" is never below where a BENT arm reaches. It was a fixed 0.86 m,
+  // under this body's straight-arm reach (~0.94 m), so at pace the solver pulled the off arm dead straight: both elbows 170-178°
+  // on every dribbling frame of a live 3v3 (body smoke, filed by the carry's state — 95-106° the moment the dribble stopped).
+  const offFloorY = Number.isFinite(lowY) ? lowY + DRIBBLE_ELBOW_HEADROOM : 0.86;
   // ONEVONE-DEFENSE-LOGIC (2026-09-07): on a hand switch the OLD arm let go in one frame — it snapped from the ball
   // back to the clip's pose, a 0.3–0.5 m hand pop on every crossover (measured on both 1v1 bodies). It now lets go
   // over SWITCH_FADE_SEC while the new arm takes the reach.
@@ -129,6 +134,21 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const offT = new Vector3(), offPole = new Vector3();
   const local = new Vector3(), world = new Vector3(), handT = new Vector3(), pole = new Vector3();
 
+  /**
+   * HOOPS-DEPTH S8 (2026-09-23): WHICH SIDE THE BALL GOES ON IS THE ARM'S, NOT ITS NAME'S. The runtime hoops rigs are mirrored
+   * (the import's -x reset at spawn): the hero's RightArm sits on the body's -x. The carry put the ball on +x for 'Right', so
+   * in 1v1 and 3v3 the ball hand reached 0.44 m across the chest to dribble and the off hand across the other way — both arms
+   * dead straight on every dribbling frame (live 3v3: ball +0.26, right shoulder -0.18; elbows 150-178°, 95-106° the moment the
+   * dribble stopped). The dunk had worked around it for itself by negating its side. The sign is now read off the shoulder,
+   * in the same root frame toWorld places things in, every frame (a crossover swaps the arm).
+   */
+  const armSign = (a: ArmChain | null, fallback: number): number => {
+    if (!a) return fallback;
+    opts.root.computeWorldMatrix(true); a.shoulder.computeWorldMatrix(true);
+    const d = a.shoulder.getAbsolutePosition().subtract(opts.root.getAbsolutePosition());
+    d.applyRotationQuaternionInPlace(Quaternion.Inverse(opts.root.absoluteRotationQuaternion ?? Quaternion.Identity()));
+    return Math.abs(d.x) > 0.02 ? Math.sign(d.x) : fallback;
+  };
   const toWorld = (x: number, y: number, z: number, out: Vector3): Vector3 => {
     opts.root.computeWorldMatrix(true);
     local.set(x, y, z);
@@ -149,7 +169,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     if (!pending) return;
     pending = false;
     const s = dribbleAt(phase, p);
-    const sx = side === 'Right' ? 1 : -1;
+    const sx = armSign(arm, side === 'Right' ? 1 : -1);
     toWorld(s.ball.x * sx, s.ball.y, s.ball.z, world);
     opts.ball.position.copyFrom(world);
     if (arm && armW > 0) {
@@ -170,7 +190,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (offArm && lastSpeed01 > 0.35) {
         const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
         const pump = Math.sin(phase * Math.PI * 2) * 0.09;
-        toWorld(-sx * 0.30, 0.86 + pump * 0.5, 0.18 + pump, offT);
+        toWorld(-sx * 0.30, Math.max(0.86, offFloorY) + pump * 0.5, 0.18 + pump, offT);
         toWorld(-sx * 0.55, 0.85, -0.45, offPole).subtractInPlace(opts.root.getAbsolutePosition());
         reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
       }

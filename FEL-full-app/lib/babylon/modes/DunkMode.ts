@@ -113,6 +113,11 @@ const SPIN_TUCK_DEG: [number, number, number] = [-18, 26, 34];
 const SPIN_TUCK_WEIGHT = 0.55;
 /** The runway loop's rate follows the run (the loop ran at one rate from a 2 m/s drift to a 7 m/s sprint: foot slide). */
 const strideRate = (mps: number): number => Math.max(0.7, Math.min(1.6, mps / HOOPS_STRIDE.run));
+/** HOOPS-DEPTH S8 (2026-09-23): the runway loop. The dunker runs up DRIBBLING, and the shared `run` (SPORT_CLIP.moveLoop) has the
+ *  arms of a sprinter with nothing in the hands — straight at the elbow on 631 of 733 approach frames (body smoke). The hoops
+ *  dribble run (its capture, 78_06, on the hero) is the one the 1v1 drives on (7 straight-armed frames in 732). Paced against the
+ *  same run reference (HOOPS_STRIDE_CAPTURE.run = HOOPS_STRIDE.run, calibrated for these captures). */
+const RUNWAY_LOOP = 'bball_dribble_run';
 // Dunk play tip (2026-09-07): a full stick runs at APPROACH_SPEED (the hold-run ramps past it to HOLD_RUN_MAX); the
 // flight eases the facing onto the rim at FACE_RIM_RATE per second.
 const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;
@@ -450,7 +455,7 @@ export const DunkMode: ModeDefinition = (() => {
     busRun = { t: 0, s: alongPane(pane, player.root.position.x, player.root.position.z), pane, speed: Math.max(BUS_RUN.speedMin, speed) };
     runUpPeak = Math.max(runUpPeak, busRun.speed);
     endRunwayBeat(true); runwayBeat = null;
-    playClip(SPORT_CLIP.moveLoop, { loop: true }); player.animator.setPlaybackScale(SPORT_CLIP.moveLoop, strideRate(busRun.speed)); setWin('run');
+    playClip(runLoop(), { loop: true }); player.animator.setPlaybackScale(runLoop(), strideRate(busRun.speed)); setWin('run');
     SoundKit.play('impact', { pitch: 1.2, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#a5f3fc', 50); ctx.camDirector.pulse(0.35, 0.3);
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(-pane.nx * 0.5, 1.0, -pane.nz * 0.5)), 'sparks');
     flash(ctx, `WALL RUN ON ${ride.name} — off the front of it`, 800); ctx.setHud({ hint: `RUNNING THE ${ride.short} — the jump is at its front end` });
@@ -877,9 +882,10 @@ export const DunkMode: ModeDefinition = (() => {
       attachBallToHand(ball, player.skeleton, 'RightHand');
       // DUNK-POSTURE-LEGS (A2/A3): the runway is a DRIBBLE — the ball leaves the palm and bounces beside the runner, the ball arm
       // pumps on it (ballCarry, the 1v1's), gathered into two hands a stride before the plant. The runtime rig's right is its
-      // local −x (the import mirror is reset at spawn), so the bounce side is negated to land on the ball hand's side.
+      // local −x (the import mirror is reset at spawn) — ballCarry reads the side off the shoulder now (HOOPS-DEPTH S8), so the
+      // bounce side is NOT negated here any more (it used to be, and 1v1 / 3v3, which were not, dribbled across the chest).
       dribble?.dispose();
-      dribble = mountBallCarry({ scene: ctx.scene, ball, root: player.root, skeleton: player.skeleton, side: 'Right', params: { ...DEFAULT_DRIBBLE, side: -DEFAULT_DRIBBLE.side, hzIdle: 1.8, hzFast: 2.8 } });
+      dribble = mountBallCarry({ scene: ctx.scene, ball, root: player.root, skeleton: player.skeleton, side: 'Right', params: { ...DEFAULT_DRIBBLE, hzIdle: 1.8, hzFast: 2.8 } });
       // DUNK-BALL-ARMS-RIM: the replay puts the ball back in what it rode — the hand it was in, the body while it dribbled
       replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : dribble?.active ? player.root : null));
 
@@ -1209,7 +1215,7 @@ export const DunkMode: ModeDefinition = (() => {
         // tricks fit before the slam window. Live 08's whole ramp, in one number.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 0.5;
-        if (!runwayBeat) { playClip(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(SPORT_CLIP.moveLoop, strideRate(Math.hypot(vel.x, vel.z))); }   // a runway beat owns the body until it ends; the loop paces to the run
+        if (!runwayBeat) { playClip(moving ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(runLoop(), strideRate(Math.hypot(vel.x, vel.z))); }   // a runway beat owns the body until it ends; the loop paces to the run
         if (player.root.position.z <= gatherLine() + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -1248,7 +1254,7 @@ export const DunkMode: ModeDefinition = (() => {
         runwayVel.x = steer; runwayVel.z = -runNow;
         runMotion.update(steer, -runNow, player.root.rotation.y, dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
-        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(SPORT_CLIP.moveLoop, strideRate(holdRunSpeed)); }
+        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(runLoop(), strideRate(holdRunSpeed)); }
         // THE RUNWAY TEACHES ITS MOVES (owner, 2026-09-16). Everything a player can throw on the run is a bare face
         // button under a held trigger — undiscoverable — and this pass added three more. The hold-run hint is the move
         // list now, and it turns into DOUBLE-UP the moment the double-up is actually on. Only pushed on CHANGE: a HUD
@@ -1624,7 +1630,7 @@ export const DunkMode: ModeDefinition = (() => {
           const rg = playClip(STYLE_CLIP[style], { speedRatio: replayRate, fadeSec: 0.25, onEnd: () => { if (replaying && replayAir && !replayAerial) { playClip(SPORT_CLIP.dunkScoreHang, { speedRatio: replayRate, onEnd: () => {} }); console.info('[HANDS] replay launch → hang'); } } });
           rg?.goToFrame(PLANT_SEC * 30);   // the clip's plant already happened on the floor
           console.info('[HANDS] replay air');
-        } else if (!replayAir) playClip(SPORT_CLIP.moveLoop, { loop: true });
+        } else if (!replayAir) playClip(runLoop(), { loop: true });
         if (replayAir) {
           replayAirSec += dt;
           // DUNK-BIOMECH: the replay re-fires the live tricks and the live turn on the replayed flight's clock (the replay used to
@@ -2337,7 +2343,7 @@ export const DunkMode: ModeDefinition = (() => {
     setPhase('charge');
     obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
     holdRunSpeed = Math.max(2, runUpPeak);
-    playClip(SPORT_CLIP.moveLoop, { loop: true });
+    playClip(runLoop(), { loop: true });
     ctx.setHud({ hint: 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });
   }
 
@@ -2457,6 +2463,11 @@ export const DunkMode: ModeDefinition = (() => {
    *  used to fire the moment its clip was superseded — measured: the land crouch was cut to idle 150 ms in by the aerial's
    *  own chain. A superseded clip's chain is dead; only a clip that ends on its own runs it (and, with no chain, the idle
    *  loop — neverBindPose's contract, gated the same way). */
+  /** HOOPS-DEPTH S8: the runway's loop — the dribbling run when the body owns it (a body built outside the dunk scope keeps `run`). */
+  function runLoop(): string {
+    const owned = player.animator.clipNames;
+    return owned.has(RUNWAY_LOOP) || owned.has('bball_mc_dribble_run') ? RUNWAY_LOOP : SPORT_CLIP.moveLoop;
+  }
   function playClip(name: string, opts: PlayOpts = {}): AnimationGroup | null {
     // DUNK-HANDS-RIM H5: the idle / rest loop is refused while the body is in the air on a flight — the dunk clip (or its held
     // last frame) owns the body through CONTACT and the fall; feet-down is the only way to the land clip and the idle
@@ -2571,7 +2582,7 @@ export const DunkMode: ModeDefinition = (() => {
       // a beat that ends a stride from the line takes off out of its last pose — two frames of run loop and a launch over a
       // fade still in flight popped the hand 0.36 m on the keyboard's cartwheel (its beat ends ~0.9 m out at a 6 m/s start)
       if (launchQueued || (phase === 'charge' && player.root.position.z <= gatherLine() + LAUNCH_OUT_OF_BEAT_M)) launchDunk(ctx0!);
-      else { playClip(phase === 'charge' ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true }); setWin('run'); }
+      else { playClip(phase === 'charge' ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); }
     }
   }
   let ctx0: ModeContext | null = null;   // the mode context for the beat-end path (the harness hands it to every hook)

@@ -12,7 +12,7 @@ import {
   buildBlockReach, buildCrossover, buildDefendSlide, buildDribbleIdle, buildHesi, buildLayupGather, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,
   buildLandAbsorb,   // HOOPS-DEPTH S4
-  buildFollowThroughEarly, buildFollowThroughLate,   // HOOPS-DEPTH S6
+  buildFollowThroughEarly, buildFollowThroughLate, buildContactReact,   // HOOPS-DEPTH S6 / S8
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // wave 2: the footwork (M8–M14)
   buildMikan, buildUpAndUnder, buildFingerRoll,   // 2026-09-16: the layup vocabulary
@@ -124,6 +124,12 @@ describe('basketball packages on the forge rig', () => {
     expect(Vector3.Distance(eEnd, gEnd)).toBeLessThan(0.05); expect(Vector3.Distance(pos('RightHand'), gEnd)).toBeLessThan(0.05);
     expect(followThroughFor('early')).toBe('bball_follow_through_early'); expect(followThroughFor('late')).toBe('bball_follow_through_late');
     expect(followThroughFor('held')).toBe('bball_follow_through_late'); expect(followThroughFor('perfect')).toBe('bball_follow_through'); expect(followThroughFor('good')).toBe('bball_follow_through');
+  });
+  it('the bump braces with the forearms up and the elbows BENT — never a straight-armed reach (HOOPS-DEPTH S8)', () => {
+    rest(); const g = buildContactReact(scene, sk)!;
+    const elbow = (s: 'Left' | 'Right') => { const a = pos(`${s}Arm`), b = pos(`${s}ForeArm`), c = pos(`${s}Hand`); const u = a.subtract(b), v = c.subtract(b); return Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(u, v) / (u.length() * v.length())))) * 180 / Math.PI; };
+    for (const t of [0, 0.12, 0.32]) { at(g, t); expect(elbow('Left'), `L @${t}`).toBeLessThan(150); expect(elbow('Right'), `R @${t}`).toBeLessThan(150); }
+    at(g, 0.12); const head = pos('Head'); expect(pos('RightHand').z).toBeGreaterThan(pos('Hips').z + 0.1); expect(pos('RightHand').y).toBeLessThan(head.y + 0.05);   // in front, chest-high
   });
   it('the landing absorb takes the jump on the knees with the hands still high, then stands up (HOOPS-DEPTH S4)', () => {
     rest(); const g = buildLandAbsorb(scene, sk)!;

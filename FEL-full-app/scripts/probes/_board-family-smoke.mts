@@ -50,6 +50,10 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
       return d < 1e-6 ? null : Math.acos(Math.max(-1, Math.min(1, (u.x * v.x + u.y * v.y + u.z * v.z) / d))) * 180 / Math.PI;
     };
     const rows: any[] = []; w.__BF = { rows };
+    // HOOPS-DEPTH S8 (2026-09-23): the HERO's own top clip — `clips` lists every body's groups (3v3 has six), so a T-arm frame
+    // could not be filed by what the hero was playing
+    const underSet = new Set(under); const mine = new Map<any, boolean>();
+    const heroTop = () => { let best: string | null = null, bw = 0; for (const g of dev.scene.animationGroups) { if (!g.isPlaying) continue; let m = mine.get(g); if (m === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; m = !!t && underSet.has(t); mine.set(g, m); } if (!m) continue; const a = g.animatables[0]; const x = a ? a.weight : 1; if (x > bw) { bw = x; best = g.name; } } return best; };
     dev.scene.onAfterRenderObservable.add(() => {
       const wt = (g: any) => (g.weight === undefined || g.weight < 0 ? 1 : g.weight);
       const rp = root ? root.getAbsolutePosition() : null;
@@ -60,7 +64,7 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
         // phase 8: the root's position and the frame's dt — speed and distance are computed off these in Node
         px: rp ? rp.x : null, py: rp ? rp.y : null, pz: rp ? rp.z : null, dt: dev.scene.getEngine().getDeltaTime() / 1000,
         eL: ang(B.LS, B.LE, B.LH), eR: ang(B.RS, B.RE, B.RH),
-        clips: dev.scene.animationGroups.filter((g: any) => g.isPlaying && wt(g) > 0.02).map((g: any) => g.name),
+        clips: dev.scene.animationGroups.filter((g: any) => g.isPlaying && wt(g) > 0.02).map((g: any) => g.name), heroClip: heroTop(), carry: (() => { const md = dev.scene.metadata; const sm = md && (md.threevthree || md.onevone); const c = sm && sm.carry ? sm.carry() : null; return c ? (c.active ? 'dribbling' : c.mine ? 'ball-held' : 'no-ball') : ''; })(),
       });
       if (rows.length > 20000) rows.shift();
     });
@@ -72,6 +76,9 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const rows: any[] = await p.evaluate(() => (window as any).__BF?.rows ?? []);
   const arms = rows.filter((r) => r.eL != null);
   const tee = arms.filter((r) => r.eL > 160 && r.eR > 160).length;
+  const teeHero: Record<string, number> = {}, heroFrames: Record<string, number> = {};
+  const elbows: Record<string, [number, number]> = {};
+  for (const r of arms) { const c = String(r.heroClip ?? '<none>').replace(/_c\d+.*$/, '') + (r.carry ? ` [${r.carry}]` : ''); heroFrames[c] = (heroFrames[c] ?? 0) + 1; if (r.eL > 160 && r.eR > 160) teeHero[c] = (teeHero[c] ?? 0) + 1; const e = (elbows[c] ??= [0, 0]); e[0] += r.eL; e[1] += r.eR; }
   const clips: Record<string, number> = {};
   for (const r of rows) for (const c of r.clips ?? []) clips[c] = (clips[c] ?? 0) + 1;
   const board = Object.entries(clips).filter(([k]) => /^board_|^skate_/.test(k)).sort((a, b) => b[1] - a[1]);
@@ -92,7 +99,7 @@ async function run(p: Page, mode: string): Promise<Record<string, unknown>> {
   const speed = speeds.length ? { mean: +(speeds.reduce((s, v) => s + v, 0) / speeds.length).toFixed(2), p90: +(sorted[Math.floor(sorted.length * 0.9)] ?? 0).toFixed(2), peak: +(sorted[sorted.length - 1] ?? 0).toFixed(2), dist: +dist.toFixed(1) } : null;
   const fpsRows = rows.filter((r) => typeof r.fps === 'number' && r.fps > 0).map((r) => r.fps as number).sort((a, b) => a - b);
   const perf = fpsRows.length ? { fpsMedian: fpsRows[Math.floor(fpsRows.length / 2)], fpsP10: fpsRows[Math.floor(fpsRows.length * 0.1)], activeMax: Math.max(...rows.map((r) => r.active ?? 0)), skinnedMax: Math.max(...rows.map((r) => r.skinned ?? 0)) } : null;
-  return { mode, frames: rows.length, armFrames: arms.length, tee, teeBy, speed, perf, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
+  return { mode, frames: rows.length, armFrames: arms.length, tee, teeHero: Object.fromEntries(Object.entries(teeHero).map(([c, n]) => [c, `${n}/${heroFrames[c]}`])), elbowsByHeroClip: Object.fromEntries(Object.entries(elbows).map(([c, [l, rr]]) => [c, `L ${Math.round(l / heroFrames[c])}° R ${Math.round(rr / heroFrames[c])}° (${heroFrames[c]})`])), teeBy, speed, perf, boardClips: board, clips: allClips, errors: logs.slice(0, 6) };
 }
 
 async function main() {
