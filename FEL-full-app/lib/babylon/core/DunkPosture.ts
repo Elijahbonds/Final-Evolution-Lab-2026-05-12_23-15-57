@@ -63,6 +63,7 @@ export const POSTURE: Record<PostureWindow, PosturePose> = {
 // The trick's arms / ball path / legs are the clip's; these are the chest / shoulders / head it should carry.
 export const TRICK_POSTURE: Record<string, Partial<PosturePose>> = {
   spin360:     { spine1: [-6, 0, 0], spine2: [-10, 0, 0], neck: [-6, 0, 0], head: [-4, 0, 0], shrug: 6,  forward: -2, chestAim: 0.85 },      // tall through the turn (the aim subtracts the spin)
+  spin720:     { spine1: [-6, 0, 0], spine2: [-10, 0, 0], neck: [-6, 0, 0], head: [-4, 0, 0], shrug: 6,  forward: -2, chestAim: 0.85 },      // phase 10b: the 360 carried on — the same tall axis
   windmill:    { spine1: [-8, 0, 0], spine2: [-14, 0, 0], neck: [-4, 0, 0], head: [-6, 0, 0], shrug: 10, forward: -6 },                      // chest open under the swinging arm
   tomahawk:    { spine1: [-8, 0, 0], spine2: [-16, 0, 0], neck: [-6, 0, 0], head: [-8, 0, 0], shrug: 12, forward: -4 },                      // the cock-back is a thoracic extension
   // DUNK MOTION phase 6: the scorpion is a NO-LOOK (Kilganon: he watches the floor, never the rim, and ducks to dunk it behind him).

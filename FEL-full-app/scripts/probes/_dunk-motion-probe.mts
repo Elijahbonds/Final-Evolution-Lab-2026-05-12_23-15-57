@@ -36,8 +36,11 @@ const AIR: Record<string, [Dir, Btn]> = {
   spin360: ['right', 'B'], scorpion: ['right', 'Y'], cradle: ['right', 'A'], fakeeastbay: ['right', 'X'],
   eastbay: ['down', 'Y'], betweenlegs: ['down', 'B'], clutch: ['down', 'A'], doubleeastbay: ['down', 'X'],
   lostfound: ['left', 'B'], hideseek: ['left', 'A'], behindback: ['left', 'Y'], fakeback: ['left', 'X'],
+  spin720: ['right', 'B'], spin720mid: ['right', 'B'],   // DUNK MOTION phase 10b: the 360 pressed twice before the rise / again mid-turn
 };
-const RUNWAY: Record<string, [Btn, Dir | null]> = { selflob: ['Y', null], kickup: ['B', null], cartwheel: ['X', null], backflip: ['B', 'up'] };   // (the two-foot 'doubleup' hop is gone — DUNK MOTION phase 10)
+/** Phase 10b: the 720 is the 360 thrown again — the second press, ms after the first (before the rise, or with the turn under way). */
+const SECOND_PRESS_MS: Record<string, number> = { spin720: 140, spin720mid: 520 };
+const RUNWAY: Record<string, [Btn, Dir | null]> = { selflob: ['Y', null], kickup: ['B', null], handspring: ['X', null], cartwheel: ['X', 'down'], backflip: ['B', 'up'] };   // (the two-foot 'doubleup' hop is gone — DUNK MOTION phase 10; phase 10b: X is the back handspring, X + down Jus Fly's cartwheel)
 const ALL = ['plain', 'plainJ', ...Object.keys(AIR), ...Object.keys(RUNWAY).map((r) => `rw:${r}`)];
 const TRICKS = (process.env.TRICKS ?? 'all') === 'all' ? ALL : (process.env.TRICKS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 for (const t of TRICKS) if (t !== 'plain' && t !== 'plain2' && t !== 'plainJ' && !AIR[t] && !(t.startsWith('rw:') && RUNWAY[t.slice(3)])) throw new Error(`unknown trick ${t} (have ${ALL.join(', ')})`);
@@ -214,7 +217,11 @@ async function attempt(p: Page, trick: string): Promise<Rec | null> {
   if (!launch) { const r0 = Date.now(); while (!launch && Date.now() - r0 < 2000) { await p.waitForTimeout(40); launch = await launchedAt(); } }
   if (!launch) { await p.evaluate('window.__rec.on = false'); console.log(`  ${trick}: never launched`); return null; }
   const air = AIR[trick];
-  if (air) { await dpad(p, air[0], true); await p.waitForTimeout(80); await tapBtn(p, air[1], 60); await p.waitForTimeout(50); await dpad(p, air[0], false); }
+  if (air) {
+    await dpad(p, air[0], true); await p.waitForTimeout(80); await tapBtn(p, air[1], 60);
+    const again = SECOND_PRESS_MS[trick]; if (again) { await p.waitForTimeout(Math.max(0, again - 60)); await tapBtn(p, air[1], 60); }
+    await p.waitForTimeout(50); await dpad(p, air[0], false);
+  }
   await p.evaluate('window.__armSlam()');
   const end = launch + 3600;
   while ((await p.evaluate('performance.now()') as number) < end) await p.waitForTimeout(100);
@@ -471,6 +478,7 @@ async function sheet(p: Page, rec: Rec, m: Metrics, file: string): Promise<void>
   let t0 = L - 250, t1 = L + land + 350;
   if (WIN === 'trick') { t0 = L + (m.beats.trick ?? 250) - 60; t1 = L + (m.beats.contact ?? land) + 300; }
   if (WIN === 'run') { t0 = L - 1500; t1 = L + 150; }   // the run-up: the dribble run into the gather and the plant
+  if (WIN === 'beat') { t0 = L - 900; t1 = L + 100; }   // DUNK MOTION phase 10b: a runway beat up close (the kick, the cartwheel)
   if (WIN === 'gather') { t0 = L - 450; t1 = L + 200; }
   if (WIN === 'flush') { const c = m.beats.contact ?? m.beats.slam ?? 1500; t0 = L + c - 300; t1 = L + c + 250; }   // DUNK MOTION phase 9: the finish up close   // DUNK MOTION phase 8: push 1-2 up close — the pick-up, the push, 1, 2, the take-off
   const picks: Frame[] = [];

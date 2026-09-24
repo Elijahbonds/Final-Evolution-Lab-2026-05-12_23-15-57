@@ -69,7 +69,7 @@ const COMBO_GAP_MS = Number(process.env.COMBO_GAP_MS ?? 340);
  * B with UP HELD = the backflip (owner's move, 2026-09-16), the one runway trick that takes a direction.
  */
 const RUNWAY: Record<string, { btn: number; dir?: string }> = {
-  selflob: { btn: 3 }, kickup: { btn: 1 }, cartwheel: { btn: 2 }, doubleup: { btn: 0 }, backflip: { btn: 1, dir: 'up' },
+  selflob: { btn: 3 }, kickup: { btn: 1 }, handspring: { btn: 2 }, cartwheel: { btn: 2, dir: 'down' }, doubleup: { btn: 0 }, backflip: { btn: 1, dir: 'up' },   // phase 10b: X = the back handspring, X + down = Jus Fly's cartwheel
 };
 const RUNWAY_TRICK = process.env.RUNWAY ?? '';
 if (RUNWAY_TRICK && !(RUNWAY_TRICK in RUNWAY)) throw new Error(`no such runway trick: ${RUNWAY_TRICK} (have ${Object.keys(RUNWAY).join(', ')})`);

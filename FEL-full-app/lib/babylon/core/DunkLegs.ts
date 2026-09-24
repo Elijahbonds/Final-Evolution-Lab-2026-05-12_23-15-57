@@ -48,6 +48,7 @@ export const LEGS: Record<PostureWindow, LegPose> = {
 export const TRICK_LEGS: Record<string, Partial<LegPose>> = {
   scorpion: { footPitch: -60 },   // the kick points the toes
   spin360:  { footPitch: -20 },   // tucked, the feet under the knees
+  spin720:  { footPitch: -20 },
 };
 /** The most the layer turns an ankle from the clip's value to reach the target (deg): a real ankle, never a broken one. */
 export const FOOT_PITCH_CAP = 50;

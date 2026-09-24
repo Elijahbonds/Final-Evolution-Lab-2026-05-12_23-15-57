@@ -18,7 +18,8 @@ import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, bui
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildEastbay } from './eastbay';
-import { CRADLE_BACK, SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC } from './dunkTricks';
+import { EASTBAY_TIMING } from './timing';
+import { CRADLE_BACK, SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildScorpionFlush, SCORPION_FLUSH_SEC, buildCartwheel, CARTWHEEL_SEC, CARTWHEEL_BOUNCE, buildSpin720, SPIN_720_SEC, KICK_UP_SEC, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC, FRONT_SWAP_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
@@ -110,17 +111,19 @@ describe('the tetris stack', () => {
 // named dunks flew from take-off to flush with legs that never moved and were mirror-identical to each other, which is
 // two things no dunker has ever done. Nothing failed, because nothing asked. This asks.
 describe('the named dunks move', () => {
-  const named: { name: string; build: () => AnimationGroup; sec: number }[] = [
+  // (DUNK MOTION phase 10b: the scorpion ENDS LOADED — Kilganon jams in the shape — and its own flush is where the body goes long)
+  const named: { name: string; build: () => AnimationGroup; sec: number; finish?: () => AnimationGroup; finishSec?: number }[] = [
     { name: 'windmill', build: () => buildFinishWindmill(scene, sk)!, sec: 0.85 },
     { name: 'tomahawk', build: () => buildFinishTomahawk(scene, sk)!, sec: 0.75 },
     { name: 'eastbay', build: () => buildEastbay(scene, sk)!, sec: 1.2 },
     { name: 'between the legs', build: () => buildBetweenLegs(scene, sk)!, sec: BETWEEN_LEGS_SEC },
-    { name: 'scorpion', build: () => buildScorpion(scene, sk)!, sec: SCORPION_SEC },
+    { name: 'scorpion', build: () => buildScorpion(scene, sk)!, sec: SCORPION_SEC, finish: () => buildScorpionFlush(scene, sk)!, finishSec: SCORPION_FLUSH_SEC },
     { name: 'lost & found', build: () => buildLostFound(scene, sk)!, sec: LOST_FOUND_SEC },
     { name: 'hide & seek', build: () => buildHideSeek(scene, sk)!, sec: HIDE_SEEK_SEC },
     { name: 'cradle', build: () => buildCradle(scene, sk)!, sec: CRADLE_SEC },
     { name: 'double clutch', build: () => buildDoubleClutch(scene, sk)!, sec: CLUTCH_SEC },
     { name: '360', build: () => buildSpin360(scene, sk)!, sec: SPIN_SEC },
+    { name: '720', build: () => buildSpin720(scene, sk)!, sec: SPIN_720_SEC },
   ];
 
   /** Where the feet are RELATIVE TO THE HIPS, so a clip that only rises does not read as leg action. */
@@ -143,9 +146,9 @@ describe('the named dunks move', () => {
   });
 
   it('every one of them finishes LONG — the body under the arm, not sat in a chair', () => {
-    for (const { name, build, sec } of named) {
-      const g = fresh(build);
-      at(g, sec);
+    for (const { name, build, sec, finish, finishSec } of named) {
+      const g = fresh(finish ?? build);
+      at(g, finishSec ?? sec);
       for (const s of ['Left', 'Right']) {
         expect(pos(`${s}Foot`).y, `${name}: ${s} foot is not extended at the flush`).toBeLessThan(pos('Hips').y - 0.55);
       }
@@ -168,17 +171,19 @@ describe('the named dunks move', () => {
 // built out of it: the plain behind-the-back (ours only existed welded to a 360 inside LOST & FOUND), the FAKE of it,
 // and the double eastbay — two passes through the legs in one jump.
 describe('the chain pieces', () => {
-  it('behind the back: round the hip, both hands meet behind, out the far side and up', () => {
+  // DUNK MOTION phase 10b: TO THE DUNKING HAND — the off (left) hand takes it up the front, round the LEFT hip, and the right finishes
+  it('behind the back: the off hand takes it up the front, round the hip, the hands meet behind, and the DUNKING hand finishes', () => {
     const g = fresh(() => buildBehindBack(scene, sk)!);
-    at(g, 0.18); expect(pos('RightHand').z).toBeLessThan(pos('Hips').z - 0.15);                     // round the hip, behind the body
+    at(g, FRONT_SWAP_SEC); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand')), 'both palms on it up the front').toBeLessThan(0.3);
+    at(g, 0.18 + FRONT_SWAP_SEC); expect(pos('LeftHand').z).toBeLessThan(pos('Hips').z - 0.15);     // round the hip, behind the body
     at(g, BEHIND_BACK_SWAP); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);   // they meet
-    at(g, BEHIND_BACK_SEC); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);         // the FAR hand finishes it
+    at(g, BEHIND_BACK_SEC); expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.2);        // the right hand finishes it
   });
 
   // The whole trick is the lie, so the first third has to be the real one's shape and the end has to betray it.
   it('the fake: the same path in, and then the SAME hand takes it up', () => {
     const real = fresh(() => buildBehindBack(scene, sk)!);
-    at(real, 0.16); const realDepth = pos('RightHand').z - pos('Hips').z;
+    at(real, 0.16 + FRONT_SWAP_SEC); const realDepth = pos('LeftHand').z - pos('Hips').z;   // (phase 10b: the real one goes round with the off hand, after the front swap)
     const g = fresh(() => buildFakeBack(scene, sk)!);
     at(g, 0.16);
     expect(pos('RightHand').z - pos('Hips').z).toBeLessThan(realDepth + 0.12);                      // it goes as deep as the real one
@@ -532,10 +537,18 @@ describe('dunk suite', () => {
     at(fresh(() => buildCelebrateBig(scene, sk)!), 0.9);
     expect(pos('RightHand').y).toBeGreaterThan(pos('RightArm').y - 0.1); expect(pos('RightHand').y).toBeLessThan(pos('Head').y + 0.15);
   });
-  it('eastbay drives the left knee up and finishes with the left hand at the rim', () => {
+  // DUNK MOTION phase 10b: Rider's — the off hand takes it up the front, feeds it under the raised left thigh, and the DUNKING hand
+  // (right, as authored; mirrored onto the rig at spawn) finishes. It used to finish on the left: the mirror image of the dunk.
+  it('eastbay: the left takes it, feeds it under the raised left knee to the right, and the right hand finishes at the rim', () => {
     const g = fresh(() => buildEastbay(scene, sk)!);
-    at(g, 0.75); expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.3);
-    at(g, 1.25); expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.2);
+    at(g, EASTBAY_TIMING.swap); expect(Vector3.Distance(pos('LeftHand'), pos('RightHand')), 'both hands on it up the front').toBeLessThan(0.3);
+    at(g, EASTBAY_TIMING.underKnee); expect(pos('LeftHand').x, 'the left hand outside the left knee').toBeLessThan(pos('LeftLeg').x + 0.05);
+    at(g, EASTBAY_TIMING.handOff);
+    expect(pos('LeftLeg').y).toBeGreaterThan(pos('RightLeg').y + 0.3);
+    expect(Vector3.Distance(pos('LeftHand'), pos('RightHand')), 'palms meet under the thigh').toBeLessThan(0.2);
+    expect(Math.max(pos('LeftHand').y, pos('RightHand').y), '…under it').toBeLessThan(pos('LeftLeg').y);
+    at(g, EASTBAY_TIMING.extend); expect(pos('RightHand').y, 'the dunking hand at the rim').toBeGreaterThan(pos('Head').y + 0.2);
+    expect(pos('LeftHand').y, 'the off arm out, not up').toBeLessThan(pos('Head').y);
   });
 });
 
@@ -555,10 +568,33 @@ describe('dunk tricks', () => {
     expect(pos('RightHand').z).toBeGreaterThan(pos('Hips').z + 0.25); expect(pos('LeftHand').z).toBeGreaterThan(pos('Hips').z + 0.25);   // out front
     expect(Math.abs(pos('LeftHand').x - pos('RightHand').x)).toBeLessThan(0.45);   // a two-hand throw
   });
-  it('kick-up: the right foot swings up front on the contact key, the ball hand starts low', () => {
+  // THE OWNER'S KICK-UP (DUNK MOTION phase 10b, from his own video): bent over the dribble, the ball flicked up off the foot from
+  // the floor, the body coming up tall behind it. The old one asserted the opposite — the foot thrown up 0.45 m over the other one,
+  // a standing soccer volley, while the ball was on the floor a stride away.
+  it('kick-up: bent over the ball, the right foot flicks it from just off the floor out front, then up tall with the hands up', () => {
     const g = fresh(() => buildKickUp(scene, sk)!);
-    at(g, 0); expect(pos('RightHand').y).toBeLessThan(hipsY() - 0.1);
-    at(g, KICK_UP_CONTACT); expect(pos('RightFoot').y).toBeGreaterThan(pos('LeftFoot').y + 0.45); expect(pos('RightFoot').z).toBeGreaterThan(pos('Hips').z + 0.2);
+    at(g, 0); expect(pos('RightHand').y, 'the ball hand low').toBeLessThan(hipsY() - 0.1); expect(pos('Head').z - pos('Hips').z, 'bent over it').toBeGreaterThan(0.2);
+    at(g, KICK_UP_CONTACT);
+    expect(pos('RightFoot').y, 'the kicking foot is down by the ball').toBeLessThan(pos('RightUpLeg').y - 0.6);
+    expect(pos('RightFoot').z, '…out in front').toBeGreaterThan(pos('Hips').z + 0.2);
+    at(g, KICK_UP_SEC);
+    expect(pos('Head').z - pos('Hips').z, 'tall again').toBeLessThan(0.15);
+    for (const s of ['Left', 'Right']) expect(pos(`${s}Hand`).y, `${s} hand up for the catch`).toBeGreaterThan(hipsY() + 0.2);
+  });
+  // JUS FLY'S CARTWHEEL (phase 10b): side-on, over the hands, travelling AT the rim — and facing it again at the end.
+  it('cartwheel: throws the ball down, goes side-on over the hands with the legs overhead, and ends facing the rim', () => {
+    const g = fresh(() => buildCartwheel(scene, sk)!);
+    at(g, 0); expect(Math.max(pos('RightHand').y, pos('LeftHand').y), 'both hands down at the floor with the ball').toBeLessThan(hipsY());
+    at(g, 0.58);
+    expect(pos('Head').y, 'inverted').toBeLessThan(pos('Hips').y);
+    for (const s of ['Left', 'Right']) expect(pos(`${s}Foot`).y, `${s} foot over the top`).toBeGreaterThan(pos('Hips').y);
+    expect(Math.min(pos('RightHand').y, pos('LeftHand').y), 'on the hands').toBeLessThan(pos('Hips').y - 0.7);
+    const side = (): number => Math.abs(pos('RightUpLeg').z - pos('LeftUpLeg').z) - Math.abs(pos('RightUpLeg').x - pos('LeftUpLeg').x);
+    expect(side(), 'side-on: the hip line along the run').toBeGreaterThan(0);
+    at(g, CARTWHEEL_SEC);
+    expect(side(), 'square to the rim again').toBeLessThan(0);
+    expect(pos('Head').y, 'upright').toBeGreaterThan(pos('Hips').y + 0.4);
+    expect(CARTWHEEL_BOUNCE).toBeLessThan(0.2);   // the ball is gone before the wheel starts
   });
   // BACK HANDSPRING (owner, 2026-09-16) — it goes over BACKWARDS, not sideways. The cartwheel it replaced rolled about
   // the forward axis, which is a gymnastic move nobody has ever put in front of a dunk; a handspring lands you facing
@@ -598,12 +634,37 @@ describe('dunk tricks', () => {
   // AUDIT (2026-09-16): Kilganon's scorpion is a NO-LOOK, BEHIND-THE-BACK jam — he watches the floor the whole way and
   // brings the ball behind him, not over the shoulder. This test used to assert the opposite of the real dunk on both
   // counts ("head up, the ball hand out front"), which is how a wrong body passed for a year.
-  it('scorpion: feet whipped up over the body, chin DOWN (he never looks), the ball BEHIND him', () => {
-    at(fresh(() => buildScorpion(scene, sk)!), 0.35);
-    for (const s of ['Left', 'Right']) { expect(pos(`${s}Foot`).z).toBeLessThan(pos('Hips').z - 0.25); expect(pos(`${s}Foot`).y).toBeGreaterThan(pos(`${s}UpLeg`).y - 0.15); }
-    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y);                 // still high — it is going in
-    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);                    // …from BEHIND, not out front
-    expect(pos('Head').z).toBeLessThan(pos('Neck').z + 0.12);                  // chin tucked toward the floor, not craned up at the rim
+  // DUNK MOTION phase 10b (owner, 2026-09-24: "make jordan kilganons scorpion accurate"), frame by frame off his All-Star jam: the ball
+  // from the right HIP up that side, folded in behind the head with the elbow up, then the head DUCKS under it with the heels up behind.
+  it('scorpion: from the hip, up the side, behind the head — then the head ducks under the ball, heels up behind', () => {
+    const g = fresh(() => buildScorpion(scene, sk)!);
+    at(g, 0); expect(pos('RightHand').y, 'the ball at the hip').toBeLessThan(hipsY() + 0.3);
+    at(g, 0.18); expect(pos('RightHand').x - pos('RightArm').x, 'up the SIDE').toBeGreaterThan(0.12);
+    at(g, 0.34); expect(pos('RightHand').z, 'folded in behind the head').toBeLessThan(pos('Head').z);
+    expect(pos('RightForeArm').y, 'the elbow up').toBeGreaterThan(pos('RightArm').y);
+    at(g, 0.64);
+    for (const s of ['Left', 'Right']) { expect(pos(`${s}Foot`).z, `${s} heel behind`).toBeLessThan(pos('Hips').z - 0.25); expect(pos(`${s}Foot`).y, `${s} heel up`).toBeGreaterThan(pos(`${s}UpLeg`).y - 0.15); }
+    expect(pos('RightHand').y, 'the ball over the ducked head').toBeGreaterThan(pos('Head').y + 0.15);
+    expect(pos('RightHand').z, '…never out in front of the face').toBeLessThan(pos('Head').z + 0.05);
+    expect(pos('Head').z - pos('Hips').z, 'the head ducked forward, toward the iron').toBeGreaterThan(0.2);
+    expect(pos('Head').y - pos('Neck').y, 'chin down: he never looks').toBeLessThan(0.12);
+  });
+  it('scorpion flush: over the back of the ducked head and through, the tail still up until the ball has gone', () => {
+    const g = fresh(() => buildScorpionFlush(scene, sk)!);
+    at(g, 0.12);
+    expect(pos('RightHand').z, 'over the top, toward the rim').toBeGreaterThan(pos('Head').z);
+    for (const s of ['Left', 'Right']) expect(pos(`${s}Foot`).z, `${s} heel still behind`).toBeLessThan(pos('Hips').z - 0.2);
+    const ducked = pos('Head').y - pos('Neck').y;
+    at(g, SCORPION_FLUSH_SEC); expect(pos('Head').y - pos('Neck').y, 'the head comes up after').toBeGreaterThan(ducked + 0.03);
+  });
+  it('720: the ball pulled in and the knees up TIGHT through the second turn, then thrown open to the rim', () => {
+    const g = fresh(() => buildSpin720(scene, sk)!);
+    for (const t of [0, 0.25, 0.5]) {
+      at(g, t);
+      for (const s of ['Left', 'Right']) expect(pos(`${s}Leg`).y, `${s} knee up @${t}`).toBeGreaterThan(pos('Hips').y - 0.25);
+      expect(pos('RightHand').y, `the ball at the chest @${t}`).toBeLessThan(pos('Head').y);
+    }
+    at(g, SPIN_720_SEC); expect(pos('RightHand').y, 'extended to the rim').toBeGreaterThan(pos('Head').y + 0.25);
   });
   it('lost & found: the ball hand goes behind the back, both hands meet there, the other hand ends at the rim', () => {
     const g = fresh(() => buildLostFound(scene, sk)!);
@@ -629,7 +690,7 @@ describe('dunk tricks', () => {
   // got, so the shared clip could never have passed them.
   it('between the legs: the legs split, the ball goes down through the gap and swaps under the lead thigh', () => {
     const g = fresh(() => buildBetweenLegs(scene, sk)!);
-    at(g, 0.28);
+    at(g, 0.28 + FRONT_SWAP_SEC);   // (phase 10b: the off hand takes it down; the right receives and finishes)
     // a real gap: the lead foot is carried HIGHER than the trail foot, which a tuck (both legs matched)
     // cannot produce. This is the assertion the shared eastbay clip could never have passed.
     // THE SPLIT IS A SCISSOR, not a lift. Measured on the rig: the lead foot goes to z +0.61 and the trail
@@ -638,18 +699,18 @@ describe('dunk tricks', () => {
     // The assertion follows what the body actually does.
     expect(pos('LeftFoot').z - pos('RightFoot').z).toBeGreaterThan(0.8);
     // and the ball is DOWN, below the hips, inside the gap the legs just made
-    expect(pos('RightHand').y).toBeLessThan(hipsY());
-    expect(pos('RightHand').z).toBeLessThan(pos('LeftFoot').z);
-    expect(pos('RightHand').z).toBeGreaterThan(pos('RightFoot').z);
+    expect(pos('LeftHand').y).toBeLessThan(hipsY());
+    expect(pos('LeftHand').z).toBeLessThan(pos('LeftFoot').z);
+    expect(pos('LeftHand').z).toBeGreaterThan(pos('RightFoot').z);
 
     at(g, BETWEEN_LEGS_HANDOFF);
     // both palms on the ball, under the thigh rather than in front of it — this is the transfer
     expect(Vector3.Distance(pos('LeftHand'), pos('RightHand'))).toBeLessThan(0.35);
-    expect(pos('LeftHand').y).toBeLessThan(hipsY());
+    expect(pos('RightHand').y).toBeLessThan(hipsY());
 
-    // and it finishes long and left-handed, the way the flush needs it
+    // and it finishes long, in the DUNKING hand (phase 10b: it used to finish left-handed — the weak hand)
     at(g, BETWEEN_LEGS_SEC);
-    expect(pos('LeftHand').y).toBeGreaterThan(pos('Head').y + 0.15);
+    expect(pos('RightHand').y).toBeGreaterThan(pos('Head').y + 0.15);
   });
 
   it('rock the cradle (Jordan\'s): rocked down and back past the hip, then one arc over the top, on ONE hand', () => {

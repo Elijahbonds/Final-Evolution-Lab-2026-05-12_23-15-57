@@ -3,6 +3,7 @@
 
 export const EASTBAY_TIMING = {
   gather: 0.0,
+  swap: 0.16,        // DUNK MOTION phase 10b: the off hand takes the ball up the front (it goes under the leg FROM the off hand)
   rise: 0.3,
   underKnee: 0.55,   // ball hand reaches under the raised left knee
   handOff: 0.75,     // hand-to-hand pass beneath the leg

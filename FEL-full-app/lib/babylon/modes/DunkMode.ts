@@ -39,7 +39,7 @@ import { firstNight, nextNight, cardWon, type NightState } from '../core/Continu
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK, DUNK_FINISH_VARIETY } from '../nexus/dressingFlags';
-import { attachBallToHand, releaseBall, runHandOffPath, handOffK, clankOffRim, palmOffsetOf, HAND_OFF_BLEND, type HandOffSpec } from '../anim/ballRig';
+import { attachBallToHand, releaseBall, runHandOffPath, handOffK, clankOffRim, palmOffsetOf, HAND_OFF_BLEND, EASTBAY_PASSES, handOffSpecAt, type HandOffSpec } from '../anim/ballRig';
 import { Matrix, Quaternion } from '@babylonjs/core';
 import { bindFrame, type BindFrame } from '../anim/bindFrame';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
@@ -74,7 +74,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { DunkFlight, DunkSpin, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
+import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, isDubble, DUBBLE_HEAD_TOP, DUBBLE_APEX_M, dubbleArc, dubbleArcPower, type ObstacleKind } from '../core/DunkObstacles';
 // DUNK PARKOUR (owner brief 2026-09-18): the glass rebound on the runway (a vector-transfer launch), the two launches, the
@@ -88,7 +88,7 @@ import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor,
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
-import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND } from '../anim/authored/dunkTricks';
+import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { approachAngle, approachBonus, takeoffFor, takeoffTell } from '../core/DunkApproach';
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
@@ -173,6 +173,8 @@ const hs = (side: 'Left' | 'Right'): 'Left' | 'Right' => (RIGHT_HANDED ? (side =
 const hand = (n: 'LeftHand' | 'RightHand'): 'LeftHand' | 'RightHand' => (RIGHT_HANDED ? mirrorSide(n) as 'LeftHand' | 'RightHand' : n);
 /** World-x offsets measured on the left-handed dunker facing −z (the catch points, the off hand's gather) flip with the body. */
 const HX = RIGHT_HANDED ? -1 : 1;
+/** DUNK MOTION phase 10b: the kick-up's ball sits this far above the instep on the kicking foot (a ball's radius less the shoe). */
+const BALL_R_KICK = 0.1;
 /** A frame-space degree triplet (X pitch, Y yaw, Z roll) across the sagittal plane: the pitch stays, the yaw and roll turn. */
 const mirrorDeg = (d: [number, number, number]): [number, number, number] => (RIGHT_HANDED ? [d[0], -d[1], -d[2]] : d);
 const SPIN_TUCK = mirrorDeg(SPIN_TUCK_DEG);
@@ -367,12 +369,16 @@ export const DunkMode: ModeDefinition = (() => {
   let catchPending = false;   // DUNK-SOFTS-NAMED: the hand-local start is solved after this frame's animation + reach (update() sees last frame's hand — 0.3 m stale mid wind-up)
   let activeHandOff: { spec: HandOffSpec; t: number } | null = null;   // the transfer in progress (the reach crossfades on it; the ball is re-placed after the IK)
   let ikSideK = 0;                            // the reach: 0 = the right arm, 1 = the left, blended across a hand-off
-  const EASTBAY_HANDOFF: HandOffSpec = { at: EB.handOff, from: hand('RightHand'), to: hand('LeftHand') };
+  /** DUNK MOTION phase 10b: the eastbay's two passes (ballRig.EASTBAY_PASSES) — into the off hand up the front, back under the thigh
+   *  to the dunking hand — on the right-handed body. */
+  const EASTBAY_HANDOFFS: HandOffSpec[] = EASTBAY_PASSES.map((sp) => ({ ...sp, from: hand(sp.from), to: hand(sp.to) }));
   const LOST_FOUND_SPEC: HandOffSpec = { at: LOST_FOUND_HANDOFF, from: hand('RightHand'), to: hand('LeftHand') };
   // BETWEEN THE LEGS is a transfer too — the ball passes under the lead thigh and comes up in the other
   // hand. Without this the clip mimes a swap the ball never makes, which is worse than no clip at all:
   // the body says one thing and the object in it says another.
-  const BETWEEN_LEGS_SPEC: HandOffSpec = { at: BETWEEN_LEGS_HANDOFF, from: hand('RightHand'), to: hand('LeftHand') };
+  // DUNK MOTION phase 10b: to the DUNKING hand — the off hand takes it up the front (FRONT_SWAP_SEC), the transfer hands it back
+  const FRONT_SWAP: HandOffSpec = { at: FRONT_SWAP_AT, from: hand('RightHand'), to: hand('LeftHand'), blend: FRONT_SWAP_BLEND };
+  const BETWEEN_LEGS_SPECS: HandOffSpec[] = [FRONT_SWAP, { at: BETWEEN_LEGS_HANDOFF, from: hand('LeftHand'), to: hand('RightHand') }];
   /**
    * DUNK MOTION phase 4 (2026-09-23): EVERY pass a named dunk throws, in that trick's own clip seconds. The comment above
    * was written for between the legs, and the rule it states was only ever kept for two tricks. The phase-1 recordings
@@ -380,9 +386,9 @@ export const DunkMode: ModeDefinition = (() => {
    * double eastbay: the clip's left hand carried nothing up to the iron while the ball rode the right hand down by the hip.
    */
   const TRICK_HANDOFFS: Record<string, HandOffSpec[]> = {
-    lostfound: [LOST_FOUND_SPEC], betweenlegs: [BETWEEN_LEGS_SPEC],
-    eastbay: [{ at: EB.handOff, from: hand('RightHand'), to: hand('LeftHand') }],
-    behindback: [{ at: BEHIND_BACK_SWAP, from: hand('RightHand'), to: hand('LeftHand') }],
+    lostfound: [LOST_FOUND_SPEC], betweenlegs: BETWEEN_LEGS_SPECS,
+    eastbay: EASTBAY_HANDOFFS,
+    behindback: [FRONT_SWAP, { at: BEHIND_BACK_SWAP, from: hand('LeftHand'), to: hand('RightHand') }],
     doubleeastbay: [{ at: DOUBLE_EASTBAY_FIRST, from: hand('RightHand'), to: hand('LeftHand') }, { at: DOUBLE_EASTBAY_SECOND, from: hand('LeftHand'), to: hand('RightHand') }],
   };
   /**
@@ -392,13 +398,19 @@ export const DunkMode: ModeDefinition = (() => {
    */
   const CARRY = { Right: 'dunk_carry_up', Left: 'dunk_carry_up_left', Both: 'dunk_carry_up_two' } as const;
   const FLUSH = { Right: 'dunk_flush_one', Left: 'dunk_flush_left', Both: 'dunk_flush_two' } as const;
-  const WAITING_CLIPS = new Set<string>([CARRY.Right, CARRY.Left, CARRY.Both, SPORT_CLIP.dunkScoreHang]);
+  // DUNK MOTION phase 10b: the scorpion ends LOADED (the ball behind the ducked head, the heels up) and waits in that shape for the
+  // SLAM — flowed into the carry-up, the carry stood the body up and the jam was a plain one-hander (measured, p10b-base)
+  const WAITING_CLIPS = new Set<string>([CARRY.Right, CARRY.Left, CARRY.Both, SPORT_CLIP.dunkScoreHang, 'dunk_scorpion']);
+  /** Called tricks that jam in their own shape (phase 10b): the scorpion goes over the back of the ducked head. */
+  const TRICK_FLUSH: Record<string, string> = { scorpion: 'dunk_flush_scorpion' };
   /** The flow into the carry-up is a real blend now (LimbDrag eases the seam as well; the finish-supersedes-the-hang snap
    *  the 0.05 s fade was guarding against was fixed at the animator, which fades a clip out from the weight it HAS). */
   const CARRY_FLOW_FADE_SEC = 0.18;
   /** A trick is paced so its shape is COMPLETE on the slam's beat (the window's centre), not 0.2–0.45 s early with a
    *  waiting clip filling the gap. The eastbay is authored on the flight's own clock: its flush pose is its extend key. */
-  const TRICK_READY_AT: Record<string, number> = { eastbay: EB.extend };
+  // phase 10b: the scorpion is READY at its loaded key (0.5) — the rest is the hold it waits in; paced on its whole 0.8 it ran 1.6×
+  // and the swing from the hip up behind the head happened inside the crossfade
+  const TRICK_READY_AT: Record<string, number> = { eastbay: EB.extend, scorpion: 0.5 };
   const TRICK_RATE_MIN = 0.8, TRICK_RATE_MAX = 1.35;
   let trail: ParticleSystem | null = null;   // juice soft #5
   let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
@@ -698,6 +710,7 @@ export const DunkMode: ModeDefinition = (() => {
   // from the cue (DunkSpin) — never authored into a clip, so no crossfade can leave it half-turned at the slam
   let armedAir: DunkTrick | null = null;
   const spin = new DunkSpin();
+  let spinPeak = 0, spinStepMax = 0;
   let hipsNode: TransformNode | null = null, hipsBf: BindFrame | null = null;
   /** DUNK MOTION phase 3: the limb follower and the wrists (flight only: bodyW fades them in at the take-off, out on the floor). */
   let limbDrag: LimbDrag | null = null, wristLayer: WristLayer | null = null, bodyW = 0, lastBallHand: 'Left' | 'Right' = hs('Right');
@@ -705,7 +718,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  alone and stops the solver's 100°+ one-frame roll). */
   let ikFrame = 0; const REACH_SWING_RATE_DEG = 720;
   const hipsBindInv = Quaternion.Identity(), hipsRaw = Quaternion.Identity(), hipsOut = Quaternion.Identity(); let hipsLayered = false;
-  let liveTricks: { clip: string; t0: number; speed: number }[] = [], liveSpin = { turns: 0, from: 0, until: 0 };   // this attempt's air tricks, for the replay
+  let liveTricks: { clip: string; t0: number; speed: number }[] = [], liveSpin: SpinRecord = { turns: 0, from: 0, until: 0 };   // this attempt's air tricks, for the replay
   // ── DUNK-POSTURE (2026-09-08): the Posture Poses layer — see core/DunkPosture.ts ──────────────────────────────────
   // The clips key the hips and ONE spine bone: the thoracic chain, the clavicles and the head were never authored and held
   // whatever the run loop last left them (a mid-stride twist) for the whole flight. This layer owns them per window,
@@ -1208,7 +1221,7 @@ export const DunkMode: ModeDefinition = (() => {
         }
       }
       // ── RUNWAY TRICKS (DUNK-CONTROL-JUICE): a bare face button while RUN is held — the stick steers, so no direction.
-      // Y = SELF-LOB (also standing, in the approach), B = KICK-UP, X = CARTWHEEL (it tosses the lob itself), A = DOUBLE-UP
+      // Y = SELF-LOB (also standing, in the approach), B = KICK-UP, X = BACK HANDSPRING (it tosses the lob itself), X + down = CARTWHEEL, A = DOUBLE-UP
       // inside the last stretch before the takeoff line at a real run; A anywhere else on the run = jump from here.
       // DUNK MOTION phase 8 (decision "triangle commits"): a BARE Y on the run is the attempt — the J bends in. Y + up / down keeps the
       // glass and bounce lobs; standing, Y is still the self-lob.
@@ -1218,10 +1231,10 @@ export const DunkMode: ModeDefinition = (() => {
         // DUNK-GLASS-BOUNCE: Y with the d-pad HELD up = off the glass, down = the bounce lob (pad / touch; the keyboard's arrows
         // are the stick); a bare Y throws the variant the PROP ring picked, or the plain self-lob
         const held = heldDpad && !heldDpadKey && (heldDpad === 'up' || heldDpad === 'down') ? heldDpad : null;
-        // Y + up/down picks the lob variant (off the glass, off the bounce); B + up is the BACKFLIP (owner, 2026-09-16).
-        // Every other button ignores the direction, so a held stick-hand never turns a kick-up into something else.
-        const variant = e.btn === 'Y' ? (held ?? (prop === 'offglass' ? 'up' : prop === 'bounce' ? 'down' : null))
-          : e.btn === 'B' && held === 'up' ? 'up' : null;
+        // Y + up/down picks the lob variant (off the glass, off the bounce); B + up is the BACKFLIP (owner, 2026-09-16); X + down is Jus
+        // Fly's CARTWHEEL (phase 10b). A direction with no variant on that button falls back to the plain trick (runwayTrickFor), so a
+        // held stick-hand never turns a kick-up into something else.
+        const variant = e.btn === 'Y' ? (held ?? (prop === 'offglass' ? 'up' : prop === 'bounce' ? 'down' : null)) : held;
         if (held && dpadPick && dpadPick.dir === held) dpadPick.fired = true;   // the d-pad was the variant, not a prop pick
         const rt = runwayTrickFor(e.btn, variant);
         // DUNK MOTION phase 10 (owner decision): A on the run is the TAKE-OFF — over the Dubble Up's helper, or from wherever you are. The
@@ -1559,7 +1572,10 @@ export const DunkMode: ModeDefinition = (() => {
             && (!qteWindowOpen || (!qteHit && clipTime <= cueLastAt(armedAir)))) {
           const a = armedAir; armedAir = null; fireTrick(ctx, a, 'armed');
         }
-        spin.update(clipTime);   // the momentum-led turn rides the flight's own clock (the hang slow-mo stretches both)
+        { const was = spin.yaw, turning = spin.record.turns !== 0; spin.update(clipTime);   // the momentum-led turn rides the flight's own clock (the hang slow-mo stretches both)
+          // phase 10b: the turn's own telemetry — how far it went and its biggest single-frame step (the 720 is two turns in one window)
+          if (turning) { spinPeak = Math.max(spinPeak, Math.abs(spin.yaw)); if (spin.yaw !== 0) spinStepMax = Math.max(spinStepMax, Math.abs(spin.yaw - was)); }
+          if (turning && spin.record.turns === 0) { console.info(`[DUNK-CUE] spin landed: ${(spinPeak * 180 / Math.PI).toFixed(0)}° turned, peak step ${(spinStepMax * 180 / Math.PI).toFixed(1)}°/frame`); spinPeak = 0; spinStepMax = 0; } }
         // ── the lob: the ball flies in CLIP time through the hang (the slow-mo stretches both), the catch is the hand ──
         if (lob.live) {
           stepLob(ctx, dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));
@@ -1576,12 +1592,13 @@ export const DunkMode: ModeDefinition = (() => {
           if (airTrick && specs) {
             // the trick's OWN clip seconds (it is paced to the slam — phase 4), and the pass whose beat is still ahead or under way
             const t = (clipTime - airTrick.t0) * airTrick.rate;
-            const spec = specs.find((sp) => t < sp.at + (sp.blend ?? HAND_OFF_BLEND)) ?? specs[specs.length - 1];
+            const spec = handOffSpecAt(specs, t);
             activeHandOff = { spec, t };
             if (runHandOffPath(ball, player.skeleton, t, spec, ebState)) console.info(`[HANDS] handoff ${spec.from[0]}→${spec.to[0]} ${airTrick.trick.id} @${t.toFixed(2)}`);
           } else if (style === 'sig') {
-            activeHandOff = { spec: EASTBAY_HANDOFF, t: clipTime };
-            if (runHandOffPath(ball, player.skeleton, clipTime, EASTBAY_HANDOFF, ebState)) console.info(`[HANDS] handoff ${EASTBAY_HANDOFF.from[0]}→${EASTBAY_HANDOFF.to[0]} eastbay @${clipTime.toFixed(2)}`);
+            const spec = handOffSpecAt(EASTBAY_HANDOFFS, clipTime);
+            activeHandOff = { spec, t: clipTime };
+            if (runHandOffPath(ball, player.skeleton, clipTime, spec, ebState)) console.info(`[HANDS] handoff ${spec.from[0]}→${spec.to[0]} eastbay @${clipTime.toFixed(2)}`);
           }
         }
         ikSideK = activeHandOff ? handOffK(activeHandOff.t, activeHandOff.spec) : (ebState.inLeftHand ? 1 : 0);
@@ -2114,6 +2131,7 @@ export const DunkMode: ModeDefinition = (() => {
     // Every other named dunk finished on the generic two-hand hang, a one-hand dunk flushed with two.
     void acc;
     if (leftHand) return FLUSH.Left;
+    if (called && TRICK_FLUSH[called]) return TRICK_FLUSH[called];
     if (called || lob.caught) return FLUSH.Right;
     return launchFoot === 'one' ? FLUSH.Right : FLUSH.Both;   // the plain flight flushes the way it went up (phase 7): one hand off one foot, two off two
   }
@@ -2253,6 +2271,22 @@ export const DunkMode: ModeDefinition = (() => {
       if (isA) { if (trick) console.info(`[DUNK-CUE] ${trick.id}'s direction is spent — the press is the SLAM`); bufferSlam(); }
       return;
     }
+    // DUNK MOTION phase 10b — THE 720: the 360 thrown AGAIN — twice before the rise, or once more while the first turn is still going
+    if (trick.id === 'spin360' && !isA) {
+      if (armedAir?.id === 'spin360') {
+        armedAir = SPIN_720; console.info(`[DUNK-CUE] armed 720 @${clipTime.toFixed(2)} → fires @${cueFireAt(SPIN_720).toFixed(2)}`);
+        flash(ctx, `720 ARMED · ${CUE_BEAT_LABEL[cueOf(SPIN_720).fire]}`, 600); SoundKit.play('uiTick', { pitch: 1.6, volume: 0.3 });
+        return;
+      }
+      if (airTrick?.trick.id === 'spin360' && spin.active) {
+        if (spinProgress(spin.record, clipTime) <= SPIN_720_UPGRADE_BY && clipTime <= cueLastAt(SPIN_720)) { upgradeTo720(ctx); return; }
+        refuse(ctx, 'TOO LATE FOR THE 720 — THROW THE 360 AGAIN EARLIER IN THE TURN');
+        return;
+      }
+      if (airTrick?.trick.id === 'spin720') return;   // two turns is the whole flight's worth
+    }
+    // a second whole-body turn cannot start on top of one still turning (it restarted the yaw layer: a visible snap)
+    if (!isA && cueOf(trick).facing === 'spinThrough' && spin.active && (spin.record.turns !== 0)) { refuse(ctx, 'ONE TURN AT A TIME — LET IT LAND'); return; }
     const v = cueVerdict(trick, clipTime), cue = cueOf(trick);
     if (v === 'early') {
       if (armedAir) return;   // one cue armed at a time — the first press is the one that fires
@@ -2301,6 +2335,23 @@ export const DunkMode: ModeDefinition = (() => {
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
     flash(ctx, trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`, 700);
     ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
+  }
+  /** DUNK MOTION phase 10b: the 360 carries on into a second turn — the same slot in the flight, the turn extended from where the body
+   *  is and as fast as it is going (DunkSpin.extend), the body tucked tighter for the second revolution. */
+  function upgradeTo720(ctx: ModeContext): void {
+    if (!flight.upgrade('spin360', SPIN_720)) return;
+    const i = trickLabels.lastIndexOf('360'); if (i >= 0) trickLabels[i] = SPIN_720.label;
+    spin.extend(HX, clipTime, SPIN_RESOLVE_T); liveSpin = spin.record;
+    const rate = trickRate(SPIN_720);
+    airTrick = { trick: SPIN_720, t0: clipTime, rate };
+    liveTricks.push({ clip: SPIN_720.clip, t0: clipTime, speed: rate });
+    console.info(`[DUNK-TRICK] air spin720 @${clipTime.toFixed(2)} (the 360 thrown again: 2 turns, rim-facing by ${SPIN_RESOLVE_T.toFixed(2)})`);
+    playAir(SPIN_720.clip, rate, 0.12);
+    hype = Math.min(100, hype + 8);
+    SoundKit.play('whoosh', { pitch: 1.1 + SPIN_720.difficulty * 0.08, volume: 0.5 });
+    SoundKit.play('crowdCheer', { volume: 0.55 });
+    flash(ctx, trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : '720!', 700);
+    ctx.camDirector.pulse(0.6, 0.5);
   }
   /** DUNK MOTION phase 4: the pace that lands this trick's flush pose on the window's centre (a touch before it), clamped so a
    *  body never visibly speeds up or slows down by more than a third. */
@@ -3048,19 +3099,44 @@ export const DunkMode: ModeDefinition = (() => {
     playClip(rt.clip, { fadeSec: 0.08, onEnd: () => { if (token === runwayToken) endRunwayBeat(); } });
     flash(ctx, rt.label, 650);
     runwayLabels.push(rt.label); runwayIds.push(rt.id); runwayDifficulty += rt.difficulty;
-    SoundKit.play('whoosh', { pitch: rt.id === 'cartwheel' ? 0.8 : 1.2, volume: 0.4 });
+    SoundKit.play('whoosh', { pitch: rt.id === 'handspring' || rt.id === 'cartwheel' ? 0.8 : 1.2, volume: 0.4 });
     ctx.camDirector.pulse(0.3, 0.35);
-    // the kick-up drops the ball to the foot: it leaves the hand at once, the kick launches it from wherever it fell
-    if (rt.id === 'kickup') { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ballSim.launch(releasePos, new Vector3(0, -0.4, -holdRunSpeed * 0.4)); lob.live = true; lob.thrown = true; lob.label = rt.label; }
+    // the kick-up drops the ball to the foot: it leaves the hand at once and falls ONTO the kicking foot for the contact (DUNK MOTION
+    // phase 10b — it used to free-fall to the floor a stride away while the foot kicked the air, and the lob left from the floor)
+    if (rt.id === 'kickup') {
+      releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ballSim.stop();
+      kickDropFrom.copyFrom(releasePos).subtractInPlace(player.root.position);
+      lob.live = true; lob.thrown = true; lob.label = rt.label;
+    }
+  }
+  const kickDropFrom = new Vector3(), _kickFoot = new Vector3();
+  /** Where the kicking foot holds the ball (world): over the instep, a ball's radius up — the right foot, mirrored onto the rig. */
+  function kickFootPoint(out: Vector3): Vector3 | null {
+    const foot = boneNode(player.skeleton, `${hs('Right')}Foot`), toe = boneNode(player.skeleton, `${hs('Right')}ToeBase`);
+    if (!foot) return null;
+    foot.computeWorldMatrix(true); out.copyFrom(foot.getAbsolutePosition());
+    if (toe) { toe.computeWorldMatrix(true); Vector3.LerpToRef(out, toe.getAbsolutePosition(), 0.6, out); }
+    out.y += BALL_R_KICK;
+    return out;
+  }
+  /** Phase 10b: the kick-up's ball, from the hand onto the foot — falling (eased in, like gravity) with the runner, landing on the
+   *  instep at the contact. Runs every frame of the beat until the kick. */
+  function kickDropTick(rt: RunwayTrick): void {
+    if (rt.id !== 'kickup' || runwayReleased || rt.releaseAt == null) return;
+    const to = kickFootPoint(_kickFoot); if (!to) return;
+    const u = clamp(runwayT / rt.releaseAt, 0, 1), k = u * u;
+    const x = player.root.position.x + kickDropFrom.x, y = player.root.position.y + kickDropFrom.y, z = player.root.position.z + kickDropFrom.z;
+    ball.position.set(x + (to.x - x) * k, y + (to.y - y) * k, z + (to.z - z) * k);
   }
   function runwayTick(ctx: ModeContext, dt: number): void {
     if (!runwayBeat) return;
     runwayT += dt;
     const rt = runwayBeat;
+    kickDropTick(rt);
     if (rt.releaseAt != null && !runwayReleased && runwayT >= rt.releaseAt) {
       runwayReleased = true;
+      if (rt.id === 'kickup') { ballSim.stop(); if (kickFootPoint(_kickFoot)) ball.position.copyFrom(_kickFoot); SoundKit.play('uiTick', { pitch: 0.6, volume: 0.5 }); }   // the flick: it leaves from the foot
       const from = ball.getAbsolutePosition().clone();
-      if (rt.id === 'kickup') { ballSim.stop(); }   // the drop ends at the foot — the kick takes over from where the ball is
       // the toss arrives at the catch beat: the run to the takeoff line (slower under the rest of this beat, and the beat must
       // end before the takeoff), then the flight's own catch beat — real seconds on the runway, clip seconds in the air
       // the beat ends when its CLIP ends: the back handspring's clip is shorter than the trick's nominal sec (0.63 vs 0.8 measured), so
@@ -3082,7 +3158,8 @@ export const DunkMode: ModeDefinition = (() => {
       chargeAtLaunch = Math.max(charge, Math.min(1, (phaseSec + tLaunch) / 1.1));   // the keyboard's hold ramps over 1.1 s; a pad's depth is what it is
       if (rt.id === 'offglass') throwGlassLob(ctx, from, tLaunch + GLASS_CATCH_CLIP_T, phase !== 'charge', dist);
       else if (rt.id === 'bounce') throwBounceLob(ctx, from, tLaunch + LOB_CATCH_CLIP_T, phase !== 'charge', dist);
-      else throwLob(ctx, from, rt.id === 'cartwheel' ? 'SELF-LOB' : rt.label, tLaunch + LOB_CATCH_CLIP_T);
+      else if (rt.id === 'cartwheel') throwBounceLob(ctx, from, tLaunch + LOB_CATCH_CLIP_T, phase !== 'charge', dist);   // phase 10b: Jus Fly throws it into the floor and takes it off the bounce
+      else throwLob(ctx, from, rt.id === 'handspring' ? 'SELF-LOB' : rt.label, tLaunch + LOB_CATCH_CLIP_T);
     }
     // DUNK-SOFTS-NAMED: a queued takeoff leaves while the beat is still playing, so the launch clip crossfades out of its last
     // pose — launched from the beat's END (the hop's crouch, the cartwheel's upright) that pose was already gone and the takeoff

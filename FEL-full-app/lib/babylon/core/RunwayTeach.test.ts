@@ -15,7 +15,7 @@ describe('the runway teaching line', () => {
     for (const t of RUNWAY_TRICKS) {
       if (!t.teach || STANDING_ONLY.has(t.id)) continue;
       expect(line).toContain(t.teach);
-      expect(line).toContain(`${t.btn}${t.dir === 'up' ? '+UP' : ''} ${t.teach}`);
+      expect(line).toContain(`${t.btn}${t.dir ? `+${t.dir.toUpperCase()}` : ''} ${t.teach}`);
     }
   });
 

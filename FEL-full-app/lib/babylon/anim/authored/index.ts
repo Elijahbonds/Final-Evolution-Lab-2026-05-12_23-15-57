@@ -17,7 +17,7 @@ import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebr
 import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildScoopLayup, buildSpinLayup, buildHangLayup, buildShimmy, buildDropStep } from './basketball';   // ACROBATIC LAYUPS + THE POST GAME (2026-09-18)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildDubbleHold, buildDubbleKneel, buildBikeRider, buildSkateRider } from './stackProp';
-import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildBackflip, buildDoubleUp, buildScorpion, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
+import { buildSelfLob, buildBounceThrow, buildKickUp, buildBackHandspring, buildCartwheel, buildBackflip, buildDoubleUp, buildScorpion, buildScorpionFlush, buildSpin720, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildWindmill360, buildFakeEastbay, buildTap } from './dunkTricks';
 import { buildIdleStand, buildStrafe, buildJumpUp, buildJumpLand } from './locomotion';
 import { buildBaseClips } from './baseClips';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdownSpike, buildStiffArm, buildQbThrow } from './football';
@@ -88,17 +88,20 @@ export function registerAuthoredClips(
     ['dunk_bounce_throw', () => buildBounceThrow(scene, skeleton)],   // DUNK-GLASS-BOUNCE: the bounce lob's two-hand throw down
     ['dunk_kick_up', () => buildKickUp(scene, skeleton)],
     ['dunk_back_handspring', () => buildBackHandspring(scene, skeleton)],
+    ['dunk_cartwheel', () => buildCartwheel(scene, skeleton)],   // DUNK MOTION phase 10b: Jus Fly's
     ['dunk_backflip', () => buildBackflip(scene, skeleton)],
     ['prop_stack_base', () => buildStackBase(scene, skeleton)],
     ['prop_stack_rider', () => buildStackRider(scene, skeleton)],
     ['dunk_double_up', () => buildDoubleUp(scene, skeleton)],
     ['dunk_scorpion', () => buildScorpion(scene, skeleton)],
+    ['dunk_flush_scorpion', () => buildScorpionFlush(scene, skeleton)],   // phase 10b: the scorpion jams in its own shape
     ['dunk_lost_found', () => buildLostFound(scene, skeleton)],
     ['dunk_hide_seek', () => buildHideSeek(scene, skeleton)],
     ['dunk_between_legs', () => buildBetweenLegs(scene, skeleton)],   // the hardest trick finally has its own body (it shared the eastbay's)
     ['dunk_cradle', () => buildCradle(scene, skeleton)],
     ['dunk_double_clutch', () => buildDoubleClutch(scene, skeleton)],
     ['dunk_360_spin', () => buildSpin360(scene, skeleton)],
+    ['dunk_720_spin', () => buildSpin720(scene, skeleton)],   // phase 10b: the 720
     ['football_juke_left', () => buildJuke(scene, skeleton, 'left')],
     ['football_juke_right', () => buildJuke(scene, skeleton, 'right')],
     ['football_spin_move', () => buildSpinMove(scene, skeleton)],

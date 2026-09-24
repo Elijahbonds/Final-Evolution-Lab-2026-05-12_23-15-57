@@ -52,8 +52,10 @@ export function spinBody(u01: number, turns: number): SpinBody {
   return { tuck, tilt, spot: 1 - lost };
 }
 
-/** Progress through a turn's window, from the flight's own clock — 0 before it starts, 1 once it is caught. */
-export function spinProgress(rec: { turns: number; from: number; until: number }, t: number): number {
+/** Progress through a turn's window, from the flight's own clock — 0 before it starts, 1 once it is caught. A turn that grew
+ *  mid-flight (the 720, DunkSpin.extend) is one window from where it first began, so the tuck never re-opens between the turns. */
+export function spinProgress(rec: { turns: number; from: number; until: number; start?: number }, t: number): number {
   if (!rec.turns) return 1;
-  return Math.min(1, Math.max(0, (t - rec.from) / Math.max(1e-3, rec.until - rec.from)));
+  const from = rec.start ?? rec.from;
+  return Math.min(1, Math.max(0, (t - from) / Math.max(1e-3, rec.until - from)));
 }

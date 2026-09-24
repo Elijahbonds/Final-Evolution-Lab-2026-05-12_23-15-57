@@ -72,8 +72,18 @@ export const DUNK_TRICKS: DunkTrick[] = [
   { id: 'tap', label: 'THE TAP', dir: 'up', btn: 'B', clip: 'dunk_tap', difficulty: 2.8, windowCost: 0.26 },
 ];
 
+/**
+ * THE 720 (owner, 2026-09-24: "720"). Two whole turns before the slam — Taurian "Air Up There" Fontenette threw the first one on an
+ * AND1 fast break in 2006. The sixteen direction + button slots are all taken, and a 720 is not a different dunk from the 360, it is
+ * MORE of it: so it is the 360's press thrown AGAIN while the first turn is still going (or twice before the rise). The turn carries
+ * straight on into a second revolution (DunkSpin.extend: the same speed, no restart), and the flight holds one trick, not two.
+ */
+export const SPIN_720: DunkTrick = { id: 'spin720', label: '720', dir: 'right', btn: 'B', clip: 'dunk_720_spin', difficulty: 4.6, windowCost: 0.5 };
+/** The 360 can become a 720 until this far through its turn (the second revolution needs the rest of the window). */
+export const SPIN_720_UPGRADE_BY = 0.55;
+
 /** Trick id by its clip (the replay re-fires clips; the posture layer wants the trick). */
-export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries(DUNK_TRICKS.map((t) => [t.clip, t.id]));
+export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries([...DUNK_TRICKS, SPIN_720].map((t) => [t.clip, t.id]));
 
 // ── Runway tricks (DUNK-CONTROL-JUICE, 2026-09-08) ─────────────────────────
 // Thrown DURING THE HOLD-RUN (the stick steers, so no direction is held): a bare face button while RUN is down. The
@@ -81,7 +91,7 @@ export const DUNK_TRICK_ID_BY_CLIP: Record<string, string> = Object.fromEntries(
 // cartwheel tosses the lob itself and rolls under it, the double-up is the two-foot hop gather into the takeoff.
 // None of them spend the air budget — they are judged as difficulty on top of the flight's own tricks.
 export interface RunwayTrick {
-  id: 'selflob' | 'kickup' | 'cartwheel' | 'offglass' | 'bounce' | 'backflip';
+  id: 'selflob' | 'kickup' | 'handspring' | 'cartwheel' | 'offglass' | 'bounce' | 'backflip';
   label: string;
   btn: 'A' | 'B' | 'X' | 'Y';
   /** DUNK-GLASS-BOUNCE: a d-pad direction HELD with the button picks a variant (up + Y = off the glass, down + Y = the
@@ -100,8 +110,15 @@ export interface RunwayTrick {
 }
 export const RUNWAY_TRICKS: RunwayTrick[] = [
   { id: 'selflob', label: 'SELF-LOB', btn: 'Y', clip: 'dunk_self_lob', sec: 0.5, difficulty: 1.6, releaseAt: 0.3, runScale: 0.85, teach: 'LOB' },
-  { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.55, difficulty: 2.2, releaseAt: 0.32, runScale: 0.55, teach: 'KICK-UP' },
-  { id: 'cartwheel', label: 'BACK HANDSPRING', btn: 'X', clip: 'dunk_back_handspring', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7, teach: 'HANDSPRING' },
+  // DUNK MOTION phase 10b (owner, 2026-09-24: "make my kick up more accurate"): his own, from his "2 new dunks" video — bent over the
+  // dribble, the ball flicked up off the foot from the floor, into the take-off and caught in the air. The ball is ON the foot at the
+  // contact (it used to free-fall to the floor while the foot kicked the air at waist height)
+  { id: 'kickup', label: 'KICK-UP', btn: 'B', clip: 'dunk_kick_up', sec: 0.5, difficulty: 2.2, releaseAt: 0.24, runScale: 0.6, teach: 'KICK-UP' },
+  { id: 'handspring', label: 'BACK HANDSPRING', btn: 'X', clip: 'dunk_back_handspring', sec: 0.8, difficulty: 2.8, releaseAt: 0.05, runScale: 0.7, teach: 'HANDSPRING' },
+  // JUS FLY'S CARTWHEEL (owner, 2026-09-24: "add the jusflys cartwheel dunk"). Justin "Jus Fly" Darlington throws the ball down, goes
+  // over in a real cartwheel — side-on, hand, hand, foot, foot — and grabs the ball on its way up off the bounce, then takes it under the
+  // legs and slams it with the right hand (THE CARTWHEEL EASTBAY below). X is the gymnastics button; DOWN is the ball into the floor.
+  { id: 'cartwheel', label: 'CARTWHEEL', btn: 'X', dir: 'down', clip: 'dunk_cartwheel', sec: 1.0, difficulty: 3.0, releaseAt: 0.1, runScale: 0.35, teach: 'CARTWHEEL' },
   // DUNK-GLASS-BOUNCE (2026-09-08): the same two-hand toss thrown AT THE GLASS (the ball comes back off the board to the
   // hand), and a two-hand throw DOWN into the floor that bounces up to the hand once or twice (WDA "Bounce Ball")
   // THE BACKFLIP (owner, 2026-09-16). B is the kick-up; B with UP held is the flip — the ball goes up ahead of you, you
@@ -146,7 +163,7 @@ export function runwayTeachLine(s: { distToLine: number; speed: number; ballThro
   if (s.ballThrown) return 'CATCH IT — take it to the rim';
   if (s.dubble) return 'DUBBLE UP — A to go up over him · the ball comes off his head in the air';   // DUNK MOTION phase 10
   const moves = RUNWAY_TRICKS.filter((t) => t.teach && !STANDING_ONLY.has(t.id))
-    .map((t) => `${t.btn}${t.dir === 'up' ? '+UP' : ''} ${t.teach}`);
+    .map((t) => `${t.btn}${t.dir ? `+${t.dir.toUpperCase()}` : ''} ${t.teach}`);
   if (!s.committed) moves.unshift(`Y ${RUN_COMMIT_TEACH}`);
   return `${moves.join(' · ')} — then release to jump`;
 }
@@ -179,6 +196,7 @@ export const DUNK_CUES: Record<string, DunkCue> = {
   // flush (Wilkins). Fired at the rise, its 0.6 s capture was over by the hang and the flight waited 0.4 s for the slam.
   windmill:    { fire: 'rise', last: 'hang', facing: 'faceRim' },   // phase 6: the circle at real speed (0.85 s) needs the flight from the rise; paced to the slam
   spin360:     { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 1 },   // the turn needs the flight: rise → carry-up
+  spin720:     { fire: 'rise', last: 'hang',    facing: 'spinThrough', turns: 2 },   // phase 10b: the 360 thrown again — two turns in the same window
   eastbay:     { fire: 'rise', last: 'hang',    facing: 'faceRim' },                 // a 1.5 s body: it has to start early
   tomahawk:    { fire: 'hang', last: 'preSlam', facing: 'faceRim' },
   betweenlegs: { fire: 'rise', last: 'hang',    facing: 'faceRim' },
@@ -298,26 +316,55 @@ const TAU = Math.PI * 2;
 /** The momentum-led turn: a whole number of turns of the hips from clip `from`, resolved (rim-facing again) by clip
  *  `until` whatever the flight has left — fired at the rise it is an easy turn, fired at the hang a quick one. Smoothstep:
  *  a wind-up, the turn, the catch. Pure: the mode reads `yaw` and writes it onto the hips after the clips evaluate. */
+/** A turn's plan: `turns` whole turns in all (the target is turns·2π), leaving yaw `y0` at rate `v0` (rad per clip second) at
+ *  `from` — 0 and 0 for a turn from standing — and landed inside SPIN_LAND_FRAC of the window to `until`. `prev` is the plan it grew
+ *  out of (the 360 a 720 extended), `start` where the whole turn began. */
+export interface SpinRecord { turns: number; from: number; until: number; y0?: number; v0?: number; prev?: SpinRecord; start?: number }
 export class DunkSpin {
   private turns = 0; private from = 0; private until = 0; private yawNow = 0; private settling = false;
+  private y0 = 0; private v0 = 0; private prev: SpinRecord | undefined; private start0: number | undefined;
   get yaw(): number { return this.yawNow; }
   /** A turn is in progress or still settling. */
   get active(): boolean { return this.turns !== 0 || this.settling; }
-  get record(): { turns: number; from: number; until: number } { return { turns: this.turns, from: this.from, until: this.until }; }
+  get record(): SpinRecord {
+    const r: SpinRecord = { turns: this.turns, from: this.from, until: this.until };
+    if (this.y0 || this.v0) { r.y0 = this.y0; r.v0 = this.v0; }
+    if (this.prev) { r.prev = this.prev; r.start = this.start0; }
+    return r;
+  }
   start(turns: number, from: number, until: number): void {
     this.turns = turns; this.from = from; this.until = Math.max(from + 0.05, until); this.settling = false;
+    this.y0 = 0; this.v0 = 0; this.prev = undefined; this.start0 = undefined;
   }
-  static yawAt(rec: { turns: number; from: number; until: number }, t: number): number {
+  /**
+   * DUNK MOTION phase 10b (the 720): add `extra` whole turns to the turn in flight, from clip `t`, landed by `until`. The new plan
+   * leaves from exactly where the body is and exactly as fast as it is turning (a cubic Hermite from the current yaw and rate to the
+   * new whole turn), so the second revolution is the first one carrying on — never a restart. False if nothing is turning.
+   */
+  extend(extra: number, t: number, until: number): boolean {
+    if (!this.turns || this.settling || !extra) return false;
+    const rec = this.record, h = 1 / 240;
+    const y = DunkSpin.yawAt(rec, t);
+    const v = (DunkSpin.yawAt(rec, t + h) - DunkSpin.yawAt(rec, Math.max(rec.from, t - h))) / (t + h - Math.max(rec.from, t - h));
+    this.prev = rec; this.start0 = rec.start ?? rec.from;
+    this.turns += extra; this.from = t; this.until = Math.max(t + 0.05, until); this.y0 = y; this.v0 = v;
+    return true;
+  }
+  static yawAt(rec: SpinRecord, t: number): number {
     if (!rec.turns) return 0;
+    if (rec.prev && t < rec.from) return DunkSpin.yawAt(rec.prev, t);
     // DUNK-BODY-MID (2026-09-09): the turn LANDS, then the body holds square. The smoothstep ran the full width of the
     // window, so the last tenth of the turn ate its last third — the chest was still coming home while the reach for the
     // iron had already started, and a 360 called at the hang measured 50° off the rim a quarter-second before the jam
     // (the SLAM buffer resolves the flight at the window's opening edge now, which is where that tail became visible).
     // The turn is finished inside SPIN_LAND_FRAC of its window and the rest is a settled, rim-facing beat before the
     // carry-up. Same wind-up, same eased catch, just not spread over the reach.
-    const u = Math.min(1, Math.max(0, (t - rec.from) / ((rec.until - rec.from) * SPIN_LAND_FRAC)));
-    const k = u * u * (3 - 2 * u);
-    return k >= 1 ? 0 : rec.turns * TAU * k;   // a completed turn IS rim-facing: 0, not 2π (nothing to unwind)
+    // (phase 10b: written as the cubic Hermite from (y0, v0) to the whole turn at rest — with y0 = v0 = 0 it IS that smoothstep.)
+    const d = (rec.until - rec.from) * SPIN_LAND_FRAC;
+    const u = Math.min(1, Math.max(0, (t - rec.from) / d));
+    const u2 = u * u, u3 = u2 * u, k = 3 * u2 - 2 * u3;
+    if (u >= 1 || k >= 1) return 0;   // a completed turn IS rim-facing: 0, not 2π (nothing to unwind)
+    return (2 * u3 - 3 * u2 + 1) * (rec.y0 ?? 0) + (u3 - 2 * u2 + u) * d * (rec.v0 ?? 0) + k * rec.turns * TAU;
   }
   /** Drive from the flight's clip time. */
   update(t: number): number {
@@ -337,7 +384,7 @@ export class DunkSpin {
     else this.yawNow += Math.sign(d) * step;
     return this.yawNow;
   }
-  reset(): void { this.turns = 0; this.from = 0; this.until = 0; this.yawNow = 0; this.settling = false; }
+  reset(): void { this.turns = 0; this.from = 0; this.until = 0; this.yawNow = 0; this.settling = false; this.y0 = 0; this.v0 = 0; this.prev = undefined; this.start0 = undefined; }
 }
 
 /** DUNK-BODY-MID (2026-09-09): the air a flight needs to hold TWO tricks, decided ONCE at the takeoff from the run-up
@@ -395,6 +442,10 @@ export interface SignatureDunk {
 }
 export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
   { id: 'kickup_eastbay', runway: 'kickup', air: ['eastbay'], name: 'THE KICK-UP EASTBAY', by: 'Elijah Bonds', nod: 1.2 },
+  // DUNK MOTION phase 10b (owner, 2026-09-24). Jus Fly's, from the Nike dunk contest: the cartwheel, the grab off the bounce, under the
+  // legs, the right hand. And the 720 — two whole turns before the slam — first thrown by Taurian "Air Up There" Fontenette (AND1, 2006).
+  { id: 'cartwheel_eastbay', runway: 'cartwheel', air: ['eastbay'], name: 'THE CARTWHEEL EASTBAY', by: 'Jus Fly', nod: 1.6 },
+  { id: '720', air: ['spin720'], name: 'THE 720', by: 'Taurian Fontenette', nod: 1.4 },
   // THE CHAINS (owner, 2026-09-16). Named combinations, in the order they have to be thrown — a signature is a
   // sequence, not a set, so throwing the same two the other way round is a combo but not THIS combo.
   { id: 'btb_btl', air: ['behindback', 'betweenlegs'], name: 'BEHIND THE BACK BETWEEN THE LEGS', by: 'Team Flight Brothers', nod: 1.4 },
@@ -588,6 +639,17 @@ export class DunkFlight {
   }
 
   get currentTrick(): DunkTrick | null { return this.tricks[this.tricks.length - 1] ?? null; }
+  /** DUNK MOTION phase 10b: a trick grows into its bigger self mid-flight (the 360 thrown again is the 720) — the same slot in the
+   *  flight, so it never counts as a second trick, and the bigger one's window tax in place of the smaller one's. */
+  upgrade(fromId: string, to: DunkTrick): boolean {
+    const i = this.tricks.map((t) => t.id).lastIndexOf(fromId);
+    if (i < 0) return false;
+    const was = this.tricks[i];
+    this.tricks[i] = to;
+    this.airLeft *= (1 - to.windowCost) / Math.max(1e-6, 1 - was.windowCost);
+    this.slamWindow *= (1 - to.windowCost * 0.5) / Math.max(1e-6, 1 - was.windowCost * 0.5);
+    return true;
+  }
   get inSlamWindow(): boolean { return this.phase === 'slamWindow'; }
   get airRemaining01(): number { return this.airTotal > 0 ? Math.max(0, this.airLeft / this.airTotal) : 0; }
   /** Product of each trick's window tax — modes multiply their slam window

@@ -42,7 +42,7 @@ import { BallSim } from '../core/BallPhysics';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK } from '../nexus/dressingFlags';
-import { attachBallToHand, releaseBall, runEastbayPath, runHandOffPath, handOffK, flushThroughRim, clankOffRim, type HandOffSpec } from '../anim/ballRig';
+import { attachBallToHand, releaseBall, runEastbayPath, runHandOffPath, handOffK, flushThroughRim, clankOffRim, EASTBAY_PASSES, handOffSpecAt, type HandOffSpec } from '../anim/ballRig';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind, OBSTACLE_KINDS } from '../core/DunkObstacles';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { boneNode } from '../anim/boneLookup';
@@ -88,7 +88,6 @@ type Prop = 'none' | ObstacleKind;
 const PROP_LABEL: Record<Prop, string> = { none: 'NO PROP', ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].label])) } as Record<Prop, string>;
 const PROP_BONUS: Record<Prop, number> = { none: 0, ...Object.fromEntries(OBSTACLE_KINDS.map((k) => [k, OBSTACLE_SPECS[k].bonus])) } as Record<Prop, number>;
 const FLUSH_Z_AHEAD = 0.6;
-const EASTBAY_HANDOFF: HandOffSpec = { at: EASTBAY_TIMING.handOff, from: 'RightHand', to: 'LeftHand' };
 const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;   // Dunk play tip (2026-09-07): the dunk mirror's stick speed / rim-facing ease
 const TURN_RATE = 10, RETREAT_Z = CFG.startZ + 1.5;   // the facing slew (rad/s); how far a pull-back may back off the runway
 const wrapYaw = (y: number): number => Math.atan2(Math.sin(y), Math.cos(y));   // the Euler yaw stays in (−π, π]
@@ -650,8 +649,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         const c = active();
-        activeHandOff = style === 'sig' ? { spec: EASTBAY_HANDOFF, t: clipTime } : null;
-        if (style === 'sig' && runEastbayPath(ball, c.skeleton, clipTime, ebState)) console.info(`[HANDS] handoff R→L eastbay @${clipTime.toFixed(2)}`);
+        activeHandOff = style === 'sig' ? { spec: handOffSpecAt(EASTBAY_PASSES, clipTime), t: clipTime } : null;   // DUNK MOTION phase 10b: up the front to the off hand, back under the thigh
+        if (style === 'sig' && runEastbayPath(ball, c.skeleton, clipTime, ebState)) console.info(`[HANDS] handoff ${activeHandOff!.spec.from[0]}→${activeHandOff!.spec.to[0]} eastbay @${clipTime.toFixed(2)}`);
         ikSideK = activeHandOff ? handOffK(activeHandOff.t, activeHandOff.spec) : (ebState.inLeftHand ? 1 : 0);
         // A+ P8 H4: the ball stays parented to the ball hand through the hang — a lost parent that is not a release re-attaches
         if (!ball.parent && !ball.metadata?.felReleased) { attachBallToHand(ball, c.skeleton, ebState.inLeftHand ? 'LeftHand' : 'RightHand'); console.info('[HANDS] ball re-attached'); }

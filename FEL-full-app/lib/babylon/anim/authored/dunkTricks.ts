@@ -13,7 +13,7 @@
 //   dunk_hide_seek  — both hands hide the ball behind the head, a hip fake, the ball hand snaps it overhead.
 //   dunk_360_spin   — the 360's body: ball to the chest through the turn, extended at the end (the turn is the mode's yaw layer).
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
-import { buildPoseClip, type Deg3 } from '../poseClip';
+import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
 type V3 = [number, number, number];
 
 const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
@@ -60,11 +60,14 @@ export const SELF_LOB_CONTACT = 0.3;
 /** DUNK-GLASS-BOUNCE: the bounce throw lets go on this clip second (both hands drive the ball DOWN at the floor). */
 export const BOUNCE_THROW_CONTACT = 0.3;
 export const BOUNCE_THROW_SEC = 0.5;
-export const KICK_UP_CONTACT = 0.32;
+export const KICK_UP_CONTACT = 0.24;
 /** Clip-local second of the lost-and-found's behind-the-back transfer (ballRig parents the ball to the other hand). */
 export const LOST_FOUND_HANDOFF = 0.32;
-export const SELF_LOB_SEC = 0.5, KICK_UP_SEC = 0.55, CARTWHEEL_SEC = 0.8, DOUBLE_UP_SEC = 0.5;
-export const SCORPION_SEC = 0.7, LOST_FOUND_SEC = 0.8, HIDE_SEEK_SEC = 0.8, SPIN_SEC = 0.8;
+export const SELF_LOB_SEC = 0.5, KICK_UP_SEC = 0.5, HANDSPRING_SEC = 0.8, DOUBLE_UP_SEC = 0.5;
+export const SCORPION_SEC = 0.8, LOST_FOUND_SEC = 0.8, HIDE_SEEK_SEC = 0.8, SPIN_SEC = 0.8;
+/** DUNK MOTION phase 10b: Jus Fly's cartwheel (the ball leaves the hands into the floor on CARTWHEEL_BOUNCE), the scorpion's own
+ *  flush, and the 720's body. */
+export const CARTWHEEL_SEC = 1.0, CARTWHEEL_BOUNCE = 0.1, SCORPION_FLUSH_SEC = 0.5, SPIN_720_SEC = 0.9;
 /**
  * BETWEEN THE LEGS (2026-09-14) — the hardest trick in the list, and until today it had no body of its own.
  *
@@ -77,7 +80,29 @@ export const SCORPION_SEC = 0.7, LOST_FOUND_SEC = 0.8, HIDE_SEEK_SEC = 0.8, SPIN
  * under the lead thigh, and comes up the other side. That is why the legs split rather than tuck — the gap
  * is the trick, and a body that keeps AIR_LEGS has nothing for the ball to pass through.
  */
-export const BETWEEN_LEGS_SEC = 0.8;
+export const BETWEEN_LEGS_SEC = 0.96;
+/**
+ * TO THE DUNKING HAND (DUNK MOTION phase 10b). A transfer dunk is finished by the hand that RECEIVES the ball, and a right-handed
+ * dunker's pass goes to the right hand — Rider's eastbay (ballRig.EASTBAY_PASSES) and the behind-the-back / between-the-legs alike.
+ * Ours were authored the other way (the right hand gave it away and the weak hand dunked). So these two now open with the off hand
+ * taking the ball up the front (both palms on it, FRONT_SWAP_SEC in), and then the authored transfer runs with the HANDS mirrored:
+ * the left hand takes it round / under, the right receives and finishes. The legs are not mirrored — the lead knee is the take-off's.
+ */
+export const FRONT_SWAP_SEC = 0.16;
+/** The off hand takes the ball on this clip second: the palms meet by 0.1 and HOLD it together to FRONT_SWAP_SEC — a swap timed
+ *  inside the take-off's crossfade (0.02 measured) blended the ball between two hands a metre apart. */
+export const FRONT_SWAP_AT = 0.14, FRONT_SWAP_BLEND = 0.03;
+const flipX = (v: V3): V3 => [-v[0], v[1], v[2]];
+function mirrorHands(k: PoseKey): PoseKey {
+  const swap = <T,>(r: { Left?: T; Right?: T } | undefined, f: (v: T) => T) => (r ? { ...(r.Right !== undefined ? { Left: f(r.Right) } : {}), ...(r.Left !== undefined ? { Right: f(r.Left) } : {}) } : undefined);
+  return { ...k, hands: swap(k.hands, flipX), poles: swap(k.poles, flipX), handsRel: swap(k.handsRel, flipX) };
+}
+/** The authored transfer, handed to the dunking hand: its first key, both hands on the ball up the front, then the rest hands-mirrored. */
+function toDunkingHand(keys: PoseKey[]): PoseKey[] {
+  const [first, ...rest] = keys;
+  const together = (t: number): PoseKey => ({ t, bones: first.bones, hands: { Right: [0.09, 1.46, 0.34], Left: [-0.09, 1.46, 0.34] }, poles: { Right: [0.8, -0.5, -0.2], Left: [-0.8, -0.5, -0.2] } });
+  return [first, together(0.1), together(FRONT_SWAP_SEC), ...rest.map((k) => ({ ...mirrorHands(k), t: k.t + FRONT_SWAP_SEC }))];
+}
 /** Rock the cradle (Jordan's): the cradled ball rocked down and back past the hip, then one big arc over the top. */
 export const CRADLE_SEC = 0.9;
 /** Clip second of the rock's back swing (the pause at the bottom). */
@@ -85,17 +110,17 @@ export const CRADLE_BACK = 0.4;
 /** Double clutch: the ball is brought all the way down to the waist at the apex and thrown back up. */
 export const CLUTCH_SEC = 0.7;
 /** The chain pieces (owner, 2026-09-16). The double eastbay is the long one: two passes have to fit inside it. */
-export const BEHIND_BACK_SEC = 0.7, FAKE_BACK_SEC = 0.5, DOUBLE_EASTBAY_SEC = 0.95;
+export const BEHIND_BACK_SEC = 0.86, FAKE_BACK_SEC = 0.5, DOUBLE_EASTBAY_SEC = 0.95;
 /** The whirlwind is the long one (a full arm circle under a full turn); the tap is the shortest thing in the mode. */
 export const WINDMILL_360_SEC = 0.9, FAKE_EASTBAY_SEC = 0.55, TAP_SEC = 0.4;
 /** The clip second the tap actually strikes the ball — the one frame the whole trick is about. */
 export const TAP_STRIKE = 0.22;
 /** The clip second each hand-off lands on — the ball rig swaps hands here, as it does for the eastbay. */
-export const BEHIND_BACK_SWAP = 0.34, DOUBLE_EASTBAY_FIRST = 0.30, DOUBLE_EASTBAY_SECOND = 0.62;
+export const BEHIND_BACK_SWAP = 0.5, DOUBLE_EASTBAY_FIRST = 0.30, DOUBLE_EASTBAY_SECOND = 0.62;   // (phase 10b: +FRONT_SWAP_SEC — the off hand takes it up the front first)
 /** Clip-local second the cradle's ball comes over the top of its arc. */
 export const CRADLE_ROUND = 0.8;
 /** Clip-local second the ball changes hands under the thigh (DunkMode reparents it here, as it does for lost & found). */
-export const BETWEEN_LEGS_HANDOFF = 0.34;
+export const BETWEEN_LEGS_HANDOFF = 0.5;   // (phase 10b: +FRONT_SWAP_SEC)
 
 export function buildSelfLob(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'dunk_self_lob', SELF_LOB_SEC, [
@@ -117,13 +142,26 @@ export function buildBounceThrow(scene: Scene, sk: Skeleton): AnimationGroup | n
   ]);
 }
 
+/**
+ * THE KICK-UP — the owner's own (DUNK MOTION phase 10b, 2026-09-24: "make my kick up more accurate").
+ *
+ * Watched on his "2 new dunks I've invented" video: he comes in on the dribble BENT OVER the ball, lets it go down to his feet, and
+ * flicks it straight up off the foot from the floor — no windup, the kicking foot never leaves the ground's neighbourhood — then
+ * comes up tall into the take-off with his eyes on it and catches it in the air. Ours was a standing soccer volley: the torso upright,
+ * the thigh thrown up to −78° with the foot at waist height, while the ball free-fell to the floor a stride away (the mode dropped it
+ * with physics and threw the lob from wherever it landed). Nothing touched it.
+ *
+ * So: low over the ball, the kicking foot swung through under it close to the floor (an ankle TARGET, so the foot is where the ball
+ * is — the mode carries the ball onto that foot for the contact), a short flick up, and the body rising behind the ball, hands coming
+ * up to catch. The right foot kicks (right-handed: it is mirrored at spawn with the rest of the family).
+ */
 export function buildKickUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const plant: Record<string, Deg3> = { LeftUpLeg: [-10, 0, 4], LeftLeg: [14, 0, 0] };
   return buildPoseClip(scene, sk, 'dunk_kick_up', KICK_UP_SEC, [
-    { t: 0,    bones: { Hips: [16, 0, 0], Spine: [36, 0, 0], Neck: [-10, 0, 0], ...plant, RightUpLeg: [10, 0, -4], RightLeg: [20, 0, 0] },   hands: { Right: [0.24, 0.62, 0.40], Left: [-0.36, 1.00, 0.16] } },   // bent over: the ball goes down toward the foot
-    { t: 0.15, bones: { Hips: [4, 0, 0], Spine: [8, 0, 0],  ...plant, RightUpLeg: [38, 0, -4], RightLeg: [62, 0, 0] },   hands: { Right: [0.36, 1.00, 0.10], Left: [-0.40, 1.10, 0.05] } },   // the leg loads back
-    { t: KICK_UP_CONTACT, bones: { Hips: [-4, 0, 0], Spine: [-12, 0, 0], Neck: [-16, 0, 0], ...plant, RightUpLeg: [-78, 0, -4], RightLeg: [12, 0, 0] }, hands: { Right: [0.50, 1.20, -0.10], Left: [-0.50, 1.25, 0.10] } },   // the kick: foot up front, arms out for balance
-    { t: KICK_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], Neck: [-12, 0, 0], ...plant, RightUpLeg: [-22, 0, -4], RightLeg: [34, 0, 0] }, hands: { Right: [0.30, 1.30, 0.20], Left: [-0.30, 1.30, 0.20] } },   // the leg comes down, eyes on the ball
+    { t: 0,    bones: { Hips: [18, 0, 0], Spine: [28, 0, 0], Neck: [-18, 0, 0], LeftUpLeg: [-26, 0, 4], LeftLeg: [44, 0, 0], RightUpLeg: [22, 0, -4], RightLeg: [58, 0, 0] }, hands: { Right: [0.20, 0.64, 0.42], Left: [-0.34, 0.96, -0.06] }, hipsY: -0.08 },   // bent over the dribble: the ball goes down to the feet
+    { t: 0.12, bones: { Hips: [16, 0, 0], Spine: [26, 0, 0], Neck: [-20, 0, 0], LeftUpLeg: [-6, 0, 4], LeftLeg: [30, 0, 0], RightUpLeg: [-8, 0, -4], RightLeg: [74, 0, 0] }, hands: { Right: [0.28, 0.74, 0.30], Left: [-0.36, 0.92, 0.00] }, hipsY: -0.1 },   // the stance foot down, the kicking foot swinging through under the knee
+    { t: KICK_UP_CONTACT, bones: { Hips: [10, 0, 0], Spine: [16, 0, 0], Neck: [-24, 0, 0], LeftUpLeg: [4, 0, 4], LeftLeg: [26, 0, 0] }, feet: { Right: [0.10, 0.12, 0.34] }, hands: { Right: [0.30, 0.96, 0.20], Left: [-0.36, 1.00, 0.02] }, hipsY: -0.08 },   // THE FLICK: the foot under the ball, just off the floor, in front
+    { t: 0.34, bones: { Hips: [4, 0, 0], Spine: [6, 0, 0], Neck: [-22, 0, 0], LeftUpLeg: [10, 0, 4], LeftLeg: [34, 0, 0] }, feet: { Right: [0.10, 0.34, 0.30] }, hands: { Right: [0.26, 1.18, 0.28], Left: [-0.26, 1.16, 0.22] }, hipsY: -0.02 },   // the foot follows it up; the body rises behind the ball
+    { t: KICK_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], Neck: [-16, 0, 0], LeftUpLeg: [14, 0, 4], LeftLeg: [48, 0, 0], RightUpLeg: [-30, 0, -4], RightLeg: [40, 0, 0] }, hands: { Right: [0.22, 1.30, 0.30], Left: [-0.22, 1.30, 0.30] }, hipsY: 0 },   // tall into the take-off, eyes up, both hands up for the catch
   ]);
 }
 
@@ -158,12 +196,12 @@ export function buildBackHandspring(scene: Scene, sk: Skeleton): AnimationGroup 
     },
     hands: { Left: hand(-1, pitch), Right: hand(1, pitch) }, hipsY,
   });
-  return buildPoseClip(scene, sk, 'dunk_back_handspring', CARTWHEEL_SEC, [
+  return buildPoseClip(scene, sk, 'dunk_back_handspring', HANDSPRING_SEC, [
     key(0, 0, 0, 0),              // stand tall, chest opening
     key(0.18, 70, 0.06, -18),     // the reach back — hands going for the floor behind, hips leading
     key(0.36, 165, 0.30, -34),    // the plant: inverted over the hands, legs long overhead
     key(0.56, 255, 0.26, 26),     // the whip: legs come over the top, the push off the hands
-    key(CARTWHEEL_SEC, 360, 0, 0),   // feet down, still facing the rim, still running at it
+    key(HANDSPRING_SEC, 360, 0, 0),   // feet down, still facing the rim, still running at it
   ]);
 }
 
@@ -205,6 +243,48 @@ export function buildBackflip(scene: Scene, sk: Skeleton): AnimationGroup | null
   ]);
 }
 
+/**
+ * JUS FLY'S CARTWHEEL (owner, 2026-09-24: "add the jusflys cartwheel dunk").
+ *
+ * Justin "Jus Fly" Darlington's, from the Nike dunk contest: he throws the ball down hard, goes over in a CARTWHEEL, grabs the ball on
+ * its way up off the bounce, takes it under the legs and slams it right-handed. A real cartwheel, which is what the owner turned our
+ * old one into a back handspring for: that one rolled about the forward axis while the body kept FACING the rim, so it wheeled off
+ * sideways. A cartwheel goes SIDE-ON to the way it travels — the body turns a quarter, the lead hand goes down ahead, then the other,
+ * the legs go over wide, foot, foot — and here it travels AT the rim, and turns back to face it as it comes up.
+ *
+ * The wheel is the Hips: a quarter yaw into side-on, a whole roll about the body's own front (keyed in steps under 90° so every
+ * interpolation is unambiguous), a quarter back. The hands trace the wheel at an arm's reach from the hips and stop at the floor:
+ * planted hands. The ball leaves both hands into the floor on CARTWHEEL_BOUNCE (the mode's bounce lob); the last key is tall and
+ * running, hands up to take it off the bounce.
+ */
+export function buildCartwheel(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const hipsAt = 0.96, reach = 1.06, spread = 24;   // hips → hand along a straight body and a straight arm (0.92 left the planted hands 0.4 m off the floor)
+  /** The hand on `side` at wheel angle `roll` (the head's direction: 0 up, 90 toward the rim, 180 down), on the floor at most. */
+  const hand = (side: -1 | 1, roll: number, hipsY: number): V3 => {
+    const th = ((roll + side * spread) * Math.PI) / 180;   // the right hand leads (it goes down first, ahead)
+    return [side * 0.04, Math.max(0.03, hipsAt + hipsY + reach * Math.cos(th)), reach * Math.sin(th)];
+  };
+  const STRADDLE: Record<string, Deg3> = { LeftUpLeg: [-6, 0, 44], LeftLeg: [6, 0, 0], RightUpLeg: [-6, 0, -44], RightLeg: [6, 0, 0] };
+  const wheel = (t: number, yaw: number, roll: number, hipsY: number, legs: Record<string, Deg3> = STRADDLE) => ({
+    t, bones: { Hips: [0, yaw, roll] as Deg3, Spine: [-4, 0, 0] as Deg3, Neck: [0, 0, 0] as Deg3, ...legs },
+    hands: { Right: hand(1, roll, hipsY), Left: hand(-1, roll, hipsY) }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'dunk_cartwheel', CARTWHEEL_SEC, [
+    { t: 0, bones: { Hips: [16, 0, 0], Spine: [34, 0, 0], Neck: [14, 0, 0], ...stride(true) }, hands: { Right: [0.18, 0.64, 0.46], Left: [-0.18, 0.64, 0.46] }, poles: UP, hipsY: -0.04 },   // both hands drive the ball into the floor
+    { t: CARTWHEEL_BOUNCE, bones: { Hips: [10, 0, 0], Spine: [20, 0, 0], Neck: [8, 0, 0], ...stride(false) }, hands: { Right: [0.18, 0.56, 0.50], Left: [-0.18, 0.56, 0.50] }, poles: UP, hipsY: -0.06 },   // it has gone: the follow-through
+    // (the quarter turn is +yaw: measured on the rig, −90 sent the head AWAY from the rim first — a wheel turning backwards under a body
+    //  running forwards, the hands never reaching the floor)
+    wheel(0.24, 50, 0, 0.02, { LeftUpLeg: [18, 0, 6], LeftLeg: [36, 0, 0], RightUpLeg: [-42, 0, -8], RightLeg: [26, 0, 0] }),   // the lunge: turning side-on, arms up in a V
+    wheel(0.36, 90, 55, 0.02),     // the lead hand reaching down ahead, the back leg kicking up
+    wheel(0.47, 90, 125, 0.04),    // hand down
+    wheel(0.58, 90, 190, 0.07),    // hand, hand: over the top, legs wide
+    wheel(0.69, 90, 255, 0.04),    // the push off the second hand
+    wheel(0.8, 90, 315, 0.01, { LeftUpLeg: [-6, 0, 30], LeftLeg: [10, 0, 0], RightUpLeg: [-6, 0, -36], RightLeg: [6, 0, 0] }),   // foot
+    wheel(0.9, 45, 350, 0, { LeftUpLeg: [-20, 0, 8], LeftLeg: [30, 0, 0], RightUpLeg: [10, 0, -8], RightLeg: [40, 0, 0] }),   // foot, and turning back to the rim
+    { t: CARTWHEEL_SEC, bones: { Hips: [2, 0, 360], Spine: [0, 0, 0], Neck: [-12, 0, 0], ...stride(true) }, hands: { Right: [0.24, 1.34, 0.30], Left: [-0.24, 1.34, 0.30] }, hipsY: 0 },   // facing the rim, running, hands up for the ball off the bounce
+  ]);
+}
+
 /** The two-foot hop gather: feet together, a hop, and the loaded landing crouch the launch clip starts from. */
 export function buildDoubleUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const together = (thigh: number, knee: number): Record<string, Deg3> => ({ LeftUpLeg: [thigh, 0, 5], LeftLeg: [knee, 0, 0], RightUpLeg: [thigh, 0, -5], RightLeg: [knee, 0, 0] });
@@ -242,12 +322,39 @@ export function buildDoubleUp(scene: Scene, sk: Skeleton): AnimationGroup | null
  * trailing behind him and the dunk lost the thing it is named for. The hold at 0.5 keeps the shape instead of
  * relaxing out of it a fifth of a second after reaching it, which made the old one read as a stretch, not a pose.
  */
+/*
+ * THE SCORPION, AS KILGANON THROWS IT (owner, 2026-09-24: "make jordan kilganons scorpion accurate"). Watched frame by frame on his
+ * All-Star timeout jam (the baseline camera, through the glass): at the top of the jump the ball is DOWN at his right hip; it swings
+ * up that side past the shoulder; the arm folds it in BEHIND his head with the elbow pointing up; then the head DUCKS — chin to the
+ * chest, the trunk pitched forward toward the iron — while the heels come up behind him, and the ball goes over the back of his head
+ * into the rim. The ball behind the head is the stinger, the heels the tail, and he dunks IN that shape.
+ *
+ * Ours had the tail and the no-look, but the ball rode overhead from the take-off to the slam (never low, never behind the head), the
+ * off arm stuck straight out like a wing, and at the slam the carry-up and the ordinary one-hand flush stood the body up: legs hanging,
+ * head up — a plain jam. So the trick is the whole sequence now and ENDS loaded (the mode holds it until the SLAM), and the scorpion
+ * has its own flush (buildScorpionFlush) that throws the ball over the ducked head with the heels still up.
+ */
 export function buildScorpion(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // the tail is not a mirror: one heel curls higher than the other (a one-foot jumper's legs never agree)
+  const TAIL = (thigh: number, knee: number): Record<string, Deg3> => ({ LeftUpLeg: [thigh, 0, 6], LeftLeg: [knee, 0, 0], RightUpLeg: [thigh - 12, 0, -6], RightLeg: [knee - 16, 0, 0] });
   return buildPoseClip(scene, sk, 'dunk_scorpion', SCORPION_SEC, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.20, 1.90, 0.15], Left: [-0.22, 1.82, 0.15] }, poles: UP },   // off one foot — the arch that follows is symmetric, the take-off never is
-    { t: 0.35, bones: { Hips: [12, 0, 0], Spine: [18, 0, 0], Neck: [15, 0, 0], LeftUpLeg: [72, 0, 5], LeftLeg: [118, 0, 0], RightUpLeg: [72, 0, -5], RightLeg: [118, 0, 0] }, hands: { Right: [0.22, 1.88, -0.34], Left: [-0.46, 1.26, -0.16] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.1 },   // THE SCORPION: the tail goes up, the chin goes DOWN (he is looking at the floor), the ball swings BEHIND the head
-    { t: 0.5,  bones: { Hips: [11, 0, 0], Spine: [16, 0, 0], Neck: [14, 0, 0], LeftUpLeg: [70, 0, 5], LeftLeg: [116, 0, 0], RightUpLeg: [70, 0, -5], RightLeg: [116, 0, 0] }, hands: { Right: [0.18, 1.94, -0.28], Left: [-0.44, 1.28, -0.14] }, poles: { Right: [0.8, 0.3, -0.6], Left: [-0.9, -0.2, -0.5] }, hipsY: 0.08 },   // still no-look, the ball behind him
-    { t: SCORPION_SEC, bones: { Hips: [4, 0, 0], Spine: [6, 0, 0], Neck: [8, 0, 0], LeftUpLeg: [10, 0, 4], LeftLeg: [40, 0, 0], RightUpLeg: [10, 0, -4], RightLeg: [40, 0, 0] }, hands: { Right: [0.15, 2.00, 0.10], Left: [-0.30, 1.50, 0.10] }, poles: UP },   // the flush, reached back over the top — chin still down, because he never looks
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], Neck: [2, 0, 0], ...TAIL(18, 70) }, hands: { Right: [0.30, 1.06, 0.10], Left: [-0.30, 1.24, 0.28] }, poles: { Left: [-0.7, -0.5, -0.2] } },   // the ball down at the right hip, the off hand in front
+    { t: 0.18, bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], Neck: [6, 0, 0], ...TAIL(34, 94) }, hands: { Right: [0.44, 1.54, 0.02], Left: [-0.30, 1.26, 0.30] }, poles: { Right: [0.6, -0.6, -0.4], Left: [-0.7, -0.5, -0.2] } },   // up the side, past the shoulder
+    { t: 0.34, bones: { Hips: [8, 0, 0], Spine: [14, 0, 0], Neck: [16, 0, 0], ...TAIL(56, 112) }, hands: { Right: [0.12, 1.78, -0.20], Left: [-0.28, 1.20, 0.32] }, poles: { Right: [0.5, 0.7, 0.4], Left: [-0.7, -0.5, -0.2] }, hipsY: 0.04 },   // folded in behind the head, the elbow up
+    { t: 0.5,  bones: { Hips: [14, 0, 0], Spine: [22, 0, 0], Neck: [26, 0, 0], ...TAIL(70, 116) }, hands: { Right: [0.14, 1.78, 0.14], Left: [-0.24, 1.04, 0.40] }, poles: { Right: [0.5, 0.7, 0.4], Left: [-0.6, -0.7, 0.2] }, hipsY: 0.08 },   // THE SCORPION: head ducked under the ball, heels up behind toward it
+    { t: 0.64, bones: { Hips: [16, 0, 0], Spine: [24, 0, 0], Neck: [28, 0, 0], ...TAIL(72, 112) }, hands: { Right: [0.14, 1.80, 0.16], Left: [-0.24, 1.02, 0.40] }, poles: { Right: [0.5, 0.7, 0.4], Left: [-0.6, -0.7, 0.2] }, hipsY: 0.08, hold: true },
+    { t: SCORPION_SEC, bones: { Hips: [16, 0, 0], Spine: [24, 0, 0], Neck: [28, 0, 0], ...TAIL(72, 112) }, hands: { Right: [0.14, 1.82, 0.12], Left: [-0.24, 1.02, 0.40] }, poles: { Right: [0.5, 0.7, 0.4], Left: [-0.6, -0.7, 0.2] }, hipsY: 0.08, hold: true },   // loaded: the mode holds this until the SLAM
+  ]);
+}
+/** THE SCORPION'S FLUSH: from the loaded scorpion, the ball comes over the back of the ducked head and down through the ring; the head
+ *  stays down and the heels stay up until the ball has gone, then the legs come down under a body dropping off the rim. */
+export function buildScorpionFlush(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const TAIL = (thigh: number, knee: number): Record<string, Deg3> => ({ LeftUpLeg: [thigh, 0, 6], LeftLeg: [knee, 0, 0], RightUpLeg: [thigh - 12, 0, -6], RightLeg: [knee - 16, 0, 0] });
+  return buildPoseClip(scene, sk, 'dunk_flush_scorpion', SCORPION_FLUSH_SEC, [
+    { t: 0,    bones: { Hips: [16, 0, 0], Spine: [24, 0, 0], Neck: [28, 0, 0], ...TAIL(72, 112) }, hands: { Right: [0.14, 1.82, 0.12], Left: [-0.24, 1.02, 0.40] }, poles: { Right: [0.5, 0.7, 0.4], Left: [-0.6, -0.7, 0.2] }, hipsY: 0.08 },
+    { t: 0.12, bones: { Hips: [16, 0, 0], Spine: [26, 0, 0], Neck: [28, 0, 0], ...TAIL(66, 110) }, hands: { Right: [0.14, 1.96, 0.46], Left: [-0.26, 1.00, 0.36] }, poles: { Right: [0.8, 0.2, -0.2], Left: [-0.6, -0.7, 0.2] }, hipsY: 0.08 },   // over the back of the head
+    { t: 0.24, bones: { Hips: [14, 0, 0], Spine: [28, 0, 0], Neck: [22, 0, 0], ...TAIL(40, 100) }, hands: { Right: [0.14, 1.74, 0.60], Left: [-0.30, 0.98, 0.30] }, poles: { Right: [0.9, 0.0, -0.3], Left: [-0.7, -0.6, 0.1] }, hipsY: 0.05 },   // down through the ring, the tail starting to drop
+    { t: SCORPION_FLUSH_SEC, bones: { Hips: [4, 0, 0], Spine: [4, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-24, 0, 6], LeftLeg: [30, 0, 0], RightUpLeg: [-16, 0, -6], RightLeg: [34, 0, 0] }, hands: { Right: [0.22, 1.52, 0.36], Left: [-0.38, 1.02, 0.18] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.8, -0.6, 0.1] }, hipsY: 0, hold: true },   // gone: the head comes up, the legs come down
   ]);
 }
 
@@ -282,19 +389,20 @@ export function buildBetweenLegs(scene: Scene, sk: Skeleton): AnimationGroup | n
   // AIR_LEGS is deliberately not used here — a tucked body has nowhere to put the ball.
   const SPLIT: Record<string, Deg3> = { LeftUpLeg: [-86, 0, 10], LeftLeg: [58, 0, 0], RightUpLeg: [34, 0, -8], RightLeg: [64, 0, 0] };
   const SPLIT_WIDE: Record<string, Deg3> = { LeftUpLeg: [-98, 0, 14], LeftLeg: [44, 0, 0], RightUpLeg: [44, 0, -10], RightLeg: [78, 0, 0] };
-  return buildPoseClip(scene, sk, 'dunk_between_legs', BETWEEN_LEGS_SEC, [
+  // (phase 10b: authored on the old clock, the ball in the right; toDunkingHand adds the front swap and hands it round to the right)
+  return buildPoseClip(scene, sk, 'dunk_between_legs', BETWEEN_LEGS_SEC, toDunkingHand([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR_LEGS }, hands: { Right: [0.26, 1.62, 0.30], Left: [-0.30, 1.32, 0.14] } },
     // the knees come up and the trunk folds over them — the dunker makes the gap before the ball goes near it
     { t: 0.18, bones: { Hips: [14, 0, 0], Spine: [20, 0, 0], Neck: [-18, 0, 0], ...SPLIT }, hands: { Right: [0.22, 1.20, 0.34], Left: [-0.26, 1.22, 0.22] }, hipsY: 0.06 },
     // THROUGH: the ball hand takes it down past the lead thigh, eyes down on it
     { t: 0.28, bones: { Hips: [20, 0, 0], Spine: [26, 0, 0], Neck: [-26, 0, 0], ...SPLIT_WIDE }, hands: { Right: [0.16, 0.86, 0.30], Left: [-0.30, 1.06, 0.18] }, poles: { Right: [0.9, -0.3, -0.2] }, hipsY: 0.1 },
     // the swap, under the thigh: both palms meet on the ball, which is what makes the transfer read
-    { t: BETWEEN_LEGS_HANDOFF, bones: { Hips: [20, 0, 0], Spine: [26, 0, 0], Neck: [-28, 0, 0], ...SPLIT_WIDE }, hands: { Right: [0.06, 0.84, 0.32], Left: [-0.10, 0.84, 0.32] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.1 },
+    { t: BETWEEN_LEGS_HANDOFF - FRONT_SWAP_SEC, bones: { Hips: [20, 0, 0], Spine: [26, 0, 0], Neck: [-28, 0, 0], ...SPLIT_WIDE }, hands: { Right: [0.06, 0.84, 0.32], Left: [-0.10, 0.84, 0.32] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] }, hipsY: 0.1 },
     // up the far side: the legs close, the trunk opens out of the fold, the left hand carries it
     { t: 0.52, bones: { Hips: [8, 0, 0], Spine: [4, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-44, 0, 8], LeftLeg: [54, 0, 0], RightUpLeg: [4, 0, -6], RightLeg: [46, 0, 0] }, hands: { Left: [-0.46, 1.28, 0.20], Right: [0.38, 1.10, 0.06] }, poles: { Left: [-0.9, -0.1, -0.4] }, hipsY: 0.04 },
-    // the flush, left-handed, the body long — the same shape lost & found finishes in, because both end the same way
-    { t: BETWEEN_LEGS_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-24, 0, 4], LeftLeg: [28, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.40, -0.08] }, poles: { Left: UP.Left } },
-  ]);
+    // the flush, the body long (authored left-handed; the dunking hand once toDunkingHand has swapped the hands)
+    { t: BETWEEN_LEGS_SEC - FRONT_SWAP_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], LeftUpLeg: [-24, 0, 4], LeftLeg: [28, 0, 0], RightUpLeg: [-12, 0, -4], RightLeg: [16, 0, 0] }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.40, -0.08] }, poles: { Left: UP.Left } },
+  ]));
 }
 
 /**
@@ -372,6 +480,20 @@ export function buildSpin360(scene: Scene, sk: Skeleton): AnimationGroup | null 
   ]);
 }
 
+/** THE 720 (DUNK MOTION phase 10b): the 360's body held through a second revolution — the ball pulled in to the chest and the knees
+ *  pulled up TIGHTER (a smaller body turns faster: that is how a second turn is found in the same air), then the same snap open to the
+ *  rim. The turn is the mode's yaw layer (DunkSpin, extended to two); nothing here yaws. */
+export function buildSpin720(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const TIGHT: Record<string, Deg3> = { LeftUpLeg: [-66, 0, 6], LeftLeg: [96, 0, 0], RightUpLeg: [-64, 0, -6], RightLeg: [94, 0, 0] };
+  return buildPoseClip(scene, sk, 'dunk_720_spin', SPIN_720_SEC, [
+    { t: 0,    bones: { Hips: [2, 0, 0], Spine: [6, 0, 0], Neck: [4, 0, 0], ...TIGHT }, hands: { Right: [0.15, 1.26, 0.28], Left: [-0.15, 1.26, 0.28] }, poles: { Left: [-0.8, -0.3, -0.5], Right: [0.8, -0.3, -0.5] } },   // pulled in: ball to the chest, knees up
+    { t: 0.5,  bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], Neck: [4, 0, 0], ...TIGHT }, hands: { Right: [0.14, 1.24, 0.26], Left: [-0.14, 1.24, 0.26] }, poles: { Left: [-0.8, -0.3, -0.5], Right: [0.8, -0.3, -0.5] }, hold: true },   // …and held tight through the second turn
+    { t: 0.66, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-4, 0, 0], ...AIR.tuckTight }, hands: { Right: [0.18, 1.62, 0.26], Left: [-0.24, 1.50, 0.18] }, poles: UP },   // coming out: the ball rises
+    { t: 0.78, bones: { Hips: [-2, 0, 0], Spine: [-8, 0, 0], Neck: [-8, 0, 0], ...AIR.kickOut }, hands: { Right: [0.18, 1.84, 0.28], Left: [-0.30, 1.54, 0.14] }, poles: UP },   // THE SNAP: thrown open, which kills the spin
+    { t: SPIN_720_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Right: [0.16, 2.00, 0.28], Left: [-0.28, 1.60, 0.12] }, poles: UP },   // extended to the rim
+  ]);
+}
+
 /**
  * BEHIND THE BACK — the plain one (owner, 2026-09-16: "behind the back scorpion", "behind the back between the legs").
  *
@@ -382,13 +504,14 @@ export function buildSpin360(scene: Scene, sk: Skeleton): AnimationGroup | null 
  * chainable: whatever comes next starts facing the right way.
  */
 export function buildBehindBack(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildPoseClip(scene, sk, 'dunk_behind_back', BEHIND_BACK_SEC, [
+  // (phase 10b: authored on the old clock with the ball in the right; toDunkingHand puts it in the left up the front and the RIGHT finishes)
+  return buildPoseClip(scene, sk, 'dunk_behind_back', BEHIND_BACK_SEC, toDunkingHand([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [0, 0, 0], ...AIR.drive(true) }, hands: { Right: [0.26, 1.60, 0.30], Left: [-0.30, 1.32, 0.16] } },
     { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0], Neck: [6, 0, 0], ...AIR.kickBack }, hands: { Right: [0.34, 1.02, -0.30], Left: [-0.36, 1.18, 0.04] }, poles: { Right: [0.9, -0.2, -0.3] } },   // round the hip
-    { t: BEHIND_BACK_SWAP, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], Neck: [4, 0, 0], ...AIR.kickBack }, hands: { Right: [0.08, 1.00, -0.38], Left: [-0.10, 1.00, -0.38] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // both hands meet in the small of the back
+    { t: BEHIND_BACK_SWAP - FRONT_SWAP_SEC, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], Neck: [4, 0, 0], ...AIR.kickBack }, hands: { Right: [0.08, 1.00, -0.38], Left: [-0.10, 1.00, -0.38] }, poles: { Right: [0.9, -0.3, -0.2], Left: [-0.9, -0.3, -0.2] } },   // both hands meet in the small of the back
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0], ...AIR.spread }, hands: { Left: [-0.50, 1.34, 0.02], Right: [0.42, 1.16, -0.08] }, poles: { Left: [-0.9, -0.2, -0.4] } },   // out the far side, legs opening under it
-    { t: BEHIND_BACK_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.06] }, poles: { Left: UP.Left } },   // carried up, left-handed
-  ]);
+    { t: BEHIND_BACK_SEC - FRONT_SWAP_SEC, bones: { Hips: [-6, 0, 0], Spine: [-12, 0, 0], Neck: [-14, 0, 0], ...AIR.long }, hands: { Left: [-0.14, 2.02, 0.26], Right: [0.36, 1.42, -0.06] }, poles: { Left: UP.Left } },   // carried up (the dunking hand, once swapped)
+  ]));
 }
 
 /**

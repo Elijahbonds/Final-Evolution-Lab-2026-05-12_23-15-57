@@ -98,12 +98,26 @@ export function runHandOffPath(
   return swapped;
 }
 
-/** Eastbay hand-to-hand — call each frame with clip-local time (sec). The right hand carries the ball under the knee,
- *  the left takes it beneath the thigh on T.handOff and carries it up (the palm-to-palm blend is runHandOffPath's). */
+/**
+ * THE EASTBAY'S TWO PASSES (DUNK MOTION phase 10b). Rider's dunk goes under the leg FROM the off hand TO the dunking hand ("transfers
+ * the ball under their left leg from left to right hand, and finishes the dunk with their right hand" — Haugen's definitions). Ours
+ * went the other way: the right hand gave it away under the thigh and the weak hand dunked, the mirror image of the dunk. So the off
+ * hand takes it up the front first (T.swap), and the pass under the thigh hands it back (T.handOff) for the right hand to finish.
+ */
+export const EASTBAY_PASSES: readonly HandOffSpec[] = [
+  { at: T.swap, from: 'RightHand', to: 'LeftHand' },
+  { at: T.handOff, from: 'LeftHand', to: 'RightHand' },
+];
+/** Of a trick's passes (in its own clip seconds), the one still ahead or under way at `t`. */
+export function handOffSpecAt(specs: readonly HandOffSpec[], t: number): HandOffSpec {
+  return specs.find((sp) => t < sp.at + (sp.blend ?? HAND_OFF_BLEND)) ?? specs[specs.length - 1];
+}
+/** Eastbay hand-to-hand — call each frame with clip-local time (sec): up the front into the off hand, under the thigh back to the
+ *  dunking hand (the palm-to-palm blends are runHandOffPath's). */
 export function runEastbayPath(
   ball: AbstractMesh, skeleton: Skeleton, t: number, state: { inLeftHand: boolean },
 ): boolean {
-  return runHandOffPath(ball, skeleton, t, { at: T.handOff, from: 'RightHand', to: 'LeftHand' }, state);
+  return runHandOffPath(ball, skeleton, t, handOffSpecAt(EASTBAY_PASSES, t), state);
 }
 
 /** Flush through the rim on a make. Call per frame; true when finished. */

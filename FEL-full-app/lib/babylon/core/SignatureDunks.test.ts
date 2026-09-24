@@ -5,7 +5,7 @@
 // one in the table is the owner's own: the KICK-UP EASTBAY, kicked up to yourself off your own foot on the runway and
 // taken between the legs in the air.
 import { describe, expect, it } from 'vitest';
-import { SIGNATURE_DUNKS, signatureFor, RUNWAY_TRICKS, DUNK_TRICKS, GestureRecognizer } from './DunkSystem';
+import { SIGNATURE_DUNKS, signatureFor, RUNWAY_TRICKS, DUNK_TRICKS, SPIN_720, GestureRecognizer } from './DunkSystem';
 
 describe('signature dunks', () => {
   it('the kick-up eastbay is a named dunk, credited', () => {
@@ -24,7 +24,7 @@ describe('signature dunks', () => {
 
   it('every signature names moves that actually exist', () => {
     const runway = new Set(RUNWAY_TRICKS.map((t) => t.id));
-    const air = new Set(DUNK_TRICKS.map((t) => t.id));
+    const air = new Set([...DUNK_TRICKS, SPIN_720].map((t) => t.id));   // (the 720 is the 360 thrown again — no slot of its own)
     for (const sig of SIGNATURE_DUNKS) {
       if (sig.runway) expect(runway.has(sig.runway), `${sig.name}: ${sig.runway}`).toBe(true);
       for (const id of sig.air) expect(air.has(id), `${sig.name}: ${id}`).toBe(true);
@@ -65,7 +65,7 @@ describe('the named chains', () => {
   });
 
   it('every part of every chain is a trick you can actually throw', () => {
-    const ids = new Set(DUNK_TRICKS.map((t) => t.id));
+    const ids = new Set([...DUNK_TRICKS, SPIN_720].map((t) => t.id));
     for (const sig of SIGNATURE_DUNKS) {
       for (const id of sig.air) expect(ids.has(id), `${sig.name} wants ${id}`).toBe(true);
       if (sig.runway) expect(RUNWAY_TRICKS.some((r) => r.id === sig.runway), sig.name).toBe(true);
@@ -125,7 +125,7 @@ describe('every trick in the table can actually be thrown', () => {
 
 describe('credit means credit', () => {
   it('a real person is named only where the dunk is really theirs; this contest owns the rest', () => {
-    const people = ['Elijah Bonds', 'Jordan Kilganon', 'Guy Dupuy', 'Team Flight Brothers'];
+    const people = ['Elijah Bonds', 'Jordan Kilganon', 'Guy Dupuy', 'Team Flight Brothers', 'Jus Fly', 'Taurian Fontenette'];   // phase 10b: the cartwheel eastbay is Jus Fly's; the 720 was first thrown by Fontenette (AND1, 2006)
     for (const sig of SIGNATURE_DUNKS) {
       expect(sig.by.length, sig.name).toBeGreaterThan(0);
       if (!people.includes(sig.by)) expect(sig.by, sig.name).toBe('FLIGHT NIGHT');
@@ -157,5 +157,18 @@ describe('credit means credit', () => {
     const left = (1 - spin.windowCost) * (1 - east.windowCost);
     expect(left).toBeGreaterThan(0.35);                     // a good flight carries it
     expect(left).toBeLessThan(0.45);                        // and a lazy one does not
+  });
+});
+
+// DUNK MOTION phase 10b (owner, 2026-09-24): Jus Fly's cartwheel and the 720, credited to the people who threw them first.
+describe('the phase 10b names', () => {
+  it('the cartwheel + eastbay is THE CARTWHEEL EASTBAY, and it is Jus Fly\'s', () => {
+    const sig = signatureFor(['cartwheel'], ['eastbay']);
+    expect(sig?.name).toBe('THE CARTWHEEL EASTBAY'); expect(sig?.by).toBe('Jus Fly');
+    expect(signatureFor(['handspring'], ['eastbay'])).toBeNull();   // the back handspring is a different runway move
+  });
+  it('two turns is THE 720, credited to Taurian Fontenette; one is still just a 360', () => {
+    expect(signatureFor([], ['spin720'])?.by).toBe('Taurian Fontenette');
+    expect(signatureFor([], ['spin360'])).toBeNull();
   });
 });
