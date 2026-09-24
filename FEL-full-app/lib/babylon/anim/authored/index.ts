@@ -12,6 +12,7 @@ import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildMocapDunk } from './mocapDunk';
 import { buildCarryUpOne, buildCarryUpLeft, buildCarryUpTwo, buildFlushOne, buildFlushLeft, buildFlushTwo } from './dunkFlush';   // DUNK MOTION phase 4
+import { buildGatherOne, buildGatherTwo, buildTakeOffOne } from './dunkTakeoff';   // DUNK MOTION phase 7: push 1-2 and the one-foot take-off
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
 import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
 import { buildScoopLayup, buildSpinLayup, buildHangLayup, buildShimmy, buildDropStep } from './basketball';   // ACROBATIC LAYUPS + THE POST GAME (2026-09-18)
@@ -77,6 +78,7 @@ export function registerAuthoredClips(
     // DUNK MOTION phase 4 (2026-09-23): the carry-up while the flight waits for the SLAM, and the flush itself, in the hand the ball is in
     ['dunk_carry_up', () => buildCarryUpOne(scene, skeleton)], ['dunk_carry_up_left', () => buildCarryUpLeft(scene, skeleton)], ['dunk_carry_up_two', () => buildCarryUpTwo(scene, skeleton)],
     ['dunk_flush_one', () => buildFlushOne(scene, skeleton)], ['dunk_flush_left', () => buildFlushLeft(scene, skeleton)], ['dunk_flush_two', () => buildFlushTwo(scene, skeleton)],
+    ['dunk_gather_one', () => buildGatherOne(scene, skeleton)], ['dunk_gather_two', () => buildGatherTwo(scene, skeleton)], ['dunk_take_off_one', () => buildTakeOffOne(scene, skeleton)],
     ['dunk_finish_blown', () => buildFinishBlown(scene, skeleton)],
     ['dunk_celebrate_big', () => buildCelebrateBig(scene, skeleton)],
     // DUNK-CONTROL-JUICE (2026-09-08): the named dunks — runway beats (self-lob, kick-up, cartwheel, double-up) and air shapes

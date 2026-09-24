@@ -85,7 +85,10 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   const refresh = () => { const walk = (n: TransformNode) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); }; walk(top); };
   const restore = () => { for (const [n, t] of bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); } refresh(); };
   const root = hips.parent as TransformNode | null;
-  refresh();
+  // From BIND, not from whatever pose the rig holds: the body's scale below is read off the hip joints' height, so a clip
+  // built on a crouched rig came out shrunk (built after the two-foot gather's −0.26 m, the take-off's struck-up hands
+  // reached 1.35 m instead of 1.81 m — DUNK MOTION phase 7). Every mode builds at spawn, at bind, so play was unaffected.
+  restore();
   const frame = frameAbove(hips);
   const keyed = (n: TransformNode, deg: Deg3): Quaternion => bf.keyed(n, deg);
   // Body height ratio = the hips' height ABOVE THE ROOT. This read the hips' absolute y, so a body spawned above y = 0 built

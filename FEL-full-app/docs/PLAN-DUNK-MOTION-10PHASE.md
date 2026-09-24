@@ -50,18 +50,29 @@ What the sheets and the traces show (`base/sheet-*.png`, `base/rec-*.json`):
 
 ## The phases
 
+The owner added four asks while the pass ran (2026-09-23), and they reshaped phases 7–10:
+1. "fix the arms when running too";
+2. "have the model curve their approach … open up to the side, look at takeoff posture and in flight body mechanics";
+3. "pay attention to the lower body … push 1-2 … not dropping their lead leg on off 1 dunks … forcefully strike their arms into
+   the air at the same time they take off … reference my book";
+4. "switch the model handedness to right hand … dribble on approach if you move the stick … change whether or not they dribble
+   based on the dunk … take the ball away and put it where it goes till the model interacts with it … a dubble up eastbay".
+
+The book is Elijah Bonds, *The Art of Dunking* (Final Evolution Press), ch. 7 (approach geometry, the penultimate, one- vs two-foot)
+and ch. 8 (in-air kinematics, the hang-time illusion, the off-arm / off-leg as instruments).
+
 | # | Theme | What changes | Gate |
 |---|---|---|---|
-| 1 | Instrument + baseline + decode | the probe, the decode, the baseline, this plan | this table |
-| 2 | Smooth pose clips | `buildPoseClip` resamples its keys as a spherical cubic in joint space (every bone, every 1/30 s), with per-key `hold` easing | dunk-family SPARC up, pops down, no new locked limbs |
-| 3 | Overlap and wrists | successive breaking of joints (the chain lags its parent by a frame or two, collapsing at contact keys); `wrists` keys (grip, cock, snap, relaxed) | wrists move in every dunk; thoracic stillness down |
-| 4 | The flight belongs to the dunk | the trick is paced to reach its flush pose on the window's centre; per-family flush clips replace the generic two-hand hang; the called windmill / tomahawk is thrown once; the hover is fixed | no held generic finish; the windmill's jam in ≤ 0.35 s |
-| 5 | Take-off and rise | a long, low penultimate step, the plant, the arm swing up the front, the lead knee drive; the rise sets up the called dunk instead of swinging the ball at the hip | the plant-to-apex frames read as a jump |
-| 6 | Names I: one-hand family | power, tomahawk (the wind-up survives the reach), windmill (a full front-to-back circle, long arm), rock the cradle (re-authored), two-hand, the tap | each dunk's signature shape measured on the sheet |
-| 7 | Names II: through the legs | eastbay (left to right under the left leg, dominant-hand finish), double eastbay, between the legs (under both), fake eastbay | the ball path measured against the legs |
-| 8 | Names III: behind, around, spins | behind the back, the fake, scorpion (ball behind, eyes down), hide & seek, lost & found, double clutch, 360, 360 windmill | the signature shapes |
-| 9 | Rim, hang, land; the reach roll | the flush wrist snap, the hang's swing, the drop, the land absorb; the reach IK's twist held continuous; locked elbows | pops at the rim ≈ 0; elbow-lock frames down |
-| 10 | Everywhere + the score loop | the game dunks (1v1 / 3v3 via HoopsDunks), Dunk Duel, the contest rival; the full re-measure, the summary, the deploy | every number above against the baseline |
+| 1 | Instrument + baseline + decode | the probe, the decode, the baseline, this plan | done, db8a5f3 |
+| 2 | Smooth pose clips | joint-space cubic resampling of the dunk family | done, e532d79 |
+| 3 | Overlap and wrists | LimbDrag, WristLayer (mesh-read flex axis) | done, 8b22627 |
+| 4 | The flight belongs to the dunk | carry-up + flush per hand, trick pacing, real hand-offs, the windmill thrown once | done, d76f347 |
+| 5 | Take-off capture + running arms | the owner's real jump (capture f49–59), the wait as a cock, the chest follows the arms, the reach can't roll the arm, the dribble elbows point back | done, cad9e8a |
+| 6 | Names I: one-hand family | real-speed windmill / tomahawk captures, Jordan's cradle, the cuff, the scorpion no-look | done, 002a6ff |
+| 7 | The approach and the take-off (asks 2 + 3) | the J approach with the lean into the bend, the open body in the rise; PUSH 1-2 as two real steps; the one-foot take-off (knee drive, arm strike, the lead leg's drop) vs the two-foot capture; carry and flush by foot | the gather's feet alternate; the take-off foot leaves last; the lead knee drives then drops |
+| 8 | Right-handed (ask 4a) | the ball hand becomes the rig side that renders as the right: the dunk family's clips mirrored, the ball / hand-offs / catch / spin / the J's side follow; dribble on the approach only when the stick moves | the ball hand is the visual right on every sheet |
+| 9 | The ball's story + names II / III (ask 4b) | the Dubble Up (a helper holds the ball on his head; the dunker runs without it, jumps over, grabs it mid-air); dribble-or-not by dunk; the eastbay passes to the dominant hand; behind / around / spins; the reach roll and the rim | every named dunk against the decode |
+| 10 | Rim, hang, land; everywhere; the score loop | the flush and hang, the drop and land absorb; Dunk Duel, the rival, the 1v1 / 3v3 game dunks; the full re-measure, summary, one deploy | every number against the baseline |
 
 Rules (from the hoops-depth pass):
 - Commit and push each green phase with the suite count.

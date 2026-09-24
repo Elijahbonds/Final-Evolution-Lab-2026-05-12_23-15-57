@@ -40,7 +40,7 @@ const AIR: Record<string, [Dir, Btn]> = {
 const RUNWAY: Record<string, [Btn, Dir | null]> = { selflob: ['Y', null], kickup: ['B', null], cartwheel: ['X', null], doubleup: ['A', null], backflip: ['B', 'up'] };
 const ALL = ['plain', ...Object.keys(AIR), ...Object.keys(RUNWAY).map((r) => `rw:${r}`)];
 const TRICKS = (process.env.TRICKS ?? 'all') === 'all' ? ALL : (process.env.TRICKS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-for (const t of TRICKS) if (t !== 'plain' && !AIR[t] && !(t.startsWith('rw:') && RUNWAY[t.slice(3)])) throw new Error(`unknown trick ${t} (have ${ALL.join(', ')})`);
+for (const t of TRICKS) if (t !== 'plain' && t !== 'plain2' && !AIR[t] && !(t.startsWith('rw:') && RUNWAY[t.slice(3)])) throw new Error(`unknown trick ${t} (have ${ALL.join(', ')})`);
 
 const RIM = { x: 0, y: 3.05, z: -10.28 };
 const JN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
@@ -150,6 +150,8 @@ async function attempt(p: Page, trick: string): Promise<Rec | null> {
   const t0 = await p.evaluate('(() => { window.__rec.frames = []; window.__rec.on = true; return performance.now(); })()') as number;
   const launchedAt = async (): Promise<number | null> => p.evaluate(`(() => { const m = window.__smp.marks.find((m) => m.t >= ${t0} && /JUICE-SOFT\\] launch|\\[DUNK-LAUNCH\\]/.test(m.msg)); return m ? m.t : null; })()`) as Promise<number | null>;
   await padSet(p, 'p.axes[1] = -1; p.buttons[7].pressed = true; p.buttons[7].value = 1');
+  // plain2: the same run with GATHER (L2) held — the two-foot take-off
+  if (trick === 'plain2') await padSet(p, 'p.buttons[6].pressed = true; p.buttons[6].value = 1');
   const hold0 = Date.now(); let threw = !trick.startsWith('rw:'); let launch: number | null = null;
   while (Date.now() - hold0 < 3600) {
     // the double-up is only a double-up inside its window (DOUBLE_UP_WINDOW_M): press it on the game's own prompt, not on a
@@ -164,7 +166,7 @@ async function attempt(p: Page, trick: string): Promise<Rec | null> {
     launch = await launchedAt(); if (launch) break;
     await p.waitForTimeout(25);
   }
-  await padSet(p, 'p.axes[1] = 0; p.buttons[7].pressed = false; p.buttons[7].value = 0');
+  await padSet(p, 'p.axes[1] = 0; p.buttons[7].pressed = false; p.buttons[7].value = 0; p.buttons[6].pressed = false; p.buttons[6].value = 0');
   if (!launch) { const r0 = Date.now(); while (!launch && Date.now() - r0 < 2000) { await p.waitForTimeout(40); launch = await launchedAt(); } }
   if (!launch) { await p.evaluate('window.__rec.on = false'); console.log(`  ${trick}: never launched`); return null; }
   const air = AIR[trick];

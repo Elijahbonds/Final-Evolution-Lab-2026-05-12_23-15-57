@@ -22,6 +22,7 @@
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
 import { mirrorPoseKeys } from '../poseMirror';
+import { HANG_ONE_LEGS } from './dunkTakeoff';
 type V3 = [number, number, number];
 
 const UP_R: V3 = [0.9, 0.1, -0.3], UP_L: V3 = [-0.9, 0.1, -0.3];
@@ -33,6 +34,9 @@ const OPENING: Record<string, Deg3> = { LeftUpLeg: [-36, 0, 6], LeftLeg: [52, 0,
 const LONG: Record<string, Deg3> = { LeftUpLeg: [-14, 0, 5], LeftLeg: [18, 0, 0], RightUpLeg: [-4, 0, -5], RightLeg: [26, 0, 0] };
 /** The bow of a wind-up: the knees bent BEHIND the body, the hips a touch forward of the shoulders (DUNK MOTION phase 5). */
 const BOW: Record<string, Deg3> = { LeftUpLeg: [-8, 0, 6], LeftLeg: [58, 0, 0], RightUpLeg: [-2, 0, -6], RightLeg: [64, 0, 0] };
+/** DUNK MOTION phase 7: the one-foot wait keeps the one-foot hang (the lead leg DROPPED long, the take-off leg folded behind) —
+ *  the owner's cue ("not dropping their lead leg on off 1 dunks") — easing a little further into it; never both knees tucked. */
+const HANG_ONE_DEEP: Record<string, Deg3> = { RightUpLeg: [-10, 0, -4], RightLeg: [18, 0, 0], LeftUpLeg: [20, 0, 5], LeftLeg: [86, 0, 0] };
 /** After the flush: the legs come forward under a body dropping off the rim. */
 const DROP: Record<string, Deg3> = { LeftUpLeg: [-24, 0, 6], LeftLeg: [30, 0, 0], RightUpLeg: [-16, 0, -6], RightLeg: [34, 0, 0] };
 
@@ -48,9 +52,9 @@ export const FLUSH_SEC = 0.5;
  * the first key through the flow's fade.
  */
 export const CARRY_UP_ONE: PoseKey[] = [
-  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...OPENING }, hands: { Right: [0.18, 1.98, 0.12], Left: [-0.12, 1.84, 0.22] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },
-  { t: 0.4,  bones: { Hips: [2, 0, 0], Spine: [-12, 0, 0], ...TUCK }, hands: { Right: [0.19, 2.00, 0.02], Left: [-0.32, 1.64, 0.26] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.1] } },
-  { t: CARRY_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...BOW }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.18, 1.98, 0.12], Left: [-0.12, 1.84, 0.22] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },
+  { t: 0.4,  bones: { Hips: [2, 0, 0], Spine: [-12, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.19, 2.00, 0.02], Left: [-0.32, 1.64, 0.26] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.1] } },
+  { t: CARRY_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...HANG_ONE_DEEP }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
 ];
 /** Both hands: overhead, then the two-hand wind-up behind the head (the back-scratcher's cock) with the body bowing under it. */
 export const CARRY_UP_TWO: PoseKey[] = [
@@ -61,7 +65,7 @@ export const CARRY_UP_TWO: PoseKey[] = [
 
 /** THE FLUSH, one hand (right): cocked over the head → over the ring → through it, the wrist snapping. */
 export const FLUSH_ONE: PoseKey[] = [
-  { t: 0,    bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...BOW }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },   // the cock the carry ends in
+  { t: 0,    bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...HANG_ONE_DEEP }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },   // the cock the carry ends in, the one-foot hang under it
   { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], ...LONG }, hands: { Right: [0.16, 2.06, 0.36], Left: [-0.44, 1.38, 0.12] }, poles: { Right: UP_R, Left: [-0.8, -0.6, 0.0] } },
   { t: 0.24, bones: { Hips: [4, 0, 0], Spine: [14, 0, 0], ...LONG }, hands: { Right: [0.14, 1.80, 0.46], Left: [-0.44, 1.16, 0.06] }, poles: { Right: [0.9, 0.0, -0.3], Left: [-0.8, -0.6, 0.1] } },
   { t: FLUSH_SEC, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], ...DROP }, hands: { Right: [0.22, 1.52, 0.34], Left: [-0.40, 1.06, 0.12] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.8, -0.6, 0.1] }, hold: true },

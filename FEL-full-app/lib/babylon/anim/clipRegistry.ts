@@ -77,6 +77,7 @@ export const REAL_CLIPS = new Set<string>([
   // any name the animator has registered — but `isResolvable()` said no, which is what every static check and
   // every blend tree proof asks. Read off anim/authored/index.ts; `clip-registry-tests.ts` now keeps it honest.
   'dunk_carry_up', 'dunk_carry_up_left', 'dunk_carry_up_two', 'dunk_flush_one', 'dunk_flush_left', 'dunk_flush_two',   // DUNK MOTION phase 4
+  'dunk_gather_one', 'dunk_gather_two', 'dunk_take_off_one',   // DUNK MOTION phase 7
   'dunk_finish_reverse', 'dunk_finish_power', 'dunk_finish_two_hand', 'karate_elbow', 'karate_spin_elbow', 'bball_in_and_out_left',
   'bball_in_and_out_right', 'bball_between_legs_left', 'bball_between_legs_right', 'bball_behind_back_left', 'bball_behind_back_right',
   'bball_double_cross_left', 'bball_double_cross_right', 'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',

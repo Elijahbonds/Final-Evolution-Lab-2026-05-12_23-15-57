@@ -44,6 +44,7 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { DEFAULT_DRIBBLE } from '../anim/Dribble';
 import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, arcApexT, slamBufferSec, ARC_TOP_FRAC, PLANT_SEC, WINDMILL_RELEASE_T, GATHER_LEAD_SEC, FOOT_PITCH_CAP, atPalm, type LegPose } from '../core/DunkLegs';
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
+import { TAKE_OFF_ONE_CATCH } from '../anim/authored/dunkTakeoff';   // DUNK MOTION phase 7
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
 import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from '../anim/HandIK';
@@ -102,6 +103,26 @@ type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'riva
 const MISS_BEAT_MS = 1400;
 /** HOLD = RUN: the hold ramps the athlete toward the rim at up to the max run (7 m/s) and launches at the gather line. */
 const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6, AIR_LEAN_RAD = 0.32, AIR_DRIFT = 0.8;
+/**
+ * THE CURVED APPROACH (DUNK MOTION phase 7; owner, 2026-09-23: "have the model curve their approach. have the body able to open
+ * up to the side, look at takeoff posture and in flight body mechanics").
+ *
+ * The hold-run drove STRAIGHT down the rim's line, and it pulled any offset back onto it at up to 2 m/s, so every dunker arrived
+ * square to the iron, bolt upright, and left the floor already facing it. A real dunker runs a J (a "banana"): out on the
+ * ball-hand side, then curving in over the last strides so the plant comes in ACROSS the rim at an angle, the body LEANING into
+ * the curve the way any runner banks a bend, and the hips and chest OPEN to the rim through the rise instead of starting there.
+ * The curve turns run speed into rotation you can see, and it is how the take-off reads as an athlete's rather than a sled's.
+ *
+ * The hold-run's lateral target is the J (curveOffset); the stick still steers on top of it. The body banks with the real
+ * lateral acceleration of the path (atan(a/g), capped), the bank carries off the floor and unwinds through the rise, the flight
+ * is a STRAIGHT line from the plant to the rim (a jump cannot curve), and the root opens onto the rim over the rise rather than
+ * snapping to it. The judges score the angle the PLAYER chose: the curve's own offset is taken out of the approach read.
+ */
+const CURVE_WIDE_M = 1.6, CURVE_LINE_M = 0.8, CURVE_FROM_M = 5.5;
+/** The most the whole body leans into the curve, and how fast the lean follows the path. */
+const RUN_BANK_MAX = 14 * Math.PI / 180, RUN_BANK_TAU = 0.12;
+/** The flight opens onto the rim at this yaw rate through the rise (the old FACE_RIM_RATE 6 squared it up in ~0.25 s). */
+const FACE_RIM_RATE_RISE = 2.6;
 /** THE GATHER STRIDE (owner 2026-09-18, "fix the gathers and the approaches in the dunk mode"). The hold-run sprinted at up to
  *  7 m/s INTO the takeoff line and the flight then carried at its own ~1.9 m/s from the launch frame — a wall at the line, the
  *  crouch of the launch clip playing while the root was already rising. The last stride is a GATHER now: inside
@@ -178,6 +199,8 @@ const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, 
  *  holds both hands overhead and a touch behind; the authored FLASHY takeoff has them up and level; the SIG eastbay's ball
  *  hand is already down at the knee. The old single (−0.12, 1.9, −0.3) was tuned against a reach that pulled the hand 0.7 m
  *  forward at the beat — and flipped the arm doing it. */
+/** DUNK MOTION phase 7: the one-foot take-off's ball hand at the catch beat (its own key, as the power offset is the capture's). */
+const CATCH_ONE = new Vector3(TAKE_OFF_ONE_CATCH[0], TAKE_OFF_ONE_CATCH[1], TAKE_OFF_ONE_CATCH[2]);
 const CATCH_HAND_OFFSET: Record<Style, Vector3> = {
   // DUNK MOTION phase 5: the POWER capture is the JUMP now (the plant → the ball up the front → overhead and cocked by the apex); at
   // the catch beat its ball hand is over the head, a touch behind (the pose key at clip 0.62, as the old value was the old key's)
@@ -1286,20 +1309,34 @@ export const DunkMode: ModeDefinition = (() => {
             // paced to the stride: the 0.5 s clip ran out ~0.23 s before the line and the body froze on its last frame (measured), so it
             // plays at the rate that ends it AT the line — the launch clip's crouch takes over from a body still moving
             const tToLine = runTimeToLineGather(distNow, holdRunSpeed, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec());
-            playClip(SPORT_CLIP.dunkChargeGather, { fadeSec: 0.1, speedRatio: Math.max(0.5, Math.min(2, DUNK_TIMING.chargeSec / Math.max(0.25, tToLine))), onEnd: () => {} });
+            // DUNK MOTION phase 7: PUSH 1-2 — two real steps (the long penultimate, the plant), off one foot or closing to two
+            playClip(footNow() === 'two' ? 'dunk_gather_two' : 'dunk_gather_one', { fadeSec: 0.1, speedRatio: Math.max(0.5, Math.min(2, DUNK_TIMING.chargeSec / Math.max(0.25, tToLine))), onEnd: () => {} });
             console.info(`[DUNK-LL] gather stride at ${distNow.toFixed(2)} m, ${holdRunSpeed.toFixed(1)} m/s → carry ${carryMps.toFixed(1)} m/s`);
           }
           if (gatherStride) holdRunSpeed += (carryMps - holdRunSpeed) * Math.min(1, dt / GATHER_EASE_SEC);
           else holdRunSpeed = Math.min(HOLD_RUN_MAX, holdRunSpeed + dt * HOLD_RUN_RAMP);
         }
         // stick-right steers screen-right (the camera's right in world x), and the facing follows the run
-        const steer = ctx.camDirector.rightFlat().x * stickX * 3 + Math.max(-2, Math.min(2, (rim.x - player.root.position.x) * 0.8));
+        // DUNK MOTION phase 7: the auto-steer follows the J (out on the ball-hand side, curving in) instead of the rim's own line
+        const lineX = rim.x + (vectorLive() ? 0 : curveOffset(player.root.position.z - gatherLine()));
+        const steer = ctx.camDirector.rightFlat().x * stickX * 3 + Math.max(-2.2, Math.min(2.2, (lineX - player.root.position.x) * 1.2));
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x + steer * dt + (performance.now() < stickReboundUntil ? stickReboundX * 3.5 * dt : 0)));
         tryGlass(ctx, steer, -holdRunSpeed);   // DUNK PARKOUR: into the glass at an angle on the hold-run
         // a runway beat (a toss, a kick, a cartwheel, the hop) runs under the body at its own pace
         const runNow = holdRunSpeed * (runwayBeat ? runwayBeat.runScale : 1);
         player.root.position.z -= runNow * dt;
         faceVel(new Vector3(steer, 0, -runNow), dt);
+        // DUNK MOTION phase 7: THE LEAN INTO THE BEND — the whole body, from the feet (atan of the path's lateral acceleration over g,
+        // capped), eased. Babylon's roll: +rotation.z tips the head toward the root's local −x, which in world is (−cos ψ, 0, sin ψ).
+        {
+          const ax = dt > 0 ? (steer - prevRunVx) / dt : 0, az = dt > 0 ? (-runNow - prevRunVz) / dt : 0; prevRunVx = steer; prevRunVz = -runNow;
+          const sp = Math.hypot(steer, runNow) || 1, fx = steer / sp, fz = -runNow / sp;
+          const aLat = ax * -fz + az * fx;   // across the path, + to its left-hand normal (−fz, fx)
+          const yaw = player.root.rotation.y, tipX = -Math.cos(yaw), tipZ = Math.sin(yaw);
+          const toward = Math.sign((-fz * tipX + fx * tipZ) * aLat) * Math.min(RUN_BANK_MAX, Math.atan2(Math.abs(aLat), 9.81));
+          runBank += (toward - runBank) * lowPassK(dt, RUN_BANK_TAU);
+          player.root.rotation.z = runBank;
+        }
         // the posture tracker: the run ramping up is a forward lean, the strafe between obstacles is a bank
         runwayVel.x = steer; runwayVel.z = -runNow;
         runMotion.update(steer, -runNow, player.root.rotation.y, dt);
@@ -1412,7 +1449,9 @@ export const DunkMode: ModeDefinition = (() => {
         // a two-foot gather plants and spends the run going up instead (0.45). Same line, two different bodies.
         const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * launchCarry * Math.min(1, clipTime / PLANT_SEC);
         player.root.position.z = plantFrom + (rim.z + FLUSH_Z_AHEAD - plantFrom) * u;
-        player.root.position.x += (rim.x - player.root.position.x) * 1.6 * dt;
+        // DUNK MOTION phase 7: a STRAIGHT line from the plant to the rim (a jump cannot curve — the old pull toward rim.x bent the
+        // flight's ground path); the stick's drift rides on top and fades by the flush, so the contact math is untouched
+        player.root.position.x = launchX + (rim.x - launchX) * u + airDriftX * (1 - u);
         if (busLaunch) {   // off the bus: 2 m off the centre line and a metre up — the x is driven to the iron on the carry, the height fades by the extension
           player.root.position.x = busLaunch.x0 + (rim.x - busLaunch.x0) * Math.min(1, u * 1.15);
           player.root.position.y += busLaunch.y0 * Math.max(0, 1 - clipTime / EASTBAY_TIMING.extend);
@@ -1420,9 +1459,12 @@ export const DunkMode: ModeDefinition = (() => {
         // Pad acceptance #2: the stick is alive in the hang — a body lean and a small drift before contact;
         // the pull to rim.x above (1.6/s) still wins by the flush, so the contact math is untouched.
         airLean += (stickX - airLean) * Math.min(1, dt * 8);
-        player.root.rotation.z = -airLean * AIR_LEAN_RAD;
-        player.root.position.x += airLean * AIR_DRIFT * dt;
-        faceToward(rim, dt * FACE_RIM_RATE);   // an angled run-up launches yawed off the iron — ease onto it through the rise
+        // the curve's bank carries off the floor and unwinds through the rise (DUNK MOTION phase 7)
+        player.root.rotation.z = -airLean * AIR_LEAN_RAD + launchBank * Math.max(0, 1 - clipTime / 0.55);
+        airDriftX += airLean * AIR_DRIFT * dt;
+        // an angled run-up launches yawed off the iron: the body OPENS onto it through the rise (phase 7: slower there, so the
+        // turn is something the hips and chest do in the air rather than a snap at the take-off), square by the hang
+        faceToward(rim, dt * (clipTime < EASTBAY_TIMING.rise + 0.35 ? FACE_RIM_RATE_RISE : FACE_RIM_RATE));
 
         // THE PROP IS PHYSICAL. Crossing the obstacle with your feet below
         // its top is not a scoring penalty — the dunk DIES at the chair,
@@ -1678,7 +1720,7 @@ export const DunkMode: ModeDefinition = (() => {
           // flight does (measured: 15 clip-less frames on the replay of every make — a frozen pose mid-replay)
           const replayRate = Math.max(0.2, 0.5 * Math.max(0.2, clipTimeAtResolve - PLANT_SEC) / liveAir);
           replayRateNow = replayRate; replayTrickIdx = 0; replaySpinYaw = 0;
-          const rg = playClip(STYLE_CLIP[style], { speedRatio: replayRate, fadeSec: 0.25, onEnd: () => { if (replaying && replayAir && !replayAerial) { playClip(carryClip(), { speedRatio: replayRate, fadeSec: CARRY_FLOW_FADE_SEC, onEnd: () => {} }); console.info('[HANDS] replay launch → carry'); } } });
+          const rg = playClip(launchClip(), { speedRatio: replayRate, fadeSec: 0.25, onEnd: () => { if (replaying && replayAir && !replayAerial) { playClip(carryClip(), { speedRatio: replayRate, fadeSec: CARRY_FLOW_FADE_SEC, onEnd: () => {} }); console.info('[HANDS] replay launch → carry'); } } });
           rg?.goToFrame(PLANT_SEC * 30);   // the clip's plant already happened on the floor
           console.info('[HANDS] replay air');
         } else if (!replayAir) playClip(runLoop(), { loop: true });
@@ -1917,14 +1959,15 @@ export const DunkMode: ModeDefinition = (() => {
     void acc;
     if (leftHand) return FLUSH.Left;
     if (called || lob.caught) return FLUSH.Right;
-    return FLUSH.Both;   // the plain POWER flight: the owner's capture arrives with both hands overhead
+    return launchFoot === 'one' ? FLUSH.Right : FLUSH.Both;   // the plain flight flushes the way it went up (phase 7): one hand off one foot, two off two
   }
   function finishBanner(hit: boolean, acc: number, leftHand = false, called: string | null = null): string {
     if (!DUNK_FINISH_VARIETY || !hit || leftHand) return '';
     if (called || lob.caught) return '';                    // the trick's (or the prop's) own banner already named it; never rename a dunk
     // DUNK MOTION phase 4: the banner names what the body DID — a plain flight is a two-hand flush, never a windmill it did not throw
-    if (acc >= 0.85) return 'TWO-HAND HAMMER!';
-    if (acc >= 0.55) return 'TWO-HAND FLUSH!';
+    const hands = launchFoot === 'one' ? 'ONE-HAND' : 'TWO-HAND';
+    if (acc >= 0.85) return `${hands} HAMMER!`;
+    if (acc >= 0.55) return `${hands} FLUSH!`;
     return '';
   }
   /** The last named air trick of this flight — the dunk the player actually called. */
@@ -1942,6 +1985,22 @@ export const DunkMode: ModeDefinition = (() => {
   let chargeAtLaunch = 0;
   function apexPredicted(): number { return ((1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + (doubleUp ? 0.15 : 0) + apexLift()) * launchMult() + doubleLaunchLift; }
   let launchZ = CFG.gatherZ;                  // where the flight left the floor (the carry is measured from here)
+  let launchX = 0, launchBank = 0, airDriftX = 0;   // DUNK MOTION phase 7: the flight's straight line starts here; the curve's bank carries off the floor; the stick's drift
+  /** DUNK MOTION phase 7: which side of the rim's line the J comes from this run (+1 / −1 world x; 0 = a straight run), the bank. */
+  let curveSide = 0, runBank = 0, prevRunVx = 0, prevRunVz = 0;
+  /** The J's lateral offset from the rim's line at `dToLine` metres before the take-off line: wide far out, curving in. */
+  function curveOffset(dToLine: number): number {
+    if (!curveSide) return 0;
+    const d = Math.max(0, dToLine);
+    const k = d >= CURVE_FROM_M ? 1 : 1 - (1 - d / CURVE_FROM_M) ** 2;
+    return curveSide * (CURVE_LINE_M + (CURVE_WIDE_M - CURVE_LINE_M) * k);
+  }
+  /** The world side the ball hand is on (the J comes from there: the ball on the outside of the bend, the take-off foot inside). */
+  function ballHandSide(): number {
+    const a = arms.Right; if (!a) return 1;
+    player.root.computeWorldMatrix(true); a.shoulder.computeWorldMatrix(true);
+    return Math.sign(a.shoulder.getAbsolutePosition().x - player.root.position.x) || 1;
+  }
   let obstacleOver = false, obstacleCleared = false, obstacleMargin = Infinity;   // the clear, once per attempt
   /** The last slam's timing verdict, shown on the card. Null until a slam is pressed this attempt. */
   let slamTiming: SlamReadout | null = null;
@@ -2095,6 +2154,7 @@ export const DunkMode: ModeDefinition = (() => {
     setPhase('cinematic'); setWin('takeoff');
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
+    launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = false;
     meterSpan = EASTBAY_TIMING.extend + slamWindowNow() / 2 + 0.16; meter3d?.begin(slamGreen());
@@ -2138,7 +2198,8 @@ export const DunkMode: ModeDefinition = (() => {
     // paid. XZ only: the rim is 3.05 m up and counting that would make every dunk read as "from range".
     const takeoffRange = Math.hypot(player.root.position.x - rim.x, player.root.position.z - rim.z);
     const approach = approachBonus(
-      approachAngle(player.root.position.x, player.root.position.z, rim.x, rim.z),
+      // DUNK MOTION phase 7: the J's own offset is the mode's, not the player's — a straight hold-run still reads head-on
+      approachAngle(player.root.position.x - curveOffset(player.root.position.z - gatherLine()), player.root.position.z, rim.x, rim.z),
       takeoffFor(runUpPeak, gatherHeld),
       takeoffRange,
     );
@@ -2161,7 +2222,7 @@ export const DunkMode: ModeDefinition = (() => {
     // BEFORE the resolve, so for 34–50 ms NO clip played on the athlete — a held pose (pose Δ 0.000) that the finish then
     // crossfaded out of. A launch clip that ends while the flight is still in the air now flows into the held hang; the
     // resolve's finish supersedes it (the token guard kills this chain once superseded). Ends at the flush → nothing here.
-    playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => { if (phase === 'cinematic') { const c = carryClip(); console.info(`[HANDS] launch → ${c}`); playAir(c, carryRateToResolve(c), CARRY_FLOW_FADE_SEC); } } });
+    playClip(launchClip(), { speedRatio: 1, onEnd: () => { if (phase === 'cinematic') { const c = carryClip(); console.info(`[HANDS] launch → ${c}`); playAir(c, carryRateToResolve(c), CARRY_FLOW_FADE_SEC); } } });
   }
 
   /** The dunk dies at the prop: clip it mid-flight and the attempt is blown
@@ -2470,6 +2531,8 @@ export const DunkMode: ModeDefinition = (() => {
     setPhase('charge');
     obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
     holdRunSpeed = Math.max(2, runUpPeak);
+    // DUNK MOTION phase 7: the J comes from the ball-hand side — unless a parkour line (the glass, the bus) owns the path
+    curveSide = busRun ? 0 : ballHandSide(); runBank = 0; prevRunVx = 0; prevRunVz = 0;
     playClip(runLoop(), { loop: true });
     ctx.setHud({ hint: 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });
   }
@@ -2653,8 +2716,17 @@ export const DunkMode: ModeDefinition = (() => {
   /** DUNK MOTION phase 4: which carry-up the flight waits in — the plain POWER flight is the owner's capture, which arrives with
    *  BOTH hands overhead; a caught lob or a called trick carries it in the hand it is in. */
   function carryClip(): string {
-    if (!airTrick && !lob.caught) return CARRY.Both;
+    // DUNK MOTION phase 7: a plain flight carries the way it left the floor — the one-foot take-off with the ball hand, the two-foot
+    // (the owner's capture) with both
+    if (!airTrick && !lob.caught) return launchFoot === 'one' ? CARRY.Right : CARRY.Both;
     return ebState.inLeftHand ? CARRY.Left : CARRY.Right;
+  }
+  /** DUNK MOTION phase 7: which foot this run-up is going up off (the L2 gather, or too slow to one-foot, is two). */
+  function footNow(): 'one' | 'two' { return takeoffFor(Math.max(runUpPeak, holdRunSpeed), gatherHeld); }
+  /** The take-off clip: the POWER flight goes up off the foot the run-up chose — the one-foot take-off (the knee drive, the arm
+   *  strike, the lead leg's drop) or the owner's own two-foot capture. Flashy / signature keep their own. */
+  function launchClip(): string {
+    return style === 'power' && MOCAP_DUNK && launchFoot === 'one' ? 'dunk_take_off_one' : STYLE_CLIP[style];
   }
   /** H5: feet-down — the land clip, then the idle loop. Once per attempt. */
   function landNow(): void {
@@ -2765,8 +2837,13 @@ export const DunkMode: ModeDefinition = (() => {
     const line = phase === 'cinematic' ? launchZ : gatherLine();
     const carry = carryU(catchT, EASTBAY_TIMING.extend);
     const kk = arcK(catchT, EASTBAY_TIMING.duration);
-    const off = CATCH_HAND_OFFSET[style];
-    return new Vector3(rim.x + off.x, 4 * kk * (1 - kk) * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
+    // DUNK MOTION phase 7: the POWER flight's hand is where ITS take-off clip puts it (off one foot or the two-foot capture)
+    const foot = phase === 'cinematic' ? launchFoot : footNow();
+    const off = style === 'power' && MOCAP_DUNK && foot === 'one' ? CATCH_ONE : CATCH_HAND_OFFSET[style];
+    // DUNK MOTION phase 7: the flight's x is a straight line from where the J planted (launchX, or the J's own offset at the line
+    // before the take-off) to the rim — no longer the rim's line from the first frame
+    const x0 = phase === 'cinematic' ? launchX : rim.x + curveOffset(0);
+    return new Vector3(x0 + (rim.x - x0) * carry + off.x, 4 * kk * (1 - kk) * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
   }
   /** The backboard's front face, read off the venue's board mesh (the Nexus hoop's `board`, VenueKit's `backboard`). */
   function findGlass(scene: Scene): void {
