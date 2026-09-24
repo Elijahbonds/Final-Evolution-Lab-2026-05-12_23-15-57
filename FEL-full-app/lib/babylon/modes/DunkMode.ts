@@ -101,7 +101,10 @@ import { MomentumBus } from '../core/MomentumBus';
 import { rivalNerve, rivalExecution } from '../core/RivalNerve';   // the rival feels the contest too
 import { rivalTricksFor, rivalSlamOffset } from '../core/RivalPlay';
 import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, pickCelebration, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
-import { PhoneFlashes } from '../visual/PhoneFlashes';   // DUNK MOTION phase 11: the rival's pad decides like a player
+import { PhoneFlashes } from '../visual/PhoneFlashes';
+import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
+import { dunkStingers } from '../audio/mic/names';
+import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -693,6 +696,11 @@ export const DunkMode: ModeDefinition = (() => {
   // DUNK MOTION phase 12: the triple cut is on (the pose replay owns the body — the old re-fly stands aside); the celebration the
   // player threw on the d-pad after the make; the stands' phones
   let cutting = false, celebPick: CelebId | null = null, phoneFlashes: PhoneFlashes | null = null;
+  // THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio"): the court's
+  // MC calls the night — the welcome, who is up, the run, the make with the dunk's name, the judges' number, the misses, the rival,
+  // the rounds, the winner — the sidekick answers the big ones, the stands shout, and the rival talks. Silent from take-off to the
+  // iron (the WINDOW OPEN / NOW! ticks are the player's to hear; only the crowd reacts to a trick in the air).
+  let mic: ModeMic | null = null, micOpened = false, micFiller = false;
   let soundGapUntil = 0;   // DUNK MOTION phase 12: the building holds its breath from the SLAM to the iron
   let celebFace: Vector3 | null = null;   // phase 12: the celebration is for the crowd — he turns to the court (and the verdict camera) for it
   /**
@@ -1136,6 +1144,7 @@ export const DunkMode: ModeDefinition = (() => {
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
+      mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES } }); micOpened = false; micFiller = false;
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       // `dunkRival` because a probe cannot find the opponent by looking: the nearest body to the hero at floor height is
       // as often a courtside spectator, and one has been measured by mistake before. The mode knows which body it is.
@@ -1429,6 +1438,7 @@ export const DunkMode: ModeDefinition = (() => {
       // with no gather and blew. Measured in the lab: attempt 3 of every set, every set, `run → dunk_launch →
       // dunk_finish_blown` with the gather clip missing. The runway now looks at the trigger it can already see.
       rivalDrive(ctx);   // DUNK MOTION phase 11: the rival's pad (a no-op on the player's turn)
+      micTick(ctx);
       if (phase === 'approach' && runHeld > 0.02) beginRun(ctx);
       meter3d?.update(dt);
       ctx0 = ctx;
@@ -2002,6 +2012,7 @@ export const DunkMode: ModeDefinition = (() => {
         for (const beat of reveal.update(dt)) {
           if (beat.kind === 'confer') {
             ctx.setHud({ hint: 'THE JUDGES CONFER…' });
+            mic?.say({ moment: 'dunk.judges', priority: 2 });
             SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
           } else if (beat.kind === 'card' && beat.judge) {
             revealed = [...revealed, beat.judge];
@@ -2022,6 +2033,9 @@ export const DunkMode: ModeDefinition = (() => {
             const overdrive = perfect || overdriveDunk(qteAccuracy, lastScores.length ? lastScores.reduce((a, j) => a + j.score, 0) / lastScores.length * 0.8 : 0);
             if (overdrive) { for (let i = 0; i < 3; i++) EffectsKit.burst(ctx.scene, new Vector3(rim.x, rim.y + 0.5 + i * 0.3, rim.z - 0.6), 'glitch', 2); ctx.juice.shake(0.22, 300); ctx.juice.flash('#ffffff', 110); console.info('[DUNK-PARKOUR] OVERDRIVE — the board shatters'); }
             ctx.setHud({ hint: '', judgeReveal: revealed, banner: perfect ? 'FIFTY! · OVERDRIVE' : overdrive ? 'OVERDRIVE DUNK' : '' });
+            // THE MIC reads the number (a fifty gets its own call, the sidekick and the whole building)
+            if (perfect) mic?.say({ moment: 'dunk.fifty', priority: 3, side: 0.6, crowd: { moment: 'crowd.erupt', n: 3 } });
+            else mic?.say({ moment: 'stinger', stinger: [`num:${beat.total}`], priority: 3, crowd: beat.band === 'eruption' ? { moment: 'crowd.erupt', n: 2 } : undefined });
             ctx.camDirector.pulse(perfect ? 1.4 : beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
             if (perfect) {
               // A 50 has to SOUND like a 50. An eruption already plays a cheer
@@ -2132,7 +2146,7 @@ export const DunkMode: ModeDefinition = (() => {
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
       phoneFlashes?.dispose(); phoneFlashes = null;
-      if (typeof window !== 'undefined') window.speechSynthesis?.cancel();   // DUNK MOTION phase 12: the announcer stops with the mode
+      mic?.dispose(); mic = null;   // THE MIC stops with the mode
       meter3d?.dispose(); meter3d = null;
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
@@ -2399,6 +2413,7 @@ export const DunkMode: ModeDefinition = (() => {
     hype = Math.min(100, hype + 6);
     SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
     SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
+    mic?.crowd('crowd.ooh', trickLabels.length > 1 ? 2 : 1);   // the stands gasp at the trick (the booth holds)
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
     flash(ctx, trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`, 700);
     ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
@@ -2451,6 +2466,7 @@ export const DunkMode: ModeDefinition = (() => {
     // still sitting under the dunker in mid-air, offering a move that is no longer available and standing where the
     // flight's own read is about to appear. The runway teaches; the air reads.
     teachHint = ''; ctx.setHud({ hint: '' });
+    mic?.hold(4);   // THE MIC: nothing from the booth through the flight — the rhythm ticks are the player's (released on the iron)
     setPhase('cinematic'); setWin('takeoff');
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
@@ -2947,6 +2963,8 @@ export const DunkMode: ModeDefinition = (() => {
     // DUNK MOTION phase 7: the J comes from the ball-hand side — unless a parkour line (the glass, the bus) owns the path
     curveSide = 0; curveFromD = 0; curveErr0 = 0; runBank = 0; prevRunVx = 0; prevRunVz = 0; strideAdjust = 1;   // phase 8: the J waits for triangle
     playClip(runLoop(), { loop: true });
+    if (turn === 'player') mic?.hush();   // THE MIC: the welcome stops when the player runs (the rival runs at once: his intro plays over it)
+    mic?.say({ moment: 'dunk.run', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
     ctx.setHud({ hint: turn === 'rival' ? `${foe.name} — ON THE RUN` : 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });   // (phase 11: the controls are the player's)
   }
 
@@ -3569,23 +3587,65 @@ export const DunkMode: ModeDefinition = (() => {
     // DUNK MOTION phase 12: the gap ends on the iron — the roar comes in over the thud — and the glass answers how hard it was
     soundGapUntil = 0;
     SoundKit.play('crowdCheer', { volume: 0.45 + 0.4 * qteAccuracy });
+    // THE MIC: the booth may speak again; the stands go up; the make call is decoded now so it lands on the replay's first frame
+    mic?.release(); mic?.crowd(qteAccuracy > 0.7 ? 'crowd.erupt' : 'crowd.cheer', 2);
+    if (turn === 'rival') mic?.expect({ moment: 'dunk.rival.make', tags: [`rival:${foe.id}`] });
+    else for (const t of [0, 1, 2] as const) mic?.expect({ moment: 'dunk.make', tier: t });
     hoopJuice?.shudder(0.3 + 0.7 * qteAccuracy + (aHeld ? 0.2 : 0));
     phoneFlashes?.burst(6, 0.5);   // the phones were up for the take-off
   }
 
-  /** DUNK MOTION phase 12 — THE ANNOUNCER: the call on the lower third and, where the browser has a voice, out loud (muted with the
-   *  game's sound; never queued behind a stale one). */
+  /** DUNK MOTION phase 12 — THE ANNOUNCER's words on the lower third. THE MIC (2026-09-24) speaks the call now, in the court MC's
+   *  own voice; this is the fallback for when the voices never arrived (the browser's robot voice is gone). */
   function announce(ctx: ModeContext, line: string): void {
     ctx.setHud({ call: line });
     console.info(`[DUNK-CALL] ${line}`);
-    try {
-      const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
-      if (!synth || SoundKit.muted) return;
-      synth.cancel();
-      const u = new SpeechSynthesisUtterance(line.replace(/→/g, ',').toLowerCase());
-      u.rate = 1.08; u.pitch = 0.85; u.volume = 0.85;
-      synth.speak(u);
-    } catch { /* no voice here: the lower third carries it */ }
+  }
+
+  // ── THE MIC ──────────────────────────────────────────────────────────────────────────────────────────────────────
+  /** Every frame: the mic's clock, the welcome on the first live frame, and filler only while the runway waits on the player. */
+  function micTick(ctx: ModeContext): void {
+    if (!mic) return;
+    mic.update();
+    if (!micOpened && ctx.phase() === 'playing' && phase === 'approach') {
+      micOpened = true;   // night 1: the welcome, Flight Night, tonight's rival
+      mic.say({ moment: 'intro.court', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
+      mic.then({ moment: 'dunk.intro', priority: 2 });
+      mic.then({ moment: 'dunk.rival.intro', tags: [`rival:${foe.id}`], priority: 2 });
+    }
+    const quiet = phase === 'approach' && turn === 'player' && ctx.phase() === 'playing';
+    if (quiet !== micFiller) {
+      micFiller = quiet;
+      mic.setFiller(quiet ? ['filler.banter', 'filler.crowd'] : null);
+      mic.setCrowdIdle(quiet ? 'crowd.idle' : null);
+    }
+  }
+  /** The make, called: the MC's line and the dunk's name (the size from the panel's own sum, so the call agrees with the reveal).
+   *  False when the voices are not in (the caller falls back to the lower third). */
+  function micMake(theName: string, rawTotal: number, isRepeat: boolean): boolean {
+    if (!mic?.ready) return false;
+    const tier = rawTotal >= BAND_TOTAL.eruption ? 2 : rawTotal >= BAND_TOTAL.approval ? 1 : 0;
+    const crowdUp = { moment: tier === 2 ? 'crowd.erupt' : 'crowd.cheer', n: tier + 1 };
+    if (isRepeat) mic.say({ moment: 'dunk.repeat', priority: 2, crowd: { moment: 'crowd.cheer', n: 1 } });
+    else if (turn === 'rival') {
+      mic.say({ moment: 'dunk.rival.make', tags: [`rival:${foe.id}`], priority: 1 + tier, stinger: dunkStingers(theName), crowd: crowdUp });
+      mic.then({ who: foe.id, moment: 'player.dunk.brag' });
+    } else {
+      mic.say({ moment: 'dunk.make', tier: tier as 0 | 1 | 2, stinger: dunkStingers(theName), side: [0.1, 0.35, 0.6][tier], crowd: crowdUp });
+      if (tier === 2 && Math.random() < 0.5) mic.then({ who: foe.id, moment: 'player.dunk.respect' });
+    }
+    return true;
+  }
+  /** A miss, called for what missed (the prop, the lob, the iron) — or the rival's; the rival may have a word for yours. */
+  function micMiss(last: boolean): void {
+    if (!mic) return;
+    const moment = turn === 'rival' ? 'dunk.rival.miss'
+      : last ? 'dunk.miss.last'
+      : obstacleClipped ? 'dunk.miss.prop'
+      : (lob.live || lob.lost) ? 'dunk.miss.lob'
+      : slamSeen ? 'dunk.miss.iron' : 'dunk.miss';
+    mic.say({ moment, priority: 2, side: turn === 'player' ? 0.15 : 0, crowd: { moment: Math.random() < 0.5 ? 'crowd.groan' : 'crowd.heckle', n: 1 } });
+    if (turn === 'player' && Math.random() < 0.45) mic.then({ who: foe.id, moment: 'player.dunk.jab' });
   }
   /** PYRO on the big ones: sparks up off both baseline corners, and the confetti. */
   function pyro(ctx: ModeContext): void {
@@ -3610,6 +3670,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (finishing) return;
     finishing = true;
     ctx.setHud({ bannerHigh: false });   // the flush is through: the replay and the judges' banners sit back in the middle
+    mic?.release();   // a miss never reaches the iron: the booth's hold ends here
 
     if (!made) {
       // A+ P2: the clank is the miss's one hit — no buzzer on the same beat; the crowd groans a breath later, quietly
@@ -3642,6 +3703,7 @@ export const DunkMode: ModeDefinition = (() => {
       // nothing left to try.
       stakes = spendAttempt(stakes);
       if (canRetry(stakes, false)) {
+        micMiss(false);
         SoundKit.play('crowdGroan', { volume: 0.35 });
         flash(ctx, `${missWhy()} — MISSED · ${attemptsLeft(stakes)} LEFT`);
         ctx.setHud({ judgeReveal: null, hint: '', attempt: stakesLabel(stakes, calledLabel()) });
@@ -3670,6 +3732,7 @@ export const DunkMode: ModeDefinition = (() => {
       // explained; no card flip for the one-beat miss (the reveal's CONFER hint used to stack under the banner)
       // a MISS is where the silence hurt most: three of six measured attempts scored nothing and said
       // nothing. If the finger moved at all, say what it did.
+      micMiss(true);
       const mb = missBeat(slamTiming?.offsetMs ?? null);
       const who = turn === 'rival' ? `${foe.name}: ` : '';
       flash(ctx, who + (slamTiming ? `${missWhy()} — ${mb.label} · ${slamTiming.label}` : `${missWhy()} — ${mb.label} · JUDGES ${missTotal}`));
@@ -3828,7 +3891,7 @@ export const DunkMode: ModeDefinition = (() => {
     const big = dunkTotal >= BAND_TOTAL.eruption || !!signature;
     const theName = signature ? signature.name : named.length ? `${named.join(' → ')}` : finishBanner(qteHit, qteAccuracy, inOffHand(), calledAirTrick()).replace('!', '') || 'THE DUNK';
     const call = announcerCall({ total: dunkTotal, name: theName, bands: BAND_TOTAL, seen: isRepeat, dunker: turn === 'rival' ? foe.name : undefined, seed: seedOf(`${theName}:${dunkTotal}:${round}:${dunkInRound}`) });
-    announce(ctx, call);
+    if (!micMake(theName, scores.reduce((a, j) => a + j.score, 0), isRepeat)) announce(ctx, call);   // the lower third only when the voices never arrived
     phoneFlashes?.burst(big ? 22 : 10, big ? 2.4 : 1.6);
     if (big) pyro(ctx);
     const contactSec = flushRealSec || resolveRealMs / 1000;
@@ -3852,6 +3915,7 @@ export const DunkMode: ModeDefinition = (() => {
       console.info(`[DUNK-CELEB] ${celeb} (${cz.clip})${celebPick ? ' — thrown on the d-pad' : ''}`);
       if (cz.by) setTimeout(() => ctx.setHud({ call: `${cz.label} — ${cz.by!.toUpperCase()}` }), 400);
       if (celeb === 'spiderman' || celeb === 'itsover') SoundKit.play('crowdCheer', { volume: 0.55 });
+      mic?.then({ moment: 'dunk.celeb', tags: [`celeb:${celeb}`] });
     }
     landingClip = SPORT_CLIP.dunkLandCrouch;   // (the landing already happened, live — after the cut there is no second one)
 
@@ -3952,6 +4016,12 @@ export const DunkMode: ModeDefinition = (() => {
         : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',   // F4 (review): six controls in one line taught none of them
       charge: 0, slamPulse: false,
     });
+    mic?.release();
+    if (turn === 'player') {   // THE MIC: who is up — the attempt, and the pressure in the final round
+      const moment = stakes.attemptsUsed >= 2 ? 'dunk.lastchance' : stakes.attemptsUsed === 1 ? 'dunk.retry'
+        : isFinalRound && dunkInRound === 0 ? (deficit > 0 ? 'dunk.need' : 'dunk.need.ahead') : 'dunk.up';
+      mic?.then({ moment, priority: 1, side: moment === 'dunk.up' ? 0.15 : 0 });
+    }
     if (turn === 'rival') {   // phase 11: his attempt, his plan, his line on the HUD
       planRivalAttempt();
       ctx.setHud({ dunkNum: `${rivalDunkNum + 1}/${DUNKS_PER_ROUND}`, attempt: '', need: 0, hint: `${foe.name} — THE RIVAL'S DUNK` });
@@ -4046,6 +4116,7 @@ export const DunkMode: ModeDefinition = (() => {
     swapBodies(ctx);   // from here `player` is the rival: the dunker, whoever he is
     runHeld = 0; runPressWas = false; stickX = 0; stickY = 0; heldDpad = null; aHeld = false;
     flash(ctx, `${foe.name} IS UP`, 1400);
+    mic?.say({ moment: 'dunk.rival.up', tags: [`rival:${foe.id}`], priority: 2 });
     resetForNextAttempt(ctx);
   }
   /** The rival's dunks are done: back to his bench, the runway back to the player. */
@@ -4077,6 +4148,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (round < TOTAL_ROUNDS) {
       round++;
       ctx.setHud({ round: `${round}/${TOTAL_ROUNDS}` }); flash(ctx, `ROUND ${round}`, 1400);
+      mic?.then({ moment: 'dunk.round', priority: 2 });
       resetForNextAttempt(ctx);
       return;
     }
@@ -4084,6 +4156,11 @@ export const DunkMode: ModeDefinition = (() => {
     SoundKit.play('whistle');
     const won = cardWon({ playerTotal, rivalTotal });
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
+    // THE MIC: the result, the sidekick, the building; then the rival has a word and the MC sends everyone home
+    mic?.hush();
+    mic?.say({ moment: won ? 'dunk.win' : 'dunk.lose', priority: 3, side: 0.5, crowd: { moment: won ? 'crowd.erupt' : 'crowd.groan', n: won ? 3 : 1 } });
+    mic?.then({ who: foe.id, moment: won ? 'player.dunk.respect' : 'player.dunk.brag' });
+    mic?.then({ moment: won ? 'outro.win' : 'outro.loss', priority: 1 });
     // the card rides out with the result, which is what the arena submit forwards
     const stats = { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain, night };
     // the card goes out on `detail`, not `stats` — stats is numbers-only because the reward layer reads it
@@ -4154,6 +4231,8 @@ export const DunkMode: ModeDefinition = (() => {
     });
     crowd.onScore(0);
     SoundKit.play('uiTick', { pitch: 1.4 });
+    mic?.hush(); mic?.say({ moment: 'dunk.night', priority: 2 });   // THE MIC: another night, and who walked in
+    mic?.then({ moment: 'dunk.rival.intro', tags: [`rival:${foe.id}`], priority: 2 });
     resetForNextAttempt(ctx);           // -> phase 'approach', the runway HUD, a fresh prop
     flash(ctx, `NIGHT ${night}`, 1400);
     // who walked in tonight — phrased by the module so no surface writes its own version of a name

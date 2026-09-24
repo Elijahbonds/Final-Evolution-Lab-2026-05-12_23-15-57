@@ -1,0 +1,140 @@
+{
+ "cast": "crowd_c",
+ "lines": [
+  {
+   "id": "crowd.hype.01",
+   "moment": "crowd.hype",
+   "text": "Recording! Go, go!"
+  },
+  {
+   "id": "crowd.hype.02",
+   "moment": "crowd.hype",
+   "text": "Wait, let me film!"
+  },
+  {
+   "id": "crowd.hype.03",
+   "moment": "crowd.hype",
+   "text": "Zooming in! Ready!"
+  },
+  {
+   "id": "crowd.hype.04",
+   "moment": "crowd.hype",
+   "text": "Okay, okay, okay!"
+  },
+  {
+   "id": "crowd.ooh.01",
+   "moment": "crowd.ooh",
+   "text": "Ooh, got it!"
+  },
+  {
+   "id": "crowd.ooh.02",
+   "moment": "crowd.ooh",
+   "text": "Rewind, rewind!"
+  },
+  {
+   "id": "crowd.ooh.03",
+   "moment": "crowd.ooh",
+   "text": "So clean!"
+  },
+  {
+   "id": "crowd.cheer.01",
+   "moment": "crowd.cheer",
+   "text": "Got it on video!"
+  },
+  {
+   "id": "crowd.cheer.02",
+   "moment": "crowd.cheer",
+   "text": "That's the clip!"
+  },
+  {
+   "id": "crowd.cheer.03",
+   "moment": "crowd.cheer",
+   "text": "Yes, posting that!"
+  },
+  {
+   "id": "crowd.cheer.04",
+   "moment": "crowd.cheer",
+   "text": "Making that my wallpaper!"
+  },
+  {
+   "id": "crowd.erupt.01",
+   "moment": "crowd.erupt",
+   "text": "I got it all!"
+  },
+  {
+   "id": "crowd.erupt.02",
+   "moment": "crowd.erupt",
+   "text": "This is going everywhere tonight!"
+  },
+  {
+   "id": "crowd.erupt.03",
+   "moment": "crowd.erupt",
+   "text": "No, my battery's empty!"
+  },
+  {
+   "id": "crowd.erupt.04",
+   "moment": "crowd.erupt",
+   "text": "Shaking! My hands are shaking!"
+  },
+  {
+   "id": "crowd.groan.01",
+   "moment": "crowd.groan",
+   "text": "Oh, almost had it!"
+  },
+  {
+   "id": "crowd.groan.02",
+   "moment": "crowd.groan",
+   "text": "Wait, what happened?"
+  },
+  {
+   "id": "crowd.groan.03",
+   "moment": "crowd.groan",
+   "text": "Not the clip!"
+  },
+  {
+   "id": "crowd.heckle.01",
+   "moment": "crowd.heckle",
+   "text": "That's a blooper reel!"
+  },
+  {
+   "id": "crowd.heckle.02",
+   "moment": "crowd.heckle",
+   "text": "Deleting that. Deleted."
+  },
+  {
+   "id": "crowd.heckle.03",
+   "moment": "crowd.heckle",
+   "text": "Muted. Next!"
+  },
+  {
+   "id": "crowd.idle.01",
+   "moment": "crowd.idle",
+   "text": "Is my phone still recording? Okay, good."
+  },
+  {
+   "id": "crowd.idle.02",
+   "moment": "crowd.idle",
+   "text": "Get me in the shot, somebody!"
+  },
+  {
+   "id": "crowd.idle.03",
+   "moment": "crowd.idle",
+   "text": "My feed is going to love this."
+  },
+  {
+   "id": "crowd.idle.04",
+   "moment": "crowd.idle",
+   "text": "Can we move closer? The angle's bad."
+  },
+  {
+   "id": "crowd.idle.05",
+   "moment": "crowd.idle",
+   "text": "Hold on, switching to slow motion."
+  },
+  {
+   "id": "crowd.defense.01",
+   "moment": "crowd.defense",
+   "text": "Lock in, defense!"
+  }
+ ]
+}

@@ -1,0 +1,140 @@
+{
+ "cast": "crowd_d",
+ "lines": [
+  {
+   "id": "crowd.hype.01",
+   "moment": "crowd.hype",
+   "text": "Show us something, kid!"
+  },
+  {
+   "id": "crowd.hype.02",
+   "moment": "crowd.hype",
+   "text": "Wake me up, champ!"
+  },
+  {
+   "id": "crowd.hype.03",
+   "moment": "crowd.hype",
+   "text": "Eyes up, folks!"
+  },
+  {
+   "id": "crowd.hype.04",
+   "moment": "crowd.hype",
+   "text": "Don't let me down!"
+  },
+  {
+   "id": "crowd.ooh.01",
+   "moment": "crowd.ooh",
+   "text": "Ha! Fancy!"
+  },
+  {
+   "id": "crowd.ooh.02",
+   "moment": "crowd.ooh",
+   "text": "Would you look!"
+  },
+  {
+   "id": "crowd.ooh.03",
+   "moment": "crowd.ooh",
+   "text": "Ooh, showboat!"
+  },
+  {
+   "id": "crowd.cheer.01",
+   "moment": "crowd.cheer",
+   "text": "Ha! There it is!"
+  },
+  {
+   "id": "crowd.cheer.02",
+   "moment": "crowd.cheer",
+   "text": "About time!"
+  },
+  {
+   "id": "crowd.cheer.03",
+   "moment": "crowd.cheer",
+   "text": "Knew you had it!"
+  },
+  {
+   "id": "crowd.cheer.04",
+   "moment": "crowd.cheer",
+   "text": "Now we're talking!"
+  },
+  {
+   "id": "crowd.erupt.01",
+   "moment": "crowd.erupt",
+   "text": "Oh, stop it! Stop it!"
+  },
+  {
+   "id": "crowd.erupt.02",
+   "moment": "crowd.erupt",
+   "text": "There goes my hot dog!"
+  },
+  {
+   "id": "crowd.erupt.03",
+   "moment": "crowd.erupt",
+   "text": "Somebody hold me up!"
+  },
+  {
+   "id": "crowd.erupt.04",
+   "moment": "crowd.erupt",
+   "text": "Unbelievable! Just unbelievable!"
+  },
+  {
+   "id": "crowd.groan.01",
+   "moment": "crowd.groan",
+   "text": "Next one, kid!"
+  },
+  {
+   "id": "crowd.groan.02",
+   "moment": "crowd.groan",
+   "text": "Aw, shake it off!"
+  },
+  {
+   "id": "crowd.groan.03",
+   "moment": "crowd.groan",
+   "text": "Whoops!"
+  },
+  {
+   "id": "crowd.heckle.01",
+   "moment": "crowd.heckle",
+   "text": "The bench could do better!"
+  },
+  {
+   "id": "crowd.heckle.02",
+   "moment": "crowd.heckle",
+   "text": "Swing and a miss!"
+  },
+  {
+   "id": "crowd.heckle.03",
+   "moment": "crowd.heckle",
+   "text": "I'd have missed that too!"
+  },
+  {
+   "id": "crowd.idle.01",
+   "moment": "crowd.idle",
+   "text": "I played here once. Badly, but I played!"
+  },
+  {
+   "id": "crowd.idle.02",
+   "moment": "crowd.idle",
+   "text": "Kid, I'll lend you my lucky sneakers."
+  },
+  {
+   "id": "crowd.idle.03",
+   "moment": "crowd.idle",
+   "text": "I'm not heckling, I'm coaching!"
+  },
+  {
+   "id": "crowd.idle.04",
+   "moment": "crowd.idle",
+   "text": "Don't tell my doctor I'm yelling."
+  },
+  {
+   "id": "crowd.idle.05",
+   "moment": "crowd.idle",
+   "text": "Easy on the rim, it's older than me!"
+  },
+  {
+   "id": "crowd.defense.01",
+   "moment": "crowd.defense",
+   "text": "Hold the line!"
+  }
+ ]
+}

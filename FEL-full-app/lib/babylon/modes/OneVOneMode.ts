@@ -179,6 +179,10 @@ import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
+import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rival, on the mic
+import { dunkStingers } from '../audio/mic/names';
+import { HOOPERS } from '../audio/mic/cast';
+import type { MicEvent } from '../audio/mic/MicDirector';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
@@ -321,6 +325,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
   /** Report a highlight and mirror the bus into the HUD momentum meter. */
   function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
+    if (kind === 'miss' || kind === 'turnover') micDry++;   // THE MIC: counted before the report, so a fall to cold knows it was earned
     mbus.report({ kind });
     momentum = Math.round(mbus.score01 * 100);
   }
@@ -393,6 +398,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     launchLoose(from, dir.scale(2.2).add(new Vector3(0, 1.2, 0)));   // ahead of the vault: where I land
     defPhase = 'over'; kin.parries++;
     bannerFlash(ctx, 'PARRY-VAULT — STRIPPED!'); SoundKit.play('impact', { pitch: 1.5, volume: 0.5 }); ctx.juice.hitStop(50); ctx.juice.flash('#ffffff', 60); ctx.feel?.impact?.(0.4);
+    micSteal();
     console.info('[1V1-KIN] parry-vault');
     later(750, () => resetPositions());
   }
@@ -406,6 +412,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     launchLoose(from, along.scale(DRIVE_BY.knockM).add(new Vector3(0, 1.0, 0)));   // knocked down my line, not his
     defPhase = 'over'; kin.driveBys++;
     bannerFlash(ctx, 'DRIVE-BY STEAL!'); SoundKit.play('impact', { pitch: 1.3, volume: 0.45 }); ctx.juice.hitStop(40); ctx.feel?.impact?.(0.35);
+    micSteal();
     console.info('[1V1-KIN] drive-by steal');
     later(750, () => resetPositions());
   }
@@ -425,6 +432,20 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
   let hud: ModeContext['setHud'] = () => {};
+  // THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio"): the
+  // court's MC calls the run — the welcome, the check, the buckets, the stops, the ankles, the whistles, game point and the
+  // winner — the sidekick answers the big ones, the stands shout, and the rival (a court regular's voice) talks back now and
+  // then. Calls only: nothing here waits on a voice, moves a clock or touches a score.
+  let mic: ModeMic | null = null, micOpened = false, micFiller = false, micStands: string | null = null, micLiveAt: number | null = null;
+  /** My buckets since his last one (the run call); my empty trips since my last bucket (the cold call); game point, said once a side. */
+  let micRun = 0, micDry = 0;
+  const micPoint = { us: false, them: false };
+  /** When each momentum call was last made (a meter that bobs across a line is not news twice in a row). */
+  const micTierAt: Record<string, number> = {};
+  /** When the mode last handed the booth a call (the rival's check and the filler wait for a quiet booth), and when each
+   *  moment was last called (the MAP's per-moment cooldown for the calls that can come every few seconds: the check, a bite). */
+  let micSaidAt = -Infinity;
+  const micCool: Record<string, number> = {};
   // ── BIOMECH-HOOPS-WAVE1 (2026-09-08): the Posture Poses layer per body, and the hoops windows it reads ──
   let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
   const meBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE }, foeBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE };
@@ -645,9 +666,99 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
 
   function checkGameOver(ctx: ModeContext): boolean {
-    if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, momentum }); return true; }
-    if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore }); return true; }
+    if (myScore >= TARGET_SCORE) { ended = true; micFinal(true); SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, momentum }); return true; }
+    if (foeScore >= TARGET_SCORE) { ended = true; micFinal(false); SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore }); return true; }
     return false;
+  }
+
+  // ── THE MIC ──────────────────────────────────────────────────────────────────────────────────────────────────────
+  /** Every frame: the mic's clock, the welcome on the first live frame, the stands chanting DEFENSE while he has the ball. */
+  function micTick(ctx: ModeContext): void {
+    if (!mic) return;
+    mic.update();
+    const live = ctx.phase() === 'playing';
+    if (!micOpened && live) {
+      // there is no 3-2-1: the ball is live on this frame, so the welcome rides the first possession — once the voices are in
+      // (a big call waits only 1.5 s for them), and not at all if they arrive after the run is under way
+      micLiveAt ??= performance.now();
+      if (mic.ready) {
+        micOpened = true;
+        micSay({ moment: 'intro.court', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
+        mic.then({ moment: 'game.intro.ones', priority: 2 });
+      } else if (performance.now() - micLiveAt > 6000) micOpened = true;
+    }
+    // a one-on-one has no dead ball to fill, so colour waits for a real lull: the filler is armed only once the mode has handed
+    // the booth nothing for 6 s, and the director then waits its own 7-12 s of quiet (ModeMic.setFiller has no interval of
+    // its own; left on all run, banter came every 7-12 s of live dribbling)
+    const lull = live && performance.now() - micSaidAt > 6000;
+    if (lull !== micFiller) { micFiller = lull; mic.setFiller(lull ? ['filler.banter', 'filler.crowd'] : null); }
+    const stands = !live ? null : possession === 'defense' ? 'crowd.defense' : 'crowd.idle';
+    if (stands !== micStands) { micStands = stands; mic.setCrowdIdle(stands); }
+  }
+  /** A bucket, called — then the run or game point (once a side), and the rival's word when it was his. The winning bucket is
+   *  not called here: checkGameOver calls the result before ctx.end, in the same frame. */
+  function micBucket(side: 'us' | 'them', ev: MicEvent, after: MicEvent[] = []): void {
+    if (side === 'us') { micRun++; micDry = 0; } else micRun = 0;
+    if (!mic || myScore >= TARGET_SCORE || foeScore >= TARGET_SCORE) return;
+    micSay(ev);
+    for (const a of after) mic.then(a);
+    const point = (side === 'us' ? myScore : foeScore) >= TARGET_SCORE - 2;   // one bucket (any two) wins it
+    if (point && !micPoint[side]) {
+      micPoint[side] = true;
+      mic.then({ moment: 'game.point', tags: [`side:${side}`], priority: 2, crowd: side === 'us' ? { moment: 'crowd.hype', n: 2 } : undefined });
+    } else if (side === 'us' && micRun >= 3 && micRun % 2 === 1) mic.then({ moment: 'game.run', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
+    if (side === 'them' && Math.random() < 0.4) mic.then({ who: 'foe', moment: 'player.trash.score' });
+  }
+  /** The result, before ctx.end: the harness stops updating in that frame, so only what starts now is heard — it plays on
+   *  under the end card (the host stays mounted behind it). */
+  function micFinal(won: boolean): void {
+    if (!mic) return;
+    mic.hush();
+    mic.say({ moment: won ? 'game.win' : 'game.loss', priority: 3, crowd: { moment: won ? 'crowd.erupt' : 'crowd.groan', n: won ? 3 : 2 } });
+  }
+  /** Every call the mode makes goes through here: the booth's last-call stamp, and — for a moment that can come every few
+   *  seconds — the MAP's per-moment cooldown (`coolSec`): inside it the booth lets the moment go and only the stands react. */
+  function micSay(ev: MicEvent, coolSec = 0): void {
+    if (!mic) return;
+    const t = performance.now();
+    if (coolSec > 0 && t - (micCool[ev.moment] ?? -Infinity) < coolSec * 1000) { if (ev.crowd) mic.crowd(ev.crowd.moment, ev.crowd.n); return; }
+    micCool[ev.moment] = t;
+    if (!ev.who) micSaidAt = t;
+    mic.say(ev);
+  }
+  /** A whistle: the ref made the call (the banner says which); the booth reacts to it. */
+  function micWhistle(crowd?: MicEvent['crowd']): void { micSay({ moment: 'game.foul', priority: 1, crowd }); }
+  function micSteal(): void { micSay({ moment: 'game.steal', priority: 2, crowd: { moment: 'crowd.ooh', n: 2 } }); }
+  /** He bit (the pump, the hesi, the jab, the shimmy): live play, so one short line or nothing — and not on every fake of a
+   *  possession (a hesi, a jab and a pump can all bite inside a few seconds). */
+  function micBite(): void { micSay({ moment: 'game.bite', priority: 1, crowd: { moment: 'crowd.ooh', n: 1 } }, 8); }
+  /** I lost it (stripped, off the head): the MC, and now and then the man who took it (`byHim` false: I fumbled it off his
+   *  head, he took nothing — his stop line would be a lie). */
+  function micStolen(byHim = true): void {
+    micSay({ moment: 'game.stolen', priority: 1, crowd: { moment: 'crowd.ooh', n: 1 } });
+    if (byHim && Math.random() < 0.4) mic?.then({ who: 'foe', moment: 'player.trash.stop' });
+  }
+  /** Broken ankles: the biggest call there is short of a poster — floored gets the sidekick and the whole building. A plain
+   *  shake is the common one (a chained handle can shake him every few seconds), so it keeps the MAP's 6 s cooldown. */
+  function micAnkles(size: 'down' | 'big' | 'shook'): void {
+    if (!mic) return;
+    if (size === 'shook') { micSay({ moment: 'game.ankles', priority: 2, crowd: { moment: 'crowd.ooh', n: 2 } }, 6); return; }
+    micSay({ moment: 'game.ankles', priority: 3, side: size === 'down' ? 0.6 : 0.35, crowd: { moment: 'crowd.erupt', n: size === 'down' ? 3 : 2 } });
+    if (size === 'down' && Math.random() < 0.4) mic.then({ who: 'foe', moment: 'player.beaten' });   // he has the floor to say it from
+  }
+  /** The momentum meter's tiers: a RISE is heating up / hot / on fire; a fall to cold only after an empty trip (the meter
+   *  cools on its own after every good stretch, and that is not a slump). After the play's own call, never over it. */
+  function micTier(tier: string, prev: string): void {
+    if (!mic) return;
+    const rank: Record<string, number> = { cold: 0, warming: 1, hot: 2, on_fire: 3 };
+    const up = (rank[tier] ?? 0) > (rank[prev] ?? 0);
+    const moment = up ? (tier === 'on_fire' ? 'momentum.fire' : tier === 'hot' ? 'momentum.hot' : tier === 'warming' ? 'momentum.warming' : null)
+      : tier === 'cold' && micDry > 0 ? 'momentum.cold' : null;
+    const t = performance.now() / 1000;
+    if (!moment || t - (micTierAt[moment] ?? -Infinity) < 20) return;
+    micTierAt[moment] = t;
+    const fire = moment === 'momentum.fire';
+    mic.then({ moment, priority: fire ? 2 : 1, side: fire ? 0.5 : moment === 'momentum.hot' ? 0 : 0.2, crowd: fire ? { moment: 'crowd.erupt', n: 2 } : undefined });
   }
 
   /** A possession-changing timer: only fires if the possession it was scheduled in is still the live one. */
@@ -690,6 +801,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       EffectsKit.ballTrail(ctx.scene, ball);
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
+      // THE MIC: the court's MC (by ctx.location) and the rival in a court regular's voice; the banks load in the background
+      mic?.dispose(); mic = new ModeMic(ctx, { groups: ['game', 'names'], court: ctx.location, players: { foe: HOOPERS[0] } });
+      micOpened = false; micFiller = false; micStands = null; micLiveAt = null; micRun = 0; micDry = 0; micPoint.us = false; micPoint.them = false;
+      micSaidAt = -Infinity; for (const k of Object.keys(micTierAt)) delete micTierAt[k]; for (const k of Object.keys(micCool)) delete micCool[k];   // the mode is one closure for every run: a rematch starts with no cooldowns
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
@@ -766,10 +881,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.heroRef.current = me.root;
       ctx.objectiveRef.current = RIM;
       mbus.reset();
-      mbus.onTierChange((tier) => {
+      mbus.onTierChange((tier, prev) => {
         if (tier === 'on_fire') { bannerFlash(ctx, "YOU'RE ON FIRE!", 1100); SoundKit.play('crowdCheer', { volume: 0.7 }); }
         else if (tier === 'hot') bannerFlash(ctx, 'HEATING UP…', 800);
         else if (tier === 'cold') bannerFlash(ctx, 'GONE COLD', 700);
+        micTier(tier, prev);   // THE MIC
       });
       ctx.camDirector.snapTo(me.root.position, RIM);
       assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 6, modeId: 'onevone' });
@@ -853,6 +969,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
+      micTick(ctx);
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
       // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
       // it was extracted FROM here because this is the mode people have actually played
@@ -920,6 +1037,12 @@ export const OneVOneMode: ModeDefinition = (() => {
             ctx.setHud({ score: myScore, momentum, banner: andOne ? `${arcLabel} +${arcPoints} — ${andOne.banner}` : `${arcLabel} +${arcPoints}${rimPlaySuffix(arc.play)}` });   // HOOPS-MOVE-KIT-A M2: fouled on the finish; RIM PLAY: "— RATTLES IN"
             if (andOne) { finishFoul = false; SoundKit.play('crowdCheer', { volume: 0.5 }); console.info(`[1V1-REF] ${andOne.id} → ${andOne.ball} (${andOne.shots} shot)`); }
             carrying = true;
+            // THE MIC: the bucket as it drops — the and-one, the three, a finish at the rim, or the two (a hook or a fade is a two)
+            const atRim = isFinishStyle(arc.shotStyle) && arc.shotStyle !== 'hook' && arc.shotStyle !== 'fadeaway';
+            micBucket('us', andOne ? { moment: 'game.andone', priority: 2, crowd: { moment: 'crowd.erupt', n: 2 } }
+              : arcPoints === 3 ? { moment: 'game.three', priority: 1, crowd: { moment: 'crowd.cheer', n: 2 } }
+              : atRim ? { moment: 'game.layup', priority: 1, crowd: { moment: 'crowd.cheer', n: 1 } }
+              : { moment: 'game.make', priority: 1, side: 0.15, crowd: { moment: 'crowd.cheer', n: 1 } });
             if (checkGameOver(ctx)) return;
             later(700, () => { ctx.setHud({ banner: '' }); resetPositions(); });   // make it, take it
           } else {
@@ -933,6 +1056,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               banner: defContest >= 0.5 ? 'THEY SCORE — THROUGH YOUR CONTEST'
                 : defContest <= 0.15 ? 'THEY SCORE — LEFT WIDE OPEN' : 'THEY SCORE',
             });
+            micBucket('them', { moment: 'game.rival.make', priority: 1, crowd: { moment: 'crowd.groan', n: 1 } });   // THE MIC
             if (checkGameOver(ctx)) return;
             // MAKE IT, TAKE IT — both ways. This handed ME the ball after their make (loser's ball).
             // The format decides; `possessionAfterScore` is the one place that answers it.
@@ -967,6 +1091,11 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (!play) { SoundKit.play('rattle', { volume: 0.34 }); hoopJuice?.punch(); }   // a play's touches already rang the iron
           else if (play.kind === 'airball') SoundKit.play('crowdGroan', { volume: 0.3 });
           if (possession === 'mine') bannerFlash(ctx, rim.label, 850);
+          // THE MIC: an airball always hears it from the stands; a plain miss only sometimes gets the booth (a miss a trip is not news)
+          if (possession === 'mine' && !finishFoul) {
+            if (play?.kind === 'airball') micSay({ moment: 'game.airball', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } });
+            else if (Math.random() < 0.35) micSay({ moment: 'game.miss', priority: 1, crowd: { moment: 'crowd.groan', n: 1 } });
+          }
           console.info(`[1V1-RIM] ${rim.kind} — ${rim.label}`);
           // HOOPS-MOVE-KIT-A M2: fouled in the air on a finish that missed — the ball back, no board race
           if (finishFoul && possession === 'mine') {
@@ -974,6 +1103,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             const call = judge('shooting_foul', { offense: 'me', shooter: 'me', fouled: 'me' });
             console.info(`[1V1-REF] ${call.id} on a miss → ${call.ball}`);
             bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}`, 1000);
+            micWhistle();
             later(900, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
             return;
           }
@@ -1016,6 +1146,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           swing('turnover');
           ctx.setHud({ momentum });
           bannerFlash(ctx, `${call.banner} — THEIR BALL`, 1000);
+          micWhistle();   // THE MIC
           later(900, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
         } else if (paintSec > THREE_SECOND_LIMIT - 1) {
           ctx.setHud({ hint: 'GET OUT OF THE PAINT' });   // the ref warns before he calls it
@@ -1042,6 +1173,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         arc.active = false;
         foeScore += arcPoints || 2;
         ctx.setHud({ foeScore, banner: call.banner });
+        micBucket('them', { moment: 'game.foul', priority: 1, crowd: { moment: 'crowd.groan', n: 1 } });   // THE MIC: the whistle, and the basket counts for him
         later(900, () => { ctx.setHud({ banner: '' }); if (!checkGameOver(ctx)) resetPositions(); });
       }
       // BIOMECH-HOOPS-WAVE1 G6: the drive dunk's make flushes THROUGH the iron from the release, then drops out of the net
@@ -1074,6 +1206,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (foeStunSec === 0 && !foeFloored && ankleBreak(me.root.position, before, foe.root.position)) {
             foeStunSec = DRIFT.stunSec; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 }); kin.ankles++;
             bannerFlash(ctx, 'ANKLES!', 700); SoundKit.play('crowdCheer', { volume: 0.45 }); ctx.juice.hitStop(45); ctx.feel?.impact?.(0.3); ctx.momentum.report({ kind: 'clean_hit', weight: 14 });
+            micAnkles('big');   // THE MIC
             console.info('[1V1-KIN] ankle-breaker');
           }
         }
@@ -1141,6 +1274,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               foeAnimTree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               bannerFlash(ctx, 'HE BIT THE JAB — GO!', 600);
+              micBite();   // THE MIC
             } else if (threat.shown >= 3) bannerFlash(ctx, 'HE IS NOT BUYING IT', 550);
             console.info(`[1V1-THREAT] jab #${threat.shown} odds ${odds.toFixed(2)} bought ${bought}`);
           }
@@ -1306,6 +1440,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               ctx.feel?.impact?.(0.2);
               foeAnimTree.beat('bball_contact_react');
               bannerFlash(ctx, 'BIT ON THE HESI!');
+              micBite();   // THE MIC
             } else {
               bannerFlash(ctx, 'HESI…', 500);
             }
@@ -1366,6 +1501,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             meCarry?.update(0, 0, false);
             console.info(`[1V1-REF] ${call.id} off the carrier at x ${p.x.toFixed(2)} z ${p.z.toFixed(2)} → ${call.ball}`);
             bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+            micWhistle();   // THE MIC
             if (call.ball === 'me') resetPositions(); else startDefense(ctx, `${call.banner} — DEFEND!`);
             return;
           }
@@ -1395,7 +1531,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
         // shot start — drive context first: a hot drive DUNKS instead of metering
         if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
-          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); } }
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); micBite(); } }   // THE MIC: the bite
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
@@ -1492,6 +1628,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               if (call.whistle) SoundKit.play('whistle');
               console.info(`[1V1-REF] ${call.id} ${c.closingSpeed.toFixed(1)} m/s on ${victim} → ${call.ball}`);
               bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+              micWhistle();   // THE MIC
               board = null; ballSim.stop(); loose = false;
               if (call.ball === 'me') resetPositions(); else startDefense(ctx, `${call.banner} — DEFEND!`);
               return;
@@ -1515,6 +1652,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               // reports the fact (a foul-speed body arrived at a SET defender) and carries out the call.
               const call = judge('charge', { offense: 'foe', fouled: 'me' });
               bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!`, 1100);
+              micWhistle({ moment: 'crowd.cheer', n: 2 });   // THE MIC: he took the charge — the stands are with him
               console.info(`[1V1-REF] ${call.id} at ${c.attackerSpeed.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
               defPhase = 'over';
               later(800, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
@@ -1532,6 +1670,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               ctx.setHud({ momentum });
               const call = judge('charge', { offense: 'me', fouled: 'foe' });
               bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 1000);
+              micWhistle();   // THE MIC
               console.info(`[1V1-REF] ${call.id} ${c.closingSpeed.toFixed(1)} m/s into a set body → ${call.ball}`);
               later(900, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'CHECK UP — DEFEND!')));
             } else if (possession === 'mine' && !shooting && !dunking && !finish && carrying && c.attacker === 'foe' && c.victim === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED) {
@@ -1539,6 +1678,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               SoundKit.play('whistle');
               const call = judge('blocking_foul', { offense: 'me', fouled: 'me' });   // the charge's mirror
               bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}`, 1000);
+              micWhistle();   // THE MIC
               console.info(`[1V1-REF] ${call.id} ${c.closingSpeed.toFixed(1)} m/s by the defender → ${call.ball}`);
               if (call.ball === 'me') resetPositions(); else startDefense(ctx, 'THEIR BALL — DEFEND!');
             } else if (possession === 'mine' && (c.attacker === 'me' || c.attacker === 'foe') && !shooting && !dunking && !finish) {
@@ -1549,6 +1689,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               ctx.setHud({ momentum });
               const call = judge('shooting_foul', { offense: 'me', fouled: 'me', shooter: 'me' });
               bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}`, 1000);
+              micWhistle();   // THE MIC
               console.info(`[1V1-REF] ${call.id} → ${call.ball} (${call.shots} shots in the book)`);
               if (call.ball === 'me') resetPositions(); else startDefense(ctx, 'THEIR BALL — DEFEND!');
             } else if (possession === 'defense' && defPhase !== 'over' && c.attacker === 'me' && c.attackerSpeed >= FOUL_CLOSING_SPEED) {
@@ -1557,6 +1698,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               mbus.report({ kind: 'turnover', weight: -10 }); momentum = Math.round(mbus.score01 * 100);
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'FOUL ON YOU — THEIR BALL', 900);
+              micWhistle();   // THE MIC
               console.info('[1V1-REF] offensive foul: ran through the defender → foe');   // the one possession change the lab could not see (Phase 4)
               defPhase = 'over';
               later(900, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
@@ -1566,6 +1708,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               swing('turnover');
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'CHARGE — YOUR BALL', 1000);
+              micWhistle({ moment: 'crowd.cheer', n: 2 });   // THE MIC
               defPhase = 'over';
               later(900, () => resetPositions());
             }
@@ -1661,6 +1804,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 });
             const call = judge('charge', { offense: 'foe', fouled: 'me' });   // the ref, not the mode — see above
             bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!`, 1100);
+            micWhistle({ moment: 'crowd.cheer', n: 2 });   // THE MIC: he took the charge — the stands are with him
             console.info(`[1V1-REF] ${call.id} at ${closing.toFixed(1)} m/s (set ${chargeSetSec.toFixed(2)}s) → ${call.ball}`);
             defPhase = 'over';
             later(800, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
@@ -1733,6 +1877,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               defPhase = 'over';
               foeAnimTree.beat('bball_contact_react', { fadeSec: 0.08 });
               bannerFlash(ctx, onBump ? 'STRIPPED ON THE BUMP!' : 'PICKED THEIR POCKET!');
+              micSteal();   // THE MIC
               console.info(`[1V1-DEF] strip by me ${onBump ? 'on the bump' : 'on the crossover'} exposure ${exposure.toFixed(2)} bumpAge ${bumpAge.toFixed(2)}`);
               later(750, () => resetPositions());
               return;
@@ -1748,6 +1893,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               if (call.whistle) SoundKit.play('whistle');
               console.info(`[1V1-REF] ${call.id} at ${dist.toFixed(2)} m → ${call.ball}`);
               bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+              micWhistle();   // THE MIC
               defPhase = 'over';
               later(700, () => (call.ball === 'me' ? resetPositions() : startDefense(ctx, 'THEIR BALL — DEFEND!')));
               return;
@@ -1839,6 +1985,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.stopAmbient();
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
       meter3d?.dispose(); meter3d = null;
+      mic?.dispose(); mic = null;   // THE MIC stops with the mode
       onevoneVenue?.dispose(); onevoneVenue = null;  // M74
     },
   };
@@ -1891,6 +2038,13 @@ export const OneVOneMode: ModeDefinition = (() => {
     giveBall('foe');
     bannerFlash(ctx, banner, 1000);
     ctx.setHud({ hint: HINT_DEFENCE, shotType: '', shotMeterT: 0 });
+    // THE MIC: check ball (half a second of check dribble before the drive) — the MC calls it, or now and then the rival
+    // checks it himself; never both, the drive comes too soon for two lines. Most checks follow a call (the whistle, the steal,
+    // his make — an out-of-bounds or a loose-ball foul calls startDefense in the whistle's own frame), so: the MC's check only
+    // into a free booth (priority 0 — an equal-priority call queued it up to 1.4 s, into his drive), the rival's only once the
+    // booth has been quiet a beat (his channel is not the booth's: he talked straight over the MC), and not every possession
+    if (performance.now() - micSaidAt > 2500 && Math.random() < 0.35) micSay({ who: 'foe', moment: 'player.check' }, 12);
+    else micSay({ moment: 'game.check', priority: 0 }, 12);
   }
 
   /** The rival's release: block check, contest (+ a hand up), the make roll, the arc. */
@@ -1916,6 +2070,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       launchLoose(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));
       ctx.setHud({ momentum });
       bannerFlash(ctx, 'REJECTED!', 900);
+      micSay({ moment: 'game.block', priority: 2, side: 0.4, crowd: { moment: 'crowd.ooh', n: 2 } });   // THE MIC
       defPhase = 'over';
       later(1000, () => resetPositions());
       return;
@@ -2035,6 +2190,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       standing: kind === 'standing',
     }));
     dunkLabel = picked.label;
+    // THE MIC: the name the call will carry (a trick landed in the air renames it), and the call decoded now so it lands on
+    // feet-down; SHOWTIME's flush is timed, so the booth holds its breath through that flight (the stands still react)
+    let micName = picked.label;
+    mic?.expect({ moment: kind === 'poster' ? 'game.poster' : 'game.dunk', stinger: dunkStingers(picked.label) });
+    if (showtime) mic?.hold(flightTotal / 1000 + 0.2);
     if (showtime) {   // the side camera: low, off the drive's flank, aimed at the iron
       const dir = RIM_FLOOR.subtract(from); dir.y = 0; if (dir.lengthSquared() < 1e-4) dir.set(0, 0, -1); dir.normalize();
       const right = new Vector3(dir.z, 0, -dir.x);
@@ -2113,6 +2273,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             made = roll() < trickPct(c.pct, asked, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
             meAnimTree.beat(spec.clip, { holdEnd: true, speedRatio: dunkSpeedRatio({ clip: spec.clip, label: spec.label, sec: 0.7, flashy: true }, flightTotal / 1000) });
             ctx.setHud({ shotType: spec.label });
+            micName = spec.label; mic?.crowd('crowd.ooh', 1);   // THE MIC: the stands gasp at the trick; the call will name it
             ctx.camDirector.pulse(0.4, 0.45);
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 });
             bannerFlash(ctx, onTheBump ? `${spec.label} ON HIM!` : spec.label, 900);
@@ -2195,6 +2356,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meAnimTree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch, never an idle flash
       meDribble.setFacing(me.root.rotation.y);
       const fouled = finishFoul; finishFoul = false;
+      mic?.release();   // THE MIC: feet-down — the booth may speak again
       if (made) {
         // A DUNK IS WORTH TWO. The comment above TARGET_SCORE records the
         // scoring scale being fixed from "1 inside the paint, 2 outside" to real
@@ -2218,15 +2380,26 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.setHud({ score: myScore, momentum });
         bannerFlash(ctx, fouled ? (posterized ? 'POSTERIZED — AND ONE!' : 'THROWN DOWN — AND ONE!') : posterized ? 'POSTERIZED!' : 'THROWN DOWN!', 1000);
         carrying = false;   // BIOMECH-HOOPS-WAVE1: the ball is in the net, not in the hand — the reset hands it back (an active carry would have snatched it out of the flush)
+        // THE MIC: the dunk, called by its name — a poster is the biggest call in the run (and he has the floor to answer from)
+        const after: MicEvent[] = [];
+        if (fouled) after.push({ moment: 'game.andone', priority: 2 });
+        if (posterized && Math.random() < 0.4) after.push({ who: 'foe', moment: 'player.beaten' });
+        micBucket('us', { moment: posterized ? 'game.poster' : 'game.dunk', priority: posterized ? 3 : 2, stinger: dunkStingers(micName), side: posterized ? 0.6 : 0,
+          crowd: { moment: posterized ? 'crowd.erupt' : 'crowd.cheer', n: posterized ? 3 : 2 } }, after);
         if (checkGameOver(ctx)) return;
         later(posterized ? 1500 : 900, () => resetPositions());   // a posterized body gets up before it is moved
       } else {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
         // the clank and the loose ball fired at the resolve (k 0.55), off the front of the iron — BIOMECH-HOOPS-WAVE1 G6
-        if (fouled) { bannerFlash(ctx, 'FOULED AT THE RIM — BALL BACK', 1000); later(900, () => resetPositions()); }
-        else if (swatted) { swing('turnover'); ctx.setHud({ momentum }); bannerFlash(ctx, 'SWATTED AT THE RIM!', 1000); later(900, () => boardRace(ctx)); }   // D1: the ball went loose at the bump — the board decides
+        if (fouled) { bannerFlash(ctx, 'FOULED AT THE RIM — BALL BACK', 1000); micWhistle(); later(900, () => resetPositions()); }
+        else if (swatted) {
+          swing('turnover'); ctx.setHud({ momentum }); bannerFlash(ctx, 'SWATTED AT THE RIM!', 1000); later(900, () => boardRace(ctx));   // D1: the ball went loose at the bump — the board decides
+          micSay({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.ooh', n: 2 } });   // THE MIC: sent back at the rim, and he may say so
+          if (Math.random() < 0.4) mic?.then({ who: 'foe', moment: 'player.trash.stop' });
+        }
         else {
+          micSay({ moment: 'game.miss', priority: 1, crowd: { moment: 'crowd.groan', n: 1 } });   // THE MIC: a missed dunk is always news
           bannerFlash(ctx, kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT');
           later(900, () => startDefense(ctx, 'THEIR BALL — CHECK UP, DEFEND!'));
         }
@@ -2424,6 +2597,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     ctx.setHud({ shotType: '', shotMeterT: 0 });
     bannerFlash(ctx, bit ? 'HE BIT THE PUMP!' : 'PUMP FAKE', 500);
+    if (bit) micBite();   // THE MIC
     console.info(`[1V1-MOVE] pump fake bit ${bit}`);
   }
 
@@ -2739,6 +2913,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
       bannerFlash(ctx, 'ANKLES — HE IS DOWN!', 1100);
+      micAnkles('down');   // THE MIC
       console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
     } else {
       foeStunSec = ANKLE_BREAK_STUN_SEC;
@@ -2748,6 +2923,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         victimSlide = { dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[1V1-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
       ctx.feel?.impact?.(0.35);
       bannerFlash(ctx, tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!');
+      micAnkles(tier === 'highlight' ? 'big' : 'shook');   // THE MIC
       console.info(`[1V1-HANDLE] ankle break, chain ${chain.length} handle ${handle} odds ${odds.toFixed(2)}`);
     }
   }
@@ -2798,6 +2974,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.juice.shake(0.1, 150);
         swing('ankle_break');
         bannerFlash(ctx, 'OFF THE HEAD!', 1100);
+        micAnkles('big');   // THE MIC: off his head and back — the ankles call is the one that fits
         console.info(`[1V1-HANDLE] off the head — CLEAN (odds ${odds.toFixed(2)})`);
       } else {
         // it did not come back. The ball is loose BEHIND him, which is the worst place for you.
@@ -2808,6 +2985,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         board = { age: 0, contestedCalled: false, shooter: 'mine' };
         SoundKit.play('miss');
         bannerFlash(ctx, 'OFF THE HEAD — LOST IT', 1000);
+        micStolen(false);   // THE MIC: I lost it; he did not take it
         console.info(`[1V1-HANDLE] off the head — MISSED (odds ${odds.toFixed(2)})`);
       }
       return;
@@ -2896,6 +3074,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       board = null; foeBrain?.boxOut(null); foeSealing = false; ballSim.stop(); loose = false;
       console.info(`[1V1-REF] ${call.id} → ${call.ball}`);
       if (call.whistle) SoundKit.play('whistle');
+      micWhistle();   // THE MIC
       if (call.ball === 'me') { bannerFlash(ctx, `${call.banner} — YOUR BALL`, 900); resetPositions(); }
       else startDefense(ctx, `${call.banner} — THEIR BALL, DEFEND!`);
       return;
@@ -3019,6 +3198,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     launchLoose(from, toFoe.scale(1.6).add(new Vector3(0, 1.2, 0)));
     carrying = false;
     bannerFlash(ctx, banner, 900);
+    micStolen();   // THE MIC
     console.info(`[1V1-DEF] strip by the ai: ${banner}`);
     later(750, () => startDefense(ctx, 'CHECK UP — DEFEND!'));
   }
@@ -3057,6 +3237,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     ctx.juice.shake(0.08, 100);
     ctx.setHud({ shotType: '', shotMeterT: 0, momentum });
     bannerFlash(ctx, foeBlockJumpAge <= HAND_UP_SEC ? 'BLOCKED!' : 'BLOCKED — HAND IN THE SHOT!', 900);
+    // THE MIC: sent back — the stands let him hear it, and now and then so does the man who did it
+    micSay({ moment: 'game.blocked', priority: 1, crowd: { moment: 'crowd.heckle', n: 1 } });
+    if (Math.random() < 0.4) mic?.then({ who: 'foe', moment: 'player.trash.stop' });
     console.info('[1V1-DEF] blocked at the release');
     later(900, () => boardRace(ctx));
   }
@@ -3115,6 +3298,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         EffectsKit.burst(ctx.scene, at, 'sparks');
         ctx.setHud({ momentum });
         bannerFlash(ctx, 'REJECTED AT THE RIM!', 1000);
+        micSay({ moment: 'game.block', priority: 3, side: 0.5, crowd: { moment: 'crowd.erupt', n: 2 } });   // THE MIC: a dunk sent back at the rim
         foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); ctx.camDirector.pulse(0.8, 0.5);   // DUNK-FANATIC: he takes the hit in the air
         console.info(`[1V1-DEF] swat at k ${k.toFixed(2)} jumpAge ${myJumpAge.toFixed(2)}`);
       }
@@ -3144,6 +3328,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         contactPunch(ctx);
         EffectsKit.burst(ctx.scene, RIM, 'net');
         ctx.setHud({ foeScore, banner: inLane ? 'POSTERIZED — THEY THREW IT DOWN ON YOU' : 'THEY THREW IT DOWN' });
+        micBucket('them', { moment: 'game.rival.dunk', priority: 2, crowd: { moment: inLane ? 'crowd.erupt' : 'crowd.ooh', n: 2 } });   // THE MIC
         if (checkGameOver(ctx)) return;
         later(meFloored ? 1600 : 1000, () => { ctx.setHud({ banner: '' }); startDefense(ctx, 'MAKE IT, TAKE IT — DEFEND!'); });
       } else {

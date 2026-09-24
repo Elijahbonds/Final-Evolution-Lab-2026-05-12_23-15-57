@@ -1,0 +1,231 @@
+{
+ "cast": "scoop",
+ "lines": [
+  {
+   "id": "intro.court.01",
+   "moment": "intro.court",
+   "text": "And Scoop is courtside with the notebook, the stat sheet, and a very long list of rematches people owe each other!"
+  },
+  {
+   "id": "intro.court.02",
+   "moment": "intro.court",
+   "text": "Scoop here on the second mic! Five courts on the tour, and I never get tired of that welcome."
+  },
+  {
+   "id": "filler.crowd.01",
+   "moment": "filler.crowd",
+   "text": "Front row, I see you! Louder than that, come on!"
+  },
+  {
+   "id": "filler.crowd.02",
+   "moment": "filler.crowd",
+   "text": "Shout out to Noodle up top, never misses a run!"
+  },
+  {
+   "id": "filler.banter.01",
+   "moment": "filler.banter",
+   "text": "Fun fact from the notebook: somebody in these stands still owes me a rematch in checkers."
+  },
+  {
+   "id": "filler.banter.02",
+   "moment": "filler.banter",
+   "text": "I've been keeping stats since I was a kid. Mostly on who hogs the snacks."
+  },
+  {
+   "id": "filler.banter.03",
+   "moment": "filler.banter",
+   "text": "Notebook rule one: write it down before the argument starts."
+  },
+  {
+   "id": "filler.banter.04",
+   "moment": "filler.banter",
+   "text": "Best part of any run? The argument afterward about who got fouled."
+  },
+  {
+   "id": "filler.banter.05",
+   "moment": "filler.banter",
+   "text": "My notebook has a whole page titled Excuses. Longest page in the book."
+  },
+  {
+   "id": "filler.banter.06",
+   "moment": "filler.banter",
+   "text": "Quick reminder: tie those laces and never trust a pump fake."
+  },
+  {
+   "id": "momentum.warming.01",
+   "moment": "momentum.warming",
+   "text": "Told you! I circled this one early."
+  },
+  {
+   "id": "momentum.fire.01",
+   "moment": "momentum.fire",
+   "text": "I need a bigger notebook for this!"
+  },
+  {
+   "id": "momentum.fire.02",
+   "moment": "momentum.fire",
+   "text": "Somebody get me a calculator!"
+  },
+  {
+   "id": "momentum.cold.01",
+   "moment": "momentum.cold",
+   "text": "Notebook says cold streaks don't last!"
+  },
+  {
+   "id": "outro.win.01",
+   "moment": "outro.win",
+   "text": "Put that on a shirt! I'm printing them now, and I'm first in line."
+  },
+  {
+   "id": "outro.win.02",
+   "moment": "outro.win",
+   "text": "Congratulations, champ! Going in the notebook in ink, not pencil."
+  },
+  {
+   "id": "outro.loss.01",
+   "moment": "outro.loss",
+   "text": "You're top of the rematch list now. Come back and cross it off!"
+  },
+  {
+   "id": "outro.loss.02",
+   "moment": "outro.loss",
+   "text": "Hey, every regular on this tour dropped a few before they ran things. Next time!"
+  },
+  {
+   "id": "dunk.up.01",
+   "moment": "dunk.up",
+   "text": "Notebook open, pencil ready. Let's see it!"
+  },
+  {
+   "id": "dunk.make.t0.01",
+   "moment": "dunk.make",
+   "text": "Nice and tidy. Put it in the book!",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t1.01",
+   "moment": "dunk.make",
+   "text": "Underline that one. Twice!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.02",
+   "moment": "dunk.make",
+   "text": "Told you! I called that one!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t2.01",
+   "moment": "dunk.make",
+   "text": "Somebody check the tape, that can't be real!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.02",
+   "moment": "dunk.make",
+   "text": "Whoa! My pencil just snapped in half!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.03",
+   "moment": "dunk.make",
+   "text": "New page! That one gets its own page!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.fifty.01",
+   "moment": "dunk.fifty",
+   "text": "All five cards! Somebody laminate this page!"
+  },
+  {
+   "id": "dunk.fifty.02",
+   "moment": "dunk.fifty",
+   "text": "Perfect across the board! I'm not even surprised."
+  },
+  {
+   "id": "dunk.miss.01",
+   "moment": "dunk.miss",
+   "text": "Hey, the notebook says that's still coming."
+  },
+  {
+   "id": "dunk.miss.02",
+   "moment": "dunk.miss",
+   "text": "Close! I'm writing that down as almost."
+  },
+  {
+   "id": "dunk.win.01",
+   "moment": "dunk.win",
+   "text": "Updating the notebook, the record book, and probably a mural somewhere!"
+  },
+  {
+   "id": "dunk.win.02",
+   "moment": "dunk.win",
+   "text": "Called it from the jump! Remember, I had you picked before the first dunk."
+  },
+  {
+   "id": "dunk.lose.01",
+   "moment": "dunk.lose",
+   "text": "Rough one, but I've got a whole page saved for your rematch."
+  },
+  {
+   "id": "three.fire.01",
+   "moment": "three.fire",
+   "text": "Stat sheet says automatic!"
+  },
+  {
+   "id": "three.fire.02",
+   "moment": "three.fire",
+   "text": "I'm running out of tally marks!"
+  },
+  {
+   "id": "game.make.01",
+   "moment": "game.make",
+   "text": "Smooth! Pencil that in."
+  },
+  {
+   "id": "game.poster.01",
+   "moment": "game.poster",
+   "text": "That's a shirt! Somebody print it!"
+  },
+  {
+   "id": "game.poster.02",
+   "moment": "game.poster",
+   "text": "Going straight on my wall!"
+  },
+  {
+   "id": "game.poster.03",
+   "moment": "game.poster",
+   "text": "Ooh! Highlight file, page one!"
+  },
+  {
+   "id": "game.block.01",
+   "moment": "game.block",
+   "text": "Denied! Stamp it, file it!"
+  },
+  {
+   "id": "game.block.02",
+   "moment": "game.block",
+   "text": "Block column, underlined!"
+  },
+  {
+   "id": "game.ankles.01",
+   "moment": "game.ankles",
+   "text": "Somebody check the tape!"
+  },
+  {
+   "id": "game.ankles.02",
+   "moment": "game.ankles",
+   "text": "Ooh, that handle was mean!"
+  },
+  {
+   "id": "game.ankles.03",
+   "moment": "game.ankles",
+   "text": "Handle, ten out of ten!"
+  },
+  {
+   "id": "game.win.01",
+   "moment": "game.win",
+   "text": "Game! I'm writing that one in permanent marker!"
+  }
+ ]
+}

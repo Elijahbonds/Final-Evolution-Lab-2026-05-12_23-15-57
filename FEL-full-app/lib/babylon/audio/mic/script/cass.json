@@ -1,0 +1,40 @@
+{
+ "cast": "cass",
+ "lines": [
+  {
+   "id": "player.dunk.brag.01",
+   "moment": "player.dunk.brag",
+   "text": "Same as always. Next."
+  },
+  {
+   "id": "player.dunk.brag.02",
+   "moment": "player.dunk.brag",
+   "text": "Consistency never goes out of style."
+  },
+  {
+   "id": "player.dunk.brag.03",
+   "moment": "player.dunk.brag",
+   "text": "Boring works. Every single time."
+  },
+  {
+   "id": "player.dunk.jab.01",
+   "moment": "player.dunk.jab",
+   "text": "See, that's why I play safe."
+  },
+  {
+   "id": "player.dunk.jab.02",
+   "moment": "player.dunk.jab",
+   "text": "Missing is a choice. Choose better."
+  },
+  {
+   "id": "player.dunk.respect.01",
+   "moment": "player.dunk.respect",
+   "text": "Fine. That one counts."
+  },
+  {
+   "id": "player.dunk.respect.02",
+   "moment": "player.dunk.respect",
+   "text": "Clean. Almost as clean as mine."
+  }
+ ]
+}

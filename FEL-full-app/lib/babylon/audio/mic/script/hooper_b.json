@@ -1,0 +1,80 @@
+{
+ "cast": "hooper_b",
+ "lines": [
+  {
+   "id": "player.trash.score.01",
+   "moment": "player.trash.score",
+   "text": "Quiet bucket."
+  },
+  {
+   "id": "player.trash.score.02",
+   "moment": "player.trash.score",
+   "text": "Tried to tell you."
+  },
+  {
+   "id": "player.trash.score.03",
+   "moment": "player.trash.score",
+   "text": "Same spot. Every time."
+  },
+  {
+   "id": "player.trash.stop.01",
+   "moment": "player.trash.stop",
+   "text": "Mine."
+  },
+  {
+   "id": "player.trash.stop.02",
+   "moment": "player.trash.stop",
+   "text": "Not on my watch."
+  },
+  {
+   "id": "player.beaten.01",
+   "moment": "player.beaten",
+   "text": "Respect. Now guard me."
+  },
+  {
+   "id": "player.beaten.02",
+   "moment": "player.beaten",
+   "text": "Won't happen twice."
+  },
+  {
+   "id": "player.beaten.03",
+   "moment": "player.beaten",
+   "text": "Fine. Earn the next one."
+  },
+  {
+   "id": "player.callball.01",
+   "moment": "player.callball",
+   "text": "Open."
+  },
+  {
+   "id": "player.callball.02",
+   "moment": "player.callball",
+   "text": "Here, dump it!"
+  },
+  {
+   "id": "player.callball.03",
+   "moment": "player.callball",
+   "text": "Look inside!"
+  },
+  {
+   "id": "player.defense.01",
+   "moment": "player.defense",
+   "text": "Switch!"
+  },
+  {
+   "id": "player.defense.02",
+   "moment": "player.defense",
+   "text": "I got ball!"
+  },
+  {
+   "id": "player.check.01",
+   "moment": "player.check",
+   "text": "Check."
+  },
+  {
+   "id": "player.check.02",
+   "moment": "player.check",
+   "text": "Ball's live. Go."
+  }
+ ]
+}

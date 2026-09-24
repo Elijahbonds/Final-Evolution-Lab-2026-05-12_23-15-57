@@ -152,6 +152,10 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
+import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the hoopers, on the mic
+import type { MicEvent } from '../audio/mic/MicDirector';
+import { dunkStingers } from '../audio/mic/names';
+import type { MomentumTier } from '../core/MomentumBus';
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
 export const RIM = new Vector3(0, 3.05, -0.6);
@@ -298,6 +302,20 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
+  // THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio"): the
+  // court's MC calls the run — the welcome, the buckets, the stops, the clock, game point, the result — the sidekick answers the
+  // big ones, the stands shout, and the hoopers talk (a mate calls for it or talks the D; the other side chirps). Every call rides
+  // a moment that already happened: nothing here waits on a voice or changes a timing.
+  let mic: ModeMic | null = null, micOpened = false, micTierOff: (() => void) | null = null;
+  /** The mic after the result was called: parked so it can still be disposed, but nothing can reach it. The scene keeps rendering
+   *  after ctx.end, so a dunk flight or a rival drive still in the air resolves AFTER the buzzer (and can even reach 21 and run an
+   *  end site again): with the live `mic` gone, every `mic?.` call after the result is a no-op instead of a second verdict. */
+  let micParked: ModeMic | null = null;
+  let micRunUs = 0, micCold = 0, micPointUs = false, micPointThem = false, micClock = false, micMateAt = 0, micLiveAt: number | null = null;
+  /** When each momentum call was last made (the meter decays 2.2/s, so it bobs back across a line after every stop: not news twice). */
+  const micTierAt: Record<string, number> = {};
+  /** Who talks on the floor: the two mates in their own voices, the other side in one chirpy one (a stable pickup crew). */
+  const MIC_PLAYERS: Record<string, string> = { mate0: 'hooper_b', mate1: 'hooper_c', foe0: 'hooper_a', foe1: 'hooper_a', foe2: 'hooper_a' };
   // ── BIOMECH-HOOPS-WAVE1 ──
   let driver: Body | null = null;                // the rival driving on their possession (its tree carries the ball, it faces the rim, the AI drive skips it)
   let driveK = 0;                                // the rival drive's clock 0..1 (the block window is its end)
@@ -637,6 +655,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       EffectsKit.ballTrail(ctx.scene, ball);
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
+      // THE MIC: one per run (the banks load in the background; the welcome waits for the first live frame, in micTick)
+      mic?.dispose(); micParked?.dispose(); micParked = null;
+      mic = new ModeMic(ctx, { groups: ['game', 'names'], court: ctx.location, players: { ...MIC_PLAYERS } });
+      micOpened = false; micRunUs = 0; micCold = 0; micPointUs = false; micPointThem = false; micClock = false; micMateAt = 0; micLiveAt = null;
+      for (const k of Object.keys(micTierAt)) delete micTierAt[k];
+      micTierOff?.(); micTierOff = ctx.momentum.onTierChange((tier, prev) => micTier(tier, prev));   // the Game-Breaker climbing, called
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
       SoundKit.startAmbient('stadium');
       // `?handle=` — the same probe override 1v1 carries. Chain depth is only reachable at a real handle,
@@ -722,6 +746,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     update(ctx: ModeContext, dt: number) {
       meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
+      micTick(ctx);   // THE MIC: its clock, the welcome on the first live frame, an open mate calling for it
       // HOOPS KINETIC 3v3: the clocks, the vault, the overdrive's infinite turbo, the gauge on the HUD
       synergy.tick(dt); driftCool = Math.max(0, driftCool - dt); meBurstLeft = Math.max(0, meBurstLeft - dt); mateBurst[0] = Math.max(0, mateBurst[0] - dt); mateBurst[1] = Math.max(0, mateBurst[1] - dt);
       if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.char.root.position.set(q.x, q.y, q.z); me.drib.vel.set(0, 0, 0); if (u >= 1) vault = null; }
@@ -742,8 +767,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // been given a reason not to trust the scoreboard. Reaching TARGET_SCORE is still an
         // outright win; only the buzzer can produce a level game, and it says so now.
         const verdict = myScore > foeScore ? 'WIN' : myScore === foeScore ? 'DRAW' : 'LOSS';
+        micEnd(verdict);   // THE MIC: the buzzer's result, called before the harness stops ticking the mode
         return ctx.end(verdict, myScore, { foeScore, assists });
       }
+      // THE MIC: ten seconds on the game clock, once (never inside my dunk's flight, where the booth is holding)
+      if (!micClock && timeLeft <= 10 && !dunking) { micClock = true; mic?.say({ moment: 'game.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } }); }
       ctx.setHud({ time: Math.ceil(timeLeft) });
       // the carrier dribbles (ball off the palm, arm reaches); everyone else's
       // carry is idle. Shots, dunks and passes put the ball back in the palm.
@@ -795,6 +823,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (call.whistle) SoundKit.play('whistle');
             swing('steal');
             ctx.setHud({ momentum, banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}!` });
+            mic?.say({ moment: 'game.foul', crowd: { moment: call.ball === 'me' ? 'crowd.cheer' : 'crowd.groan', n: 1 } });   // THE MIC: the whistle
             bannerClearLater(ctx, 1100);
             me.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });        // he ran into you; nobody punched either of you
             driver.tree.beat(ANKLE_STUMBLE_CLIP, { fadeSec: 0.06 });
@@ -809,7 +838,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (me.slot.intent.steal && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {
           me.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
           const exposure = bumpExposure(0.3, bumpAge);
-          if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; swing('steal'); ctx.setHud({ momentum }); if (synergy.add('steal')) igniteOverdrive(ctx); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
+          // THE MIC calls the poke here, where it is decided: the knock-loose branch in opponentPossession also runs after a charge,
+          // a reach-in, a parry-vault and a drive-by (each has its own call), so a call there would double up or mislabel them
+          if (exposure >= 0.5 || roll() < 0.3) { driveStolen = true; mic?.say({ moment: 'game.steal', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } }); swing('steal'); ctx.setHud({ momentum }); if (synergy.add('steal')) igniteOverdrive(ctx); console.info(`[3V3-DEF] strip by me ${bumpAge <= BUMP_STRIP_WINDOW_SEC ? 'on the bump' : 'on the roll'} bumpAge ${bumpAge.toFixed(2)}`); }
           else {
             meStunSec = 0.35;
             // A REACH THROUGH THE BODY IS A FOUL, and `reach_in` has been in the handbook the whole time with
@@ -819,6 +850,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (onHim && me.drib.vel.length() >= REACH_FOUL_SPEED) {
               const call = judge('reach_in', { offense: 'foe', fouled: 'foe' });
               if (call.whistle) SoundKit.play('whistle');
+              mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
               ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
               bannerClearLater(ctx, 900);
               console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
@@ -864,6 +896,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (call.whistle) SoundKit.play('whistle');
           swing('turnover');
           ctx.setHud({ momentum, banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+          mic?.say({ moment: 'game.foul' }); micSlump();   // THE MIC: the whistle, and a turnover counts toward a cold stretch
           bannerClearLater(ctx, 1000);
           later(900, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
         } else if (paintSec > THREE_SECOND_LIMIT - 1) {
@@ -897,9 +930,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (!foeShotScored) foeScore += 2;
         ctx.setHud({ foeScore, banner: call.banner });
         bannerClearLater(ctx, 900);
+        // THE MIC: the whistle — on a miss the call is their bucket, so it breaks my run and can bring up their game point
+        if (!foeShotScored) micTheirs({ moment: 'game.foul', priority: 2, crowd: { moment: 'crowd.groan', n: 1 } }, null);
+        else mic?.say({ moment: 'game.foul', priority: 2 });
         // 3v3 has no checkGameOver helper — it inlines the target check everywhere, so this matches that idiom
         later(900, () => {
-          if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
+          if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('LOSS'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
           resetPossession(true);
         });
       }
@@ -944,7 +980,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               : arcQuality === 'perfect' ? `${arcLabel} — SPLASH!` : `${arcLabel} — GOOD!${rimPlaySuffix(arc.play)}`,   // RIM PLAY: "— RATTLES IN"
           });
           bannerClearLater(ctx, 800);
-          if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
+          // THE MIC: the bucket, called for what it was — through the foul, a three, a finish at the rim, a jumper
+          const rimFinish = isFinishStyle(arc.shotStyle) && arc.shotStyle !== 'fadeaway' && arc.shotStyle !== 'hook';
+          micOurs(andOneCall ? { moment: 'game.andone', priority: 2, crowd: { moment: 'crowd.erupt', n: 2 } }
+            : bigShot ? { moment: 'game.three', priority: 2, crowd: { moment: arcQuality === 'perfect' ? 'crowd.erupt' : 'crowd.cheer', n: 2 } }
+            : { moment: rimFinish ? 'game.layup' : 'game.make', side: rimFinish ? 0 : 0.15, crowd: { moment: 'crowd.cheer', n: arcQuality === 'perfect' ? 2 : 1 } },
+          nearestLiveFoe());
+          if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
           if (andOneCall) {
             console.info(`[3V3-REF] ${andOneCall.id} → ${andOneCall.ball} (${foulAward(andOneCall)})`);
             if (andOneCall.whistle) SoundKit.play('whistle');
@@ -974,11 +1016,18 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // no free throws in this format (Ref.FREE_THROWS_IMPLEMENTED) — a foul is answered with the ball
             ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}` });
             bannerClearLater(ctx, 900);
+            mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
             const back = call.ball ?? 'me';
             later(900, () => (back === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
           } else {
             ctx.setHud({ banner: 'RIMS OUT' });
             bannerClearLater(ctx, 700);
+            // THE MIC: an airball always gets the stands on him; a plain miss only sometimes gets the booth (a miss a trip is not
+            // news — the 1v1's rate), the stands groan either way; a third in a row is a cold stretch
+            if (arc.play?.kind === 'airball') mic?.say({ moment: 'game.airball', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } });
+            else if (Math.random() < 0.35) mic?.say({ moment: 'game.miss', crowd: { moment: 'crowd.groan', n: 1 } });
+            else mic?.crowd('crowd.groan', 1);
+            micSlump();
             board = { age: 0, contestedCalled: false, shooter: 'me' };   // O2: the board is LIVE, not a race
           }
         }
@@ -1047,7 +1096,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         console.info(`[3V3-KIN] drift at ${before.length().toFixed(1)} m/s`);
         let broke = false;
         for (const f of foes) if (f.stunSec === 0 && !f.floored && ankleBreak(me.char.root.position, before, f.char.root.position)) { f.stunSec = DRIFT.stunSec; f.tree.beat('bball_contact_react', { fadeSec: 0.08 }); broke = true; }
-        if (broke) { kin.ankles++; bannerFlash(ctx, 'ANKLES!', 700); SoundKit.play('crowdCheer', { volume: 0.45 }); ctx.juice.hitStop(45); ctx.feel?.impact?.(0.3); ctx.momentum.report({ kind: 'clean_hit', weight: 14 }); console.info('[3V3-KIN] ankle-breaker'); }
+        if (broke) { kin.ankles++; bannerFlash(ctx, 'ANKLES!', 700); SoundKit.play('crowdCheer', { volume: 0.45 }); ctx.juice.hitStop(45); ctx.feel?.impact?.(0.3); ctx.momentum.report({ kind: 'clean_hit', weight: 14 }); console.info('[3V3-KIN] ankle-breaker');
+          mic?.say({ moment: 'game.ankles', priority: 2, side: 0.3, crowd: { moment: 'crowd.ooh', n: 2 } }); }   // THE MIC
         if (synergy.add('drift')) igniteOverdrive(ctx);
       }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
@@ -1215,6 +1265,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               nf.tree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               ctx.setHud({ banner: 'HE BIT THE JAB — GO!' });
+              mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } });   // THE MIC
               bannerClearLater(ctx, 600);
             }
             console.info(`[3V3-THREAT] jab #${threat.shown} odds ${odds.toFixed(2)} bought ${bought}`);
@@ -1259,6 +1310,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             console.info(`[3V3-REF] ${call.id} off the carrier at x ${p.x.toFixed(2)} z ${p.z.toFixed(2)} → ${call.ball}`);
             ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
             bannerClearLater(ctx, 900);
+            mic?.say({ moment: 'game.foul' }); if (call.ball !== 'me') micSlump();   // THE MIC: the whistle (my ball given away counts toward a cold stretch)
             if (call.ball === 'me') resetPossession(true); else void opponentPossession(ctx);
             return;
           }
@@ -1281,6 +1333,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             EffectsKit.burst(ctx.scene, near.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
             near.tree.beat(ANKLE_STUMBLE_CLIP);   // a STUMBLE, not a karate hit react — nobody punched him
             ctx.setHud({ banner: 'ANKLES!' });
+            mic?.say({ moment: 'game.ankles', priority: 2, side: 0.3, crowd: { moment: 'crowd.erupt', n: 1 } }); micTalk(near, 'player.beaten');   // THE MIC
             bannerClearLater(ctx, 800);
           }
         }
@@ -1309,6 +1362,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             SoundKit.play('impact', { pitch: 1.1, volume: 0.35 });
             ctx.feel?.impact?.(0.2);
             ctx.setHud({ banner: 'BIT ON THE HESI!' });
+            mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } });   // THE MIC
           } else {
             ctx.setHud({ banner: 'HESI…' });
           }
@@ -1474,6 +1528,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             nf.stunSec = Math.max(nf.stunSec, PASS_FAKE_STUN);
             ctx.feel?.impact?.(0.2);
             ctx.setHud({ banner: 'HE BIT IT!' });
+            mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } });   // THE MIC
             bannerClearLater(ctx, 700);
             console.info(`[3V3-FAKE] pass fake bit — lane opens ${bite.lane.x.toFixed(2)},${bite.lane.z.toFixed(2)}`);
           } else {
@@ -1513,7 +1568,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (slingPass) { kin.slings++; ctx.juice.callout('SLING-PASS', '#fbbf24', 420); SoundKit.play('whoosh', { pitch: 1.4, volume: 0.45 }); console.info(`[3V3-KIN] sling-pass at ${Math.hypot(me.drib.vel.x, me.drib.vel.z).toFixed(1)} m/s`); }
           lastPasserWasMe = true;
           SoundKit.play('uiTick', { pitch: type === 'bounce' ? 1.0 : type === 'lob' ? 0.8 : 1.3 });
-          if (type === 'lob') { bannerFlash(ctx, 'LOB!', 500); }
+          if (type === 'lob') { bannerFlash(ctx, 'LOB!', 500); mic?.expect({ moment: 'game.alleyoop' }); mic?.crowd('crowd.hype', 1); }   // THE MIC: the oop call decoded before the catch; the stands see it coming
           EffectsKit.burst(ctx.scene, me.char.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
         } else {
           // NO LANE (2026-09-15). `lockTarget` refuses a pass into a covered lane, and it refused it in silence — 3 of
@@ -1542,6 +1597,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             SoundKit.play('impact', { pitch: 1.3, volume: 0.4 });
             SoundKit.play('crowdGroan', { volume: 0.35 });
             ctx.setHud({ banner: 'PICKED OFF! — you threw into coverage' });
+            mic?.say({ moment: 'game.stolen', crowd: { moment: 'crowd.groan', n: 1 } }); micTalk(picker, 'player.trash.stop'); micSlump();   // THE MIC
             bannerClearLater(ctx, 1100);
             void opponentPossession(ctx);
           }
@@ -1569,7 +1625,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // test): a trigger still held past the meter's end restarted a shot with the ball in the air (a second gather on top of
       // the arc, measured)
       if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
-          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); } } }
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } }); } } }   // THE MIC: the bite
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
@@ -1657,6 +1713,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (onHim && carrierSpeed >= REACH_FOUL_SPEED) {
               const call = judge('reach_in', { offense: 'me', fouled: 'me' });
               if (call.whistle) SoundKit.play('whistle');
+              mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
               ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
               bannerClearLater(ctx, 900);
               console.info(`[3V3-REF] ${call.id} (their reach on ${carrier === me ? 'me' : 'my mate'}) → ${call.ball}`);
@@ -1683,6 +1740,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ball?.dispose(); SoundKit.stopAmbient();
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
       meter3d?.dispose(); meter3d = null;
+      mic?.dispose(); mic = null; micParked?.dispose(); micParked = null; micTierOff?.(); micTierOff = null;   // THE MIC stops with the mode
     },
   };
 
@@ -1732,13 +1790,18 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (lastPasserWasMe) { assists++; ctx.setHud({ ast: assists }); if (synergy.add('assist')) igniteOverdrive(ctx); }
       SoundKit.play('score'); EffectsKit.burst(ctx.scene, RIM, 'net');
       ctx.setHud({ score: myScore, banner: finish === 'alleyoop' ? 'ALLEY-OOP!' : 'ASSISTED BUCKET' });
+      // THE MIC: the oop, or my pass into his bucket — called at the release, where the make is decided and the banner says so
+      micOurs(finish === 'alleyoop' ? { moment: 'game.alleyoop', priority: 2, crowd: { moment: 'crowd.erupt', n: 2 } }
+        : lastPasserWasMe ? { moment: 'game.assist', crowd: { moment: 'crowd.cheer', n: 1 } } : null);
+      if (finish !== 'alleyoop' && !lastPasserWasMe) mic?.crowd('crowd.cheer', 1);
     } else {
       SoundKit.play('miss');
       ctx.setHud({ banner: `MISS${rimPlaySuffix(mateArc.play)}` });   // Phase 9: the iron the pass's shot found
+      mic?.crowd('crowd.groan', 1);   // THE MIC: the stands feel his miss; the booth keeps its calls for mine
     }
     lastPasserWasMe = false;
     bannerClearLater(ctx, 800);
-    if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
+    if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
     // A MISS IS A REBOUND, NOT A HANDOVER. This used to schedule `opponentPossession` on a miss too, 900 ms
     // after the release — while the arc's own miss branch was setting a LIVE board for the same shot. Two
     // owners for one outcome: six bodies would go and contest the rebound and then the ball was taken off
@@ -1825,6 +1888,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     console.info(`[3V3-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)} wall ${wall ? (wall.stunSec > 0 ? 'stunned' : 'live') : 'none'}`);
     let made = Math.random() < c.pct;
     let swatted = false;
+    let swatBy: Body | null = null;   // THE MIC: who stuffed it (his word after the call)
     // DUNK-FANATIC (2026-09-17): the rim hang and the RIM PROTECTOR — the nearest live defender to the ring may leave the
     // floor to MEET me, timed into the flight; at the meeting he swats it or gets dunked on (see DriveFlight.ts)
     let showtimeJudge: ShowtimeJudge | null = null, hangLeft = 0, hangOn = false;
@@ -1878,6 +1942,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       console.info(`[3V3-SHOWTIME] ${picked3.label} (${picked3.clip}) ${kind === 'poster' ? 'over a body' : 'open'} — time the flush`);
     }
     if (picked3.flashy) ctx.camDirector.pulse(0.35, 0.4);
+    // THE MIC: the booth holds its breath through the flight (released at feet-down, where the call lands, so the showtime
+    // flush is the player's alone); the call for this dunk's name is decoded now; the stands get up for a big one
+    const stingers3 = dunkStingers(picked3.label);
+    mic?.hold(4); mic?.expect({ moment: 'game.dunk', stinger: stingers3 });
+    if (kind === 'poster') mic?.expect({ moment: 'game.poster', stinger: stingers3 });
+    if (picked3.flashy || showtime) mic?.crowd('crowd.hype', 2);
     console.info(`[3V3-DUNK] ${picked3.label} (${picked3.clip}) speed ${speed3.toFixed(1)} lateral ${lateral3.toFixed(2)} momentum ${mbus.score01.toFixed(2)}`);
     startBoxOut('mine');   // O2
     // the flight's own clock: real time, FROZEN for the bump's hit-stop and slowed for BUMP_SLOW_SEC after it (the velocity kill)
@@ -1913,7 +1983,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         protectorMet = true;
         const dist = Math.min(distXZ(protector.char.root.position, me.char.root.position), distXZ(protector.char.root.position, ball.getAbsolutePosition()));
         if (rimProtectorSwats({ k, jumpAge: protector.jumpAge, dist, set: c.contested ? c.set : true, strength01: c.contested ? c.strength01 : 0.7, roll })) {
-          swatted = true; made = false;
+          swatted = true; made = false; swatBy = protector;
           swing('block'); ctx.setHud({ momentum });
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           const away = me.char.root.position.subtract(protector.char.root.position); away.y = 0; if (away.lengthSquared() < 1e-4) away.set(0, 0, 1); away.normalize();
@@ -1924,7 +1994,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           console.info(`[3V3-DEF] rim protector swat at k ${k.toFixed(2)} dist ${dist.toFixed(2)}`);
         } else {
           console.info(`[3V3-DEF] rim protector beaten at k ${k.toFixed(2)} dist ${dist.toFixed(2)}`);
-          if ((c.bumpK === null || bumped || wall !== protector) && dist <= 1.3 && !protector.floored) { protector.stunSec = Math.max(protector.stunSec, 1.0); protector.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); bannerFlash(ctx, 'OVER THE TOP!', 700); }
+          if ((c.bumpK === null || bumped || wall !== protector) && dist <= 1.3 && !protector.floored) { protector.stunSec = Math.max(protector.stunSec, 1.0); protector.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); bannerFlash(ctx, 'OVER THE TOP!', 700); mic?.crowd('crowd.ooh', 2); }   // THE MIC: the stands (the booth is holding)
         }
       }
       // M2: the bodies meet — the bump
@@ -1933,7 +2003,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const handUp = foeHandUp === wall || wall.jumpAge <= HAND_UP_SEC;
         const swatChance = aiBlockChance('dunk', 0, handUp, c.set, c.strength01);
         if (swatChance > 0 && roll() < swatChance) {
-          swatted = true; made = false;
+          swatted = true; made = false; swatBy = wall;
           swing('block'); ctx.setHud({ momentum });
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           ballSim.launch(at, c.dir.scale(-2.2).add(new Vector3((Math.random() - 0.5) * 2, 1.3, 0)));
@@ -1976,6 +2046,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       me.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });   // G5: feet-down is the land crouch
       me.drib.setFacing(me.char.root.rotation.y);
       const fouled = finishFoul; finishFoul = false;
+      mic?.release();   // THE MIC: feet-down — the booth may speak again
       if (made) {
         // A DUNK IS WORTH TWO. This awarded 1, left over from the old "1 inside
         // the paint, 2 outside" scale that this file's own header says was
@@ -2001,7 +2072,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const slamCall = posterized ? contactBanner(lastDunkKind) : 'THROWN DOWN!';
         ctx.setHud({ score: myScore, banner: fouled ? `${slamCall.replace(/!+$/, '')} — AND ONE!` : slamCall });
         bannerClearLater(ctx, 1000);
-        if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
+        // THE MIC: the slam and its name — a poster is the biggest call in the run (and the man it went over may have a word)
+        micOurs(posterized ? { moment: 'game.poster', priority: 3, side: 0.6, stinger: stingers3, crowd: { moment: 'crowd.erupt', n: 3 } }
+          : { moment: 'game.dunk', priority: 2, stinger: stingers3, crowd: { moment: picked3.flashy ? 'crowd.erupt' : 'crowd.cheer', n: 2 } },
+        posterized ? wall : null);
+        if (fouled && myScore < TARGET_SCORE) mic?.then({ moment: 'game.andone', priority: 2 });
+        if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
         later(400, () => void opponentPossession(ctx));
       } else {
         SoundKit.play('miss');
@@ -2009,14 +2085,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // the clank and the loose ball fired at the resolve (k 0.55), off the front of the iron — BIOMECH-HOOPS-WAVE1 G6
         if (fouled) {
           ctx.setHud({ banner: 'FOULED AT THE RIM — BALL BACK' });
+          mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
           bannerClearLater(ctx, 900);
           later(900, () => resetPossession(true));
         } else if (swatted) {   // D1: the ball went loose at the bump
           ctx.setHud({ banner: 'SWATTED AT THE RIM!' });
+          mic?.say({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } }); micTalk(swatBy, 'player.trash.stop'); micSlump();   // THE MIC
           bannerClearLater(ctx, 1000);
           later(900, () => boardAfterMiss(ctx));
         } else {
           ctx.setHud({ banner: kind === 'poster' ? 'STUFFED AT THE RIM!' : 'RATTLED OUT' });
+          mic?.say({ moment: 'game.miss', crowd: { moment: 'crowd.groan', n: 1 } }); micSlump();   // THE MIC
           bannerClearLater(ctx, 800);
           later(900, () => boardAfterMiss(ctx));
         }
@@ -2181,6 +2260,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const bit = !!near && near.stunSec === 0 && !near.floored && distXZ(me.char.root.position, near.char.root.position) <= PUMP_BITE_RANGE && roll() < PUMP_BITE_CHANCE;
     if (bit && near) { near.stunSec = PUMP_BITE_STUN; near.tree.beat('bball_block_reach'); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 }); }
     ctx.setHud({ shotType: '', shotMeterT: 0, banner: bit ? 'HE BIT THE PUMP!' : 'PUMP FAKE' });
+    if (bit) mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } });   // THE MIC
     setTimeout(() => ctx0?.setHud({ banner: '' }), 500);
     console.info(`[3V3-MOVE] pump fake bit ${bit}`);
   }
@@ -2261,6 +2341,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const beaten = !!near && distXZ(near.char.root.position, me.char.root.position) <= SPIN_TRIGGER_RANGE + 0.5;
       if (beaten && near) { near.stunSec = SPIN_STUN_SEC; near.tree.beat('bball_contact_react', { fadeSec: 0.06 }); }
       ctx.setHud({ banner: beaten ? 'SPIN — BEAT HIM!' : 'SPIN!' });
+      if (beaten) mic?.crowd('crowd.ooh', 1);   // THE MIC: the stands (no booth moment for a spin)
       setTimeout(() => ctx0?.setHud({ banner: '' }), 500);
       console.info(`[3V3-MOVE] spin shoulder clear beaten ${beaten}`);
     }
@@ -2479,6 +2560,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (call.whistle) SoundKit.play('whistle');
       ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
       bannerClearLater(ctx, 800);
+      mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle (out off the board)
       if (call.ball === 'me') resetPossession(true); else void opponentPossession(ctx);
       return;
     }
@@ -2565,6 +2647,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
       ctx.setHud({ banner: 'ANKLES — HE IS DOWN!' });
+      mic?.say({ moment: 'game.ankles', priority: 3, side: 0.6, crowd: { moment: 'crowd.erupt', n: 3 } }); micTalk(foe, 'player.beaten');   // THE MIC: he is on the floor
       bannerClearLater(ctx, 1100);
     } else {
       foe.stunSec = ANKLE_BREAK_STUN_SEC;
@@ -2574,6 +2657,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         victimSlide = { body: foe, dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[3V3-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
       ctx.feel?.impact?.(0.35);
       ctx.setHud({ banner: outcome.tier === 'highlight' ? 'ANKLES!' : 'SHOOK HIM!' });
+      // THE MIC: a highlight break is the ankles call; a plain shake only moves the stands
+      if (outcome.tier === 'highlight') { mic?.say({ moment: 'game.ankles', priority: 2, side: 0.3, crowd: { moment: 'crowd.erupt', n: 2 } }); micTalk(foe, 'player.beaten'); }
+      else mic?.crowd('crowd.ooh', 1);
       bannerClearLater(ctx, 800);
     }
     console.info(`[3V3-HANDLE] ${move} chain ${chain.length} ${outcome.broke} odds ${outcome.odds.toFixed(2)}`);
@@ -2622,6 +2708,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         ctx.feel?.impact?.(0.5);
         ctx.juice.shake(0.1, 150);
         ctx.setHud({ banner: 'OFF THE HEAD!' });
+        mic?.crowd('crowd.erupt', 2);   // THE MIC: the stands (no booth moment for it; the ankles call would be wrong)
         bannerClearLater(ctx, 1100);
         console.info(`[3V3-HANDLE] off the head — CLEAN (odds ${odds.toFixed(2)})`);
       } else {
@@ -2632,6 +2719,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         board = { age: 0, contestedCalled: false, shooter: 'me' };
         SoundKit.play('miss');
         ctx.setHud({ banner: 'OFF THE HEAD — LOST IT' });
+        mic?.say({ moment: 'game.stolen', crowd: { moment: 'crowd.groan', n: 1 } }); micSlump();   // THE MIC: lost it
         bannerClearLater(ctx, 1000);
         console.info(`[3V3-HANDLE] off the head — MISSED (odds ${odds.toFixed(2)})`);
       }
@@ -2696,6 +2784,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     me.tree.beat('bball_block_reach');
     d.stunSec = PARRY.stunSec; d.tree.beat('bball_contact_react', { fadeSec: 0.08 });
     driveStolen = true; swing('steal'); ctx.setHud({ momentum });
+    mic?.say({ moment: 'game.steal', priority: 2, crowd: { moment: 'crowd.erupt', n: 2 } });   // THE MIC: over him and the ball with it
     const from = ballWorld().clone(); releaseBall(ball);
     ballSim.launch(from, dir.scale(2.2).add(new Vector3(0, 1.2, 0)));   // ahead of the vault: where I land
     kin.parries++; if (synergy.add('parry')) igniteOverdrive(ctx);
@@ -2708,6 +2797,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     d.stunSec = DRIVE_BY.stunSec; d.tree.beat('bball_contact_react', { fadeSec: 0.08 });
     me.tree.beat('bball_steal_reach', { fadeSec: 0.1 });
     driveStolen = true; swing('steal'); ctx.setHud({ momentum });
+    mic?.say({ moment: 'game.steal', priority: 2, crowd: { moment: 'crowd.ooh', n: 2 } });   // THE MIC
     const from = ballWorld().clone(); releaseBall(ball);
     const along = me.drib.vel.clone(); along.y = 0; if (along.lengthSquared() < 1e-3) along.set(0, 0, 1); along.normalize();
     ballSim.launch(from, along.scale(DRIVE_BY.knockM).add(new Vector3(0, 1.0, 0)));
@@ -2720,6 +2810,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     kin.ignitions++;
     ctx.setHud({ banner: 'SYNERGY OVERDRIVE!', synergy: 0, overdrive: SYNERGY.overdriveSec }); bannerClearLater(ctx, 1100);
     SoundKit.play('crowdCheer', { volume: 0.6 }); ctx.juice.flash('#fbbf24', 90); ctx.juice.hitStop(60); ctx.feel?.impact?.(0.5); ctx.camDirector.pulse(0.6, 0.5);
+    // THE MIC: the stands at once; the booth after the call for the play that filled the gauge (it ignites inside that play)
+    mic?.crowd('crowd.erupt', 2); mic?.then({ moment: 'game.overdrive', priority: 2 });
     console.info('[3V3-KIN] synergy overdrive');
   }
   /** An overdrive dunk lands a SHOCKWAVE: every rival near the rim is put on the floor. */
@@ -2741,6 +2833,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     SoundKit.play('impact', { pitch: 0.75, volume: 0.55 }); SoundKit.play('crowdGroan', { volume: 0.4 });
     ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 100);
     ctx.setHud({ shotType: '', shotMeterT: 0, banner: by.jumpAge <= HAND_UP_SEC ? 'BLOCKED!' : 'BLOCKED — HAND IN THE SHOT!' });
+    mic?.say({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.heckle', n: 1 } }); micTalk(by, 'player.trash.stop'); micSlump();   // THE MIC
     bannerClearLater(ctx, 900);
     console.info('[3V3-DEF] blocked at the release');
     startBoxOut('mine');
@@ -2756,6 +2849,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const toFoe = by.char.root.position.subtract(me.char.root.position); toFoe.y = 0; toFoe.normalize();
     ballSim.launch(from, toFoe.scale(1.6).add(new Vector3(0, 1.2, 0)));
     ctx.setHud({ banner }); bannerClearLater(ctx, 900);
+    mic?.say({ moment: 'game.stolen', crowd: { moment: 'crowd.groan', n: 1 } }); micTalk(by, 'player.trash.stop'); micSlump();   // THE MIC
     console.info(`[3V3-DEF] strip by the ai: ${banner}`);
     later(750, () => void opponentPossession(ctx));
   }
@@ -2820,7 +2914,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdCheer', { volume: 0.7 });
           ctx.feel?.impact?.(0.5); ctx.juice.hitStop(50); ctx.juice.shake(0.1, 120);
           EffectsKit.burst(ctx.scene, at, 'sparks');
-          ctx.setHud({ banner: 'REJECTED AT THE RIM!' }); if (synergy.add('block')) igniteOverdrive(ctx);
+          ctx.setHud({ banner: 'REJECTED AT THE RIM!' });
+          mic?.say({ moment: 'game.block', priority: 3, side: 0.5, crowd: { moment: 'crowd.erupt', n: 3 } });   // THE MIC: a swat on his dunk, the call before the gauge's
+          if (synergy.add('block')) igniteOverdrive(ctx);
           shooter.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); ctx.camDirector.pulse(0.8, 0.5);   // DUNK-FANATIC: he takes the hit in the air
           console.info(`[3V3-DEF] swat at k ${k.toFixed(2)} jumpAge ${myJumpAge.toFixed(2)}`);
         }
@@ -2851,10 +2947,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           EffectsKit.burst(ctx.scene, RIM, 'net');
           ctx.setHud({ foeScore, banner: inLane ? 'POSTERIZED — THEY THREW IT DOWN ON YOU' : 'THEY THREW IT DOWN' });
           setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 1000);
-          if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); done(); return; }
+          // THE MIC: their slam (on me, the stands go up for it anyway); the dunker chirps now and then
+          micTheirs({ moment: 'game.rival.dunk', priority: 2, crowd: { moment: inLane ? 'crowd.erupt' : 'crowd.ooh', n: 2 } }, shooter);
+          if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('LOSS'); ctx.end('LOSS', myScore, { foeScore, assists }); done(); return; }
           later(meFloored ? 1600 : 1000, () => resetPossession(true));
         } else {
-          if (!swatted) { SoundKit.play('miss'); ctx.setHud({ banner: 'THEY RATTLED IT OUT' }); }
+          if (!swatted) { SoundKit.play('miss'); ctx.setHud({ banner: 'THEY RATTLED IT OUT' }); mic?.crowd('crowd.cheer', 1); }   // THE MIC: the stands like the stop
           setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
           later(900, () => boardAfterMiss(ctx));
         }
@@ -2878,6 +2976,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // a sprint THROUGH a set defender is a CHARGE (a foul-speed contact on offense was never read)
       SoundKit.play('whistle');
       bannerFlash(ctx, 'CHARGE — THEIR BALL', 1000);
+      mic?.say({ moment: 'game.foul' }); micSlump();   // THE MIC: the whistle
       console.info(`[3V3-CONTACT] charge ${closing.toFixed(1)} m/s into a set body`);
       void opponentPossession(ctx);
       return;
@@ -2900,6 +2999,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // a defender running THROUGH the handler at foul speed — the ball back
       SoundKit.play('whistle');
       bannerFlash(ctx, 'FOUL ON THE DEFENDER — BALL BACK', 1000);
+      mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
       console.info(`[3V3-CONTACT] foul ${closing.toFixed(1)} m/s by the defender`);
       later(600, () => resetPossession(true));
       return;
@@ -2935,6 +3035,98 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     console.info('[3V3-JUICE] dunk miss clank');
   }
 
+  // ── THE MIC (2026-09-24) ─────────────────────────────────────────────────────────────────────────────────────────
+  /** A body's voice on the floor (the players map): mate0 / mate1, foe0..foe2; the hero has none. */
+  function micWho(b: Body | null): string | undefined {
+    if (!b || b === me) return undefined;
+    const fi = foes.indexOf(b);
+    return fi >= 0 ? `foe${fi}` : mates.includes(b) ? `mate${mates.indexOf(b)}` : undefined;
+  }
+  /** A player's word after the booth's call — occasional, so the floor talks without it becoming spam. */
+  function micTalk(b: Body | null, moment: string, chance = 0.4): void {
+    const who = micWho(b);
+    if (who && Math.random() < chance) mic?.then({ who, moment });
+  }
+  /** Every frame: the mic's clock, the welcome on the first live frame, and now and then an open mate calling for it. No
+   *  filler and no idle crowd: the 90 s clock never stops, so a run has no dead time to fill. */
+  function micTick(ctx: ModeContext): void {
+    if (!mic) return;
+    mic.update();
+    if (!micOpened && ctx.phase() === 'playing') {
+      // the welcome to this court, then what the run is (to 21, a 90 s clock) — once the voices are in (the 1v1's gate: a call
+      // made before the banks land is let go), and not at all if they arrive after the run is under way. PRIORITY 1: the ball
+      // is live on this frame and the welcome runs ~9 s, so at priority 2 it swallowed every priority-2 call under it (the
+      // opening dunk, three, steal, block — equal priority is only queued inside the last 1.2 s); now a real play cuts in.
+      micLiveAt ??= performance.now();
+      if (mic.ready) {
+        micOpened = true;
+        mic.say({ moment: 'intro.court', priority: 1, crowd: { moment: 'crowd.hype', n: 2 } });
+        mic.then({ moment: 'game.intro.threes', priority: 1 });
+        micMateAt = performance.now() + 15000;   // the mates let the welcome finish
+      } else if (performance.now() - micLiveAt > 6000) micOpened = true;
+    }
+    if (carrierId === 'me' && !shooting && !dunking && !passFlight.active && !board && performance.now() >= micMateAt) {
+      micMateAt = performance.now() + 5000 + Math.random() * 4000;
+      const open = mates.findIndex((m) => Math.min(...foes.map((f) => distXZ(f.char.root.position, m.char.root.position))) > 3);
+      if (open >= 0 && Math.random() < 0.4) mic.say({ who: `mate${open}`, moment: 'player.callball' });
+    }
+  }
+  /** My team scored: the call and the stands, the run, game point, and a word from the man it went past. The winning bucket
+   *  is micEnd's (at the end site, before ctx.end), so it skips the ordinary call. `ev` null = counted, not called. */
+  function micOurs(ev: MicEvent | null, beaten: Body | null = null): void {
+    if (!mic) return;
+    micRunUs++; micCold = 0;
+    if (myScore >= TARGET_SCORE) return;
+    if (ev) mic.say(ev);
+    micTalk(beaten, 'player.beaten');
+    if (micRunUs === 3 || micRunUs === 6) mic.then({ moment: 'game.run', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } });
+    micGamePoint();
+  }
+  /** They scored: the call, the run broken, their game point, and the scorer's chirp. Their winner is micEnd's. */
+  function micTheirs(ev: MicEvent, shooter: Body | null): void {
+    if (!mic) return;
+    micRunUs = 0;
+    if (foeScore >= TARGET_SCORE) return;
+    mic.say(ev);
+    micTalk(shooter, 'player.trash.score');
+    micGamePoint();
+  }
+  /** One bucket from 21 (a two wins it; the other side only ever scores twos), once per side. */
+  function micGamePoint(): void {
+    if (!micPointUs && myScore >= TARGET_SCORE - 2 && myScore < TARGET_SCORE) { micPointUs = true; mic?.then({ moment: 'game.point', tags: ['side:us'], priority: 2, crowd: { moment: 'crowd.hype', n: 2 } }); }
+    if (!micPointThem && foeScore >= TARGET_SCORE - 2 && foeScore < TARGET_SCORE) { micPointThem = true; mic?.then({ moment: 'game.point', tags: ['side:them'], priority: 2 }); }
+  }
+  /** A bad stretch of mine (a miss, a turnover): the third in a row is called once, until the next bucket. The meter's own
+   *  'cold' is only its decay, which is not a slump. */
+  function micSlump(): void { if (++micCold === 3) mic?.then({ moment: 'momentum.cold', priority: 1 }); }
+  /** The Game-Breaker meter climbing (only a climb). It fires inside the play that raised it, so it follows that play's call. */
+  function micTier(tier: MomentumTier, prev: MomentumTier): void {
+    const rank: Record<MomentumTier, number> = { cold: 0, warming: 1, hot: 2, on_fire: 3 };
+    // not inside my dunk's flight: the AI's swat of it reports swing('block') on MY meter (a wrong-side report), and "heating
+    // up" after being stuffed is a lie; a poster's own climb is drowned by the poster call anyway
+    if (!mic || ended || dunking || rank[tier] <= rank[prev]) return;
+    // every tier, not just warming: the meter decays 2.2/s, so a hot stretch dips under 45 and a steal puts it back — "he's hot"
+    // on every re-cross was the same call every ~10 s (the 1v1's 20 s per moment)
+    const moment = tier === 'on_fire' ? 'momentum.fire' : tier === 'hot' ? 'momentum.hot' : 'momentum.warming';
+    const t = performance.now() / 1000;
+    if (t - (micTierAt[moment] ?? -Infinity) < 20) return;
+    micTierAt[moment] = t;
+    mic.then(moment === 'momentum.fire' ? { moment, priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 } } : { moment, priority: 1 });
+  }
+  /** The result, at every end site BEFORE ctx.end: the harness stops ticking the mode in that frame, so this is the last call
+   *  (a sidekick answer or an outro would wait on a tick that never comes); the audio plays on after the end. */
+  function micEnd(verdict: 'WIN' | 'LOSS' | 'DRAW'): void {
+    if (!mic) return;
+    mic.release(); mic.hush();   // a buzzer inside my dunk's flight must not be held
+    mic.say(verdict === 'WIN' ? { moment: 'game.win', priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } }
+      : verdict === 'LOSS' ? { moment: 'game.loss', priority: 3, crowd: { moment: 'crowd.groan', n: 2 } }
+      : { moment: 'game.draw', priority: 3, crowd: { moment: 'crowd.ooh', n: 2 } });
+    // the last word: park it. The dunk flight, the rival's drive and his dunk run on onBeforeRender (and the drive's await), which
+    // the harness keeps rendering after ctx.end — a flight landing after the buzzer still fired its crowd and queued its calls, and
+    // one that reached 21 (my dunk, or his make after the drive's await) ran micEnd again: the buzzer's verdict hushed for another
+    micParked = mic; mic = null;
+  }
+
   async function opponentPossession(ctx: ModeContext): Promise<void> {
     if (ended) return;
     possessionToken++;
@@ -2942,6 +3134,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     carrierId = 'foeTeam';
     myJumpAge = Infinity; foeShotBlocked = false;
     ctx.setHud({ hint: 'DEFEND — stay tight · time a jump (A) at the release to BLOCK' });
+    // THE MIC: their ball. The booth sets the stop only when it has the air (priority 0: it never cuts or queues), a mate talks
+    // the D, the stands chant for one — each now and then, because this happens every other possession
+    if (Math.random() < 0.5) mic?.say({ moment: 'game.check', priority: 0 });
+    if (Math.random() < 0.3) mic?.say({ who: Math.random() < 0.5 ? 'mate0' : 'mate1', moment: 'player.defense' });
+    if (Math.random() < 0.3) mic?.crowd('crowd.defense', 1);
     // the drive beat is watchable AND contestable: your positioning sets
     // the make%, and a timed block jump at the release erases it outright
     const shooter = foes[Math.floor(Math.random() * foes.length)];
@@ -3034,6 +3231,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 120);
           console.info(`[3V3-REF] ${call.id} on the drive at k ${k.toFixed(2)} (defender ${drivePlanted ? 'set' : 'moving'}) → ${call.ball}`);
           ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
+          mic?.say({ moment: 'game.foul', crowd: { moment: call.ball === 'me' ? 'crowd.cheer' : 'crowd.groan', n: 1 } });   // THE MIC: the whistle
           bannerClearLater(ctx, 1000);
           driveStolen = true;   // the drive is over either way; the award decides who restarts
           ctx.scene.onBeforeRenderObservable.remove(obs);
@@ -3073,7 +3271,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       EffectsKit.burst(ctx.scene, shooter.char.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
       shooter.tree.beat('bball_contact_react');
       releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
-      ctx.setHud({ banner: 'REJECTED!' }); if (synergy.add('block')) igniteOverdrive(ctx);
+      ctx.setHud({ banner: 'REJECTED!' });
+      mic?.say({ moment: 'game.block', priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 } });   // THE MIC: the call before the gauge's
+      if (synergy.add('block')) igniteOverdrive(ctx);
       setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
       later(1000, () => resetPossession(true));
       return;
@@ -3113,13 +3313,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         banner: defenseFactor >= 0.5 ? 'THEY SCORE — THROUGH THE CONTEST'
           : defenseFactor <= 0.15 ? 'THEY SCORE — LEFT WIDE OPEN' : 'THEY SCORE',
       });
+      // THE MIC: called at the release, where it is decided and banked (the banner says it there too)
+      micTheirs({ moment: 'game.rival.make', crowd: { moment: 'crowd.groan', n: 1 } }, shooter);
     } else {
       SoundKit.play('impact', { pitch: 0.9, volume: 0.3 });
       ctx.setHud({ banner: 'STOP!' });
       ctx.feel?.impact?.(0.2);
+      mic?.crowd('crowd.cheer', 1);   // THE MIC: the stands like the stop (no booth moment for their miss)
     }
     setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 800);
-    if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
+    if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('LOSS'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
     if (made) later(900, () => resetPossession(true)); else later(900, () => boardAfterMiss(ctx));   // O2: their miss is a board too
   }
 })();

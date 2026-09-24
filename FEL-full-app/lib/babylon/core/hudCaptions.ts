@@ -13,7 +13,8 @@
 // sixty times a second and a screen reader would say nothing else ever again.
 
 /** The HUD keys that carry news a player is told, rather than numbers they can read at leisure. */
-export const CAPTION_HUD_KEYS = ['banner'] as const;
+/** THE MIC (2026-09-24): 'mic' is what the court's MC just said: news a player who cannot hear it still has to be told. */
+export const CAPTION_HUD_KEYS = ['banner', 'mic'] as const;
 
 export interface HudCaption { text: string; key: string }
 

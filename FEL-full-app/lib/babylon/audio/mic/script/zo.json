@@ -1,0 +1,40 @@
+{
+ "cast": "zo",
+ "lines": [
+  {
+   "id": "player.dunk.brag.01",
+   "moment": "player.dunk.brag",
+   "text": "Tell me somebody got that!"
+  },
+  {
+   "id": "player.dunk.brag.02",
+   "moment": "player.dunk.brag",
+   "text": "That one's for the replay!"
+  },
+  {
+   "id": "player.dunk.brag.03",
+   "moment": "player.dunk.brag",
+   "text": "Smile, you're in my highlight!"
+  },
+  {
+   "id": "player.dunk.jab.01",
+   "moment": "player.dunk.jab",
+   "text": "Keep that one off the replay."
+  },
+  {
+   "id": "player.dunk.jab.02",
+   "moment": "player.dunk.jab",
+   "text": "Cameras caught that too, sorry!"
+  },
+  {
+   "id": "player.dunk.respect.01",
+   "moment": "player.dunk.respect",
+   "text": "Okay, the phones loved that."
+  },
+  {
+   "id": "player.dunk.respect.02",
+   "moment": "player.dunk.respect",
+   "text": "Fine, that's a highlight. Rude."
+  }
+ ]
+}

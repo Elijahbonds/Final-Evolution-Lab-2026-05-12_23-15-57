@@ -1,0 +1,2060 @@
+{
+ "cast": "moss",
+ "lines": [
+  {
+   "id": "intro.court.01",
+   "moment": "intro.court",
+   "text": "Welcome to Canopy Court, friends! I'm Moss. Light's pouring through the leaves, the birds are settling in, and the hoop is waiting."
+  },
+  {
+   "id": "intro.court.02",
+   "moment": "intro.court",
+   "text": "Hey, hey, deep in the woods! Moss on the mic, coming to you live from Canopy Court. Find a stump, get comfy."
+  },
+  {
+   "id": "intro.court.03",
+   "moment": "intro.court",
+   "text": "Ha, look at all of you up in the branches! This is Canopy Court, I'm Moss, and the Treetop Jam starts right now."
+  },
+  {
+   "id": "intro.court.04",
+   "moment": "intro.court",
+   "text": "Good to see you under the canopy! Moss here. Breathe in that pine air, the Treetop Jam is on."
+  },
+  {
+   "id": "filler.crowd.01",
+   "moment": "filler.crowd",
+   "text": "Rope bridge section, let me hear you! Shake those branches!"
+  },
+  {
+   "id": "filler.crowd.02",
+   "moment": "filler.crowd",
+   "text": "Juniper's on the front stump again! Twenty summers and counting, give it up!"
+  },
+  {
+   "id": "filler.crowd.03",
+   "moment": "filler.crowd",
+   "text": "Treehouse crew, I see you up there! Make some noise!"
+  },
+  {
+   "id": "filler.crowd.04",
+   "moment": "filler.crowd",
+   "text": "Hammock row, wake up! Ha, I know it's comfy."
+  },
+  {
+   "id": "filler.crowd.05",
+   "moment": "filler.crowd",
+   "text": "Big love to the Birch twins, best seats on the log!"
+  },
+  {
+   "id": "filler.crowd.06",
+   "moment": "filler.crowd",
+   "text": "Owls in the back, I know you're awake. Hoot it up!"
+  },
+  {
+   "id": "filler.banter.01",
+   "moment": "filler.banter",
+   "text": "True story: this court was a fern clearing. We swept it out one Saturday and never left."
+  },
+  {
+   "id": "filler.banter.02",
+   "moment": "filler.banter",
+   "text": "The trail mix stand has the good stuff today. Extra chocolate. Don't tell the squirrels."
+  },
+  {
+   "id": "filler.banter.03",
+   "moment": "filler.banter",
+   "text": "A deer wandered onto the court last spring. Stood at the free throw line like it knew."
+  },
+  {
+   "id": "filler.banter.04",
+   "moment": "filler.banter",
+   "text": "If it rains, no worries. The canopy's got us covered. Nature's own roof, friends."
+  },
+  {
+   "id": "filler.banter.05",
+   "moment": "filler.banter",
+   "text": "You ever notice the owls go quiet right before a big play? They know something."
+  },
+  {
+   "id": "filler.banter.06",
+   "moment": "filler.banter",
+   "text": "Campfire corn by the creek, friends. Trust me, best snack in the whole forest."
+  },
+  {
+   "id": "filler.banter.07",
+   "moment": "filler.banter",
+   "text": "Lost a ball in the ferns last spring. A rabbit family lives in it now. Ha!"
+  },
+  {
+   "id": "filler.banter.08",
+   "moment": "filler.banter",
+   "text": "Hear that woodpecker? Keeps better time than our scoreboard ever did."
+  },
+  {
+   "id": "momentum.warming.01",
+   "moment": "momentum.warming",
+   "text": "Ooh, the sap is rising!"
+  },
+  {
+   "id": "momentum.warming.02",
+   "moment": "momentum.warming",
+   "text": "Something's sprouting out there. I like it."
+  },
+  {
+   "id": "momentum.warming.03",
+   "moment": "momentum.warming",
+   "text": "Wind's starting to stir in the branches."
+  },
+  {
+   "id": "momentum.hot.01",
+   "moment": "momentum.hot",
+   "text": "Now the leaves are shaking!"
+  },
+  {
+   "id": "momentum.hot.02",
+   "moment": "momentum.hot",
+   "text": "Birds are paying attention now!"
+  },
+  {
+   "id": "momentum.hot.03",
+   "moment": "momentum.hot",
+   "text": "Feel that wind? The whole grove's leaning in!"
+  },
+  {
+   "id": "momentum.fire.01",
+   "moment": "momentum.fire",
+   "text": "The whole forest woke up!"
+  },
+  {
+   "id": "momentum.fire.02",
+   "moment": "momentum.fire",
+   "text": "Thunder in the treetops! Can't stop it!"
+  },
+  {
+   "id": "momentum.fire.03",
+   "moment": "momentum.fire",
+   "text": "Every branch is shaking! Every single one!"
+  },
+  {
+   "id": "momentum.fire.04",
+   "moment": "momentum.fire",
+   "text": "Oh, full storm in the canopy now!"
+  },
+  {
+   "id": "momentum.cold.01",
+   "moment": "momentum.cold",
+   "text": "Ha, bit of a frost out there."
+  },
+  {
+   "id": "momentum.cold.02",
+   "moment": "momentum.cold",
+   "text": "Leaves falling, friend. Spring always comes back."
+  },
+  {
+   "id": "momentum.cold.03",
+   "moment": "momentum.cold",
+   "text": "Quiet in the woods. Shake it loose."
+  },
+  {
+   "id": "outro.win.01",
+   "moment": "outro.win",
+   "text": "That's your name carved in the big oak now, friend! The Treetop Jam belongs to you!"
+  },
+  {
+   "id": "outro.win.02",
+   "moment": "outro.win",
+   "text": "Whoa, what a show under the leaves! Go soak up that sunlight, you earned every bit."
+  },
+  {
+   "id": "outro.win.03",
+   "moment": "outro.win",
+   "text": "Champion of the canopy! Ha! The birds will be singing about this one all week."
+  },
+  {
+   "id": "outro.win.04",
+   "moment": "outro.win",
+   "text": "You came into these woods and took root. Take a bow, and come back soon."
+  },
+  {
+   "id": "outro.loss.01",
+   "moment": "outro.loss",
+   "text": "Roots grow slow, friend, but they grow deep. Come back and run it again."
+  },
+  {
+   "id": "outro.loss.02",
+   "moment": "outro.loss",
+   "text": "Hey, every big tree started as a seed. This hoop will wait for you."
+  },
+  {
+   "id": "outro.loss.03",
+   "moment": "outro.loss",
+   "text": "The forest saw all that hustle. Rest up and come find me for a rematch."
+  },
+  {
+   "id": "outro.loss.04",
+   "moment": "outro.loss",
+   "text": "Big respect from the whole canopy. Grab some water and come see us again."
+  },
+  {
+   "id": "dunk.intro.01",
+   "moment": "dunk.intro",
+   "text": "Flight Night in the forest, friends! Two rounds, two dunks each, five judges on the log, and tonight's rival is waiting in the ferns."
+  },
+  {
+   "id": "dunk.intro.02",
+   "moment": "dunk.intro",
+   "text": "Ha, the treehouse is packed, friends! It's Flight Night: two rounds, two dunks apiece, five judges watching, and a rival who wants it too."
+  },
+  {
+   "id": "dunk.intro.03",
+   "moment": "dunk.intro",
+   "text": "Light through the leaves, hoop in the clearing, Flight Night is on! Two rounds, two dunks each. Five judges. One rival. Let's fly."
+  },
+  {
+   "id": "dunk.night.01",
+   "moment": "dunk.night",
+   "text": "Back in the woods for another Flight Night! The birds remember you."
+  },
+  {
+   "id": "dunk.night.02",
+   "moment": "dunk.night",
+   "text": "Ha, couldn't stay away from the canopy, huh? Another Flight Night it is."
+  },
+  {
+   "id": "dunk.night.03",
+   "moment": "dunk.night",
+   "text": "The forest saved your spot, friend. Another Flight Night, here we go."
+  },
+  {
+   "id": "dunk.rival.intro.01",
+   "moment": "dunk.rival.intro",
+   "text": "Tonight's rival just stepped out of the trees, and they came ready."
+  },
+  {
+   "id": "dunk.rival.intro.02",
+   "moment": "dunk.rival.intro",
+   "text": "Say hello to tonight's rival! The forest has heard stories. Let's see if they're true."
+  },
+  {
+   "id": "dunk.rival.intro.cass.01",
+   "moment": "dunk.rival.intro",
+   "text": "Here comes Cass! Steady as an old oak. Same tomahawk, same landing, every single time.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.ty.01",
+   "moment": "dunk.rival.intro",
+   "text": "Ty is in the woods tonight! Quiet, then thunder. Shakes every branch on the way down.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.pilot.01",
+   "moment": "dunk.rival.intro",
+   "text": "Pilot's here. Quiet as an owl, reads the whole forest, then swoops in.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.zo.01",
+   "moment": "dunk.rival.intro",
+   "text": "Oh, it's Zo! Glows like a firefly for the phones. Here for the highlight, friends.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.stack.01",
+   "moment": "dunk.rival.intro",
+   "text": "Stack is here! Climbs the tallest tree first, figures out the way down later. Ha!",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.up.01",
+   "moment": "dunk.up",
+   "text": "Your turn, friend. The forest is listening."
+  },
+  {
+   "id": "dunk.up.02",
+   "moment": "dunk.up",
+   "text": "Alright, the clearing's all yours. Go climb."
+  },
+  {
+   "id": "dunk.up.03",
+   "moment": "dunk.up",
+   "text": "Here we go. Birds, hush up a second."
+  },
+  {
+   "id": "dunk.up.04",
+   "moment": "dunk.up",
+   "text": "Step up. The light's on you."
+  },
+  {
+   "id": "dunk.up.05",
+   "moment": "dunk.up",
+   "text": "Quiet now... this one's up."
+  },
+  {
+   "id": "dunk.retry.01",
+   "moment": "dunk.retry",
+   "text": "Shake it off. Same tree, one more climb."
+  },
+  {
+   "id": "dunk.retry.02",
+   "moment": "dunk.retry",
+   "text": "Ha, the hoop's still there. Go again."
+  },
+  {
+   "id": "dunk.retry.03",
+   "moment": "dunk.retry",
+   "text": "No worries. Run it back."
+  },
+  {
+   "id": "dunk.retry.04",
+   "moment": "dunk.retry",
+   "text": "Easy. Roots first, then branches. Again."
+  },
+  {
+   "id": "dunk.lastchance.01",
+   "moment": "dunk.lastchance",
+   "text": "Last climb, friend. Make it count."
+  },
+  {
+   "id": "dunk.lastchance.02",
+   "moment": "dunk.lastchance",
+   "text": "Third try. Even the owls are watching."
+  },
+  {
+   "id": "dunk.lastchance.03",
+   "moment": "dunk.lastchance",
+   "text": "One more shot at this. Quiet, everybody."
+  },
+  {
+   "id": "dunk.run.01",
+   "moment": "dunk.run",
+   "text": "Here it comes..."
+  },
+  {
+   "id": "dunk.run.02",
+   "moment": "dunk.run",
+   "text": "Go get it!"
+  },
+  {
+   "id": "dunk.run.03",
+   "moment": "dunk.run",
+   "text": "Up, up..."
+  },
+  {
+   "id": "dunk.run.04",
+   "moment": "dunk.run",
+   "text": "Climb, friend!"
+  },
+  {
+   "id": "dunk.run.05",
+   "moment": "dunk.run",
+   "text": "Wind's up!"
+  },
+  {
+   "id": "dunk.make.t0.01",
+   "moment": "dunk.make",
+   "text": "Right down the trunk, nice and calm.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.02",
+   "moment": "dunk.make",
+   "text": "Clean, simple, no complaints from me.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.03",
+   "moment": "dunk.make",
+   "text": "Smooth as a river stone.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.04",
+   "moment": "dunk.make",
+   "text": "Solid roots on that one.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.05",
+   "moment": "dunk.make",
+   "text": "There it is, snug as a bird's nest.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.06",
+   "moment": "dunk.make",
+   "text": "Easy breeze, easy points.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t1.01",
+   "moment": "dunk.make",
+   "text": "Ooh, now the leaves are rustling!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.02",
+   "moment": "dunk.make",
+   "text": "Ha, the judges almost fell off the log!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.03",
+   "moment": "dunk.make",
+   "text": "Floated like a leaf on that one!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.04",
+   "moment": "dunk.make",
+   "text": "Branches are shaking now, friends!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.05",
+   "moment": "dunk.make",
+   "text": "Wind's picking up in the treetops!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.06",
+   "moment": "dunk.make",
+   "text": "Good stuff, that's the good stuff!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.07",
+   "moment": "dunk.make",
+   "text": "Now we're climbing!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.08",
+   "moment": "dunk.make",
+   "text": "Somebody woke up the owls with that one!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t2.01",
+   "moment": "dunk.make",
+   "text": "Oh my goodness! The whole forest woke up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.02",
+   "moment": "dunk.make",
+   "text": "Are you serious?! There go the birds!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.03",
+   "moment": "dunk.make",
+   "text": "Get up, treehouse! Get up, get up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.04",
+   "moment": "dunk.make",
+   "text": "Call the rangers, that was wild!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.05",
+   "moment": "dunk.make",
+   "text": "Unreal! Leaves are still falling from that!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.06",
+   "moment": "dunk.make",
+   "text": "Ha! Even the squirrels are clapping!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.07",
+   "moment": "dunk.make",
+   "text": "No way! That came from the top branch!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.08",
+   "moment": "dunk.make",
+   "text": "Lightning through the leaves!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.09",
+   "moment": "dunk.make",
+   "text": "Whoa, whoa, whoa! Up with the eagles!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.10",
+   "moment": "dunk.make",
+   "text": "Every nest in the canopy just shook!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.fifty.01",
+   "moment": "dunk.fifty",
+   "text": "Fifty! Perfect fifty! Ha, the birds are singing it!"
+  },
+  {
+   "id": "dunk.fifty.02",
+   "moment": "dunk.fifty",
+   "text": "All five judges, tens right across the log!"
+  },
+  {
+   "id": "dunk.fifty.03",
+   "moment": "dunk.fifty",
+   "text": "Oh, a perfect fifty! The old oak tips its branches!"
+  },
+  {
+   "id": "dunk.fifty.04",
+   "moment": "dunk.fifty",
+   "text": "Five tens! I'm hugging a tree right now, friends!"
+  },
+  {
+   "id": "dunk.repeat.01",
+   "moment": "dunk.repeat",
+   "text": "Ooh, the judges saw that one already tonight."
+  },
+  {
+   "id": "dunk.repeat.02",
+   "moment": "dunk.repeat",
+   "text": "Ha, same tree, same branch. The panel noticed."
+  },
+  {
+   "id": "dunk.repeat.03",
+   "moment": "dunk.repeat",
+   "text": "We've climbed that trail already tonight. Mix it up."
+  },
+  {
+   "id": "dunk.repeat.04",
+   "moment": "dunk.repeat",
+   "text": "Pretty, but we've seen that leaf fall already."
+  },
+  {
+   "id": "dunk.miss.01",
+   "moment": "dunk.miss",
+   "text": "Ha, fell short of the top branch."
+  },
+  {
+   "id": "dunk.miss.02",
+   "moment": "dunk.miss",
+   "text": "Ooh, slipped right through the branches."
+  },
+  {
+   "id": "dunk.miss.03",
+   "moment": "dunk.miss",
+   "text": "Nope, the forest wasn't ready."
+  },
+  {
+   "id": "dunk.miss.04",
+   "moment": "dunk.miss",
+   "text": "Whoa, easy! Wind took that one."
+  },
+  {
+   "id": "dunk.miss.05",
+   "moment": "dunk.miss",
+   "text": "Oh, the squirrels really wanted that one."
+  },
+  {
+   "id": "dunk.miss.06",
+   "moment": "dunk.miss",
+   "text": "Missed, but I love the ambition."
+  },
+  {
+   "id": "dunk.miss.iron.01",
+   "moment": "dunk.miss.iron",
+   "text": "Knock on wood... and out it comes."
+  },
+  {
+   "id": "dunk.miss.iron.02",
+   "moment": "dunk.miss.iron",
+   "text": "Ooh, the woodpecker's back on that rim!"
+  },
+  {
+   "id": "dunk.miss.iron.03",
+   "moment": "dunk.miss.iron",
+   "text": "Rattled around like an acorn in a can."
+  },
+  {
+   "id": "dunk.miss.lob.01",
+   "moment": "dunk.miss.lob",
+   "text": "Ha, that lob flew off with the birds."
+  },
+  {
+   "id": "dunk.miss.lob.02",
+   "moment": "dunk.miss.lob",
+   "text": "Toss got caught in the wind."
+  },
+  {
+   "id": "dunk.miss.lob.03",
+   "moment": "dunk.miss.lob",
+   "text": "Oh, the ball went exploring without you."
+  },
+  {
+   "id": "dunk.miss.prop.01",
+   "moment": "dunk.miss.prop",
+   "text": "Ooh, brushed it like a low branch!"
+  },
+  {
+   "id": "dunk.miss.prop.02",
+   "moment": "dunk.miss.prop",
+   "text": "Ha, tagged the obstacle. It's fine, it's fine."
+  },
+  {
+   "id": "dunk.miss.prop.03",
+   "moment": "dunk.miss.prop",
+   "text": "Clipped it! So close to clean."
+  },
+  {
+   "id": "dunk.miss.last.01",
+   "moment": "dunk.miss.last",
+   "text": "Out of climbs. That one goes down as a miss."
+  },
+  {
+   "id": "dunk.miss.last.02",
+   "moment": "dunk.miss.last",
+   "text": "No more tries. The judges log it as a miss."
+  },
+  {
+   "id": "dunk.miss.last.03",
+   "moment": "dunk.miss.last",
+   "text": "That tree didn't want climbing tonight. It's a miss."
+  },
+  {
+   "id": "dunk.judges.01",
+   "moment": "dunk.judges",
+   "text": "Over to the log!"
+  },
+  {
+   "id": "dunk.judges.02",
+   "moment": "dunk.judges",
+   "text": "Log bench is thinking..."
+  },
+  {
+   "id": "dunk.judges.03",
+   "moment": "dunk.judges",
+   "text": "Let's hear the panel."
+  },
+  {
+   "id": "dunk.judges.04",
+   "moment": "dunk.judges",
+   "text": "Cards up, judges!"
+  },
+  {
+   "id": "dunk.rival.up.01",
+   "moment": "dunk.rival.up",
+   "text": "Rival's turn. Let's see what grows."
+  },
+  {
+   "id": "dunk.rival.up.02",
+   "moment": "dunk.rival.up",
+   "text": "Now the rival steps into the light."
+  },
+  {
+   "id": "dunk.rival.up.cass.01",
+   "moment": "dunk.rival.up",
+   "text": "Cass is up. Steady, steady, steady.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.ty.01",
+   "moment": "dunk.rival.up",
+   "text": "Here comes Ty. Hear that thunder rolling?",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.pilot.01",
+   "moment": "dunk.rival.up",
+   "text": "Pilot's up, reading the wind like an owl.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.zo.01",
+   "moment": "dunk.rival.up",
+   "text": "Zo's up! Phones out, fireflies!",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.stack.01",
+   "moment": "dunk.rival.up",
+   "text": "Stack's up. Somebody spot this one, please.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.01",
+   "moment": "dunk.rival.make",
+   "text": "Oh, nice climb from the other side..."
+  },
+  {
+   "id": "dunk.rival.make.02",
+   "moment": "dunk.rival.make",
+   "text": "Ha, fair enough. That one grew some roots."
+  },
+  {
+   "id": "dunk.rival.make.03",
+   "moment": "dunk.rival.make",
+   "text": "Treehouse nods for that one..."
+  },
+  {
+   "id": "dunk.rival.make.04",
+   "moment": "dunk.rival.make",
+   "text": "Whoa, the other side can fly too!"
+  },
+  {
+   "id": "dunk.rival.make.cass.01",
+   "moment": "dunk.rival.make",
+   "text": "Cass, steady as that old oak...",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.ty.01",
+   "moment": "dunk.rival.make",
+   "text": "Ty brought the thunder, as promised!",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.pilot.01",
+   "moment": "dunk.rival.make",
+   "text": "Pilot read it, then swooped!",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.zo.01",
+   "moment": "dunk.rival.make",
+   "text": "Zo, glowing for the phones!",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.stack.01",
+   "moment": "dunk.rival.make",
+   "text": "Stack went out on the thinnest branch!",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.miss.01",
+   "moment": "dunk.rival.miss",
+   "text": "Ha, the rival slipped off the branch!"
+  },
+  {
+   "id": "dunk.rival.miss.02",
+   "moment": "dunk.rival.miss",
+   "text": "Ooh, there's a gap in the trees, friend!"
+  },
+  {
+   "id": "dunk.rival.miss.03",
+   "moment": "dunk.rival.miss",
+   "text": "Missed! The forest giggled a little."
+  },
+  {
+   "id": "dunk.rival.miss.04",
+   "moment": "dunk.rival.miss",
+   "text": "Nope! That one stayed up in the trees."
+  },
+  {
+   "id": "dunk.rival.miss.05",
+   "moment": "dunk.rival.miss",
+   "text": "Well, well. Even oaks drop acorns."
+  },
+  {
+   "id": "dunk.round.01",
+   "moment": "dunk.round",
+   "text": "Round two, friends! Final round. This is where the roots show."
+  },
+  {
+   "id": "dunk.round.02",
+   "moment": "dunk.round",
+   "text": "Final round under the canopy! Everybody grab a branch."
+  },
+  {
+   "id": "dunk.round.03",
+   "moment": "dunk.round",
+   "text": "Here comes round two. Last climb of the night."
+  },
+  {
+   "id": "dunk.need.01",
+   "moment": "dunk.need",
+   "text": "You need a big one now. Top branch or nothing."
+  },
+  {
+   "id": "dunk.need.02",
+   "moment": "dunk.need",
+   "text": "Behind, but the forest believes. Go shake every leaf out there."
+  },
+  {
+   "id": "dunk.need.03",
+   "moment": "dunk.need",
+   "text": "Ha, the rival's got the lead. Time to wake the whole forest."
+  },
+  {
+   "id": "dunk.need.ahead.01",
+   "moment": "dunk.need.ahead",
+   "text": "Out in front, friend. Keep those roots planted and close it out."
+  },
+  {
+   "id": "dunk.need.ahead.02",
+   "moment": "dunk.need.ahead",
+   "text": "You've got the lead. Finish it clean and it's yours."
+  },
+  {
+   "id": "dunk.win.01",
+   "moment": "dunk.win",
+   "text": "Flight Night winner, right here in the woods! Every bird in the canopy is singing!"
+  },
+  {
+   "id": "dunk.win.02",
+   "moment": "dunk.win",
+   "text": "Ha! Flight Night champion! I'm naming the tallest pine after you, friend!"
+  },
+  {
+   "id": "dunk.win.03",
+   "moment": "dunk.win",
+   "text": "You own the top branch now! Treehouse keys are yours, champion!"
+  },
+  {
+   "id": "dunk.win.04",
+   "moment": "dunk.win",
+   "text": "What a night in the woods! Higher than the hawks, and the crown is yours!"
+  },
+  {
+   "id": "dunk.lose.01",
+   "moment": "dunk.lose",
+   "text": "The rival climbed a little higher tonight. Come back, and we'll climb again."
+  },
+  {
+   "id": "dunk.lose.02",
+   "moment": "dunk.lose",
+   "text": "Ha, the woods keep score in seasons, not nights. The forest saw what you've got."
+  },
+  {
+   "id": "dunk.lose.03",
+   "moment": "dunk.lose",
+   "text": "Alright, the rival took this one. Rest up, the hoop will be right here."
+  },
+  {
+   "id": "dunk.lose.04",
+   "moment": "dunk.lose",
+   "text": "Flight Night goes to the rival tonight. Next time, we shake the whole canopy together."
+  },
+  {
+   "id": "dunk.celeb.spiderman.01",
+   "moment": "dunk.celeb",
+   "text": "Splits! Like a spider in the ferns!",
+   "tags": [
+    "celeb:spiderman"
+   ]
+  },
+  {
+   "id": "dunk.celeb.itsover.01",
+   "moment": "dunk.celeb",
+   "text": "Ha! Packing up the picnic already?",
+   "tags": [
+    "celeb:itsover"
+   ]
+  },
+  {
+   "id": "dunk.celeb.roar.01",
+   "moment": "dunk.celeb",
+   "text": "Whoa, there's a bear loose in these woods!",
+   "tags": [
+    "celeb:roar"
+   ]
+  },
+  {
+   "id": "dunk.celeb.toosmall.01",
+   "moment": "dunk.celeb",
+   "text": "Telling us the rim's just a bird's nest!",
+   "tags": [
+    "celeb:toosmall"
+   ]
+  },
+  {
+   "id": "dunk.celeb.armsup.01",
+   "moment": "dunk.celeb",
+   "text": "Reaching for the top branch! Love it!",
+   "tags": [
+    "celeb:armsup"
+   ]
+  },
+  {
+   "id": "duel.pass.01",
+   "moment": "duel.pass",
+   "text": "Pass it over. Next climber's up!"
+  },
+  {
+   "id": "duel.pass.02",
+   "moment": "duel.pass",
+   "text": "Swap seats, friends. Your turn in the clearing."
+  },
+  {
+   "id": "duel.pass.1.01",
+   "moment": "duel.pass",
+   "text": "Player one, up into the branches!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.pass.2.01",
+   "moment": "duel.pass",
+   "text": "Controller to player two! Let's go!",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.win.01",
+   "moment": "duel.win",
+   "text": "That's the duel! Top of the tree, winner!"
+  },
+  {
+   "id": "duel.win.1.01",
+   "moment": "duel.win",
+   "text": "Player one takes the duel! Highest branch in the forest!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.win.2.01",
+   "moment": "duel.win",
+   "text": "Ha! Player two wins it! The forest saw that!",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.tie.01",
+   "moment": "duel.tie",
+   "text": "A tie! Ha, side by side, like twin pines."
+  },
+  {
+   "id": "duel.tie.02",
+   "moment": "duel.tie",
+   "text": "Even all the way! Roots tangled together. Run it back?"
+  },
+  {
+   "id": "three.intro.01",
+   "moment": "three.intro",
+   "text": "Downtown comes to the forest! Six shooters, five racks, sixty seconds, and the money balls. Top three move on."
+  },
+  {
+   "id": "three.intro.02",
+   "moment": "three.intro",
+   "text": "Welcome to Downtown at Canopy Court! Five racks, sixty seconds on the clock, six shooters, and only the top three advance."
+  },
+  {
+   "id": "three.intro.03",
+   "moment": "three.intro",
+   "text": "Ha, grab a stump, it's Downtown! Six shooters, five racks, sixty seconds. Watch those money balls. Top three go through."
+  },
+  {
+   "id": "three.go.01",
+   "moment": "three.go",
+   "text": "Clock's running, go!"
+  },
+  {
+   "id": "three.go.02",
+   "moment": "three.go",
+   "text": "Let it rain!"
+  },
+  {
+   "id": "three.go.03",
+   "moment": "three.go",
+   "text": "Rise and shine, shooter!"
+  },
+  {
+   "id": "three.rack.01",
+   "moment": "three.rack",
+   "text": "Next stump over!"
+  },
+  {
+   "id": "three.rack.02",
+   "moment": "three.rack",
+   "text": "On to the next branch!"
+  },
+  {
+   "id": "three.rack.03",
+   "moment": "three.rack",
+   "text": "Moving along."
+  },
+  {
+   "id": "three.rack.04",
+   "moment": "three.rack",
+   "text": "New rack, keep flowing."
+  },
+  {
+   "id": "three.lastrack.01",
+   "moment": "three.lastrack",
+   "text": "Last rack! Let it all fall!"
+  },
+  {
+   "id": "three.lastrack.02",
+   "moment": "three.lastrack",
+   "text": "Final rack, top of the tree!"
+  },
+  {
+   "id": "three.lastrack.03",
+   "moment": "three.lastrack",
+   "text": "One rack left. Stay rooted."
+  },
+  {
+   "id": "three.money.01",
+   "moment": "three.money",
+   "text": "This one grows double!"
+  },
+  {
+   "id": "three.money.02",
+   "moment": "three.money",
+   "text": "Golden acorn's up!"
+  },
+  {
+   "id": "three.money.03",
+   "moment": "three.money",
+   "text": "Two points on this one!"
+  },
+  {
+   "id": "three.money.04",
+   "moment": "three.money",
+   "text": "Ooh, money ball time."
+  },
+  {
+   "id": "three.make.01",
+   "moment": "three.make",
+   "text": "Easy breeze!"
+  },
+  {
+   "id": "three.make.02",
+   "moment": "three.make",
+   "text": "Right in!"
+  },
+  {
+   "id": "three.make.03",
+   "moment": "three.make",
+   "text": "Clean!"
+  },
+  {
+   "id": "three.make.04",
+   "moment": "three.make",
+   "text": "Ooh, pretty!"
+  },
+  {
+   "id": "three.make.05",
+   "moment": "three.make",
+   "text": "In it goes!"
+  },
+  {
+   "id": "three.make.06",
+   "moment": "three.make",
+   "text": "Feather soft!"
+  },
+  {
+   "id": "three.make.money.01",
+   "moment": "three.make.money",
+   "text": "Golden acorn, cashed!"
+  },
+  {
+   "id": "three.make.money.02",
+   "moment": "three.make.money",
+   "text": "Money ball drops! Two!"
+  },
+  {
+   "id": "three.make.money.03",
+   "moment": "three.make.money",
+   "text": "Ooh, that's the good one!"
+  },
+  {
+   "id": "three.make.money.04",
+   "moment": "three.make.money",
+   "text": "Squirrels love that one!"
+  },
+  {
+   "id": "three.miss.01",
+   "moment": "three.miss",
+   "text": "Wind took it."
+  },
+  {
+   "id": "three.miss.02",
+   "moment": "three.miss",
+   "text": "Ooh, short."
+  },
+  {
+   "id": "three.miss.03",
+   "moment": "three.miss",
+   "text": "Nope."
+  },
+  {
+   "id": "three.miss.04",
+   "moment": "three.miss",
+   "text": "Let it go."
+  },
+  {
+   "id": "three.miss.05",
+   "moment": "three.miss",
+   "text": "Knock on wood."
+  },
+  {
+   "id": "three.streak.01",
+   "moment": "three.streak",
+   "text": "Rain's picking up!"
+  },
+  {
+   "id": "three.streak.02",
+   "moment": "three.streak",
+   "text": "Growing like ivy!"
+  },
+  {
+   "id": "three.streak.03",
+   "moment": "three.streak",
+   "text": "Blooming now!"
+  },
+  {
+   "id": "three.streak.04",
+   "moment": "three.streak",
+   "text": "Birds are singing now!"
+  },
+  {
+   "id": "three.fire.01",
+   "moment": "three.fire",
+   "text": "Full bloom, every shot!"
+  },
+  {
+   "id": "three.fire.02",
+   "moment": "three.fire",
+   "text": "Not a leaf out of place!"
+  },
+  {
+   "id": "three.fire.03",
+   "moment": "three.fire",
+   "text": "Raining from the canopy!"
+  },
+  {
+   "id": "three.fire.04",
+   "moment": "three.fire",
+   "text": "Whoa! This one can't miss!"
+  },
+  {
+   "id": "three.cold.01",
+   "moment": "three.cold",
+   "text": "Dry spell. Rain's coming."
+  },
+  {
+   "id": "three.cold.02",
+   "moment": "three.cold",
+   "text": "Shake the leaves loose, friend."
+  },
+  {
+   "id": "three.cold.03",
+   "moment": "three.cold",
+   "text": "Deep breath. Find the rhythm."
+  },
+  {
+   "id": "three.clock.01",
+   "moment": "three.clock",
+   "text": "Ten seconds, friend!"
+  },
+  {
+   "id": "three.clock.02",
+   "moment": "three.clock",
+   "text": "Squirrel speed, ten seconds!"
+  },
+  {
+   "id": "three.clock.03",
+   "moment": "three.clock",
+   "text": "Last ten, let it fly!"
+  },
+  {
+   "id": "three.buzzer.01",
+   "moment": "three.buzzer",
+   "text": "Late bloomer! Still counts!"
+  },
+  {
+   "id": "three.buzzer.02",
+   "moment": "three.buzzer",
+   "text": "Off the fingertips in time!"
+  },
+  {
+   "id": "three.buzzer.03",
+   "moment": "three.buzzer",
+   "text": "Ha! Snuck in under the wire!"
+  },
+  {
+   "id": "three.results.01",
+   "moment": "three.results",
+   "text": "Scores are sprouting up now. Let's see them grow."
+  },
+  {
+   "id": "three.results.02",
+   "moment": "three.results",
+   "text": "Let's see who's still standing in the forest."
+  },
+  {
+   "id": "three.advance.01",
+   "moment": "three.advance",
+   "text": "On to the final, friend! Keep that sap flowing."
+  },
+  {
+   "id": "three.advance.02",
+   "moment": "three.advance",
+   "text": "Ha! Top three! On to the final, up the next branch."
+  },
+  {
+   "id": "three.advance.03",
+   "moment": "three.advance",
+   "text": "Final round, here you come! The forest loves that jumper."
+  },
+  {
+   "id": "three.out.01",
+   "moment": "three.out",
+   "text": "The final slipped through the branches this time, friend."
+  },
+  {
+   "id": "three.out.02",
+   "moment": "three.out",
+   "text": "Rim got stubborn this time. Come shoot with us again soon."
+  },
+  {
+   "id": "three.out.03",
+   "moment": "three.out",
+   "text": "No final today. Every tree has a bare winter."
+  },
+  {
+   "id": "three.final.01",
+   "moment": "three.final",
+   "text": "The final! Deep breath, friend. You shoot last, and the whole forest is listening."
+  },
+  {
+   "id": "three.final.02",
+   "moment": "three.final",
+   "text": "Last shooter in the forest. The number's up in the branches. Climb past it."
+  },
+  {
+   "id": "three.final.03",
+   "moment": "three.final",
+   "text": "Saved the best for last! You know what you need. Let it rain."
+  },
+  {
+   "id": "three.clinch.01",
+   "moment": "three.clinch",
+   "text": "Climbed right past it!"
+  },
+  {
+   "id": "three.clinch.02",
+   "moment": "three.clinch",
+   "text": "Over the top! It's yours!"
+  },
+  {
+   "id": "three.clinch.03",
+   "moment": "three.clinch",
+   "text": "Whoa! Past the number! It's done!"
+  },
+  {
+   "id": "three.champion.01",
+   "moment": "three.champion",
+   "text": "The three-point champion of Canopy Court! Listen to those owls go!"
+  },
+  {
+   "id": "three.champion.02",
+   "moment": "three.champion",
+   "text": "Downtown belongs to you, friend! Rain from every branch. Champion!"
+  },
+  {
+   "id": "three.champion.03",
+   "moment": "three.champion",
+   "text": "Ha! Golden acorns all day! Take a bow, three-point champion!"
+  },
+  {
+   "id": "game.intro.ones.01",
+   "moment": "game.intro.ones",
+   "text": "Ones under the canopy! First to eleven, make it take it. Just you, the hoop, and one defender."
+  },
+  {
+   "id": "game.intro.ones.02",
+   "moment": "game.intro.ones",
+   "text": "Alright, one-on-one in the woods! First to eleven, make it take it. Roots down, friends."
+  },
+  {
+   "id": "game.intro.threes.01",
+   "moment": "game.intro.threes",
+   "text": "Threes at Canopy Court! Three on three, first to twenty-one, ninety seconds on the clock. Let's go!"
+  },
+  {
+   "id": "game.intro.threes.02",
+   "moment": "game.intro.threes",
+   "text": "Two groves, three trees each! First to twenty-one, ninety-second clock. Share the sunlight out there."
+  },
+  {
+   "id": "game.check.01",
+   "moment": "game.check",
+   "text": "Stand tall, friend. Their ball."
+  },
+  {
+   "id": "game.check.02",
+   "moment": "game.check",
+   "text": "Check it up. Roots down."
+  },
+  {
+   "id": "game.check.03",
+   "moment": "game.check",
+   "text": "Defense now. Be the tree."
+  },
+  {
+   "id": "game.check.04",
+   "moment": "game.check",
+   "text": "Ball's theirs. Guard the clearing."
+  },
+  {
+   "id": "game.make.01",
+   "moment": "game.make",
+   "text": "Easy breeze."
+  },
+  {
+   "id": "game.make.02",
+   "moment": "game.make",
+   "text": "Soft touch."
+  },
+  {
+   "id": "game.make.03",
+   "moment": "game.make",
+   "text": "Drops right in."
+  },
+  {
+   "id": "game.make.04",
+   "moment": "game.make",
+   "text": "Clean jumper."
+  },
+  {
+   "id": "game.make.05",
+   "moment": "game.make",
+   "text": "Pure as creek water."
+  },
+  {
+   "id": "game.make.06",
+   "moment": "game.make",
+   "text": "Nice, count it."
+  },
+  {
+   "id": "game.three.01",
+   "moment": "game.three",
+   "text": "From deep in the woods!"
+  },
+  {
+   "id": "game.three.02",
+   "moment": "game.three",
+   "text": "Treeline shot, drops in!"
+  },
+  {
+   "id": "game.three.03",
+   "moment": "game.three",
+   "text": "Ooh, long range!"
+  },
+  {
+   "id": "game.three.04",
+   "moment": "game.three",
+   "text": "Way back there, yes!"
+  },
+  {
+   "id": "game.three.05",
+   "moment": "game.three",
+   "text": "Ha! Rained that one in!"
+  },
+  {
+   "id": "game.layup.01",
+   "moment": "game.layup",
+   "text": "Soft as moss."
+  },
+  {
+   "id": "game.layup.02",
+   "moment": "game.layup",
+   "text": "Like a leaf landing."
+  },
+  {
+   "id": "game.layup.03",
+   "moment": "game.layup",
+   "text": "Ooh, finesse at the rim!"
+  },
+  {
+   "id": "game.layup.04",
+   "moment": "game.layup",
+   "text": "Right up the trunk!"
+  },
+  {
+   "id": "game.dunk.01",
+   "moment": "game.dunk",
+   "text": "Rim's still swaying!"
+  },
+  {
+   "id": "game.dunk.02",
+   "moment": "game.dunk",
+   "text": "Branches shaking!"
+  },
+  {
+   "id": "game.dunk.03",
+   "moment": "game.dunk",
+   "text": "Whoa, from the treetops!"
+  },
+  {
+   "id": "game.dunk.04",
+   "moment": "game.dunk",
+   "text": "Ha! Right through the leaves!"
+  },
+  {
+   "id": "game.dunk.05",
+   "moment": "game.dunk",
+   "text": "Big one, friends!"
+  },
+  {
+   "id": "game.poster.01",
+   "moment": "game.poster",
+   "text": "Timber! Oh, timber!"
+  },
+  {
+   "id": "game.poster.02",
+   "moment": "game.poster",
+   "text": "The whole forest woke up!"
+  },
+  {
+   "id": "game.poster.03",
+   "moment": "game.poster",
+   "text": "Posterized! Hang it in the treehouse!"
+  },
+  {
+   "id": "game.poster.04",
+   "moment": "game.poster",
+   "text": "Whoa! Sailed right over!"
+  },
+  {
+   "id": "game.poster.05",
+   "moment": "game.poster",
+   "text": "Birds scattering everywhere! Everywhere!"
+  },
+  {
+   "id": "game.poster.06",
+   "moment": "game.poster",
+   "text": "Oh my goodness! On somebody!"
+  },
+  {
+   "id": "game.andone.01",
+   "moment": "game.andone",
+   "text": "And one, through it all!"
+  },
+  {
+   "id": "game.andone.02",
+   "moment": "game.andone",
+   "text": "Through the branches! Count it!"
+  },
+  {
+   "id": "game.andone.03",
+   "moment": "game.andone",
+   "text": "Ha! Plus the foul!"
+  },
+  {
+   "id": "game.andone.04",
+   "moment": "game.andone",
+   "text": "Bent like a willow! Counts!"
+  },
+  {
+   "id": "game.miss.01",
+   "moment": "game.miss",
+   "text": "Didn't take root."
+  },
+  {
+   "id": "game.miss.02",
+   "moment": "game.miss",
+   "text": "Almost, friend."
+  },
+  {
+   "id": "game.miss.03",
+   "moment": "game.miss",
+   "text": "Not falling."
+  },
+  {
+   "id": "game.miss.04",
+   "moment": "game.miss",
+   "text": "Next one drops."
+  },
+  {
+   "id": "game.airball.01",
+   "moment": "game.airball",
+   "text": "Ha! Mailed to the ferns!"
+  },
+  {
+   "id": "game.airball.02",
+   "moment": "game.airball",
+   "text": "Whoa, feeding the birds?"
+  },
+  {
+   "id": "game.airball.03",
+   "moment": "game.airball",
+   "text": "Went looking for the creek!"
+  },
+  {
+   "id": "game.airball.04",
+   "moment": "game.airball",
+   "text": "Airball! The owls saw it!"
+  },
+  {
+   "id": "game.block.01",
+   "moment": "game.block",
+   "text": "Rejected by the forest!"
+  },
+  {
+   "id": "game.block.02",
+   "moment": "game.block",
+   "text": "Beaver dam! Nothing through!"
+  },
+  {
+   "id": "game.block.03",
+   "moment": "game.block",
+   "text": "Swatted like a mosquito!"
+  },
+  {
+   "id": "game.block.04",
+   "moment": "game.block",
+   "text": "Ooh, stuffed it!"
+  },
+  {
+   "id": "game.block.05",
+   "moment": "game.block",
+   "text": "Sent back to the trees!"
+  },
+  {
+   "id": "game.block.06",
+   "moment": "game.block",
+   "text": "Rooted like an oak! Blocked!"
+  },
+  {
+   "id": "game.blocked.01",
+   "moment": "game.blocked",
+   "text": "Ooh, oak in the way!"
+  },
+  {
+   "id": "game.blocked.02",
+   "moment": "game.blocked",
+   "text": "Ha, the defender said nope."
+  },
+  {
+   "id": "game.blocked.03",
+   "moment": "game.blocked",
+   "text": "Blocked! Shake it off."
+  },
+  {
+   "id": "game.blocked.04",
+   "moment": "game.blocked",
+   "text": "Right into the brambles!"
+  },
+  {
+   "id": "game.steal.01",
+   "moment": "game.steal",
+   "text": "Picked like a berry!"
+  },
+  {
+   "id": "game.steal.02",
+   "moment": "game.steal",
+   "text": "Sneaky as a squirrel!"
+  },
+  {
+   "id": "game.steal.03",
+   "moment": "game.steal",
+   "text": "Ooh, took it clean!"
+  },
+  {
+   "id": "game.steal.04",
+   "moment": "game.steal",
+   "text": "That's yours now!"
+  },
+  {
+   "id": "game.steal.05",
+   "moment": "game.steal",
+   "text": "Quick as a fox!"
+  },
+  {
+   "id": "game.stolen.01",
+   "moment": "game.stolen",
+   "text": "Ooh, lost in the leaves."
+  },
+  {
+   "id": "game.stolen.02",
+   "moment": "game.stolen",
+   "text": "Ha, squirrel took your acorn!"
+  },
+  {
+   "id": "game.stolen.03",
+   "moment": "game.stolen",
+   "text": "Blew away. Chase it down!"
+  },
+  {
+   "id": "game.stolen.04",
+   "moment": "game.stolen",
+   "text": "Stripped! Next one, hang on."
+  },
+  {
+   "id": "game.ankles.01",
+   "moment": "game.ankles",
+   "text": "Defender hit the moss!"
+  },
+  {
+   "id": "game.ankles.02",
+   "moment": "game.ankles",
+   "text": "Ooh, planted in the ferns!"
+  },
+  {
+   "id": "game.ankles.03",
+   "moment": "game.ankles",
+   "text": "Roots got tangled up!"
+  },
+  {
+   "id": "game.ankles.04",
+   "moment": "game.ankles",
+   "text": "Twisted like a vine!"
+  },
+  {
+   "id": "game.ankles.05",
+   "moment": "game.ankles",
+   "text": "Whoa, fell like a leaf!"
+  },
+  {
+   "id": "game.ankles.06",
+   "moment": "game.ankles",
+   "text": "Which way's the trail?!"
+  },
+  {
+   "id": "game.bite.01",
+   "moment": "game.bite",
+   "text": "Hopped like a frog!"
+  },
+  {
+   "id": "game.bite.02",
+   "moment": "game.bite",
+   "text": "Up with the sparrows!"
+  },
+  {
+   "id": "game.bite.03",
+   "moment": "game.bite",
+   "text": "Easy fake, easy bite!"
+  },
+  {
+   "id": "game.bite.04",
+   "moment": "game.bite",
+   "text": "Chasing butterflies!"
+  },
+  {
+   "id": "game.foul.01",
+   "moment": "game.foul",
+   "text": "Whistle in the woods."
+  },
+  {
+   "id": "game.foul.02",
+   "moment": "game.foul",
+   "text": "Easy, easy, there's a call."
+  },
+  {
+   "id": "game.foul.03",
+   "moment": "game.foul",
+   "text": "Birds heard that whistle!"
+  },
+  {
+   "id": "game.foul.04",
+   "moment": "game.foul",
+   "text": "Pause the forest a second."
+  },
+  {
+   "id": "game.rival.make.01",
+   "moment": "game.rival.make",
+   "text": "Other side answers."
+  },
+  {
+   "id": "game.rival.make.02",
+   "moment": "game.rival.make",
+   "text": "A little breeze their way."
+  },
+  {
+   "id": "game.rival.make.03",
+   "moment": "game.rival.make",
+   "text": "Fair enough, that one's theirs."
+  },
+  {
+   "id": "game.rival.make.04",
+   "moment": "game.rival.make",
+   "text": "They're growing too."
+  },
+  {
+   "id": "game.rival.make.05",
+   "moment": "game.rival.make",
+   "text": "Answer back, friend. Plenty of trail."
+  },
+  {
+   "id": "game.rival.dunk.01",
+   "moment": "game.rival.dunk",
+   "text": "Whoa, they shook the branches too!"
+  },
+  {
+   "id": "game.rival.dunk.02",
+   "moment": "game.rival.dunk",
+   "text": "That rattled the treehouse."
+  },
+  {
+   "id": "game.rival.dunk.03",
+   "moment": "game.rival.dunk",
+   "text": "Respect. That was loud."
+  },
+  {
+   "id": "game.rival.dunk.04",
+   "moment": "game.rival.dunk",
+   "text": "Birds scattered for the wrong team."
+  },
+  {
+   "id": "game.run.01",
+   "moment": "game.run",
+   "text": "Rolling like a creek! Nobody's stopping this!"
+  },
+  {
+   "id": "game.run.02",
+   "moment": "game.run",
+   "text": "Growing like wildflowers out here!"
+  },
+  {
+   "id": "game.run.03",
+   "moment": "game.run",
+   "text": "Bucket after bucket, like rain on the leaves!"
+  },
+  {
+   "id": "game.run.04",
+   "moment": "game.run",
+   "text": "Ha! The other side can't find the trail!"
+  },
+  {
+   "id": "game.point.us.01",
+   "moment": "game.point",
+   "text": "One more, friend. Top branch is right there.",
+   "tags": [
+    "side:us"
+   ]
+  },
+  {
+   "id": "game.point.them.01",
+   "moment": "game.point",
+   "text": "They need one. Dig those roots in!",
+   "tags": [
+    "side:them"
+   ]
+  },
+  {
+   "id": "game.win.01",
+   "moment": "game.win",
+   "text": "That's game! Whole grove's on its feet!"
+  },
+  {
+   "id": "game.win.02",
+   "moment": "game.win",
+   "text": "Ballgame! Carve it in the old oak!"
+  },
+  {
+   "id": "game.win.03",
+   "moment": "game.win",
+   "text": "Game winner! The birds are singing your song!"
+  },
+  {
+   "id": "game.win.04",
+   "moment": "game.win",
+   "text": "Yes! Winner! Canopy Court belongs to you!"
+  },
+  {
+   "id": "game.loss.01",
+   "moment": "game.loss",
+   "text": "That's their game. Good run, friend. Run it back?"
+  },
+  {
+   "id": "game.loss.02",
+   "moment": "game.loss",
+   "text": "They took this one. Good roots, though. Come again."
+  },
+  {
+   "id": "game.loss.03",
+   "moment": "game.loss",
+   "text": "The other side had it. Rematch under the leaves?"
+  },
+  {
+   "id": "game.draw.01",
+   "moment": "game.draw",
+   "text": "Tied at the buzzer! Two groves, roots all tangled."
+  },
+  {
+   "id": "game.draw.02",
+   "moment": "game.draw",
+   "text": "Even up! Two trees, same height!"
+  },
+  {
+   "id": "game.assist.01",
+   "moment": "game.assist",
+   "text": "Shared the sunlight!"
+  },
+  {
+   "id": "game.assist.02",
+   "moment": "game.assist",
+   "text": "Ooh, what a dish!"
+  },
+  {
+   "id": "game.assist.03",
+   "moment": "game.assist",
+   "text": "Carried on the breeze!"
+  },
+  {
+   "id": "game.assist.04",
+   "moment": "game.assist",
+   "text": "That's how forests grow!"
+  },
+  {
+   "id": "game.alleyoop.01",
+   "moment": "game.alleyoop",
+   "text": "Up to the high branch!"
+  },
+  {
+   "id": "game.alleyoop.02",
+   "moment": "game.alleyoop",
+   "text": "Caught it in the canopy!"
+  },
+  {
+   "id": "game.alleyoop.03",
+   "moment": "game.alleyoop",
+   "text": "Whoa! Picked from the sky!"
+  },
+  {
+   "id": "game.clock.01",
+   "moment": "game.clock",
+   "text": "Ten seconds left, friends!"
+  },
+  {
+   "id": "game.clock.02",
+   "moment": "game.clock",
+   "text": "Last light! Ten seconds!"
+  },
+  {
+   "id": "game.clock.03",
+   "moment": "game.clock",
+   "text": "Final ten, run like deer!"
+  },
+  {
+   "id": "game.overdrive.01",
+   "moment": "game.overdrive",
+   "text": "Full canopy! Overdrive!"
+  },
+  {
+   "id": "game.overdrive.02",
+   "moment": "game.overdrive",
+   "text": "Three trees, one root system!"
+  },
+  {
+   "id": "game.overdrive.03",
+   "moment": "game.overdrive",
+   "text": "Whoa, the canopy's glowing now!"
+  },
+  {
+   "id": "carnival.intro.01",
+   "moment": "carnival.intro",
+   "text": "Game Night, friends! Four events tonight, points for every one, and one champion at the end. Ha, let's play!"
+  },
+  {
+   "id": "carnival.intro.02",
+   "moment": "carnival.intro",
+   "text": "Lanterns up, it's Game Night! Four events, points on each, one champion under the leaves."
+  },
+  {
+   "id": "carnival.intro.03",
+   "moment": "carnival.intro",
+   "text": "It's Game Night! Four events, points on every one, and the top of the tree gets crowned."
+  },
+  {
+   "id": "carnival.event.slam_rush.01",
+   "moment": "carnival.event",
+   "text": "Slam Rush! Twenty seconds. Shake that rim like a branch!",
+   "tags": [
+    "ev:slam_rush"
+   ]
+  },
+  {
+   "id": "carnival.event.strike_storm.01",
+   "moment": "carnival.event",
+   "text": "Strike Storm! Hit those pads, quick as raindrops.",
+   "tags": [
+    "ev:strike_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.trick_gauntlet.01",
+   "moment": "carnival.event",
+   "text": "Trick Gauntlet! Grab a board and flow through it like a creek.",
+   "tags": [
+    "ev:trick_gauntlet"
+   ]
+  },
+  {
+   "id": "carnival.event.hot_shot.01",
+   "moment": "carnival.event",
+   "text": "Hot Shot! Shots on goal. Thread it through the branches!",
+   "tags": [
+    "ev:hot_shot"
+   ]
+  },
+  {
+   "id": "carnival.event.coin_storm.01",
+   "moment": "carnival.event",
+   "text": "Coin Storm! Grab every coin, like a squirrel in acorn season!",
+   "tags": [
+    "ev:coin_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.counter_strike.01",
+   "moment": "carnival.event",
+   "text": "Counter time! Bend like a willow, answer the jab in the window.",
+   "tags": [
+    "ev:counter_strike"
+   ]
+  },
+  {
+   "id": "carnival.go.01",
+   "moment": "carnival.go",
+   "text": "Go, go, go!"
+  },
+  {
+   "id": "carnival.go.02",
+   "moment": "carnival.go",
+   "text": "Wind's up, go!"
+  },
+  {
+   "id": "carnival.go.03",
+   "moment": "carnival.go",
+   "text": "Off you go!"
+  },
+  {
+   "id": "carnival.clock.01",
+   "moment": "carnival.clock",
+   "text": "Five seconds left!"
+  },
+  {
+   "id": "carnival.clock.02",
+   "moment": "carnival.clock",
+   "text": "Scamper! Five left!"
+  },
+  {
+   "id": "carnival.clock.03",
+   "moment": "carnival.clock",
+   "text": "Last five, move it!"
+  },
+  {
+   "id": "carnival.eventwin.01",
+   "moment": "carnival.eventwin",
+   "text": "That one's yours! The squirrels are cheering!"
+  },
+  {
+   "id": "carnival.eventwin.02",
+   "moment": "carnival.eventwin",
+   "text": "Took that event clean! Sweet as honey!"
+  },
+  {
+   "id": "carnival.eventwin.03",
+   "moment": "carnival.eventwin",
+   "text": "Winner! Points in the basket, keep climbing!"
+  },
+  {
+   "id": "carnival.eventwin.04",
+   "moment": "carnival.eventwin",
+   "text": "Ooh, nobody's catching you in these woods!"
+  },
+  {
+   "id": "carnival.eventloss.01",
+   "moment": "carnival.eventloss",
+   "text": "Rival takes that one. Brush off the leaves, friend."
+  },
+  {
+   "id": "carnival.eventloss.02",
+   "moment": "carnival.eventloss",
+   "text": "The rival grabbed that one. Fair play."
+  },
+  {
+   "id": "carnival.eventloss.03",
+   "moment": "carnival.eventloss",
+   "text": "Not this round. Keep your roots down."
+  },
+  {
+   "id": "carnival.tie.01",
+   "moment": "carnival.tie",
+   "text": "A tie! Even branches, even points!"
+  },
+  {
+   "id": "carnival.tie.02",
+   "moment": "carnival.tie",
+   "text": "Level all the way! The forest shrugs!"
+  },
+  {
+   "id": "carnival.handoff.01",
+   "moment": "carnival.handoff",
+   "text": "Player two, hop on the branch! You're up!"
+  },
+  {
+   "id": "carnival.handoff.02",
+   "moment": "carnival.handoff",
+   "text": "Controller to player two. Your turn, friend!"
+  },
+  {
+   "id": "carnival.champion.01",
+   "moment": "carnival.champion",
+   "text": "Game Night champion! Top of the tree, friend, and the whole forest saw it!"
+  },
+  {
+   "id": "carnival.champion.02",
+   "moment": "carnival.champion",
+   "text": "Ha! You took the whole carnival! Somebody hang a lantern in the treehouse!"
+  },
+  {
+   "id": "carnival.champion.03",
+   "moment": "carnival.champion",
+   "text": "Champion of Game Night! Go on, soak it up. You earned every leaf."
+  },
+  {
+   "id": "carnival.runnerup.01",
+   "moment": "carnival.runnerup",
+   "text": "The rival takes the carnival. Good games all night, friend. Come play again soon."
+  },
+  {
+   "id": "carnival.runnerup.02",
+   "moment": "carnival.runnerup",
+   "text": "Carnival goes to the rival. You grew a lot out there. Rematch?"
+  }
+ ]
+}

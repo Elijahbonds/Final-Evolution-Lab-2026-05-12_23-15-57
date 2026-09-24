@@ -14,6 +14,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';   // CONTROLLER-UNIVERSAL-MULTI: pass-the-pad nights name each controller
 import { hnode } from './hud-format';
+import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): the MC's words and the voice switch
 /** The between-events scoreboard rows the mode publishes (HudScoreCard shape). */
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
   Array.isArray(v) && v.every((r) => !!r && typeof r === 'object' && 'line' in (r as object));
@@ -162,6 +163,13 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
           )}
         </div>
       )}
+
+      {/* THE MIC: under the reveal / hand-off card, and at the bottom while the scoreboard is up (it would cover the scores) */}
+      {phase === 'playing' && (
+        <MicCaption text={hud.mic} who={hud.micWho}
+          className={isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle ? 'bottom-3' : 'top-[62%]'} />
+      )}
+      {phase === 'playing' && <MicToggle />}
 
       <BootSplash
         modeId="carnival"

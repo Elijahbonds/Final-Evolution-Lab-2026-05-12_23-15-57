@@ -1,0 +1,40 @@
+{
+ "cast": "stack",
+ "lines": [
+  {
+   "id": "player.dunk.brag.01",
+   "moment": "player.dunk.brag",
+   "text": "Impossible? Nobody told me!"
+  },
+  {
+   "id": "player.dunk.brag.02",
+   "moment": "player.dunk.brag",
+   "text": "Higher! I want higher next time!"
+  },
+  {
+   "id": "player.dunk.brag.03",
+   "moment": "player.dunk.brag",
+   "text": "Again, but crazier this time!"
+  },
+  {
+   "id": "player.dunk.jab.01",
+   "moment": "player.dunk.jab",
+   "text": "If you miss, miss big!"
+  },
+  {
+   "id": "player.dunk.jab.02",
+   "moment": "player.dunk.jab",
+   "text": "Too careful, that's the problem!"
+  },
+  {
+   "id": "player.dunk.respect.01",
+   "moment": "player.dunk.respect",
+   "text": "Ha! Now it's a party!"
+  },
+  {
+   "id": "player.dunk.respect.02",
+   "moment": "player.dunk.respect",
+   "text": "Finally, somebody as wild as me!"
+  }
+ ]
+}

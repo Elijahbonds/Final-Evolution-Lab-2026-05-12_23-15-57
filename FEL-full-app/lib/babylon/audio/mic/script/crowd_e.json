@@ -1,0 +1,140 @@
+{
+ "cast": "crowd_e",
+ "lines": [
+  {
+   "id": "crowd.hype.01",
+   "moment": "crowd.hype",
+   "text": "Alright, impress me."
+  },
+  {
+   "id": "crowd.hype.02",
+   "moment": "crowd.hype",
+   "text": "Prove it!"
+  },
+  {
+   "id": "crowd.hype.03",
+   "moment": "crowd.hype",
+   "text": "Let's see it."
+  },
+  {
+   "id": "crowd.hype.04",
+   "moment": "crowd.hype",
+   "text": "Go on then."
+  },
+  {
+   "id": "crowd.ooh.01",
+   "moment": "crowd.ooh",
+   "text": "Okay, that's clean."
+  },
+  {
+   "id": "crowd.ooh.02",
+   "moment": "crowd.ooh",
+   "text": "Oh, respect."
+  },
+  {
+   "id": "crowd.ooh.03",
+   "moment": "crowd.ooh",
+   "text": "Nice handle!"
+  },
+  {
+   "id": "crowd.cheer.01",
+   "moment": "crowd.cheer",
+   "text": "Yeah, that's cash."
+  },
+  {
+   "id": "crowd.cheer.02",
+   "moment": "crowd.cheer",
+   "text": "Can't guard that."
+  },
+  {
+   "id": "crowd.cheer.03",
+   "moment": "crowd.cheer",
+   "text": "Pure!"
+  },
+  {
+   "id": "crowd.cheer.04",
+   "moment": "crowd.cheer",
+   "text": "That's a real bucket."
+  },
+  {
+   "id": "crowd.erupt.01",
+   "moment": "crowd.erupt",
+   "text": "Okay, I take it back!"
+  },
+  {
+   "id": "crowd.erupt.02",
+   "moment": "crowd.erupt",
+   "text": "Nah, that's just unfair!"
+  },
+  {
+   "id": "crowd.erupt.03",
+   "moment": "crowd.erupt",
+   "text": "I got next, never mind!"
+  },
+  {
+   "id": "crowd.erupt.04",
+   "moment": "crowd.erupt",
+   "text": "Whoa! Whoa! Whoa!"
+  },
+  {
+   "id": "crowd.groan.01",
+   "moment": "crowd.groan",
+   "text": "Had it, then didn't."
+  },
+  {
+   "id": "crowd.groan.02",
+   "moment": "crowd.groan",
+   "text": "Soft finish."
+  },
+  {
+   "id": "crowd.groan.03",
+   "moment": "crowd.groan",
+   "text": "Rushed it. Slow down."
+  },
+  {
+   "id": "crowd.heckle.01",
+   "moment": "crowd.heckle",
+   "text": "Too fancy. Keep it simple!"
+  },
+  {
+   "id": "crowd.heckle.02",
+   "moment": "crowd.heckle",
+   "text": "Check the arc on that!"
+  },
+  {
+   "id": "crowd.heckle.03",
+   "moment": "crowd.heckle",
+   "text": "Wrong shot. Wrong time."
+  },
+  {
+   "id": "crowd.idle.01",
+   "moment": "crowd.idle",
+   "text": "I got next. Anybody seen who's after me?"
+  },
+  {
+   "id": "crowd.idle.02",
+   "moment": "crowd.idle",
+   "text": "Honestly? I'd have taken that."
+  },
+  {
+   "id": "crowd.idle.03",
+   "moment": "crowd.idle",
+   "text": "Everybody wants to dunk. Nobody boxes out."
+  },
+  {
+   "id": "crowd.idle.04",
+   "moment": "crowd.idle",
+   "text": "Watch the footwork, that's the whole thing."
+  },
+  {
+   "id": "crowd.idle.05",
+   "moment": "crowd.idle",
+   "text": "Nice court. Rims are a little tight."
+  },
+  {
+   "id": "crowd.defense.01",
+   "moment": "crowd.defense",
+   "text": "Stay in front!"
+  }
+ ]
+}

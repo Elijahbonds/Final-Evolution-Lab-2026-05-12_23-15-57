@@ -68,6 +68,8 @@ import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM D
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/BasketballCore';
 import { SoundKit } from '../audio/SoundKit';
+import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd call the shootout
+import type { MicEvent } from '../audio/mic/MicDirector';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the bar beside the shooter's head
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -271,6 +273,19 @@ let disposeCount = 0;
 let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
 let contactLatch = false;                 // one landing beat per ball — never re-fired by the HUD or the rack advance
 let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat
+// ── THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio") ──────
+// The court's MC calls the contest: the welcome, the racks, the money ball, every shot AT THE RIM (the release already
+// shows it with the score SFX; saying it there would spoil the ball in the air), the streaks and the cold spells, ten
+// seconds, the buzzer, the board, the final and the champion. The stands answer; the sidekick jumps in on the hot hand.
+// Speech never touches play: nothing here waits on a voice, and no timing or score reads it.
+let mic: ModeMic | null = null;
+let micOpened = false, micQuiet = false;
+/** The call for the shot in the air — decided with the shot at the release, spoken when the ball reaches the iron. */
+let micLanding: MicEvent | null = null;
+/** Misses in a row (the mode keeps no such count: its 'cold' heat only means "no streak"), for the cold-spell call. */
+let missRun = 0;
+/** The final's "that's the number" call, once per run. */
+let micClinched = false;
 // ── BIOMECH-HOOPS-WAVE1 (2026-09-08) ────────────────────────────────────────────────────────────────────────────
 let posture: { layer: PostureLayer; dispose(): void } | null = null;
 let carryObs: Observer<Scene> | null = null, carryScene: Scene | null = null;
@@ -465,6 +480,10 @@ function fire(ctx: ModeContext, power?: number): void {
 
   const money = isMoneyBall(S.ballIdx);
   landing = { perfect, money }; contactLatch = false;   // A+ P0: the landing beat (update → 'made' | 'missed') reads these
+  // THE MIC: the call is picked now, with the counts this shot just set, and its clip decoded while the ball flies
+  missRun = made ? 0 : missRun + 1;
+  micLanding = micShotCall(made, money, err >= goodBand());
+  mic?.expect(micLanding);
   if (made) {
     ctx.juice.scorePop(RIM.clone(), perfect ? `PERFECT +${worth}` : `+${worth}`,
       perfect ? '#22d3ee' : '#ffd75e');
@@ -493,6 +512,57 @@ function fire(ctx: ModeContext, power?: number): void {
   // "OFF THE LEFT IRON" again at the iron, two banners for one shot
   pushHud(ctx, perfect ? 'PERFECT' : err < goodBand() ? 'GOOD' : signed < 0 ? 'EARLY' : 'LATE');
   pendingPerfect = perfect;
+}
+
+// ── THE MIC ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** The number the final is shot at (the HUD's NEED): one more than the best finalist's posted score. */
+const finalNeed = (): number => Math.max(0, ...S.field.filter((f) => !f.isPlayer).map((f) => f.score)) + 1;
+
+/** What the booth says when this shot reaches the rim. A make is under a second before the next ball, so the plain calls are
+ *  tiny; the bigger beats (the money ball, a streak, the number passed in the final) outrank them. */
+function micShotCall(made: boolean, money: boolean, brick: boolean): MicEvent {
+  if (!made) {
+    if (missRun === 3) return { moment: 'three.cold', priority: 2, crowd: { moment: 'crowd.groan', n: 1 } };
+    return { moment: 'three.miss', priority: 1,
+      crowd: money ? { moment: 'crowd.groan', n: 2 } : brick && Math.random() < 0.3 ? { moment: 'crowd.heckle', n: 1 } : undefined };
+  }
+  // (only when the player is IN the final's field: a rivals-only tie at the top re-runs the player without a card on the
+  // board, and "it's won" there would be a lie the result then takes back)
+  if (S.round === 'final' && !micClinched && S.field.some((f) => f.isPlayer) && S.pts >= finalNeed()) {
+    micClinched = true;   // past the number: this one wins it (unless the horn beats the ball to the rim: then it is the buzzer's)
+    return { moment: 'three.clinch', priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } };
+  }
+  // on fire at five, and again at every five after (a call on every ball of a hot run would be a chant, not a call)
+  if (S.streak >= 5 && S.streak % 5 === 0) return { moment: 'three.fire', priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 } };
+  if (money) return { moment: 'three.make.money', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } };
+  if (S.streak === 3 || S.streak === 4) return { moment: 'three.streak', priority: 2, crowd: { moment: 'crowd.cheer', n: 1 } };
+  return { moment: 'three.make', priority: 1, crowd: Math.random() < 0.35 ? { moment: 'crowd.cheer', n: 1 } : undefined };
+}
+/** The ball reached the iron: the call picked at the release, now. */
+function micLand(): void {
+  if (!micLanding) return;
+  mic?.say(micLanding);
+  micLanding = null;
+}
+/** Every frame: the mic's clock, the welcome on the first live frame, and the stands' chatter only while the board is up
+ *  (the run itself has no dead time: a ball every second and a half). */
+function micTick(ctx: ModeContext): void {
+  if (!mic) return;
+  mic.update();
+  const live = ctx.phase() === 'playing';
+  if (!micOpened && live) {
+    // There is no 3-2-1 here: the first press starts the clock, so the welcome plays over the first rack (the shot calls under
+    // it give way; the stands still answer them).
+    micOpened = true;
+    mic.say({ moment: 'intro.court', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
+    mic.then({ moment: 'three.intro', priority: 2 });
+  }
+  const quiet = live && S.phase === 'standings';
+  if (quiet !== micQuiet) {
+    micQuiet = quiet;
+    mic.setFiller(quiet ? ['filler.crowd', 'filler.banter'] : null);
+    mic.setCrowdIdle(quiet ? 'crowd.idle' : null);
+  }
 }
 
 /** The make's landing beat: a soft shake, a short flash on a PERFECT or the money ball, and the hoop answers. Latched once per ball.
@@ -524,6 +594,7 @@ function missClank(ctx: ModeContext): void {
 
 function advanceBall(ctx: ModeContext): void {
   setTrail('off');
+  micLanding = null;   // THE MIC: the last ball's call is spoken or stale; never carried onto the next one
   S.ballIdx += 1;
   S.fired = false;
   shotWin = 'none';
@@ -546,6 +617,9 @@ function advanceBall(ctx: ModeContext): void {
   S.barT = Math.random() * Math.PI; meterBegin();   // desync the bar so it cannot be memorised
   S.phase = 'shoot';
   dressBall();
+  // THE MIC: the gold ball is up (an ordinary call: it waits behind the last shot's call rather than cutting it); the last
+  // rack's is the run's last ball, and the stands get up for it
+  if (isMoneyBall(S.ballIdx)) mic?.say({ moment: 'three.money', priority: 1, crowd: S.rack === RACKS - 1 ? { moment: 'crowd.hype', n: 2 } : undefined });
 }
 
 /** The player's run for this round is over — post the score, run the field. */
@@ -554,6 +628,7 @@ function endRun(ctx: ModeContext): void {
 
   const me = S.field.find((f) => f.isPlayer);
   if (me) { me.score = S.pts; me.shot = true; }
+  micRunOver();
 
   // The field's numbers land ONE AT A TIME, weakest first — a results board
   // that appears fully formed has no drama, and the dunk contest's staged
@@ -569,6 +644,31 @@ function endRun(ctx: ModeContext): void {
   S.phase = 'standings';
   S.standingsT = 0;
   pushHud(ctx, S.round === 'qualifying' ? 'QUALIFYING RESULTS' : 'FINAL RESULTS');
+}
+
+/** THE MIC — the run is over (the horn, or the 25th ball). A made ball still in the air at the horn counts (the points went
+ *  up at the press) and never reaches its landing beat: that is the buzzer call, over everything. Then the board, after the
+ *  booth's last call: in qualifying the field's numbers are about to come in; in the final the finalists posted first, so the
+ *  result is known now and the 4 s hold is its window (ctx.end comes after it, with nothing left to say). A tie at the top
+ *  goes to a playoff and is not called here. */
+function micRunOver(): void {
+  const buzzer = !!micLanding && pendingMade;
+  micLanding = null;
+  if (!mic) return;
+  if (buzzer) mic.say({ moment: 'three.buzzer', priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } });
+  if (S.round === 'qualifying') { mic.then({ moment: 'three.results', priority: 2 }); return; }
+  const board = standings();   // the same read afterStandings makes at the end of the hold
+  if (board.filter((f) => f.score === board[0].score).length > 1 && S.playoff < 3) return;
+  if (board[0]?.isPlayer) mic.then({ moment: 'three.champion', priority: 3, side: 0.5, crowd: { moment: 'crowd.erupt', n: 3 } });
+  else mic.then({ moment: 'outro.loss', priority: 3, side: 0.5, crowd: { moment: 'crowd.groan', n: 1 } });
+}
+/** THE MIC — the last qualifying number is up: the player's place is settled (the decision waits out the 4 s hold). */
+function micPlaced(): void {
+  if (!mic || S.round !== 'qualifying' || S.finalistsPosting) return;
+  const through = standings().findIndex((f) => f.isPlayer) < FINALISTS;
+  mic.then(through
+    ? { moment: 'three.advance', priority: 3, crowd: { moment: 'crowd.cheer', n: 2 } }
+    : { moment: 'three.out', priority: 3, crowd: { moment: 'crowd.groan', n: 1 } });
 }
 
 /** Called once the standings board has been shown long enough to read. */
@@ -592,6 +692,9 @@ function afterStandings(ctx: ModeContext): void {
       S.phase = 'standings';
       S.standingsT = 0;
       pushHud(ctx, `PLAYOFF ${S.playoff} — TIED AT ${board[0].score}`);
+      // THE MIC: no playoff line exists; the final's call fits it (the tied shooters post, the player shoots last at the number)
+      // — only when the player is one of the tied (a rivals-only tie is theirs to settle: "the player shoots last" would be false)
+      if (tied.some((f) => f.isPlayer)) mic?.then({ moment: 'three.final', priority: 2 });
       return;
     }
     const won = me === 0;
@@ -631,6 +734,7 @@ function afterStandings(ctx: ModeContext): void {
   S.phase = 'standings';
   S.standingsT = 0;
   pushHud(ctx, 'THE FIELD POSTS…');
+  mic?.then({ moment: 'three.final', priority: 2 });   // THE MIC: the final round starts (its ~5.5 s setup is the window)
 }
 
 /**
@@ -662,6 +766,10 @@ export const ThreePointMode: ModeDefinition = {
   async load(ctx: ModeContext): Promise<void> {
     loadCount += 1;
     resetState();
+    // THE MIC: made before the first await, so a newer load always owns the one mic (an older load resuming later never
+    // replaces it; a stale teardown skips it with the rest)
+    mic?.dispose(); mic = new ModeMic(ctx, { groups: ['three', 'names'], court: ctx.location });
+    micOpened = false; micQuiet = false; micLanding = null; missRun = 0; micClinched = false;
 
     // TV MODE. Read once at load (see shotFactor): a player who flips the setting mid-rack must not be
     // judged by two different windows inside one rack. The banner says WHY the timing moved, so a widened
@@ -811,6 +919,7 @@ export const ThreePointMode: ModeDefinition = {
 
   update(ctx: ModeContext, dt: number): void {
     meter3d?.update(dt);
+    micTick(ctx);   // THE MIC: its clock runs on every frame (the board's calls, the caption's expiry)
     if (S.phase === 'done' || !player || !ball || !arc) return;
     if (pick) {   // POLISH: the pick off the rack — eased from the rack to the hand, then attached
       pick.t = Math.min(1, pick.t + dt / PICK_SEC); const k = pick.t * pick.t * (3 - 2 * pick.t);
@@ -836,6 +945,7 @@ export const ThreePointMode: ModeDefinition = {
           const body = rivalBodies[RIVAL_NAMES.indexOf(f.name)];
           if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { onEnd: () => body.animator.play('idle_stand', { loop: true }) });
           pushHud(ctx);
+          if (!S.revealQueue.length) { micPlaced(); if (S.finalistsPosting) mic?.expect({ moment: 'three.go' }); }   // THE MIC: the last number is up
         }
         return;
       }
@@ -846,6 +956,9 @@ export const ThreePointMode: ModeDefinition = {
           S.finalistsPosting = false;
           resetRun();
           pushHud(ctx, 'FINAL ROUND — YOUR RUN');
+          // THE MIC: the clock starts (it runs from this frame) — over whatever is left of the setup; a fresh run's counts
+          missRun = 0; micClinched = false; micLanding = null;
+          mic?.say({ moment: 'three.go', priority: 3, crowd: { moment: 'crowd.hype', n: 2 } });
         } else {
           afterStandings(ctx);
         }
@@ -853,7 +966,10 @@ export const ThreePointMode: ModeDefinition = {
       return;
     }
 
+    const clockWas = S.clock;
     S.clock -= dt;
+    // THE MIC: ten seconds left, once per run (the host turns the clock red on the same second)
+    if (clockWas > 10 && S.clock <= 10 && S.clock > 0) mic?.say({ moment: 'three.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
     if (S.clock <= 0) { endRun(ctx); return; }
 
     if (S.phase === 'move') {
@@ -873,6 +989,9 @@ export const ThreePointMode: ModeDefinition = {
         dressBall();
         setFeet();   // S2: the first ball of a rack is already in hand — the arrival at the rack is its catch
         pushHud(ctx, `RACK ${S.rack + 1}`);
+        // THE MIC: the next rack (the first one is the run's opening: the welcome or the go has it); the last gets its own call
+        if (S.rack === RACKS - 1) mic?.say({ moment: 'three.lastrack', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
+        else if (S.rack > 0) mic?.say({ moment: 'three.rack', priority: 1 });
       }
     } else if (S.phase === 'shoot') {
       // Triangle sweep 0..1..0 — a sine would linger at the extremes and make
@@ -906,9 +1025,10 @@ export const ThreePointMode: ModeDefinition = {
           if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3PT-RIM] glass kiss`); }
           else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
         }
-        if (r === 'made') { pushHud(ctx, `${pendingPerfect ? 'SPLASH' : 'GOOD'}${rimPlaySuffix(arc.play)}${S.streak >= FIRE_STREAK ? ' · ON FIRE' : ''}`); contactMake(ctx); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
+        if (r === 'made') { pushHud(ctx, `${pendingPerfect ? 'SPLASH' : 'GOOD'}${rimPlaySuffix(arc.play)}${S.streak >= FIRE_STREAK ? ' · ON FIRE' : ''}`); contactMake(ctx); micLand(); const v = netExitVelocity('jumper'); ballSim?.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); rimOut = NET_EXIT_SEC; console.info(`[3PT-NET] jumper exit ${netExitMph('jumper')} mph`); }   // A+ P0: the hoop answers the make; NET EXIT: the ball drops through with pace and bounces before the next ball
         else if (r === 'missed') {
           missClank(ctx);                             // A+ P0: the miss has weight — a clank off the iron, never HoopJuice
+          micLand();                                  // THE MIC: the call lands with the ball, not at the release
           // A shootout is nothing but shooting feedback, and the ball used to vanish to the next rack the
           // instant a shot missed — so EARLY and LATE looked identical and the shooter learned nothing
           // from the one thing the mode is about. Now the iron answers the timing: early is short off the
@@ -953,6 +1073,7 @@ export const ThreePointMode: ModeDefinition = {
     // A newer instance has already loaded — this teardown belongs to an older
     // one and must not touch the live objects.
     if (disposeCount < loadCount) return;
+    mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
     meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1

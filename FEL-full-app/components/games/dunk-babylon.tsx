@@ -19,6 +19,7 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
+import { MicCaption, MicToggle } from './mic-caption';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
 type Hud = Record<string, HudValue>;
@@ -301,6 +302,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           </span>
         </div>
       )}
+      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
+      {phase === 'playing' && <MicToggle />}
       {typeof hud.call === 'string' && hud.call && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 top-[58%] px-4 text-center">
           <span className="fel-heading inline-block rounded-md bg-black/55 px-3 py-1 text-base font-black uppercase italic tracking-wide text-[#ffd75e]">{hud.call}</span>

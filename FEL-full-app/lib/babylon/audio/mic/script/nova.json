@@ -1,0 +1,2060 @@
+{
+ "cast": "nova",
+ "lines": [
+  {
+   "id": "intro.court.01",
+   "moment": "intro.court",
+   "text": "Hello from above the clouds! This is Nova, live from a court floating under the stars, with the planet rising behind the rim."
+  },
+  {
+   "id": "intro.court.02",
+   "moment": "intro.court",
+   "text": "Welcome aboard! Nova on the mic, broadcasting from Orbit, where the stars are the ceiling and gravity is strictly optional."
+  },
+  {
+   "id": "intro.court.03",
+   "moment": "intro.court",
+   "text": "Mission control, we are live. This is Nova, and this is the Zero-G Classic. Seatbelts off, eyes up!"
+  },
+  {
+   "id": "intro.court.04",
+   "moment": "intro.court",
+   "text": "Stars out, planet up, lights on. Nova here, and you are floating at Orbit, home of the Zero-G Classic!"
+  },
+  {
+   "id": "filler.crowd.01",
+   "moment": "filler.crowd",
+   "text": "Observation deck, let me hear you! Louder than a launch!"
+  },
+  {
+   "id": "filler.crowd.02",
+   "moment": "filler.crowd",
+   "text": "Upper ring, you are quiet up there. Make some noise for Orbit!"
+  },
+  {
+   "id": "filler.crowd.03",
+   "moment": "filler.crowd",
+   "text": "Shout-out to the Comet Kids in row zero, loudest seats in the galaxy!"
+  },
+  {
+   "id": "filler.crowd.04",
+   "moment": "filler.crowd",
+   "text": "Big welcome to Professor Pip, front row, telescope and all!"
+  },
+  {
+   "id": "filler.crowd.05",
+   "moment": "filler.crowd",
+   "text": "Countdown with me, Orbit! Three, two, one... noise!"
+  },
+  {
+   "id": "filler.crowd.06",
+   "moment": "filler.crowd",
+   "text": "Night shift crew by the airlock, stand up! You earned it."
+  },
+  {
+   "id": "filler.banter.01",
+   "moment": "filler.banter",
+   "text": "Forecast for tonight: clear skies, light solar wind, and a small chance of meteors near the three-point line."
+  },
+  {
+   "id": "filler.banter.02",
+   "moment": "filler.banter",
+   "text": "Somebody's water bottle has been orbiting the scoreboard since spring. We call it a moon now."
+  },
+  {
+   "id": "filler.banter.03",
+   "moment": "filler.banter",
+   "text": "The concession pod has freeze-dried nachos tonight. Hold on to the chips, they float."
+  },
+  {
+   "id": "filler.banter.04",
+   "moment": "filler.banter",
+   "text": "A fan asked if the planet behind the backboard is real. Very real. It just likes basketball."
+  },
+  {
+   "id": "filler.banter.05",
+   "moment": "filler.banter",
+   "text": "Last season a ball left orbit on a bad pass. Mission control still gets a postcard every year."
+  },
+  {
+   "id": "filler.banter.06",
+   "moment": "filler.banter",
+   "text": "Quick reminder: the last shuttle home leaves after the final horn. Nobody sleeps on the court. Again."
+  },
+  {
+   "id": "filler.banter.07",
+   "moment": "filler.banter",
+   "text": "Mission control says the stars are aligned tonight. Mission control says that every night."
+  },
+  {
+   "id": "filler.banter.08",
+   "moment": "filler.banter",
+   "text": "Beautiful night up here. Then again, it is always night up here."
+  },
+  {
+   "id": "momentum.warming.01",
+   "moment": "momentum.warming",
+   "text": "Thrusters warming up! Here we go!"
+  },
+  {
+   "id": "momentum.warming.02",
+   "moment": "momentum.warming",
+   "text": "Engines are humming now. Feel that?"
+  },
+  {
+   "id": "momentum.warming.03",
+   "moment": "momentum.warming",
+   "text": "Fuel is flowing, Orbit. Something's building."
+  },
+  {
+   "id": "momentum.hot.01",
+   "moment": "momentum.hot",
+   "text": "We are cleared for liftoff! Orbit is up!"
+  },
+  {
+   "id": "momentum.hot.02",
+   "moment": "momentum.hot",
+   "text": "Full thrust! The whole deck is standing!"
+  },
+  {
+   "id": "momentum.hot.03",
+   "moment": "momentum.hot",
+   "text": "Now you are climbing! Keep that altitude!"
+  },
+  {
+   "id": "momentum.fire.01",
+   "moment": "momentum.fire",
+   "text": "Escape velocity! Nothing can pull this one down!"
+  },
+  {
+   "id": "momentum.fire.02",
+   "moment": "momentum.fire",
+   "text": "Afterburners! The whole court is floating!"
+  },
+  {
+   "id": "momentum.fire.03",
+   "moment": "momentum.fire",
+   "text": "Gravity just gave up! Cannot miss!"
+  },
+  {
+   "id": "momentum.fire.04",
+   "moment": "momentum.fire",
+   "text": "Out of the atmosphere! Nobody touch anything!"
+  },
+  {
+   "id": "momentum.cold.01",
+   "moment": "momentum.cold",
+   "text": "Engines went quiet. Relight them, you got this."
+  },
+  {
+   "id": "momentum.cold.02",
+   "moment": "momentum.cold",
+   "text": "Running on backup power. Reboot and go again."
+  },
+  {
+   "id": "momentum.cold.03",
+   "moment": "momentum.cold",
+   "text": "Little turbulence, that is all. Stay the course."
+  },
+  {
+   "id": "outro.win.01",
+   "moment": "outro.win",
+   "text": "Mission accomplished! Touchdown confirmed. Take your victory lap around the moon!"
+  },
+  {
+   "id": "outro.win.02",
+   "moment": "outro.win",
+   "text": "That is a champion of the Zero-G Classic! Write that name across the stars!"
+  },
+  {
+   "id": "outro.win.03",
+   "moment": "outro.win",
+   "text": "Stuck the landing, start to finish. Orbit salutes you. Safe travels home, and come back soon!"
+  },
+  {
+   "id": "outro.win.04",
+   "moment": "outro.win",
+   "text": "The stars came out for you tonight, and you delivered. Nova, signing off happy!"
+  },
+  {
+   "id": "outro.loss.01",
+   "moment": "outro.loss",
+   "text": "Every great mission has a few scrubbed launches first. Refuel, and come back to Orbit."
+  },
+  {
+   "id": "outro.loss.02",
+   "moment": "outro.loss",
+   "text": "The flight ends here, my friend. The launch pad will be waiting when you are ready."
+  },
+  {
+   "id": "outro.loss.03",
+   "moment": "outro.loss",
+   "text": "Gravity won this round. Rematch? Orbit says yes. Nova says yes. Get back up here!"
+  },
+  {
+   "id": "outro.loss.04",
+   "moment": "outro.loss",
+   "text": "Hands together for our cadet, Orbit! Brave flight. The next launch window opens soon."
+  },
+  {
+   "id": "dunk.intro.01",
+   "moment": "dunk.intro",
+   "text": "Launch day, Orbit! Flight Night is go. Two rounds, two dunks each, five judges at mission control, and a rival already on the pad."
+  },
+  {
+   "id": "dunk.intro.02",
+   "moment": "dunk.intro",
+   "text": "Orbit, it is Flight Night! Five judges, two rounds, two dunks apiece. Tonight's rival is fueled up and waiting."
+  },
+  {
+   "id": "dunk.intro.03",
+   "moment": "dunk.intro",
+   "text": "Countdown to Flight Night begins now! Two rounds of two dunks, five judges scoring every landing, and one rival standing between you and the stars."
+  },
+  {
+   "id": "dunk.night.01",
+   "moment": "dunk.night",
+   "text": "Back for another Flight Night? Orbit never gets tired of a return mission."
+  },
+  {
+   "id": "dunk.night.02",
+   "moment": "dunk.night",
+   "text": "Look who docked again! Refueled, rested, and ready for another night of flight."
+  },
+  {
+   "id": "dunk.night.03",
+   "moment": "dunk.night",
+   "text": "Another launch, another night under the stars. The pad is yours again."
+  },
+  {
+   "id": "dunk.rival.intro.01",
+   "moment": "dunk.rival.intro",
+   "text": "Tonight's rival just arrived in Orbit, and nobody gets up here by accident."
+  },
+  {
+   "id": "dunk.rival.intro.02",
+   "moment": "dunk.rival.intro",
+   "text": "Across the court, a rival with a flight plan of their own. Engines are warming."
+  },
+  {
+   "id": "dunk.rival.intro.cass.01",
+   "moment": "dunk.rival.intro",
+   "text": "Cass, tonight's rival: flies on autopilot, lands every time, tomahawk loaded. Zero surprises.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.ty.01",
+   "moment": "dunk.rival.intro",
+   "text": "Ty brings maximum thrust, every launch, every night. Watch out for that windmill.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.pilot.01",
+   "moment": "dunk.rival.intro",
+   "text": "Pilot. Yes, really. Scans the sky, then makes the call. Three-sixty on deck.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.zo.01",
+   "moment": "dunk.rival.intro",
+   "text": "Zo is in it for the highlight reel. Phones up, Orbit. Zo wants the replay.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.stack.01",
+   "moment": "dunk.rival.intro",
+   "text": "Stack launches the wildest dunk first and asks questions at re-entry. Between the legs, probably.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.up.01",
+   "moment": "dunk.up",
+   "text": "Cadet on the pad. All eyes up."
+  },
+  {
+   "id": "dunk.up.02",
+   "moment": "dunk.up",
+   "text": "Launch window is open. Your dunk, your sky."
+  },
+  {
+   "id": "dunk.up.03",
+   "moment": "dunk.up",
+   "text": "Orbit, quiet on deck. Our flyer is up."
+  },
+  {
+   "id": "dunk.up.04",
+   "moment": "dunk.up",
+   "text": "Tower, stand by. Here comes the flight."
+  },
+  {
+   "id": "dunk.up.05",
+   "moment": "dunk.up",
+   "text": "All systems go. Show us something new."
+  },
+  {
+   "id": "dunk.retry.01",
+   "moment": "dunk.retry",
+   "text": "Systems reset. Take it from the top."
+  },
+  {
+   "id": "dunk.retry.02",
+   "moment": "dunk.retry",
+   "text": "Second attempt. Same flight plan, better landing."
+  },
+  {
+   "id": "dunk.retry.03",
+   "moment": "dunk.retry",
+   "text": "Recalibrating. You have another shot at it."
+  },
+  {
+   "id": "dunk.retry.04",
+   "moment": "dunk.retry",
+   "text": "Engines still warm, cadet. Go again!"
+  },
+  {
+   "id": "dunk.lastchance.01",
+   "moment": "dunk.lastchance",
+   "text": "Final attempt. This launch window is closing."
+  },
+  {
+   "id": "dunk.lastchance.02",
+   "moment": "dunk.lastchance",
+   "text": "Last shot at orbit. Stick the landing."
+  },
+  {
+   "id": "dunk.lastchance.03",
+   "moment": "dunk.lastchance",
+   "text": "Third and final. All eyes on the pad."
+  },
+  {
+   "id": "dunk.run.01",
+   "moment": "dunk.run",
+   "text": "Ignition!"
+  },
+  {
+   "id": "dunk.run.02",
+   "moment": "dunk.run",
+   "text": "Engines hot..."
+  },
+  {
+   "id": "dunk.run.03",
+   "moment": "dunk.run",
+   "text": "Three, two, one!"
+  },
+  {
+   "id": "dunk.run.04",
+   "moment": "dunk.run",
+   "text": "Here comes liftoff!"
+  },
+  {
+   "id": "dunk.run.05",
+   "moment": "dunk.run",
+   "text": "Go for launch!"
+  },
+  {
+   "id": "dunk.make.t0.01",
+   "moment": "dunk.make",
+   "text": "Clean launch, clean landing...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.02",
+   "moment": "dunk.make",
+   "text": "Touchdown confirmed...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.03",
+   "moment": "dunk.make",
+   "text": "Into the flight log...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.04",
+   "moment": "dunk.make",
+   "text": "Solid flight, cadet...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.05",
+   "moment": "dunk.make",
+   "text": "Right on the flight plan...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.06",
+   "moment": "dunk.make",
+   "text": "Safe landing, points on the board...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t1.01",
+   "moment": "dunk.make",
+   "text": "Ooh, now that had some altitude!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.02",
+   "moment": "dunk.make",
+   "text": "Readings are strong on that one!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.03",
+   "moment": "dunk.make",
+   "text": "Smooth re-entry, and the deck approves!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.04",
+   "moment": "dunk.make",
+   "text": "Look at the hang time on that!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.05",
+   "moment": "dunk.make",
+   "text": "Well, well! Somebody brought extra fuel!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.06",
+   "moment": "dunk.make",
+   "text": "That one cleared the upper deck!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.07",
+   "moment": "dunk.make",
+   "text": "Beautiful flight path, beautiful finish!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.08",
+   "moment": "dunk.make",
+   "text": "Orbit, that is how you fly!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t2.01",
+   "moment": "dunk.make",
+   "text": "We have altitude! We have altitude!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.02",
+   "moment": "dunk.make",
+   "text": "Oh, stop the countdown! Stop everything!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.03",
+   "moment": "dunk.make",
+   "text": "Gravity just filed a complaint!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.04",
+   "moment": "dunk.make",
+   "text": "Mission control, are you seeing this?!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.05",
+   "moment": "dunk.make",
+   "text": "Whoa! That one left the atmosphere!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.06",
+   "moment": "dunk.make",
+   "text": "Somebody call the observatory!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.07",
+   "moment": "dunk.make",
+   "text": "New star in the sky, folks!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.08",
+   "moment": "dunk.make",
+   "text": "Orbit is shaking! The planet is shaking!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.09",
+   "moment": "dunk.make",
+   "text": "Rewrite the flight manual!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.10",
+   "moment": "dunk.make",
+   "text": "Put that one in the star charts!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.fifty.01",
+   "moment": "dunk.fifty",
+   "text": "Fifty! Perfect score! Mission control is on its feet!"
+  },
+  {
+   "id": "dunk.fifty.02",
+   "moment": "dunk.fifty",
+   "text": "Five judges, five tens. That is a perfect orbit!"
+  },
+  {
+   "id": "dunk.fifty.03",
+   "moment": "dunk.fifty",
+   "text": "Perfect fifty! Paint it on the side of the rocket!"
+  },
+  {
+   "id": "dunk.fifty.04",
+   "moment": "dunk.fifty",
+   "text": "Ten, ten, ten, ten, ten! Flawless flight!"
+  },
+  {
+   "id": "dunk.repeat.01",
+   "moment": "dunk.repeat",
+   "text": "Seen it! That flight plan already flew tonight."
+  },
+  {
+   "id": "dunk.repeat.02",
+   "moment": "dunk.repeat",
+   "text": "Repeat flight! The judges already logged that one."
+  },
+  {
+   "id": "dunk.repeat.03",
+   "moment": "dunk.repeat",
+   "text": "Same orbit, same view. The judges want a new route."
+  },
+  {
+   "id": "dunk.repeat.04",
+   "moment": "dunk.repeat",
+   "text": "Nice landing, but that satellite already launched tonight."
+  },
+  {
+   "id": "dunk.miss.01",
+   "moment": "dunk.miss",
+   "text": "Mission scrubbed! Back to the pad."
+  },
+  {
+   "id": "dunk.miss.02",
+   "moment": "dunk.miss",
+   "text": "Abort, abort! The rim said negative."
+  },
+  {
+   "id": "dunk.miss.03",
+   "moment": "dunk.miss",
+   "text": "We lost the signal on that one."
+  },
+  {
+   "id": "dunk.miss.04",
+   "moment": "dunk.miss",
+   "text": "Rough landing, cadet. Shake it off."
+  },
+  {
+   "id": "dunk.miss.05",
+   "moment": "dunk.miss",
+   "text": "Gravity wins that round."
+  },
+  {
+   "id": "dunk.miss.06",
+   "moment": "dunk.miss",
+   "text": "So close to touchdown. Almost had it."
+  },
+  {
+   "id": "dunk.miss.iron.01",
+   "moment": "dunk.miss.iron",
+   "text": "Off the iron and back into orbit!"
+  },
+  {
+   "id": "dunk.miss.iron.02",
+   "moment": "dunk.miss.iron",
+   "text": "Circled the rim like a moon, then out!"
+  },
+  {
+   "id": "dunk.miss.iron.03",
+   "moment": "dunk.miss.iron",
+   "text": "So close! The docking clamps would not hold!"
+  },
+  {
+   "id": "dunk.miss.lob.01",
+   "moment": "dunk.miss.lob",
+   "text": "That lob slipped out of orbit!"
+  },
+  {
+   "id": "dunk.miss.lob.02",
+   "moment": "dunk.miss.lob",
+   "text": "Where is that ball going? Deep space!"
+  },
+  {
+   "id": "dunk.miss.lob.03",
+   "moment": "dunk.miss.lob",
+   "text": "Missed the rendezvous. The ball never docked."
+  },
+  {
+   "id": "dunk.miss.prop.01",
+   "moment": "dunk.miss.prop",
+   "text": "Clipped it on the way up!"
+  },
+  {
+   "id": "dunk.miss.prop.02",
+   "moment": "dunk.miss.prop",
+   "text": "Contact with the obstacle! Landing gear caught."
+  },
+  {
+   "id": "dunk.miss.prop.03",
+   "moment": "dunk.miss.prop",
+   "text": "Obstacle clearance: negative. So close!"
+  },
+  {
+   "id": "dunk.miss.last.01",
+   "moment": "dunk.miss.last",
+   "text": "Launch window closed. That one goes down as a miss."
+  },
+  {
+   "id": "dunk.miss.last.02",
+   "moment": "dunk.miss.last",
+   "text": "Out of attempts. Mission scrubbed, but the night goes on."
+  },
+  {
+   "id": "dunk.miss.last.03",
+   "moment": "dunk.miss.last",
+   "text": "Three tries, no touchdown. Logged as a miss."
+  },
+  {
+   "id": "dunk.judges.01",
+   "moment": "dunk.judges",
+   "text": "Mission control, your scores?"
+  },
+  {
+   "id": "dunk.judges.02",
+   "moment": "dunk.judges",
+   "text": "Judges are conferring..."
+  },
+  {
+   "id": "dunk.judges.03",
+   "moment": "dunk.judges",
+   "text": "Transmitting scores now..."
+  },
+  {
+   "id": "dunk.judges.04",
+   "moment": "dunk.judges",
+   "text": "Awaiting the verdict..."
+  },
+  {
+   "id": "dunk.rival.up.01",
+   "moment": "dunk.rival.up",
+   "text": "Rival on the pad. Clear the runway."
+  },
+  {
+   "id": "dunk.rival.up.02",
+   "moment": "dunk.rival.up",
+   "text": "Next launch belongs to the rival. Eyes up."
+  },
+  {
+   "id": "dunk.rival.up.cass.01",
+   "moment": "dunk.rival.up",
+   "text": "Cass on the pad. Autopilot engaged.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.ty.01",
+   "moment": "dunk.rival.up",
+   "text": "Ty is up. Brace for thrust.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.pilot.01",
+   "moment": "dunk.rival.up",
+   "text": "Pilot, you are cleared for takeoff.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.zo.01",
+   "moment": "dunk.rival.up",
+   "text": "Zo is up, and the cameras know it.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.stack.01",
+   "moment": "dunk.rival.up",
+   "text": "Stack is up. Something wild is coming.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.01",
+   "moment": "dunk.rival.make",
+   "text": "The rival sticks the landing..."
+  },
+  {
+   "id": "dunk.rival.make.02",
+   "moment": "dunk.rival.make",
+   "text": "Solid flight from across the court..."
+  },
+  {
+   "id": "dunk.rival.make.03",
+   "moment": "dunk.rival.make",
+   "text": "Respect to the other crew..."
+  },
+  {
+   "id": "dunk.rival.make.04",
+   "moment": "dunk.rival.make",
+   "text": "Ooh, the rival found some altitude!"
+  },
+  {
+   "id": "dunk.rival.make.cass.01",
+   "moment": "dunk.rival.make",
+   "text": "Cass, autopilot, perfect landing...",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.ty.01",
+   "moment": "dunk.rival.make",
+   "text": "Ty with the heavy thrust, as advertised...",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.pilot.01",
+   "moment": "dunk.rival.make",
+   "text": "Pilot calculated every inch of that...",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.zo.01",
+   "moment": "dunk.rival.make",
+   "text": "Zo plays to the cameras, and delivers...",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.stack.01",
+   "moment": "dunk.rival.make",
+   "text": "Stack went for the wild one, and landed...",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.miss.01",
+   "moment": "dunk.rival.miss",
+   "text": "Rival misses! Your mission is very much alive."
+  },
+  {
+   "id": "dunk.rival.miss.02",
+   "moment": "dunk.rival.miss",
+   "text": "Scrubbed on the other side! Opening for you."
+  },
+  {
+   "id": "dunk.rival.miss.03",
+   "moment": "dunk.rival.miss",
+   "text": "Off the rim! That is a gift!"
+  },
+  {
+   "id": "dunk.rival.miss.04",
+   "moment": "dunk.rival.miss",
+   "text": "Hard landing for the rival. Stay ready."
+  },
+  {
+   "id": "dunk.rival.miss.05",
+   "moment": "dunk.rival.miss",
+   "text": "No touchdown! The rival comes up empty."
+  },
+  {
+   "id": "dunk.round.01",
+   "moment": "dunk.round",
+   "text": "Round two, final round! Next stop, the stars."
+  },
+  {
+   "id": "dunk.round.02",
+   "moment": "dunk.round",
+   "text": "Final round at Flight Night! Everything you have, all engines."
+  },
+  {
+   "id": "dunk.round.03",
+   "moment": "dunk.round",
+   "text": "Stage two separation! We are in the final round, Orbit!"
+  },
+  {
+   "id": "dunk.need.01",
+   "moment": "dunk.need",
+   "text": "Trailing into the final round. You need big altitude now."
+  },
+  {
+   "id": "dunk.need.02",
+   "moment": "dunk.need",
+   "text": "Behind on the board, cadet. Time to burn every drop of fuel."
+  },
+  {
+   "id": "dunk.need.03",
+   "moment": "dunk.need",
+   "text": "Big numbers needed, cadet. Go higher than you have ever gone."
+  },
+  {
+   "id": "dunk.need.ahead.01",
+   "moment": "dunk.need.ahead",
+   "text": "You are ahead, cadet. Bring this mission home. Smooth and steady."
+  },
+  {
+   "id": "dunk.need.ahead.02",
+   "moment": "dunk.need.ahead",
+   "text": "Leading into the final round. Keep it clean, close it out."
+  },
+  {
+   "id": "dunk.win.01",
+   "moment": "dunk.win",
+   "text": "Mission control, confirm it: we have a new commander of the sky!"
+  },
+  {
+   "id": "dunk.win.02",
+   "moment": "dunk.win",
+   "text": "Touchdown! Our cadet wins Flight Night, and Orbit will be talking about it for light-years."
+  },
+  {
+   "id": "dunk.win.03",
+   "moment": "dunk.win",
+   "text": "The planet rose tonight just to watch you fly. What a champion, cadet!"
+  },
+  {
+   "id": "dunk.win.04",
+   "moment": "dunk.win",
+   "text": "What a flight! The rival is grounded, and the stars are yours tonight."
+  },
+  {
+   "id": "dunk.lose.01",
+   "moment": "dunk.lose",
+   "text": "The rival takes Flight Night. Tough one, cadet, but you flew with everything."
+  },
+  {
+   "id": "dunk.lose.02",
+   "moment": "dunk.lose",
+   "text": "Mission incomplete, cadet. The hangar is open, and the pad will wait."
+  },
+  {
+   "id": "dunk.lose.03",
+   "moment": "dunk.lose",
+   "text": "Crown goes to the rival tonight. Orbit saw real flight from you, though."
+  },
+  {
+   "id": "dunk.lose.04",
+   "moment": "dunk.lose",
+   "text": "Refuel, regroup, relaunch, cadet. The rival wins this one, not the next."
+  },
+  {
+   "id": "dunk.celeb.spiderman.01",
+   "moment": "dunk.celeb",
+   "text": "Down in the splits! Zero gravity, full flexibility!",
+   "tags": [
+    "celeb:spiderman"
+   ]
+  },
+  {
+   "id": "dunk.celeb.itsover.01",
+   "moment": "dunk.celeb",
+   "text": "It's over? Mission control concurs!",
+   "tags": [
+    "celeb:itsover"
+   ]
+  },
+  {
+   "id": "dunk.celeb.roar.01",
+   "moment": "dunk.celeb",
+   "text": "Listen to that roar! Louder than liftoff!",
+   "tags": [
+    "celeb:roar"
+   ]
+  },
+  {
+   "id": "dunk.celeb.toosmall.01",
+   "moment": "dunk.celeb",
+   "text": "Too small! That rim looked tiny from orbit!",
+   "tags": [
+    "celeb:toosmall"
+   ]
+  },
+  {
+   "id": "dunk.celeb.armsup.01",
+   "moment": "dunk.celeb",
+   "text": "Arms up! The whole observation deck rises!",
+   "tags": [
+    "celeb:armsup"
+   ]
+  },
+  {
+   "id": "duel.pass.01",
+   "moment": "duel.pass",
+   "text": "Controller changes hands. Next cadet to the pad!"
+  },
+  {
+   "id": "duel.pass.02",
+   "moment": "duel.pass",
+   "text": "Crew change! Pass it over, new flight up."
+  },
+  {
+   "id": "duel.pass.1.01",
+   "moment": "duel.pass",
+   "text": "Handing off to player one. Controls are yours!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.pass.2.01",
+   "moment": "duel.pass",
+   "text": "Player two, you are cleared for launch!",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.win.01",
+   "moment": "duel.win",
+   "text": "That settles the Dunk Duel! Touchdown for the winner!"
+  },
+  {
+   "id": "duel.win.1.01",
+   "moment": "duel.win",
+   "text": "Player one takes the Dunk Duel! New commander on deck!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.win.2.01",
+   "moment": "duel.win",
+   "text": "Victory for player two! Bragging rights, now in orbit!",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.tie.01",
+   "moment": "duel.tie",
+   "text": "Perfectly tied! Two ships, one orbit, no winner yet."
+  },
+  {
+   "id": "duel.tie.02",
+   "moment": "duel.tie",
+   "text": "Level at the finish! Same altitude, same score."
+  },
+  {
+   "id": "three.intro.01",
+   "moment": "three.intro",
+   "text": "Orbit, this is Downtown! Six shooters, five racks, sixty seconds on the clock, and only the top three advance."
+  },
+  {
+   "id": "three.intro.02",
+   "moment": "three.intro",
+   "text": "Downtown is open for launch! Five racks, sixty seconds, money balls worth double. Six shooters, three seats in the final."
+  },
+  {
+   "id": "three.intro.03",
+   "moment": "three.intro",
+   "text": "Long-range mission tonight, Orbit! Sixty seconds, five racks, watch those money balls. Top three of six move on."
+  },
+  {
+   "id": "three.go.01",
+   "moment": "three.go",
+   "text": "Clock is live!"
+  },
+  {
+   "id": "three.go.02",
+   "moment": "three.go",
+   "text": "Launch sequence started!"
+  },
+  {
+   "id": "three.go.03",
+   "moment": "three.go",
+   "text": "Ignition! Go!"
+  },
+  {
+   "id": "three.rack.01",
+   "moment": "three.rack",
+   "text": "Coordinates set, next rack!"
+  },
+  {
+   "id": "three.rack.02",
+   "moment": "three.rack",
+   "text": "Fresh rack, fresh fuel!"
+  },
+  {
+   "id": "three.rack.03",
+   "moment": "three.rack",
+   "text": "Keep the rhythm, next rack!"
+  },
+  {
+   "id": "three.rack.04",
+   "moment": "three.rack",
+   "text": "On to the next station!"
+  },
+  {
+   "id": "three.lastrack.01",
+   "moment": "three.lastrack",
+   "text": "Last rack! Final approach!"
+  },
+  {
+   "id": "three.lastrack.02",
+   "moment": "three.lastrack",
+   "text": "Final rack. Bring it home!"
+  },
+  {
+   "id": "three.lastrack.03",
+   "moment": "three.lastrack",
+   "text": "One rack left. Full burn!"
+  },
+  {
+   "id": "three.money.01",
+   "moment": "three.money",
+   "text": "Money ball! Worth two!"
+  },
+  {
+   "id": "three.money.02",
+   "moment": "three.money",
+   "text": "Here comes the money ball!"
+  },
+  {
+   "id": "three.money.03",
+   "moment": "three.money",
+   "text": "Priority payload!"
+  },
+  {
+   "id": "three.money.04",
+   "moment": "three.money",
+   "text": "Precious cargo! Worth double!"
+  },
+  {
+   "id": "three.make.01",
+   "moment": "three.make",
+   "text": "Touchdown!"
+  },
+  {
+   "id": "three.make.02",
+   "moment": "three.make",
+   "text": "Nothing but stars!"
+  },
+  {
+   "id": "three.make.03",
+   "moment": "three.make",
+   "text": "Docked!"
+  },
+  {
+   "id": "three.make.04",
+   "moment": "three.make",
+   "text": "Right on target!"
+  },
+  {
+   "id": "three.make.05",
+   "moment": "three.make",
+   "text": "Splashdown!"
+  },
+  {
+   "id": "three.make.06",
+   "moment": "three.make",
+   "text": "Clean landing!"
+  },
+  {
+   "id": "three.make.money.01",
+   "moment": "three.make.money",
+   "text": "Money ball, touchdown! Double!"
+  },
+  {
+   "id": "three.make.money.02",
+   "moment": "three.make.money",
+   "text": "Precious cargo delivered!"
+  },
+  {
+   "id": "three.make.money.03",
+   "moment": "three.make.money",
+   "text": "Payload secured!"
+  },
+  {
+   "id": "three.make.money.04",
+   "moment": "three.make.money",
+   "text": "Cash in the cosmos!"
+  },
+  {
+   "id": "three.miss.01",
+   "moment": "three.miss",
+   "text": "Off target."
+  },
+  {
+   "id": "three.miss.02",
+   "moment": "three.miss",
+   "text": "No landing."
+  },
+  {
+   "id": "three.miss.03",
+   "moment": "three.miss",
+   "text": "Rim says negative."
+  },
+  {
+   "id": "three.miss.04",
+   "moment": "three.miss",
+   "text": "Just missed."
+  },
+  {
+   "id": "three.miss.05",
+   "moment": "three.miss",
+   "text": "Short of orbit."
+  },
+  {
+   "id": "three.streak.01",
+   "moment": "three.streak",
+   "text": "Locked on target now!"
+  },
+  {
+   "id": "three.streak.02",
+   "moment": "three.streak",
+   "text": "String of landings!"
+  },
+  {
+   "id": "three.streak.03",
+   "moment": "three.streak",
+   "text": "Rhythm is locked in!"
+  },
+  {
+   "id": "three.streak.04",
+   "moment": "three.streak",
+   "text": "All systems green!"
+  },
+  {
+   "id": "three.fire.01",
+   "moment": "three.fire",
+   "text": "Supernova! Every single one!"
+  },
+  {
+   "id": "three.fire.02",
+   "moment": "three.fire",
+   "text": "Clean rack! A perfect orbit!"
+  },
+  {
+   "id": "three.fire.03",
+   "moment": "three.fire",
+   "text": "Light speed, Downtown! Unstoppable!"
+  },
+  {
+   "id": "three.fire.04",
+   "moment": "three.fire",
+   "text": "The basket is a black hole!"
+  },
+  {
+   "id": "three.cold.01",
+   "moment": "three.cold",
+   "text": "Three straight misses. Time to recalibrate."
+  },
+  {
+   "id": "three.cold.02",
+   "moment": "three.cold",
+   "text": "Lost the signal. Find it again!"
+  },
+  {
+   "id": "three.cold.03",
+   "moment": "three.cold",
+   "text": "Engines sputtering. Deep breath, reset."
+  },
+  {
+   "id": "three.clock.01",
+   "moment": "three.clock",
+   "text": "Ten seconds! Countdown is on!"
+  },
+  {
+   "id": "three.clock.02",
+   "moment": "three.clock",
+   "text": "Hurry! Ten seconds left!"
+  },
+  {
+   "id": "three.clock.03",
+   "moment": "three.clock",
+   "text": "Launch window closing! Ten seconds!"
+  },
+  {
+   "id": "three.buzzer.01",
+   "moment": "three.buzzer",
+   "text": "After the horn, and it counts!"
+  },
+  {
+   "id": "three.buzzer.02",
+   "moment": "three.buzzer",
+   "text": "Released in time! That one counts!"
+  },
+  {
+   "id": "three.buzzer.03",
+   "moment": "three.buzzer",
+   "text": "Beat the clock! Points secured!"
+  },
+  {
+   "id": "three.results.01",
+   "moment": "three.results",
+   "text": "Results are coming in from mission control. Shooter by shooter."
+  },
+  {
+   "id": "three.results.02",
+   "moment": "three.results",
+   "text": "Transmitting the qualifying numbers now. Six shooters, three seats."
+  },
+  {
+   "id": "three.advance.01",
+   "moment": "three.advance",
+   "text": "Next stage ignites soon, and you are on board!"
+  },
+  {
+   "id": "three.advance.02",
+   "moment": "three.advance",
+   "text": "Stage one complete! Our cadet advances to the Downtown final!"
+  },
+  {
+   "id": "three.advance.03",
+   "moment": "three.advance",
+   "text": "Qualified! You are cleared for the final round."
+  },
+  {
+   "id": "three.out.01",
+   "moment": "three.out",
+   "text": "Not this orbit. Qualifying ends here, but the range is always open."
+  },
+  {
+   "id": "three.out.02",
+   "moment": "three.out",
+   "text": "Just short of the final. Recalibrate the jumper and come back."
+  },
+  {
+   "id": "three.out.03",
+   "moment": "three.out",
+   "text": "Mission scrubbed in qualifying. Downtown will be here next launch."
+  },
+  {
+   "id": "three.final.01",
+   "moment": "three.final",
+   "text": "Countdown to the final! You go last, and you know the number. Launch it!"
+  },
+  {
+   "id": "three.final.02",
+   "moment": "three.final",
+   "text": "Last launch of Downtown. The target is on the board. Hit it."
+  },
+  {
+   "id": "three.final.03",
+   "moment": "three.final",
+   "text": "Final round, final shooter. The mark is set. Now top it."
+  },
+  {
+   "id": "three.clinch.01",
+   "moment": "three.clinch",
+   "text": "Past the mark! It is won!"
+  },
+  {
+   "id": "three.clinch.02",
+   "moment": "three.clinch",
+   "text": "That clinches it! Mission complete!"
+  },
+  {
+   "id": "three.clinch.03",
+   "moment": "three.clinch",
+   "text": "Orbit achieved! Nobody catches you now!"
+  },
+  {
+   "id": "three.champion.01",
+   "moment": "three.champion",
+   "text": "Downtown champion! Sharpest shooter in the solar system, and it is official!"
+  },
+  {
+   "id": "three.champion.02",
+   "moment": "three.champion",
+   "text": "Mission control, record it! Three-point champion of the Zero-G Classic!"
+  },
+  {
+   "id": "three.champion.03",
+   "moment": "three.champion",
+   "text": "Crown them, Orbit! Longest range in the galaxy, and a trophy to match!"
+  },
+  {
+   "id": "game.intro.ones.01",
+   "moment": "game.intro.ones",
+   "text": "Ones at Orbit! One on one, first to eleven, make it take it. Two hoopers, one court, zero gravity."
+  },
+  {
+   "id": "game.intro.ones.02",
+   "moment": "game.intro.ones",
+   "text": "Mission briefing: one on one, first to eleven, and if you score, you keep the ball. Launch!"
+  },
+  {
+   "id": "game.intro.threes.01",
+   "moment": "game.intro.threes",
+   "text": "Threes at Orbit! Three on three, first to twenty-one, and ninety seconds on the clock. Crew up!"
+  },
+  {
+   "id": "game.intro.threes.02",
+   "moment": "game.intro.threes",
+   "text": "Full crew mission! Three a side, first to twenty-one, ninety-second clock. Mission control, start the countdown!"
+  },
+  {
+   "id": "game.check.01",
+   "moment": "game.check",
+   "text": "Check ball. Shields up, cadet."
+  },
+  {
+   "id": "game.check.02",
+   "moment": "game.check",
+   "text": "Their ball. Guard your airspace."
+  },
+  {
+   "id": "game.check.03",
+   "moment": "game.check",
+   "text": "Defense! Hold the orbit!"
+  },
+  {
+   "id": "game.check.04",
+   "moment": "game.check",
+   "text": "Ball checked. Protect the pad."
+  },
+  {
+   "id": "game.make.01",
+   "moment": "game.make",
+   "text": "Touchdown from midrange!"
+  },
+  {
+   "id": "game.make.02",
+   "moment": "game.make",
+   "text": "Pull-up, and it lands!"
+  },
+  {
+   "id": "game.make.03",
+   "moment": "game.make",
+   "text": "Smooth launch, clean landing!"
+  },
+  {
+   "id": "game.make.04",
+   "moment": "game.make",
+   "text": "Jumper is good!"
+  },
+  {
+   "id": "game.make.05",
+   "moment": "game.make",
+   "text": "Right on the flight path!"
+  },
+  {
+   "id": "game.make.06",
+   "moment": "game.make",
+   "text": "Docked it, nice and smooth!"
+  },
+  {
+   "id": "game.three.01",
+   "moment": "game.three",
+   "text": "From deep space! Three!"
+  },
+  {
+   "id": "game.three.02",
+   "moment": "game.three",
+   "text": "Long-range launch, good!"
+  },
+  {
+   "id": "game.three.03",
+   "moment": "game.three",
+   "text": "Outer ring, and it lands!"
+  },
+  {
+   "id": "game.three.04",
+   "moment": "game.three",
+   "text": "Beyond the arc, beyond gravity!"
+  },
+  {
+   "id": "game.three.05",
+   "moment": "game.three",
+   "text": "Satellite shot, it drops!"
+  },
+  {
+   "id": "game.layup.01",
+   "moment": "game.layup",
+   "text": "Soft landing at the rim!"
+  },
+  {
+   "id": "game.layup.02",
+   "moment": "game.layup",
+   "text": "Smooth re-entry, and in!"
+  },
+  {
+   "id": "game.layup.03",
+   "moment": "game.layup",
+   "text": "Up and in, gentle docking!"
+  },
+  {
+   "id": "game.layup.04",
+   "moment": "game.layup",
+   "text": "Easy touchdown inside!"
+  },
+  {
+   "id": "game.dunk.01",
+   "moment": "game.dunk",
+   "text": "We have liftoff!"
+  },
+  {
+   "id": "game.dunk.02",
+   "moment": "game.dunk",
+   "text": "Rocket to the rim!"
+  },
+  {
+   "id": "game.dunk.03",
+   "moment": "game.dunk",
+   "text": "Ooh, full-power flush!"
+  },
+  {
+   "id": "game.dunk.04",
+   "moment": "game.dunk",
+   "text": "Launched and landed!"
+  },
+  {
+   "id": "game.dunk.05",
+   "moment": "game.dunk",
+   "text": "Altitude check: plenty!"
+  },
+  {
+   "id": "game.poster.01",
+   "moment": "game.poster",
+   "text": "Posterized into orbit! Unreal!"
+  },
+  {
+   "id": "game.poster.02",
+   "moment": "game.poster",
+   "text": "Eclipsed the defender completely!"
+  },
+  {
+   "id": "game.poster.03",
+   "moment": "game.poster",
+   "text": "Cleared the defender! We have altitude!"
+  },
+  {
+   "id": "game.poster.04",
+   "moment": "game.poster",
+   "text": "Defender turned launch pad! Whoa!"
+  },
+  {
+   "id": "game.poster.05",
+   "moment": "game.poster",
+   "text": "Hang it next to the planet!"
+  },
+  {
+   "id": "game.poster.06",
+   "moment": "game.poster",
+   "text": "Mission control, that was a poster!"
+  },
+  {
+   "id": "game.andone.01",
+   "moment": "game.andone",
+   "text": "And one! Through the turbulence!"
+  },
+  {
+   "id": "game.andone.02",
+   "moment": "game.andone",
+   "text": "Contact, and it still lands!"
+  },
+  {
+   "id": "game.andone.03",
+   "moment": "game.andone",
+   "text": "Fouled, and it counts anyway!"
+  },
+  {
+   "id": "game.andone.04",
+   "moment": "game.andone",
+   "text": "Extra fuel at the line!"
+  },
+  {
+   "id": "game.miss.01",
+   "moment": "game.miss",
+   "text": "Off the rim."
+  },
+  {
+   "id": "game.miss.02",
+   "moment": "game.miss",
+   "text": "No landing there."
+  },
+  {
+   "id": "game.miss.03",
+   "moment": "game.miss",
+   "text": "Missed the docking."
+  },
+  {
+   "id": "game.miss.04",
+   "moment": "game.miss",
+   "text": "Drifted wide."
+  },
+  {
+   "id": "game.airball.01",
+   "moment": "game.airball",
+   "text": "Airball! Missed the whole planet!"
+  },
+  {
+   "id": "game.airball.02",
+   "moment": "game.airball",
+   "text": "Off the radar entirely!"
+  },
+  {
+   "id": "game.airball.03",
+   "moment": "game.airball",
+   "text": "Orbit saw that. Everybody did."
+  },
+  {
+   "id": "game.airball.04",
+   "moment": "game.airball",
+   "text": "Where was that headed? Mars?"
+  },
+  {
+   "id": "game.block.01",
+   "moment": "game.block",
+   "text": "Launch denied!"
+  },
+  {
+   "id": "game.block.02",
+   "moment": "game.block",
+   "text": "Rejected into deep space!"
+  },
+  {
+   "id": "game.block.03",
+   "moment": "game.block",
+   "text": "Force field! Blocked!"
+  },
+  {
+   "id": "game.block.04",
+   "moment": "game.block",
+   "text": "Sent right back to earth!"
+  },
+  {
+   "id": "game.block.05",
+   "moment": "game.block",
+   "text": "No-fly zone!"
+  },
+  {
+   "id": "game.block.06",
+   "moment": "game.block",
+   "text": "Asteroid deflected!"
+  },
+  {
+   "id": "game.blocked.01",
+   "moment": "game.blocked",
+   "text": "Launch intercepted!"
+  },
+  {
+   "id": "game.blocked.02",
+   "moment": "game.blocked",
+   "text": "Denied re-entry!"
+  },
+  {
+   "id": "game.blocked.03",
+   "moment": "game.blocked",
+   "text": "Stuffed at the pad!"
+  },
+  {
+   "id": "game.blocked.04",
+   "moment": "game.blocked",
+   "text": "Grounded by the defender!"
+  },
+  {
+   "id": "game.steal.01",
+   "moment": "game.steal",
+   "text": "Intercepted! Signal captured!"
+  },
+  {
+   "id": "game.steal.02",
+   "moment": "game.steal",
+   "text": "Picked clean out of orbit!"
+  },
+  {
+   "id": "game.steal.03",
+   "moment": "game.steal",
+   "text": "Swiped! Change of mission!"
+  },
+  {
+   "id": "game.steal.04",
+   "moment": "game.steal",
+   "text": "Cargo recovered!"
+  },
+  {
+   "id": "game.steal.05",
+   "moment": "game.steal",
+   "text": "Tractor beam! Ball is yours!"
+  },
+  {
+   "id": "game.stolen.01",
+   "moment": "game.stolen",
+   "text": "Cargo lost in transit!"
+  },
+  {
+   "id": "game.stolen.02",
+   "moment": "game.stolen",
+   "text": "Stripped. Signal lost."
+  },
+  {
+   "id": "game.stolen.03",
+   "moment": "game.stolen",
+   "text": "Ball drifted away! Get back!"
+  },
+  {
+   "id": "game.stolen.04",
+   "moment": "game.stolen",
+   "text": "Pickpocketed in zero gravity!"
+  },
+  {
+   "id": "game.ankles.01",
+   "moment": "game.ankles",
+   "text": "Ankles lost in space!"
+  },
+  {
+   "id": "game.ankles.02",
+   "moment": "game.ankles",
+   "text": "Crossover! Gravity took the defender!"
+  },
+  {
+   "id": "game.ankles.03",
+   "moment": "game.ankles",
+   "text": "Whoa! Defender down, orbit wobbling!"
+  },
+  {
+   "id": "game.ankles.04",
+   "moment": "game.ankles",
+   "text": "Shook them out of orbit!"
+  },
+  {
+   "id": "game.ankles.05",
+   "moment": "game.ankles",
+   "text": "Ha! Who turned gravity up?"
+  },
+  {
+   "id": "game.ankles.06",
+   "moment": "game.ankles",
+   "text": "Somebody help the defender up!"
+  },
+  {
+   "id": "game.bite.01",
+   "moment": "game.bite",
+   "text": "Took the bait! Launched early!"
+  },
+  {
+   "id": "game.bite.02",
+   "moment": "game.bite",
+   "text": "Fake launch! Defender bought it!"
+  },
+  {
+   "id": "game.bite.03",
+   "moment": "game.bite",
+   "text": "Up went the defender!"
+  },
+  {
+   "id": "game.bite.04",
+   "moment": "game.bite",
+   "text": "Pump fake, false alarm!"
+  },
+  {
+   "id": "game.foul.01",
+   "moment": "game.foul",
+   "text": "Whistle! Mission paused."
+  },
+  {
+   "id": "game.foul.02",
+   "moment": "game.foul",
+   "text": "Hold the countdown. Whistle."
+  },
+  {
+   "id": "game.foul.03",
+   "moment": "game.foul",
+   "text": "Red light! There's a call."
+  },
+  {
+   "id": "game.foul.04",
+   "moment": "game.foul",
+   "text": "Stoppage. The tower is reviewing."
+  },
+  {
+   "id": "game.rival.make.01",
+   "moment": "game.rival.make",
+   "text": "Incoming score. Stay on course."
+  },
+  {
+   "id": "game.rival.make.02",
+   "moment": "game.rival.make",
+   "text": "Opponents on the board. Refocus."
+  },
+  {
+   "id": "game.rival.make.03",
+   "moment": "game.rival.make",
+   "text": "Their launch lands. Respond!"
+  },
+  {
+   "id": "game.rival.make.04",
+   "moment": "game.rival.make",
+   "text": "Scored on. Shields back up!"
+  },
+  {
+   "id": "game.rival.make.05",
+   "moment": "game.rival.make",
+   "text": "Other side docks one. Stay steady."
+  },
+  {
+   "id": "game.rival.dunk.01",
+   "moment": "game.rival.dunk",
+   "text": "Their rocket reached the rim!"
+  },
+  {
+   "id": "game.rival.dunk.02",
+   "moment": "game.rival.dunk",
+   "text": "Heavy landing, other side. Answer back!"
+  },
+  {
+   "id": "game.rival.dunk.03",
+   "moment": "game.rival.dunk",
+   "text": "They found altitude. Your turn next."
+  },
+  {
+   "id": "game.rival.dunk.04",
+   "moment": "game.rival.dunk",
+   "text": "Thrown down from orbit! Regroup!"
+  },
+  {
+   "id": "game.run.01",
+   "moment": "game.run",
+   "text": "Unanswered buckets! This mission is on autopilot!"
+  },
+  {
+   "id": "game.run.02",
+   "moment": "game.run",
+   "text": "Scoring streak! Orbit cannot look away!"
+  },
+  {
+   "id": "game.run.03",
+   "moment": "game.run",
+   "text": "Three straight and climbing! Keep the engines lit!"
+  },
+  {
+   "id": "game.run.04",
+   "moment": "game.run",
+   "text": "Nobody is answering! Full thrust run!"
+  },
+  {
+   "id": "game.point.us.01",
+   "moment": "game.point",
+   "text": "Game point! One bucket from touchdown!",
+   "tags": [
+    "side:us"
+   ]
+  },
+  {
+   "id": "game.point.them.01",
+   "moment": "game.point",
+   "text": "Their game point. Hold the line, cadet!",
+   "tags": [
+    "side:them"
+   ]
+  },
+  {
+   "id": "game.win.01",
+   "moment": "game.win",
+   "text": "That is the game! Touchdown, and the run is yours!"
+  },
+  {
+   "id": "game.win.02",
+   "moment": "game.win",
+   "text": "Game winner! Into the flight log!"
+  },
+  {
+   "id": "game.win.03",
+   "moment": "game.win",
+   "text": "Ballgame! Our cadet runs this orbit!"
+  },
+  {
+   "id": "game.win.04",
+   "moment": "game.win",
+   "text": "Final bucket lands! Victory at Orbit!"
+  },
+  {
+   "id": "game.loss.01",
+   "moment": "game.loss",
+   "text": "Their run. Refuel, cadet, and check back in."
+  },
+  {
+   "id": "game.loss.02",
+   "moment": "game.loss",
+   "text": "Game goes to the other side. Good run, though."
+  },
+  {
+   "id": "game.loss.03",
+   "moment": "game.loss",
+   "text": "Rough re-entry. Orbit still wants the rematch."
+  },
+  {
+   "id": "game.draw.01",
+   "moment": "game.draw",
+   "text": "Equal power at the horn! Two crews, perfectly even."
+  },
+  {
+   "id": "game.draw.02",
+   "moment": "game.draw",
+   "text": "Even at the buzzer! Share the sky tonight."
+  },
+  {
+   "id": "game.assist.01",
+   "moment": "game.assist",
+   "text": "What a feed! Delivered!"
+  },
+  {
+   "id": "game.assist.02",
+   "moment": "game.assist",
+   "text": "Perfect handoff to the crew!"
+  },
+  {
+   "id": "game.assist.03",
+   "moment": "game.assist",
+   "text": "Coordinates sent! Bucket!"
+  },
+  {
+   "id": "game.assist.04",
+   "moment": "game.assist",
+   "text": "Guided it right in!"
+  },
+  {
+   "id": "game.alleyoop.01",
+   "moment": "game.alleyoop",
+   "text": "Alley-oop! Up and slammed!"
+  },
+  {
+   "id": "game.alleyoop.02",
+   "moment": "game.alleyoop",
+   "text": "Lob up, and liftoff!"
+  },
+  {
+   "id": "game.alleyoop.03",
+   "moment": "game.alleyoop",
+   "text": "Midair rendezvous! Beautiful!"
+  },
+  {
+   "id": "game.clock.01",
+   "moment": "game.clock",
+   "text": "Ten seconds! Countdown is live!"
+  },
+  {
+   "id": "game.clock.02",
+   "moment": "game.clock",
+   "text": "Final ten! Every second counts!"
+  },
+  {
+   "id": "game.clock.03",
+   "moment": "game.clock",
+   "text": "Clock is burning, ten seconds!"
+  },
+  {
+   "id": "game.overdrive.01",
+   "moment": "game.overdrive",
+   "text": "Overdrive! The whole crew is synced!"
+  },
+  {
+   "id": "game.overdrive.02",
+   "moment": "game.overdrive",
+   "text": "Hyperdrive engaged! Full crew thrust!"
+  },
+  {
+   "id": "game.overdrive.03",
+   "moment": "game.overdrive",
+   "text": "All engines, full power!"
+  },
+  {
+   "id": "carnival.intro.01",
+   "moment": "carnival.intro",
+   "text": "Now boarding: Game Night! Four stops on tonight's flight, points at each, and one champion lands on top."
+  },
+  {
+   "id": "carnival.intro.02",
+   "moment": "carnival.intro",
+   "text": "Game Night is go! Four missions tonight, points on each, one champion walks away with the stars."
+  },
+  {
+   "id": "carnival.intro.03",
+   "moment": "carnival.intro",
+   "text": "Four events, one champion, and every point counts. Mission control, open Game Night!"
+  },
+  {
+   "id": "carnival.event.slam_rush.01",
+   "moment": "carnival.event",
+   "text": "Slam Rush! Twenty seconds, dunk as many as you can!",
+   "tags": [
+    "ev:slam_rush"
+   ]
+  },
+  {
+   "id": "carnival.event.strike_storm.01",
+   "moment": "carnival.event",
+   "text": "Next up, Strike Storm! Land your hits on the pads, full thrust!",
+   "tags": [
+    "ev:strike_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.trick_gauntlet.01",
+   "moment": "carnival.event",
+   "text": "Trick Gauntlet! Board up, and stick every landing!",
+   "tags": [
+    "ev:trick_gauntlet"
+   ]
+  },
+  {
+   "id": "carnival.event.hot_shot.01",
+   "moment": "carnival.event",
+   "text": "Hot Shot is up! Shots on goal, lock on and launch!",
+   "tags": [
+    "ev:hot_shot"
+   ]
+  },
+  {
+   "id": "carnival.event.coin_storm.01",
+   "moment": "carnival.event",
+   "text": "Coin Storm incoming! Meteor shower of coins, grab all you can!",
+   "tags": [
+    "ev:coin_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.counter_strike.01",
+   "moment": "carnival.event",
+   "text": "Counter mission! Wait for the jab, then answer in the window!",
+   "tags": [
+    "ev:counter_strike"
+   ]
+  },
+  {
+   "id": "carnival.go.01",
+   "moment": "carnival.go",
+   "text": "Blast off!"
+  },
+  {
+   "id": "carnival.go.02",
+   "moment": "carnival.go",
+   "text": "Launch!"
+  },
+  {
+   "id": "carnival.go.03",
+   "moment": "carnival.go",
+   "text": "Engines on, go!"
+  },
+  {
+   "id": "carnival.clock.01",
+   "moment": "carnival.clock",
+   "text": "Five seconds! Burn it!"
+  },
+  {
+   "id": "carnival.clock.02",
+   "moment": "carnival.clock",
+   "text": "Final five, full thrust!"
+  },
+  {
+   "id": "carnival.clock.03",
+   "moment": "carnival.clock",
+   "text": "Countdown: five seconds left!"
+  },
+  {
+   "id": "carnival.eventwin.01",
+   "moment": "carnival.eventwin",
+   "text": "Points secured, cadet! Log that event!"
+  },
+  {
+   "id": "carnival.eventwin.02",
+   "moment": "carnival.eventwin",
+   "text": "Mission complete! That event is yours."
+  },
+  {
+   "id": "carnival.eventwin.03",
+   "moment": "carnival.eventwin",
+   "text": "You take it! Orbit loved every second."
+  },
+  {
+   "id": "carnival.eventwin.04",
+   "moment": "carnival.eventwin",
+   "text": "Touchdown! That event belongs to you!"
+  },
+  {
+   "id": "carnival.eventloss.01",
+   "moment": "carnival.eventloss",
+   "text": "Rival lands that one. Reset for the next launch."
+  },
+  {
+   "id": "carnival.eventloss.02",
+   "moment": "carnival.eventloss",
+   "text": "That event goes the other way. Stay in orbit!"
+  },
+  {
+   "id": "carnival.eventloss.03",
+   "moment": "carnival.eventloss",
+   "text": "Scrubbed that one. The rival banks the points."
+  },
+  {
+   "id": "carnival.tie.01",
+   "moment": "carnival.tie",
+   "text": "Even! Split the points, share the sky."
+  },
+  {
+   "id": "carnival.tie.02",
+   "moment": "carnival.tie",
+   "text": "A tie! Not even radar can separate you."
+  },
+  {
+   "id": "carnival.handoff.01",
+   "moment": "carnival.handoff",
+   "text": "Controller handoff! Player two, engines on!"
+  },
+  {
+   "id": "carnival.handoff.02",
+   "moment": "carnival.handoff",
+   "text": "Crew swap! Pass the controller to player two."
+  },
+  {
+   "id": "carnival.champion.01",
+   "moment": "carnival.champion",
+   "text": "Game Night champion! Four events, one commander, and every star shining for you!"
+  },
+  {
+   "id": "carnival.champion.02",
+   "moment": "carnival.champion",
+   "text": "Crown secured! Mission control, put the champion's name up in lights across the sky!"
+  },
+  {
+   "id": "carnival.champion.03",
+   "moment": "carnival.champion",
+   "text": "Top of the whole Game Night! We have altitude, and we have a champion!"
+  },
+  {
+   "id": "carnival.runnerup.01",
+   "moment": "carnival.runnerup",
+   "text": "Good flying, cadet. The rival takes Game Night, but the launch pad stays open."
+  },
+  {
+   "id": "carnival.runnerup.02",
+   "moment": "carnival.runnerup",
+   "text": "Game Night goes the other way. Refuel, regroup, and come back for the rematch."
+  }
+ ]
+}

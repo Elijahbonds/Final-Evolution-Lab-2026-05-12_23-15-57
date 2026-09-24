@@ -1,0 +1,140 @@
+{
+ "cast": "crowd_f",
+ "lines": [
+  {
+   "id": "crowd.hype.01",
+   "moment": "crowd.hype",
+   "text": "Is it happening now?!"
+  },
+  {
+   "id": "crowd.hype.02",
+   "moment": "crowd.hype",
+   "text": "Ooh, what's this?!"
+  },
+  {
+   "id": "crowd.hype.03",
+   "moment": "crowd.hype",
+   "text": "Everyone, look, look!"
+  },
+  {
+   "id": "crowd.hype.04",
+   "moment": "crowd.hype",
+   "text": "Right, this is exciting!"
+  },
+  {
+   "id": "crowd.ooh.01",
+   "moment": "crowd.ooh",
+   "text": "Goodness me!"
+  },
+  {
+   "id": "crowd.ooh.02",
+   "moment": "crowd.ooh",
+   "text": "Well, I never!"
+  },
+  {
+   "id": "crowd.ooh.03",
+   "moment": "crowd.ooh",
+   "text": "Oh, clever!"
+  },
+  {
+   "id": "crowd.cheer.01",
+   "moment": "crowd.cheer",
+   "text": "Brilliant! Absolutely brilliant!"
+  },
+  {
+   "id": "crowd.cheer.02",
+   "moment": "crowd.cheer",
+   "text": "It went in!"
+  },
+  {
+   "id": "crowd.cheer.03",
+   "moment": "crowd.cheer",
+   "text": "Lovely! Lovely stuff!"
+  },
+  {
+   "id": "crowd.cheer.04",
+   "moment": "crowd.cheer",
+   "text": "Well done, you!"
+  },
+  {
+   "id": "crowd.erupt.01",
+   "moment": "crowd.erupt",
+   "text": "Is that even allowed?!"
+  },
+  {
+   "id": "crowd.erupt.02",
+   "moment": "crowd.erupt",
+   "text": "I think I love basketball!"
+  },
+  {
+   "id": "crowd.erupt.03",
+   "moment": "crowd.erupt",
+   "text": "What on earth was that?!"
+  },
+  {
+   "id": "crowd.erupt.04",
+   "moment": "crowd.erupt",
+   "text": "Best thing on my trip!"
+  },
+  {
+   "id": "crowd.groan.01",
+   "moment": "crowd.groan",
+   "text": "Oh, unlucky!"
+  },
+  {
+   "id": "crowd.groan.02",
+   "moment": "crowd.groan",
+   "text": "So nearly!"
+  },
+  {
+   "id": "crowd.groan.03",
+   "moment": "crowd.groan",
+   "text": "Ah, what a shame!"
+  },
+  {
+   "id": "crowd.heckle.01",
+   "moment": "crowd.heckle",
+   "text": "Was that on purpose?"
+  },
+  {
+   "id": "crowd.heckle.02",
+   "moment": "crowd.heckle",
+   "text": "Hang on, is that bad?"
+  },
+  {
+   "id": "crowd.heckle.03",
+   "moment": "crowd.heckle",
+   "text": "Oh dear, oh dear!"
+  },
+  {
+   "id": "crowd.idle.01",
+   "moment": "crowd.idle",
+   "text": "I only came out for a walk!"
+  },
+  {
+   "id": "crowd.idle.02",
+   "moment": "crowd.idle",
+   "text": "Does this happen every night?"
+  },
+  {
+   "id": "crowd.idle.03",
+   "moment": "crowd.idle",
+   "text": "Excuse me, which one is winning?"
+  },
+  {
+   "id": "crowd.idle.04",
+   "moment": "crowd.idle",
+   "text": "Could somebody take my picture with the hoop?"
+  },
+  {
+   "id": "crowd.idle.05",
+   "moment": "crowd.idle",
+   "text": "Nobody back home will believe this."
+  },
+  {
+   "id": "crowd.defense.01",
+   "moment": "crowd.defense",
+   "text": "Defend, please!"
+  }
+ ]
+}

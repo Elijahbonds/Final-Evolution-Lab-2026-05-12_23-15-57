@@ -27,6 +27,7 @@ import {
   type ImpactFrameState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
+import { VoiceKit } from '../audio/mic/VoiceKit';
 import { QaTrace } from './QaTrace';
 import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
@@ -400,6 +401,9 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // mode reports at all is to read its source and hope.
     momentum: () => ({ score01: momentum.score01, tier: momentum.tier }),
     anim: animProbe,
+    // THE MIC (2026-09-24): the audio graph, so a probe can record what the game actually sounds like (the MC on the PA, the
+    // crowd ducking under him) instead of trusting that a cue that was logged was also heard
+    audio: () => SoundKit.graph(),
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
@@ -629,6 +633,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     unsub?.();
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
+    VoiceKit.stopAll(0.1);    // THE MIC: whatever a mode left on the mic goes with it
     juice.dispose();
     qaRestore?.();
     shaker.dispose();

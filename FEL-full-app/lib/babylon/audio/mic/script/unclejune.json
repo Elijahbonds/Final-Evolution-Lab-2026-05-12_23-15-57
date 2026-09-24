@@ -1,0 +1,2060 @@
+{
+ "cast": "unclejune",
+ "lines": [
+  {
+   "id": "intro.court.01",
+   "moment": "intro.court",
+   "text": "Evening, everybody. Uncle June here, same bench, same mic, under the same cherry trees at Blossom Park. Let's play some ball."
+  },
+  {
+   "id": "intro.court.02",
+   "moment": "intro.court",
+   "text": "Welcome to Blossom Park and the Spring Invitational. Petals on the court, ice cream on the cart, and Uncle June on the mic."
+  },
+  {
+   "id": "intro.court.03",
+   "moment": "intro.court",
+   "text": "Now settle in, folks. I've been calling games in this park since half these cherry trees were twigs. Let's see who blooms."
+  },
+  {
+   "id": "intro.court.04",
+   "moment": "intro.court",
+   "text": "Spring air, pink sky, and the old-timers arguing on the bench. This is Blossom Park, and I'm Uncle June. Pull up a seat."
+  },
+  {
+   "id": "filler.crowd.01",
+   "moment": "filler.crowd",
+   "text": "Bench regulars, let me hear you! Cornbread, I see you with your folding chair."
+  },
+  {
+   "id": "filler.crowd.02",
+   "moment": "filler.crowd",
+   "text": "Ice cream line, you can cheer and wait at the same time!"
+  },
+  {
+   "id": "filler.crowd.03",
+   "moment": "filler.crowd",
+   "text": "Left side of the fountain, you're quieter than the petals. Let's fix that."
+  },
+  {
+   "id": "filler.crowd.04",
+   "moment": "filler.crowd",
+   "text": "Checkers table, put the game down for one minute and holler with me!"
+  },
+  {
+   "id": "filler.crowd.05",
+   "moment": "filler.crowd",
+   "text": "Sunday crew in the back, I know you can still get loud. Show them!"
+  },
+  {
+   "id": "filler.crowd.06",
+   "moment": "filler.crowd",
+   "text": "Birdie brought the whole family again. Family, let this park hear you!"
+  },
+  {
+   "id": "filler.banter.01",
+   "moment": "filler.banter",
+   "text": "Back in my day, our rim was a bicycle wheel nailed to the old cherry tree. Worked fine."
+  },
+  {
+   "id": "filler.banter.02",
+   "moment": "filler.banter",
+   "text": "Rollie's ice cream cart is out. Strawberry's gone already. Pistachio? Plenty of pistachio. Always is."
+  },
+  {
+   "id": "filler.banter.03",
+   "moment": "filler.banter",
+   "text": "The old folks used to tell me, you can't hurry spring. Took me sixty years to listen."
+  },
+  {
+   "id": "filler.banter.04",
+   "moment": "filler.banter",
+   "text": "Petals on the court again. Don't sweep them, folks. That's not a mess, that's the season."
+  },
+  {
+   "id": "filler.banter.05",
+   "moment": "filler.banter",
+   "text": "Hollis still plays every Sunday. Hasn't hit a layup since the lamps went up. Never missed a Sunday."
+  },
+  {
+   "id": "filler.banter.06",
+   "moment": "filler.banter",
+   "text": "Cornbread says rain's coming. Cornbread's said that every day for thirty years. Right about twice."
+  },
+  {
+   "id": "filler.banter.07",
+   "moment": "filler.banter",
+   "text": "Smell that spring air. Cut grass, cherry blossoms, and whatever's melting on the ice cream cart."
+  },
+  {
+   "id": "filler.banter.08",
+   "moment": "filler.banter",
+   "text": "People ask why I've called games here forty years. Simple. Best seat in the park, and it's free."
+  },
+  {
+   "id": "momentum.warming.01",
+   "moment": "momentum.warming",
+   "text": "Getting a little June weather out here."
+  },
+  {
+   "id": "momentum.warming.02",
+   "moment": "momentum.warming",
+   "text": "Well, now. Something's starting to bloom."
+  },
+  {
+   "id": "momentum.warming.03",
+   "moment": "momentum.warming",
+   "text": "Easy, sprout. You're finding something."
+  },
+  {
+   "id": "momentum.hot.01",
+   "moment": "momentum.hot",
+   "text": "Oh, the bench is up now. That's rare."
+  },
+  {
+   "id": "momentum.hot.02",
+   "moment": "momentum.hot",
+   "text": "Tell Rollie to hold the cart. Nobody's leaving."
+  },
+  {
+   "id": "momentum.hot.03",
+   "moment": "momentum.hot",
+   "text": "That's warm. That's real warm, youngster."
+  },
+  {
+   "id": "momentum.fire.01",
+   "moment": "momentum.fire",
+   "text": "Rollie's giving out free cones now!"
+  },
+  {
+   "id": "momentum.fire.02",
+   "moment": "momentum.fire",
+   "text": "Hold on, now. Hold on! Can't miss!"
+  },
+  {
+   "id": "momentum.fire.03",
+   "moment": "momentum.fire",
+   "text": "Whole park's up! Even the checkers table!"
+  },
+  {
+   "id": "momentum.fire.04",
+   "moment": "momentum.fire",
+   "text": "Petals are dancing for this one!"
+  },
+  {
+   "id": "momentum.cold.01",
+   "moment": "momentum.cold",
+   "text": "Cold snap. Happens every April. Shake it off."
+  },
+  {
+   "id": "momentum.cold.02",
+   "moment": "momentum.cold",
+   "text": "Frost in the morning, blossoms by noon, sprout."
+  },
+  {
+   "id": "momentum.cold.03",
+   "moment": "momentum.cold",
+   "text": "Rim's being stubborn. Keep knocking, it opens."
+  },
+  {
+   "id": "outro.win.01",
+   "moment": "outro.win",
+   "text": "Somebody find a ribbon for the old tree. Blossom Park has a new name to remember."
+  },
+  {
+   "id": "outro.win.02",
+   "moment": "outro.win",
+   "text": "Forty years on this mic, that's near the top. Go get some ice cream, champ."
+  },
+  {
+   "id": "outro.win.03",
+   "moment": "outro.win",
+   "text": "The bench remembers, youngster. Come back anytime, your seat's got your name on it."
+  },
+  {
+   "id": "outro.win.04",
+   "moment": "outro.win",
+   "text": "Well, well. You came to Blossom Park a bud and you're leaving in full bloom."
+  },
+  {
+   "id": "outro.loss.01",
+   "moment": "outro.loss",
+   "text": "Rain waters the flowers too, youngster. Come on back, the bench will save your spot."
+  },
+  {
+   "id": "outro.loss.02",
+   "moment": "outro.loss",
+   "text": "Not today. But I've seen many springs, and the good ones always come back around."
+  },
+  {
+   "id": "outro.loss.03",
+   "moment": "outro.loss",
+   "text": "Back in my day, I lost here three summers straight. Then I didn't. Run it back."
+  },
+  {
+   "id": "outro.loss.04",
+   "moment": "outro.loss",
+   "text": "That's a good showing, sprout. The petals will be here tomorrow, and so will the rematch."
+  },
+  {
+   "id": "dunk.intro.01",
+   "moment": "dunk.intro",
+   "text": "It's Flight Night under the cherry trees. Two rounds, two dunks apiece, five judges on the bench, and a rival loitering by the ice cream cart."
+  },
+  {
+   "id": "dunk.intro.02",
+   "moment": "dunk.intro",
+   "text": "Flight Night, folks! Two rounds, two dunks each, five judges who've seen it all, and a rival who thinks this park belongs to them."
+  },
+  {
+   "id": "dunk.intro.03",
+   "moment": "dunk.intro",
+   "text": "Now, the dunk contest is the only time I let anybody hang on my rim. Five judges, two rounds, two dunks each. Rival's waiting."
+  },
+  {
+   "id": "dunk.night.01",
+   "moment": "dunk.night",
+   "text": "Back again? Good. The petals missed you, and so did the bench."
+  },
+  {
+   "id": "dunk.night.02",
+   "moment": "dunk.night",
+   "text": "Another Flight Night. Cart's restocked, lamps are on, and I'm not going anywhere."
+  },
+  {
+   "id": "dunk.night.03",
+   "moment": "dunk.night",
+   "text": "Look who came back to Blossom Park. That's how the regulars start, youngster."
+  },
+  {
+   "id": "dunk.rival.intro.01",
+   "moment": "dunk.rival.intro",
+   "text": "Tonight's rival came to my park to take something home. Let's see about that."
+  },
+  {
+   "id": "dunk.rival.intro.02",
+   "moment": "dunk.rival.intro",
+   "text": "Across the way, tonight's other dunker. Give them a polite hand, folks. Just polite."
+  },
+  {
+   "id": "dunk.rival.intro.cass.01",
+   "moment": "dunk.rival.intro",
+   "text": "Cass. Steady as a porch swing. Same tomahawk every time, and it never once misses.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.ty.01",
+   "moment": "dunk.rival.intro",
+   "text": "Ty. Doesn't say much. Doesn't need to. That windmill does all the talking, all night.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.pilot.01",
+   "moment": "dunk.rival.intro",
+   "text": "Pilot. Sits back, reads the whole park, then spins a three-sixty through it. Patient, like me.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.zo.01",
+   "moment": "dunk.rival.intro",
+   "text": "Zo. Came for the cameras, and the trophy's an afterthought. Wave, folks. Zo's already posing.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.stack.01",
+   "moment": "dunk.rival.intro",
+   "text": "Stack. Starts with the hardest dunk there is and laughs the whole way. Youth.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.up.01",
+   "moment": "dunk.up",
+   "text": "All right, sprout. Your stage."
+  },
+  {
+   "id": "dunk.up.02",
+   "moment": "dunk.up",
+   "text": "Quiet down, bench. Let the youngster work."
+  },
+  {
+   "id": "dunk.up.03",
+   "moment": "dunk.up",
+   "text": "Here we go. Show this park something."
+  },
+  {
+   "id": "dunk.up.04",
+   "moment": "dunk.up",
+   "text": "Take your time. Spring's not going anywhere."
+  },
+  {
+   "id": "dunk.up.05",
+   "moment": "dunk.up",
+   "text": "Petals are falling. Let's see you rise."
+  },
+  {
+   "id": "dunk.retry.01",
+   "moment": "dunk.retry",
+   "text": "Again. Nobody blooms on the first try."
+  },
+  {
+   "id": "dunk.retry.02",
+   "moment": "dunk.retry",
+   "text": "That's fine. Dust it off. One more."
+  },
+  {
+   "id": "dunk.retry.03",
+   "moment": "dunk.retry",
+   "text": "One try, back in my day. Lucky you."
+  },
+  {
+   "id": "dunk.retry.04",
+   "moment": "dunk.retry",
+   "text": "Easy now. Plant your feet and go."
+  },
+  {
+   "id": "dunk.lastchance.01",
+   "moment": "dunk.lastchance",
+   "text": "Last one, youngster. Make this spring count."
+  },
+  {
+   "id": "dunk.lastchance.02",
+   "moment": "dunk.lastchance",
+   "text": "Third try. Even the checkers game stopped."
+  },
+  {
+   "id": "dunk.lastchance.03",
+   "moment": "dunk.lastchance",
+   "text": "Now or never, sprout. Whole park's watching."
+  },
+  {
+   "id": "dunk.run.01",
+   "moment": "dunk.run",
+   "text": "Go on, now."
+  },
+  {
+   "id": "dunk.run.02",
+   "moment": "dunk.run",
+   "text": "Now then!"
+  },
+  {
+   "id": "dunk.run.03",
+   "moment": "dunk.run",
+   "text": "Up you go!"
+  },
+  {
+   "id": "dunk.run.04",
+   "moment": "dunk.run",
+   "text": "Rise, sprout!"
+  },
+  {
+   "id": "dunk.run.05",
+   "moment": "dunk.run",
+   "text": "Let's see it."
+  },
+  {
+   "id": "dunk.make.t0.01",
+   "moment": "dunk.make",
+   "text": "Well, that'll do.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.02",
+   "moment": "dunk.make",
+   "text": "Clean. Sensible. I respect sensible.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.03",
+   "moment": "dunk.make",
+   "text": "All right, all right. Honest work.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.04",
+   "moment": "dunk.make",
+   "text": "Solid. Won't wake the neighbors, but solid.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.05",
+   "moment": "dunk.make",
+   "text": "Plain as Sunday toast, and just as good.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.06",
+   "moment": "dunk.make",
+   "text": "Gets the job done. Old-timers approve.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t1.01",
+   "moment": "dunk.make",
+   "text": "Now that's pretty. Real pretty.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.02",
+   "moment": "dunk.make",
+   "text": "Ooh, the judges liked that one!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.03",
+   "moment": "dunk.make",
+   "text": "Look at that! Petals went flying!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.04",
+   "moment": "dunk.make",
+   "text": "Whoa! I felt that on the bench!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.05",
+   "moment": "dunk.make",
+   "text": "Somebody tell the checkers table what they missed!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.06",
+   "moment": "dunk.make",
+   "text": "There it is! That's Blossom Park basketball!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.07",
+   "moment": "dunk.make",
+   "text": "Easy, easy... no, go ahead and cheer!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.08",
+   "moment": "dunk.make",
+   "text": "Ring the ice cream bell, Rollie!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t2.01",
+   "moment": "dunk.make",
+   "text": "Oh, now hold on. Hold on!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.02",
+   "moment": "dunk.make",
+   "text": "Tie a ribbon on the old tree!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.03",
+   "moment": "dunk.make",
+   "text": "Call the Sunday crew! They won't believe me!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.04",
+   "moment": "dunk.make",
+   "text": "Wait. Wait a minute. Wait a minute!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.05",
+   "moment": "dunk.make",
+   "text": "Bench, you seeing this?! You seeing this?!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.06",
+   "moment": "dunk.make",
+   "text": "Rollie dropped the whole ice cream cart!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.07",
+   "moment": "dunk.make",
+   "text": "Get me off this bench! Get me up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.08",
+   "moment": "dunk.make",
+   "text": "The petals stopped falling! They stopped to watch!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.09",
+   "moment": "dunk.make",
+   "text": "In all my springs... I have never!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.10",
+   "moment": "dunk.make",
+   "text": "Good gracious alive! What did I just see?!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.fifty.01",
+   "moment": "dunk.fifty",
+   "text": "Fifty! Folks, this bench has waited years for that!"
+  },
+  {
+   "id": "dunk.fifty.02",
+   "moment": "dunk.fifty",
+   "text": "Perfect fifty! Five judges agreeing? That never happens here!"
+  },
+  {
+   "id": "dunk.fifty.03",
+   "moment": "dunk.fifty",
+   "text": "Five tens, under my cherry trees. Mercy!"
+  },
+  {
+   "id": "dunk.fifty.04",
+   "moment": "dunk.fifty",
+   "text": "Last fifty I saw out here, the lamps were gas."
+  },
+  {
+   "id": "dunk.repeat.01",
+   "moment": "dunk.repeat",
+   "text": "I've heard that story before, and so have the judges."
+  },
+  {
+   "id": "dunk.repeat.02",
+   "moment": "dunk.repeat",
+   "text": "Pretty. Pretty familiar, too."
+  },
+  {
+   "id": "dunk.repeat.03",
+   "moment": "dunk.repeat",
+   "text": "Seen that bloom already this spring. Plant something new."
+  },
+  {
+   "id": "dunk.repeat.04",
+   "moment": "dunk.repeat",
+   "text": "The bench remembers that one. Judges do too."
+  },
+  {
+   "id": "dunk.miss.01",
+   "moment": "dunk.miss",
+   "text": "Not this time. That rim's seen it all."
+  },
+  {
+   "id": "dunk.miss.02",
+   "moment": "dunk.miss",
+   "text": "Well. Can't win them all, sprout."
+  },
+  {
+   "id": "dunk.miss.03",
+   "moment": "dunk.miss",
+   "text": "Ooh. That one got away."
+  },
+  {
+   "id": "dunk.miss.04",
+   "moment": "dunk.miss",
+   "text": "Close. Close isn't a bucket, but it's close."
+  },
+  {
+   "id": "dunk.miss.05",
+   "moment": "dunk.miss",
+   "text": "Easy. Even the cherry trees drop a few."
+  },
+  {
+   "id": "dunk.miss.06",
+   "moment": "dunk.miss",
+   "text": "Back in my day, that counted. Not today."
+  },
+  {
+   "id": "dunk.miss.iron.01",
+   "moment": "dunk.miss.iron",
+   "text": "In and out. The rim's being greedy."
+  },
+  {
+   "id": "dunk.miss.iron.02",
+   "moment": "dunk.miss.iron",
+   "text": "Went in for a visit, didn't stay."
+  },
+  {
+   "id": "dunk.miss.iron.03",
+   "moment": "dunk.miss.iron",
+   "text": "Oh, that iron's got a temper tonight."
+  },
+  {
+   "id": "dunk.miss.lob.01",
+   "moment": "dunk.miss.lob",
+   "text": "Lost it in the petals, I suppose."
+  },
+  {
+   "id": "dunk.miss.lob.02",
+   "moment": "dunk.miss.lob",
+   "text": "That lob had other plans."
+  },
+  {
+   "id": "dunk.miss.lob.03",
+   "moment": "dunk.miss.lob",
+   "text": "Never caught it. Ball wanted ice cream."
+  },
+  {
+   "id": "dunk.miss.prop.01",
+   "moment": "dunk.miss.prop",
+   "text": "Caught a piece of it going over."
+  },
+  {
+   "id": "dunk.miss.prop.02",
+   "moment": "dunk.miss.prop",
+   "text": "Oh, you clipped it. Clear it next time."
+  },
+  {
+   "id": "dunk.miss.prop.03",
+   "moment": "dunk.miss.prop",
+   "text": "Over it, sprout. Not through it."
+  },
+  {
+   "id": "dunk.miss.last.01",
+   "moment": "dunk.miss.last",
+   "text": "That's three. We'll mark it down and move along, gently."
+  },
+  {
+   "id": "dunk.miss.last.02",
+   "moment": "dunk.miss.last",
+   "text": "Out of tries. Judges have to call it a miss."
+  },
+  {
+   "id": "dunk.miss.last.03",
+   "moment": "dunk.miss.last",
+   "text": "No more tries on that one. Let it go, sprout."
+  },
+  {
+   "id": "dunk.judges.01",
+   "moment": "dunk.judges",
+   "text": "Judges, your cards."
+  },
+  {
+   "id": "dunk.judges.02",
+   "moment": "dunk.judges",
+   "text": "Let's hear it, judges."
+  },
+  {
+   "id": "dunk.judges.03",
+   "moment": "dunk.judges",
+   "text": "Well, judges?"
+  },
+  {
+   "id": "dunk.judges.04",
+   "moment": "dunk.judges",
+   "text": "What say you, judges?"
+  },
+  {
+   "id": "dunk.rival.up.01",
+   "moment": "dunk.rival.up",
+   "text": "Rival's turn. Show them some spring hospitality."
+  },
+  {
+   "id": "dunk.rival.up.02",
+   "moment": "dunk.rival.up",
+   "text": "The visitor's up. Mind your manners, bench."
+  },
+  {
+   "id": "dunk.rival.up.cass.01",
+   "moment": "dunk.rival.up",
+   "text": "Cass is up. Same as always, I expect.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.ty.01",
+   "moment": "dunk.rival.up",
+   "text": "Ty's up. Hold on to your ice cream.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.pilot.01",
+   "moment": "dunk.rival.up",
+   "text": "Pilot's been watching. Now Pilot moves.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.zo.01",
+   "moment": "dunk.rival.up",
+   "text": "Zo's up. Phones out, apparently.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.stack.01",
+   "moment": "dunk.rival.up",
+   "text": "Stack's up, grinning. Never a good sign.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.01",
+   "moment": "dunk.rival.make",
+   "text": "Credit where it's due, folks."
+  },
+  {
+   "id": "dunk.rival.make.02",
+   "moment": "dunk.rival.make",
+   "text": "Can't argue with that one, sprout."
+  },
+  {
+   "id": "dunk.rival.make.03",
+   "moment": "dunk.rival.make",
+   "text": "Well, the visitor came ready."
+  },
+  {
+   "id": "dunk.rival.make.04",
+   "moment": "dunk.rival.make",
+   "text": "Clean, I'll give them that."
+  },
+  {
+   "id": "dunk.rival.make.cass.01",
+   "moment": "dunk.rival.make",
+   "text": "Cass. Porch swing steady, as usual...",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.ty.01",
+   "moment": "dunk.rival.make",
+   "text": "Ty put the whole park on notice!",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.pilot.01",
+   "moment": "dunk.rival.make",
+   "text": "Patient as a gardener, that Pilot...",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.zo.01",
+   "moment": "dunk.rival.make",
+   "text": "Zo got the shot for the phones!",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.stack.01",
+   "moment": "dunk.rival.make",
+   "text": "Look at that. Stack pulled it off...",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.miss.01",
+   "moment": "dunk.rival.miss",
+   "text": "Came up empty. Happens under these trees."
+  },
+  {
+   "id": "dunk.rival.miss.02",
+   "moment": "dunk.rival.miss",
+   "text": "Oh, that didn't go to plan."
+  },
+  {
+   "id": "dunk.rival.miss.03",
+   "moment": "dunk.rival.miss",
+   "text": "Missed. Even the visitors get spring fever."
+  },
+  {
+   "id": "dunk.rival.miss.04",
+   "moment": "dunk.rival.miss",
+   "text": "No luck. The rim's a Blossom Park regular."
+  },
+  {
+   "id": "dunk.rival.miss.05",
+   "moment": "dunk.rival.miss",
+   "text": "That's an opening, youngster. Walk right through it."
+  },
+  {
+   "id": "dunk.round.01",
+   "moment": "dunk.round",
+   "text": "Round two. The final round. This is where the old-timers lean in."
+  },
+  {
+   "id": "dunk.round.02",
+   "moment": "dunk.round",
+   "text": "Final round. In my day, that's when the lamps came on."
+  },
+  {
+   "id": "dunk.round.03",
+   "moment": "dunk.round",
+   "text": "Second round, last round. Everything you saved, spend it now."
+  },
+  {
+   "id": "dunk.need.01",
+   "moment": "dunk.need",
+   "text": "Trailing, sprout. You'll need something this bench has never seen."
+  },
+  {
+   "id": "dunk.need.02",
+   "moment": "dunk.need",
+   "text": "Chasing now. Time to go big or go get ice cream."
+  },
+  {
+   "id": "dunk.need.03",
+   "moment": "dunk.need",
+   "text": "Down, but it's still spring. Big numbers, youngster. Big ones."
+  },
+  {
+   "id": "dunk.need.ahead.01",
+   "moment": "dunk.need.ahead",
+   "text": "Out in front. Don't get fancy, just finish the job."
+  },
+  {
+   "id": "dunk.need.ahead.02",
+   "moment": "dunk.need.ahead",
+   "text": "Ahead now. Close it out slow and sure, like locking the gate."
+  },
+  {
+   "id": "dunk.win.01",
+   "moment": "dunk.win",
+   "text": "Oh, now hold on! We have a champion! Blossom Park, make some noise!"
+  },
+  {
+   "id": "dunk.win.02",
+   "moment": "dunk.win",
+   "text": "Champion of Flight Night! Rollie, the ice cream's on the house for this one."
+  },
+  {
+   "id": "dunk.win.03",
+   "moment": "dunk.win",
+   "text": "Every champion gets a spot on the bench, sprout. Scoot over, Cornbread."
+  },
+  {
+   "id": "dunk.win.04",
+   "moment": "dunk.win",
+   "text": "I'm going to be telling this one on Sundays for years. Flight Night is yours!"
+  },
+  {
+   "id": "dunk.lose.01",
+   "moment": "dunk.lose",
+   "text": "The visitor takes Flight Night. Shake hands, sprout, then come back and take it home."
+  },
+  {
+   "id": "dunk.lose.02",
+   "moment": "dunk.lose",
+   "text": "Rival's night. Every champion on that bench lost here first, youngster. Ask Cornbread."
+  },
+  {
+   "id": "dunk.lose.03",
+   "moment": "dunk.lose",
+   "text": "Blossoms fall every spring, and they come right back. So will you, sprout."
+  },
+  {
+   "id": "dunk.lose.04",
+   "moment": "dunk.lose",
+   "text": "Well, that's the contest. Rival earned it. You earned a rematch, and I'll be right here."
+  },
+  {
+   "id": "dunk.celeb.spiderman.01",
+   "moment": "dunk.celeb",
+   "text": "The splits! Old dance hall move, that one.",
+   "tags": [
+    "celeb:spiderman"
+   ]
+  },
+  {
+   "id": "dunk.celeb.itsover.01",
+   "moment": "dunk.celeb",
+   "text": "Calling it over already? Bold. Might be right.",
+   "tags": [
+    "celeb:itsover"
+   ]
+  },
+  {
+   "id": "dunk.celeb.roar.01",
+   "moment": "dunk.celeb",
+   "text": "A roar! The checkers table jumped!",
+   "tags": [
+    "celeb:roar"
+   ]
+  },
+  {
+   "id": "dunk.celeb.toosmall.01",
+   "moment": "dunk.celeb",
+   "text": "Too small, is it? Somebody raise the rim!",
+   "tags": [
+    "celeb:toosmall"
+   ]
+  },
+  {
+   "id": "dunk.celeb.armsup.01",
+   "moment": "dunk.celeb",
+   "text": "Arms up! Soak it in. Petals and all.",
+   "tags": [
+    "celeb:armsup"
+   ]
+  },
+  {
+   "id": "duel.pass.01",
+   "moment": "duel.pass",
+   "text": "Hand over the controller, gently now. Next!"
+  },
+  {
+   "id": "duel.pass.02",
+   "moment": "duel.pass",
+   "text": "Trade places, friends. The other one's up."
+  },
+  {
+   "id": "duel.pass.1.01",
+   "moment": "duel.pass",
+   "text": "Player one, you're up. Show me something.",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.pass.2.01",
+   "moment": "duel.pass",
+   "text": "Your turn, player two. Take the controller.",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.win.01",
+   "moment": "duel.win",
+   "text": "Settled! Other one's buying the ice cream."
+  },
+  {
+   "id": "duel.win.1.01",
+   "moment": "duel.win",
+   "text": "Player one wins it! Save a spot on the bench!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.win.2.01",
+   "moment": "duel.win",
+   "text": "Duel goes to player two! The bench saw it all.",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.tie.01",
+   "moment": "duel.tie",
+   "text": "Nobody wins, nobody loses. Guess you'll both come back Sunday."
+  },
+  {
+   "id": "duel.tie.02",
+   "moment": "duel.tie",
+   "text": "A tie. The cherry trees won't mind. Run it back."
+  },
+  {
+   "id": "three.intro.01",
+   "moment": "three.intro",
+   "text": "Welcome to Downtown, Blossom Park style. Six shooters, five racks, sixty seconds. Mind the money balls. Top three move on."
+  },
+  {
+   "id": "three.intro.02",
+   "moment": "three.intro",
+   "text": "Shooting contest. Set shots in my day, but go on. Five racks, sixty seconds, six shooters. Top three advance."
+  },
+  {
+   "id": "three.intro.03",
+   "moment": "three.intro",
+   "text": "Now, this one's for the patient ones. Five racks, the money balls, sixty seconds. Six shoot, three advance."
+  },
+  {
+   "id": "three.go.01",
+   "moment": "three.go",
+   "text": "Take your time. Quickly."
+  },
+  {
+   "id": "three.go.02",
+   "moment": "three.go",
+   "text": "Go on, then!"
+  },
+  {
+   "id": "three.go.03",
+   "moment": "three.go",
+   "text": "Let it fly!"
+  },
+  {
+   "id": "three.rack.01",
+   "moment": "three.rack",
+   "text": "Next rack, please."
+  },
+  {
+   "id": "three.rack.02",
+   "moment": "three.rack",
+   "text": "Move along now."
+  },
+  {
+   "id": "three.rack.03",
+   "moment": "three.rack",
+   "text": "Keep strolling."
+  },
+  {
+   "id": "three.rack.04",
+   "moment": "three.rack",
+   "text": "Onward, youngster."
+  },
+  {
+   "id": "three.lastrack.01",
+   "moment": "three.lastrack",
+   "text": "Last rack. Finish your plate."
+  },
+  {
+   "id": "three.lastrack.02",
+   "moment": "three.lastrack",
+   "text": "Final rack, youngster. Empty it."
+  },
+  {
+   "id": "three.lastrack.03",
+   "moment": "three.lastrack",
+   "text": "One more rack. Make it sweet."
+  },
+  {
+   "id": "three.money.01",
+   "moment": "three.money",
+   "text": "Money ball. Counts double."
+  },
+  {
+   "id": "three.money.02",
+   "moment": "three.money",
+   "text": "Here's the good one."
+  },
+  {
+   "id": "three.money.03",
+   "moment": "three.money",
+   "text": "Worth two, youngster."
+  },
+  {
+   "id": "three.money.04",
+   "moment": "three.money",
+   "text": "This one pays."
+  },
+  {
+   "id": "three.make.01",
+   "moment": "three.make",
+   "text": "There it is."
+  },
+  {
+   "id": "three.make.02",
+   "moment": "three.make",
+   "text": "Good."
+  },
+  {
+   "id": "three.make.03",
+   "moment": "three.make",
+   "text": "Sweet."
+  },
+  {
+   "id": "three.make.04",
+   "moment": "three.make",
+   "text": "Counts."
+  },
+  {
+   "id": "three.make.05",
+   "moment": "three.make",
+   "text": "Pretty."
+  },
+  {
+   "id": "three.make.06",
+   "moment": "three.make",
+   "text": "That'll do."
+  },
+  {
+   "id": "three.make.money.01",
+   "moment": "three.make.money",
+   "text": "Money ball, cashed."
+  },
+  {
+   "id": "three.make.money.02",
+   "moment": "three.make.money",
+   "text": "Double, and deserved."
+  },
+  {
+   "id": "three.make.money.03",
+   "moment": "three.make.money",
+   "text": "Ooh, that pays nicely."
+  },
+  {
+   "id": "three.make.money.04",
+   "moment": "three.make.money",
+   "text": "Ring the bell, Rollie!"
+  },
+  {
+   "id": "three.miss.01",
+   "moment": "three.miss",
+   "text": "Pity."
+  },
+  {
+   "id": "three.miss.02",
+   "moment": "three.miss",
+   "text": "Didn't drop."
+  },
+  {
+   "id": "three.miss.03",
+   "moment": "three.miss",
+   "text": "Next one."
+  },
+  {
+   "id": "three.miss.04",
+   "moment": "three.miss",
+   "text": "Almost."
+  },
+  {
+   "id": "three.miss.05",
+   "moment": "three.miss",
+   "text": "Nearly."
+  },
+  {
+   "id": "three.streak.01",
+   "moment": "three.streak",
+   "text": "Like clockwork, folks."
+  },
+  {
+   "id": "three.streak.02",
+   "moment": "three.streak",
+   "text": "Now we're cooking."
+  },
+  {
+   "id": "three.streak.03",
+   "moment": "three.streak",
+   "text": "One after another."
+  },
+  {
+   "id": "three.streak.04",
+   "moment": "three.streak",
+   "text": "Oh, the bench likes this."
+  },
+  {
+   "id": "three.fire.01",
+   "moment": "three.fire",
+   "text": "My word. Can't miss, can it?"
+  },
+  {
+   "id": "three.fire.02",
+   "moment": "three.fire",
+   "text": "Somebody tell the old-timers!"
+  },
+  {
+   "id": "three.fire.03",
+   "moment": "three.fire",
+   "text": "Whole rack! Not a crumb left!"
+  },
+  {
+   "id": "three.fire.04",
+   "moment": "three.fire",
+   "text": "Pure spring water, every one!"
+  },
+  {
+   "id": "three.cold.01",
+   "moment": "three.cold",
+   "text": "Late frost. It'll pass."
+  },
+  {
+   "id": "three.cold.02",
+   "moment": "three.cold",
+   "text": "Patience. The rim remembers you."
+  },
+  {
+   "id": "three.cold.03",
+   "moment": "three.cold",
+   "text": "Slow down, sprout. Old-timer pace."
+  },
+  {
+   "id": "three.clock.01",
+   "moment": "three.clock",
+   "text": "Ten seconds, youngster!"
+  },
+  {
+   "id": "three.clock.02",
+   "moment": "three.clock",
+   "text": "Step lively, ten seconds!"
+  },
+  {
+   "id": "three.clock.03",
+   "moment": "three.clock",
+   "text": "Last ten, now hurry!"
+  },
+  {
+   "id": "three.buzzer.01",
+   "moment": "three.buzzer",
+   "text": "Horn went, ball still counts!"
+  },
+  {
+   "id": "three.buzzer.02",
+   "moment": "three.buzzer",
+   "text": "Out before the horn. Counts!"
+  },
+  {
+   "id": "three.buzzer.03",
+   "moment": "three.buzzer",
+   "text": "Beat the buzzer! Count it!"
+  },
+  {
+   "id": "three.results.01",
+   "moment": "three.results",
+   "text": "Here come the numbers. Shooter by shooter, now."
+  },
+  {
+   "id": "three.results.02",
+   "moment": "three.results",
+   "text": "Let's see the board. Patience, folks, one at a time."
+  },
+  {
+   "id": "three.advance.01",
+   "moment": "three.advance",
+   "text": "You're moving on, sprout. The final's waiting, and the bench is too."
+  },
+  {
+   "id": "three.advance.02",
+   "moment": "three.advance",
+   "text": "Through to the final! Blossom Park's got a shooter."
+  },
+  {
+   "id": "three.advance.03",
+   "moment": "three.advance",
+   "text": "Advancing. Don't celebrate yet, youngster. Save some for the final."
+  },
+  {
+   "id": "three.out.01",
+   "moment": "three.out",
+   "text": "Out in qualifying. That's all right. The rim will be here tomorrow."
+  },
+  {
+   "id": "three.out.02",
+   "moment": "three.out",
+   "text": "Not this time, sprout. Shoot a few hundred and come see me."
+  },
+  {
+   "id": "three.out.03",
+   "moment": "three.out",
+   "text": "Didn't make the cut. Back in my day, neither did I. Twice."
+  },
+  {
+   "id": "three.final.01",
+   "moment": "three.final",
+   "text": "The final, youngster. You've seen the number. Now go past it, nice and easy."
+  },
+  {
+   "id": "three.final.02",
+   "moment": "three.final",
+   "text": "Shooting last, number known. My old coach called that a gift."
+  },
+  {
+   "id": "three.final.03",
+   "moment": "three.final",
+   "text": "Final round. The others are done. Now it's you. Beat the number, sprout."
+  },
+  {
+   "id": "three.clinch.01",
+   "moment": "three.clinch",
+   "text": "That's the number! It's yours!"
+  },
+  {
+   "id": "three.clinch.02",
+   "moment": "three.clinch",
+   "text": "Well, now. That'll win it."
+  },
+  {
+   "id": "three.clinch.03",
+   "moment": "three.clinch",
+   "text": "Past the number! Go on, smile!"
+  },
+  {
+   "id": "three.champion.01",
+   "moment": "three.champion",
+   "text": "Three-point champion of Blossom Park! Put that name up by the fountain."
+  },
+  {
+   "id": "three.champion.02",
+   "moment": "three.champion",
+   "text": "Champion! Back in my day, the prize was a free cone. Today, too. Rollie?"
+  },
+  {
+   "id": "three.champion.03",
+   "moment": "three.champion",
+   "text": "The best shooter in Blossom Park. Hollis wants a rematch, set shot only."
+  },
+  {
+   "id": "game.intro.ones.01",
+   "moment": "game.intro.ones",
+   "text": "Ones at Blossom Park. First to eleven, make it take it. The bench is watching, so play clean."
+  },
+  {
+   "id": "game.intro.ones.02",
+   "moment": "game.intro.ones",
+   "text": "One on one, the oldest game in the park. First to eleven. You score, you keep it."
+  },
+  {
+   "id": "game.intro.threes.01",
+   "moment": "game.intro.threes",
+   "text": "Threes, folks. Three a side, first to twenty-one, ninety seconds on the clock. Share the ball like it's ice cream."
+  },
+  {
+   "id": "game.intro.threes.02",
+   "moment": "game.intro.threes",
+   "text": "Now we've got a real run. Twenty-one wins, ninety-second clock. Back in my day, the clock was sundown."
+  },
+  {
+   "id": "game.check.01",
+   "moment": "game.check",
+   "text": "Their ball. Dig in, sprout."
+  },
+  {
+   "id": "game.check.02",
+   "moment": "game.check",
+   "text": "Check it up. Defense now."
+  },
+  {
+   "id": "game.check.03",
+   "moment": "game.check",
+   "text": "Other side's ball. Stay in front."
+  },
+  {
+   "id": "game.check.04",
+   "moment": "game.check",
+   "text": "Get low, youngster. Their ball."
+  },
+  {
+   "id": "game.make.01",
+   "moment": "game.make",
+   "text": "Sunday bucket."
+  },
+  {
+   "id": "game.make.02",
+   "moment": "game.make",
+   "text": "Pretty jumper."
+  },
+  {
+   "id": "game.make.03",
+   "moment": "game.make",
+   "text": "That'll play."
+  },
+  {
+   "id": "game.make.04",
+   "moment": "game.make",
+   "text": "Nice and easy."
+  },
+  {
+   "id": "game.make.05",
+   "moment": "game.make",
+   "text": "Good. Real good."
+  },
+  {
+   "id": "game.make.06",
+   "moment": "game.make",
+   "text": "Old-school. I like it."
+  },
+  {
+   "id": "game.three.01",
+   "moment": "game.three",
+   "text": "From way back. Lovely."
+  },
+  {
+   "id": "game.three.02",
+   "moment": "game.three",
+   "text": "Three! Rollie, ring it!"
+  },
+  {
+   "id": "game.three.03",
+   "moment": "game.three",
+   "text": "Deep one. Park felt that."
+  },
+  {
+   "id": "game.three.04",
+   "moment": "game.three",
+   "text": "Ooh, from the petals!"
+  },
+  {
+   "id": "game.three.05",
+   "moment": "game.three",
+   "text": "That's a grown-up shot."
+  },
+  {
+   "id": "game.layup.01",
+   "moment": "game.layup",
+   "text": "Soft. Like a petal."
+  },
+  {
+   "id": "game.layup.02",
+   "moment": "game.layup",
+   "text": "Laid it in nice."
+  },
+  {
+   "id": "game.layup.03",
+   "moment": "game.layup",
+   "text": "Old-timer finish. Beautiful."
+  },
+  {
+   "id": "game.layup.04",
+   "moment": "game.layup",
+   "text": "Up and in."
+  },
+  {
+   "id": "game.dunk.01",
+   "moment": "game.dunk",
+   "text": "Well, look at that!"
+  },
+  {
+   "id": "game.dunk.02",
+   "moment": "game.dunk",
+   "text": "Right through it!"
+  },
+  {
+   "id": "game.dunk.03",
+   "moment": "game.dunk",
+   "text": "Threw it down, sprout!"
+  },
+  {
+   "id": "game.dunk.04",
+   "moment": "game.dunk",
+   "text": "Petals everywhere!"
+  },
+  {
+   "id": "game.dunk.05",
+   "moment": "game.dunk",
+   "text": "Oh, the old tree shook!"
+  },
+  {
+   "id": "game.poster.01",
+   "moment": "game.poster",
+   "text": "Oh, now hold on. Hold everything!"
+  },
+  {
+   "id": "game.poster.02",
+   "moment": "game.poster",
+   "text": "Rollie dropped a cone on that!"
+  },
+  {
+   "id": "game.poster.03",
+   "moment": "game.poster",
+   "text": "Frame that one for the fountain!"
+  },
+  {
+   "id": "game.poster.04",
+   "moment": "game.poster",
+   "text": "Cornbread fell off the folding chair!"
+  },
+  {
+   "id": "game.poster.05",
+   "moment": "game.poster",
+   "text": "Right on top of them!"
+  },
+  {
+   "id": "game.poster.06",
+   "moment": "game.poster",
+   "text": "Forty years! Never! Never like that!"
+  },
+  {
+   "id": "game.andone.01",
+   "moment": "game.andone",
+   "text": "Bumped and still scored!"
+  },
+  {
+   "id": "game.andone.02",
+   "moment": "game.andone",
+   "text": "Bucket, and the whistle!"
+  },
+  {
+   "id": "game.andone.03",
+   "moment": "game.andone",
+   "text": "And a cherry on top!"
+  },
+  {
+   "id": "game.andone.04",
+   "moment": "game.andone",
+   "text": "Counts, plus the foul!"
+  },
+  {
+   "id": "game.miss.01",
+   "moment": "game.miss",
+   "text": "Not quite."
+  },
+  {
+   "id": "game.miss.02",
+   "moment": "game.miss",
+   "text": "Rim wasn't having it."
+  },
+  {
+   "id": "game.miss.03",
+   "moment": "game.miss",
+   "text": "Next time, sprout."
+  },
+  {
+   "id": "game.miss.04",
+   "moment": "game.miss",
+   "text": "Close. Not close enough."
+  },
+  {
+   "id": "game.airball.01",
+   "moment": "game.airball",
+   "text": "Airball. The bench noticed."
+  },
+  {
+   "id": "game.airball.02",
+   "moment": "game.airball",
+   "text": "Missed everything. Even the petals."
+  },
+  {
+   "id": "game.airball.03",
+   "moment": "game.airball",
+   "text": "Oh, Cornbread's going to talk."
+  },
+  {
+   "id": "game.airball.04",
+   "moment": "game.airball",
+   "text": "My, my. Not even close."
+  },
+  {
+   "id": "game.block.01",
+   "moment": "game.block",
+   "text": "Sent it back!"
+  },
+  {
+   "id": "game.block.02",
+   "moment": "game.block",
+   "text": "Rejected! Good hands, youngster!"
+  },
+  {
+   "id": "game.block.03",
+   "moment": "game.block",
+   "text": "Blocked! Rollie felt that!"
+  },
+  {
+   "id": "game.block.04",
+   "moment": "game.block",
+   "text": "Shooed it like a pigeon!"
+  },
+  {
+   "id": "game.block.05",
+   "moment": "game.block",
+   "text": "Oh, that's a Sunday block."
+  },
+  {
+   "id": "game.block.06",
+   "moment": "game.block",
+   "text": "Nope! Not today!"
+  },
+  {
+   "id": "game.blocked.01",
+   "moment": "game.blocked",
+   "text": "Blocked. Humbling, isn't it?"
+  },
+  {
+   "id": "game.blocked.02",
+   "moment": "game.blocked",
+   "text": "Got stuffed. Happens."
+  },
+  {
+   "id": "game.blocked.03",
+   "moment": "game.blocked",
+   "text": "Oh, that one got caught."
+  },
+  {
+   "id": "game.blocked.04",
+   "moment": "game.blocked",
+   "text": "Try it again, sprout."
+  },
+  {
+   "id": "game.steal.01",
+   "moment": "game.steal",
+   "text": "Stole it! Clean!"
+  },
+  {
+   "id": "game.steal.02",
+   "moment": "game.steal",
+   "text": "Took it right from them!"
+  },
+  {
+   "id": "game.steal.03",
+   "moment": "game.steal",
+   "text": "Ha! Didn't even see it!"
+  },
+  {
+   "id": "game.steal.04",
+   "moment": "game.steal",
+   "text": "Your ball now, sprout."
+  },
+  {
+   "id": "game.steal.05",
+   "moment": "game.steal",
+   "text": "Quick hands, youngster!"
+  },
+  {
+   "id": "game.stolen.01",
+   "moment": "game.stolen",
+   "text": "Lost it. Hold on tighter."
+  },
+  {
+   "id": "game.stolen.02",
+   "moment": "game.stolen",
+   "text": "Go on, fetch it."
+  },
+  {
+   "id": "game.stolen.03",
+   "moment": "game.stolen",
+   "text": "Oh, they took your lunch."
+  },
+  {
+   "id": "game.stolen.04",
+   "moment": "game.stolen",
+   "text": "Loose handle. Tighten it up."
+  },
+  {
+   "id": "game.ankles.01",
+   "moment": "game.ankles",
+   "text": "Bring the defender a chair!"
+  },
+  {
+   "id": "game.ankles.02",
+   "moment": "game.ankles",
+   "text": "Crossed up! Petals flying!"
+  },
+  {
+   "id": "game.ankles.03",
+   "moment": "game.ankles",
+   "text": "Whoa, where'd the defender go?"
+  },
+  {
+   "id": "game.ankles.04",
+   "moment": "game.ankles",
+   "text": "Oh, that's just unkind!"
+  },
+  {
+   "id": "game.ankles.05",
+   "moment": "game.ankles",
+   "text": "The old-timers felt that!"
+  },
+  {
+   "id": "game.ankles.06",
+   "moment": "game.ankles",
+   "text": "Ha! Defender's at the fountain!"
+  },
+  {
+   "id": "game.bite.01",
+   "moment": "game.bite",
+   "text": "Fell for it!"
+  },
+  {
+   "id": "game.bite.02",
+   "moment": "game.bite",
+   "text": "Oldest trick in the park."
+  },
+  {
+   "id": "game.bite.03",
+   "moment": "game.bite",
+   "text": "Fooled them. Patience pays."
+  },
+  {
+   "id": "game.bite.04",
+   "moment": "game.bite",
+   "text": "Defender jumped at shadows!"
+  },
+  {
+   "id": "game.foul.01",
+   "moment": "game.foul",
+   "text": "Whistle. Hold up."
+  },
+  {
+   "id": "game.foul.02",
+   "moment": "game.foul",
+   "text": "That's a call."
+  },
+  {
+   "id": "game.foul.03",
+   "moment": "game.foul",
+   "text": "Easy now, play clean."
+  },
+  {
+   "id": "game.foul.04",
+   "moment": "game.foul",
+   "text": "Rule book says no."
+  },
+  {
+   "id": "game.rival.make.01",
+   "moment": "game.rival.make",
+   "text": "They answered. Answer back."
+  },
+  {
+   "id": "game.rival.make.02",
+   "moment": "game.rival.make",
+   "text": "Other side scores. Your turn."
+  },
+  {
+   "id": "game.rival.make.03",
+   "moment": "game.rival.make",
+   "text": "Well, they can play too."
+  },
+  {
+   "id": "game.rival.make.04",
+   "moment": "game.rival.make",
+   "text": "Bucket for them. Stay patient."
+  },
+  {
+   "id": "game.rival.make.05",
+   "moment": "game.rival.make",
+   "text": "Don't let that settle, sprout."
+  },
+  {
+   "id": "game.rival.dunk.01",
+   "moment": "game.rival.dunk",
+   "text": "Oh, they meant that one."
+  },
+  {
+   "id": "game.rival.dunk.02",
+   "moment": "game.rival.dunk",
+   "text": "That one's going in their scrapbook."
+  },
+  {
+   "id": "game.rival.dunk.03",
+   "moment": "game.rival.dunk",
+   "text": "Easy, sprout. Get it back."
+  },
+  {
+   "id": "game.rival.dunk.04",
+   "moment": "game.rival.dunk",
+   "text": "Loud one. Don't take it personal."
+  },
+  {
+   "id": "game.run.01",
+   "moment": "game.run",
+   "text": "Unanswered, and the bench is counting."
+  },
+  {
+   "id": "game.run.02",
+   "moment": "game.run",
+   "text": "Rolling now. Somebody stop this youngster."
+  },
+  {
+   "id": "game.run.03",
+   "moment": "game.run",
+   "text": "Look at this run. Petals can't keep up."
+  },
+  {
+   "id": "game.run.04",
+   "moment": "game.run",
+   "text": "That's a spring rain, folks. Steady, steady."
+  },
+  {
+   "id": "game.point.us.01",
+   "moment": "game.point",
+   "text": "One more bucket, sprout. Then ice cream.",
+   "tags": [
+    "side:us"
+   ]
+  },
+  {
+   "id": "game.point.them.01",
+   "moment": "game.point",
+   "text": "Their game point. One stop. Just one.",
+   "tags": [
+    "side:them"
+   ]
+  },
+  {
+   "id": "game.win.01",
+   "moment": "game.win",
+   "text": "Game! Checkers table, you seeing this?"
+  },
+  {
+   "id": "game.win.02",
+   "moment": "game.win",
+   "text": "That's the game, sprout. The bench tips its caps."
+  },
+  {
+   "id": "game.win.03",
+   "moment": "game.win",
+   "text": "Winner! Rollie, one cone, on the house!"
+  },
+  {
+   "id": "game.win.04",
+   "moment": "game.win",
+   "text": "Ballgame! Just like the old Sundays!"
+  },
+  {
+   "id": "game.loss.01",
+   "moment": "game.loss",
+   "text": "They take it. Run it back. I'm not going anywhere."
+  },
+  {
+   "id": "game.loss.02",
+   "moment": "game.loss",
+   "text": "Other side wins it. Spring's long. Plenty more runs."
+  },
+  {
+   "id": "game.loss.03",
+   "moment": "game.loss",
+   "text": "Game's theirs. The bench saw the effort, youngster. Come back."
+  },
+  {
+   "id": "game.draw.01",
+   "moment": "game.draw",
+   "text": "Tied at the horn. Even the petals can't pick."
+  },
+  {
+   "id": "game.draw.02",
+   "moment": "game.draw",
+   "text": "A tie. We'd have played till the lamps came on."
+  },
+  {
+   "id": "game.assist.01",
+   "moment": "game.assist",
+   "text": "Beautiful pass!"
+  },
+  {
+   "id": "game.assist.02",
+   "moment": "game.assist",
+   "text": "Shared it. That's manners."
+  },
+  {
+   "id": "game.assist.03",
+   "moment": "game.assist",
+   "text": "What a dime!"
+  },
+  {
+   "id": "game.assist.04",
+   "moment": "game.assist",
+   "text": "Found the open hooper."
+  },
+  {
+   "id": "game.alleyoop.01",
+   "moment": "game.alleyoop",
+   "text": "Alley-oop! Oh, lovely!"
+  },
+  {
+   "id": "game.alleyoop.02",
+   "moment": "game.alleyoop",
+   "text": "Up top! Caught and flushed!"
+  },
+  {
+   "id": "game.alleyoop.03",
+   "moment": "game.alleyoop",
+   "text": "Lobbed it, they finished it!"
+  },
+  {
+   "id": "game.clock.01",
+   "moment": "game.clock",
+   "text": "Ten seconds, folks!"
+  },
+  {
+   "id": "game.clock.02",
+   "moment": "game.clock",
+   "text": "Clock's going. Ten left!"
+  },
+  {
+   "id": "game.clock.03",
+   "moment": "game.clock",
+   "text": "Hurry, sprout! Ten seconds!"
+  },
+  {
+   "id": "game.overdrive.01",
+   "moment": "game.overdrive",
+   "text": "Whole team's in bloom now!"
+  },
+  {
+   "id": "game.overdrive.02",
+   "moment": "game.overdrive",
+   "text": "Now that's a team!"
+  },
+  {
+   "id": "game.overdrive.03",
+   "moment": "game.overdrive",
+   "text": "All together now! Beautiful!"
+  },
+  {
+   "id": "carnival.intro.01",
+   "moment": "carnival.intro",
+   "text": "Game Night, folks! Four little events, points for every one, and a single champion takes home the bragging rights."
+  },
+  {
+   "id": "carnival.intro.02",
+   "moment": "carnival.intro",
+   "text": "Welcome to Game Night. Back in my day, this was called Tuesday. Four events, points each, one champion."
+  },
+  {
+   "id": "carnival.intro.03",
+   "moment": "carnival.intro",
+   "text": "Tonight's a little bit of everything, like Rollie's sundae. Four scoops, points on each, one champion."
+  },
+  {
+   "id": "carnival.event.slam_rush.01",
+   "moment": "carnival.event",
+   "text": "Slam Rush. Twenty seconds, as many dunks as you can manage.",
+   "tags": [
+    "ev:slam_rush"
+   ]
+  },
+  {
+   "id": "carnival.event.strike_storm.01",
+   "moment": "carnival.event",
+   "text": "Strike Storm. Land hits on the pads. Quick now, quick.",
+   "tags": [
+    "ev:strike_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.trick_gauntlet.01",
+   "moment": "carnival.event",
+   "text": "Trick Gauntlet. Hop on a board and string some tricks together.",
+   "tags": [
+    "ev:trick_gauntlet"
+   ]
+  },
+  {
+   "id": "carnival.event.hot_shot.01",
+   "moment": "carnival.event",
+   "text": "Hot Shot. Put shots on goal. The goal's the big thing, sprout.",
+   "tags": [
+    "ev:hot_shot"
+   ]
+  },
+  {
+   "id": "carnival.event.coin_storm.01",
+   "moment": "carnival.event",
+   "text": "Coin Storm. Grab every coin. First time this park's ever paid anybody.",
+   "tags": [
+    "ev:coin_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.counter_strike.01",
+   "moment": "carnival.event",
+   "text": "Counters next. Patience. Let the jab come, then answer it.",
+   "tags": [
+    "ev:counter_strike"
+   ]
+  },
+  {
+   "id": "carnival.go.01",
+   "moment": "carnival.go",
+   "text": "And... go!"
+  },
+  {
+   "id": "carnival.go.02",
+   "moment": "carnival.go",
+   "text": "Off with you!"
+  },
+  {
+   "id": "carnival.go.03",
+   "moment": "carnival.go",
+   "text": "Begin, sprout!"
+  },
+  {
+   "id": "carnival.clock.01",
+   "moment": "carnival.clock",
+   "text": "Five seconds!"
+  },
+  {
+   "id": "carnival.clock.02",
+   "moment": "carnival.clock",
+   "text": "Hurry now, five left!"
+  },
+  {
+   "id": "carnival.clock.03",
+   "moment": "carnival.clock",
+   "text": "Last five, youngster!"
+  },
+  {
+   "id": "carnival.eventwin.01",
+   "moment": "carnival.eventwin",
+   "text": "That one's yours, sprout. Tuck those points away."
+  },
+  {
+   "id": "carnival.eventwin.02",
+   "moment": "carnival.eventwin",
+   "text": "Event goes to you! Don't spend it all now."
+  },
+  {
+   "id": "carnival.eventwin.03",
+   "moment": "carnival.eventwin",
+   "text": "Well done. The old-timers are nodding, and they never nod."
+  },
+  {
+   "id": "carnival.eventwin.04",
+   "moment": "carnival.eventwin",
+   "text": "Won it! Knew you had that in you."
+  },
+  {
+   "id": "carnival.eventloss.01",
+   "moment": "carnival.eventloss",
+   "text": "Rival takes that one. Plenty of night left."
+  },
+  {
+   "id": "carnival.eventloss.02",
+   "moment": "carnival.eventloss",
+   "text": "Not yours, that one. Shake the petals off."
+  },
+  {
+   "id": "carnival.eventloss.03",
+   "moment": "carnival.eventloss",
+   "text": "Lost that event. The next event doesn't know that."
+  },
+  {
+   "id": "carnival.tie.01",
+   "moment": "carnival.tie",
+   "text": "A tie. Share the cone, you two."
+  },
+  {
+   "id": "carnival.tie.02",
+   "moment": "carnival.tie",
+   "text": "Right down the middle. Nobody blinked."
+  },
+  {
+   "id": "carnival.handoff.01",
+   "moment": "carnival.handoff",
+   "text": "Player two, your turn. Pass the controller gently."
+  },
+  {
+   "id": "carnival.handoff.02",
+   "moment": "carnival.handoff",
+   "text": "Share nicely, now. Player two, you're up."
+  },
+  {
+   "id": "carnival.champion.01",
+   "moment": "carnival.champion",
+   "text": "Game Night champion! Folks, that's the one they'll talk about on Sundays."
+  },
+  {
+   "id": "carnival.champion.02",
+   "moment": "carnival.champion",
+   "text": "Champion of the whole night! The bench remembers, and so will Rollie."
+  },
+  {
+   "id": "carnival.champion.03",
+   "moment": "carnival.champion",
+   "text": "Four events, and one youngster on top of them all. Make some noise, folks!"
+  },
+  {
+   "id": "carnival.runnerup.01",
+   "moment": "carnival.runnerup",
+   "text": "Rival takes the night. Close, though. Close enough to come right back."
+  },
+  {
+   "id": "carnival.runnerup.02",
+   "moment": "carnival.runnerup",
+   "text": "Not your night, sprout. Best stories I know start with a loss."
+  }
+ ]
+}

@@ -1,0 +1,140 @@
+{
+ "cast": "crowd_b",
+ "lines": [
+  {
+   "id": "crowd.hype.01",
+   "moment": "crowd.hype",
+   "text": "Get up, get up!"
+  },
+  {
+   "id": "crowd.hype.02",
+   "moment": "crowd.hype",
+   "text": "I can't even look!"
+  },
+  {
+   "id": "crowd.hype.03",
+   "moment": "crowd.hype",
+   "text": "Big one coming!"
+  },
+  {
+   "id": "crowd.hype.04",
+   "moment": "crowd.hype",
+   "text": "Bring it! Bring it!"
+  },
+  {
+   "id": "crowd.ooh.01",
+   "moment": "crowd.ooh",
+   "text": "Whoa! Whoa!"
+  },
+  {
+   "id": "crowd.ooh.02",
+   "moment": "crowd.ooh",
+   "text": "Look at that!"
+  },
+  {
+   "id": "crowd.ooh.03",
+   "moment": "crowd.ooh",
+   "text": "Oh, buddy!"
+  },
+  {
+   "id": "crowd.cheer.01",
+   "moment": "crowd.cheer",
+   "text": "Let's go! Let's go!"
+  },
+  {
+   "id": "crowd.cheer.02",
+   "moment": "crowd.cheer",
+   "text": "Buckets!"
+  },
+  {
+   "id": "crowd.cheer.03",
+   "moment": "crowd.cheer",
+   "text": "Beautiful! Beautiful!"
+  },
+  {
+   "id": "crowd.cheer.04",
+   "moment": "crowd.cheer",
+   "text": "In! It's in!"
+  },
+  {
+   "id": "crowd.erupt.01",
+   "moment": "crowd.erupt",
+   "text": "No way! No way!"
+  },
+  {
+   "id": "crowd.erupt.02",
+   "moment": "crowd.erupt",
+   "text": "Are you serious right now?!"
+  },
+  {
+   "id": "crowd.erupt.03",
+   "moment": "crowd.erupt",
+   "text": "Did everybody see that?!"
+  },
+  {
+   "id": "crowd.erupt.04",
+   "moment": "crowd.erupt",
+   "text": "My voice is gone!"
+  },
+  {
+   "id": "crowd.groan.01",
+   "moment": "crowd.groan",
+   "text": "Oh, come on..."
+  },
+  {
+   "id": "crowd.groan.02",
+   "moment": "crowd.groan",
+   "text": "Heartbreaker!"
+  },
+  {
+   "id": "crowd.groan.03",
+   "moment": "crowd.groan",
+   "text": "So close, so close!"
+  },
+  {
+   "id": "crowd.heckle.01",
+   "moment": "crowd.heckle",
+   "text": "Hit the rim at least!"
+  },
+  {
+   "id": "crowd.heckle.02",
+   "moment": "crowd.heckle",
+   "text": "Return to sender!"
+  },
+  {
+   "id": "crowd.heckle.03",
+   "moment": "crowd.heckle",
+   "text": "Nope! Try again!"
+  },
+  {
+   "id": "crowd.idle.01",
+   "moment": "crowd.idle",
+   "text": "Scoot over, let my cousin sit."
+  },
+  {
+   "id": "crowd.idle.02",
+   "moment": "crowd.idle",
+   "text": "I'm telling everybody at work tomorrow."
+  },
+  {
+   "id": "crowd.idle.03",
+   "moment": "crowd.idle",
+   "text": "Grab me a drink, I'm not moving."
+  },
+  {
+   "id": "crowd.idle.04",
+   "moment": "crowd.idle",
+   "text": "Best seats we have ever had, easy."
+  },
+  {
+   "id": "crowd.idle.05",
+   "moment": "crowd.idle",
+   "text": "Next time we bring the whole crew."
+  },
+  {
+   "id": "crowd.defense.01",
+   "moment": "crowd.defense",
+   "text": "Get a stop!"
+  }
+ ]
+}

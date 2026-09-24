@@ -36,6 +36,7 @@ import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
 import {
   pickNight, rollRival, rivalProgress, freshTally, bankEvent, nightChampion, nightBoard, type NightTally,
 } from '../core/CarnivalNight';
+import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the MC calls Game Night, the stands react
 
 type Phase = 'pick' | 'reveal' | 'playing' | 'handoff' | 'eventOver' | 'finale';
 const PICK_TIMEOUT_S = 6;
@@ -57,6 +58,14 @@ const BLURB: Record<string, string> = {
   coin_storm: 'Sprint the pattern — clear it and a fresh one drops',
   counter_strike: 'Read the wind-up, tap GO at the last instant',
 };
+
+/** THE MIC: events whose timing cue is a SOUND (the counter's wind-up whoosh). The booth is silent from the whistle until the
+ *  clock runs out (no "go": the first wind-up comes 0.4–0.9 s after the whistle), and the stands stay quiet, so nothing talks
+ *  over the cue the player is timing. */
+const MIC_HELD: ReadonlySet<string> = new Set(['counter_strike']);
+/** THE MIC's court: the carnival has no court pick, so its place look picks the MC (the rooftop look gets the rooftop's host;
+ *  the Carnival Court and the Boardwalk get Venice's). */
+const micCourt = (): string => (readPlaceLook('carnival')?.id === 'neon-block' ? 'rooftop' : 'venice');
 
 /** Everything an instance owns. Keyed by the harness scene: a host that mounts twice (React strict mode: effect →
  *  cleanup → effect) runs two load()s that INTERLEAVE, and module-level state let the phantom's hub win over the live
@@ -92,6 +101,14 @@ interface St {
   /** A+ P0 juice latches: one event-win punch per event (reset when the next event starts), one champion punch per night. */
   eventLatch: boolean;
   champLatch: boolean;
+  /** THE MIC: one per night. `micOpening` until the first event's card (the welcome is the pick screen's), `micOpened` once
+   *  the welcome is said, `micQuiet` the dead time the booth / the stands are filling ('pick', 'board' or ''), `micClock` the
+   *  five-seconds call of this attempt is said. */
+  mic: ModeMic | null;
+  micOpening: boolean;
+  micOpened: boolean;
+  micQuiet: string;
+  micClock: boolean;
 }
 
 const states = new WeakMap<BABYLON.Scene, St>();
@@ -190,6 +207,12 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     // SCORECARD FEEL: the night is four events, and the turn of one is the biggest beat the hub has (3 juice beats a minute)
     ctx.juice.flash('#ffd75e', 110);
     ctx.juice.callout(S.current.title, '#ffd75e', 900);
+    // THE MIC names the event over its card. The first card ends the pick screen's welcome where it is (the player pressed
+    // on, as the dunk's welcome stops when the player runs): queued behind the welcome and the Game Night intro, the name
+    // was cut by the first whistle before it was ever said, and when the press beat the voices it jumped AHEAD of the intro.
+    // Later cards wait a beat for the last result call to finish (equal priority) and cut the board's filler.
+    if (S.micOpening) { S.micOpening = false; S.mic?.hush(); }
+    S.mic?.say({ moment: 'carnival.event', tags: [`ev:${S.current.id}`], priority: 2 });
     await new Promise((r) => setTimeout(r, REVEAL_S * 1000));
     if (S.ended || S.scene.isDisposed) return;
     await runAttempt(ctx, S);
@@ -204,11 +227,13 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     if (S.players === 1) S.rivalTarget = Math.round(rollRival(S.current.rivalRange) * S.current.pointsPerUnit);
     setPhase(S, 'playing');
     SoundKit.play('whistle');
+    micGo(S);
     hud(ctx, S, { time: S.current.durationSec, turnLabel: S.players > 1 ? `${names(S)[S.turn]} — GO` : '' });
   }
 
   function endAttempt(ctx: ModeContext, S: St): void {
     if (!S.current) return;
+    S.mic?.release();   // THE MIC: a held event's clock is out; the booth may talk again
     const raw = S.current.tick(ctx, 0);
     const points = Math.round(raw * S.current.pointsPerUnit);
     S.current.teardown();
@@ -220,6 +245,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       showHub(ctx, S, true);
       SoundKit.play('uiTick', { pitch: 1.1 });
       hud(ctx, S, { banner: `${S.current.title}: ${names(S)[0]} ${points}`, blurb: `${names(S)[1]} — YOUR TURN`, time: null, turnLabel: '' });
+      S.mic?.say({ moment: 'carnival.handoff', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });   // THE MIC: pass the pad
       return;
     }
     if (S.players === 1) S.turnPoints[1] = S.rivalTarget;
@@ -242,6 +268,11 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     setResult(S, w === -1 ? null : rivalTookIt ? 1 : 0);
     if (w === 0) { EffectsKit.burst(ctx.scene, ctx.camera.position, 'confetti'); SoundKit.play('crowdCheer', { volume: 0.4 }); eventWinPunch(ctx, S); }
     else if (w === 1) { SoundKit.play('crowdGroan', { volume: 0.4 }); rivalSoftFlash(ctx, 'event'); }
+    // THE MIC: the result is the night's best speech window (the board, then the next card: ~5 s) — who took it, and the
+    // stands. Two on one screen, P2 taking it is still a player's win (the loss lines are about the rival).
+    if (w === -1) S.mic?.say({ moment: 'carnival.tie', priority: 2, crowd: { moment: 'crowd.ooh', n: 1 } });
+    else if (w === 0 || S.players > 1) S.mic?.say({ moment: 'carnival.eventwin', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } });
+    else S.mic?.say({ moment: 'carnival.eventloss', priority: 2, crowd: { moment: 'crowd.groan', n: 1 } });
     const [n1, n2] = names(S);
     hud(ctx, S, {
       banner: `${S.current.title}: ${n1} ${a} · ${n2} ${b}`,
@@ -280,10 +311,46 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       blurb: `${n1} ${S.tally.points[0]} · ${n2} ${S.tally.points[1]}`,
       board: nightBoard(S.tally, names(S)), boardTitle: 'FINAL',
     });
+    // THE MIC: the champion is called BEFORE ctx.end parks the harness (the voice plays on over the result screen). Two on
+    // one screen, whoever takes it is the champion (the runner-up lines are about the rival).
+    const champCall = won || S.players > 1;
+    S.mic?.hush();
+    S.mic?.say({ moment: champCall ? 'carnival.champion' : 'carnival.runnerup', priority: 3,
+      crowd: champCall ? { moment: 'crowd.erupt', n: 3 } : { moment: 'crowd.groan', n: 1 } });
     ctx.end(won ? 'CHAMPION' : 'RUNNER_UP', S.tally.points[0], {
       rivalPoints: S.tally.points[1], events: S.events.length, players: S.players,
       eventsWon: S.tally.won[0].length, rivalEventsWon: S.tally.won[1].length, champion: champ,
     });
+  }
+
+  // ── THE MIC ─────────────────────────────────────────────────────────
+  /** Every frame: the welcome once the voices are in (only before the first whistle — never mid-event), the mic's clock, and
+   *  the booth's filler only on the result board / the stands' chatter on the board and the pick screen (dead time). */
+  function micTick(ctx: ModeContext, S: St): void {
+    const mic = S.mic; if (!mic) return;
+    // the pick screen only: a welcome begun under the first card was cut by its whistle, and the stall watchdog can start
+    // an event with no whistle at all (the welcome would have run over play)
+    if (!S.micOpened && S.micOpening && S.phase === 'pick' && mic.ready && ctx.phase() === 'playing') {
+      S.micOpened = true;   // the court's welcome, then Game Night (the first card cuts whatever is left of them)
+      mic.say({ moment: 'intro.court', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
+      mic.then({ moment: 'carnival.intro', priority: 2 });
+    }
+    mic.update();
+    const quiet = S.phase === 'eventOver' ? 'board' : S.phase === 'pick' ? 'pick' : '';
+    if (quiet !== S.micQuiet) {
+      S.micQuiet = quiet;
+      mic.setFiller(quiet === 'board' ? ['filler.banter', 'filler.crowd'] : null);
+      mic.setCrowdIdle(quiet ? 'crowd.idle' : null);
+    }
+  }
+  /** The whistle: "Go!" The event's name may still be finishing: the go waits a beat for it or lets it go (equal priority).
+   *  A held event gets no go at all: its first wind-up whoosh comes 0.4–0.9 s after the whistle, so a "Go!" landed right on
+   *  the first cue the player times. The whistle is its go; the booth is cleared and held until the clock runs out. */
+  function micGo(S: St): void {
+    const mic = S.mic; if (!mic || !S.current) return;
+    S.micClock = false;
+    if (MIC_HELD.has(S.current.id)) { mic.hush(); mic.hold(S.current.durationSec + 1); return; }   // released at the end of the attempt
+    mic.say({ moment: 'carnival.go', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
   }
 
   return {
@@ -303,9 +370,12 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         players: Math.max(1, Math.min(2, Number(q ?? 1) || 1)), turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
         ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, eventLatch: false, champLatch: false,
         hostPP: null, guestPP: null, hostBio: { ...STAGE_INPUT_IDLE, watching: true }, guestBio: { ...STAGE_INPUT_IDLE, watching: true },
+        mic: null, micOpening: true, micOpened: false, micQuiet: '', micClock: false,
       };
       states.set(ctx.scene, S); live.add(S);
       SoundKit.startAmbient('stadium');
+      // THE MIC: the night's MC, the sidekick and the stands (the banks load in the background; nothing waits on them)
+      S.mic = new ModeMic(ctx, { groups: ['carnival'], court: micCourt() });
 
       // THE HUB: the Carnival Court under the cards, party-goers on its actor spots — you (and P2 / the rival)
       S.host = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: HUB_SPOTS[0].clone(), yawRad: Math.PI });
@@ -379,6 +449,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       const S = st(ctx); if (!S || S.ended) return;
       S.phaseSec += dt;
+      micTick(ctx, S);
 
       if (S.phase === 'pick') { S.pickSec += dt; if (S.autoBegin || S.pickSec >= PICK_TIMEOUT_S) begin(ctx, S); return; }
 
@@ -395,6 +466,10 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
           extra.turnLabel = `${names(S)[S.turn]} — ${Math.ceil(left)}s`;
         }
         ctx.setHud(extra);
+        if (!S.micClock && left <= 5 && left > 0) {
+          S.micClock = true;   // THE MIC: once, at five seconds (not on a held event: the stands would cover the cue too)
+          if (!MIC_HELD.has(S.current.id)) S.mic?.say({ moment: 'carnival.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
+        }
         if (left <= 0) endAttempt(ctx, S);
         return;
       }
@@ -414,7 +489,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // things to do by hand are the instance whose scene is GOING away — found on the next tick by `isDisposed` —
       // and the ambient bed, which stays up while another instance is still live (strict-mode phantom stop).
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) { S.ended = true; S.current = null; S.hostPP?.dispose(); S.hostPP = null; S.guestPP?.dispose(); S.guestPP = null; live.delete(S); }
+        for (const S of live) if (S.scene.isDisposed) { S.ended = true; S.current = null; S.hostPP?.dispose(); S.hostPP = null; S.guestPP?.dispose(); S.guestPP = null; S.mic?.dispose(); S.mic = null; live.delete(S); }   // THE MIC stops with its night
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

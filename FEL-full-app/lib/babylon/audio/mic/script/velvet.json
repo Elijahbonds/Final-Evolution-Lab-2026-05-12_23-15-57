@@ -1,0 +1,2060 @@
+{
+ "cast": "velvet",
+ "lines": [
+  {
+   "id": "intro.court.01",
+   "moment": "intro.court",
+   "text": "Good evening, city. This is Velvet, coming to you from the Rooftop. String lights on, skyline up, and After Hours is open."
+  },
+  {
+   "id": "intro.court.02",
+   "moment": "intro.court",
+   "text": "You found the Night Rooftop. Twenty floors up, the whole city watching. I'm Velvet, and nobody sleeps tonight."
+  },
+  {
+   "id": "intro.court.03",
+   "moment": "intro.court",
+   "text": "Welcome to After Hours. I'm Velvet. Up here we keep it low, keep it smooth, and let the skyline judge."
+  },
+  {
+   "id": "intro.court.04",
+   "moment": "intro.court",
+   "text": "Hey, night people. The elevator's slow again, so if you took the stairs, you earned your seat. Velvet, live from the Rooftop."
+  },
+  {
+   "id": "filler.crowd.01",
+   "moment": "filler.crowd",
+   "text": "Fire escape crew, I see you. Let the whole block hear it."
+  },
+  {
+   "id": "filler.crowd.02",
+   "moment": "filler.crowd",
+   "text": "Tower across the street, flash those window lights if you're watching."
+  },
+  {
+   "id": "filler.crowd.03",
+   "moment": "filler.crowd",
+   "text": "This one goes out to Nico, driving the night bus. Honk if you're listening."
+  },
+  {
+   "id": "filler.crowd.04",
+   "moment": "filler.crowd",
+   "text": "Folks by the water tower... louder. The city can't hear you."
+  },
+  {
+   "id": "filler.crowd.05",
+   "moment": "filler.crowd",
+   "text": "Request line's open. Tonight the only request is noise."
+  },
+  {
+   "id": "filler.crowd.06",
+   "moment": "filler.crowd",
+   "text": "Jules by the planters, you brought the whole building up here. Respect."
+  },
+  {
+   "id": "filler.banter.01",
+   "moment": "filler.banter",
+   "text": "Little breeze up here tonight. That's the city exhaling. It's been waiting all week for this."
+  },
+  {
+   "id": "filler.banter.02",
+   "moment": "filler.banter",
+   "text": "Dumpling cart downstairs stays open till the last shot. Priorities. I respect a cart with priorities."
+  },
+  {
+   "id": "filler.banter.03",
+   "moment": "filler.banter",
+   "text": "A thermos of tea showed up by my mic stand. It's mine now. Rooftop law."
+  },
+  {
+   "id": "filler.banter.04",
+   "moment": "filler.banter",
+   "text": "Somebody hung every one of these string lights by hand. One still blinks. We call it the critic."
+  },
+  {
+   "id": "filler.banter.05",
+   "moment": "filler.banter",
+   "text": "The tower across the street used to complain about the noise. Now they hold up score cards."
+  },
+  {
+   "id": "filler.banter.06",
+   "moment": "filler.banter",
+   "text": "Pigeons on the ledge again. Front row every night, and they never buy a ticket."
+  },
+  {
+   "id": "filler.banter.07",
+   "moment": "filler.banter",
+   "text": "Radio rule number one: never talk over a good play. Rule number two: there's always a good play."
+  },
+  {
+   "id": "filler.banter.08",
+   "moment": "filler.banter",
+   "text": "Hear that rumble? That's the last train of the night. It always slows down to watch."
+  },
+  {
+   "id": "momentum.warming.01",
+   "moment": "momentum.warming",
+   "text": "Oh, there's the opening note."
+  },
+  {
+   "id": "momentum.warming.02",
+   "moment": "momentum.warming",
+   "text": "Warming up nice and slow. Like a record."
+  },
+  {
+   "id": "momentum.warming.03",
+   "moment": "momentum.warming",
+   "text": "Easy now... I see that groove."
+  },
+  {
+   "id": "momentum.hot.01",
+   "moment": "momentum.hot",
+   "text": "Now the whole skyline's paying attention."
+  },
+  {
+   "id": "momentum.hot.02",
+   "moment": "momentum.hot",
+   "text": "Turn the string lights up. It's happening."
+  },
+  {
+   "id": "momentum.hot.03",
+   "moment": "momentum.hot",
+   "text": "Hear that? This roof is yours now."
+  },
+  {
+   "id": "momentum.fire.01",
+   "moment": "momentum.fire",
+   "text": "Okay, now I'm loud. Unstoppable!"
+  },
+  {
+   "id": "momentum.fire.02",
+   "moment": "momentum.fire",
+   "text": "Can't miss. Won't miss. The city's glowing."
+  },
+  {
+   "id": "momentum.fire.03",
+   "moment": "momentum.fire",
+   "text": "Somebody call downstairs. The whole building's shaking!"
+  },
+  {
+   "id": "momentum.fire.04",
+   "moment": "momentum.fire",
+   "text": "Unreal. Nobody touch the dial."
+  },
+  {
+   "id": "momentum.cold.01",
+   "moment": "momentum.cold",
+   "text": "Getting chilly. Grab a jacket, then a bucket."
+  },
+  {
+   "id": "momentum.cold.02",
+   "moment": "momentum.cold",
+   "text": "Slow song right now. Change the record."
+  },
+  {
+   "id": "momentum.cold.03",
+   "moment": "momentum.cold",
+   "text": "Deep breath. The night is long."
+  },
+  {
+   "id": "outro.win.01",
+   "moment": "outro.win",
+   "text": "That's the show. The whole skyline saw it, and the skyline doesn't forget. Goodnight, champ."
+  },
+  {
+   "id": "outro.win.02",
+   "moment": "outro.win",
+   "text": "You came up to the Rooftop and took the whole night. After Hours belongs to you."
+  },
+  {
+   "id": "outro.win.03",
+   "moment": "outro.win",
+   "text": "Take a bow, headliner. That was the best set this roof has heard all year."
+  },
+  {
+   "id": "outro.win.04",
+   "moment": "outro.win",
+   "text": "I don't raise my voice. But for you? Winner! Now go home and dream about it."
+  },
+  {
+   "id": "outro.loss.01",
+   "moment": "outro.loss",
+   "text": "Not your night. This roof stays open, and the city stays up late. Come back."
+  },
+  {
+   "id": "outro.loss.02",
+   "moment": "outro.loss",
+   "text": "The elevator's slow. Use the ride down to plan the rematch."
+  },
+  {
+   "id": "outro.loss.03",
+   "moment": "outro.loss",
+   "text": "Every great set has a rough night. Tomorrow, same roof, same lights. I'll save your spot."
+  },
+  {
+   "id": "outro.loss.04",
+   "moment": "outro.loss",
+   "text": "Head up. The skyline saw the heart in that. Request line's open for the rematch."
+  },
+  {
+   "id": "dunk.intro.01",
+   "moment": "dunk.intro",
+   "text": "Flight Night on the Rooftop. Two rounds, two dunks each, five judges, and tonight's guest leaning on the railing, waiting."
+  },
+  {
+   "id": "dunk.intro.02",
+   "moment": "dunk.intro",
+   "text": "It's Flight Night, city. Two rounds, two dunks apiece, five judges who've heard every song, and a rival who came up here for you."
+  },
+  {
+   "id": "dunk.intro.03",
+   "moment": "dunk.intro",
+   "text": "Lights low, stakes high. Flight Night starts now: two rounds, two dunks each, five judges at the table. Tonight's rival is warm. Are you?"
+  },
+  {
+   "id": "dunk.night.01",
+   "moment": "dunk.night",
+   "text": "You came back. Of course you did. The roof missed you."
+  },
+  {
+   "id": "dunk.night.02",
+   "moment": "dunk.night",
+   "text": "Another night, another set. Same skyline, new chances."
+  },
+  {
+   "id": "dunk.night.03",
+   "moment": "dunk.night",
+   "text": "Welcome back, regular. The city kept your seat warm."
+  },
+  {
+   "id": "dunk.rival.intro.01",
+   "moment": "dunk.rival.intro",
+   "text": "Tonight's guest is here, and they came up twenty floors to take your roof."
+  },
+  {
+   "id": "dunk.rival.intro.02",
+   "moment": "dunk.rival.intro",
+   "text": "Give it up for tonight's rival. One warm round of applause, city. Just the one."
+  },
+  {
+   "id": "dunk.rival.intro.cass.01",
+   "moment": "dunk.rival.intro",
+   "text": "Cass. Hits every note, never plays a solo. Expect the tomahawk, on schedule.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.ty.01",
+   "moment": "dunk.rival.intro",
+   "text": "Ty. Few words, heavy dunks. When that windmill comes around, hold onto the railing.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.pilot.01",
+   "moment": "dunk.rival.intro",
+   "text": "Pilot. Listens to the whole room before playing a note. Then the three-sixty.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.zo.01",
+   "moment": "dunk.rival.intro",
+   "text": "Zo. Doesn't need the trophy, just the clip. Every phone in the tower is already recording.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.stack.01",
+   "moment": "dunk.rival.intro",
+   "text": "Stack. The riskiest dunk in the building, attempted first, with a grin. Between the legs, naturally.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.up.01",
+   "moment": "dunk.up",
+   "text": "You're on, headliner. The city's tuned in."
+  },
+  {
+   "id": "dunk.up.02",
+   "moment": "dunk.up",
+   "text": "Spotlight's yours. Make it worth the stairs."
+  },
+  {
+   "id": "dunk.up.03",
+   "moment": "dunk.up",
+   "text": "Low lights. All eyes on you."
+  },
+  {
+   "id": "dunk.up.04",
+   "moment": "dunk.up",
+   "text": "All right. Give the skyline a reason."
+  },
+  {
+   "id": "dunk.up.05",
+   "moment": "dunk.up",
+   "text": "Here's your moment. Make it smooth."
+  },
+  {
+   "id": "dunk.retry.01",
+   "moment": "dunk.retry",
+   "text": "Run it back. Same song, better take."
+  },
+  {
+   "id": "dunk.retry.02",
+   "moment": "dunk.retry",
+   "text": "Second take. The tape's still rolling."
+  },
+  {
+   "id": "dunk.retry.03",
+   "moment": "dunk.retry",
+   "text": "No rush. The night is young."
+  },
+  {
+   "id": "dunk.retry.04",
+   "moment": "dunk.retry",
+   "text": "Again. Slower this time... smoother."
+  },
+  {
+   "id": "dunk.lastchance.01",
+   "moment": "dunk.lastchance",
+   "text": "Last take. Make it the one they play."
+  },
+  {
+   "id": "dunk.lastchance.02",
+   "moment": "dunk.lastchance",
+   "text": "Final attempt. Even the traffic went quiet."
+  },
+  {
+   "id": "dunk.lastchance.03",
+   "moment": "dunk.lastchance",
+   "text": "This is it. No encore after this one."
+  },
+  {
+   "id": "dunk.run.01",
+   "moment": "dunk.run",
+   "text": "Let it fly."
+  },
+  {
+   "id": "dunk.run.02",
+   "moment": "dunk.run",
+   "text": "Quiet, city."
+  },
+  {
+   "id": "dunk.run.03",
+   "moment": "dunk.run",
+   "text": "Go on."
+  },
+  {
+   "id": "dunk.run.04",
+   "moment": "dunk.run",
+   "text": "Easy... now."
+  },
+  {
+   "id": "dunk.run.05",
+   "moment": "dunk.run",
+   "text": "Watch this."
+  },
+  {
+   "id": "dunk.make.t0.01",
+   "moment": "dunk.make",
+   "text": "It counts. That's all I'll say.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.02",
+   "moment": "dunk.make",
+   "text": "Clean enough. The skyline shrugs.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.03",
+   "moment": "dunk.make",
+   "text": "Fine. Filed under fine.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.04",
+   "moment": "dunk.make",
+   "text": "A make is a make.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.05",
+   "moment": "dunk.make",
+   "text": "Tidy. Not a love song, but tidy.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.06",
+   "moment": "dunk.make",
+   "text": "Down it goes. Polite applause, please.",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t1.01",
+   "moment": "dunk.make",
+   "text": "Ooh. Now that one had a groove.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.02",
+   "moment": "dunk.make",
+   "text": "Smooth. Late-night smooth.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.03",
+   "moment": "dunk.make",
+   "text": "That one had a little shine.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.04",
+   "moment": "dunk.make",
+   "text": "The string lights flickered for that one.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.05",
+   "moment": "dunk.make",
+   "text": "Oh, that swung. That really swung.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.06",
+   "moment": "dunk.make",
+   "text": "Somebody at the judges' table just smiled.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.07",
+   "moment": "dunk.make",
+   "text": "Lovely. Put that one on the radio.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.08",
+   "moment": "dunk.make",
+   "text": "Right in the pocket. Right on the beat.",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t2.01",
+   "moment": "dunk.make",
+   "text": "Okay! Now I'm raising my voice!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.02",
+   "moment": "dunk.make",
+   "text": "Whoa! The whole skyline saw that!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.03",
+   "moment": "dunk.make",
+   "text": "Turn me up! Turn the whole city up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.04",
+   "moment": "dunk.make",
+   "text": "Call the station! Wait, we are the station!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.05",
+   "moment": "dunk.make",
+   "text": "Every window on the block just lit up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.06",
+   "moment": "dunk.make",
+   "text": "Unbelievable! Somebody check the roof for cracks!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.07",
+   "moment": "dunk.make",
+   "text": "Stop the music! Nobody move!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.08",
+   "moment": "dunk.make",
+   "text": "Oh, the city is on its feet!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.09",
+   "moment": "dunk.make",
+   "text": "Goodness! The neighbors are on their balconies!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.10",
+   "moment": "dunk.make",
+   "text": "Ha! That one's going in the time capsule!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.fifty.01",
+   "moment": "dunk.fifty",
+   "text": "Fifty. Say it slowly, city. Fifty."
+  },
+  {
+   "id": "dunk.fifty.02",
+   "moment": "dunk.fifty",
+   "text": "A perfect fifty. Put it up in lights."
+  },
+  {
+   "id": "dunk.fifty.03",
+   "moment": "dunk.fifty",
+   "text": "Five tens! The whole skyline stands up!"
+  },
+  {
+   "id": "dunk.fifty.04",
+   "moment": "dunk.fifty",
+   "text": "Perfection. The highest thing on this roof tonight."
+  },
+  {
+   "id": "dunk.repeat.01",
+   "moment": "dunk.repeat",
+   "text": "Heard that song already. The judges want new music."
+  },
+  {
+   "id": "dunk.repeat.02",
+   "moment": "dunk.repeat",
+   "text": "A rerun? At this hour? The judges noticed."
+  },
+  {
+   "id": "dunk.repeat.03",
+   "moment": "dunk.repeat",
+   "text": "Same dunk, second time. Encores score lower up here."
+  },
+  {
+   "id": "dunk.repeat.04",
+   "moment": "dunk.repeat",
+   "text": "The table's seen that one. Bring something they haven't."
+  },
+  {
+   "id": "dunk.miss.01",
+   "moment": "dunk.miss",
+   "text": "Oh. The city saw that too."
+  },
+  {
+   "id": "dunk.miss.02",
+   "moment": "dunk.miss",
+   "text": "No. Not tonight, anyway."
+  },
+  {
+   "id": "dunk.miss.03",
+   "moment": "dunk.miss",
+   "text": "That's a sour note."
+  },
+  {
+   "id": "dunk.miss.04",
+   "moment": "dunk.miss",
+   "text": "Missed. Keep that one off the radio."
+  },
+  {
+   "id": "dunk.miss.05",
+   "moment": "dunk.miss",
+   "text": "Close. Close doesn't play on this station."
+  },
+  {
+   "id": "dunk.miss.06",
+   "moment": "dunk.miss",
+   "text": "Well. We'll edit that out of the replay."
+  },
+  {
+   "id": "dunk.miss.iron.01",
+   "moment": "dunk.miss.iron",
+   "text": "In and out. So close, so rude."
+  },
+  {
+   "id": "dunk.miss.iron.02",
+   "moment": "dunk.miss.iron",
+   "text": "Iron. The whole block heard that clang."
+  },
+  {
+   "id": "dunk.miss.iron.03",
+   "moment": "dunk.miss.iron",
+   "text": "Rattled, then refused. Cold iron."
+  },
+  {
+   "id": "dunk.miss.lob.01",
+   "moment": "dunk.miss.lob",
+   "text": "The lob wandered off into the night."
+  },
+  {
+   "id": "dunk.miss.lob.02",
+   "moment": "dunk.miss.lob",
+   "text": "Gone. That ball caught a cab home."
+  },
+  {
+   "id": "dunk.miss.lob.03",
+   "moment": "dunk.miss.lob",
+   "text": "Lost the toss. The dunk never showed up."
+  },
+  {
+   "id": "dunk.miss.prop.01",
+   "moment": "dunk.miss.prop",
+   "text": "Clipped it. That's a scratch on the record."
+  },
+  {
+   "id": "dunk.miss.prop.02",
+   "moment": "dunk.miss.prop",
+   "text": "Touched the prop. The judges saw it."
+  },
+  {
+   "id": "dunk.miss.prop.03",
+   "moment": "dunk.miss.prop",
+   "text": "A little contact on the way over. No."
+  },
+  {
+   "id": "dunk.miss.last.01",
+   "moment": "dunk.miss.last",
+   "text": "That's the last take. The judges mark it a miss."
+  },
+  {
+   "id": "dunk.miss.last.02",
+   "moment": "dunk.miss.last",
+   "text": "Out of attempts. We'll call that one a rehearsal."
+  },
+  {
+   "id": "dunk.miss.last.03",
+   "moment": "dunk.miss.last",
+   "text": "No more tries. Scored as a miss, filed away quietly."
+  },
+  {
+   "id": "dunk.judges.01",
+   "moment": "dunk.judges",
+   "text": "Judges, your verdict?"
+  },
+  {
+   "id": "dunk.judges.02",
+   "moment": "dunk.judges",
+   "text": "The table's talking."
+  },
+  {
+   "id": "dunk.judges.03",
+   "moment": "dunk.judges",
+   "text": "Cards, please."
+  },
+  {
+   "id": "dunk.judges.04",
+   "moment": "dunk.judges",
+   "text": "Take it away, table."
+  },
+  {
+   "id": "dunk.rival.up.01",
+   "moment": "dunk.rival.up",
+   "text": "Your rival's turn. Try not to watch."
+  },
+  {
+   "id": "dunk.rival.up.02",
+   "moment": "dunk.rival.up",
+   "text": "Tonight's guest is up. Let's see it."
+  },
+  {
+   "id": "dunk.rival.up.cass.01",
+   "moment": "dunk.rival.up",
+   "text": "Cass is up. Expect it on time.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.ty.01",
+   "moment": "dunk.rival.up",
+   "text": "Ty steps up. Mind the glass, city.",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.pilot.01",
+   "moment": "dunk.rival.up",
+   "text": "Pilot's up, taking the room's temperature.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.zo.01",
+   "moment": "dunk.rival.up",
+   "text": "Zo is up. Somebody's already filming.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.stack.01",
+   "moment": "dunk.rival.up",
+   "text": "Stack's up. Not even Stack knows what's next.",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.01",
+   "moment": "dunk.rival.make",
+   "text": "Fine. I'll admit it. That was good."
+  },
+  {
+   "id": "dunk.rival.make.02",
+   "moment": "dunk.rival.make",
+   "text": "Smooth reply from the other side..."
+  },
+  {
+   "id": "dunk.rival.make.03",
+   "moment": "dunk.rival.make",
+   "text": "Annoyingly good, that..."
+  },
+  {
+   "id": "dunk.rival.make.04",
+   "moment": "dunk.rival.make",
+   "text": "Well. The guest brought a song..."
+  },
+  {
+   "id": "dunk.rival.make.cass.01",
+   "moment": "dunk.rival.make",
+   "text": "Cass, right on schedule. Of course.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.ty.01",
+   "moment": "dunk.rival.make",
+   "text": "Ty, heavy as the late train...",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.pilot.01",
+   "moment": "dunk.rival.make",
+   "text": "Pilot waited for the downbeat, then...",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.zo.01",
+   "moment": "dunk.rival.make",
+   "text": "Zo got the highlight. Phones got it too.",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.stack.01",
+   "moment": "dunk.rival.make",
+   "text": "Stack jumped without a net, and landed...",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.miss.01",
+   "moment": "dunk.rival.miss",
+   "text": "Oh, tonight's guest missed. Pity."
+  },
+  {
+   "id": "dunk.rival.miss.02",
+   "moment": "dunk.rival.miss",
+   "text": "No good. Your spotlight, if you want it."
+  },
+  {
+   "id": "dunk.rival.miss.03",
+   "moment": "dunk.rival.miss",
+   "text": "Missed it. I'd say sorry, but I'm not."
+  },
+  {
+   "id": "dunk.rival.miss.04",
+   "moment": "dunk.rival.miss",
+   "text": "Off-key. Your rival hit a wrong note."
+  },
+  {
+   "id": "dunk.rival.miss.05",
+   "moment": "dunk.rival.miss",
+   "text": "That one stays off the playlist."
+  },
+  {
+   "id": "dunk.round.01",
+   "moment": "dunk.round",
+   "text": "Round two. The late set. This is where the night gets decided."
+  },
+  {
+   "id": "dunk.round.02",
+   "moment": "dunk.round",
+   "text": "Final round, city. Everybody lean in close."
+  },
+  {
+   "id": "dunk.round.03",
+   "moment": "dunk.round",
+   "text": "Second set, last set. Make it memorable."
+  },
+  {
+   "id": "dunk.need.01",
+   "moment": "dunk.need",
+   "text": "You're behind, and quiet dunks won't do it. Make some noise."
+  },
+  {
+   "id": "dunk.need.02",
+   "moment": "dunk.need",
+   "text": "Down on the cards. Time for something the city's never seen."
+  },
+  {
+   "id": "dunk.need.03",
+   "moment": "dunk.need",
+   "text": "Behind going into the late set. Big numbers only, headliner."
+  },
+  {
+   "id": "dunk.need.ahead.01",
+   "moment": "dunk.need.ahead",
+   "text": "You're ahead. Close it out smooth, like the last song."
+  },
+  {
+   "id": "dunk.need.ahead.02",
+   "moment": "dunk.need.ahead",
+   "text": "Leading into the late set. Play it cool and finish the song."
+  },
+  {
+   "id": "dunk.win.01",
+   "moment": "dunk.win",
+   "text": "Flight Night is yours. Tonight the city goes to sleep saying your name."
+  },
+  {
+   "id": "dunk.win.02",
+   "moment": "dunk.win",
+   "text": "Champion of the Rooftop! Yes, I'm yelling! I'm allowed to yell for this!"
+  },
+  {
+   "id": "dunk.win.03",
+   "moment": "dunk.win",
+   "text": "You outflew tonight's guest and won over five tough judges. Enjoy the view from up here."
+  },
+  {
+   "id": "dunk.win.04",
+   "moment": "dunk.win",
+   "text": "This roof has a new headliner. Flight Night winner, take your bow."
+  },
+  {
+   "id": "dunk.lose.01",
+   "moment": "dunk.lose",
+   "text": "Tonight's guest takes Flight Night. Be gracious, then come back for it."
+  },
+  {
+   "id": "dunk.lose.02",
+   "moment": "dunk.lose",
+   "text": "Close, but the cards said no. The roof will be here tomorrow night."
+  },
+  {
+   "id": "dunk.lose.03",
+   "moment": "dunk.lose",
+   "text": "The rival leaves with the win. You leave with a reason to return."
+  },
+  {
+   "id": "dunk.lose.04",
+   "moment": "dunk.lose",
+   "text": "Judges went the other way. Every great act has an off night. Encore soon."
+  },
+  {
+   "id": "dunk.celeb.spiderman.01",
+   "moment": "dunk.celeb",
+   "text": "Splits on the concrete? Now that's commitment.",
+   "tags": [
+    "celeb:spiderman"
+   ]
+  },
+  {
+   "id": "dunk.celeb.itsover.01",
+   "moment": "dunk.celeb",
+   "text": "Over? Yes. The city signs off on that.",
+   "tags": [
+    "celeb:itsover"
+   ]
+  },
+  {
+   "id": "dunk.celeb.roar.01",
+   "moment": "dunk.celeb",
+   "text": "Go on, roar. The whole block heard it.",
+   "tags": [
+    "celeb:roar"
+   ]
+  },
+  {
+   "id": "dunk.celeb.toosmall.01",
+   "moment": "dunk.celeb",
+   "text": "Calling the rim too small? Bold. Earned.",
+   "tags": [
+    "celeb:toosmall"
+   ]
+  },
+  {
+   "id": "dunk.celeb.armsup.01",
+   "moment": "dunk.celeb",
+   "text": "Arms up. The string lights approve.",
+   "tags": [
+    "celeb:armsup"
+   ]
+  },
+  {
+   "id": "duel.pass.01",
+   "moment": "duel.pass",
+   "text": "Pass the controller. Next hooper, you're on."
+  },
+  {
+   "id": "duel.pass.02",
+   "moment": "duel.pass",
+   "text": "Smooth handoff, please. Your set now."
+  },
+  {
+   "id": "duel.pass.1.01",
+   "moment": "duel.pass",
+   "text": "Player one, the stage is yours.",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.pass.2.01",
+   "moment": "duel.pass",
+   "text": "Controller to player two. You're on the air.",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.win.01",
+   "moment": "duel.win",
+   "text": "Duel's settled. Somebody owns bragging rights till sunrise."
+  },
+  {
+   "id": "duel.win.1.01",
+   "moment": "duel.win",
+   "text": "Player one takes the duel. Sleep well, player two.",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.win.2.01",
+   "moment": "duel.win",
+   "text": "It's player two's night. Player one, rematch at midnight?",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.tie.01",
+   "moment": "duel.tie",
+   "text": "A tie. Perfect harmony, no soloist. What a standoff."
+  },
+  {
+   "id": "duel.tie.02",
+   "moment": "duel.tie",
+   "text": "Even. Perfectly even. The skyline can't pick a side."
+  },
+  {
+   "id": "three.intro.01",
+   "moment": "three.intro",
+   "text": "Now playing: Downtown on the Rooftop. Five racks, sixty seconds, money balls worth two. Six shooters, top three move on."
+  },
+  {
+   "id": "three.intro.02",
+   "moment": "three.intro",
+   "text": "It's Downtown, city. Six shooters, five racks, sixty seconds on the clock, and only three get to stay up late."
+  },
+  {
+   "id": "three.intro.03",
+   "moment": "three.intro",
+   "text": "Downtown tonight: sixty seconds, five racks, a money ball on every one. Six in the field. Three advance."
+  },
+  {
+   "id": "three.go.01",
+   "moment": "three.go",
+   "text": "Drop the needle."
+  },
+  {
+   "id": "three.go.02",
+   "moment": "three.go",
+   "text": "Sixty seconds. Now."
+  },
+  {
+   "id": "three.go.03",
+   "moment": "three.go",
+   "text": "And... we're live."
+  },
+  {
+   "id": "three.rack.01",
+   "moment": "three.rack",
+   "text": "Next rack."
+  },
+  {
+   "id": "three.rack.02",
+   "moment": "three.rack",
+   "text": "Keep moving, keep smooth."
+  },
+  {
+   "id": "three.rack.03",
+   "moment": "three.rack",
+   "text": "Stay in the pocket."
+  },
+  {
+   "id": "three.rack.04",
+   "moment": "three.rack",
+   "text": "Flip the record."
+  },
+  {
+   "id": "three.lastrack.01",
+   "moment": "three.lastrack",
+   "text": "Last rack. Finish the song."
+  },
+  {
+   "id": "three.lastrack.02",
+   "moment": "three.lastrack",
+   "text": "Final rack. Make it sing."
+  },
+  {
+   "id": "three.lastrack.03",
+   "moment": "three.lastrack",
+   "text": "One rack left, headliner."
+  },
+  {
+   "id": "three.money.01",
+   "moment": "three.money",
+   "text": "Money ball. Double the tip."
+  },
+  {
+   "id": "three.money.02",
+   "moment": "three.money",
+   "text": "Here comes the gold one."
+  },
+  {
+   "id": "three.money.03",
+   "moment": "three.money",
+   "text": "The pricey one. Go on."
+  },
+  {
+   "id": "three.money.04",
+   "moment": "three.money",
+   "text": "Big one. Easy now."
+  },
+  {
+   "id": "three.make.01",
+   "moment": "three.make",
+   "text": "Smooth."
+  },
+  {
+   "id": "three.make.02",
+   "moment": "three.make",
+   "text": "Easy."
+  },
+  {
+   "id": "three.make.03",
+   "moment": "three.make",
+   "text": "Silk."
+  },
+  {
+   "id": "three.make.04",
+   "moment": "three.make",
+   "text": "Right there."
+  },
+  {
+   "id": "three.make.05",
+   "moment": "three.make",
+   "text": "That's jazz."
+  },
+  {
+   "id": "three.make.06",
+   "moment": "three.make",
+   "text": "Soft as velvet."
+  },
+  {
+   "id": "three.make.money.01",
+   "moment": "three.make.money",
+   "text": "Tip jar's full."
+  },
+  {
+   "id": "three.make.money.02",
+   "moment": "three.make.money",
+   "text": "Gold record."
+  },
+  {
+   "id": "three.make.money.03",
+   "moment": "three.make.money",
+   "text": "That's two, thank you."
+  },
+  {
+   "id": "three.make.money.04",
+   "moment": "three.make.money",
+   "text": "Paid in full."
+  },
+  {
+   "id": "three.miss.01",
+   "moment": "three.miss",
+   "text": "No."
+  },
+  {
+   "id": "three.miss.02",
+   "moment": "three.miss",
+   "text": "Off."
+  },
+  {
+   "id": "three.miss.03",
+   "moment": "three.miss",
+   "text": "Flat note."
+  },
+  {
+   "id": "three.miss.04",
+   "moment": "three.miss",
+   "text": "Not that one."
+  },
+  {
+   "id": "three.miss.05",
+   "moment": "three.miss",
+   "text": "Next."
+  },
+  {
+   "id": "three.streak.01",
+   "moment": "three.streak",
+   "text": "Now there's a groove."
+  },
+  {
+   "id": "three.streak.02",
+   "moment": "three.streak",
+   "text": "In a rhythm now."
+  },
+  {
+   "id": "three.streak.03",
+   "moment": "three.streak",
+   "text": "Keep that record spinning."
+  },
+  {
+   "id": "three.streak.04",
+   "moment": "three.streak",
+   "text": "The city's catching on."
+  },
+  {
+   "id": "three.fire.01",
+   "moment": "three.fire",
+   "text": "Every note lands."
+  },
+  {
+   "id": "three.fire.02",
+   "moment": "three.fire",
+   "text": "Nobody breathe. Keep playing."
+  },
+  {
+   "id": "three.fire.03",
+   "moment": "three.fire",
+   "text": "Pure music! Don't stop!"
+  },
+  {
+   "id": "three.fire.04",
+   "moment": "three.fire",
+   "text": "Still perfect! Still going!"
+  },
+  {
+   "id": "three.cold.01",
+   "moment": "three.cold",
+   "text": "Rough patch. Reset, breathe."
+  },
+  {
+   "id": "three.cold.02",
+   "moment": "three.cold",
+   "text": "Off beat. Breathe, then swing."
+  },
+  {
+   "id": "three.cold.03",
+   "moment": "three.cold",
+   "text": "Three misses. Slow it down."
+  },
+  {
+   "id": "three.clock.01",
+   "moment": "three.clock",
+   "text": "Ten seconds. Hurry, smoothly."
+  },
+  {
+   "id": "three.clock.02",
+   "moment": "three.clock",
+   "text": "Final ten seconds!"
+  },
+  {
+   "id": "three.clock.03",
+   "moment": "three.clock",
+   "text": "Tempo up. Ten left."
+  },
+  {
+   "id": "three.buzzer.01",
+   "moment": "three.buzzer",
+   "text": "Horn sounded. Ball didn't care."
+  },
+  {
+   "id": "three.buzzer.02",
+   "moment": "three.buzzer",
+   "text": "Late arrival. Still on the list."
+  },
+  {
+   "id": "three.buzzer.03",
+   "moment": "three.buzzer",
+   "text": "Snuck in before closing!"
+  },
+  {
+   "id": "three.results.01",
+   "moment": "three.results",
+   "text": "Reading the numbers now, slowly. Stay with me."
+  },
+  {
+   "id": "three.results.02",
+   "moment": "three.results",
+   "text": "Results, city. Let's see who stays up late."
+  },
+  {
+   "id": "three.advance.01",
+   "moment": "three.advance",
+   "text": "You're in the final. The late set belongs to you."
+  },
+  {
+   "id": "three.advance.02",
+   "moment": "three.advance",
+   "text": "Top three, headliner. Next stop, the final."
+  },
+  {
+   "id": "three.advance.03",
+   "moment": "three.advance",
+   "text": "Advancing to the final. The skyline wants an encore."
+  },
+  {
+   "id": "three.out.01",
+   "moment": "three.out",
+   "text": "Not tonight. The final goes on without you, but the roof remembers."
+  },
+  {
+   "id": "three.out.02",
+   "moment": "three.out",
+   "text": "Cut from the setlist tonight. Rehearse, and come back strong."
+  },
+  {
+   "id": "three.out.03",
+   "moment": "three.out",
+   "text": "That's the end of your set. Good crowd, though. Come back soon."
+  },
+  {
+   "id": "three.final.01",
+   "moment": "three.final",
+   "text": "The final. Headliner closes the show, and the number's already up."
+  },
+  {
+   "id": "three.final.02",
+   "moment": "three.final",
+   "text": "Last shooter of the night. The number's on the board. Top it."
+  },
+  {
+   "id": "three.final.03",
+   "moment": "three.final",
+   "text": "Final round. Everybody else has posted. Now it's your song."
+  },
+  {
+   "id": "three.clinch.01",
+   "moment": "three.clinch",
+   "text": "Passed it. Cue the applause."
+  },
+  {
+   "id": "three.clinch.02",
+   "moment": "three.clinch",
+   "text": "Won! Right there, won!"
+  },
+  {
+   "id": "three.clinch.03",
+   "moment": "three.clinch",
+   "text": "Past the number. That's the song."
+  },
+  {
+   "id": "three.champion.01",
+   "moment": "three.champion",
+   "text": "Downtown belongs to you. The city waited all night for a shooter like that."
+  },
+  {
+   "id": "three.champion.02",
+   "moment": "three.champion",
+   "text": "Best shooter on the roof tonight. I'll be playing that one back all week."
+  },
+  {
+   "id": "three.champion.03",
+   "moment": "three.champion",
+   "text": "Every window in the city just flicked its lights for you. Champion."
+  },
+  {
+   "id": "game.intro.ones.01",
+   "moment": "game.intro.ones",
+   "text": "Ones on the Rooftop. First to eleven, make it, take it. The city has the best seats."
+  },
+  {
+   "id": "game.intro.ones.02",
+   "moment": "game.intro.ones",
+   "text": "One on one, After Hours style. First to eleven. Score and you keep the ball."
+  },
+  {
+   "id": "game.intro.threes.01",
+   "moment": "game.intro.threes",
+   "text": "Threes on the Rooftop. First to twenty-one, ninety seconds on the clock. Pass it like a secret."
+  },
+  {
+   "id": "game.intro.threes.02",
+   "moment": "game.intro.threes",
+   "text": "Three on three under the string lights. Twenty-one wins, ninety-second clock. Play together."
+  },
+  {
+   "id": "game.check.01",
+   "moment": "game.check",
+   "text": "Their ball. Quiet feet."
+  },
+  {
+   "id": "game.check.02",
+   "moment": "game.check",
+   "text": "Checked. Stay in step."
+  },
+  {
+   "id": "game.check.03",
+   "moment": "game.check",
+   "text": "Shadow them. All night."
+  },
+  {
+   "id": "game.check.04",
+   "moment": "game.check",
+   "text": "Ball's theirs. Make it uncomfortable."
+  },
+  {
+   "id": "game.make.01",
+   "moment": "game.make",
+   "text": "Smooth jumper."
+  },
+  {
+   "id": "game.make.02",
+   "moment": "game.make",
+   "text": "Soft touch. Nice."
+  },
+  {
+   "id": "game.make.03",
+   "moment": "game.make",
+   "text": "That's a two."
+  },
+  {
+   "id": "game.make.04",
+   "moment": "game.make",
+   "text": "Pull-up, pure."
+  },
+  {
+   "id": "game.make.05",
+   "moment": "game.make",
+   "text": "Right on the beat."
+  },
+  {
+   "id": "game.make.06",
+   "moment": "game.make",
+   "text": "Mid-range, midnight."
+  },
+  {
+   "id": "game.three.01",
+   "moment": "game.three",
+   "text": "From way out there!"
+  },
+  {
+   "id": "game.three.02",
+   "moment": "game.three",
+   "text": "Three. Cool as the night."
+  },
+  {
+   "id": "game.three.03",
+   "moment": "game.three",
+   "text": "Deep one. Very deep."
+  },
+  {
+   "id": "game.three.04",
+   "moment": "game.three",
+   "text": "That's three. Don't wait up."
+  },
+  {
+   "id": "game.three.05",
+   "moment": "game.three",
+   "text": "Long range, no problem."
+  },
+  {
+   "id": "game.layup.01",
+   "moment": "game.layup",
+   "text": "Soft finish. Lovely."
+  },
+  {
+   "id": "game.layup.02",
+   "moment": "game.layup",
+   "text": "Like a whisper."
+  },
+  {
+   "id": "game.layup.03",
+   "moment": "game.layup",
+   "text": "Tasteful finish."
+  },
+  {
+   "id": "game.layup.04",
+   "moment": "game.layup",
+   "text": "Easy two. Quiet two."
+  },
+  {
+   "id": "game.dunk.01",
+   "moment": "game.dunk",
+   "text": "Oh, nobody's sleeping now!"
+  },
+  {
+   "id": "game.dunk.02",
+   "moment": "game.dunk",
+   "text": "Rim just rang!"
+  },
+  {
+   "id": "game.dunk.03",
+   "moment": "game.dunk",
+   "text": "Now that's loud!"
+  },
+  {
+   "id": "game.dunk.04",
+   "moment": "game.dunk",
+   "text": "The skyline saw that!"
+  },
+  {
+   "id": "game.dunk.05",
+   "moment": "game.dunk",
+   "text": "Flushed it! Lights up!"
+  },
+  {
+   "id": "game.poster.01",
+   "moment": "game.poster",
+   "text": "Oh! Posterized! Hang it downtown!"
+  },
+  {
+   "id": "game.poster.02",
+   "moment": "game.poster",
+   "text": "On the defender! Gallery piece!"
+  },
+  {
+   "id": "game.poster.03",
+   "moment": "game.poster",
+   "text": "Whoa! Put that on a billboard!"
+  },
+  {
+   "id": "game.poster.04",
+   "moment": "game.poster",
+   "text": "Somebody get that defender a blanket!"
+  },
+  {
+   "id": "game.poster.05",
+   "moment": "game.poster",
+   "text": "The city will talk about that!"
+  },
+  {
+   "id": "game.poster.06",
+   "moment": "game.poster",
+   "text": "Up and over! Gorgeous!"
+  },
+  {
+   "id": "game.andone.01",
+   "moment": "game.andone",
+   "text": "And one. Unbothered."
+  },
+  {
+   "id": "game.andone.02",
+   "moment": "game.andone",
+   "text": "Plus the foul. Greedy."
+  },
+  {
+   "id": "game.andone.03",
+   "moment": "game.andone",
+   "text": "Contact? Didn't matter."
+  },
+  {
+   "id": "game.andone.04",
+   "moment": "game.andone",
+   "text": "Bonus track."
+  },
+  {
+   "id": "game.miss.01",
+   "moment": "game.miss",
+   "text": "Off the iron."
+  },
+  {
+   "id": "game.miss.02",
+   "moment": "game.miss",
+   "text": "Wrong key."
+  },
+  {
+   "id": "game.miss.03",
+   "moment": "game.miss",
+   "text": "Close, not quite."
+  },
+  {
+   "id": "game.miss.04",
+   "moment": "game.miss",
+   "text": "Missed. Next one."
+  },
+  {
+   "id": "game.airball.01",
+   "moment": "game.airball",
+   "text": "Airball. Pigeons looked away."
+  },
+  {
+   "id": "game.airball.02",
+   "moment": "game.airball",
+   "text": "Radio silence. Nothing hit."
+  },
+  {
+   "id": "game.airball.03",
+   "moment": "game.airball",
+   "text": "Still falling somewhere downtown."
+  },
+  {
+   "id": "game.airball.04",
+   "moment": "game.airball",
+   "text": "Ooh. Nothing but night air."
+  },
+  {
+   "id": "game.block.01",
+   "moment": "game.block",
+   "text": "Denied. Politely."
+  },
+  {
+   "id": "game.block.02",
+   "moment": "game.block",
+   "text": "Rejected! Back to sender!"
+  },
+  {
+   "id": "game.block.03",
+   "moment": "game.block",
+   "text": "Sent it twenty floors down!"
+  },
+  {
+   "id": "game.block.04",
+   "moment": "game.block",
+   "text": "Right into the skyline!"
+  },
+  {
+   "id": "game.block.05",
+   "moment": "game.block",
+   "text": "Absolutely not. Next."
+  },
+  {
+   "id": "game.block.06",
+   "moment": "game.block",
+   "text": "Blocked it, cool as anything."
+  },
+  {
+   "id": "game.blocked.01",
+   "moment": "game.blocked",
+   "text": "Sent back. Ouch."
+  },
+  {
+   "id": "game.blocked.02",
+   "moment": "game.blocked",
+   "text": "Turned away. Try the fake."
+  },
+  {
+   "id": "game.blocked.03",
+   "moment": "game.blocked",
+   "text": "Defender got a piece."
+  },
+  {
+   "id": "game.blocked.04",
+   "moment": "game.blocked",
+   "text": "Bouncer said no."
+  },
+  {
+   "id": "game.steal.01",
+   "moment": "game.steal",
+   "text": "Picked the pocket!"
+  },
+  {
+   "id": "game.steal.02",
+   "moment": "game.steal",
+   "text": "Too quick! Yours now."
+  },
+  {
+   "id": "game.steal.03",
+   "moment": "game.steal",
+   "text": "Swiped it, quietly."
+  },
+  {
+   "id": "game.steal.04",
+   "moment": "game.steal",
+   "text": "Taken, no questions."
+  },
+  {
+   "id": "game.steal.05",
+   "moment": "game.steal",
+   "text": "Lifted. Nobody heard a thing."
+  },
+  {
+   "id": "game.stolen.01",
+   "moment": "game.stolen",
+   "text": "Oh, they took it."
+  },
+  {
+   "id": "game.stolen.02",
+   "moment": "game.stolen",
+   "text": "Slipped away. Stay calm."
+  },
+  {
+   "id": "game.stolen.03",
+   "moment": "game.stolen",
+   "text": "Lost it. That stings."
+  },
+  {
+   "id": "game.stolen.04",
+   "moment": "game.stolen",
+   "text": "Gone. Get it back."
+  },
+  {
+   "id": "game.ankles.01",
+   "moment": "game.ankles",
+   "text": "Ankles took the elevator!"
+  },
+  {
+   "id": "game.ankles.02",
+   "moment": "game.ankles",
+   "text": "Defender's on the floor!"
+  },
+  {
+   "id": "game.ankles.03",
+   "moment": "game.ankles",
+   "text": "Whoa! Crossed up and cooked!"
+  },
+  {
+   "id": "game.ankles.04",
+   "moment": "game.ankles",
+   "text": "Take a minute, defender."
+  },
+  {
+   "id": "game.ankles.05",
+   "moment": "game.ankles",
+   "text": "Static on that defender!"
+  },
+  {
+   "id": "game.ankles.06",
+   "moment": "game.ankles",
+   "text": "Oh, that crossover was rude."
+  },
+  {
+   "id": "game.bite.01",
+   "moment": "game.bite",
+   "text": "They bit. Sweet."
+  },
+  {
+   "id": "game.bite.02",
+   "moment": "game.bite",
+   "text": "Fooled the defender."
+  },
+  {
+   "id": "game.bite.03",
+   "moment": "game.bite",
+   "text": "Hook caught them."
+  },
+  {
+   "id": "game.bite.04",
+   "moment": "game.bite",
+   "text": "Sold the fake. Sold out."
+  },
+  {
+   "id": "game.foul.01",
+   "moment": "game.foul",
+   "text": "Needle off the record."
+  },
+  {
+   "id": "game.foul.02",
+   "moment": "game.foul",
+   "text": "Somebody's in trouble."
+  },
+  {
+   "id": "game.foul.03",
+   "moment": "game.foul",
+   "text": "Referee's got something."
+  },
+  {
+   "id": "game.foul.04",
+   "moment": "game.foul",
+   "text": "Pause the music."
+  },
+  {
+   "id": "game.rival.make.01",
+   "moment": "game.rival.make",
+   "text": "They answer. Fine."
+  },
+  {
+   "id": "game.rival.make.02",
+   "moment": "game.rival.make",
+   "text": "Cute. Now show them."
+  },
+  {
+   "id": "game.rival.make.03",
+   "moment": "game.rival.make",
+   "text": "Their verse. Now yours."
+  },
+  {
+   "id": "game.rival.make.04",
+   "moment": "game.rival.make",
+   "text": "That fell for them."
+  },
+  {
+   "id": "game.rival.make.05",
+   "moment": "game.rival.make",
+   "text": "Well, that went in."
+  },
+  {
+   "id": "game.rival.dunk.01",
+   "moment": "game.rival.dunk",
+   "text": "Oh, they wanted the spotlight."
+  },
+  {
+   "id": "game.rival.dunk.02",
+   "moment": "game.rival.dunk",
+   "text": "Heavy bass on that one."
+  },
+  {
+   "id": "game.rival.dunk.03",
+   "moment": "game.rival.dunk",
+   "text": "Ooh. That one's getting replayed."
+  },
+  {
+   "id": "game.rival.dunk.04",
+   "moment": "game.rival.dunk",
+   "text": "They flushed it. Answer back."
+  },
+  {
+   "id": "game.run.01",
+   "moment": "game.run",
+   "text": "That's a run. The other side went quiet."
+  },
+  {
+   "id": "game.run.02",
+   "moment": "game.run",
+   "text": "Unanswered, all of it. The city's humming."
+  },
+  {
+   "id": "game.run.03",
+   "moment": "game.run",
+   "text": "On a run. Don't let the music stop."
+  },
+  {
+   "id": "game.run.04",
+   "moment": "game.run",
+   "text": "Another, and another. The city loves a streak."
+  },
+  {
+   "id": "game.point.us.01",
+   "moment": "game.point",
+   "text": "Game point. One more, and we say goodnight.",
+   "tags": [
+    "side:us"
+   ]
+  },
+  {
+   "id": "game.point.them.01",
+   "moment": "game.point",
+   "text": "They're one away. Make it awkward.",
+   "tags": [
+    "side:them"
+   ]
+  },
+  {
+   "id": "game.win.01",
+   "moment": "game.win",
+   "text": "That's the game! You won the run!"
+  },
+  {
+   "id": "game.win.02",
+   "moment": "game.win",
+   "text": "Winner. The city goes to bed happy."
+  },
+  {
+   "id": "game.win.03",
+   "moment": "game.win",
+   "text": "Game-winner. Smooth to the very end."
+  },
+  {
+   "id": "game.win.04",
+   "moment": "game.win",
+   "text": "Ballgame. Other side can catch the last train."
+  },
+  {
+   "id": "game.loss.01",
+   "moment": "game.loss",
+   "text": "Their song tonight. Yours is still being written."
+  },
+  {
+   "id": "game.loss.02",
+   "moment": "game.loss",
+   "text": "Not tonight. The roof stays open for a rematch."
+  },
+  {
+   "id": "game.loss.03",
+   "moment": "game.loss",
+   "text": "Walk it off. The city's still up."
+  },
+  {
+   "id": "game.draw.01",
+   "moment": "game.draw",
+   "text": "A draw. Nobody sleeps on that."
+  },
+  {
+   "id": "game.draw.02",
+   "moment": "game.draw",
+   "text": "All square. Nobody goes home happy, or everybody does."
+  },
+  {
+   "id": "game.assist.01",
+   "moment": "game.assist",
+   "text": "What a pass!"
+  },
+  {
+   "id": "game.assist.02",
+   "moment": "game.assist",
+   "text": "Dropped the dime, quietly."
+  },
+  {
+   "id": "game.assist.03",
+   "moment": "game.assist",
+   "text": "Unselfish. I like that."
+  },
+  {
+   "id": "game.assist.04",
+   "moment": "game.assist",
+   "text": "Perfect pitch."
+  },
+  {
+   "id": "game.alleyoop.01",
+   "moment": "game.alleyoop",
+   "text": "Lob... and flush!"
+  },
+  {
+   "id": "game.alleyoop.02",
+   "moment": "game.alleyoop",
+   "text": "Up top! Perfect timing!"
+  },
+  {
+   "id": "game.alleyoop.03",
+   "moment": "game.alleyoop",
+   "text": "Alley-oop! Pure jazz!"
+  },
+  {
+   "id": "game.clock.01",
+   "moment": "game.clock",
+   "text": "Ten seconds. Last dance."
+  },
+  {
+   "id": "game.clock.02",
+   "moment": "game.clock",
+   "text": "The song's fading. Ten seconds."
+  },
+  {
+   "id": "game.clock.03",
+   "moment": "game.clock",
+   "text": "Last ten seconds, Rooftop!"
+  },
+  {
+   "id": "game.overdrive.01",
+   "moment": "game.overdrive",
+   "text": "Overdrive. Every instrument, in tune."
+  },
+  {
+   "id": "game.overdrive.02",
+   "moment": "game.overdrive",
+   "text": "Full sync! Turn it up!"
+  },
+  {
+   "id": "game.overdrive.03",
+   "moment": "game.overdrive",
+   "text": "The band's all in harmony!"
+  },
+  {
+   "id": "carnival.intro.01",
+   "moment": "carnival.intro",
+   "text": "Tonight's program: Game Night. Four sets, points for each, and one champion when the music stops."
+  },
+  {
+   "id": "carnival.intro.02",
+   "moment": "carnival.intro",
+   "text": "It's Game Night, city. Four little contests, points for each, one big winner. Pace yourself."
+  },
+  {
+   "id": "carnival.intro.03",
+   "moment": "carnival.intro",
+   "text": "Four events tonight, points on each. Collect them all, and the night crowns one champion."
+  },
+  {
+   "id": "carnival.event.slam_rush.01",
+   "moment": "carnival.event",
+   "text": "Slam Rush. Twenty seconds, every dunk you can. No slow songs.",
+   "tags": [
+    "ev:slam_rush"
+   ]
+  },
+  {
+   "id": "carnival.event.strike_storm.01",
+   "moment": "carnival.event",
+   "text": "Strike Storm. Hit the pads, clean and quick, like a drum solo.",
+   "tags": [
+    "ev:strike_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.trick_gauntlet.01",
+   "moment": "carnival.event",
+   "text": "Trick Gauntlet. Board under your feet, tricks under the string lights.",
+   "tags": [
+    "ev:trick_gauntlet"
+   ]
+  },
+  {
+   "id": "carnival.event.hot_shot.01",
+   "moment": "carnival.event",
+   "text": "Hot Shot. Shots on goal, as many as the clock allows.",
+   "tags": [
+    "ev:hot_shot"
+   ]
+  },
+  {
+   "id": "carnival.event.coin_storm.01",
+   "moment": "carnival.event",
+   "text": "Coin Storm. Coins falling like city lights. Grab them all.",
+   "tags": [
+    "ev:coin_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.counter_strike.01",
+   "moment": "carnival.event",
+   "text": "Counters, city. The jab comes first. You answer on the offbeat.",
+   "tags": [
+    "ev:counter_strike"
+   ]
+  },
+  {
+   "id": "carnival.go.01",
+   "moment": "carnival.go",
+   "text": "Go. Now."
+  },
+  {
+   "id": "carnival.go.02",
+   "moment": "carnival.go",
+   "text": "And... begin."
+  },
+  {
+   "id": "carnival.go.03",
+   "moment": "carnival.go",
+   "text": "Clock's running."
+  },
+  {
+   "id": "carnival.clock.01",
+   "moment": "carnival.clock",
+   "text": "Five seconds. Last verse."
+  },
+  {
+   "id": "carnival.clock.02",
+   "moment": "carnival.clock",
+   "text": "Last five. Hurry."
+  },
+  {
+   "id": "carnival.clock.03",
+   "moment": "carnival.clock",
+   "text": "Almost out of time!"
+  },
+  {
+   "id": "carnival.eventwin.01",
+   "moment": "carnival.eventwin",
+   "text": "That event's yours. Smooth work."
+  },
+  {
+   "id": "carnival.eventwin.02",
+   "moment": "carnival.eventwin",
+   "text": "You take it. Points in the pocket."
+  },
+  {
+   "id": "carnival.eventwin.03",
+   "moment": "carnival.eventwin",
+   "text": "Winner of that one. The skyline's keeping score."
+  },
+  {
+   "id": "carnival.eventwin.04",
+   "moment": "carnival.eventwin",
+   "text": "Easy. Well, you made it look easy."
+  },
+  {
+   "id": "carnival.eventloss.01",
+   "moment": "carnival.eventloss",
+   "text": "That one's theirs. Plenty of songs left."
+  },
+  {
+   "id": "carnival.eventloss.02",
+   "moment": "carnival.eventloss",
+   "text": "Lost that round. Next event, new song."
+  },
+  {
+   "id": "carnival.eventloss.03",
+   "moment": "carnival.eventloss",
+   "text": "Your rival grabs that one. Stay cool, stay close."
+  },
+  {
+   "id": "carnival.tie.01",
+   "moment": "carnival.tie",
+   "text": "A tie. Nobody gets that one."
+  },
+  {
+   "id": "carnival.tie.02",
+   "moment": "carnival.tie",
+   "text": "Even. Perfectly, annoyingly even."
+  },
+  {
+   "id": "carnival.handoff.01",
+   "moment": "carnival.handoff",
+   "text": "Pass the controller. Player two, you're on."
+  },
+  {
+   "id": "carnival.handoff.02",
+   "moment": "carnival.handoff",
+   "text": "Hand it over. Player two, your set."
+  },
+  {
+   "id": "carnival.champion.01",
+   "moment": "carnival.champion",
+   "text": "Every light in the city, on. Game Night champion. This one's yours."
+  },
+  {
+   "id": "carnival.champion.02",
+   "moment": "carnival.champion",
+   "text": "Four events, one winner, and it's you. Smooth from the first note."
+  },
+  {
+   "id": "carnival.champion.03",
+   "moment": "carnival.champion",
+   "text": "Champion of the night. Take a bow before the sun comes up."
+  },
+  {
+   "id": "carnival.runnerup.01",
+   "moment": "carnival.runnerup",
+   "text": "Game Night goes to the rival. Rest up, bring a new setlist next time."
+  },
+  {
+   "id": "carnival.runnerup.02",
+   "moment": "carnival.runnerup",
+   "text": "Runner-up tonight. Good company, good show, and a rematch waiting on the roof."
+  }
+ ]
+}

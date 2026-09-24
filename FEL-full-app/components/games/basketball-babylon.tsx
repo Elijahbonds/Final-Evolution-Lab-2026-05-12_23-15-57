@@ -13,6 +13,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
 
 type Hud = Record<string, HudValue>;
 
@@ -128,6 +129,8 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
           <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
         </div>
       )}
+      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
+      {phase === 'playing' && <MicToggle />}
 
       <BootSplash
         modeId="onevone"

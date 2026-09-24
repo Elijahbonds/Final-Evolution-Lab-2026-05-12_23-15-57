@@ -1,0 +1,40 @@
+{
+ "cast": "pilot",
+ "lines": [
+  {
+   "id": "player.dunk.brag.01",
+   "moment": "player.dunk.brag",
+   "text": "Read it. Took it."
+  },
+  {
+   "id": "player.dunk.brag.02",
+   "moment": "player.dunk.brag",
+   "text": "Exactly as planned."
+  },
+  {
+   "id": "player.dunk.brag.03",
+   "moment": "player.dunk.brag",
+   "text": "The math was on my side."
+  },
+  {
+   "id": "player.dunk.jab.01",
+   "moment": "player.dunk.jab",
+   "text": "Wrong read. Adjust."
+  },
+  {
+   "id": "player.dunk.jab.02",
+   "moment": "player.dunk.jab",
+   "text": "You rushed it. Patience wins."
+  },
+  {
+   "id": "player.dunk.respect.01",
+   "moment": "player.dunk.respect",
+   "text": "Didn't see that in the numbers."
+  },
+  {
+   "id": "player.dunk.respect.02",
+   "moment": "player.dunk.respect",
+   "text": "Noted. You're a problem now."
+  }
+ ]
+}

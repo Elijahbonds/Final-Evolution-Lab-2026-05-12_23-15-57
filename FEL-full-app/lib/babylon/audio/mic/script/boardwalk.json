@@ -1,0 +1,2060 @@
+{
+ "cast": "boardwalk",
+ "lines": [
+  {
+   "id": "intro.court.01",
+   "moment": "intro.court",
+   "text": "Welcome to Venice Beach Court! Boardwalk on the mic, sand on the court, sun on the water, and the pier is watching!"
+  },
+  {
+   "id": "intro.court.02",
+   "moment": "intro.court",
+   "text": "Venice, say hello! It's Boardwalk, live from the loudest slab of concrete between the pier and Dogtown!"
+  },
+  {
+   "id": "intro.court.03",
+   "moment": "intro.court",
+   "text": "Drum circle, drop a beat! Skaters, roll on in! Tourists, phones up! Boardwalk has the mic, and Venice Beach Court is open!"
+  },
+  {
+   "id": "intro.court.04",
+   "moment": "intro.court",
+   "text": "What's good, beach people! Sun going down, lights coming up, tacos on the grill, and Boardwalk on the mic. Let's run it!"
+  },
+  {
+   "id": "filler.crowd.01",
+   "moment": "filler.crowd",
+   "text": "When I say Venice, you say Beach! Venice!"
+  },
+  {
+   "id": "filler.crowd.02",
+   "moment": "filler.crowd",
+   "text": "Pier side, where you at?! Taco stand side, you're louder! Prove me wrong!"
+  },
+  {
+   "id": "filler.crowd.03",
+   "moment": "filler.crowd",
+   "text": "Big love to the drum circle! Give me a beat, give me a beat!"
+  },
+  {
+   "id": "filler.crowd.04",
+   "moment": "filler.crowd",
+   "text": "Where my Dogtown skaters at? Tap those decks on the concrete!"
+  },
+  {
+   "id": "filler.crowd.05",
+   "moment": "filler.crowd",
+   "text": "Captain Sunscreen, front row since noon! That's dedication, Venice!"
+  },
+  {
+   "id": "filler.crowd.06",
+   "moment": "filler.crowd",
+   "text": "Sand side, surf side, taco side too! Venice, let me hear you!"
+  },
+  {
+   "id": "filler.banter.01",
+   "moment": "filler.banter",
+   "text": "Taco stand just sold twelve tacos to one person. Twelve! That's a whole team's lunch!"
+  },
+  {
+   "id": "filler.banter.02",
+   "moment": "filler.banter",
+   "text": "Sun's sinking into the ocean like a soft free throw. Venice, that's a make every night!"
+  },
+  {
+   "id": "filler.banter.03",
+   "moment": "filler.banter",
+   "text": "Twenty years on this mic, and the seagulls still think they run this court. They don't. I do."
+  },
+  {
+   "id": "filler.banter.04",
+   "moment": "filler.banter",
+   "text": "Dogtown kids rolling by on the bike path, doing tricks nobody asked for. Respect! Venice never sits still."
+  },
+  {
+   "id": "filler.banter.05",
+   "moment": "filler.banter",
+   "text": "Lifeguard tower says the water's perfect. Boardwalk says the court is hotter. Who you trusting?"
+  },
+  {
+   "id": "filler.banter.06",
+   "moment": "filler.banter",
+   "text": "Churro cart rolling by. Cinnamon in the air, sand on the court. That's the Venice combo meal!"
+  },
+  {
+   "id": "filler.banter.07",
+   "moment": "filler.banter",
+   "text": "Breeze coming off the ocean, so if your shot drifts left, blame the Pacific. That's the rule."
+  },
+  {
+   "id": "filler.banter.08",
+   "moment": "filler.banter",
+   "text": "Court rule since forever: loser buys the lemonade. The lemonade stand loves a close game."
+  },
+  {
+   "id": "momentum.warming.01",
+   "moment": "momentum.warming",
+   "text": "Tide is coming in! You feel that, Venice?"
+  },
+  {
+   "id": "momentum.warming.02",
+   "moment": "momentum.warming",
+   "text": "Ooh, the kid's finding a rhythm out here!"
+  },
+  {
+   "id": "momentum.warming.03",
+   "moment": "momentum.warming",
+   "text": "Warm sand, warmer shots! Keep it coming!"
+  },
+  {
+   "id": "momentum.hot.01",
+   "moment": "momentum.hot",
+   "text": "High tide, Venice! Everybody on your feet!"
+  },
+  {
+   "id": "momentum.hot.02",
+   "moment": "momentum.hot",
+   "text": "Sizzling sand! Somebody bring this hooper some water!"
+  },
+  {
+   "id": "momentum.hot.03",
+   "moment": "momentum.hot",
+   "text": "Phones up, tourists! You'll want this one!"
+  },
+  {
+   "id": "momentum.fire.01",
+   "moment": "momentum.fire",
+   "text": "Riptide! This beach can't handle it!"
+  },
+  {
+   "id": "momentum.fire.02",
+   "moment": "momentum.fire",
+   "text": "Boardwalk approved, stamped, and framed! Can't miss!"
+  },
+  {
+   "id": "momentum.fire.03",
+   "moment": "momentum.fire",
+   "text": "Ocean's boiling, Venice! Whole pier is up!"
+  },
+  {
+   "id": "momentum.fire.04",
+   "moment": "momentum.fire",
+   "text": "Somebody call the lifeguard, the sand's melting!"
+  },
+  {
+   "id": "momentum.cold.01",
+   "moment": "momentum.cold",
+   "text": "Low tide, kid. It always comes back."
+  },
+  {
+   "id": "momentum.cold.02",
+   "moment": "momentum.cold",
+   "text": "Little sand in your shoes? Shake it out!"
+  },
+  {
+   "id": "momentum.cold.03",
+   "moment": "momentum.cold",
+   "text": "Building sandcastles with those bricks! Next one drops!"
+  },
+  {
+   "id": "outro.win.01",
+   "moment": "outro.win",
+   "text": "That's a wrap, Venice! Boardwalk approved! Take a bow, and take the sunset with you!"
+  },
+  {
+   "id": "outro.win.02",
+   "moment": "outro.win",
+   "text": "Write it in the sand, the tide can't wash this one away! You ran Venice!"
+  },
+  {
+   "id": "outro.win.03",
+   "moment": "outro.win",
+   "text": "Venice Beach, on your feet for the winner! Honorary local, starting right now!"
+  },
+  {
+   "id": "outro.win.04",
+   "moment": "outro.win",
+   "text": "Game, set, sunset! The kid came to the beach and took the whole boardwalk home!"
+  },
+  {
+   "id": "outro.loss.01",
+   "moment": "outro.loss",
+   "text": "Not today, but the tide always comes back in. Venice will be here. Run it back!"
+  },
+  {
+   "id": "outro.loss.02",
+   "moment": "outro.loss",
+   "text": "Big respect! You left it all on the sand. Grab a taco and come back hungry!"
+  },
+  {
+   "id": "outro.loss.03",
+   "moment": "outro.loss",
+   "text": "Venice, give it up anyway! That's a hooper who'll be back, and Boardwalk will be waiting!"
+  },
+  {
+   "id": "outro.loss.04",
+   "moment": "outro.loss",
+   "text": "Sand in your shoes means you're coming back. Rematch is on the house, my friend!"
+  },
+  {
+   "id": "dunk.intro.01",
+   "moment": "dunk.intro",
+   "text": "Wings on, Venice, it's Flight Night! Two rounds, two dunks each, five judges on the sand, and one rival with a plan!"
+  },
+  {
+   "id": "dunk.intro.02",
+   "moment": "dunk.intro",
+   "text": "It's Flight Night, Venice! Five judges, two rounds, two dunks apiece, and somebody across the court who wants your spot. Get loud!"
+  },
+  {
+   "id": "dunk.intro.03",
+   "moment": "dunk.intro",
+   "text": "The pier is packed for Flight Night! Two rounds, two dunks a round, five judges, one rival waiting. Who's ready?!"
+  },
+  {
+   "id": "dunk.night.01",
+   "moment": "dunk.night",
+   "text": "Back for more? Venice loves a regular! Flight Night, let's go again!"
+  },
+  {
+   "id": "dunk.night.02",
+   "moment": "dunk.night",
+   "text": "The kid came back! Same sand, new night, bigger dunks. I hope."
+  },
+  {
+   "id": "dunk.night.03",
+   "moment": "dunk.night",
+   "text": "Another Flight Night at Venice! The tide keeps coming back, and so do you!"
+  },
+  {
+   "id": "dunk.rival.intro.01",
+   "moment": "dunk.rival.intro",
+   "text": "Look across the sand, Venice: tonight's rival! Wave hello, then pick a side!"
+  },
+  {
+   "id": "dunk.rival.intro.02",
+   "moment": "dunk.rival.intro",
+   "text": "Every Flight Night needs a rival, and this one flew in hungry. Give it up, Venice!"
+  },
+  {
+   "id": "dunk.rival.intro.cass.01",
+   "moment": "dunk.rival.intro",
+   "text": "Clockwork Cass! Tick, tock, tomahawk! Same dunk, same time, never a miss, never a twist!",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.ty.01",
+   "moment": "dunk.rival.intro",
+   "text": "Heavy-duty Ty! Big power, few words, and a windmill that shakes the whole pier!",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.pilot.01",
+   "moment": "dunk.rival.intro",
+   "text": "Pilot! Reads the room like a surf report, then takes the wave. Watch that three-sixty!",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.zo.01",
+   "moment": "dunk.rival.intro",
+   "text": "Zo the Show! Plays to the cameras, not the judges. Phones up for that eastbay!",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.intro.stack.01",
+   "moment": "dunk.rival.intro",
+   "text": "No-brakes Stack! Tries the wild one first and laughs the whole way. Between the legs? Warm-up!",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.up.01",
+   "moment": "dunk.up",
+   "text": "Boardwalk's clear, sand is swept. You're up!"
+  },
+  {
+   "id": "dunk.up.02",
+   "moment": "dunk.up",
+   "text": "Here comes the kid! Phones up, Venice!"
+  },
+  {
+   "id": "dunk.up.03",
+   "moment": "dunk.up",
+   "text": "Your turn! Show the pier something new!"
+  },
+  {
+   "id": "dunk.up.04",
+   "moment": "dunk.up",
+   "text": "Quiet on the sand... dunker's up."
+  },
+  {
+   "id": "dunk.up.05",
+   "moment": "dunk.up",
+   "text": "Hold those tacos, Venice! Dunker coming through!"
+  },
+  {
+   "id": "dunk.retry.01",
+   "moment": "dunk.retry",
+   "text": "Shake the sand off! Same dunk, again!"
+  },
+  {
+   "id": "dunk.retry.02",
+   "moment": "dunk.retry",
+   "text": "Skaters fall, skaters get up! Go again!"
+  },
+  {
+   "id": "dunk.retry.03",
+   "moment": "dunk.retry",
+   "text": "One more time, Venice! Help the kid out!"
+  },
+  {
+   "id": "dunk.retry.04",
+   "moment": "dunk.retry",
+   "text": "Second try, same dream. Let's see it!"
+  },
+  {
+   "id": "dunk.lastchance.01",
+   "moment": "dunk.lastchance",
+   "text": "Last wave of the day. Ride it!"
+  },
+  {
+   "id": "dunk.lastchance.02",
+   "moment": "dunk.lastchance",
+   "text": "Final attempt! Venice, give the kid some noise!"
+  },
+  {
+   "id": "dunk.lastchance.03",
+   "moment": "dunk.lastchance",
+   "text": "Third try! Tide goes out after this one!"
+  },
+  {
+   "id": "dunk.run.01",
+   "moment": "dunk.run",
+   "text": "Here we go!"
+  },
+  {
+   "id": "dunk.run.02",
+   "moment": "dunk.run",
+   "text": "Send it!"
+  },
+  {
+   "id": "dunk.run.03",
+   "moment": "dunk.run",
+   "text": "Fly, kid, fly!"
+  },
+  {
+   "id": "dunk.run.04",
+   "moment": "dunk.run",
+   "text": "Go, go, go!"
+  },
+  {
+   "id": "dunk.run.05",
+   "moment": "dunk.run",
+   "text": "Let it rip!"
+  },
+  {
+   "id": "dunk.make.t0.01",
+   "moment": "dunk.make",
+   "text": "Clean and simple, just how Venice likes it...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.02",
+   "moment": "dunk.make",
+   "text": "Nice and easy on the rim...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.03",
+   "moment": "dunk.make",
+   "text": "Solid! Tourists, that one's called...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.04",
+   "moment": "dunk.make",
+   "text": "Textbook, kid. Nothing fancy, all business...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.05",
+   "moment": "dunk.make",
+   "text": "That'll count! Tell them what it was...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t0.06",
+   "moment": "dunk.make",
+   "text": "Easy money on the sand...",
+   "tier": 0
+  },
+  {
+   "id": "dunk.make.t1.01",
+   "moment": "dunk.make",
+   "text": "Ooh, the judges are leaning forward!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.02",
+   "moment": "dunk.make",
+   "text": "Oh, that one came with extra sizzle!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.03",
+   "moment": "dunk.make",
+   "text": "Venice, say it with me...",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.04",
+   "moment": "dunk.make",
+   "text": "Pier's nodding, judges nodding! That was...",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.05",
+   "moment": "dunk.make",
+   "text": "Tide is coming in with that one!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.06",
+   "moment": "dunk.make",
+   "text": "Sweet as the churro cart!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.07",
+   "moment": "dunk.make",
+   "text": "Whoa, look at the lift on that...",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t1.08",
+   "moment": "dunk.make",
+   "text": "Now we're talking, Venice!",
+   "tier": 1
+  },
+  {
+   "id": "dunk.make.t2.01",
+   "moment": "dunk.make",
+   "text": "Put it on a postcard!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.02",
+   "moment": "dunk.make",
+   "text": "Boardwalk approved! Frame it on the pier!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.03",
+   "moment": "dunk.make",
+   "text": "Whole beach just stood up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.04",
+   "moment": "dunk.make",
+   "text": "Close the boardwalk! Everybody go home!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.05",
+   "moment": "dunk.make",
+   "text": "Drum circle, go double time!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.06",
+   "moment": "dunk.make",
+   "text": "Up, Venice! Up, up, up!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.07",
+   "moment": "dunk.make",
+   "text": "Somebody check on that rim!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.08",
+   "moment": "dunk.make",
+   "text": "No way! No way! Venice, you saw it!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.09",
+   "moment": "dunk.make",
+   "text": "Hand me a new mic, this one's melted!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.make.t2.10",
+   "moment": "dunk.make",
+   "text": "Tourists screaming! Phones shaking! What was that?!",
+   "tier": 2
+  },
+  {
+   "id": "dunk.fifty.01",
+   "moment": "dunk.fifty",
+   "text": "Fifty! Five judges, five tens, one perfect sunset!"
+  },
+  {
+   "id": "dunk.fifty.02",
+   "moment": "dunk.fifty",
+   "text": "Perfect fifty! Boardwalk approved, judge approved, ocean approved!"
+  },
+  {
+   "id": "dunk.fifty.03",
+   "moment": "dunk.fifty",
+   "text": "Tens across the board! Carve it into the pier!"
+  },
+  {
+   "id": "dunk.fifty.04",
+   "moment": "dunk.fifty",
+   "text": "Top marks! The judges ran out of numbers!"
+  },
+  {
+   "id": "dunk.repeat.01",
+   "moment": "dunk.repeat",
+   "text": "Old news on the boardwalk! Judges want something fresh!"
+  },
+  {
+   "id": "dunk.repeat.02",
+   "moment": "dunk.repeat",
+   "text": "Same wave twice? The judges want a new one!"
+  },
+  {
+   "id": "dunk.repeat.03",
+   "moment": "dunk.repeat",
+   "text": "Ooh, we saw that earlier! Points get washed out."
+  },
+  {
+   "id": "dunk.repeat.04",
+   "moment": "dunk.repeat",
+   "text": "Leftovers from the taco stand! Tasty, but the judges noticed."
+  },
+  {
+   "id": "dunk.miss.01",
+   "moment": "dunk.miss",
+   "text": "Wipeout! Paddle back out, kid!"
+  },
+  {
+   "id": "dunk.miss.02",
+   "moment": "dunk.miss",
+   "text": "Ooh, the sand wins that one!"
+  },
+  {
+   "id": "dunk.miss.03",
+   "moment": "dunk.miss",
+   "text": "Not this time! Venice still loves you!"
+  },
+  {
+   "id": "dunk.miss.04",
+   "moment": "dunk.miss",
+   "text": "Almost! Even the taco stand gasped!"
+  },
+  {
+   "id": "dunk.miss.05",
+   "moment": "dunk.miss",
+   "text": "Nope! Rim said come back later!"
+  },
+  {
+   "id": "dunk.miss.06",
+   "moment": "dunk.miss",
+   "text": "Sand in your shoes on that one!"
+  },
+  {
+   "id": "dunk.miss.iron.01",
+   "moment": "dunk.miss.iron",
+   "text": "In and out! The rim changed its mind!"
+  },
+  {
+   "id": "dunk.miss.iron.02",
+   "moment": "dunk.miss.iron",
+   "text": "Rattled, rolled, and rolled right out!"
+  },
+  {
+   "id": "dunk.miss.iron.03",
+   "moment": "dunk.miss.iron",
+   "text": "Clanked it! The iron won that round!"
+  },
+  {
+   "id": "dunk.miss.lob.01",
+   "moment": "dunk.miss.lob",
+   "text": "Lost the lob in the sunset!"
+  },
+  {
+   "id": "dunk.miss.lob.02",
+   "moment": "dunk.miss.lob",
+   "text": "Where'd it go? The ocean breeze took it!"
+  },
+  {
+   "id": "dunk.miss.lob.03",
+   "moment": "dunk.miss.lob",
+   "text": "Missed the catch! Ball's headed for the pier!"
+  },
+  {
+   "id": "dunk.miss.prop.01",
+   "moment": "dunk.miss.prop",
+   "text": "Clipped it! Obstacle's fine, dunk's not!"
+  },
+  {
+   "id": "dunk.miss.prop.02",
+   "moment": "dunk.miss.prop",
+   "text": "Snagged it on the way over! So close!"
+  },
+  {
+   "id": "dunk.miss.prop.03",
+   "moment": "dunk.miss.prop",
+   "text": "Hurdle got a vote, and it voted no!"
+  },
+  {
+   "id": "dunk.miss.last.01",
+   "moment": "dunk.miss.last",
+   "text": "That's all three, Venice. Clap it up for the effort!"
+  },
+  {
+   "id": "dunk.miss.last.02",
+   "moment": "dunk.miss.last",
+   "text": "Out of tries. Marked a miss. Next one's yours, kid!"
+  },
+  {
+   "id": "dunk.miss.last.03",
+   "moment": "dunk.miss.last",
+   "text": "Judges mark it a miss. Shake it off, next one!"
+  },
+  {
+   "id": "dunk.judges.01",
+   "moment": "dunk.judges",
+   "text": "Judges, what you got?"
+  },
+  {
+   "id": "dunk.judges.02",
+   "moment": "dunk.judges",
+   "text": "Cards up, panel!"
+  },
+  {
+   "id": "dunk.judges.03",
+   "moment": "dunk.judges",
+   "text": "Let's see those numbers!"
+  },
+  {
+   "id": "dunk.judges.04",
+   "moment": "dunk.judges",
+   "text": "Five judges... drum roll!"
+  },
+  {
+   "id": "dunk.rival.up.01",
+   "moment": "dunk.rival.up",
+   "text": "Rival's up! Hold those cheers, Venice... mostly!"
+  },
+  {
+   "id": "dunk.rival.up.02",
+   "moment": "dunk.rival.up",
+   "text": "Other side's up! Let's see what they brought!"
+  },
+  {
+   "id": "dunk.rival.up.cass.01",
+   "moment": "dunk.rival.up",
+   "text": "Cass is up. Set your watch by it.",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.ty.01",
+   "moment": "dunk.rival.up",
+   "text": "Here comes Ty. Big surf warning, Venice!",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.pilot.01",
+   "moment": "dunk.rival.up",
+   "text": "Pilot's up. Reading the room, reading the waves.",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.zo.01",
+   "moment": "dunk.rival.up",
+   "text": "Zo's up! Tourists, you know what to do!",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.up.stack.01",
+   "moment": "dunk.rival.up",
+   "text": "Stack's up! Lifeguard, stay close on this one!",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.01",
+   "moment": "dunk.rival.make",
+   "text": "Respect from the sand for that one..."
+  },
+  {
+   "id": "dunk.rival.make.02",
+   "moment": "dunk.rival.make",
+   "text": "Rival answered the call!"
+  },
+  {
+   "id": "dunk.rival.make.03",
+   "moment": "dunk.rival.make",
+   "text": "Even the skaters stopped rolling for that..."
+  },
+  {
+   "id": "dunk.rival.make.04",
+   "moment": "dunk.rival.make",
+   "text": "They came to play, Venice!"
+  },
+  {
+   "id": "dunk.rival.make.cass.01",
+   "moment": "dunk.rival.make",
+   "text": "Tick, tock, Cass delivers on time...",
+   "tags": [
+    "rival:cass"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.ty.01",
+   "moment": "dunk.rival.make",
+   "text": "Ty brought the heavy surf!",
+   "tags": [
+    "rival:ty"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.pilot.01",
+   "moment": "dunk.rival.make",
+   "text": "Pilot picked the perfect wave, then rode it...",
+   "tags": [
+    "rival:pilot"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.zo.01",
+   "moment": "dunk.rival.make",
+   "text": "Zo played it straight to the phones!",
+   "tags": [
+    "rival:zo"
+   ]
+  },
+  {
+   "id": "dunk.rival.make.stack.01",
+   "moment": "dunk.rival.make",
+   "text": "No brakes, no fear, and Stack landed it!",
+   "tags": [
+    "rival:stack"
+   ]
+  },
+  {
+   "id": "dunk.rival.miss.01",
+   "moment": "dunk.rival.miss",
+   "text": "Off the rim! Venice exhales!"
+  },
+  {
+   "id": "dunk.rival.miss.02",
+   "moment": "dunk.rival.miss",
+   "text": "Rival wiped out! Door's open, kid!"
+  },
+  {
+   "id": "dunk.rival.miss.03",
+   "moment": "dunk.rival.miss",
+   "text": "Missed it! Drum circle, keep that beat going!"
+  },
+  {
+   "id": "dunk.rival.miss.04",
+   "moment": "dunk.rival.miss",
+   "text": "Nope! The rim is on our side!"
+  },
+  {
+   "id": "dunk.rival.miss.05",
+   "moment": "dunk.rival.miss",
+   "text": "Sand in their shoes! Your window, kid!"
+  },
+  {
+   "id": "dunk.round.01",
+   "moment": "dunk.round",
+   "text": "Round two! Final round! Sun's almost down, so make it count!"
+  },
+  {
+   "id": "dunk.round.02",
+   "moment": "dunk.round",
+   "text": "Last round on the sand, Venice! Everything you got, right now!"
+  },
+  {
+   "id": "dunk.round.03",
+   "moment": "dunk.round",
+   "text": "Final round! When I say flight, you say night! Flight!"
+  },
+  {
+   "id": "dunk.need.01",
+   "moment": "dunk.need",
+   "text": "Behind on the cards. Only big waves get you back now!"
+  },
+  {
+   "id": "dunk.need.02",
+   "moment": "dunk.need",
+   "text": "Kid needs big numbers! Save the safe stuff for the taco line!"
+  },
+  {
+   "id": "dunk.need.03",
+   "moment": "dunk.need",
+   "text": "Trailing, Venice! Get loud, this comeback needs a crowd!"
+  },
+  {
+   "id": "dunk.need.ahead.01",
+   "moment": "dunk.need.ahead",
+   "text": "Out front going into the final round. Close the door, kid!"
+  },
+  {
+   "id": "dunk.need.ahead.02",
+   "moment": "dunk.need.ahead",
+   "text": "You're leading! Finish strong and the sunset's yours!"
+  },
+  {
+   "id": "dunk.win.01",
+   "moment": "dunk.win",
+   "text": "Sunset guaranteed, Venice certified! The kid just took Flight Night!"
+  },
+  {
+   "id": "dunk.win.02",
+   "moment": "dunk.win",
+   "text": "Champion of the sand! Somebody get this dunker a trophy and a taco!"
+  },
+  {
+   "id": "dunk.win.03",
+   "moment": "dunk.win",
+   "text": "Tide came in and it never went out! You own Flight Night, my friend!"
+  },
+  {
+   "id": "dunk.win.04",
+   "moment": "dunk.win",
+   "text": "Venice, crown your winner! Pier to the parking lot, everybody up!"
+  },
+  {
+   "id": "dunk.lose.01",
+   "moment": "dunk.lose",
+   "text": "Tip your cap to the rival! Flight Night goes their way. Come get it back!"
+  },
+  {
+   "id": "dunk.lose.02",
+   "moment": "dunk.lose",
+   "text": "Not your night, kid. But the boardwalk remembers every dunk, and so do I."
+  },
+  {
+   "id": "dunk.lose.03",
+   "moment": "dunk.lose",
+   "text": "Venice, love to both sides! Trophy goes to the rival, but the rematch is already booked!"
+  },
+  {
+   "id": "dunk.lose.04",
+   "moment": "dunk.lose",
+   "text": "Rival's night, not ours. Save the ticket stub, kid, the sequel's coming!"
+  },
+  {
+   "id": "dunk.celeb.spiderman.01",
+   "moment": "dunk.celeb",
+   "text": "Splits on the baseline! Stretch it out, Venice!",
+   "tags": [
+    "celeb:spiderman"
+   ]
+  },
+  {
+   "id": "dunk.celeb.itsover.01",
+   "moment": "dunk.celeb",
+   "text": "Calling it early? Venice, you buying it?!",
+   "tags": [
+    "celeb:itsover"
+   ]
+  },
+  {
+   "id": "dunk.celeb.roar.01",
+   "moment": "dunk.celeb",
+   "text": "Hear that roar? The pier just shook!",
+   "tags": [
+    "celeb:roar"
+   ]
+  },
+  {
+   "id": "dunk.celeb.toosmall.01",
+   "moment": "dunk.celeb",
+   "text": "Too small? Talking about the rim, right? Right!",
+   "tags": [
+    "celeb:toosmall"
+   ]
+  },
+  {
+   "id": "dunk.celeb.armsup.01",
+   "moment": "dunk.celeb",
+   "text": "Arms up! Venice, get yours up too!",
+   "tags": [
+    "celeb:armsup"
+   ]
+  },
+  {
+   "id": "duel.pass.01",
+   "moment": "duel.pass",
+   "text": "Hand it over! Next dunker's up!"
+  },
+  {
+   "id": "duel.pass.02",
+   "moment": "duel.pass",
+   "text": "Controller swap! New dunker, same sand!"
+  },
+  {
+   "id": "duel.pass.1.01",
+   "moment": "duel.pass",
+   "text": "Player one, grab the controller! You're up!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.pass.2.01",
+   "moment": "duel.pass",
+   "text": "Your turn, player two! Show Venice something!",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.win.01",
+   "moment": "duel.win",
+   "text": "We got a winner! Venice, crown the champ!"
+  },
+  {
+   "id": "duel.win.1.01",
+   "moment": "duel.win",
+   "text": "Player one takes the Dunk Duel! Bragging rights, all week!",
+   "tags": [
+    "p:1"
+   ]
+  },
+  {
+   "id": "duel.win.2.01",
+   "moment": "duel.win",
+   "text": "Dunk Duel goes to player two! Couch champion of Venice!",
+   "tags": [
+    "p:2"
+   ]
+  },
+  {
+   "id": "duel.tie.01",
+   "moment": "duel.tie",
+   "text": "All square! Nobody blinked. Run it back, both of you!"
+  },
+  {
+   "id": "duel.tie.02",
+   "moment": "duel.tie",
+   "text": "Tied up on the sand! The judges can't split you!"
+  },
+  {
+   "id": "three.intro.01",
+   "moment": "three.intro",
+   "text": "Welcome to Downtown on the beach! Five racks, sixty seconds, money balls on every rack. Six shooters, top three move on!"
+  },
+  {
+   "id": "three.intro.02",
+   "moment": "three.intro",
+   "text": "Downtown at Venice Beach! Sixty seconds, five racks, gold money balls worth two. Six shooters, only three advance!"
+  },
+  {
+   "id": "three.intro.03",
+   "moment": "three.intro",
+   "text": "Shooters on the sand! It's Downtown: five racks, sixty seconds, six shooters, top three advance. Grab that money ball!"
+  },
+  {
+   "id": "three.go.01",
+   "moment": "three.go",
+   "text": "Paddle out, shooter!"
+  },
+  {
+   "id": "three.go.02",
+   "moment": "three.go",
+   "text": "Sixty seconds, go!"
+  },
+  {
+   "id": "three.go.03",
+   "moment": "three.go",
+   "text": "Start splashing!"
+  },
+  {
+   "id": "three.rack.01",
+   "moment": "three.rack",
+   "text": "Next rack, keep rolling!"
+  },
+  {
+   "id": "three.rack.02",
+   "moment": "three.rack",
+   "text": "New rack, same sand!"
+  },
+  {
+   "id": "three.rack.03",
+   "moment": "three.rack",
+   "text": "Slide on over!"
+  },
+  {
+   "id": "three.rack.04",
+   "moment": "three.rack",
+   "text": "Roll to the next rack!"
+  },
+  {
+   "id": "three.lastrack.01",
+   "moment": "three.lastrack",
+   "text": "Last rack! Empty the tank!"
+  },
+  {
+   "id": "three.lastrack.02",
+   "moment": "three.lastrack",
+   "text": "Final rack, Venice, get loud!"
+  },
+  {
+   "id": "three.lastrack.03",
+   "moment": "three.lastrack",
+   "text": "One rack left, sunset's coming!"
+  },
+  {
+   "id": "three.money.01",
+   "moment": "three.money",
+   "text": "Money ball! Cash it!"
+  },
+  {
+   "id": "three.money.02",
+   "moment": "three.money",
+   "text": "Gold ball, double points!"
+  },
+  {
+   "id": "three.money.03",
+   "moment": "three.money",
+   "text": "Here's the money!"
+  },
+  {
+   "id": "three.money.04",
+   "moment": "three.money",
+   "text": "Payday on the beach!"
+  },
+  {
+   "id": "three.make.01",
+   "moment": "three.make",
+   "text": "Splash!"
+  },
+  {
+   "id": "three.make.02",
+   "moment": "three.make",
+   "text": "Count it!"
+  },
+  {
+   "id": "three.make.03",
+   "moment": "three.make",
+   "text": "Wet sand!"
+  },
+  {
+   "id": "three.make.04",
+   "moment": "three.make",
+   "text": "Boardwalk bucket!"
+  },
+  {
+   "id": "three.make.05",
+   "moment": "three.make",
+   "text": "Pure!"
+  },
+  {
+   "id": "three.make.06",
+   "moment": "three.make",
+   "text": "Swish, Venice!"
+  },
+  {
+   "id": "three.make.money.01",
+   "moment": "three.make.money",
+   "text": "Money in the bank!"
+  },
+  {
+   "id": "three.make.money.02",
+   "moment": "three.make.money",
+   "text": "Cash register's ringing!"
+  },
+  {
+   "id": "three.make.money.03",
+   "moment": "three.make.money",
+   "text": "Gold ball, gone!"
+  },
+  {
+   "id": "three.make.money.04",
+   "moment": "three.make.money",
+   "text": "Two-for-one special!"
+  },
+  {
+   "id": "three.miss.01",
+   "moment": "three.miss",
+   "text": "Short!"
+  },
+  {
+   "id": "three.miss.02",
+   "moment": "three.miss",
+   "text": "Choppy water!"
+  },
+  {
+   "id": "three.miss.03",
+   "moment": "three.miss",
+   "text": "Missed the wave!"
+  },
+  {
+   "id": "three.miss.04",
+   "moment": "three.miss",
+   "text": "Wipeout!"
+  },
+  {
+   "id": "three.miss.05",
+   "moment": "three.miss",
+   "text": "Next ball!"
+  },
+  {
+   "id": "three.streak.01",
+   "moment": "three.streak",
+   "text": "Surf's building, Venice!"
+  },
+  {
+   "id": "three.streak.02",
+   "moment": "three.streak",
+   "text": "Wave after wave!"
+  },
+  {
+   "id": "three.streak.03",
+   "moment": "three.streak",
+   "text": "Piling them up!"
+  },
+  {
+   "id": "three.streak.04",
+   "moment": "three.streak",
+   "text": "Rhythm on the boardwalk!"
+  },
+  {
+   "id": "three.fire.01",
+   "moment": "three.fire",
+   "text": "Automatic! Venice, stand up!"
+  },
+  {
+   "id": "three.fire.02",
+   "moment": "three.fire",
+   "text": "Every shot's a splash! Unreal!"
+  },
+  {
+   "id": "three.fire.03",
+   "moment": "three.fire",
+   "text": "Hotter than noon on the sand!"
+  },
+  {
+   "id": "three.fire.04",
+   "moment": "three.fire",
+   "text": "Pier's shaking! Nothing's missing!"
+  },
+  {
+   "id": "three.cold.01",
+   "moment": "three.cold",
+   "text": "Rim's closed for lunch, apparently!"
+  },
+  {
+   "id": "three.cold.02",
+   "moment": "three.cold",
+   "text": "Cold water! Shake it off!"
+  },
+  {
+   "id": "three.cold.03",
+   "moment": "three.cold",
+   "text": "Find the wave again, shooter!"
+  },
+  {
+   "id": "three.clock.01",
+   "moment": "three.clock",
+   "text": "Ten seconds! Quick hands!"
+  },
+  {
+   "id": "three.clock.02",
+   "moment": "three.clock",
+   "text": "Clock says ten! Hurry!"
+  },
+  {
+   "id": "three.clock.03",
+   "moment": "three.clock",
+   "text": "Final ten, empty the rack!"
+  },
+  {
+   "id": "three.buzzer.01",
+   "moment": "three.buzzer",
+   "text": "Beat the horn! It counts!"
+  },
+  {
+   "id": "three.buzzer.02",
+   "moment": "three.buzzer",
+   "text": "Out in time! Splash counts!"
+  },
+  {
+   "id": "three.buzzer.03",
+   "moment": "three.buzzer",
+   "text": "Just under the wire! Count it!"
+  },
+  {
+   "id": "three.results.01",
+   "moment": "three.results",
+   "text": "Numbers rolling in, one shooter at a time..."
+  },
+  {
+   "id": "three.results.02",
+   "moment": "three.results",
+   "text": "Let's check the board. Venice, hold your breath!"
+  },
+  {
+   "id": "three.advance.01",
+   "moment": "three.advance",
+   "text": "You're through to the final! Grab some water, shooter, you earned it!"
+  },
+  {
+   "id": "three.advance.02",
+   "moment": "three.advance",
+   "text": "Made the cut! The final's waiting, and Venice wants more!"
+  },
+  {
+   "id": "three.advance.03",
+   "moment": "three.advance",
+   "text": "Advancing! Save some splash for the final!"
+  },
+  {
+   "id": "three.out.01",
+   "moment": "three.out",
+   "text": "Out in qualifying. The waves just weren't breaking today. Come back soon!"
+  },
+  {
+   "id": "three.out.02",
+   "moment": "three.out",
+   "text": "So close, shooter! Grab a lemonade, and run it back!"
+  },
+  {
+   "id": "three.out.03",
+   "moment": "three.out",
+   "text": "Missed the cut, but Venice saw the touch. Next time, it falls!"
+  },
+  {
+   "id": "three.final.01",
+   "moment": "three.final",
+   "text": "Final round! You shoot last. Drum circle, give this shooter a beat!"
+  },
+  {
+   "id": "three.final.02",
+   "moment": "three.final",
+   "text": "Everybody else has posted. Last shooter on the sand, this one's yours to take!"
+  },
+  {
+   "id": "three.final.03",
+   "moment": "three.final",
+   "text": "The number's up on the board, kid. Top it, and the whole pier knows!"
+  },
+  {
+   "id": "three.clinch.01",
+   "moment": "three.clinch",
+   "text": "Number's cooked! Beach party!"
+  },
+  {
+   "id": "three.clinch.02",
+   "moment": "three.clinch",
+   "text": "Passed it! Downtown is yours!"
+  },
+  {
+   "id": "three.clinch.03",
+   "moment": "three.clinch",
+   "text": "Clinched! Pop the lemonade!"
+  },
+  {
+   "id": "three.champion.01",
+   "moment": "three.champion",
+   "text": "Three-point champion of Venice Beach! Splash after splash, and the ocean's jealous!"
+  },
+  {
+   "id": "three.champion.02",
+   "moment": "three.champion",
+   "text": "Downtown belongs to the kid! Boardwalk approved, trophy approved, taco on me!"
+  },
+  {
+   "id": "three.champion.03",
+   "moment": "three.champion",
+   "text": "Crown the shooter, Venice! Best touch on the beach, no argument!"
+  },
+  {
+   "id": "game.intro.ones.01",
+   "moment": "game.intro.ones",
+   "text": "Ones at Venice Beach! First to eleven, make it take it. One ball, two hoopers, the whole boardwalk watching!"
+  },
+  {
+   "id": "game.intro.ones.02",
+   "moment": "game.intro.ones",
+   "text": "Straight up, one on one! First to eleven, make it take it. Venice, get loud!"
+  },
+  {
+   "id": "game.intro.threes.01",
+   "moment": "game.intro.threes",
+   "text": "Threes at Venice Beach! Three on three, first to twenty-one, ninety seconds on the clock. Let's run!"
+  },
+  {
+   "id": "game.intro.threes.02",
+   "moment": "game.intro.threes",
+   "text": "Six hoopers, one court, ninety seconds! First to twenty-one takes the sand. Drum circle, go!"
+  },
+  {
+   "id": "game.check.01",
+   "moment": "game.check",
+   "text": "Their ball. Lock in, defense!"
+  },
+  {
+   "id": "game.check.02",
+   "moment": "game.check",
+   "text": "Check it up! Get a stop!"
+  },
+  {
+   "id": "game.check.03",
+   "moment": "game.check",
+   "text": "Defense, kid! Guard the boardwalk!"
+  },
+  {
+   "id": "game.check.04",
+   "moment": "game.check",
+   "text": "Ball's checked. Nothing easy, Venice!"
+  },
+  {
+   "id": "game.make.01",
+   "moment": "game.make",
+   "text": "Wet jumper!"
+  },
+  {
+   "id": "game.make.02",
+   "moment": "game.make",
+   "text": "Pull-up, cash!"
+  },
+  {
+   "id": "game.make.03",
+   "moment": "game.make",
+   "text": "Boardwalk approved!"
+  },
+  {
+   "id": "game.make.04",
+   "moment": "game.make",
+   "text": "Jumper's pure!"
+  },
+  {
+   "id": "game.make.05",
+   "moment": "game.make",
+   "text": "Buckets on the beach!"
+  },
+  {
+   "id": "game.make.06",
+   "moment": "game.make",
+   "text": "Sweet shot, sneakers!"
+  },
+  {
+   "id": "game.three.01",
+   "moment": "game.three",
+   "text": "Deep water! Splash!"
+  },
+  {
+   "id": "game.three.02",
+   "moment": "game.three",
+   "text": "Three from the pier!"
+  },
+  {
+   "id": "game.three.03",
+   "moment": "game.three",
+   "text": "Out past the lifeguard tower!"
+  },
+  {
+   "id": "game.three.04",
+   "moment": "game.three",
+   "text": "Cash, times three!"
+  },
+  {
+   "id": "game.three.05",
+   "moment": "game.three",
+   "text": "Rainbow over the ocean!"
+  },
+  {
+   "id": "game.layup.01",
+   "moment": "game.layup",
+   "text": "Soft off the glass!"
+  },
+  {
+   "id": "game.layup.02",
+   "moment": "game.layup",
+   "text": "Laid it in easy!"
+  },
+  {
+   "id": "game.layup.03",
+   "moment": "game.layup",
+   "text": "Sneaky finish!"
+  },
+  {
+   "id": "game.layup.04",
+   "moment": "game.layup",
+   "text": "Gentle as a wave!"
+  },
+  {
+   "id": "game.dunk.01",
+   "moment": "game.dunk",
+   "text": "Flushed it!"
+  },
+  {
+   "id": "game.dunk.02",
+   "moment": "game.dunk",
+   "text": "Rim's rattling!"
+  },
+  {
+   "id": "game.dunk.03",
+   "moment": "game.dunk",
+   "text": "Surf's up at the rim!"
+  },
+  {
+   "id": "game.dunk.04",
+   "moment": "game.dunk",
+   "text": "Sand flew on that one!"
+  },
+  {
+   "id": "game.dunk.05",
+   "moment": "game.dunk",
+   "text": "Ooh, jam session!"
+  },
+  {
+   "id": "game.poster.01",
+   "moment": "game.poster",
+   "text": "Postcard! Wish you were here!"
+  },
+  {
+   "id": "game.poster.02",
+   "moment": "game.poster",
+   "text": "Put it on the pier wall!"
+  },
+  {
+   "id": "game.poster.03",
+   "moment": "game.poster",
+   "text": "Posterized! Tourists, buy the print!"
+  },
+  {
+   "id": "game.poster.04",
+   "moment": "game.poster",
+   "text": "Over the top! Ocean's roaring!"
+  },
+  {
+   "id": "game.poster.05",
+   "moment": "game.poster",
+   "text": "Stop the boardwalk! Stop everything!"
+  },
+  {
+   "id": "game.poster.06",
+   "moment": "game.poster",
+   "text": "Whoa! Whole beach felt that one!"
+  },
+  {
+   "id": "game.andone.01",
+   "moment": "game.andone",
+   "text": "And one, Venice!"
+  },
+  {
+   "id": "game.andone.02",
+   "moment": "game.andone",
+   "text": "Through the contact! Count it!"
+  },
+  {
+   "id": "game.andone.03",
+   "moment": "game.andone",
+   "text": "Plus the freebie!"
+  },
+  {
+   "id": "game.andone.04",
+   "moment": "game.andone",
+   "text": "Bucket and a bonus!"
+  },
+  {
+   "id": "game.miss.01",
+   "moment": "game.miss",
+   "text": "Rimmed out."
+  },
+  {
+   "id": "game.miss.02",
+   "moment": "game.miss",
+   "text": "Just off!"
+  },
+  {
+   "id": "game.miss.03",
+   "moment": "game.miss",
+   "text": "Rough surf, kid."
+  },
+  {
+   "id": "game.miss.04",
+   "moment": "game.miss",
+   "text": "Close, no taco."
+  },
+  {
+   "id": "game.airball.01",
+   "moment": "game.airball",
+   "text": "Airball! Straight into the ocean!"
+  },
+  {
+   "id": "game.airball.02",
+   "moment": "game.airball",
+   "text": "Ball's headed to the pier!"
+  },
+  {
+   "id": "game.airball.03",
+   "moment": "game.airball",
+   "text": "Beach ball, Venice!"
+  },
+  {
+   "id": "game.airball.04",
+   "moment": "game.airball",
+   "text": "Tourists, that's a souvenir!"
+  },
+  {
+   "id": "game.block.01",
+   "moment": "game.block",
+   "text": "Stamped and sent back!"
+  },
+  {
+   "id": "game.block.02",
+   "moment": "game.block",
+   "text": "Not on my boardwalk!"
+  },
+  {
+   "id": "game.block.03",
+   "moment": "game.block",
+   "text": "Swatted into the sand!"
+  },
+  {
+   "id": "game.block.04",
+   "moment": "game.block",
+   "text": "Blocked! Closed for business!"
+  },
+  {
+   "id": "game.block.05",
+   "moment": "game.block",
+   "text": "Pier security, denied!"
+  },
+  {
+   "id": "game.block.06",
+   "moment": "game.block",
+   "text": "Shut the gate!"
+  },
+  {
+   "id": "game.blocked.01",
+   "moment": "game.blocked",
+   "text": "Ooh, stuffed at the rim!"
+  },
+  {
+   "id": "game.blocked.02",
+   "moment": "game.blocked",
+   "text": "Denied at the door!"
+  },
+  {
+   "id": "game.blocked.03",
+   "moment": "game.blocked",
+   "text": "They saw that coming!"
+  },
+  {
+   "id": "game.blocked.04",
+   "moment": "game.blocked",
+   "text": "Wall went up! Regroup, kid!"
+  },
+  {
+   "id": "game.steal.01",
+   "moment": "game.steal",
+   "text": "Snatched it! Gone!"
+  },
+  {
+   "id": "game.steal.02",
+   "moment": "game.steal",
+   "text": "Picked clean!"
+  },
+  {
+   "id": "game.steal.03",
+   "moment": "game.steal",
+   "text": "Swiped! Off to the races!"
+  },
+  {
+   "id": "game.steal.04",
+   "moment": "game.steal",
+   "text": "Takeaway! Let's go!"
+  },
+  {
+   "id": "game.steal.05",
+   "moment": "game.steal",
+   "text": "Too quick, tide's turning!"
+  },
+  {
+   "id": "game.stolen.01",
+   "moment": "game.stolen",
+   "text": "Picked off! Get back!"
+  },
+  {
+   "id": "game.stolen.02",
+   "moment": "game.stolen",
+   "text": "Ooh, lost it!"
+  },
+  {
+   "id": "game.stolen.03",
+   "moment": "game.stolen",
+   "text": "Seagull got your fries!"
+  },
+  {
+   "id": "game.stolen.04",
+   "moment": "game.stolen",
+   "text": "Turnover! Shake it off!"
+  },
+  {
+   "id": "game.ankles.01",
+   "moment": "game.ankles",
+   "text": "Sneakers with the handle!"
+  },
+  {
+   "id": "game.ankles.02",
+   "moment": "game.ankles",
+   "text": "Ankle check on the boardwalk!"
+  },
+  {
+   "id": "game.ankles.03",
+   "moment": "game.ankles",
+   "text": "Wrong way, defender!"
+  },
+  {
+   "id": "game.ankles.04",
+   "moment": "game.ankles",
+   "text": "Crossed up! Wave goodbye!"
+  },
+  {
+   "id": "game.ankles.05",
+   "moment": "game.ankles",
+   "text": "Shook! Lifeguard, we need you!"
+  },
+  {
+   "id": "game.ankles.06",
+   "moment": "game.ankles",
+   "text": "Left them in the sand!"
+  },
+  {
+   "id": "game.bite.01",
+   "moment": "game.bite",
+   "text": "Bit on the bait!"
+  },
+  {
+   "id": "game.bite.02",
+   "moment": "game.bite",
+   "text": "Hook, line, and sinker!"
+  },
+  {
+   "id": "game.bite.03",
+   "moment": "game.bite",
+   "text": "Defender's still up there!"
+  },
+  {
+   "id": "game.bite.04",
+   "moment": "game.bite",
+   "text": "Sold it! Bought it!"
+  },
+  {
+   "id": "game.foul.01",
+   "moment": "game.foul",
+   "text": "Whistle! Everybody freeze!"
+  },
+  {
+   "id": "game.foul.02",
+   "moment": "game.foul",
+   "text": "Foul on the play!"
+  },
+  {
+   "id": "game.foul.03",
+   "moment": "game.foul",
+   "text": "Lifeguard's whistle! Stop the play!"
+  },
+  {
+   "id": "game.foul.04",
+   "moment": "game.foul",
+   "text": "Whoa, whoa! Hold the drums!"
+  },
+  {
+   "id": "game.rival.make.01",
+   "moment": "game.rival.make",
+   "text": "They splashed back! Lock in!"
+  },
+  {
+   "id": "game.rival.make.02",
+   "moment": "game.rival.make",
+   "text": "Their bucket. Next wave is ours!"
+  },
+  {
+   "id": "game.rival.make.03",
+   "moment": "game.rival.make",
+   "text": "Ooh, they got one. Next!"
+  },
+  {
+   "id": "game.rival.make.04",
+   "moment": "game.rival.make",
+   "text": "Tide goes both ways, Venice!"
+  },
+  {
+   "id": "game.rival.make.05",
+   "moment": "game.rival.make",
+   "text": "Shake it off, get it back!"
+  },
+  {
+   "id": "game.rival.dunk.01",
+   "moment": "game.rival.dunk",
+   "text": "Ooh, they threw one down!"
+  },
+  {
+   "id": "game.rival.dunk.02",
+   "moment": "game.rival.dunk",
+   "text": "Rival rocked the rim! Answer back!"
+  },
+  {
+   "id": "game.rival.dunk.03",
+   "moment": "game.rival.dunk",
+   "text": "That one shook the pier!"
+  },
+  {
+   "id": "game.rival.dunk.04",
+   "moment": "game.rival.dunk",
+   "text": "Big flush from the other side!"
+  },
+  {
+   "id": "game.run.01",
+   "moment": "game.run",
+   "text": "Big swell rolling in! Nobody's stopping it!"
+  },
+  {
+   "id": "game.run.02",
+   "moment": "game.run",
+   "text": "Run on the boardwalk! Venice, you seeing this?"
+  },
+  {
+   "id": "game.run.03",
+   "moment": "game.run",
+   "text": "Bucket, bucket, bucket! Somebody call a timeout!"
+  },
+  {
+   "id": "game.run.04",
+   "moment": "game.run",
+   "text": "Unanswered! Other side's stuck in beach traffic!"
+  },
+  {
+   "id": "game.point.us.01",
+   "moment": "game.point",
+   "text": "Game point, Venice! One more bucket, stand up!",
+   "tags": [
+    "side:us"
+   ]
+  },
+  {
+   "id": "game.point.them.01",
+   "moment": "game.point",
+   "text": "Their game point! Venice, get loud for defense!",
+   "tags": [
+    "side:them"
+   ]
+  },
+  {
+   "id": "game.win.01",
+   "moment": "game.win",
+   "text": "Game over! Winner stays on, Venice!"
+  },
+  {
+   "id": "game.win.02",
+   "moment": "game.win",
+   "text": "That's the run! Venice, give it up for the winner!"
+  },
+  {
+   "id": "game.win.03",
+   "moment": "game.win",
+   "text": "Ballgame! The sand is yours, the sunset too!"
+  },
+  {
+   "id": "game.win.04",
+   "moment": "game.win",
+   "text": "Winner! Tide came all the way in!"
+  },
+  {
+   "id": "game.loss.01",
+   "moment": "game.loss",
+   "text": "They take the run. Next time, the sand's yours."
+  },
+  {
+   "id": "game.loss.02",
+   "moment": "game.loss",
+   "text": "Not today, kid. Grab next and run it back!"
+  },
+  {
+   "id": "game.loss.03",
+   "moment": "game.loss",
+   "text": "Rough tide. Respect the win, then come get yours!"
+  },
+  {
+   "id": "game.draw.01",
+   "moment": "game.draw",
+   "text": "Even at the buzzer! Nobody takes the sand!"
+  },
+  {
+   "id": "game.draw.02",
+   "moment": "game.draw",
+   "text": "All square when the horn sounds! Split the tacos!"
+  },
+  {
+   "id": "game.assist.01",
+   "moment": "game.assist",
+   "text": "Dime on the beach!"
+  },
+  {
+   "id": "game.assist.02",
+   "moment": "game.assist",
+   "text": "Great find! Beach-style sharing!"
+  },
+  {
+   "id": "game.assist.03",
+   "moment": "game.assist",
+   "text": "Unselfish! Love to see it!"
+  },
+  {
+   "id": "game.assist.04",
+   "moment": "game.assist",
+   "text": "Served it up hot!"
+  },
+  {
+   "id": "game.alleyoop.01",
+   "moment": "game.alleyoop",
+   "text": "Up top and in!"
+  },
+  {
+   "id": "game.alleyoop.02",
+   "moment": "game.alleyoop",
+   "text": "Alley-oop off the boardwalk!"
+  },
+  {
+   "id": "game.alleyoop.03",
+   "moment": "game.alleyoop",
+   "text": "High toss, big catch!"
+  },
+  {
+   "id": "game.clock.01",
+   "moment": "game.clock",
+   "text": "Ten seconds! Make it count!"
+  },
+  {
+   "id": "game.clock.02",
+   "moment": "game.clock",
+   "text": "Everybody up! Ten seconds!"
+  },
+  {
+   "id": "game.clock.03",
+   "moment": "game.clock",
+   "text": "Clock's almost gone! Ten left!"
+  },
+  {
+   "id": "game.overdrive.01",
+   "moment": "game.overdrive",
+   "text": "Overdrive! Full tide, full speed!"
+  },
+  {
+   "id": "game.overdrive.02",
+   "moment": "game.overdrive",
+   "text": "Meter's maxed! Here comes the wave!"
+  },
+  {
+   "id": "game.overdrive.03",
+   "moment": "game.overdrive",
+   "text": "Synergy's full! Ride it together!"
+  },
+  {
+   "id": "carnival.intro.01",
+   "moment": "carnival.intro",
+   "text": "Welcome to Game Night! Four events, points on every one, and one champion walks off the boardwalk!"
+  },
+  {
+   "id": "carnival.intro.02",
+   "moment": "carnival.intro",
+   "text": "Game Night, Venice! Four mini-events tonight, points for each, and only one champion. Step right up!"
+  },
+  {
+   "id": "carnival.intro.03",
+   "moment": "carnival.intro",
+   "text": "Carnival's in town! Four games, points on each, one champion. Boardwalk's calling it all!"
+  },
+  {
+   "id": "carnival.event.slam_rush.01",
+   "moment": "carnival.event",
+   "text": "Slam Rush! Twenty seconds, as many dunks as you can. Rim's open!",
+   "tags": [
+    "ev:slam_rush"
+   ]
+  },
+  {
+   "id": "carnival.event.strike_storm.01",
+   "moment": "carnival.event",
+   "text": "Next up, Strike Storm! Tag those pads, fast and clean!",
+   "tags": [
+    "ev:strike_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.trick_gauntlet.01",
+   "moment": "carnival.event",
+   "text": "Trick Gauntlet! Grab a deck, Dogtown style, and string those tricks!",
+   "tags": [
+    "ev:trick_gauntlet"
+   ]
+  },
+  {
+   "id": "carnival.event.hot_shot.01",
+   "moment": "carnival.event",
+   "text": "Hot Shot time! Shots on goal, aim for the corners!",
+   "tags": [
+    "ev:hot_shot"
+   ]
+  },
+  {
+   "id": "carnival.event.coin_storm.01",
+   "moment": "carnival.event",
+   "text": "Coin Storm! Coins everywhere, grab every one before the tide does!",
+   "tags": [
+    "ev:coin_storm"
+   ]
+  },
+  {
+   "id": "carnival.event.counter_strike.01",
+   "moment": "carnival.event",
+   "text": "Counter round! Wait on the jab, then answer back quick!",
+   "tags": [
+    "ev:counter_strike"
+   ]
+  },
+  {
+   "id": "carnival.go.01",
+   "moment": "carnival.go",
+   "text": "Game on!"
+  },
+  {
+   "id": "carnival.go.02",
+   "moment": "carnival.go",
+   "text": "Let's ride!"
+  },
+  {
+   "id": "carnival.go.03",
+   "moment": "carnival.go",
+   "text": "Clock's live, go!"
+  },
+  {
+   "id": "carnival.clock.01",
+   "moment": "carnival.clock",
+   "text": "Five seconds! Everything now!"
+  },
+  {
+   "id": "carnival.clock.02",
+   "moment": "carnival.clock",
+   "text": "Last five, Venice, go!"
+  },
+  {
+   "id": "carnival.clock.03",
+   "moment": "carnival.clock",
+   "text": "Clock's almost out! Hurry!"
+  },
+  {
+   "id": "carnival.eventwin.01",
+   "moment": "carnival.eventwin",
+   "text": "Event goes to the kid! Points on the board!"
+  },
+  {
+   "id": "carnival.eventwin.02",
+   "moment": "carnival.eventwin",
+   "text": "Bank it! That one's yours, sneakers!"
+  },
+  {
+   "id": "carnival.eventwin.03",
+   "moment": "carnival.eventwin",
+   "text": "Won it! The carnival crowd is loving you!"
+  },
+  {
+   "id": "carnival.eventwin.04",
+   "moment": "carnival.eventwin",
+   "text": "Winner at the booth! Pick your prize, kid!"
+  },
+  {
+   "id": "carnival.eventloss.01",
+   "moment": "carnival.eventloss",
+   "text": "Rival grabs that one. Stay loose, kid!"
+  },
+  {
+   "id": "carnival.eventloss.02",
+   "moment": "carnival.eventloss",
+   "text": "Other side cashes in that one. Points go their way."
+  },
+  {
+   "id": "carnival.eventloss.03",
+   "moment": "carnival.eventloss",
+   "text": "Missed that prize! Rival gets the big stuffed bear!"
+  },
+  {
+   "id": "carnival.tie.01",
+   "moment": "carnival.tie",
+   "text": "Tied up! Split the prize, Venice!"
+  },
+  {
+   "id": "carnival.tie.02",
+   "moment": "carnival.tie",
+   "text": "Neither side budged! Rematch at the ring toss!"
+  },
+  {
+   "id": "carnival.handoff.01",
+   "moment": "carnival.handoff",
+   "text": "Player two, step right up! Your booth now!"
+  },
+  {
+   "id": "carnival.handoff.02",
+   "moment": "carnival.handoff",
+   "text": "Pass it over! Player two, you're up!"
+  },
+  {
+   "id": "carnival.champion.01",
+   "moment": "carnival.champion",
+   "text": "Game Night champion! Win the prize, keep the prize, ride the Ferris wheel free!"
+  },
+  {
+   "id": "carnival.champion.02",
+   "moment": "carnival.champion",
+   "text": "Champion of the carnival! Biggest prize on the boardwalk, and it's yours!"
+  },
+  {
+   "id": "carnival.champion.03",
+   "moment": "carnival.champion",
+   "text": "Ring the carnival bell! Game Night belongs to you, Boardwalk approved!"
+  },
+  {
+   "id": "carnival.runnerup.01",
+   "moment": "carnival.runnerup",
+   "text": "Rival takes Game Night. Grab a churro, catch your breath, and we go again!"
+  },
+  {
+   "id": "carnival.runnerup.02",
+   "moment": "carnival.runnerup",
+   "text": "Game Night goes to the rival. Next carnival, we're coming for that prize!"
+  }
+ ]
+}

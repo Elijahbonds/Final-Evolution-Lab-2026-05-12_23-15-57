@@ -65,7 +65,9 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
-import { judgeDunk, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges
+import { judgeDunk, BAND_TOTAL, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges
+import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd, on the mic
+import { dunkStingers } from '../audio/mic/names';
 
 type Phase = 'handoff' | 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'matchOver';
 const STYLES = ['power', 'flashy', 'sig'] as const;
@@ -175,6 +177,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const ebState = { inLeftHand: false };
   let stickX = 0, stickY = 0;
   let lookX = 0, lookY = 0, lookSeen = false; // R stick → the director's look orbit (Dunk play tip 2026-09-07)
+  // THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events"): the court's MC calls the duel — the welcome, who
+  // takes the device, the run, the make with the dunk's name and the number, the misses, the winner — and the stands shout. No
+  // player voices: P1 and P2 are the two people holding the pad. Silent from take-off to the iron (the SLAM is the player's).
+  let mic: ModeMic | null = null, micOpened = false, micFiller = false;
 
   const active = (): SpawnedCharacter => (activeIdx === 0 ? p1 : p2);
   const bench = (): SpawnedCharacter => (activeIdx === 0 ? p2 : p1);
@@ -239,6 +245,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
       prop: PROP_LABEL[prop],
       banner: `PASS TO ${label()}`, hint: `${label()} — take the device`,
     });
+    // THE MIC: who takes the device, once the booth has finished the last dunk's call (the first hand-off comes during the load,
+    // before the mic can speak: the welcome calls P1 up instead)
+    if (micOpened) mic?.then({ moment: 'duel.pass', tags: [`p:${activeIdx + 1}`], priority: 1 });
     setTimeout(() => {
       if (phase !== 'handoff' || ended) return;
       ctx.setHud({ banner: '', hint: 'STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump' });
@@ -257,6 +266,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
     console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${((1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3)).toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}`);
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
     SoundKit.play('whoosh', { pitch: 0.85 });   // the ONE whoosh — never re-triggered on CONTACT
+    // THE MIC: nothing from the booth through the flight — the SLAM is the player's (released on the iron, the clank or the prop);
+    // the make call is decoded now so it lands on the flush
+    mic?.hold(4);
+    for (const t of [0, 1, 2] as const) mic?.expect({ moment: 'dunk.make', tier: t, stinger: dunkStingers(duelDunkName()) });
     // Soft-OPEN #2 mirror (see DunkMode.launchDunk): a launch clip that runs out in the air flows into the held hang, not into nothing
     playClip(STYLE_CLIP[style], { speedRatio: 1, onEnd: () => { if (phase === 'cinematic') { console.info('[HANDS] launch → hang'); playAir(SPORT_CLIP.dunkScoreHang, hangRateToResolve()); } } });
   }
@@ -344,6 +357,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
     ctx.feel?.impact?.(0.6);
     ctx.setHud({ banner: `${label()} CAUGHT THE ${obstacle?.spec.label ?? 'PROP'} — BLOWN` });
     setTimeout(() => ctx.setHud({ banner: '' }), 1200);
+    // THE MIC: the dunk is dead here (no SLAM left to hear), so the booth calls it now — the clank path's 1.2 s is its window
+    mic?.release();
+    mic?.say({ moment: 'dunk.miss.prop', priority: 2, side: 0.15, crowd: { moment: Math.random() < 0.5 ? 'crowd.groan' : 'crowd.heckle', n: 1 } });
     resolveDunk(ctx); // qteHit false → the clank path; a blown dunk judges at 0
   }
 
@@ -466,6 +482,11 @@ export const DunkDuelMode: ModeDefinition = (() => {
         ? (isRepeat ? `${label()} SCORES ${dunkTotal} — JUDGES HAVE SEEN THAT ONE` : `${label()} SCORES ${dunkTotal}`)
         : `${label()} — MISSED, 0 pts`,
     });
+    // THE MIC: the booth may speak again (the iron, or the clank) — the make with its name and number, or the miss (a clipped
+    // prop was called when it happened)
+    mic?.release();
+    if (made) micMake(dunkTotal, isRepeat);
+    else if (!obstacleClipped) mic?.say({ moment: 'dunk.miss', priority: 2, side: 0.15, crowd: { moment: Math.random() < 0.5 ? 'crowd.groan' : 'crowd.heckle', n: 1 } });
     setPhase('judging');
     setTimeout(() => {
       ctx.setHud({ judgeReveal: null, banner: '' });
@@ -486,12 +507,55 @@ export const DunkDuelMode: ModeDefinition = (() => {
       const winner = totals[0] >= totals[1] ? 'P1' : 'P2';
       if (!tie) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, rim, 'confetti'); }
       ctx.setHud({ banner: tie ? 'DEAD HEAT!' : `${winner} TAKES THE DUEL!` });
+      // THE MIC: the result, before ctx.end parks the mode (the voice plays on after it)
+      mic?.hush();
+      mic?.say(tie
+        ? { moment: 'duel.tie', priority: 3, crowd: { moment: 'crowd.ooh', n: 2 } }
+        : { moment: 'duel.win', tags: [winner === 'P1' ? 'p:1' : 'p:2'], priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } });
       ctx.end(tie ? 'DUEL_TIED' : `${winner}_WINS`, Math.max(totals[0], totals[1]), { p1: totals[0], p2: totals[1] });
       return;
     }
     // alternate: whoever has fewer attempts goes next
     activeIdx = attemptNum[0] <= attemptNum[1] ? 0 : 1;
     enterHandoff(ctx);
+  }
+
+  // ── THE MIC ──────────────────────────────────────────────────────────────────────────────────────────────────────
+  /** Every frame: the mic's clock, the welcome on the first live frame, and filler only while the runway waits on a player. */
+  function micTick(ctx: ModeContext): void {
+    if (!mic) return;
+    mic.update();
+    if (!micOpened && ctx.phase() === 'playing') {
+      micOpened = true;
+      // the welcome, then P1 is up (a runner already on the way skips it: the booth never talks over the run-up to a flight)
+      if (phase === 'handoff' || phase === 'approach') {
+        mic.say({ moment: 'intro.court', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
+        mic.then({ moment: 'duel.pass', tags: [`p:${activeIdx + 1}`], priority: 1 });
+      }
+    }
+    const quiet = (phase === 'handoff' || phase === 'approach') && ctx.phase() === 'playing' && !ended;
+    if (quiet !== micFiller) {
+      micFiller = quiet;
+      mic.setFiller(quiet ? ['filler.banter', 'filler.crowd'] : null);
+      mic.setCrowdIdle(quiet ? 'crowd.idle' : null);
+    }
+  }
+  /** The name the MC calls. The duel shows only the style, which is no dunk's name, so the style is named by what the body does:
+   *  SIGNATURE flies the contest's eastbay clip; POWER and FLASHY fly the owner's two-foot capture, called the contest's way
+   *  (a clean slam is a hammer). */
+  function duelDunkName(): string {
+    if (style === 'sig') return 'EASTBAY';
+    return qteAccuracy >= 0.85 ? 'TWO-HAND HAMMER' : style === 'power' ? 'POWER SLAM' : 'TWO-HAND FLUSH';
+  }
+  /** The make, called: the MC's line and the dunk's name (the size from the panel's raw sum, the contest's bands), then the
+   *  number. The cards and the total land on the same frame here, so the read follows the call; a fifty gets its own. */
+  function micMake(total: number, isRepeat: boolean): void {
+    if (!mic) return;
+    const tier = total >= BAND_TOTAL.eruption ? 2 : total >= BAND_TOTAL.approval ? 1 : 0;
+    if (isRepeat) mic.say({ moment: 'dunk.repeat', priority: 2, crowd: { moment: 'crowd.cheer', n: 1 } });
+    else mic.say({ moment: 'dunk.make', tier, stinger: dunkStingers(duelDunkName()), side: tier === 2 ? 0.4 : 0, crowd: { moment: tier === 2 ? 'crowd.erupt' : 'crowd.cheer', n: tier + 1 } });
+    if (total >= 50) mic.then({ moment: 'dunk.fifty', priority: 3, side: 0.6, crowd: { moment: 'crowd.erupt', n: 3 } });
+    else mic.then({ moment: 'stinger', stinger: [`num:${total}`], priority: 2 });
   }
 
   function watchdog(ctx: ModeContext): void {
@@ -547,6 +611,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location }); micOpened = false; micFiller = false;   // THE MIC
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
       // under any other location the location's environment stands, so the pass steps aside.
@@ -593,6 +658,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
           holdRunSpeed = Math.max(2, runUpPeak);
           playClip(SPORT_CLIP.moveLoop, { loop: true });
           ctx.setHud({ hint: 'HOLD — running to the rim · steer with the stick · release early to jump from here' });
+          // THE MIC: the run is the player's — whatever the booth was saying stops, and one short word sends him
+          mic?.hush();
+          mic?.say({ moment: 'dunk.run', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
         }
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
@@ -613,6 +681,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if ((phase === 'approach' || phase === 'charge') && !fovOn && Math.hypot(active().root.position.x - rim.x, active().root.position.z - rim.z) <= 3.6) fovGather(ctx);
       phaseSec += dt;
       watchdog(ctx);
+      micTick(ctx);
       if (ended) return;
 
       const lookOn = phase === 'approach' || phase === 'charge';   // R look on the runway only (the rim cut / verdict keep their framing)
@@ -691,6 +760,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
             obstacleCleared = true;
             console.info(`[DUNK-PROP] CLEARED ${obstacle.spec.label}`);
             SoundKit.play('crowdCheer', { volume: 0.35 }); ctx.camDirector.pulse(0.35, 0.3);
+            mic?.crowd('crowd.ooh', 1);   // THE MIC: the stands gasp at the clear (the booth holds)
             ctx.setHud({ banner: `${label()} OVER THE ${obstacle.spec.label}!` }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
           }
         }
@@ -760,6 +830,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
     dispose() {
       hoopJuice?.dispose(); hoopJuice = null;
+      mic?.dispose(); mic = null;   // THE MIC stops with the mode
       modeVenue?.dispose?.(); modeVenue = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       handIkObs = null; ikScene = null; handIkT = 0;

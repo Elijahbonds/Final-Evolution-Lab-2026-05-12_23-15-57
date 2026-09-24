@@ -11,6 +11,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, t
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
+import { MicCaption, MicToggle } from './mic-caption';
 
 type Hud = Record<string, HudValue>;
 
@@ -162,6 +163,10 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
           <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
         </div>
       )}
+
+      {/* THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice */}
+      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
+      {phase === 'playing' && <MicToggle />}
 
       <BootSplash
         modeId="dunkduel"

@@ -1,0 +1,40 @@
+{
+ "cast": "ty",
+ "lines": [
+  {
+   "id": "player.dunk.brag.01",
+   "moment": "player.dunk.brag",
+   "text": "Power."
+  },
+  {
+   "id": "player.dunk.brag.02",
+   "moment": "player.dunk.brag",
+   "text": "Again. And again."
+  },
+  {
+   "id": "player.dunk.brag.03",
+   "moment": "player.dunk.brag",
+   "text": "All night."
+  },
+  {
+   "id": "player.dunk.jab.01",
+   "moment": "player.dunk.jab",
+   "text": "Finish it next time."
+  },
+  {
+   "id": "player.dunk.jab.02",
+   "moment": "player.dunk.jab",
+   "text": "Not enough."
+  },
+  {
+   "id": "player.dunk.respect.01",
+   "moment": "player.dunk.respect",
+   "text": "Strong. Real strong."
+  },
+  {
+   "id": "player.dunk.respect.02",
+   "moment": "player.dunk.respect",
+   "text": "I felt that one."
+  }
+ ]
+}

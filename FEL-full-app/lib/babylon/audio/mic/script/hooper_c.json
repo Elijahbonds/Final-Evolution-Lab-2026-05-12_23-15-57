@@ -1,0 +1,80 @@
+{
+ "cast": "hooper_c",
+ "lines": [
+  {
+   "id": "player.trash.score.01",
+   "moment": "player.trash.score",
+   "text": "Wet! Next question?"
+  },
+  {
+   "id": "player.trash.score.02",
+   "moment": "player.trash.score",
+   "text": "Should've closed out, friend!"
+  },
+  {
+   "id": "player.trash.score.03",
+   "moment": "player.trash.score",
+   "text": "Keep giving me that space!"
+  },
+  {
+   "id": "player.trash.stop.01",
+   "moment": "player.trash.stop",
+   "text": "Denied! Thanks for playing!"
+  },
+  {
+   "id": "player.trash.stop.02",
+   "moment": "player.trash.stop",
+   "text": "Oops, that's mine now!"
+  },
+  {
+   "id": "player.beaten.01",
+   "moment": "player.beaten",
+   "text": "Okay, that was cute."
+  },
+  {
+   "id": "player.beaten.02",
+   "moment": "player.beaten",
+   "text": "Lucky. Very lucky."
+  },
+  {
+   "id": "player.beaten.03",
+   "moment": "player.beaten",
+   "text": "Enjoy it. It's rare."
+  },
+  {
+   "id": "player.callball.01",
+   "moment": "player.callball",
+   "text": "Corner! I'm wide open!"
+  },
+  {
+   "id": "player.callball.02",
+   "moment": "player.callball",
+   "text": "Kick it out!"
+  },
+  {
+   "id": "player.callball.03",
+   "moment": "player.callball",
+   "text": "Find me!"
+  },
+  {
+   "id": "player.defense.01",
+   "moment": "player.defense",
+   "text": "Help! I'm rotating!"
+  },
+  {
+   "id": "player.defense.02",
+   "moment": "player.defense",
+   "text": "Screen left! Heads up!"
+  },
+  {
+   "id": "player.check.01",
+   "moment": "player.check",
+   "text": "Check it. Try me."
+  },
+  {
+   "id": "player.check.02",
+   "moment": "player.check",
+   "text": "Ball up. Let's go."
+  }
+ ]
+}

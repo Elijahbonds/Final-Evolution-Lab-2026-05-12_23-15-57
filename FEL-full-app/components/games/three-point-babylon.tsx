@@ -24,6 +24,7 @@ import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnum } from './hud-format';
+import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24)
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -52,6 +53,10 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  // THE MIC's caption lives apart from the hud: the mode pushes its WHOLE hud every frame and this host replaces it (setHud(h)),
+  // while the mic sends only { mic, micWho } — merged into the hud, a caption would blank the scoreboard for a frame and the
+  // next frame's hud would wipe the caption
+  const [micLine, setMicLine] = useState<{ text: HudValue; who: HudValue }>({ text: '', who: '' });
   const [busReady, setBusReady] = useState(false);
 
   useEffect(() => {
@@ -103,7 +108,13 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         setCountdown(typeof detail === 'number' ? detail : null);
         if (p === 'error') setLoadError(typeof detail === 'string' ? detail : 'load failed');
       },
-      onHud: (h) => { if (!disposed) setHud(h); },
+      onHud: (h) => {
+        if (disposed) return;
+        if (!('mic' in h) && !('micWho' in h)) { setHud(h); return; }
+        const { mic, micWho, ...rest } = h;
+        setMicLine((m) => ({ text: 'mic' in h ? mic : m.text, who: 'micWho' in h ? micWho : m.who }));
+        if (Object.keys(rest).length) setHud(rest);
+      },
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
       .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
@@ -237,6 +248,16 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
             <div className={`fel-heading fel-panel px-5 py-1.5 text-3xl font-black ${hud.banner.startsWith('MISS') ? 'text-white/70' : 'text-[#00E5FF]'}`}>{hud.banner}</div>
           )}
           {typeof hud.meter === 'number' && <ReleaseBar t={hud.meter} />}
+        </div>
+      )}
+
+      {/* THE MIC: the MC's words just above the call and the meter (the scoreboard owns the top, the board the right) */}
+      {phase === 'playing' && <MicCaption text={micLine.text} who={micLine.who} className="bottom-[12rem]" />}
+      {/* The switch never takes focus from a click: Space is the keyboard's SHOOT and fires on keyup, and a focused button
+          answers that same keyup with a click — every shot after one click on MC would flip the announcer on and off */}
+      {phase === 'playing' && (
+        <div className="contents" onMouseDown={(e) => e.preventDefault()}>
+          <MicToggle className="left-4 top-[24%]" />
         </div>
       )}
 

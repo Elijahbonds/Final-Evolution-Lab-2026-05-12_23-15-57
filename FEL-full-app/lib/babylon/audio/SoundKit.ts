@@ -29,6 +29,22 @@ class SoundKitImpl {
   private sfxEnabled = true;
   /** Sound effects are off (the announcer's voice goes quiet with them — DUNK MOTION phase 12). */
   get muted(): boolean { return !this.sfxEnabled; }
+  // THE MIC (2026-09-24): the MC, the sidekick, the crowd and the players are pre-rendered voice clips (lib/babylon/audio/mic).
+  // They share this context (one clock, one iOS unlock) through three nodes: the VOICE bus, the CROWD DUCK (the crowd bed and the
+  // crowd one-shots run through it, so the voice can sit on top of them: the harness writes the bed's own gain every frame, so a
+  // duck on that node would be fighting it) and a LIMITER on the way out, so a cheer under the MC on top of an impact cannot clip.
+  private voiceBus: GainNode | null = null;
+  private crowdDuck: GainNode | null = null;
+  private out: AudioNode | null = null;
+  private voiceEnabled = readVoicePref();
+  /** The MC's voice is on (a player setting, kept across sessions; the captions carry the call either way). */
+  get voiceOn(): boolean { return this.voiceEnabled && this.sfxEnabled; }
+  setVoice(on: boolean): void { this.voiceEnabled = on; writeVoicePref(on); }
+  /** The graph the voice plays into; null before a context can exist (server, no Web Audio). */
+  graph(): { ctx: AudioContext; voice: GainNode; crowdDuck: GainNode; out: AudioNode } | null {
+    const ctx = this.ensure();
+    return ctx && this.voiceBus && this.crowdDuck && this.out ? { ctx, voice: this.voiceBus, crowdDuck: this.crowdDuck, out: this.out } : null;
+  }
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -37,7 +53,12 @@ class SoundKitImpl {
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.55;
-    this.master.connect(this.ctx.destination);
+    const limiter = this.ctx.createDynamicsCompressor();
+    limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.12;
+    this.master.connect(limiter).connect(this.ctx.destination);
+    this.out = limiter;   // everything the game sounds like, last node before the speakers (a dev probe can tap it)
+    this.crowdDuck = this.ctx.createGain(); this.crowdDuck.connect(this.master);
+    this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = 1.35; this.voiceBus.connect(this.master);
     return this.ctx;
   }
 
@@ -46,7 +67,8 @@ class SoundKitImpl {
    *  the "TAP TO START" / first input handler. Safe to call repeatedly. */
   unlock(): void {
     const ctx = this.ensure();
-    if (ctx && ctx.state === 'suspended') void ctx.resume();
+    // not only 'suspended': Safari parks a context in 'interrupted' after a call or a trip to the background
+    if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume();
   }
 
   setEnabled(sfx: boolean, music: boolean): void {
@@ -276,7 +298,7 @@ class SoundKitImpl {
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime((name === 'crowdCheer' ? 0.4 : 0.3) * vol, t + 0.15);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
-        src.connect(bp).connect(g).connect(this.master);
+        src.connect(bp).connect(g).connect(this.crowdDuck ?? this.master);
         src.start(); src.stop(t + 1.4);
         break;
       }
@@ -306,7 +328,7 @@ class SoundKitImpl {
     lfoGain.gain.value = g.gain.value * 0.4;
     lfo.connect(lfoGain).connect(g.gain);
     lfo.start();
-    src.connect(bp).connect(g).connect(this.master);
+    src.connect(bp).connect(g).connect(this.crowdDuck ?? this.master);
     src.start();
     this.crowdGain = g;
     this.crowdBaseGain = g.gain.value;
@@ -328,6 +350,18 @@ class SoundKitImpl {
     this.crowdBed = null;
     this.crowdGain = null;
   }
+}
+
+const VOICE_PREF_KEY = 'fel-audio';
+function readVoicePref(): boolean {
+  try { return typeof localStorage === 'undefined' ? true : (JSON.parse(localStorage.getItem(VOICE_PREF_KEY) ?? '{}') as { voice?: boolean }).voice !== false; }
+  catch { return true; }
+}
+function writeVoicePref(on: boolean): void {
+  try {
+    const cur = JSON.parse(localStorage.getItem(VOICE_PREF_KEY) ?? '{}') as Record<string, unknown>;
+    localStorage.setItem(VOICE_PREF_KEY, JSON.stringify({ ...cur, voice: on }));
+  } catch { /* private mode: the setting lasts the session */ }
 }
 
 export const SoundKit = new SoundKitImpl();

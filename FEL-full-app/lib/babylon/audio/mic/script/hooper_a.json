@@ -1,0 +1,80 @@
+{
+ "cast": "hooper_a",
+ "lines": [
+  {
+   "id": "player.trash.score.01",
+   "moment": "player.trash.score",
+   "text": "Too easy! Check it up!"
+  },
+  {
+   "id": "player.trash.score.02",
+   "moment": "player.trash.score",
+   "text": "Cash! Stay in front next time."
+  },
+  {
+   "id": "player.trash.score.03",
+   "moment": "player.trash.score",
+   "text": "Tell your friends about that one!"
+  },
+  {
+   "id": "player.trash.stop.01",
+   "moment": "player.trash.stop",
+   "text": "Not today! My ball!"
+  },
+  {
+   "id": "player.trash.stop.02",
+   "moment": "player.trash.stop",
+   "text": "Thank you, I'll take that!"
+  },
+  {
+   "id": "player.beaten.01",
+   "moment": "player.beaten",
+   "text": "Hey! Nobody saw that."
+  },
+  {
+   "id": "player.beaten.02",
+   "moment": "player.beaten",
+   "text": "That's one. Do it again."
+  },
+  {
+   "id": "player.beaten.03",
+   "moment": "player.beaten",
+   "text": "Alright, I see you."
+  },
+  {
+   "id": "player.callball.01",
+   "moment": "player.callball",
+   "text": "Ball! I'm open!"
+  },
+  {
+   "id": "player.callball.02",
+   "moment": "player.callball",
+   "text": "Right here, right here!"
+  },
+  {
+   "id": "player.callball.03",
+   "moment": "player.callball",
+   "text": "Swing it!"
+  },
+  {
+   "id": "player.defense.01",
+   "moment": "player.defense",
+   "text": "Switch! I got mine!"
+  },
+  {
+   "id": "player.defense.02",
+   "moment": "player.defense",
+   "text": "I'm on the shooter!"
+  },
+  {
+   "id": "player.check.01",
+   "moment": "player.check",
+   "text": "Check. Let's work."
+  },
+  {
+   "id": "player.check.02",
+   "moment": "player.check",
+   "text": "Ball in. You ready?"
+  }
+ ]
+}
