@@ -1,0 +1,366 @@
+[
+ {
+  "name": "stand_still",
+  "description": "Standing still, arms down: the calibration stand. The owner's DeepMotion take, so it carries a video solve's small sway.",
+  "source": "deepmotion/IMG_2138.bvh [120, 210) @ 30 fps",
+  "seconds": 2.9666,
+  "frames": 88,
+  "kb": 236,
+  "jumps": [],
+  "flights": 0,
+  "steps": 0,
+  "wrist": {
+   "strike": 0,
+   "reach": 0,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "jump_two_foot_low",
+  "description": "Four two-foot jumps in place, 0.41–0.51 s flights (~0.2–0.3 m), little rest between: the owner's take, already in place (0.35 m of travel).",
+  "source": "deepmotion/IMG_0938.bvh [30, 132) @ 30 fps",
+  "seconds": 3.3666,
+  "frames": 101,
+  "kb": 275,
+  "jumps": [
+   {
+    "takeoff": 13,
+    "apex": 18,
+    "landing": 26,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 425.6663,
+    "heightFlightM": 0.2222,
+    "hipRiseM": 0.1204
+   },
+   {
+    "takeoff": 33,
+    "apex": 38,
+    "landing": 45,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 411.8679,
+    "heightFlightM": 0.208,
+    "hipRiseM": 0.1352
+   },
+   {
+    "takeoff": 51,
+    "apex": 58,
+    "landing": 65,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 489.1229,
+    "heightFlightM": 0.2934,
+    "hipRiseM": 0.2557
+   },
+   {
+    "takeoff": 73,
+    "apex": 79,
+    "landing": 88,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 510.5901,
+    "heightFlightM": 0.3197,
+    "hipRiseM": 0.1855
+   }
+  ],
+  "flights": 0,
+  "steps": 10,
+  "wrist": {
+   "strike": 0,
+   "reach": 0,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "jump_two_foot_high",
+  "description": "Two-foot jumps low / max / low (hip rise ~0.24 / 0.73 / 0.22 m). The max jump takes the hands out of the top of the frame at 3 m.",
+  "source": "deepmotion/IMG_0940.bvh [39, 147) @ 30 fps",
+  "seconds": 3.5666,
+  "frames": 104,
+  "kb": 281,
+  "jumps": [
+   {
+    "takeoff": 13,
+    "apex": 20,
+    "landing": 27,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 498.4045,
+    "heightFlightM": 0.3046,
+    "hipRiseM": 0.2417
+   },
+   {
+    "takeoff": 33,
+    "apex": 44,
+    "landing": 57,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 826.1182,
+    "heightFlightM": 0.8369,
+    "hipRiseM": 0.7302
+   },
+   {
+    "takeoff": 64,
+    "apex": 70,
+    "landing": 77,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 455.0848,
+    "heightFlightM": 0.254,
+    "hipRiseM": 0.2239
+   }
+  ],
+  "flights": 0,
+  "steps": 6,
+  "wrist": {
+   "strike": 2,
+   "reach": 2,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "jump_one_foot_runup",
+  "description": "Two running strides into a one-foot (right) take-off over an obstacle, 0.55 s flight; the run-up pulled in to steps in place.",
+  "source": "cmu/127/127_22.bvh [6, 264) @ 120 fps",
+  "seconds": 2.1417,
+  "frames": 63,
+  "kb": 172,
+  "jumps": [
+   {
+    "takeoff": 16,
+    "apex": 24,
+    "landing": 33,
+    "feet": 1,
+    "foot": "right",
+    "flightMs": 549.3042,
+    "heightFlightM": 0.37,
+    "hipRiseM": 0.303
+   }
+  ],
+  "flights": 0,
+  "steps": 4,
+  "wrist": {
+   "strike": 0,
+   "reach": 0,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "run_in_place",
+  "description": "A jog in place (~2.7 steps/s): a figure-8 run turned to face the camera every frame, travel removed, strides pulled in under the hips. Its running flights are NOT jumps.",
+  "source": "cmu/143/143_04.bvh [210, 450) @ 60 fps",
+  "seconds": 3.9833,
+  "frames": 118,
+  "kb": 316,
+  "jumps": [],
+  "flights": 7,
+  "steps": 12,
+  "wrist": {
+   "strike": 0,
+   "reach": 0,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "dunk_elijah_two_foot",
+  "description": "The owner's dunk (basketball_dunk__elijah): approach steps in place, a two-foot take-off, ~0.9 s flight (~1 m), the right hand's flush ~70 ms after the apex, then the arms swung down into the landing.",
+  "source": "deepmotion/basketball_dunk__elijah.bvh [0, 156) @ 60 fps",
+  "seconds": 2.5834,
+  "frames": 77,
+  "kb": 208,
+  "jumps": [
+   {
+    "takeoff": 39,
+    "apex": 53,
+    "landing": 66,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 898.1243,
+    "heightFlightM": 0.9891,
+    "hipRiseM": 1.0257
+   }
+  ],
+  "flights": 1,
+  "steps": 5,
+  "wrist": {
+   "strike": 3,
+   "reach": 2,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "dunk_elijah_one_foot",
+  "description": "The owner's one-foot (left) take-off after ~2 s of running steps in place, 0.74 s flight (~0.8 m of hip rise), edge-on to the camera. The steps hold a 0.34 s two-foot hop (a GT jump) with his back to the camera. In this solve the reach and the hammer come BEFORE the take-off and the hands stay low in the flight: a take-off and height case, not a slam. He turns away after landing.",
+  "source": "deepmotion/basketball_dunk__elijah.bvh [288, 480) @ 60 fps",
+  "seconds": 3.1834,
+  "frames": 92,
+  "kb": 249,
+  "jumps": [
+   {
+    "takeoff": 33,
+    "apex": 38,
+    "landing": 43,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 338.0469,
+    "heightFlightM": 0.1401,
+    "hipRiseM": 0.1028
+   },
+   {
+    "takeoff": 58,
+    "apex": 71,
+    "landing": 80,
+    "feet": 1,
+    "foot": "left",
+    "flightMs": 741.383,
+    "heightFlightM": 0.674,
+    "hipRiseM": 0.8274
+   }
+  ],
+  "flights": 4,
+  "steps": 8,
+  "wrist": {
+   "strike": 2,
+   "reach": 2,
+   "release": 1,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "dunk_approach_two_foot",
+  "description": "A 2.5 s approach (steps in place) into a two-foot take-off, 0.89 s flight, a late right hand: the reach tops out just after the apex and the hammer comes at the landing.",
+  "source": "deepmotion/IMG_8593.bvh [24, 138) @ 29.97 fps",
+  "seconds": 3.7705,
+  "frames": 113,
+  "kb": 303,
+  "jumps": [
+   {
+    "takeoff": 66,
+    "apex": 78,
+    "landing": 92,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 884.7876,
+    "heightFlightM": 0.96,
+    "hipRiseM": 0.8579
+   }
+  ],
+  "flights": 1,
+  "steps": 9,
+  "wrist": {
+   "strike": 1,
+   "reach": 1,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "jumpshot",
+  "description": "The game's jumpshot source (CMU 124_05): the turn and dip, the ball lifted to the set point, a two-foot jump (0.54 s), the release ~0.1 s before the apex.",
+  "source": "cmu/124/124_05.bvh [228, 576) @ 120 fps",
+  "seconds": 2.8917,
+  "frames": 86,
+  "kb": 235,
+  "jumps": [
+   {
+    "takeoff": 38,
+    "apex": 45,
+    "landing": 53,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 531.4942,
+    "heightFlightM": 0.3464,
+    "hipRiseM": 0.3263
+   }
+  ],
+  "flights": 0,
+  "steps": 3,
+  "wrist": {
+   "strike": 2,
+   "reach": 2,
+   "release": 1,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "jumpshot_dribble",
+  "description": "Dribble into a jumpshot (CMU 06_15): a smaller two-foot jump (0.35 s).",
+  "source": "cmu/06/06_15.bvh [120, 480) @ 120 fps",
+  "seconds": 2.9917,
+  "frames": 88,
+  "kb": 238,
+  "jumps": [
+   {
+    "takeoff": 53,
+    "apex": 58,
+    "landing": 64,
+    "feet": 2,
+    "foot": "both",
+    "flightMs": 353.252,
+    "heightFlightM": 0.153,
+    "hipRiseM": 0.1324
+   }
+  ],
+  "flights": 0,
+  "steps": 4,
+  "wrist": {
+   "strike": 1,
+   "reach": 0,
+   "release": 1,
+   "punch": 0
+  },
+  "kicks": 0
+ },
+ {
+  "name": "punch_kick",
+  "description": "Fighting stance (rear heel up): a right, a left, a right punch, then a right kick (CMU 141_14 \"Punch and Kick\"). Its sloppy CMU feet need a 7 cm contact line.",
+  "source": "cmu/141/141_14.bvh [84, 336) @ 60 fps",
+  "seconds": 4.1833,
+  "frames": 124,
+  "kb": 337,
+  "jumps": [],
+  "flights": 0,
+  "steps": 1,
+  "wrist": {
+   "strike": 0,
+   "reach": 0,
+   "release": 0,
+   "punch": 3
+  },
+  "kicks": 1
+ },
+ {
+  "name": "shuffle_lateral",
+  "description": "Walking sideways to the right (crossover side-steps), a pause, then back to the left (CMU 143_40 \"Walk Sideways\"), the travel scaled to the room (±0.5 m).",
+  "source": "cmu/143/143_40.bvh [390, 660) @ 60 fps",
+  "seconds": 4.4833,
+  "frames": 131,
+  "kb": 355,
+  "jumps": [],
+  "flights": 0,
+  "steps": 7,
+  "wrist": {
+   "strike": 0,
+   "reach": 0,
+   "release": 0,
+   "punch": 0
+  },
+  "kicks": 0
+ }
+]
