@@ -90,14 +90,20 @@ export const TAKE_OFF_ONE: PoseKey[] = [
   // the plant: the take-off (left) leg under the body and a little ahead, flexed; the free leg behind; the ball loaded at the hip
   { t: 0,    bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], RightUpLeg: [26, 0, -5], RightLeg: [58, 0, 0] }, feet: { Left: foot(-0.12, ANKLE, 0.24, -0.14) }, hands: { Right: [0.28, 1.00, -0.10], Left: [0.08, 1.02, -0.02] }, poles: RIP_POLE, hipsY: -0.14 },
   // TOE-OFF, and the ARMS STRIKE: the take-off leg extended under and behind (it leaves last), the free knee DRIVEN to the hip,
-  // both hands struck up the front with the ball — on the same beat, which is the cue
-  { t: 0.1,  bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], RightUpLeg: [-86, 0, -6], RightLeg: [96, 0, 0] }, feet: { Left: foot(-0.12, ANKLE, -0.16, 0) }, hands: { Right: [0.16, 1.86, 0.24], Left: [-0.08, 1.80, 0.26] }, poles: { Right: [0.8, -0.3, 0.1], Left: [-0.8, -0.3, 0.1] }, hipsY: 0 },
+  // both hands struck up the front with the ball — on the same beat, which is the cue. DUNK MOTION phase 9 (owner: "fix the arm
+  // swing / upward momentum with ball swing"): the swing is at FULL SPEED through the toe-off — past the face, not arrived — and
+  // carries on up with the body (overhead by 0.2, extended by 0.3). Keyed overhead at the toe-off, it arrived, stopped dead, and the
+  // body rose under frozen arms: no momentum handed from the swing to the jump.
+  { t: 0.1,  bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], RightUpLeg: [-86, 0, -6], RightLeg: [96, 0, 0] }, feet: { Left: foot(-0.12, ANKLE, -0.16, 0) }, hands: { Right: [0.18, 1.50, 0.34], Left: [-0.04, 1.46, 0.36] }, poles: { Right: [0.8, -0.3, 0.1], Left: [-0.8, -0.3, 0.1] }, hipsY: 0 },
+  // still swinging: over the head, the ball carried up the line of the jump
+  { t: 0.2,  bones: { Hips: [-1, 0, 0], Spine: [-1, 0, 0], RightUpLeg: [-86, 0, -6], RightLeg: [98, 0, 0], LeftUpLeg: [10, 0, 5], LeftLeg: [24, 0, 0] }, hands: { Right: [0.17, 1.86, 0.24], Left: [-0.10, 1.80, 0.26] }, poles: { Right: [0.8, -0.1, 0.3], Left: [-0.8, -0.1, 0.3] } },
   // rising: the knee still high, the take-off leg trailing long, the ball overhead with the guide hand still on it
   { t: 0.3,  bones: { Hips: [-2, 0, 0], Spine: [-4, 0, 0], RightUpLeg: [-86, 0, -6], RightLeg: [100, 0, 0], LeftUpLeg: [18, 0, 5], LeftLeg: [40, 0, 0] }, hands: { Right: [0.16, 1.96, 0.16], Left: [-0.14, 1.86, 0.20] }, poles: { Right: UP_R, Left: UP_L } },   // (a touch short of straight: the arms struck up, not locked up)
   // THE DROP: the lead leg comes DOWN long (the cue — the body lengthens under the reaching hand), the take-off leg folds behind
-  { t: 0.55, bones: { Hips: [-2, 0, 0], Spine: [-8, 0, 0], RightUpLeg: [-30, 0, -4], RightLeg: [30, 0, 0], LeftUpLeg: [22, 0, 5], LeftLeg: [74, 0, 0] }, hands: { Right: [0.18, 1.98, 0.10], Left: [-0.28, 1.66, 0.22] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },
-  // the apex: long under the ball hand, the off arm THROWN DOWN (the book's instrument for the finishing hand's height)
-  { t: TAKE_OFF_ONE_SEC, bones: { Hips: [-2, 0, 0], Spine: [-10, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.19, 1.99, 0.04], Left: [-0.40, 1.48, 0.18] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
+  { t: 0.55, bones: { Hips: [-2, 0, 0], Spine: [-8, 0, 0], RightUpLeg: [-30, 0, -4], RightLeg: [30, 0, 0], LeftUpLeg: [22, 0, 5], LeftLeg: [74, 0, 0] }, hands: { Right: [0.18, 1.98, 0.10], Left: [-0.38, 1.30, 0.18] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },   // (the off arm on its way DOWN — phase 9)
+  // the apex: long under the ball hand, the off arm THROWN DOWN (the book's instrument for the finishing hand's height). DUNK MOTION
+  // phase 9: it only ever reached the shoulder (0.2–0.47 m ABOVE it from the strike to the flush, measured) — now ~0.4 m below, and out
+  { t: TAKE_OFF_ONE_SEC, bones: { Hips: [-2, 0, 0], Spine: [-10, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.19, 1.99, 0.04], Left: [-0.46, 1.06, 0.12] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
 ];
 /** Where the ball hand is at the lob's catch beat (clip 0.62) on the one-foot take-off — the key's own target (CATCH_HAND_OFFSET's rule). */
 export const TAKE_OFF_ONE_CATCH: V3 = [0.18, 1.985, 0.08];

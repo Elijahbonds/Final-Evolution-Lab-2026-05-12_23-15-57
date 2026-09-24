@@ -46,7 +46,7 @@ const RIM = { x: 0, y: 3.05, z: -10.28 };
 const JN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
 const J = Object.fromEntries(JN.map((n, i) => [n, i])) as Record<string, number>;
 
-interface Frame { t: number; rp: number[]; rq: number[] | null; rr: number[]; rs: number[]; q: number[]; hp?: number[]; j: (number[] | null)[]; ball?: number[]; bpar?: string; clips?: [string, number][]; pw?: string }
+interface Frame { t: number; rp: number[]; rq: number[] | null; rr: number[]; rs: number[]; q: number[]; hp?: number[]; j: (number[] | null)[]; ball?: number[]; bpar?: string; clips?: [string, number][]; pw?: string; jt?: Record<string, [number, number, number]> }
 interface Rec { trick: string; names: string[]; frames: Frame[]; marks: { t: number; msg: string }[]; t0: number; launchAt: number | null; hud: string[] }
 
 // ── in-page recorder ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -64,6 +64,35 @@ const RECORDER = `(() => {
     R.nodes = nodes; R.names = nodes.map((n) => n.name); R.rootRef = root;
     R.jIdx = JN.map((j) => nodes.findIndex((n) => clean(n.name) === j));
     R.targets = new Set(nodes);
+    // DUNK MOTION phase 9 — THE JOINT AUDIT (owner: "fix the orientation of the joints … analyze it"). Each limb's hinge, from the REST
+    // pose alone (independent of every solver in the game): an elbow flexes toward the body's front, a knee toward its back, about
+    // the axis ⟂ to the upper bone and that direction, in the upper bone's own frame.
+    const qm = (a, b) => [a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1], a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0], a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3], a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
+    const qi = (a) => [-a[0], -a[1], -a[2], a[3]];
+    const qr = (q, v) => { const r = qm(qm(q, [v[0], v[1], v[2], 0]), qi(q)); return [r[0], r[1], r[2]]; };
+    const nrm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0]/l, v[1]/l, v[2]/l]; };
+    const crs = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+    const dt3 = (a, b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    R.qm = qm; R.qi = qi; R.qr = qr; R.nrm = nrm; R.crs = crs; R.dt3 = dt3;
+    const byName = new Map(nodes.map((n) => [clean(n.name), n]));
+    const boneOf = new Map(); if (sk) for (const b of sk.bones) { const t = b.getTransformNode(); if (t) boneOf.set(t, b); }
+    const restQ = (n) => { const b = boneOf.get(n); if (!b) { const q = n.rotationQuaternion; return q ? [q.x, q.y, q.z, q.w] : [0, 0, 0, 1]; } const m = b.getRestMatrix(); try { const V = root.position.constructor, Q = n.rotationQuaternion ? n.rotationQuaternion.constructor : null; const vs = new V(), vp = new V(), qq = new Q(); m.decompose(vs, qq, vp); return [qq.x, qq.y, qq.z, qq.w]; } catch (e) { return [0, 0, 0, 1]; } };
+    const restP = (n) => { const b = boneOf.get(n); try { const V = root.position.constructor, Q = n.rotationQuaternion.constructor; const vs = new V(), vp = new V(), qq = new Q(); b.getRestMatrix().decompose(vs, qq, vp); return [vp.x, vp.y, vp.z]; } catch (e) { return [n.position.x, n.position.y, n.position.z]; } };
+    // bind rotation and position in the body's frame (below the root): the chain of rest locals
+    const chainTo = (n) => { const c = []; for (let x = n; x && x !== root; x = x.parent) c.unshift(x); return c; };
+    const bindWorld = (n) => { let q = [0, 0, 0, 1], p = [0, 0, 0]; for (const x of chainTo(n)) { const lp = restP(x); const r = qr(q, lp); p = [p[0] + r[0], p[1] + r[1], p[2] + r[2]]; q = qm(q, restQ(x)); } return { q, p }; };
+    const toes = []; for (const sd of ['Left', 'Right']) { const f = byName.get(sd + 'Foot'), t = byName.get(sd + 'ToeBase'); if (f && t) { const a = bindWorld(f).p, b = bindWorld(t).p; toes.push(nrm([b[0] - a[0], 0, b[2] - a[2]])); } }
+    const front = toes.length ? nrm(toes.reduce((a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], [0, 0, 0])) : [0, 0, 1];
+    R.limbs = [];
+    for (const [key, up, lo, end, toward] of [['LArm', 'LeftArm', 'LeftForeArm', 'LeftHand', 1], ['RArm', 'RightArm', 'RightForeArm', 'RightHand', 1], ['LLeg', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', -1], ['RLeg', 'RightUpLeg', 'RightLeg', 'RightFoot', -1]]) {
+      const U = byName.get(up), L = byName.get(lo), E = byName.get(end); if (!U || !L || !E) continue;
+      const bw = bindWorld(U), aL = nrm(restP(L)), fL = qr(qi(bw.q), [front[0] * toward, front[1] * toward, front[2] * toward]);
+      let h = nrm(crs(aL, fL));
+      // the sign: +90° about h carries the bone axis toward the flexion side (checked with the same rotation the audit uses)
+      const s2 = Math.SQRT1_2, rot = [h[0] * s2, h[1] * s2, h[2] * s2, s2];
+      if (dt3(qr(rot, aL), fL) < 0) h = [-h[0], -h[1], -h[2]];
+      R.limbs.push({ key, U, L, E, h, aL, prevQ: null });
+    }
   };
   let ballRef = null;
   const findBall = () => { if (ballRef && !ballRef.isDisposed()) return ballRef; ballRef = scene.meshes.find((m) => m.name === 'ball' && m.metadata && m.metadata.felPalmMirrorLeft) || null; return ballRef; };
@@ -81,6 +110,17 @@ const RECORDER = `(() => {
     const hi = R.jIdx[0]; if (hi >= 0) { const hp = R.nodes[hi].position; f.hp = [r5(hp.x), r5(hp.y), r5(hp.z)]; }
     f.j = R.jIdx.map((i) => { if (i < 0) return null; const a = R.nodes[i].getAbsolutePosition(); return [r4(a.x), r4(a.y), r4(a.z)]; });
     const b = findBall(); if (b) { const a = b.getAbsolutePosition(); f.ball = [r4(a.x), r4(a.y), r4(a.z)]; f.bpar = b.parent ? b.parent.name : ''; }
+    // the joint audit: [bend°, hinge error° (the bend plane's normal against the upper bone's hinge), upper-bone roll° since last frame]
+    if (R.limbs) { f.jt = {}; for (const Lm of R.limbs) {
+      const uq = Lm.U.absoluteRotationQuaternion, qU = [uq.x, uq.y, uq.z, uq.w];
+      const S = Lm.U.getAbsolutePosition(), E = Lm.L.getAbsolutePosition(), H = Lm.E.getAbsolutePosition();
+      const a = R.nrm([E.x - S.x, E.y - S.y, E.z - S.z]), bb = R.nrm([H.x - E.x, H.y - E.y, H.z - E.z]);
+      const bend = Math.acos(Math.max(-1, Math.min(1, R.dt3(a, bb)))) * 180 / Math.PI;
+      let err = -1; if (bend > 12) { const n = R.nrm(R.crs(a, bb)), hw = R.qr(qU, Lm.h); err = Math.acos(Math.max(-1, Math.min(1, R.dt3(n, hw)))) * 180 / Math.PI; }
+      let roll = 0; if (Lm.prevQ) { const d = R.qm(R.qi(Lm.prevQ), qU); const w = d[3] < 0 ? -d[3] : d[3], v = (d[3] < 0 ? -1 : 1) * R.dt3([d[0], d[1], d[2]], Lm.aL); roll = 2 * Math.atan2(v, w) * 180 / Math.PI; }
+      Lm.prevQ = qU;
+      f.jt[Lm.key] = [Math.round(bend), Math.round(err), Math.round(roll * 10) / 10];
+    } }
     f.clips = scene.animationGroups.filter((g) => g.isPlaying && g.targetedAnimations.some((t) => R.targets.has(t.target))).map((g) => { const a = g.animatables && g.animatables[0]; const w = a && typeof a.weight === 'number' && a.weight >= 0 ? a.weight : (g.weight >= 0 ? g.weight : 1); return [g.name, Math.round(w * 100) / 100]; }).filter((c) => c[1] > 0.02);
     try { const pp = dev.dunkPosture && dev.dunkPosture.get && dev.dunkPosture.get(); if (pp) f.pw = String(pp.window || ''); } catch (e) {}
     R.frames.push(f);
@@ -237,6 +277,8 @@ export interface Metrics {
   whips: number;
   /** The run-up (last 1.5 s): frames, chicken-wing frames (an elbow at shoulder height and > 0.15 m out), mean elbow angle. */
   runFrames: number; runWing: number; ballScreenRight: number | null; runElbowMean: number | null;
+  joints: Record<string, { bent: number; off: number; inverted: number; errP90: number; rollMax: number; rollFast: number }>;
+  elbowBad: Record<string, { high: number; low: number }>; handOverBall: number | null;
   heldFrac: Record<string, number>;
   lockedElbow: number; lockedKnee: number;
   ballGapP90: number | null; ballGapMax: number | null; ballFar: number;
@@ -319,6 +361,39 @@ export function measure(rec: Rec): Metrics {
   const contactAt = markAt(/\[HANDS\] (contact|iron contact)|\[DUNK-SLAM\].*(contact|flush)/);
   const cF = contactAt ? rec.frames.reduce((a, f) => (Math.abs(f.t - contactAt) < Math.abs(a.t - contactAt) ? f : a), rec.frames[0]) : null;
   const handRim = cF ? Math.min(...[cF.j[J.RightHand], cF.j[J.LeftHand]].filter(Boolean).map((h) => len(sub(h!, [RIM.x, RIM.y, RIM.z])))) : null;
+  // DUNK MOTION phase 9 — the joint audit over the window: per limb, frames bent off the hinge (> 35°), frames INVERTED (> 120°: the
+  // joint bending backward), and the upper bone's fastest roll (°/s; a flip is a roll with the joint still)
+  const joints: Record<string, { bent: number; off: number; inverted: number; errP90: number; rollMax: number; rollFast: number }> = {};
+  for (const k of ['LArm', 'RArm', 'LLeg', 'RLeg']) {
+    const fr = win.filter((f) => f.jt && f.jt[k]);
+    const bent = fr.filter((f) => f.jt![k][1] >= 0), errs = bent.map((f) => f.jt![k][1]).sort((a, b) => a - b);
+    const rolls = fr.map((f, i) => (i ? Math.abs(f.jt![k][2]) / Math.max(1e-3, (f.t - fr[i - 1].t) / 1000) : 0));
+    joints[k] = { bent: bent.length, off: errs.filter((e) => e > 35 && e <= 120).length, inverted: errs.filter((e) => e > 120).length,
+      errP90: errs.length ? errs[Math.floor(errs.length * 0.9)] : 0, rollMax: Math.round(Math.max(0, ...rolls)), rollFast: rolls.filter((r) => r > 1500).length };
+  }
+  // DUNK MOTION phase 9 — WHERE THE ELBOW POINTS (the shoulder's own range, which the hinge audit cannot see: a hinge-true elbow on a
+  // humerus rolled past its limit). With the hand ABOVE the shoulder an elbow leads forward or up (the hand goes behind the head, never
+  // ahead of an elbow that trails behind); with the hand LOW it points back or out. Frames that break it, per arm, over the window.
+  const elbowBad: Record<string, { high: number; low: number }> = {};
+  for (const sd of ['Left', 'Right']) {
+    let high = 0, low = 0;
+    for (const f of win) {
+      const S = f.j[J[sd + 'Arm']], E = f.j[J[sd + 'ForeArm']], H = f.j[J[sd + 'Hand']], lu = f.j[J.LeftUpLeg], ru = f.j[J.RightUpLeg], lf = f.j[J.LeftFoot], lt = f.j[J.LeftToeBase];
+      if (!S || !E || !H || !lu || !ru || !lf || !lt) continue;
+      const ax = sub(H, S), al = len(ax); if (al < 1e-3) continue;
+      const bendDeg = angleAt(S, E, H); if (bendDeg > 160) continue;   // a nearly straight arm has no elbow direction to judge
+      const axn = ax.map((v) => v / al) as V, e = sub(E, S), pe = sub(e, axn.map((v) => v * dot(e, axn)) as V), pl = len(pe); if (pl < 1e-3) continue;
+      const p = pe.map((v) => v / pl);
+      const across = sub(ru, lu); across[1] = 0; const acl = len(across) || 1; const ac = across.map((v) => v / acl);
+      let fwd: V = [ac[2], 0, -ac[0]]; if (dot(fwd, sub(lt, lf)) < 0) fwd = [-fwd[0], 0, -fwd[2]];
+      const pf = dot(p, fwd), pu = p[1], handUp = H[1] - S[1];
+      if (handUp > 0.15 && pf < -0.5 && pu < 0.3) high++;          // overhead with the elbow trailing back and down: the arm bent the wrong way
+      if (handUp < -0.1 && pf > 0.6) low++;                          // low with the elbow forward: a wing thrown forward
+    }
+    elbowBad[sd] = { high, low };
+  }
+  const hand0 = cF && cF.ball ? (['Left', 'Right'] as const).map((sd) => cF.j[J[sd + 'Hand']]).filter(Boolean).sort((a, b) => len(sub(a!, cF.ball!)) - len(sub(b!, cF.ball!)))[0] : null;
+  const handOverBall = hand0 && cF?.ball ? +(hand0[1] - cF.ball[1]).toFixed(3) : null;
   const beats: Record<string, number> = {};
   const addBeat = (k: string, re: RegExp) => { const t = markAt(re); if (t) beats[k] = Math.round(t - L); };
   addBeat('trick', /\[DUNK-TRICK\] air/); addBeat('slam', /\[DUNK-SLAM\]/); addBeat('contact', /\[HANDS\] (contact|iron contact)/); addBeat('flush', /\[HANDS\] through the net/);
@@ -331,6 +406,7 @@ export function measure(rec: Rec): Metrics {
     ballGapP90: gaps.length ? +gaps[Math.floor(gaps.length * 0.9)].toFixed(3) : null, ballGapMax: gaps.length ? +gaps[gaps.length - 1].toFixed(3) : null, ballFar: gaps.filter((g) => g > 0.2).length,
     rimHandAtContact: handRim != null ? +handRim.toFixed(3) : null, ballRimAtContact: cF?.ball ? +len(sub(cF.ball, [RIM.x, RIM.y, RIM.z])).toFixed(3) : null,
     slam: rec.hud.filter((h) => /EARLY|LATE|ON TIME|EXECUTION|MISS/.test(h)).pop() ?? '',
+    joints, elbowBad, handOverBall,
   };
 }
 
@@ -393,7 +469,8 @@ async function sheet(p: Page, rec: Rec, m: Metrics, file: string): Promise<void>
   let t0 = L - 250, t1 = L + land + 350;
   if (WIN === 'trick') { t0 = L + (m.beats.trick ?? 250) - 60; t1 = L + (m.beats.contact ?? land) + 300; }
   if (WIN === 'run') { t0 = L - 1500; t1 = L + 150; }   // the run-up: the dribble run into the gather and the plant
-  if (WIN === 'gather') { t0 = L - 450; t1 = L + 200; }   // DUNK MOTION phase 8: push 1-2 up close — the pick-up, the push, 1, 2, the take-off
+  if (WIN === 'gather') { t0 = L - 450; t1 = L + 200; }
+  if (WIN === 'flush') { const c = m.beats.contact ?? m.beats.slam ?? 1500; t0 = L + c - 300; t1 = L + c + 250; }   // DUNK MOTION phase 9: the finish up close   // DUNK MOTION phase 8: push 1-2 up close — the pick-up, the push, 1, 2, the take-off
   const picks: Frame[] = [];
   for (let k = 0; k < COLS; k++) { const t = t0 + ((t1 - t0) * k) / (COLS - 1); picks.push(rec.frames.reduce((a, f) => (Math.abs(f.t - t) < Math.abs(a.t - t) ? f : a), rec.frames[0])); }
   const a = rec.frames.find((f) => f.t >= L - 300) ?? rec.frames[0];
@@ -435,6 +512,9 @@ const ms = recs.map(measure);
 const pad = (s: string | number, n: number) => String(s).padEnd(n);
 console.log(`\n${pad('trick', 16)}${pad('land', 6)}${pad('SPARC', 7)}${pad('pops', 5)}${pad('elb', 5)}${pad('knee', 5)}${pad('ball p90', 9)}${pad('far', 4)}${pad('rimH', 6)}held(Spine2/Neck/Head/LHand)  clips`);
 for (const m of ms) console.log(`${pad(m.trick, 16)}${pad(m.launchToLandMs ?? '-', 6)}${pad(m.sparcMean, 7)}${pad(m.pops.length, 5)}${pad(m.lockedElbow, 5)}${pad(m.lockedKnee, 5)}${pad(m.ballGapP90 ?? '-', 9)}${pad(m.ballFar, 4)}${pad(m.rimHandAtContact ?? '-', 6)}${pad([m.heldFrac.Spine2, m.heldFrac.Neck, m.heldFrac.Head, m.heldFrac.LeftHand].join('/'), 29)}${m.clips.join(' → ')}`);
+console.log('\nJOINTS (frames in the window: bent off the hinge >35° / INVERTED >120° · hinge error p90° · upper-bone roll max °/s, frames >1500°/s)');
+for (const m of ms) console.log(`${pad(m.trick, 16)}elbow wrong-way L ${m.elbowBad?.Left?.high ?? '-'}/${m.elbowBad?.Left?.low ?? '-'} R ${m.elbowBad?.Right?.high ?? '-'}/${m.elbowBad?.Right?.low ?? '-'} · hand over ball at contact ${m.handOverBall ?? '-'}`);
+for (const m of ms) console.log(`${pad(m.trick, 16)}` + ['LArm', 'RArm', 'LLeg', 'RLeg'].map((k) => { const j = m.joints?.[k]; return j ? `${k} ${j.off}/${j.inverted} p90 ${j.errP90} roll ${j.rollMax}(${j.rollFast})` : `${k} -`; }).map((x) => x.padEnd(34)).join(''));
 fs.writeFileSync(`${OUT}/metrics.json`, JSON.stringify(ms, null, 1));
 if (SCRUB && recs.length) {
   const sp = await boot(browser, false);

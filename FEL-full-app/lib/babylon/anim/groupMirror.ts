@@ -30,6 +30,27 @@ export function reflectRotation(q: Quaternion, n: Vector3): Quaternion {
   return new Quaternion(2 * d * n.x - q.x, 2 * d * n.y - q.y, 2 * d * n.z - q.z, q.w);
 }
 
+/** A bone's position at bind in the body's frame (below the top node): the chain of rest locals. */
+export function bindPosInFrame(sk: Skeleton, n: TransformNode): Vector3 {
+  const bf = bindFrame(sk); const frame = frameAbove(n);
+  const chain: TransformNode[] = [];
+  for (let c: TransformNode | null = n; c && c !== frame; c = c.parent as TransformNode | null) chain.unshift(c);
+  let w = Matrix.Identity();
+  for (const c of chain) {
+    const b = bf.bind.get(c);
+    const local = Matrix.Compose(c.scaling, b ? b.q : (c.rotationQuaternion ?? Quaternion.FromEulerVector(c.rotation)), b ? b.p : c.position);
+    w = local.multiply(w);
+  }
+  return w.getTranslation();
+}
+/** The body's front at bind in its frame: heel → toe, level, both feet (null if the rig has no toes). */
+export function bindFrontInFrame(sk: Skeleton): Vector3 | null {
+  const nodes = new Map<string, TransformNode>();
+  for (const b of sk.bones) { const t = b.getTransformNode(); if (t) nodes.set(clean(t.name), t); }
+  const acc = Vector3.Zero(); let n = 0;
+  for (const sd of ['Left', 'Right']) { const f = nodes.get(sd + 'Foot'), t = nodes.get(sd + 'ToeBase'); if (!f || !t) continue; const d = bindPosInFrame(sk, t).subtract(bindPosInFrame(sk, f)); d.y = 0; if (d.lengthSquared() > 1e-8) { acc.addInPlace(d.normalize()); n++; } }
+  return n && acc.lengthSquared() > 1e-8 ? acc.normalize() : null;
+}
 /** The body's sagittal normal in its frame at bind: left hip → right hip (the shoulders if a rig has no UpLegs). */
 export function sagittalNormal(sk: Skeleton): Vector3 {
   const bf = bindFrame(sk);

@@ -146,3 +146,97 @@ export function limitArmTwist(arm: ArmChain, dt: number, stamp: number, rateDeg:
 }
 /** Forget an arm's last drawn roll (a teleport, a respawn). */
 export function forgetArmTwist(arm: ArmChain): void { twistMemo.delete(arm.shoulder); }
+
+// DUNK MOTION phase 9 (2026-09-23; owner: "fix the orientation of the joints and proper biomechanics … analyze it"). WHERE AN ELBOW
+// MAY POINT. An elbow bends toward the FRONT of the upper arm, so its point — the bulge the pole aims — is the upper arm's BACK (the
+// triceps side), and that side turns as the arm rises: back with the arm hanging, down with it held forward, FORWARD with it overhead.
+// Every dunk clip's overhead arm was solved with a pole out and BACK ([±0.9, 0.1, −0.3], and the poseClip default for the pole-less
+// capture), so with the ball overhead the elbow trailed behind a hand held ahead of it — an arm bent the wrong way at the shoulder
+// (12–18 frames a dunk on the ball arm, measured: the carry-up, the cock, the flush). A pole in the forbidden half is turned just into
+// the allowed one; a pole already there is kept as authored. Lateral arms (the hand out to the side) have no sagittal back to keep.
+/** The upper arm's back (the elbow's natural side) for an arm from `shoulder` to `hand`, and its lateral share (0 = sagittal). */
+export function elbowBackDir(shoulder: Vector3, hand: Vector3, up: Vector3, front: Vector3): { dir: Vector3; sagittal: number } {
+  const u = hand.subtract(shoulder); const ul = u.length(); if (ul < 1e-5) return { dir: front.scale(-1), sagittal: 0 };
+  u.scaleInPlace(1 / ul);
+  const uy = Vector3.Dot(u, up), uz = Vector3.Dot(u, front);
+  const back = up.scale(-uz).addInPlace(front.scale(uy));   // hanging → back, forward → down, overhead → forward
+  const perp = back.subtract(u.scale(Vector3.Dot(back, u)));
+  return { dir: perp.lengthSquared() > 1e-8 ? perp.normalize() : front.scale(-1), sagittal: Math.hypot(uy, uz) };
+}
+/** `pole` kept, or turned just far enough toward the elbow's natural side that it points there by at least `minDot`. */
+export function anatomicalElbowPole(pole: Vector3, shoulder: Vector3, hand: Vector3, up: Vector3, front: Vector3, minDot = 0.2): Vector3 {
+  const { dir, sagittal } = elbowBackDir(shoulder, hand, up, front);
+  if (sagittal < 0.35) return pole.clone();
+  const u = hand.subtract(shoulder).normalize();
+  const pp = pole.subtract(u.scale(Vector3.Dot(pole, u)));
+  if (pp.lengthSquared() < 1e-8) return dir.clone();
+  pp.normalize();
+  if (Vector3.Dot(pp, dir) >= minDot) return pole.clone();
+  for (let t = 0.05; t < 40; t *= 1.25) { const c = pp.add(dir.scale(t)).normalize(); if (Vector3.Dot(c, dir) >= minDot + 0.05) return c; }
+  return dir.clone();
+}
+
+// DUNK MOTION phase 9 (2026-09-23; owner: "fix the orientation of the joints" · "fix the off arm on all the dunks"). THE HINGED ARM.
+// Every arm in the game is solved from a hand target and an elbow pole, and the two-bone solver's from-to arcs leave the forearm's
+// TWIST (about its own axis) wherever they land: at the slam's press the dunking forearm spun 92° in one frame (the jam re-aimed the
+// reach), the off arm's upper arm rolled 90° with the elbow still (the gather) — the flips of this pass were all this one freedom.
+// After every writer of the arm: (1) the upper arm is rolled about its own line so its elbow hinge (read off the rig at bind: the
+// flexion carries the forearm toward the body's front) lies in the plane the arm actually bends in; (2) the forearm is rebuilt as a
+// pure bend about that hinge, then its own twist (the pronation); (3) that twist follows what the writers wanted, no faster than a
+// forearm turns. The elbow and the hand stay where they were solved; only the flips and the skin twists go.
+export interface HingeArm { arm: ArmChain; h: Vector3; bindF: Quaternion; axisF: Vector3; tau: number; stamp: number }
+/** The arm's hinge in the upper arm's local frame, from bind: ⟂ to the upper arm and the body's front, signed so +θ bends toward it. */
+export function makeHingeArm(arm: ArmChain, bindUpper: Quaternion, bindF: Quaternion, frontInFrame: Vector3): HingeArm | null {
+  const aL = arm.elbow.position.clone(); const fL = arm.hand.position.clone();
+  if (aL.lengthSquared() < 1e-10 || fL.lengthSquared() < 1e-10) return null;
+  aL.normalize(); fL.normalize();
+  const frontL = frontInFrame.applyRotationQuaternion(Quaternion.Inverse(bindUpper));
+  let h = Vector3.Cross(aL, frontL); if (h.lengthSquared() < 1e-8) return null; h.normalize();
+  if (Vector3.Dot(aL.applyRotationQuaternion(Quaternion.RotationAxis(h, Math.PI / 2)), frontL) < 0) h = h.scale(-1);
+  return { arm, h, bindF: bindF.clone(), axisF: fL, tau: 0, stamp: -10 };
+}
+const wrapPi = (x: number): number => { let v = x; while (v > Math.PI) v -= 2 * Math.PI; while (v < -Math.PI) v += 2 * Math.PI; return v; };
+/** Apply the hinge to `H.arm` (call after every writer of the arm). `stamp` counts drawn frames; a gap re-seeds the twist.
+ *  All in the upper arm's PARENT frame, from local rotations and that frame's inverse world matrix — never a node's decomposed world
+ *  rotation, which a reflected import root corrupts (Babylon folds the mirror into the rotation). */
+export function hingeArmApply(H: HingeArm, dt: number, stamp: number, twistRateDeg: number): void {
+  const u = H.arm.shoulder, fo = H.arm.elbow, ha = H.arm.hand;
+  const qU = u.rotationQuaternion, qF = fo.rotationQuaternion;
+  if (!qU || !qF) return;
+  u.computeWorldMatrix(true); fo.computeWorldMatrix(true); ha.computeWorldMatrix(true);
+  const par = u.parent as TransformNode | null;
+  const toP = par ? par.getWorldMatrix().clone().invert() : Matrix.Identity();
+  const inP = (v: Vector3) => Vector3.TransformCoordinates(v, toP);
+  const S = inP(u.getAbsolutePosition()), E = inP(fo.getAbsolutePosition()), P = inP(ha.getAbsolutePosition());
+  const a = E.subtract(S), b = P.subtract(E); if (a.lengthSquared() < 1e-12 || b.lengthSquared() < 1e-12) return;
+  a.normalize(); b.normalize();
+  const theta = Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(a, b))));
+  const qU0 = qU.clone(), qF0 = qF.clone();
+  // (1) the upper arm's roll: its hinge onto the bend plane, fading out as the arm straightens (a straight arm has no plane)
+  const w = Math.min(1, Math.max(0, (theta - 5 * DEG) / (15 * DEG)));
+  if (w > 0) {
+    const n = Vector3.Cross(a, b).normalize();
+    const hw = H.h.applyRotationQuaternion(qU);
+    const hp = hw.subtract(a.scale(Vector3.Dot(hw, a))), np = n.subtract(a.scale(Vector3.Dot(n, a)));
+    if (hp.lengthSquared() > 1e-8 && np.lengthSquared() > 1e-8) {
+      hp.normalize(); np.normalize();
+      const roll = Math.atan2(Vector3.Dot(Vector3.Cross(hp, np), a), Vector3.Dot(hp, np)) * w;
+      if (Math.abs(roll) > 1e-5) qU.copyFrom(Quaternion.RotationAxis(a, roll).multiply(qU));   // about the upper arm's own line: the elbow stays
+    }
+  }
+  // (2) the forearm: the bend that carries its bind line onto the solved one (the hand lands exactly where it was solved, whatever the
+  // rig's bind elbow), then its own twist
+  const qUinv = Quaternion.Inverse(qU);
+  const cBind = H.axisF.applyRotationQuaternion(H.bindF).normalize();                       // the forearm's line at bind, in the upper arm
+  const dNow = b.applyRotationQuaternion(qUinv).normalize();                                // …and where it is solved now
+  const swing = new Quaternion(); Quaternion.FromUnitVectorsToRef(cBind, dNow, swing);
+  const base = swing.multiply(H.bindF);
+  const want = qUinv.multiply(qU0).multiply(qF0);                                            // the writers' forearm, under the rolled upper arm
+  const tauWant = twistAbout(Quaternion.Inverse(base).multiply(want), H.axisF);
+  // (3) the twist follows, no faster than a forearm turns (a gap starts free)
+  const fresh = H.stamp !== stamp - 1 || dt <= 0;
+  H.tau = fresh ? tauWant : H.tau + Math.max(-twistRateDeg * DEG * dt, Math.min(twistRateDeg * DEG * dt, wrapPi(tauWant - H.tau)));
+  H.stamp = stamp;
+  qF.copyFrom(base.multiply(Quaternion.RotationAxis(H.axisF, H.tau)));
+  u.computeWorldMatrix(true); fo.computeWorldMatrix(true); ha.computeWorldMatrix(true);
+}

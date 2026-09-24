@@ -52,9 +52,9 @@ export const FLUSH_SEC = 0.5;
  * the first key through the flow's fade.
  */
 export const CARRY_UP_ONE: PoseKey[] = [
-  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.18, 1.98, 0.12], Left: [-0.12, 1.84, 0.22] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },
-  { t: 0.4,  bones: { Hips: [2, 0, 0], Spine: [-12, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.19, 2.00, 0.02], Left: [-0.32, 1.64, 0.26] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.1] } },
-  { t: CARRY_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...HANG_ONE_DEEP }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.18, 1.98, 0.12], Left: [-0.46, 1.06, 0.12] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },   // the off arm stays DOWN (phase 9: it pumped back up to 1.84 here)
+  { t: 0.4,  bones: { Hips: [2, 0, 0], Spine: [-12, 0, 0], ...HANG_ONE_LEGS }, hands: { Right: [0.19, 2.00, 0.02], Left: [-0.48, 1.02, 0.08] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },
+  { t: CARRY_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...HANG_ONE_DEEP }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.48, 1.00, 0.06] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
 ];
 /** Both hands: overhead, then the two-hand wind-up behind the head (the back-scratcher's cock) with the body bowing under it. */
 export const CARRY_UP_TWO: PoseKey[] = [
@@ -65,10 +65,10 @@ export const CARRY_UP_TWO: PoseKey[] = [
 
 /** THE FLUSH, one hand (right): cocked over the head → over the ring → through it, the wrist snapping. */
 export const FLUSH_ONE: PoseKey[] = [
-  { t: 0,    bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...HANG_ONE_DEEP }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },   // the cock the carry ends in, the one-foot hang under it
-  { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], ...LONG }, hands: { Right: [0.16, 2.06, 0.36], Left: [-0.44, 1.38, 0.12] }, poles: { Right: UP_R, Left: [-0.8, -0.6, 0.0] } },
-  { t: 0.24, bones: { Hips: [4, 0, 0], Spine: [14, 0, 0], ...LONG }, hands: { Right: [0.14, 1.80, 0.46], Left: [-0.44, 1.16, 0.06] }, poles: { Right: [0.9, 0.0, -0.3], Left: [-0.8, -0.6, 0.1] } },
-  { t: FLUSH_SEC, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], ...DROP }, hands: { Right: [0.22, 1.52, 0.34], Left: [-0.40, 1.06, 0.12] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.8, -0.6, 0.1] }, hold: true },
+  { t: 0,    bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...HANG_ONE_DEEP }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.48, 1.00, 0.06] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },   // the cock the carry ends in, the one-foot hang under it
+  { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], ...LONG }, hands: { Right: [0.16, 2.06, 0.36], Left: [-0.47, 0.98, 0.06] }, poles: { Right: UP_R, Left: [-0.8, -0.6, 0.0] } },
+  { t: 0.24, bones: { Hips: [4, 0, 0], Spine: [14, 0, 0], ...LONG }, hands: { Right: [0.14, 1.80, 0.46], Left: [-0.44, 0.98, 0.10] }, poles: { Right: [0.9, 0.0, -0.3], Left: [-0.8, -0.6, 0.1] } },
+  { t: FLUSH_SEC, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], ...DROP }, hands: { Right: [0.22, 1.52, 0.34], Left: [-0.38, 1.02, 0.18] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.8, -0.6, 0.1] }, hold: true },
 ];
 /** THE FLUSH, two hands: over and behind the head → over the ring → both through it. */
 export const FLUSH_TWO: PoseKey[] = [

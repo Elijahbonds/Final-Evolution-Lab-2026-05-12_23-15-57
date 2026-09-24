@@ -75,6 +75,24 @@ export function arcK(t: number, durationSec: number, plantSec = PLANT_SEC): numb
   const tf = Math.max(0, t - plantSec);
   return Math.min(1, tf / Math.max(1e-3, durationSec - plantSec));
 }
+/**
+ * DUNK MOTION phase 9 (owner: "common sense how you would complete the dunk"): THE TOP OF THE JUMP IS AT THE RIM. The height was the
+ * parabola 4k(1−k) over plant → duration, topping out at clip 0.80 — while the carry reaches the rim at the extension (1.25), where
+ * the slam window is centred, by which time the body was back down to 59 % of its height: the hand came UP to the iron from under
+ * it (2.75 m at the press, the ball set onto the ring from below). The rise now leaves the floor as hard as the parabola did
+ * (3/(top − plant) of the apex a second, the parabola's 2.86) and eases into its top AT the extension, so the ball goes over the
+ * rim from above; past the top the body falls on a parabola over ARC_FALL_SEC.
+ */
+export const ARC_FALL_SEC = 0.5;
+export function arcHeight(t: number, topSec: number, plantSec = PLANT_SEC): number {
+  if (t <= plantSec) return 0;
+  if (t <= topSec) { const w = 1 - (t - plantSec) / Math.max(1e-3, topSec - plantSec); return 1 - w * w * w; }
+  const v = Math.min(1, (t - topSec) / ARC_FALL_SEC); return 1 - v * v;
+}
+/** The flight clock second the rise reaches `frac` of its top. */
+export function arcTopT(topSec: number, frac: number, plantSec = PLANT_SEC): number {
+  return plantSec + (topSec - plantSec) * (1 - Math.cbrt(Math.max(0, 1 - frac)));
+}
 /** How much of the jump's height still reads as "the top": a parabola is flat up there — 98 % of the peak spans ±0.1 s. */
 export const ARC_TOP_FRAC = 0.98;
 /** The flight clock second the jump reaches the TOP (ARC_TOP_FRAC of its height, on the way up; frac 1 = the apex itself,

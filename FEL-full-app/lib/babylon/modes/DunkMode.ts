@@ -28,7 +28,7 @@ import { Color3, Color4, MeshBuilder, Vector3, type Mesh } from '@babylonjs/core
 import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
-import { mirrorGroupsInPlace, mirrorSide } from '../anim/groupMirror';   // DUNK MOTION phase 8: the right-handed dunker
+import { mirrorGroupsInPlace, mirrorSide, bindFrontInFrame } from '../anim/groupMirror';   // DUNK MOTION phase 8: the right-handed dunker
 import { planGather, fitGather, gatherProgress, gatherSpeedAt, gatherDistAt, GATHER_CLIP_SEC, GATHER_BRAKE_FROM } from '../core/DunkGatherRun';   // …and push 1-2 at speed
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -44,14 +44,14 @@ import { Matrix, Quaternion } from '@babylonjs/core';
 import { bindFrame, type BindFrame } from '../anim/bindFrame';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { DEFAULT_DRIBBLE } from '../anim/Dribble';
-import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, arcApexT, slamBufferSec, ARC_TOP_FRAC, PLANT_SEC, WINDMILL_RELEASE_T, GATHER_LEAD_SEC, FOOT_PITCH_CAP, atPalm, type LegPose } from '../core/DunkLegs';
+import { LEGS, legPose, easeLegPose, cloneLegPose, arcHeight, arcTopT, carryU, slamBufferSec, ARC_TOP_FRAC, PLANT_SEC, WINDMILL_RELEASE_T, GATHER_LEAD_SEC, FOOT_PITCH_CAP, atPalm, type LegPose } from '../core/DunkLegs';
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { TAKE_OFF_ONE_CATCH } from '../anim/authored/dunkTakeoff';   // DUNK MOTION phase 7
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
 import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
-import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from '../anim/HandIK';
+import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, anatomicalElbowPole, makeHingeArm, hingeArmApply, type ArmChain, type HingeArm } from '../anim/HandIK';
 import { LimbDrag } from '../anim/LimbDrag';           // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
-import { WristLayer, wristFor, handFlexAxisFromPoints, handPointsFromMeshes, flexAxisLocal, PALM_LOCAL } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
+import { WristLayer, wristFor, handFlexAxisFromPoints, handPointsFromMeshes, flexAxisLocal, PALM_LOCAL, pronateToward } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '../core/CourtMovement';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
@@ -147,6 +147,12 @@ const DRIBBLE_MOVE_MPS = 0.5, DRIBBLE_STOP_SEC = 0.35;
 const CURVE_COMMIT_MIN_M = 2.4;
 /** The dribble's arms let go this fast when push 1-2 takes the ball (the clip's arms own the push). */
 const GATHER_LET_GO_SEC = 0.06;
+/** The palm comes over the ball this fast from the press (the swing to the iron), and lets it go this slowly after (the follow-through). */
+const PALM_OVER_IN_SEC = 0.22, PALM_OVER_OUT_SEC = 0.25;
+/** The fastest the forearm turns the palm (a flush's pronation, not a whip). */
+const PALM_TURN_RATE_DEG = 720;
+/** The fastest a forearm turns on its own axis (the hinged arm: a flip becomes a turn at this rate). */
+const ARM_TWIST_RATE_DEG = 800;   // (0.1 s from the press turned the forearm 110° in six frames: 19 forearm whips, p9f)
 /** The push is this long after the take-off foot strikes (the foot behind the hips, the clips' first pose). The last strides
  *  stretch or quicken — never more than STRIDE_ADJUST_MAX — so that push lands on the gather's own moment: a jumper's check-mark
  *  steps. Without it the gather started on the push foot in 1 run of 8 (p8b) and crossfaded a stride out of phase. */
@@ -621,7 +627,7 @@ export const DunkMode: ModeDefinition = (() => {
   // inside it is HELD and fires on the frame the window opens (scored as the early press it was), and a press that
   // resolves to a trick which cannot fire falls through to that buffer instead of a banner.
   const SLAM_BUFFER_SEC = 0.22;              // how early a SLAM press still counts (clip seconds) — the least; slamBufferSec reaches back to the top of the arc
-  const SLAM_APEX_T = arcApexT(EASTBAY_TIMING.duration, PLANT_SEC, ARC_TOP_FRAC);   // clip 0.70: the top of the jump the runway hint names (98 % of the height; the apex is 0.80)
+  const SLAM_APEX_T = arcTopT(EASTBAY_TIMING.extend, ARC_TOP_FRAC);   // DUNK MOTION phase 9: the top is at the rim now (clip ~0.94 reaches 98 %)   // clip 0.70: the top of the jump the runway hint names (98 % of the height; the apex is 0.80)
   let slamBufferAt = -1;                     // clip second of a SLAM press waiting for the window (−1 = none)
   let slamSeen = false;                      // an A press reached the flight at all (the miss banner names WHAT missed)
   /** HOOPS-DEPTH phase 10 (2026-09-23): THE FIRST SLAM PRESS DECIDES. The buffer kept the NEWEST press, so a masher (8 presses a
@@ -635,6 +641,7 @@ export const DunkMode: ModeDefinition = (() => {
   const arms: { Left: ArmChain | null; Right: ArmChain | null } = { Left: null, Right: null };   // H1: built once at spawn
   let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
   let handIkObs: Observer<Scene> | null = null, ikScene: Scene | null = null;
+  let hingeObs: Observer<Scene> | null = null; const hinges: HingeArm[] = [];   // DUNK MOTION phase 9: the arms' last writer (HandIK.hingeArmApply)
   const handIkTarget = new Vector3(), handIkPole = new Vector3();
   let clipToken = 0;                          // H5: a superseded clip's onEnd chain is dead (Babylon fires it on stop() too)
   // ── DUNK-HANDS-RIM (2026-09-08): the hands and the rim ──
@@ -645,7 +652,7 @@ export const DunkMode: ModeDefinition = (() => {
   // palm into the iron: the wrist target LAGS in (τ WRIST_LAG_TAU), the jam weight eases up (jamWeight), the root follows
   // through JAM_FOLLOW_M, the ball lets go on the frame it meets the ring (ironContact, or the short timeout) and THAT is the
   // contact beat — the punch, the ring's dip, the net. SLAM held through the contact is a real rim hang (hangHold).
-  const lagTarget = new Vector3(), _reachT = new Vector3(); let lagLive = false;   // H1: the reach point the wrist trails — seeded from the clip's own hand when the reach comes on
+  const lagTarget = new Vector3(), _reachT = new Vector3(), _reachFwd = new Vector3(); let lagLive = false;   // H1: the reach point the wrist trails — seeded from the clip's own hand when the reach comes on
   let jamSec = -1;                            // seconds into the JAM (the press, or the windmill's release) — −1 outside it
   let jamContact = false;                     // the ball met the iron this attempt (released there, CONTACT fired)
   // DUNK-BALL-ARMS-RIM (2026-09-14): the make's ball goes over the lip and DOWN THROUGH the ring (RimFlush), out of the net to the
@@ -1047,6 +1054,16 @@ export const DunkMode: ModeDefinition = (() => {
       // bounce side is NOT negated here any more (it used to be, and 1v1 / 3v3, which were not, dribbled across the chest).
       dribble?.dispose();
       dribble = mountBallCarry({ scene: ctx.scene, ball, root: player.root, skeleton: player.skeleton, side: hs('Right'), params: { ...DEFAULT_DRIBBLE, hzIdle: 1.8, hzFast: 2.8 } });
+      // DUNK MOTION phase 9 (owner: "fix the orientation of the joints" · "fix the off arm on all the dunks"): THE HINGED ARM, after every
+      // writer of the arms (registered after the dribble's own IK): the elbow bends about its hinge, the forearm's twist turns no faster
+      // than a forearm does — the one-frame twist flips (92° at the slam's press, 90° on the gather's off arm) become turns
+      hinges.length = 0;
+      { const front = bindFrontInFrame(player.skeleton), bf = hipsBf ?? bindFrame(player.skeleton);
+        for (const side of ['Left', 'Right'] as const) { const a = arms[side]; const bu = a ? bf.bind.get(a.shoulder) : null, bfo = a ? bf.bind.get(a.elbow) : null;
+          if (!a || !bu || !bfo || !front) continue;
+          const H = makeHingeArm(a, (bf.parentRot.get(a.shoulder) ?? Quaternion.Identity()).multiply(bu.q), bfo.q, front); if (H) hinges.push(H); } }
+      if (hingeObs) ctx.scene.onAfterAnimationsObservable.remove(hingeObs);
+      hingeObs = ctx.scene.onAfterAnimationsObservable.add(() => { if (MOTION_OFF || !player) return; const dt = motionDt(); for (const H of hinges) hingeArmApply(H, dt, ikFrame, ARM_TWIST_RATE_DEG); });
       // DUNK-BALL-ARMS-RIM: the replay puts the ball back in what it rode — the hand it was in, the body while it dribbled
       replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : dribble?.active ? player.root : null));
 
@@ -1504,7 +1521,7 @@ export const DunkMode: ModeDefinition = (() => {
         const pickUp = dribble.active && !wantBounce ? ball.getAbsolutePosition().clone() : null;
         // the gather's pick-up lets the dribble's arms go in 0.06 s (the shot's 0.14 s held both arms at their bounce pose 0.1 s into
         // push 1-2, so the two-foot swing reached BACK a beat after the push instead of on it — p8i close-up)
-        dribble.update(dt, speed01, wantBounce, strideClock.lockHz > 0 ? strideClock.lockHz : undefined, gatherLatched ? GATHER_LET_GO_SEC : undefined);
+        dribble.update(dt, speed01, wantBounce, strideClock.lockHz > 0 ? strideClock.lockHz : undefined, gatherLatched && footNow() === 'two' ? GATHER_LET_GO_SEC : undefined);   // (the quick let-go is the two-foot swing's: off one it snapped both arms, p9g)
         // the pick-up EASES into the palm from where the ball was (the lob's own 80 ms catch) — it was teleported 0.27 m (p8b)
         if (pickUp && ball.parent) { catchWorld.copyFrom(pickUp); catchPending = true; catchBlend = 0; }
         if (pendingBeat && onRunway && !runwayBeat) { if (!dribble.active || atPalm(dribble.phase, 0.12)) { const rt = pendingBeat; pendingBeat = null; startRunwayBeat(ctx, rt); } } else if (pendingBeat && !onRunway) pendingBeat = null;
@@ -1562,12 +1579,11 @@ export const DunkMode: ModeDefinition = (() => {
         if (!lob.live && !ball.parent && !ball.metadata?.felReleased) { attachBallToHand(ball, player.skeleton, ebState.inLeftHand ? 'LeftHand' : 'RightHand'); console.info('[HANDS] ball re-attached'); }
         // DUNK-POSTURE-LEGS: the PLANT — the root holds on the floor at the line for PLANT_SEC while the launch clip's loaded
         // crouch plays with the feet ON the floor, then the same arc to the same rim point at the same beat (arcK / carryU)
-        const k = arcK(clipTime, EASTBAY_TIMING.duration);
         // DUNK-CONTROL-JUICE: a real jump — the height is a parabola (off the floor faster than the old sine), the forward
         // carry is CONSTANT SPEED from the takeoff to the rim's front edge at the extension, whatever the takeoff distance
         // (a car is a 4.3 m jump, the plain runway 2.8 m). Before, an exponential pull (1.6/s) front-loaded the carry and
         // got 86% of the way from one fixed gather line — a car's near door was under the feet 0.2 s after takeoff.
-        player.root.position.y = 4 * k * (1 - k) * apexFor();
+        player.root.position.y = arcHeight(clipTime, EASTBAY_TIMING.extend) * apexFor();   // DUNK MOTION phase 9: the top AT the rim (DunkLegs.arcHeight)
         const u = carryU(clipTime, EASTBAY_TIMING.extend);
         // THE PLANT MOVES (2026-09-18): the root used to stand dead still at the line for PLANT_SEC (measured: 2.0 m/s → 0.0 → 1.9 m/s
         // on consecutive frames — the wall at the takeoff). The gather step keeps rolling through the plant (PLANT_DRIFT_M over the
@@ -1778,7 +1794,7 @@ export const DunkMode: ModeDefinition = (() => {
             }
             ball.computeWorldMatrix(true);
             const bp = ball.getAbsolutePosition();
-            if (ironContact({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec })) {
+            if (ironContact({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec, centred: true })) {
               // DUNK-BALL-ARMS-RIM: let go where the ball TOUCHED the iron on this frame's travel, not where the frame left it (in the metal)
               // …and out of the metal when it was already in it a frame ago (a low catch under the front rim: no clear frame to rewind to)
               const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
@@ -2028,6 +2044,7 @@ export const DunkMode: ModeDefinition = (() => {
       meter3d?.dispose(); meter3d = null;
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
+      if (ikScene && hingeObs) ikScene.onAfterAnimationsObservable.remove(hingeObs); hingeObs = null;
       handIkObs = null; ikScene = null; handIkT = 0;
       ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
@@ -2433,6 +2450,8 @@ export const DunkMode: ModeDefinition = (() => {
     _aim.x = rim.x; _aim.y = rim.y + ballSim.radius + 0.02; _aim.z = rim.z;
     if (!bw || RIM_AIM_OFF) return _aim;
     const dx = bw.x - rim.x, dz = bw.z - rim.z, r = Math.hypot(dx, dz);
+    // DUNK MOTION phase 9: over the MIDDLE of the ring the hand pushes the ball down THROUGH it (the flush), not onto it
+    if (r <= RIM_RADIUS - c + 0.02 && phase === 'resolve' && qteHit) { _aim.y = rim.y - 0.06; return _aim; }
     if (bw.y >= rim.y + 0.02 || r <= RIM_RADIUS - c || r >= RIM_RADIUS + c + 0.25) return _aim;   // over the ring's plane, inside it, or still well short: straight in
     const ux = r > 1e-3 ? dx / r : 0, uz = r > 1e-3 ? dz / r : 1, out = RIM_RADIUS + c + 0.01;
     _aim.x = rim.x + ux * out; _aim.y = rim.y + c * 0.8; _aim.z = rim.z + uz * out;
@@ -2452,6 +2471,7 @@ export const DunkMode: ModeDefinition = (() => {
     applySpinLayer();
     applyPostureLayer();   // DUNK-POSTURE: thoracic / clavicles / head, the rim-locked chest aim, the eyes — before the reach
     applyWrists();         // DUNK MOTION phase 3: before the reach, which aims the BALL through this frame's palm
+    applyPalm();           // DUNK MOTION phase 9: the palm over the ball through the jam, so the reach aims the ball the flush holds
 
     // (DUNK MOTION phase 8: the off hand's IK onto the ball through the gather is gone. It dates from the one-crouch gather that had no
     // hands of its own; push 1-2's clips author both hands now — on the ball off one foot, swinging off two — and the reach fought
@@ -2488,11 +2508,16 @@ export const DunkMode: ModeDefinition = (() => {
         _reachT.copyFrom(handIkTarget);
         if (ball.parent === arm.hand) { ball.computeWorldMatrix(true); _reachT.subtractInPlace(ball.getAbsolutePosition().subtract(hd)); }
         const want = hd.add(_reachT.subtract(hd).scale(ws));
+        // DUNK MOTION phase 9: the reach's elbow where an elbow can point (out and back was right for a low arm, backward for one
+        // going up to the iron — the elbow trailed behind the hand into the flush)
+        _reachFwd.set(0, 0, 1).applyRotationQuaternionInPlace(player.root.absoluteRotationQuaternion); _reachFwd.y = 0; _reachFwd.normalize();
+        handIkPole.copyFrom(anatomicalElbowPole(handIkPole, sh, want, Vector3.Up(), _reachFwd));
         const shaped = shapeReach(sh, el, hd, want, handIkPole, undefined, REACH_POLE_CAP * ws);
         reachArm(arm, shaped.target, shaped.pole, 1);
         limitElbowSwing(arm, motionDt(), ikFrame, REACH_SWING_RATE_DEG);   // DUNK MOTION: no one-frame upper-arm roll at full extension
       }
     } else { if (arms.Right) forgetElbowSwing(arms.Right); if (arms.Left) forgetElbowSwing(arms.Left); }
+    applyPalm(true);   // …and a small settle after the reach (its re-solve can hand back some of the forearm's turn)
     // the ball is placed AFTER the reach with this frame's hand matrices — the palm-to-palm blend never lags the arms
     if (activeHandOff && phase === 'cinematic' && !lob.live) runHandOffPath(ball, player.skeleton, activeHandOff.t, activeHandOff.spec, ebState);
     if (catchPending && ball.parent) {   // where the hand met the ball, in the frame of the hand that is about to be rendered — the ease starts from there, not one frame of hand motion away
@@ -2501,6 +2526,26 @@ export const DunkMode: ModeDefinition = (() => {
     if (catchBlend < 1 && ball.parent) { catchBlend = Math.min(1, catchBlend + (ikScene?.getEngine().getDeltaTime() ?? 16) / 80); const k = catchBlend * catchBlend * (3 - 2 * catchBlend); Vector3.LerpToRef(catchFrom, palmOffsetOf(ball, (ball.parent as TransformNode).name) as Vector3, k, ball.position); }
   }
   // ── DUNK MOTION phase 3 (2026-09-23): the limbs a beat behind their clips, and the wrists ─────────────────────────────
+  // DUNK MOTION phase 9 (owner: "common sense how you would complete the dunk"): THE HAND COMES OVER THE BALL. From the press to the
+  // iron and through it, the ball hand's forearm turns the palm over the ball (down, a touch toward the ring) — it was under the
+  // ball at every contact (the wrist 7–36 cm below the ball's centre) and the ball dropped through the ring past it
+  let palmK = 0; const _palmWant = new Vector3(); const palmTurn = { Left: 0, Right: 0 };
+  /** `settle`: the second pass after the reach — a small correction on top of the turn already made this frame, not a new turn. */
+  function applyPalm(settle = false): void {
+    const holder = ball.parent as TransformNode | null;
+    const side = holder && arms.Left && holder === arms.Left.hand ? 'Left' : holder && arms.Right && holder === arms.Right.hand ? 'Right' : null;
+    // from the slam window opening (the arm starts over the top on the way to the iron), not the press — the press is ~0.1 s before the iron
+    const on = !!side && !obstacleClipped && ((phase === 'cinematic' && qteWindowOpen) || (phase === 'resolve' && qteHit && (jamSec >= 0 || jamContact)));
+    palmK = clamp(palmK + (on ? motionDt() / PALM_OVER_IN_SEC : -motionDt() / PALM_OVER_OUT_SEC), 0, 1);
+    if (!side || palmK <= 0.001 || MOTION_OFF) { palmTurn.Left = 0; palmTurn.Right = 0; return; }
+    const arm = arms[side]!; ball.computeWorldMatrix(true);
+    const bp = ball.getAbsolutePosition();
+    _palmWant.set(rim.x - bp.x, 0, rim.z - bp.z); const l = _palmWant.length(); if (l > 1e-4) _palmWant.scaleInPlace(0.35 / l);
+    _palmWant.y = -1; _palmWant.normalize();
+    const k = palmK * palmK * (3 - 2 * palmK), step = (PALM_TURN_RATE_DEG * Math.PI / 180) * Math.max(1 / 120, motionDt());
+    if (settle) pronateToward(arm.elbow, arm.hand, palmOffsetOf(ball, arm.hand.name) as Vector3, _palmWant, k, 110, 0, step * 0.5);
+    else palmTurn[side] = pronateToward(arm.elbow, arm.hand, palmOffsetOf(ball, arm.hand.name) as Vector3, _palmWant, k, 110, palmTurn[side], step);
+  }
   /** Dev: `?nomotion=1` turns both off (the A/B). */
   const MOTION_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]nomotion=1/.test(location.search);
   /** This frame's step on the ANIMATION clock (the hang slow-mo slows the clips, so it slows their followers with them). */
@@ -2947,9 +2992,9 @@ export const DunkMode: ModeDefinition = (() => {
   function throwLob(ctx: ModeContext, from: Vector3, label: string, tf: number): void {
     const line = phase === 'cinematic' ? launchZ : gatherLine();
     const carry = carryU(LOB_CATCH_CLIP_T, EASTBAY_TIMING.extend);
-    const kk = arcK(LOB_CATCH_CLIP_T, EASTBAY_TIMING.duration);
+    const kh = arcHeight(LOB_CATCH_CLIP_T, EASTBAY_TIMING.extend);
     const off = CATCH_HAND_OFFSET[style];
-    const to = new Vector3(rim.x + off.x, 4 * kk * (1 - kk) * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
+    const to = new Vector3(rim.x + off.x, kh * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
     const v = lobVelocity(from, to, tf);
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(v.x, v.y, v.z));
@@ -2970,14 +3015,14 @@ export const DunkMode: ModeDefinition = (() => {
   function catchPointNow(catchT = LOB_CATCH_CLIP_T): Vector3 {
     const line = phase === 'cinematic' ? launchZ : gatherLine();
     const carry = carryU(catchT, EASTBAY_TIMING.extend);
-    const kk = arcK(catchT, EASTBAY_TIMING.duration);
+    const kh = arcHeight(catchT, EASTBAY_TIMING.extend);
     // DUNK MOTION phase 7: the POWER flight's hand is where ITS take-off clip puts it (off one foot or the two-foot capture)
     const foot = phase === 'cinematic' ? launchFoot : footNow();
     const off = style === 'power' && MOCAP_DUNK && foot === 'one' ? CATCH_ONE : CATCH_HAND_OFFSET[style];
     // DUNK MOTION phase 7: the flight's x is a straight line from where the J planted (launchX, or the J's own offset at the line
     // before the take-off) to the rim — no longer the rim's line from the first frame
     const x0 = phase === 'cinematic' ? launchX : rim.x + curveOffset(0);
-    return new Vector3(x0 + (rim.x - x0) * carry + off.x, 4 * kk * (1 - kk) * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
+    return new Vector3(x0 + (rim.x - x0) * carry + off.x, kh * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
   }
   /** The backboard's front face, read off the venue's board mesh (the Nexus hoop's `board`, VenueKit's `backboard`). */
   function findGlass(scene: Scene): void {

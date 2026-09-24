@@ -75,5 +75,7 @@ describe('WristLayer — the wrist flexes toward the palm, additively, without c
     expect(wristFor({ holds: true, onBall: false, aboveShoulder: -0.3, sinceContact: null, jamming: false })).toBeGreaterThan(-15);
     expect(wristFor({ holds: false, onBall: false, aboveShoulder: 0.4, sinceContact: 0.05, jamming: false })).toBe(WRIST.snap);
     expect(wristFor({ holds: false, onBall: false, aboveShoulder: 0, sinceContact: null, jamming: false })).toBe(WRIST.relaxed);
+    // DUNK MOTION phase 9: the jam rolls the wrist OVER the ball (flexed) before the iron — it was still cocked back at contact
+    expect(wristFor({ holds: true, onBall: false, aboveShoulder: 0.5, sinceContact: null, jamming: true })).toBeGreaterThan(0);
   });
 });

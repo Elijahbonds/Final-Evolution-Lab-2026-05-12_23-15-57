@@ -15,7 +15,7 @@ import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AnimationGroup, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { boneNode } from './boneLookup';
 import { buildQuatClip, eulerQ, type QuatKeys } from './restPose';
-import { armChain, reachArm } from './HandIK';
+import { armChain, reachArm, anatomicalElbowPole, elbowBackDir } from './HandIK';
 import { frameAbove } from './TwoBoneIK';
 import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
@@ -51,6 +51,8 @@ export interface PoseClipOpts {
   smooth?: boolean;
   /** [1 2 1] passes over the keys first (a capture's jitter). Default: from smoothByDefault. */
   prefilter?: number;
+  /** Hold every elbow pole to the arm's anatomy (HandIK.anatomicalElbowPole). Default: the dunk family. */
+  anatomicalPoles?: boolean;
 }
 /** The sample rate a smoothed clip is written at. */
 export const SMOOTH_FPS = 30;
@@ -152,6 +154,8 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   };
 
   const out: QuatKeys = {}; const hipsY: [number, number][] = [];
+  /** DUNK MOTION phase 9: the dunk family's elbows are held to the arm's anatomy (opt out with `anatomicalPoles: false`). */
+  const anatomical = opts.anatomicalPoles ?? (/^dunk_/.test(name) && !/^dunk_gather_/.test(name));   // (push 1-2's arms are low and authored true: the rule only re-rolled them — 84 forearm pops, p9f)
   const push = (bone: string, t: number, q: Quaternion) => { (out[bone] ??= []).push([t, q.clone()]); };
   for (const key of keys) {
     restore();
@@ -169,7 +173,15 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
         arm.shoulder.computeWorldMatrix(true);
         world = arm.shoulder.getAbsolutePosition().add(inBody([rel[0] * r, rel[1] * r, rel[2] * r]));
       } else world = forLimb(tgt as [number, number, number], arm.shoulder, ratios.arm[side]);
-      reachArm(arm, world, inBody(pole), 1);   // the pole is a body-frame direction too
+      // DUNK MOTION phase 9: the dunk family's elbows point where an elbow can (HandIK.anatomicalElbowPole): an authored pole in the
+      // forbidden half turned into the allowed one, a missing one the upper arm's natural back plus a flare out to its own side
+      let poleW = inBody(pole);
+      if (anatomical) {
+        arm.shoulder.computeWorldMatrix(true); const sh = arm.shoulder.getAbsolutePosition();
+        if (!key.poles?.[side]) { const nat = elbowBackDir(sh, world, bodyFrame.up, bodyFrame.front); if (nat.sagittal >= 0.35) poleW = nat.dir.add(bodyFrame.right.scale(side === 'Left' ? -0.6 : 0.6)).normalize(); }
+        poleW = anatomicalElbowPole(poleW, sh, world, bodyFrame.up, bodyFrame.front);
+      }
+      reachArm(arm, world, poleW, 1);   // the pole is a body-frame direction too
       refresh();
     }
     // 3) feet

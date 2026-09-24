@@ -71,17 +71,21 @@ and ch. 8 (in-air kinematics, the hang-time illusion, the off-arm / off-leg as i
 | 6 | Names I: one-hand family | real-speed windmill / tomahawk captures, Jordan's cradle, the cuff, the scorpion no-look | done, 002a6ff |
 | 7 | The approach and the take-off (asks 2 + 3) | the J approach with the lean into the bend, the open body in the rise; PUSH 1-2 as two real steps; the one-foot take-off (knee drive, arm strike, the lead leg's drop) vs the two-foot capture; carry and flush by foot | done, 60c8d25 |
 | 8 | Right-handed + the approach (asks 4a, 5, 6, 7) | the dunk family mirrored onto the rig's other side at spawn (groupMirror, bind-relative); push 1-2 at the runner's own speed (DunkGatherRun: the run kept into the penultimate, a staccato contact, the plant on the line) started ON the push foot (the check-mark strides); the dribble locked to the stride and only while moving; the pick-up eased; the two-foot arms back on the push and up on 2; the J only on triangle | done (this commit) |
-| 9 | Joints and the finish (asks 8, 9) | the joint audit (each elbow and knee against its hinge read off the captures: sideways bend, hyperextension, roll continuity); a hinged arm solve (the off arm's roll flips); the off arm's job in every dunk (down and out off one hand, on the ball off two); the finish by common sense: the hand on top, the reach along the jump line, the wrist through, the let-go, the landing | every joint inside its range on every sheet |
+| 9 | Joints and the finish (asks 8, 9, 10, 11) | the joint audit (hinges from the rig's rest pose, where each elbow points, the hand against the ball, the ball against the ring); the elbow's natural side; the off arm thrown down; the jump's top AT the rim; the palm over the ball; the hinged arm (no one-frame twists); the swing that carries on up; the clean flush | done (this commit) · analysis in the outbox: PHASE9-JOINTS-AND-FINISH.md |
 | 10 | The Dubble Up + names II / III (ask 4b, owner decisions round 2) | the helper from the prop ring (1–10 in a line) or a call; A on the run near the helper = the straddle-and-grab (the old hop gone); Chen's version off two from the elbow; the eastbay to the dominant hand; behind / around / spins | the Dubble Up eastbay beat by beat against Chen Dengxing's |
-| 11 | Right-handed everywhere; rim, hang, land | Dunk Duel, the rival, the 1v1 / 3v3 game dunks mirrored too (owner: "every dunk, every body"); the flush and hang, the drop and the land absorb | every dunk mode on the sheets |
-| 12 | The score loop | the full re-measure against the baseline, the summary, ONE deploy | every number against the baseline |
+| 11 | Right-handed everywhere; the rival as a player; rim, hang, land | Dunk Duel, the rival, the 1v1 / 3v3 game dunks mirrored too (owner: "every dunk, every body"); the rival's turn run through the same attempt pipeline, like another person playing (owner: "it needs to look like one of the users attempts"); the hang and the land | every dunk mode on the sheets |
+| 12 | Effects and celebrations | the triple camera cut on every make (skippable, ~2 s); the rim, the net and the glass react; the speed ramp, the impact frame, the sound gap; the crowd and the announcer; the poster freeze-frame; post-dunk celebration emotes from real dunkers (Brandon Ruffin and others) | owner decisions, 2026-09-23 |
+| 13 | The score loop | the full re-measure against the baseline, the summary, ONE deploy | every number against the baseline |
 
-The owner's asks grew the pass from ten phases to twelve (2026-09-23), with the same one deploy at the end:
+The owner's asks grew the pass from ten phases to thirteen (2026-09-23), with the same one deploy at the end:
 5. "make the off the dribble approach look fluid, look at examples of elite dunkers";
 6. "make the arms fluid with gait, back on push, up on 2 in push 1 2 … thats in a 2 foot jump";
 7. "curve the approach only when you decide to press … the top button. make the movement normal elsewhere" (decision: triangle commits);
 8. "fix the off arm on all the dunks";
-9. "fix the orientation of the joints and proper biomechanics and common sense how you would complete the dunk. analyze it".
+9. "fix the orientation of the joints and proper biomechanics and common sense how you would complete the dunk. analyze it";
+10. "fix the arm swing / upward momentum with ball swing" · "make the made dunks cleaner";
+11. "fix the rivals dunk, it needs to look like one of the users attempts or like another person was playing";
+12. effects (decided by multiple choice: the triple cut, contest-show style, all four effect families) and "cinematic emotes after the dunks … like brandon ruffin".
 
 Rules (from the hoops-depth pass):
 - Commit and push each green phase with the suite count.

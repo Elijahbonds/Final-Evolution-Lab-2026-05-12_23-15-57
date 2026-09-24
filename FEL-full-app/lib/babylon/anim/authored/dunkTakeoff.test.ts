@@ -37,7 +37,7 @@ describe('push 1-2 — two real steps into the take-off', () => {
   it('a clip built on a posed rig is the same clip (the build starts from bind)', () => {
     const crouched = fresh(() => buildGatherTwo(scene, sk)); at(crouched, GATHER_SEC);   // leave the rig 0.26 m low
     const g = fresh(() => buildTakeOffOne(scene, sk)); crouched.stop();
-    at(g, 0.1); expect(pos('RightHand').y).toBeGreaterThan(1.7);
+    at(g, 0.2); expect(pos('RightHand').y).toBeGreaterThan(1.7);
     g.stop();
   });
   it('off two: the second foot CLOSES beside the first under a deeper gather', () => {
@@ -82,7 +82,10 @@ describe('the one-foot take-off — knee drive, arm strike, the lead leg drops',
     at(g, 0.1);
     expect(pos('LeftFoot').y).toBeLessThan(pos('RightFoot').y - 0.3);               // the plant foot still down, the free foot up
     expect(pos('RightLeg').y).toBeGreaterThan(pos('Hips').y - 0.12);                // the knee driven to hip height
-    expect(Math.min(pos('RightHand').y, pos('LeftHand').y)).toBeGreaterThan(handsLow + 0.6);   // both arms struck up
+    const struck = Math.min(pos('RightHand').y, pos('LeftHand').y);
+    expect(struck).toBeGreaterThan(handsLow + 0.45);                                  // both arms struck up past the face on the beat…
+    at(g, 0.2);
+    expect(Math.min(pos('RightHand').y, pos('LeftHand').y)).toBeGreaterThan(struck + 0.25);   // …and still going: the swing carries on up with the body
     expect(Math.min(pos('RightHand').y, pos('LeftHand').y)).toBeGreaterThan(pos('Head').y);
     g.stop();
   });

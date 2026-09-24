@@ -62,6 +62,10 @@ export interface IronContactInput {
   /** seconds since the slam press */
   sincePress: number;
   timeout?: number;
+  /** DUNK MOTION phase 9 (owner: "make the made dunks cleaner"): the FLUSH — the ball is let go only once it is over the middle of the
+   *  ring and down at its plane (or on the iron). The loose rule let it go 0.2–0.27 m out and up to 0.2 m above the ring, and the
+   *  ball floated to the centre on its own while the hand hung behind it. */
+  centred?: boolean;
 }
 /** True on the frame the ball is AT the iron — inside the ring's radius (plus half a ball) in XZ and at the rim's height
  *  (no lower than 3 cm under the ring's centre line, no higher than a ball + 8 cm over it: a ball still UNDER the iron is
@@ -70,9 +74,9 @@ export function ironContact(i: IronContactInput): boolean {
   const timeout = i.timeout ?? IRON_CONTACT_TIMEOUT_SEC;
   if (i.sincePress >= timeout) return true;
   const dx = i.ball.x - i.rim.x, dz = i.ball.z - i.rim.z, radial = Math.hypot(dx, dz);
-  const inRing = radial <= i.rimRadius + i.ballRadius * 0.5;
+  const inRing = i.centred ? radial <= i.rimRadius - i.ballRadius + 0.03 : radial <= i.rimRadius + i.ballRadius * 0.5;
   const dy = i.ball.y - i.rim.y;
-  const atHeight = dy >= -0.03 && dy <= i.ballRadius + 0.08;
+  const atHeight = dy >= -0.03 && dy <= (i.centred ? i.ballRadius * 0.6 : i.ballRadius + 0.08);
   // DUNK-BALL-ARMS-RIM: the ball TOUCHING the iron is the contact too — a hand that brings it in from the front at the ring's
   // height used to be let go only once the ball's centre was 0.2–0.28 m out, 5–8 cm INSIDE the metal (measured on 8586f1e)
   const touching = Math.hypot(radial - i.rimRadius, dy) <= i.ballRadius + 0.02;

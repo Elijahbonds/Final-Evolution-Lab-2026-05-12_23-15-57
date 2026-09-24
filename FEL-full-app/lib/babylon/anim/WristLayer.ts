@@ -128,13 +128,52 @@ export interface WristRead {
   /** The slam has been pressed and the jam is carrying the ball to the iron. */
   jamming: boolean;
 }
-export const WRIST = { relaxed: 14, support: -10, cockMin: -12, cockMax: -42, snap: 58, after: 26 } as const;
+export const WRIST = { relaxed: 14, support: -10, cockMin: -12, cockMax: -42, jamOver: 22, snap: 58, after: 26 } as const;
 export function wristFor(r: WristRead): number {
   if (r.sinceContact != null) return r.sinceContact < 0.18 ? WRIST.snap : WRIST.after;
   if (r.holds || r.onBall) {
     const up = Math.max(0, Math.min(1, (r.aboveShoulder + 0.05) / 0.5));
     const cock = WRIST.cockMin + (WRIST.cockMax - WRIST.cockMin) * up;
-    return r.jamming && r.holds ? cock * 0.6 : r.holds ? cock : cock * 0.7;   // the jam starts rolling the wrist over the ball
+    // THE JAM ROLLS THE WRIST OVER THE BALL (DUNK MOTION phase 9, the finish by common sense): from the press to the iron the hand
+    // comes over the top, so it is ON the ball as the ball crosses the front of the ring and the snap drives it through. It eased to
+    // 60 % of the cock instead: at every contact the wrist was still bent back under the ball (the hand 7–36 cm below the ball's
+    // centre, measured) — a shot put, not a flush.
+    return r.jamming && r.holds ? WRIST.jamOver : r.holds ? cock : cock * 0.7;
   }
   return WRIST.relaxed;
+}
+
+// DUNK MOTION phase 9 (2026-09-23; owner: "common sense how you would complete the dunk"). THE HAND COMES OVER THE BALL. The flush
+// was thrown with the palm UNDER the ball: at every contact the wrist sat 7–36 cm below the ball's centre, and the ball went down
+// through the ring past a hand that never got on top of it. A flush turns the palm over the ball as the arm swings to the iron
+// (the forearm pronates), so the ball is pushed down through the rim from above. The palm's facing is the forearm's twist, which
+// the arm solver leaves wherever its arcs land — so this turns the forearm about its own axis (through the elbow and the wrist:
+// the hand does not move) until the hand→ball direction faces `want`, capped at a forearm's own range.
+/** Turn `forearm` about its own axis so the hand's `palmLocal` direction faces `want` (world), by `weight`. Returns the turn (rad).
+ *  `prev` (the turn applied last frame) keeps it on one branch — a needed turn near ±180° otherwise flips sign between frames (a
+ *  220° forearm whip at the slam's press, measured) — and `maxStepRad` caps how far it may move from `prev` in one call. */
+export function pronateToward(forearm: TransformNode, hand: TransformNode, palmLocal: Vector3, want: Vector3, weight: number, maxDeg = 110, prev = 0, maxStepRad = Infinity): number {
+  if (weight <= 1e-4) return 0;
+  forearm.computeWorldMatrix(true); hand.computeWorldMatrix(true);
+  const axis = hand.getAbsolutePosition().subtract(forearm.getAbsolutePosition());
+  if (axis.lengthSquared() < 1e-8) return 0;
+  axis.normalize();
+  const palmW = palmLocal.applyRotationQuaternion(hand.absoluteRotationQuaternion);
+  const flat = (v: Vector3) => { const p = v.subtract(axis.scale(Vector3.Dot(v, axis))); return p.lengthSquared() > 1e-8 ? p.normalize() : null; };
+  const a = flat(palmW), b = flat(want);
+  if (!a || !b) return 0;
+  let ang = Math.atan2(Vector3.Dot(Vector3.Cross(a, b), axis), Vector3.Dot(a, b));
+  while (ang - prev > Math.PI) ang -= 2 * Math.PI;
+  while (ang - prev < -Math.PI) ang += 2 * Math.PI;
+  const cap = (maxDeg * Math.PI) / 180;
+  ang = Math.max(-cap, Math.min(cap, ang)) * Math.min(1, weight);
+  ang = prev + Math.max(-maxStepRad, Math.min(maxStepRad, ang - prev));
+  const q = Quaternion.RotationAxis(axis, ang);
+  // the forearm's WORLD rotation turned about the axis, written back as a local through its parent
+  const parent = forearm.parent as TransformNode | null;
+  const worldNew = q.multiply(forearm.absoluteRotationQuaternion);
+  const pw = parent ? parent.absoluteRotationQuaternion : Quaternion.Identity();
+  (forearm.rotationQuaternion ??= Quaternion.Identity()).copyFrom(Quaternion.Inverse(pw).multiply(worldNew));
+  forearm.computeWorldMatrix(true); hand.computeWorldMatrix(true);
+  return ang;
 }
