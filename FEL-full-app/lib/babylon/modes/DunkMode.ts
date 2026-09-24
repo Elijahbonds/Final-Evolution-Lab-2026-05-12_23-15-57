@@ -46,7 +46,7 @@ import { LEGS, legPose, easeLegPose, cloneLegPose, arcK, carryU, arcApexT, slamB
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
 import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
-import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';
+import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from '../anim/HandIK';
 import { LimbDrag } from '../anim/LimbDrag';           // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
 import { WristLayer, wristFor, handFlexAxisFromPoints, handPointsFromMeshes, flexAxisLocal, PALM_LOCAL } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
@@ -179,7 +179,9 @@ const PROP_BONUS: Record<Prop, number> = { none: 0, alleyoop: 2, oopglass: 3.2, 
  *  hand is already down at the knee. The old single (−0.12, 1.9, −0.3) was tuned against a reach that pulled the hand 0.7 m
  *  forward at the beat — and flipped the arm doing it. */
 const CATCH_HAND_OFFSET: Record<Style, Vector3> = {
-  power: new Vector3(0.18, 1.49, 0.31), flashy: new Vector3(0.30, 1.35, 0.08), sig: new Vector3(0.01, 0.97, 0.04),
+  // DUNK MOTION phase 5: the POWER capture is the JUMP now (the plant → the ball up the front → overhead and cocked by the apex); at
+  // the catch beat its ball hand is over the head, a touch behind (the pose key at clip 0.62, as the old value was the old key's)
+  power: new Vector3(0.18, 1.97, -0.14), flashy: new Vector3(0.30, 1.35, 0.08), sig: new Vector3(0.01, 0.97, 0.04),
 };
 /** A queued takeoff leaves this many clip seconds before the runway beat's last key, inside the crossfade. */
 const BEAT_TAKEOFF_LEAD = 0.12;
@@ -622,6 +624,9 @@ export const DunkMode: ModeDefinition = (() => {
   let hipsNode: TransformNode | null = null, hipsBf: BindFrame | null = null;
   /** DUNK MOTION phase 3: the limb follower and the wrists (flight only: bodyW fades them in at the take-off, out on the floor). */
   let limbDrag: LimbDrag | null = null, wristLayer: WristLayer | null = null, bodyW = 0, lastBallHand: 'Left' | 'Right' = 'Right';
+  /** Drawn-frame counter for the reach's elbow-swing limit, and that limit (the dribble's 720°/s leaves the flush's own fast swing
+   *  alone and stops the solver's 100°+ one-frame roll). */
+  let ikFrame = 0; const REACH_SWING_RATE_DEG = 720;
   const hipsBindInv = Quaternion.Identity(), hipsRaw = Quaternion.Identity(), hipsOut = Quaternion.Identity(); let hipsLayered = false;
   let liveTricks: { clip: string; t0: number; speed: number }[] = [], liveSpin = { turns: 0, from: 0, until: 0 };   // this attempt's air tricks, for the replay
   // ── DUNK-POSTURE (2026-09-08): the Posture Poses layer — see core/DunkPosture.ts ──────────────────────────────────
@@ -635,6 +640,8 @@ export const DunkMode: ModeDefinition = (() => {
   const llPitch = { Left: 0, Right: 0 };   // the eased ankle correction per side (rad)
   let ppSign: 1 | -1 = 1;                     // world yaw per frame-space yaw (−1 under a mirrored import root)
   let ppPose: PosturePose = clonePose(POSTURE.stance), ppWindow: PostureWindow = 'stance', ppTrick: string | null = null;
+  /** DUNK MOTION phase 5: how open the chest is with the arms (0 at the shoulder, 1 a hand 0.55 m over it), and the most it opens. */
+  let ppOpen = 0; const REACH_OPEN_DEG = 14;
   // DYNAMIC POSTURE on the RUNWAY only. The flight windows are choreography — rise / hang / extend / jam / brace
   // are paced to the flight clock and DynamicPosture's allowlist refuses them — but the approach is locomotion:
   // it ramps up to speed and it strafes between the obstacles, so it should lean and bank like a body running.
@@ -2238,6 +2245,7 @@ export const DunkMode: ModeDefinition = (() => {
     const wMax = phase === 'resolve' && qteHit && (!contactLatch || hangOn) && !obstacleClipped && finishRelease < 0 ? jamWeight(jamSec, HAND_IK_MAX, HAND_IK_MAX_JAM) : HAND_IK_MAX;
     const w = wMax * handIkT * handIkT * (3 - 2 * handIkT);
     if (!player) return;
+    ikFrame++;
     applyLimbDrag();       // DUNK MOTION phase 3: first, on the clips' own values — every layer after it writes on top
     postureTick();         // DUNK-POSTURE: this frame's stance (eased between windows) — the spin layer reads its hip-yaw keep
     applySpinLayer();
@@ -2288,8 +2296,9 @@ export const DunkMode: ModeDefinition = (() => {
         const want = hd.add(_reachT.subtract(hd).scale(ws));
         const shaped = shapeReach(sh, el, hd, want, handIkPole, undefined, REACH_POLE_CAP * ws);
         reachArm(arm, shaped.target, shaped.pole, 1);
+        limitElbowSwing(arm, motionDt(), ikFrame, REACH_SWING_RATE_DEG);   // DUNK MOTION: no one-frame upper-arm roll at full extension
       }
-    }
+    } else { if (arms.Right) forgetElbowSwing(arms.Right); if (arms.Left) forgetElbowSwing(arms.Left); }
     // the ball is placed AFTER the reach with this frame's hand matrices — the palm-to-palm blend never lags the arms
     if (activeHandOff && phase === 'cinematic' && !lob.live) runHandOffPath(ball, player.skeleton, activeHandOff.t, activeHandOff.spec, ebState);
     if (catchPending && ball.parent) {   // where the hand met the ball, in the frame of the hand that is about to be rendered — the ease starts from there, not one frame of hand motion away
@@ -2470,6 +2479,25 @@ export const DunkMode: ModeDefinition = (() => {
       Quaternion.RotationAxisToRef(axis, P.lean * w * Math.PI / 180, _ppRho); rotateInFrame(sp.n, _ppRho); ppCommit(sp);
     } else if (ppNodes.spine) { const sp = ppNodes.spine; const base = ppBase(sp); sp.n.rotationQuaternion!.copyFrom(base); ppCommit(sp); }
     stance(ppNodes.spine1, P.spine1); stance(ppNodes.spine2, P.spine2);
+    // DUNK MOTION phase 5: THE CHEST FOLLOWS THE ARMS. The stance is one fixed thoracic shape per flight window, so the upper
+    // back held still while the arms went overhead and came down (Spine2 still for 33–55 % of the air once the take-off stopped
+    // shaking it). A body reaching overhead extends through the thoracic spine, and flexes as the arms come down through the
+    // flush: an extension added in proportion to how far the higher hand is over its shoulder, eased, in the air windows only.
+    if (ppNodes.spine1 && ppNodes.spine2) {
+      // (not while a lob is in the air: the catch point is measured on the clip's hand, and opening the chest carries the hands
+      // ~0.14 m back — every runway lob was LOST with it on)
+      const inAir = (ppWindow === 'rise' || ppWindow === 'hang' || ppWindow === 'extend' || ppWindow === 'jam') && !(lob.live && !lob.caught);
+      let up = 0;
+      if (inAir) for (const side of ['Left', 'Right'] as const) { const a = arms[side]; if (!a) continue; a.hand.computeWorldMatrix(true); a.shoulder.computeWorldMatrix(true); up = Math.max(up, clamp((a.hand.getAbsolutePosition().y - a.shoulder.getAbsolutePosition().y) / 0.55, -0.4, 1)); }
+      ppOpen += (up - ppOpen) * lowPassK(dt, 0.1);
+      if (Math.abs(ppOpen) > 0.01) {
+        for (const [pnode, k] of [[ppNodes.spine1, 0.4], [ppNodes.spine2, 0.6]] as [PpNode, number][]) {
+          chainRotation(pnode.n, ppFrame).multiplyToRef(Quaternion.Inverse(pnode.bindChain), _ppD);
+          const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+          Quaternion.RotationAxisToRef(axis, -REACH_OPEN_DEG * ppOpen * k * w * Math.PI / 180, _ppRho); rotateInFrame(pnode.n, _ppRho); ppCommit(pnode);
+        }
+      }
+    }
     for (const side of ['Left', 'Right'] as const) stance(ppNodes[side], [0, CLAVICLE_SIGN[side].forward * P.forward, CLAVICLE_SIGN[side].shrug * P.shrug]);
     stance(ppNodes.neck, P.neck); stance(ppNodes.head, P.head);
     // 1b) THE BODY AROUND THE 360 (DunkSpinBody): the off arm tucks to drive the turn and opens at the catch to stop it,

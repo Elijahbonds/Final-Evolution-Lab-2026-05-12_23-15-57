@@ -12,11 +12,22 @@ type V3 = [number, number, number];
 const UP = { Left: [-0.9, 0.1, -0.3] as V3, Right: [0.9, 0.1, -0.3] as V3 };
 const legs = (thigh: number, knee: number, flare = 4): Record<string, Deg3> => ({ LeftUpLeg: [thigh, 0, flare], RightUpLeg: [thigh, 0, -flare], LeftLeg: [knee, 0, 0], RightLeg: [knee, 0, 0] });
 
+/**
+ * THE GATHER: the penultimate step's two-hand RIP (DUNK MOTION, 2026-09-23 — owner: "fix the arms when running too").
+ *
+ * It was two keys: arms hanging, then both hands swung back and APART behind the hips (±0.28 m, elbows near straight) — an
+ * empty-handed sprinter's arm swing, with the ball actually low in one hand by the right knee and the other arm reaching across
+ * the body for it (the carry's gather IK). A dunker gathering a power dunk takes the ball in BOTH hands out of the last bounce
+ * and rips it to the hip on the long, low penultimate step (the elbows bent, the trunk folding over it), which is the loaded
+ * shape the jump's own first frame starts from: the owner's capture plants with the ball back at the right hip.
+ */
 export function buildChargeGather(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = D.chargeSec;
+  const RIP_POLE = { Left: [-0.3, -0.5, -0.8] as V3, Right: [0.5, -0.4, -0.8] as V3 };
   return buildPoseClip(scene, sk, 'dunk_charge_gather', T, [
-    { t: 0, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  ...legs(-12, 16) }, hands: { Left: [-0.24, 0.90, 0.18], Right: [0.24, 0.90, 0.18] }, hipsY: 0 },
-    { t: T, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0], ...legs(-55, 80, 8) }, hands: { Left: [-0.28, 0.85, -0.30], Right: [0.28, 0.85, -0.30] }, poles: { Left: [-0.6, 0.4, -0.6], Right: [0.6, 0.4, -0.6] }, hipsY: -0.22 },   // arms swung back, loaded
+    { t: 0,        bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  ...legs(-14, 18) },    hands: { Right: [0.22, 1.02, 0.28], Left: [-0.02, 1.04, 0.30] }, poles: RIP_POLE, hipsY: 0 },       // both hands onto the ball out of the last bounce
+    { t: T * 0.55, bones: { Hips: [4, 0, 0], Spine: [20, 0, 0], ...legs(-36, 52, 6) }, hands: { Right: [0.26, 0.98, 0.10], Left: [0.04, 1.00, 0.14] }, poles: RIP_POLE, hipsY: -0.12 },   // the long, low penultimate step
+    { t: T,        bones: { Hips: [6, 0, 0], Spine: [28, 0, 0], ...legs(-55, 80, 8) }, hands: { Right: [0.26, 1.02, -0.10], Left: [0.06, 1.02, -0.02] }, poles: RIP_POLE, hipsY: -0.22 },   // ripped to the right hip, loaded — the jump's first frame
   ]);
 }
 

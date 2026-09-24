@@ -9,11 +9,12 @@
 // is overwritten a moment later. update() only records the frame; the ball
 // placement and the arm reach happen in onAfterAnimationsObservable, on top
 // of the final pose (same slot foot planting uses).
-import { Matrix, Quaternion, Space, Vector3 } from '@babylonjs/core';
+import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand } from './ballRig';
 import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, advancePhase, dribbleAt, fitDribbleToReach, type DribbleParams } from './Dribble';
-import { armChain, reachArm, shapeReach, type ArmChain } from './HandIK';
+import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from './HandIK';
+import { findBone } from './boneLookup';
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -46,6 +47,13 @@ const RELEASE_FADE_SEC = 0.14;
 const REACH_POLE_CAP = Math.PI / 2;
 /** The fastest the carrying arm's elbow may swing round the shoulder→hand line between two drawn frames (deg per second). */
 export const ELBOW_SWING_RATE_DEG = 720;
+/** DUNK MOTION (2026-09-23): elbow pole DIRECTIONS in the root frame (x toward the arm's own side, then up, then forward). */
+export const BALL_ELBOW_POLE: readonly [number, number, number] = [0.45, -0.3, -0.85];
+export const OFF_ELBOW_POLE: readonly [number, number, number] = [0.3, -0.35, -0.9];
+/** How far ahead of the body the ball is pushed at a full sprint (m). */
+export const PUSH_AHEAD_M = 0.16;
+/** The off hand's forward / back swing about its mid-point at a full stride (m). */
+export const OFF_SWING_M = 0.16;
 
 /**
  * CLOTHING-SOFT-RESIDUAL C4 (2026-09-15): THE DRIBBLE WHIPPED THE ARM AT EVERY CATCH. As the ball comes back up, the hand target
@@ -60,39 +68,14 @@ export const ELBOW_SWING_RATE_DEG = 720;
  * parent frame, so the body's own turn is not a swing). A rotation about that line leaves the hand exactly where the solve put it.
  * The weight also lives in the target now (the dunk reach's DUNK-SOFTS-NAMED shape), not in a partial-weight slerp.
  */
-type ArmMemo = { side: Vector3; stamp: number };
-const armMemo = new WeakMap<TransformNode, ArmMemo>();
 function reachShaped(arm: ArmChain, target: Vector3, pole: Vector3, weight: number, dt: number, stamp: number): void {
-  if (!(weight > 1e-3)) { armMemo.delete(arm.shoulder); return; }
+  if (!(weight > 1e-3)) { forgetElbowSwing(arm); return; }
   arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
   const sh = arm.shoulder.getAbsolutePosition(), el = arm.elbow.getAbsolutePosition(), hd = arm.hand.getAbsolutePosition();
   const want = hd.add(target.subtract(hd).scale(Math.min(1, weight)));
   const shaped = shapeReach(sh, el, hd, want, pole, undefined, REACH_POLE_CAP * Math.min(1, weight));
   reachArm(arm, shaped.target, shaped.pole, 1);
-  arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
-  const parent = arm.shoulder.parent as TransformNode | null;
-  const toParent = parent ? parent.getWorldMatrix().clone().invert() : null;
-  const inP = (v: Vector3) => (toParent ? Vector3.TransformCoordinates(v, toParent) : v.clone());
-  const S = inP(arm.shoulder.getAbsolutePosition()), E = inP(arm.elbow.getAbsolutePosition()), H = inP(arm.hand.getAbsolutePosition());
-  const axis = H.subtract(S), al = axis.length();
-  if (al < 1e-5) { armMemo.delete(arm.shoulder); return; }
-  axis.scaleInPlace(1 / al);
-  const perp = (v: Vector3) => { const p = v.subtract(axis.scale(Vector3.Dot(v, axis))); return p.lengthSquared() > 1e-10 ? p.normalize() : null; };
-  let side = perp(E.subtract(S));
-  if (!side) { armMemo.delete(arm.shoulder); return; }
-  const memo = armMemo.get(arm.shoulder), prev = memo && memo.stamp === stamp - 1 && dt > 0 ? perp(memo.side) : null;
-  if (prev) {
-    const ang = Math.atan2(Vector3.Dot(Vector3.Cross(prev, side), axis), Vector3.Dot(prev, side));
-    const maxRad = ELBOW_SWING_RATE_DEG * Math.PI / 180 * dt;
-    if (Math.abs(ang) > maxRad) {
-      const back = -(ang - Math.sign(ang) * maxRad);
-      const worldAxis = parent ? Vector3.TransformNormal(axis, parent.getWorldMatrix()).normalize() : axis;
-      arm.shoulder.rotate(worldAxis, back, Space.WORLD);   // about the line through the shoulder and the hand: the hand stays put
-      arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
-      side = Vector3.TransformNormal(side, Matrix.RotationAxis(axis, back));
-    }
-  }
-  armMemo.set(arm.shoulder, { side, stamp });
+  limitElbowSwing(arm, dt, stamp, ELBOW_SWING_RATE_DEG);   // (the swing limit lives in HandIK now: the dunk's reach to the rim flips the same way)
 }
 
 /**
@@ -132,6 +115,25 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   let releaseLeft = 0, releaseDt = 1 / 60;   // the let-go fade (see apply)
   let offArm: ArmChain | null = armChain(opts.skeleton, side === 'Right' ? 'Left' : 'Right');
   const offT = new Vector3(), offPole = new Vector3();
+  // the thighs and knees, for the off arm's opposition swing (DUNK MOTION)
+  const legNodes = (['Left', 'Right'] as const).map((sd) => ({ hip: findBone(opts.skeleton, `${sd}UpLeg`)?.getTransformNode() ?? null, knee: findBone(opts.skeleton, `${sd}Leg`)?.getTransformNode() ?? null }));
+  const _inv = new Quaternion(), _d = new Vector3();
+  /** How far the knee on the root-local side `sideSign` is ahead of its hip joint (m, + = forward). 0 if the rig has no legs. */
+  const kneeForward = (sideSign: number): number => {
+    opts.root.computeWorldMatrix(true);
+    Quaternion.InverseToRef(opts.root.absoluteRotationQuaternion ?? Quaternion.Identity(), _inv);
+    const rp = opts.root.getAbsolutePosition();
+    for (const L of legNodes) {
+      if (!L.hip || !L.knee) continue;
+      L.hip.computeWorldMatrix(true); L.knee.computeWorldMatrix(true);
+      L.hip.getAbsolutePosition().subtractToRef(rp, _d); _d.applyRotationQuaternionInPlace(_inv);
+      if (Math.sign(_d.x) !== Math.sign(sideSign)) continue;
+      const hz = _d.z;
+      L.knee.getAbsolutePosition().subtractToRef(rp, _d); _d.applyRotationQuaternionInPlace(_inv);
+      return _d.z - hz;
+    }
+    return 0;
+  };
   const local = new Vector3(), world = new Vector3(), handT = new Vector3(), pole = new Vector3();
 
   /**
@@ -170,12 +172,18 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     pending = false;
     const s = dribbleAt(phase, p);
     const sx = armSign(arm, side === 'Right' ? 1 : -1);
-    toWorld(s.ball.x * sx, s.ball.y, s.ball.z, world);
+    // DUNK MOTION (2026-09-23): at pace the ball is PUSHED out ahead of the body (a sprint dribble), not bounced beside the hip
+    const push = PUSH_AHEAD_M * Math.min(1, Math.max(0, lastSpeed01));
+    toWorld(s.ball.x * sx, s.ball.y, s.ball.z + push, world);
     opts.ball.position.copyFrom(world);
     if (arm && armW > 0) {
-      toWorld(s.hand.x * sx, s.hand.y, s.hand.z, handT);
-      // elbow out to the side and back, never into the ribs
-      toWorld(sx * 0.7, s.hand.y - 0.2, -0.5, pole).subtractInPlace(opts.root.getAbsolutePosition());
+      toWorld(s.hand.x * sx, s.hand.y, s.hand.z + push, handT);
+      // THE ELBOWS POINT BACK (DUNK MOTION, 2026-09-23 — owner: "fix the arms when running too"). The poles here were POINTS
+      // turned into directions with a HEIGHT left in them — toWorld(x, hand.y − 0.2 ≈ 0.8 m, z) − root — so the ball arm's elbow
+      // was aimed mostly UP (and the off arm's, below, with its 0.85). Measured on the dunk runway (motion probe, 60 fps): both
+      // elbows rode at shoulder height, 0.20–0.25 m out to the side and folded to 30–60° on every running frame — two chicken
+      // wings. A ball handler's elbow points back and a little out, and a touch down.
+      toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const k = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       // ANIM CLEAN-UP (2026-09-18): at pace the ball arm STAYS on the ball's line. The hand weight eased to 0.6 while the ball
       // was down, which at a walk reads as the hand waiting for it — at a sprint the dribbling run clip's own arm swings
@@ -187,11 +195,16 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       // high — a runner's arm, not a ball handler's. At pace the off hand is held LOW beside the hip and a little forward,
       // pumping a hand's width with the bounce (the dribble's phase is the stride's), the elbow back. Faded in from a
       // walk so the idle / walk clips keep their own arms.
+      // DUNK MOTION (2026-09-23): and it swings in OPPOSITION to its own side's leg — forward and up as that knee goes back,
+      // back and down beside the hip as it comes through, the way a runner's arm does — read off the leg itself, not the dribble's
+      // phase (a bounce a STEP swung the arm at twice a stride's rate). The elbow points back, like the ball arm's.
       if (offArm && lastSpeed01 > 0.35) {
         const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
-        const pump = Math.sin(phase * Math.PI * 2) * 0.09;
-        toWorld(-sx * 0.30, Math.max(0.86, offFloorY) + pump * 0.5, 0.18 + pump, offT);
-        toWorld(-sx * 0.55, 0.85, -0.45, offPole).subtractInPlace(opts.root.getAbsolutePosition());
+        const knee = kneeForward(-sx);   // + = the off side's knee ahead of its hip
+        const swing = Math.max(-1, Math.min(1, -knee / 0.35));   // + = the arm forward
+        const baseY = Math.max(0.9, offFloorY) + 0.04;
+        toWorld(-sx * 0.28, baseY + 0.16 * Math.max(0, swing) - 0.03 * Math.max(0, -swing), 0.10 + OFF_SWING_M * swing, offT);
+        toWorld(-sx * OFF_ELBOW_POLE[0], OFF_ELBOW_POLE[1], OFF_ELBOW_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
         reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
       }
     }

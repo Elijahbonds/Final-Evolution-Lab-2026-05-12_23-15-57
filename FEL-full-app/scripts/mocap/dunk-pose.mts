@@ -12,8 +12,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const flag = (n: string, d: string) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = flag('out', 'lib/babylon/anim/authored/mocapDunk.ts');
-const FROM = Number(flag('from', '14')), TO = Number(flag('to', '66')), STEP = Number(flag('step', '2'));
-const DUR = Number(flag('dur', '1.3'));
+// DUNK MOTION phase 5 (2026-09-23): THE JUMP, NOT THE APPROACH. The window used to be frames 14..66 squeezed into 1.3 s — 3.5 s of
+// capture at 2.67× — and frames 14..48 are the owner's APPROACH (the hips' "climb" from 0.8 to 2.2 m there is DeepMotion's root
+// drift, not a rise). So the flight's first 0.9 s played his run-up, sped up, while the game's body was already in the air: the
+// ball carried low at the hip into the rise, the "unnatural" part of every plain dunk. The jump is frames 49..59: the plant (the
+// hips' last dip, f50), both hands whipping the ball from the waist to the face in 0.13 s, overhead and cocked by the apex (f58).
+// It plays at 1.23× its real length (0.667 s → 0.82 s): a touch of hang time, not a fast-forward. The flush is the game's own
+// (dunk_flush_two from the SLAM), so the window ends at the apex, before the capture's own throw-down.
+const FROM = Number(flag('from', '49')), TO = Number(flag('to', '59')), STEP = Number(flag('step', '1'));
+const DUR = Number(flag('dur', '0.82'));
 
 interface Cap { joints: string[]; fps: number; frames: number[][][] }
 const cap: Cap = JSON.parse(readFileSync('public/mocap/dunk.json', 'utf8'));
@@ -78,10 +85,12 @@ for (let f = FROM; f <= TO; f += STEP) {
 // the game the ball rode that hand: six frames of a 0.3–0.47 m/frame palm on every power make. The dunker in this mode is
 // holding the ball, so the hand CARRIES it up in front of the chest between the capture's own last in-front key and its
 // first over-the-head key; everything else (the off hand, the torso, the legs) stays the capture's.
-const CARRY = { from: Number(flag('carry-from', '0.65')), to: Number(flag('carry-to', '0.95')) };
+// (phase 5: the jump window has no wind-up to replace — the ball goes up the front in both hands on its own — so these spans only
+// run when asked for, e.g. --carry-from 0.65 --carry-to 0.95 on the old approach window)
+const CARRY = { from: Number(flag('carry-from', '99')), to: Number(flag('carry-to', '99')) };
 // The OFF hand's rise into the reach: the capture's 0.9 → 0.95 key climbs 0.62 m (12.8 m/s on the hero); live it was a 0.34 m
 // one-frame pop of the left palm at clip 0.94 on a self-lob make. It rises over 0.85 → 1.0 with the body instead.
-const RISE = { from: Number(flag('rise-from', '0.85')), to: Number(flag('rise-to', '1.0')) };
+const RISE = { from: Number(flag('rise-from', '99')), to: Number(flag('rise-to', '99')) };
 /** A hand straight from the capture's key at `from` to its key at `to` (the keys between are the capture's whip). */
 function span(hand: 'lh' | 'rh', from: number, to: number): void {
   const kFrom = raw.find((k) => k.t >= from - 1e-6), kTo = raw.find((k) => k.t >= to - 1e-6);
@@ -94,6 +103,14 @@ function span(hand: 'lh' | 'rh', from: number, to: number): void {
 }
 span('rh', CARRY.from, CARRY.to);
 span('lh', RISE.from, RISE.to);
+// DUNK MOTION phase 5: the ball hand swings up from BESIDE the hip, not through it. At the plant the capture has it back by the
+// hip (the rip before the arm swing) at x 0.14 — inside the pelvis's width — so the swing forward took the ball through the hip
+// for two frames (mocapDunkCarry.test.ts). A ball hand low and not yet in front keeps a hip's width out to the side.
+const BALL_CLEAR_X = Number(flag('ball-clear', '0.24'));
+for (const k of raw) {
+  const y = REF_HIPS + k.hY + k.rh[1] * SCALE, z = k.rh[2] * SCALE;
+  if (y < 1.45 && z < 0.12 && k.rh[0] * SCALE < BALL_CLEAR_X) k.rh = [BALL_CLEAR_X / SCALE, k.rh[1], k.rh[2]];
+}
 const keys = raw.map(({ t, hipYaw, pitch, spineYaw, lh, rh, lf, rf, hY }) => {
   const P = (v: V): string => `[${R(v[0] * SCALE)}, ${R(REF_HIPS + hY + v[1] * SCALE)}, ${R(v[2] * SCALE)}]`;
   // THE CROUCH IS CARRIED ONCE, NOT TWICE (dunk pass, 2026-09-16). poseClip solves the foot
@@ -110,9 +127,9 @@ const keys = raw.map(({ t, hipYaw, pitch, spineYaw, lh, rh, lf, rf, hY }) => {
 
 const src = `// mocapDunk — the owner's REAL dunk capture (public/mocap/dunk.json, DeepMotion,
 // 92 frames @ 15 fps, 16 world joints in cm), as POSE KEYS: wrists and ankles as
-// hips-relative targets and the torso's lean, frames ${FROM}..${TO} mapped to ${DUR} s. The ball (right) hand
-// carries the ball up in front of the chest from ${CARRY.from} to ${CARRY.to} s instead of the capture's wind-up behind the hip,
-// and the off hand rises from ${RISE.from} to ${RISE.to} s instead of in one 50 ms step.
+// hips-relative targets and the torso's lean, frames ${FROM}..${TO} mapped to ${DUR} s: THE JUMP — the plant, both hands taking
+// the ball up the front to over the head, cocked at the apex (DUNK MOTION phase 5; the old window was the run-up at 2.67×).${CARRY.from < 90 ? `
+// The ball hand's carry is replaced ${CARRY.from}–${CARRY.to} s.` : ''}${RISE.from < 90 ? ` The off hand's rise is replaced ${RISE.from}–${RISE.to} s.` : ''}
 // GENERATED by scripts/mocap/dunk-pose.mts — edit the script, not this file.
 //
 // The two-bone solver fits the targets to whichever body plays (ship pass 3,

@@ -31,35 +31,44 @@ const TUCK: Record<string, Deg3> = { LeftUpLeg: [-58, 0, 8], LeftLeg: [84, 0, 0]
 const OPENING: Record<string, Deg3> = { LeftUpLeg: [-36, 0, 6], LeftLeg: [52, 0, 0], RightUpLeg: [-20, 0, -6], RightLeg: [48, 0, 0] };
 /** The flush body: long under the arm, one knee still a touch ahead of the other. */
 const LONG: Record<string, Deg3> = { LeftUpLeg: [-14, 0, 5], LeftLeg: [18, 0, 0], RightUpLeg: [-4, 0, -5], RightLeg: [26, 0, 0] };
+/** The bow of a wind-up: the knees bent BEHIND the body, the hips a touch forward of the shoulders (DUNK MOTION phase 5). */
+const BOW: Record<string, Deg3> = { LeftUpLeg: [-8, 0, 6], LeftLeg: [58, 0, 0], RightUpLeg: [-2, 0, -6], RightLeg: [64, 0, 0] };
 /** After the flush: the legs come forward under a body dropping off the rim. */
 const DROP: Record<string, Deg3> = { LeftUpLeg: [-24, 0, 6], LeftLeg: [30, 0, 0], RightUpLeg: [-16, 0, -6], RightLeg: [34, 0, 0] };
 
 export const CARRY_UP_SEC = 0.8;
 export const FLUSH_SEC = 0.5;
 
-/** One hand (right): the ball carried up the front and cocked over the head, the guide hand coming off. */
+/**
+ * One hand (right): THE WIND-UP. DUNK MOTION phase 5: the carry-up began at the chest, so a flight arriving with the ball already
+ * overhead (the owner's jump holds it there from 0.35 s) dropped it to the chest and took it back up — a pump nobody threw — and
+ * then held it still until the SLAM. It starts overhead now and spends the wait easing the ball back into a cock over the head while
+ * the knees bend behind the body, so the flush is thrown OUT of a loaded shape. A deep cock behind the head fought the reach (on the
+ * arm from the carry-up) and crossed the arms (measured, 2026-09-23), so it is a modest one. A trick that ends low blends up into
+ * the first key through the flow's fade.
+ */
 export const CARRY_UP_ONE: PoseKey[] = [
-  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...OPENING }, hands: { Right: [0.20, 1.72, 0.30], Left: [-0.22, 1.62, 0.30] }, poles: { Right: [0.8, -0.3, 0.1], Left: [-0.8, -0.3, 0.1] } },
-  { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], ...TUCK }, hands: { Right: [0.20, 2.00, 0.10], Left: [-0.30, 1.66, 0.22] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },
-  { t: CARRY_UP_SEC, bones: { Hips: [-2, 0, 0], Spine: [-12, 0, 0], ...OPENING }, hands: { Right: [0.18, 2.04, 0.00], Left: [-0.40, 1.56, 0.18] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...OPENING }, hands: { Right: [0.18, 1.98, 0.12], Left: [-0.12, 1.84, 0.22] }, poles: { Right: UP_R, Left: [-0.8, -0.4, 0.1] } },
+  { t: 0.4,  bones: { Hips: [2, 0, 0], Spine: [-12, 0, 0], ...TUCK }, hands: { Right: [0.19, 2.00, 0.02], Left: [-0.32, 1.64, 0.26] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.1] } },
+  { t: CARRY_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...BOW }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] }, hold: true },
 ];
-/** Both hands: the ball carried up in both and taken over and a little behind the head. */
+/** Both hands: overhead, then the two-hand wind-up behind the head (the back-scratcher's cock) with the body bowing under it. */
 export const CARRY_UP_TWO: PoseKey[] = [
-  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], ...OPENING }, hands: { Right: [0.18, 1.70, 0.30], Left: [-0.18, 1.70, 0.30] }, poles: { Right: [0.8, -0.3, 0.1], Left: [-0.8, -0.3, 0.1] } },
-  { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], ...TUCK }, hands: { Right: [0.16, 2.02, 0.06], Left: [-0.16, 2.02, 0.06] }, poles: { Right: UP_R, Left: UP_L } },
-  { t: CARRY_UP_SEC, bones: { Hips: [-2, 0, 0], Spine: [-14, 0, 0], ...OPENING }, hands: { Right: [0.16, 2.04, -0.06], Left: [-0.16, 2.04, -0.06] }, poles: { Right: UP_R, Left: UP_L }, hold: true },
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...OPENING }, hands: { Right: [0.14, 1.98, 0.10], Left: [-0.14, 1.98, 0.10] }, poles: { Right: UP_R, Left: UP_L } },
+  { t: 0.4,  bones: { Hips: [2, 0, 0], Spine: [-12, 0, 0], ...TUCK }, hands: { Right: [0.15, 2.00, 0.00], Left: [-0.15, 2.00, 0.00] }, poles: { Right: UP_R, Left: UP_L } },
+  { t: CARRY_UP_SEC, bones: { Hips: [2, 0, 0], Spine: [-15, 0, 0], ...BOW }, hands: { Right: [0.15, 1.98, -0.10], Left: [-0.15, 1.98, -0.10] }, poles: { Right: UP_R, Left: UP_L }, hold: true },
 ];
 
 /** THE FLUSH, one hand (right): cocked over the head → over the ring → through it, the wrist snapping. */
 export const FLUSH_ONE: PoseKey[] = [
-  { t: 0,    bones: { Hips: [-2, 0, 0], Spine: [-12, 0, 0], ...OPENING }, hands: { Right: [0.18, 2.04, 0.00], Left: [-0.40, 1.56, 0.18] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },
+  { t: 0,    bones: { Hips: [2, 0, 0], Spine: [-14, 0, 0], ...BOW }, hands: { Right: [0.19, 1.98, -0.08], Left: [-0.42, 1.52, 0.20] }, poles: { Right: UP_R, Left: [-0.8, -0.5, 0.0] } },   // the cock the carry ends in
   { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], ...LONG }, hands: { Right: [0.16, 2.06, 0.36], Left: [-0.44, 1.38, 0.12] }, poles: { Right: UP_R, Left: [-0.8, -0.6, 0.0] } },
   { t: 0.24, bones: { Hips: [4, 0, 0], Spine: [14, 0, 0], ...LONG }, hands: { Right: [0.14, 1.80, 0.46], Left: [-0.44, 1.16, 0.06] }, poles: { Right: [0.9, 0.0, -0.3], Left: [-0.8, -0.6, 0.1] } },
   { t: FLUSH_SEC, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], ...DROP }, hands: { Right: [0.22, 1.52, 0.34], Left: [-0.40, 1.06, 0.12] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.8, -0.6, 0.1] }, hold: true },
 ];
 /** THE FLUSH, two hands: over and behind the head → over the ring → both through it. */
 export const FLUSH_TWO: PoseKey[] = [
-  { t: 0,    bones: { Hips: [-2, 0, 0], Spine: [-14, 0, 0], ...OPENING }, hands: { Right: [0.16, 2.04, -0.06], Left: [-0.16, 2.04, -0.06] }, poles: { Right: UP_R, Left: UP_L } },
+  { t: 0,    bones: { Hips: [2, 0, 0], Spine: [-15, 0, 0], ...BOW }, hands: { Right: [0.15, 1.98, -0.10], Left: [-0.15, 1.98, -0.10] }, poles: { Right: UP_R, Left: UP_L } },   // the two-hand cock
   { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0], ...LONG }, hands: { Right: [0.15, 2.06, 0.34], Left: [-0.15, 2.06, 0.34] }, poles: { Right: UP_R, Left: UP_L } },
   { t: 0.24, bones: { Hips: [4, 0, 0], Spine: [16, 0, 0], ...LONG }, hands: { Right: [0.15, 1.80, 0.44], Left: [-0.15, 1.80, 0.44] }, poles: { Right: [0.9, 0.0, -0.3], Left: [-0.9, 0.0, -0.3] } },
   { t: FLUSH_SEC, bones: { Hips: [2, 0, 0], Spine: [8, 0, 0], ...DROP }, hands: { Right: [0.24, 1.50, 0.32], Left: [-0.24, 1.50, 0.32] }, poles: { Right: [0.9, -0.2, -0.3], Left: [-0.9, -0.2, -0.3] }, hold: true },

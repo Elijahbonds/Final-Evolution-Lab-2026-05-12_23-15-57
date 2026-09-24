@@ -152,7 +152,10 @@ async function attempt(p: Page, trick: string): Promise<Rec | null> {
   await padSet(p, 'p.axes[1] = -1; p.buttons[7].pressed = true; p.buttons[7].value = 1');
   const hold0 = Date.now(); let threw = !trick.startsWith('rw:'); let launch: number | null = null;
   while (Date.now() - hold0 < 3600) {
-    if (!threw && Date.now() - hold0 >= 700) {
+    // the double-up is only a double-up inside its window (DOUBLE_UP_WINDOW_M): press it on the game's own prompt, not on a
+    // clock — at 700 ms a slower run-up was 3.39 m out, the A took off from there, and the slam after it was the ignored second press
+    const dblReady = trick === 'rw:doubleup' ? /DOUBLE-UP/.test(String((await p.evaluate('window.__hud().hint || ""')) ?? '')) : true;
+    if (!threw && Date.now() - hold0 >= 700 && dblReady) {
       threw = true; const [b, d] = RUNWAY[trick.slice(3)];
       if (d) { await dpad(p, d, true); await p.waitForTimeout(60); }
       await tapBtn(p, b, 60);
@@ -226,6 +229,8 @@ export interface Metrics {
   pops: { bone: string; atMs: number; degPerSec: number; clip: string }[];
   /** Frames on which an arm / leg bone turned faster than 1500°/s in the air (an authored swing too fast for a body). */
   whips: number;
+  /** The run-up (last 1.5 s): frames, chicken-wing frames (an elbow at shoulder height and > 0.15 m out), mean elbow angle. */
+  runFrames: number; runWing: number; runElbowMean: number | null;
   heldFrac: Record<string, number>;
   lockedElbow: number; lockedKnee: number;
   ballGapP90: number | null; ballGapMax: number | null; ballFar: number;
@@ -284,6 +289,20 @@ export function measure(rec: Rec): Metrics {
     if (e('RightArm', 'RightForeArm', 'RightHand') > 172 || e('LeftArm', 'LeftForeArm', 'LeftHand') > 172) lockedElbow++;
     if (e('RightUpLeg', 'RightLeg', 'RightFoot') > 176 || e('LeftUpLeg', 'LeftLeg', 'LeftFoot') > 176) lockedKnee++;
   }
+  // THE RUN-UP ARMS (owner, 2026-09-23: "fix the arms when running too"): the last 1.5 s before the take-off. A WING frame is an
+  // elbow at (or over) its shoulder's height AND more than 0.15 m out to the side of it — the chicken wing; plus the mean elbow angle.
+  const run = rec.frames.filter((f) => f.t >= L - 1500 && f.t <= L - 100);
+  let runWing = 0, elbowSum = 0, elbowN = 0;
+  for (const f of run) {
+    let wing = false;
+    for (const sd of ['Left', 'Right']) {
+      const S = f.j[J[sd + 'Arm']], E = f.j[J[sd + 'ForeArm']], H = f.j[J[sd + 'Hand']]; if (!S || !E || !H) continue;
+      const Sl = local(f, S), El = local(f, E);
+      if (El[1] > Sl[1] - 0.05 && Math.abs(El[0]) - Math.abs(Sl[0]) > 0.15) wing = true;
+      elbowSum += angleAt(S, E, H); elbowN++;
+    }
+    if (wing) runWing++;
+  }
   // the ball against the palm while it is carried (parented to a hand / a hand socket)
   const held2 = win.filter((f) => f.ball && f.bpar && /hand|palm|socket/i.test(f.bpar));
   const gaps = held2.map((f) => { const hand = /left/i.test(f.bpar!) ? f.j[J.LeftHand] : f.j[J.RightHand]; return hand ? len(sub(f.ball!, hand)) : 0; }).sort((a, b) => a - b);
@@ -298,7 +317,7 @@ export function measure(rec: Rec): Metrics {
   return {
     trick: rec.trick, frames: win.length, fps: +fs.toFixed(1), flightMs: Math.round((landAt ?? L) - L), launchToLandMs: landAt ? Math.round(landAt - L) : null, beats, clips,
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
-    pops, whips, heldFrac: held, lockedElbow, lockedKnee,
+    pops, whips, heldFrac: held, lockedElbow, lockedKnee, runFrames: run.length, runWing, runElbowMean: elbowN ? Math.round(elbowSum / elbowN) : null,
     ballGapP90: gaps.length ? +gaps[Math.floor(gaps.length * 0.9)].toFixed(3) : null, ballGapMax: gaps.length ? +gaps[gaps.length - 1].toFixed(3) : null, ballFar: gaps.filter((g) => g > 0.2).length,
     rimHandAtContact: handRim != null ? +handRim.toFixed(3) : null, ballRimAtContact: cF?.ball ? +len(sub(cF.ball, [RIM.x, RIM.y, RIM.z])).toFixed(3) : null,
     slam: rec.hud.filter((h) => /EARLY|LATE|ON TIME|EXECUTION|MISS/.test(h)).pop() ?? '',
@@ -355,13 +374,15 @@ async function scrubPose(p: Page, names: string[], f: Frame, view: 'side' | 'fro
   })(${JSON.stringify(names)}, ${JSON.stringify(f)}, ${JSON.stringify(view)}, ${JSON.stringify(runDir)})`);
 }
 const CELL_W = 250, CELL_H = 390, COLS = Number(process.env.COLS ?? 12);
-/** WIN=air (default): 0.25 s before the take-off → 0.35 s after feet-down · WIN=trick: the trick's fire → 0.3 s past the contact. */
+/** WIN=air (default): 0.25 s before the take-off → 0.35 s after feet-down · WIN=trick: the trick's fire → 0.3 s past the contact ·
+ *  WIN=run: the last 1.5 s of the run-up (the arms while running). */
 const WIN = process.env.WIN ?? 'air';
 async function sheet(p: Page, rec: Rec, m: Metrics, file: string): Promise<void> {
   const L = rec.launchAt ?? rec.frames[0].t;
   const land = m.launchToLandMs ?? 1500;
   let t0 = L - 250, t1 = L + land + 350;
   if (WIN === 'trick') { t0 = L + (m.beats.trick ?? 250) - 60; t1 = L + (m.beats.contact ?? land) + 300; }
+  if (WIN === 'run') { t0 = L - 1500; t1 = L + 150; }   // the run-up: the dribble run into the gather and the plant
   const picks: Frame[] = [];
   for (let k = 0; k < COLS; k++) { const t = t0 + ((t1 - t0) * k) / (COLS - 1); picks.push(rec.frames.reduce((a, f) => (Math.abs(f.t - t) < Math.abs(a.t - t) ? f : a), rec.frames[0])); }
   const a = rec.frames.find((f) => f.t >= L - 300) ?? rec.frames[0];

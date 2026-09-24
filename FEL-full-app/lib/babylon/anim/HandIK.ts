@@ -2,7 +2,7 @@
 // "code-driven + IK planting + hand IK for the ball"). Same node-space solver
 // as the feet: shoulder and elbow receive rotations only, blended by weight so
 // the clip's arm still reads when the hand is waiting for the ball.
-import { Quaternion, Vector3 } from '@babylonjs/core';
+import { Matrix, Quaternion, Space, Vector3 } from '@babylonjs/core';
 import type { Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
 import { solveChainInFrame } from './TwoBoneIK';
@@ -58,4 +58,45 @@ export function shapeReach(shoulder: Vector3, elbow: Vector3, hand: Vector3, tar
   const psi = angleBetween(elPerp, polePerp);
   const th2 = Math.min(psi, poleCap * (1 - smooth(fadeFrom, 175 * DEG, psi)));
   return { target: target2, pole: rotateToward(elPerp, polePerp, th2) };
+}
+
+// ── THE ELBOW'S SWING ROUND THE SHOULDER→HAND LINE (moved here from ballCarry, DUNK MOTION phase 5, 2026-09-23) ───────────
+// A two-bone solve is not continuous where the arm nears straight: its pole twist fades in with the elbow's bend over a narrow
+// band, so the elbow can jump to the other side of the shoulder→hand line in one frame while the hand holds still — the upper arm
+// ROLLS 60–120° in a frame (CLOTHING-SOFT-RESIDUAL C4 found it on the dribble at every catch). The dunk's reach to the rim does
+// the same thing near full extension: the motion probe's biggest remaining pops were a 100–110° RightArm roll in one frame with
+// the hand and elbow within 2 cm (the eastbay, the clutch, the plain carry-up as the reach came on). After the solve, the
+// elbow's swing round that line is limited to `rateDeg` per second from where it was drawn last frame (measured in the
+// shoulder's parent frame, so the body's own turn is not a swing). A rotation about that line never moves the hand.
+type SwingMemo = { side: Vector3; stamp: number };
+const swingMemo = new WeakMap<TransformNode, SwingMemo>();
+/** Forget an arm's last drawn elbow side (the reach let go; the next solve starts free). */
+export function forgetElbowSwing(arm: ArmChain): void { swingMemo.delete(arm.shoulder); }
+/** Call right after solving `arm`: limit the elbow's swing round the shoulder→hand line to `rateDeg`/s. `stamp` counts drawn
+ *  frames (a gap of more than one frame starts free). */
+export function limitElbowSwing(arm: ArmChain, dt: number, stamp: number, rateDeg: number): void {
+  arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+  const parent = arm.shoulder.parent as TransformNode | null;
+  const toParent = parent ? parent.getWorldMatrix().clone().invert() : null;
+  const inP = (v: Vector3) => (toParent ? Vector3.TransformCoordinates(v, toParent) : v.clone());
+  const S = inP(arm.shoulder.getAbsolutePosition()), E = inP(arm.elbow.getAbsolutePosition()), H = inP(arm.hand.getAbsolutePosition());
+  const axis = H.subtract(S), al = axis.length();
+  if (al < 1e-5) { swingMemo.delete(arm.shoulder); return; }
+  axis.scaleInPlace(1 / al);
+  const perp = (v: Vector3) => { const p = v.subtract(axis.scale(Vector3.Dot(v, axis))); return p.lengthSquared() > 1e-10 ? p.normalize() : null; };
+  let side = perp(E.subtract(S));
+  if (!side) { swingMemo.delete(arm.shoulder); return; }
+  const memo = swingMemo.get(arm.shoulder), prev = memo && memo.stamp === stamp - 1 && dt > 0 ? perp(memo.side) : null;
+  if (prev) {
+    const ang = Math.atan2(Vector3.Dot(Vector3.Cross(prev, side), axis), Vector3.Dot(prev, side));
+    const maxRad = rateDeg * Math.PI / 180 * dt;
+    if (Math.abs(ang) > maxRad) {
+      const back = -(ang - Math.sign(ang) * maxRad);
+      const worldAxis = parent ? Vector3.TransformNormal(axis, parent.getWorldMatrix()).normalize() : axis;
+      arm.shoulder.rotate(worldAxis, back, Space.WORLD);   // about the line through the shoulder and the hand: the hand stays put
+      arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
+      side = Vector3.TransformNormal(side, Matrix.RotationAxis(axis, back));
+    }
+  }
+  swingMemo.set(arm.shoulder, { side, stamp });
 }
