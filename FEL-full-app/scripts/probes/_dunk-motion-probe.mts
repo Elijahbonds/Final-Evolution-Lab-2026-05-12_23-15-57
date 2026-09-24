@@ -224,6 +224,8 @@ export interface Metrics {
   clips: string[];
   sparc: Record<string, number>; sparcMean: number;
   pops: { bone: string; atMs: number; degPerSec: number; clip: string }[];
+  /** Frames on which an arm / leg bone turned faster than 1500°/s in the air (an authored swing too fast for a body). */
+  whips: number;
   heldFrac: Record<string, number>;
   lockedElbow: number; lockedKnee: number;
   ballGapP90: number | null; ballGapMax: number | null; ballFar: number;
@@ -237,7 +239,11 @@ export function measure(rec: Rec): Metrics {
   const post = rec.frames.filter((f) => f.t >= L);
   const landF = post.find((f, i) => i > 10 && f.t - L > 350 && f.rp[1] < 0.03);
   const landAt = landF ? landF.t : null;
-  const win = rec.frames.filter((f) => f.t >= L - 300 && f.t <= (landAt ?? L + 1800) + 500);
+  // the flight ends at the CONTACT: the mode hands the root to the instant replay a beat later (a teleport back up the
+  // runway, by design), so nothing after contact + 250 ms is the live body
+  const contact0 = markAt(/\[HANDS\] (contact|iron contact)/);
+  const flightEnd = contact0 != null ? contact0 + 250 : (landAt ?? L + 1800) + 300;
+  const win = rec.frames.filter((f) => f.t >= L - 300 && f.t <= flightEnd);
   const dtAvg = win.length > 1 ? (win[win.length - 1].t - win[0].t) / (win.length - 1) : 16.7;
   const fs = 1000 / dtAvg;
   const eff: Record<string, number> = { RightHand: J.RightHand, LeftHand: J.LeftHand, RightFoot: J.RightFoot, LeftFoot: J.LeftFoot, Head: J.Head, RightForeArm: J.RightForeArm, LeftForeArm: J.LeftForeArm, LeftLeg: J.LeftLeg, RightLeg: J.RightLeg };
@@ -249,8 +255,9 @@ export function measure(rec: Rec): Metrics {
     sp[name] = +sparc(speed, fs).toFixed(2);
   }
   const vals = Object.values(sp).filter((v) => isFinite(v));
-  // pops: a bone's angular speed on one frame ≥ 3.5× the median of its ±6-frame neighbourhood AND ≥ 600°/s
-  const nb = rec.names.length; const pops: Metrics['pops'] = [];
+  // pops: a ONE- OR TWO-FRAME spike — ≥ 600°/s, ≥ 3.5× the median of its ±6-frame neighbourhood, and ≥ 3× the speed 3 frames
+  // either side (a fast authored swing is a bell several frames wide; a snap is a spike). whips: a limb past 1500°/s at all.
+  const nb = rec.names.length; const pops: Metrics['pops'] = []; let whips = 0;
   const watch = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot'];
   const idxOf = (n: string) => rec.names.findIndex((x) => x.replace(/^mixamorig:?/, '').replace(/_c\d+$/, '') === n);
   const held: Record<string, number> = {};
@@ -261,15 +268,17 @@ export function measure(rec: Rec): Metrics {
     for (let i = 0; i < w.length; i++) {
       const nbh = w.slice(Math.max(0, i - 6), i).concat(w.slice(i + 1, i + 7)).sort((a, b) => a - b);
       const med = nbh[Math.floor(nbh.length / 2)] ?? 0;
-      if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60)) pops.push({ bone: bn, atMs: Math.round(win[i + 1].t - L), degPerSec: Math.round(w[i]), clip: (win[i + 1].clips ?? []).map((c) => `${c[0]}:${c[1]}`).join('+') });
+      const side = Math.max(w[i - 3] ?? 0, w[i + 3] ?? 0);
+      if (/Arm|Leg|Hand|Foot/.test(bn) && w[i] > 1500 && win[i + 1].t >= L && win[i + 1].t <= flightEnd - 250) whips++;
+      if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) pops.push({ bone: bn, atMs: Math.round(win[i + 1].t - L), degPerSec: Math.round(w[i]), clip: (win[i + 1].clips ?? []).map((c) => `${c[0]}:${c[1]}`).join('+') });
     }
     // held: inside the AIR only (launch → land), angular speed under 8°/s
-    const airIdx = win.map((f, i) => (f.t >= L + 50 && f.t <= (landAt ?? L + 1500) - 50 ? i : -1)).filter((i) => i > 0);
+    const airIdx = win.map((f, i) => (f.t >= L + 50 && f.t <= flightEnd - 250 ? i : -1)).filter((i) => i > 0);
     const still = airIdx.filter((i) => w[i - 1] !== undefined && w[i - 1] < 8).length;
     held[bn] = airIdx.length ? +(still / airIdx.length).toFixed(2) : 0;
   }
   let lockedElbow = 0, lockedKnee = 0;
-  const air = win.filter((f) => f.t >= L && f.t <= (landAt ?? L + 1500));
+  const air = win.filter((f) => f.t >= L && f.t <= flightEnd - 250);
   for (const f of air) {
     const e = (a: string, m: string, b: string) => (f.j[J[a]] && f.j[J[m]] && f.j[J[b]] ? angleAt(f.j[J[a]]!, f.j[J[m]]!, f.j[J[b]]!) : 0);
     if (e('RightArm', 'RightForeArm', 'RightHand') > 172 || e('LeftArm', 'LeftForeArm', 'LeftHand') > 172) lockedElbow++;
@@ -289,7 +298,7 @@ export function measure(rec: Rec): Metrics {
   return {
     trick: rec.trick, frames: win.length, fps: +fs.toFixed(1), flightMs: Math.round((landAt ?? L) - L), launchToLandMs: landAt ? Math.round(landAt - L) : null, beats, clips,
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
-    pops, heldFrac: held, lockedElbow, lockedKnee,
+    pops, whips, heldFrac: held, lockedElbow, lockedKnee,
     ballGapP90: gaps.length ? +gaps[Math.floor(gaps.length * 0.9)].toFixed(3) : null, ballGapMax: gaps.length ? +gaps[gaps.length - 1].toFixed(3) : null, ballFar: gaps.filter((g) => g > 0.2).length,
     rimHandAtContact: handRim != null ? +handRim.toFixed(3) : null, ballRimAtContact: cF?.ball ? +len(sub(cF.ball, [RIM.x, RIM.y, RIM.z])).toFixed(3) : null,
     slam: rec.hud.filter((h) => /EARLY|LATE|ON TIME|EXECUTION|MISS/.test(h)).pop() ?? '',

@@ -19,6 +19,7 @@ import { armChain, reachArm } from './HandIK';
 import { frameAbove } from './TwoBoneIK';
 import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
+import { smoothByDefault, smoothQuatKeys, smoothScalarKeys, type Q4 } from './smoothKeys';
 
 export type Deg3 = [number, number, number];
 export interface PoseKey {
@@ -42,7 +43,17 @@ export interface PoseKey {
   feet?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Hips vertical offset (metres) — the only translation a clip carries. */
   hipsY?: number;
+  /** A smooth clip eases to a stop on this key (zero velocity in and out): the top of a wind-up, a held accent. */
+  hold?: boolean;
 }
+export interface PoseClipOpts {
+  /** Resample the keys as a joint-space cubic (smoothKeys). Default: the dunk family (smoothByDefault). */
+  smooth?: boolean;
+  /** [1 2 1] passes over the keys first (a capture's jitter). Default: from smoothByDefault. */
+  prefilter?: number;
+}
+/** The sample rate a smoothed clip is written at. */
+export const SMOOTH_FPS = 30;
 /** Hips height the targets were authored against (the forge hero). */
 export const REF_HIPS_Y = 0.96;
 /** The forge hero's hip JOINTS (mean UpLeg height) at bind — the span a body is sized by (rig-measured 0.910). */
@@ -58,7 +69,7 @@ export const REF_LEG_LEN = 0.82;
 const ARM_BONES = ['LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'];
 const LEG_BONES = ['LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg'];
 
-export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration: number, keys: PoseKey[]): AnimationGroup | null {
+export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration: number, keys: PoseKey[], opts: PoseClipOpts = {}): AnimationGroup | null {
   // snapshot bind so every key is solved from the same start and the rig is left untouched
   const nodes = new Map<string, TransformNode>();
   for (const b of sk.bones) { const n = b.getTransformNode(); if (n) nodes.set(b.name.replace(/^mixamorig:?/, ''), n); }
@@ -172,5 +183,16 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     if (key.hipsY != null) hipsY.push([key.t, key.hipsY * scale]);
   }
   restore();
+  // DUNK MOTION phase 2: the joint-space cubic between the poses (slow-in / slow-out, velocity continuous through a key,
+  // a pose reached and never overshot) instead of Babylon's constant-speed slerp from key to key
+  const byDefault = smoothByDefault(name);
+  if (opts.smooth ?? byDefault != null) {
+    const so = { fps: SMOOTH_FPS, duration, holds: keys.filter((k) => k.hold).map((k) => k.t), prefilter: opts.prefilter ?? byDefault ?? 0 };
+    for (const bone of Object.keys(out)) {
+      const dense = smoothQuatKeys(out[bone].map(([t, q]) => ({ t, q: [q.x, q.y, q.z, q.w] as Q4 })), so);
+      out[bone] = dense.map((k) => [k.t, new Quaternion(k.q[0], k.q[1], k.q[2], k.q[3])]);
+    }
+    if (hipsY.length > 1) { const dense = smoothScalarKeys(hipsY.map(([t, v]) => ({ t, v })), so); hipsY.length = 0; for (const k of dense) hipsY.push([k.t, k.v]); }
+  }
   return buildQuatClip(scene, sk, name, duration, out, hipsY.length ? hipsY : undefined);
 }
