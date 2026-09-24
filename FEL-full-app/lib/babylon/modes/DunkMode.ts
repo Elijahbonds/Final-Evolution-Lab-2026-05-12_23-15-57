@@ -84,7 +84,7 @@ import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../
 import { readSeasonLane, specialOpen, specialLockLine, SPECIAL_PROPS, type SeasonLane } from '../core/SeasonSpecials';   // SEASON SPECIALS (owner, 2026-09-18): the PRO lane's   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
 import { spawnMeshyProp } from '../visual/meshyProps';
 import { SceneLoader } from '@babylonjs/core';
-import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
+import { runwayTrickById, DUNK_TRICKS, SLAM_EDGE_EXEC, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
@@ -99,6 +99,7 @@ import {
 } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
 import { rivalNerve, rivalExecution } from '../core/RivalNerve';   // the rival feels the contest too
+import { rivalTricksFor, rivalSlamOffset } from '../core/RivalPlay';   // DUNK MOTION phase 11: the rival's pad decides like a player
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -280,16 +281,10 @@ const RUN_CUE_MARGIN_SEC = 0.05;
 type Win = 'run' | 'gather' | 'takeoff' | 'hang' | 'contact' | 'land';
 
 const DUNKS_PER_ROUND = 2;
-const RIVAL_HOP_MS = 1300;                 // the rival's scripted hop bench → rim
 /** The re-aimed lob's shortest flight to the catch (a shorter one would need a cannon). */
 const LOB_REAIM_MIN_SEC = 0.35;
-const RIVAL_AT_RIM_K = 0.62;               // MOCAP DUNKS: the hop reaches the ring by here and hangs (it used to arrive only at the landing — the flush left the palm 1.6 m wide)
-const RIVAL_FLUSH_K_MAX = 0.86;
-/** Where in the captured finish the flush is (the dunk-finder's peak, ~0.53 of the window). */
-const RIVAL_FINISH_KEY_01 = 0.53;            // …and the ball leaves the palm when it is AT the ring's height (the captured finish decides the moment), or here at the latest
-                                           // (measured at a fixed 0.68: the ball let go 2.2–2.7 m up, under the iron, while the hand was still rising)
-/** The run-up before that hop. A dunk that starts from a standing launch is not a dunk anybody runs up to. */
-const RIVAL_RUNUP_MS = 900;
+// (DUNK MOTION phase 11: the rival's scripted hop — RIVAL_HOP_MS, RIVAL_RUNUP_MS, RIVAL_AT_RIM_K, RIVAL_FLUSH_K_MAX, RIVAL_FINISH_KEY_01 —
+//  is gone: he runs the player's own attempt pipeline on an AI pad, see rivalRound)
 const TOTAL_ROUNDS = 2;
 // Every threshold below is derived from the panel, never a bare number. The D1
 // bug was exactly this: the judge total was written as a literal tuned to a
@@ -326,7 +321,9 @@ const FINISH_FORCE = process.env.NODE_ENV === 'development' && typeof location !
 const CLAVICLE_SIGN = { Left: { shrug: 1, forward: -1 }, Right: { shrug: -1, forward: 1 } } as const;
 /** H5: the root's fall from the release height (the arc's own rate at the release, ~2.6 m/s) — feet-down is where the land clip plays.
  *  Measured before: the root froze at the resolve height (~0.23 m) and the idle loop played there through the judging. */
-const FALL_SPEED = 2.6;
+/** DUNK MOTION phase 11 (was a constant FALL_SPEED 2.6 m/s): the drop off the iron under gravity (capped — a body does not fall faster than a 1.3 m drop lands it), and
+ *  the beat on the floor before the replay rolls. */
+const GRAVITY = 9.81, FALL_SPEED_MAX = 5.2, LIVE_LAND_BEAT_MS = 380;
 
 // Judges + staged reveal + crowd energy now live in the SHARED JudgePanel
 // (lib/babylon/core/JudgePanel.ts) — DunkDuelMode drinks from the same well.
@@ -690,6 +687,20 @@ export const DunkMode: ModeDefinition = (() => {
   let landingClip: string = SPORT_CLIP.dunkLandCrouch;   // H5: the land clip feet-down plays (a make picks it from the score)
   let aerialClip: string = SPORT_CLIP.dunkScoreHang;     // the finish chosen at resolve (the replay re-plays it)
   let dropToFloor = false;                    // H5: the root falls to the floor (a miss from the release; a make after the replay)
+  let dropVy = 0, liveLandAt = -1;            // DUNK MOTION phase 11: the drop's speed (gravity), and when the feet came down live
+  /**
+   * DUNK MOTION phase 11 — THE LANDING IS LIVE (the decode's "after": the hand lets go and the body drops, absorbing with bent knees
+   * and the arms coming down in front — or it keeps the rim and swings under it). The make went straight to the replay with the
+   * dunker still hanging at the rim, and he fell to the floor five seconds later, after it, at a constant 2.6 m/s. Now: off the iron
+   * (or out of the hang), the drop under gravity in the flush's own let-go (arms down in front) and the brace legs, the land clip at
+   * feet-down, a beat on the floor — and then the replay, which ends where he stands.
+   */
+  function liveLandThenJudge(ctx: ModeContext): void {
+    if (finishing) return;
+    if (player.root.position.y > 0.02) { if (!dropToFloor) { dropToFloor = true; dropVy = 0; console.info(`[HANDS] off the iron — the drop from ${player.root.position.y.toFixed(2)} m`); } return; }
+    if (liveLandAt < 0) { liveLandAt = performance.now(); console.info('[HANDS] feet down, live'); return; }
+    if (performance.now() - liveLandAt >= LIVE_LAND_BEAT_MS) { liveLandAt = -1; void finishAttempt(ctx, true); }
+  }
   let replayClipNow = 0;                      // DUNK-BALL-ARMS-RIM: the replayed flight's clip second (the reach gate)
   let replaying = false, replayAir = false, replayAerial = false, replayAirSec = 0, replayAerialAt = 0, replayPrevY = 0;   // H5: replay re-drive
   let launchRealMs = 0, resolveRealMs = 0, clipTimeAtResolve = 0;   // the live flight's real timing, for the replay's clip rate
@@ -961,6 +972,51 @@ export const DunkMode: ModeDefinition = (() => {
     }
   }
 
+  /**
+   * DUNK MOTION phase 11 (owner, 2026-09-23: "fix the rivals dunk, it needs to look like one of the users attempts or like another
+   * person was playing"). Everything the attempt pipeline hangs on a BODY — the arm chains, the feet, the hips' turn layer, the
+   * posture chain, the limb followers and wrists, the dribble, the hinged arms, the replay's recorder, the hero the camera guards —
+   * in one place, so the rival's turn can hand the SAME pipeline to the rival's body (swapBodies) and he dunks the way a player
+   * does: the run on the stick, push 1-2, the take-off, his tricks, the slam on a timing of his own, the flush, the replay.
+   */
+  function bindBody(ctx: ModeContext): void {
+    // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
+    // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
+    arms.Left = armChain(player.skeleton, 'Left'); arms.Right = armChain(player.skeleton, 'Right');
+    if (!arms.Right) console.warn('[FEL-DUNK] no Right arm chain on this rig — the hang wrist reach is off');
+    feet = { L: boneNode(player.skeleton, 'LeftFoot'), R: boneNode(player.skeleton, 'RightFoot') };   // DUNK-CONTROL-JUICE: the clear test's feet
+    // DUNK-BIOMECH: the hips carry the trick spin as a yaw layer (bind-relative, the clips' own degree convention)
+    hipsNode = boneNode(player.skeleton, 'Hips'); hipsBf = bindFrame(player.skeleton); hipsLayered = false;
+    if (hipsNode) { const b = hipsBf.bind.get(hipsNode)?.q ?? Quaternion.Identity(); hipsBindInv.copyFrom(b).invertInPlace(); } else console.warn('[FEL-DUNK] no Hips node on this rig — the 360 turn is off');
+    if (!feet.L || !feet.R) console.warn('[FEL-DUNK] no foot bones on this rig — the obstacle clear reads the root');
+    setupPosture();   // DUNK-POSTURE: the thoracic chain, the clavicles and the head, and the frame's yaw sense
+    limbDrag = LimbDrag.forRig((n) => boneNode(player.skeleton, n));
+    wristLayer = new WristLayer();
+    { const bodyMeshes = player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0);
+      for (const side of ['Left', 'Right'] as const) { const h = boneNode(player.skeleton, `${side}Hand`); const b = h ? hipsBf.bind.get(h) : null; if (!h || !b) continue;
+        // the axis off the body's own hand mesh (the palm's normal, signed to the ball's side); the bones' guess only as a fallback
+        const axis = handFlexAxisFromPoints(handPointsFromMeshes(bodyMeshes, h, `${side}Hand`), side) ?? flexAxisLocal(b.p, b.q, PALM_LOCAL[side]);
+        wristLayer.add(side, h, axis); } }
+    if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
+    ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
+    dribble?.dispose();
+    dribble = mountBallCarry({ scene: ctx.scene, ball, root: player.root, skeleton: player.skeleton, side: hs('Right'), params: { ...DEFAULT_DRIBBLE, hzIdle: 1.8, hzFast: 2.8 } });
+    // DUNK MOTION phase 9 (owner: "fix the orientation of the joints" · "fix the off arm on all the dunks"): THE HINGED ARM, after every
+    // writer of the arms (registered after the dribble's own IK): the elbow bends about its hinge, the forearm's twist turns no faster
+    // than a forearm does — the one-frame twist flips (92° at the slam's press, 90° on the gather's off arm) become turns
+    hinges.length = 0;
+    { const front = bindFrontInFrame(player.skeleton), bf = hipsBf ?? bindFrame(player.skeleton);
+      for (const side of ['Left', 'Right'] as const) { const a = arms[side]; const bu = a ? bf.bind.get(a.shoulder) : null, bfo = a ? bf.bind.get(a.elbow) : null;
+        if (!a || !bu || !bfo || !front) continue;
+        const H = makeHingeArm(a, (bf.parentRot.get(a.shoulder) ?? Quaternion.Identity()).multiply(bu.q), bfo.q, front); if (H) hinges.push(H); } }
+    if (hingeObs) ctx.scene.onAfterAnimationsObservable.remove(hingeObs);
+    hingeObs = ctx.scene.onAfterAnimationsObservable.add(() => { if (MOTION_OFF || !player) return; const dt = motionDt(); for (const H of hinges) hingeArmApply(H, dt, ikFrame, ARM_TWIST_RATE_DEG); });
+    // DUNK-BALL-ARMS-RIM: the replay puts the ball back in what it rode — the hand it was in, the body while it dribbled
+    replay?.dispose(); replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : dribble?.active ? player.root : null));
+
+    ctx.camDirector.snapTo(player.root.position, rim);
+    ctx.heroRef.current = player.root;
+  }
   const def: ModeDefinition = {
     modeId: 'dunk', mood: 'goldenHour', camPreset: 'contest',  // Phase 8: cinematic, not broadcast
     // CrowdEnergy owns this venue's voice (the hush before an attempt, the roar on a flush), which is
@@ -1034,25 +1090,6 @@ export const DunkMode: ModeDefinition = (() => {
       }
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#ffd75e', icon: readPlayerIcon() });   // PLAYER RING: the contest's gold
       ctx.groundLock?.track(player.root, player.skeleton);
-      // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
-      // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
-      arms.Left = armChain(player.skeleton, 'Left'); arms.Right = armChain(player.skeleton, 'Right');
-      if (!arms.Right) console.warn('[FEL-DUNK] no Right arm chain on this rig — the hang wrist reach is off');
-      feet = { L: boneNode(player.skeleton, 'LeftFoot'), R: boneNode(player.skeleton, 'RightFoot') };   // DUNK-CONTROL-JUICE: the clear test's feet
-      // DUNK-BIOMECH: the hips carry the trick spin as a yaw layer (bind-relative, the clips' own degree convention)
-      hipsNode = boneNode(player.skeleton, 'Hips'); hipsBf = bindFrame(player.skeleton); hipsLayered = false;
-      if (hipsNode) { const b = hipsBf.bind.get(hipsNode)?.q ?? Quaternion.Identity(); hipsBindInv.copyFrom(b).invertInPlace(); } else console.warn('[FEL-DUNK] no Hips node on this rig — the 360 turn is off');
-      if (!feet.L || !feet.R) console.warn('[FEL-DUNK] no foot bones on this rig — the obstacle clear reads the root');
-      setupPosture();   // DUNK-POSTURE: the thoracic chain, the clavicles and the head, and the frame's yaw sense
-      limbDrag = LimbDrag.forRig((n) => boneNode(player.skeleton, n));
-      wristLayer = new WristLayer();
-      { const bodyMeshes = player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0);
-        for (const side of ['Left', 'Right'] as const) { const h = boneNode(player.skeleton, `${side}Hand`); const b = h ? hipsBf.bind.get(h) : null; if (!h || !b) continue;
-          // the axis off the body's own hand mesh (the palm's normal, signed to the ball's side); the bones' guess only as a fallback
-          const axis = handFlexAxisFromPoints(handPointsFromMeshes(bodyMeshes, h, `${side}Hand`), side) ?? flexAxisLocal(b.p, b.q, PALM_LOCAL[side]);
-          wristLayer.add(side, h, axis); } }
-      if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
-      ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
       // spawnNpc is explicit: the rival must NEVER wear the player's identity,
       // or you end up dunking against yourself.
       rival = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
@@ -1062,6 +1099,13 @@ export const DunkMode: ModeDefinition = (() => {
       });
       neverBindPose(rival.animator, SPORT_CLIP.idle);
       installSafePlay(rival.animator, 'dunk-rival');
+      // DUNK MOTION phase 11: the rival is right-handed too (owner: "every dunk, every body") — and he dunks through the player's own
+      // pipeline on his turn, so he needs the same mirrored family
+      if (RIGHT_HANDED) {
+        const groups = (rival.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
+        const done = mirrorGroupsInPlace([...groups.values()].filter((g) => g.name.startsWith('dunk_')), rival.skeleton);
+        console.info(`[DUNK-HAND] the rival right-handed: ${done.length} dunk clips mirrored`);
+      }
       ctx.groundLock?.track(rival.root, rival.skeleton);
       dunkVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
 
@@ -1069,28 +1113,12 @@ export const DunkMode: ModeDefinition = (() => {
       (ball.metadata ??= {}).felPalmMirrorLeft = true;   // DUNK-BALL-ARMS-RIM: the left hand's palm is the right's mirror (ballRig.palmOffsetOf)
       void dressBall(ball, 'basketball');   // Meshy ball skin rides the physics sphere (visual only)
       ballSim = new BallSim(ball, 0.12);
-      attachBallToHand(ball, player.skeleton, hand('RightHand'));
       // DUNK-POSTURE-LEGS (A2/A3): the runway is a DRIBBLE — the ball leaves the palm and bounces beside the runner, the ball arm
       // pumps on it (ballCarry, the 1v1's), gathered into two hands a stride before the plant. The runtime rig's right is its
       // local −x (the import mirror is reset at spawn) — ballCarry reads the side off the shoulder now (HOOPS-DEPTH S8), so the
       // bounce side is NOT negated here any more (it used to be, and 1v1 / 3v3, which were not, dribbled across the chest).
-      dribble?.dispose();
-      dribble = mountBallCarry({ scene: ctx.scene, ball, root: player.root, skeleton: player.skeleton, side: hs('Right'), params: { ...DEFAULT_DRIBBLE, hzIdle: 1.8, hzFast: 2.8 } });
-      // DUNK MOTION phase 9 (owner: "fix the orientation of the joints" · "fix the off arm on all the dunks"): THE HINGED ARM, after every
-      // writer of the arms (registered after the dribble's own IK): the elbow bends about its hinge, the forearm's twist turns no faster
-      // than a forearm does — the one-frame twist flips (92° at the slam's press, 90° on the gather's off arm) become turns
-      hinges.length = 0;
-      { const front = bindFrontInFrame(player.skeleton), bf = hipsBf ?? bindFrame(player.skeleton);
-        for (const side of ['Left', 'Right'] as const) { const a = arms[side]; const bu = a ? bf.bind.get(a.shoulder) : null, bfo = a ? bf.bind.get(a.elbow) : null;
-          if (!a || !bu || !bfo || !front) continue;
-          const H = makeHingeArm(a, (bf.parentRot.get(a.shoulder) ?? Quaternion.Identity()).multiply(bu.q), bfo.q, front); if (H) hinges.push(H); } }
-      if (hingeObs) ctx.scene.onAfterAnimationsObservable.remove(hingeObs);
-      hingeObs = ctx.scene.onAfterAnimationsObservable.add(() => { if (MOTION_OFF || !player) return; const dt = motionDt(); for (const H of hinges) hingeArmApply(H, dt, ikFrame, ARM_TWIST_RATE_DEG); });
-      // DUNK-BALL-ARMS-RIM: the replay puts the ball back in what it rode — the hand it was in, the body while it dribbled
-      replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : dribble?.active ? player.root : null));
-
-      ctx.camDirector.snapTo(player.root.position, rim);
-      ctx.heroRef.current = player.root;
+      bindBody(ctx);   // DUNK MOTION phase 11: every per-body hook of the attempt pipeline, on the dunker (the rival's turn rebinds it)
+      attachBallToHand(ball, player.skeleton, hand('RightHand'));
       ctx.objectiveRef.current = rim;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
@@ -1131,6 +1159,12 @@ export const DunkMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
+      // DUNK MOTION phase 11: on the rival's turn the runway is HIS — the AI's pad is the only one read; the player's presses are
+      // answered, never obeyed (his analog streams are dropped quietly)
+      if (turn === 'rival' && !aiFeeding) {
+        if ((e.t === 'button' || e.t === 'dpad') && e.pressed) refuse(ctx, "RIVAL'S TURN");
+        return;
+      }
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'dpad') { if (e.pressed) { heldDpad = e.dir; heldDpadKey = e.src === 'key'; } else if (heldDpad === e.dir) heldDpad = null; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }   // LOOK: read at last (it was emitted and dropped)
@@ -1375,6 +1409,7 @@ export const DunkMode: ModeDefinition = (() => {
       // exactly what a player does between attempts — produced no event and no run: the attempt launched off a walk
       // with no gather and blew. Measured in the lab: attempt 3 of every set, every set, `run → dunk_launch →
       // dunk_finish_blown` with the gather clip missing. The runway now looks at the trigger it can already see.
+      rivalDrive(ctx);   // DUNK MOTION phase 11: the rival's pad (a no-op on the player's turn)
       if (phase === 'approach' && runHeld > 0.02) beginRun(ctx);
       meter3d?.update(dt);
       ctx0 = ctx;
@@ -1506,7 +1541,7 @@ export const DunkMode: ModeDefinition = (() => {
         // write every frame is a React render every frame.
         if (!runwayBeat) {
           const line = runwayTeachLine({ distToLine: player.root.position.z - gatherLine(), speed: holdRunSpeed, ballThrown: lob.thrown, committed: curveSide !== 0, dubble: isDubble(prop) });
-          if (line !== teachHint) { teachHint = line; ctx.setHud({ hint: line }); }
+          if (line !== teachHint && turn === 'player') { teachHint = line; ctx.setHud({ hint: line }); }   // (phase 11: the move list is the player's — the rival's turn keeps his line)
         }
         // the SELF-LOB prop tosses itself ahead of the takeoff when the runner has not thrown it by hand
         if (prop === 'selflob' && !lob.thrown && !runwayBeat && player.root.position.z <= gatherLine() + AUTO_LOB_AHEAD_M) startRunwayBeat(ctx, runwayTrickFor('Y')!);
@@ -1863,7 +1898,12 @@ export const DunkMode: ModeDefinition = (() => {
                 hangBase = null;
               }
             }
-            else if (through) void finishAttempt(ctx, true);
+            else {
+              // DUNK MOTION phase 11: nobody floats at the iron — the hand leaves it and the body is falling on that frame (it held the
+              // jam's height for the whole flush beat, ~0.5 s); the ball's own flush through the net runs on without it
+              if (!dropToFloor && !finishing && liveLandAt < 0 && player.root.position.y > 0.02) { dropToFloor = true; dropVy = 0; console.info(`[HANDS] off the iron — the drop from ${player.root.position.y.toFixed(2)} m`); }
+              if (through) liveLandThenJudge(ctx);   // off the iron, down, feet on the floor — THEN the replay
+            }
           }
         } else {
           if (sinceRelease > 1.2) void finishAttempt(ctx, false);   // the clanked ball is a loose ball (stepped below)
@@ -1909,8 +1949,10 @@ export const DunkMode: ModeDefinition = (() => {
       }
       // H5: the fall — a miss from the release height, a make once the replay hands the root back (the chair's own drop stays)
       if (dropToFloor && !replaying && !obstacleClipped) {
-        player.root.position.y = Math.max(0, player.root.position.y - FALL_SPEED * dt);
-        if (player.root.position.y <= 0) dropToFloor = false;
+        // DUNK MOTION phase 11: the drop FALLS (from rest at the iron, gravity) — a constant 2.6 m/s floated a 1.2 m drop down over 0.46 s
+        dropVy = Math.min(FALL_SPEED_MAX, dropVy + GRAVITY * dt);
+        player.root.position.y = Math.max(0, player.root.position.y - dropVy * dt);
+        if (player.root.position.y <= 0) { dropToFloor = false; dropVy = 0; }
       }
       // H5: feet-down — the land clip plays when the body is back on the floor, never on the hit frame and never in the air
       const floorY = obstacleClipped ? clipFloorY : 0;
@@ -2397,7 +2439,7 @@ export const DunkMode: ModeDefinition = (() => {
     rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
     slamBufferAt = -1; slamSeen = false; slamCueOn = false; beatCalled = false; slamCommitted = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
-    airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
+    airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     console.info('[JUICE-SOFT] launch');
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
@@ -2880,7 +2922,7 @@ export const DunkMode: ModeDefinition = (() => {
     // DUNK MOTION phase 7: the J comes from the ball-hand side — unless a parkour line (the glass, the bus) owns the path
     curveSide = 0; curveFromD = 0; curveErr0 = 0; runBank = 0; prevRunVx = 0; prevRunVz = 0; strideAdjust = 1;   // phase 8: the J waits for triangle
     playClip(runLoop(), { loop: true });
-    ctx.setHud({ hint: 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });
+    ctx.setHud({ hint: turn === 'rival' ? `${foe.name} — ON THE RUN` : 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here' });   // (phase 11: the controls are the player's)
   }
 
   function applyPostureLayer(): void {
@@ -3548,13 +3590,16 @@ export const DunkMode: ModeDefinition = (() => {
       }
       const missTotal = Math.round(missScores.reduce((a, j) => a + j.score, 0)
         * stakesScale(stakes, flight.attempt.tricks.map((t) => t.id), false));
-      playerTotal += missTotal; misses++; playerCards.push(missTotal);   // a miss is part of the standard too
-      card = addAttempt(card, {
-        round, style: STYLE_LABEL[style], prop: propLabel(prop),
-        finish: SPORT_CLIP.dunkFinishBlown, label: 'BLOWN',
-        judges: missScores.map((j) => j.score), total: missTotal, made: false,
-        diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
-      });
+      if (turn === 'rival') rivalTotal += missTotal;   // phase 11: the rival's miss is his
+      else {
+        playerTotal += missTotal; misses++; playerCards.push(missTotal);   // a miss is part of the standard too
+        card = addAttempt(card, {
+          round, style: STYLE_LABEL[style], prop: propLabel(prop),
+          finish: SPORT_CLIP.dunkFinishBlown, label: 'BLOWN',
+          judges: missScores.map((j) => j.score), total: missTotal, made: false,
+          diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
+        });
+      }
       lastScores = missScores;
       crowd.onScore(missTotal);
       revealed = [];
@@ -3563,9 +3608,11 @@ export const DunkMode: ModeDefinition = (() => {
       // a MISS is where the silence hurt most: three of six measured attempts scored nothing and said
       // nothing. If the finger moved at all, say what it did.
       const mb = missBeat(slamTiming?.offsetMs ?? null);
-      flash(ctx, slamTiming ? `${missWhy()} — ${mb.label} · ${slamTiming.label}` : `${missWhy()} — ${mb.label} · JUDGES ${missTotal}`);
+      const who = turn === 'rival' ? `${foe.name}: ` : '';
+      flash(ctx, who + (slamTiming ? `${missWhy()} — ${mb.label} · ${slamTiming.label}` : `${missWhy()} — ${mb.label} · JUDGES ${missTotal}`));
       ctx.setHud({ slamTiming: slamTiming?.label ?? '' });
-      ctx.setHud({ judgeReveal: [], hint: '', score: playerTotal, chain, hype: Math.round(hype) });
+      if (turn === 'rival') ctx.setHud({ judgeReveal: [], hint: '', rivalScore: rivalTotal });
+      else ctx.setHud({ judgeReveal: [], hint: '', score: playerTotal, chain, hype: Math.round(hype) });
       landingClip = SPORT_CLIP.dunkLandCrouch; landNow();   // A+ P8 H5: normally landed at feet-down already (~0.1 s after the release); this is the floor
       setPhase('judging');
       // Pad acceptance #4: a miss is one beat, then the next run-up — no reveal wait, no card, no re-press
@@ -3648,19 +3695,22 @@ export const DunkMode: ModeDefinition = (() => {
     // CHAIN: consecutive approval-band dunks build the multiplier; each link
     // pumps extra hype (which feeds the NEXT dunk's style score — real teeth)
     // Game-Breaker: an eruption-band dunk is a highlight that shifts the building
-    if (dunkTotal >= BAND_TOTAL.eruption) {
+    const rivalsDunk = turn === 'rival';   // phase 11: the rival's card is his — the player's building, chain and hype are the player's
+    if (rivalsDunk) { /* the room still reacts below (the crowd, the reveal) — the player's momentum does not */ }
+    else if (dunkTotal >= BAND_TOTAL.eruption) {
       momentum.report({ kind: 'highlight_dunk', weight: perJudgeAvg(dunkTotal) >= MONSTER_AVG ? 30 : 18 });
     } else if (perJudgeAvg(dunkTotal) <= FLAT_AVG) {
       momentum.report({ kind: 'contest_low' });
     }
     momentum.update(0); // settle tier for this beat
     const tier = momentum.tier;
-    if (tier === 'on_fire' || tier === 'hot') {
+    if (!rivalsDunk && (tier === 'on_fire' || tier === 'hot')) {
       hype = Math.min(100, hype + (tier === 'on_fire' ? 14 : 7));
       verdictParts.push(tier === 'on_fire' ? 'THE BUILDING IS ON FIRE' : 'HEATING UP…');
     }
 
-    if (dunkTotal >= CHAIN_THRESHOLD) {
+    if (rivalsDunk) { /* no player chain on the rival's dunk */ }
+    else if (dunkTotal >= CHAIN_THRESHOLD) {
       chain++;
       if (chain >= 2) {
         hype = Math.min(100, hype + chain * 5);
@@ -3671,10 +3721,11 @@ export const DunkMode: ModeDefinition = (() => {
       chain = 0;
     }
 
-    playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain); playerCards.push(dunkTotal);
+    if (rivalsDunk) rivalTotal += dunkTotal;
+    else { playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain); playerCards.push(dunkTotal); }
     // the FINISH CLIP goes in, not only a label: the body's finish is picked deterministically from these
     // same values, so the card is enough to re-perform the attempt if a replay is ever built
-    card = addAttempt(card, {
+    if (!rivalsDunk) card = addAttempt(card, {
       round, style: STYLE_LABEL[style], prop: propLabel(prop),
       finish: aerialClip, label: finishBanner(true, qteAccuracy, inOffHand(), calledAirTrick()).replace('!', '') || STYLE_LABEL[style],
       judges: scores.map((j) => j.score), total: dunkTotal, made: true,
@@ -3684,7 +3735,7 @@ export const DunkMode: ModeDefinition = (() => {
     // range moved with the ceiling and `dunkTotal * 2` would now fill the meter
     // almost instantly, quietly wrecking the momentum curve. Per-judge average
     // is scale-free: this yields the same 36..60 it always did.
-    hype = Math.min(100, hype + perJudgeAvg(dunkTotal) * 6);
+    if (!rivalsDunk) hype = Math.min(100, hype + perJudgeAvg(dunkTotal) * 6);
 
     ctx.feel?.impact?.(0.2 + execution / 15);
     SoundKit.play('score', { pitch: 1 + Math.min(1, hype / 100) });
@@ -3693,7 +3744,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.camDirector.pulse(Math.min(1.2, 0.5 + named.length * 0.25), 0.5);
       SoundKit.play('crowdCheer', { volume: Math.min(0.9, 0.4 + difficulty * 0.05) });
     }
-    flash(ctx, [signature ? `${signature.name} — ${signature.by.toUpperCase()}`
+    flash(ctx, (rivalsDunk ? `${foe.name}: ` : '') + [signature ? `${signature.name} — ${signature.by.toUpperCase()}`
       : named.length ? `${named.join(' → ')} DUNK!` : finishBanner(qteHit, qteAccuracy, inOffHand(), calledAirTrick()), ...verdictParts].filter(Boolean).join(' · '));
     if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     landingClip = pickLanding(dunkTotal);   // A+ P8 H5: plays at feet-down after the replay hands the root back, not on the flush frame
@@ -3719,7 +3770,8 @@ export const DunkMode: ModeDefinition = (() => {
     crowd.onScore(dunkTotal);
     revealed = [];
     reveal.start(scores);
-    ctx.setHud({ score: playerTotal, hype: Math.round(hype), chain, judgeReveal: [] });
+    if (rivalsDunk) ctx.setHud({ rivalScore: rivalTotal, judgeReveal: [] });
+    else ctx.setHud({ score: playerTotal, hype: Math.round(hype), chain, judgeReveal: [] });
     setPhase('judging');
     setTimeout(() => void advanceAfterJudging(ctx), REVEAL_DURATION_SEC * 1000 + 400);
     finishing = false;
@@ -3747,6 +3799,13 @@ export const DunkMode: ModeDefinition = (() => {
   async function advanceAfterJudging(ctx: ModeContext): Promise<void> {
     if (phase !== 'judging') return;   // already advanced (watchdog vs normal path race)
     clearBanner(ctx); ctx.setHud({ judgeReveal: null });
+    if (turn === 'rival') {   // phase 11: the rival's own count, then the runway back
+      stakes = freshStakes();
+      rivalDunkNum++;
+      if (rivalDunkNum < DUNKS_PER_ROUND) { resetForNextAttempt(ctx); return; }
+      endRivalTurn(ctx);
+      return;
+    }
     // the dunk is over however it ended: fresh attempts, and the call cleared. A call belongs to one dunk.
     stakes = freshStakes();
     dunkInRound++;
@@ -3763,7 +3822,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0; approachMove.stop();
-    airHeld = false; dropToFloor = false; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
+    airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
     armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
@@ -3802,164 +3861,112 @@ export const DunkMode: ModeDefinition = (() => {
         : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',   // F4 (review): six controls in one line taught none of them
       charge: 0, slamPulse: false,
     });
+    if (turn === 'rival') {   // phase 11: his attempt, his plan, his line on the HUD
+      planRivalAttempt();
+      ctx.setHud({ dunkNum: `${rivalDunkNum + 1}/${DUNKS_PER_ROUND}`, attempt: '', need: 0, hint: `${foe.name} — THE RIVAL'S DUNK` });
+    }
   }
 
+  // ── DUNK MOTION phase 11: THE RIVAL PLAYS ───────────────────────────────────────────────────────────────────────────
+  // Owner, 2026-09-23: "fix the rivals dunk, it needs to look like one of the users attempts or like another person was playing".
+  // The rival's turn was a scripted hop — a sine arc 1.2 m high slid linearly at the rim under a launch clip and a finish capture,
+  // the card rolled up front. Now the rival IS a player: the bodies swap (the pipeline binds to whoever is dunking — bindBody) and
+  // an AI hand feeds the SAME inputs a pad does, through the same input handler: the stick and RUN to the line, push 1-2 and the
+  // take-off off the run, his trick on the d-pad and a face button, SLAM on a timing of his own. The judges score what he did.
+  // His nerve (RivalNerve) and temperament (DunkRivals) decide the plan exactly as they decided the rolled card: what he goes for
+  // (his signature dunk leads), how clean the slam is, and whether he blows it (he never finds the window).
+  let turn: 'player' | 'rival' = 'player';
+  let aiFeeding = false, rivalDunkNum = 0, playerProp: Prop = 'none';
+  interface RivalAttempt { tricks: DunkTrick[]; acc: number; early: boolean; blew: boolean }
+  let rivalPlan: RivalAttempt | null = null;
+  let rivalFed = { run: false, released: false, trickIdx: 0, slammed: false, slamUpAt: -1 };
+  const playerCombos = new Set<string>(), rivalCombos = new Set<string>();   // the judges remember each dunker's own
+  /** The pad the rival holds: an event into the SAME handler a player's pad reaches. */
+  function aiFeed(ctx: ModeContext, e: FelInput): void { aiFeeding = true; try { def.onInput?.(ctx, e); } finally { aiFeeding = false; } }
+  /** The dunker changes: the rival takes the runway (or hands it back), and the pipeline re-binds to the new body. */
+  function swapBodies(ctx: ModeContext): void {
+    const was = player; player = rival; rival = was;
+    bindBody(ctx);
+    attachBallToHand(ball, player.skeleton, hand('RightHand')); ebState.inLeftHand = hs('Right') === 'Left';
+    const combos = [...usedCombos]; usedCombos.clear();
+    for (const c of (turn === 'rival' ? rivalCombos : playerCombos)) usedCombos.add(c);
+    (turn === 'rival' ? playerCombos : rivalCombos).clear(); for (const c of combos) (turn === 'rival' ? playerCombos : rivalCombos).add(c);
+  }
+  /** What the rival goes for this time, and how clean: the nerve's reach picks the dunk (his signature leads), its execution band
+   *  places the slam against the beat, its blown chance means he never finds the window. */
+  function planRivalAttempt(): void {
+    const nerve = rivalNerve({
+      deficit: rivalTotal - playerTotal, isFinalRound: round === TOTAL_ROUNDS,
+      attemptsLeft: DUNKS_PER_ROUND - rivalDunkNum + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND, playerPace: playerPace(),
+    });
+    const band = rivalExecution(nerve);
+    const blew = Math.random() < Math.min(0.85, nerve.blownChance * foe.risk);
+    const reach = (nerve.diffMin + Math.random() * (nerve.diffMax - nerve.diffMin)) * foe.reach;
+    const exec = band.min + Math.random() * (band.max - band.min);
+    const acc = clamp((exec - band.min) / Math.max(0.1, band.max - band.min), 0, 1);
+    const tricks = rivalTricksFor(reach, foe.signature);
+    // (a clean one can land either side of the beat; one that leaks is LATE — the side the execution reads linearly, so the slam
+    //  scores the execution he rolled, whatever tax his tricks put on the window)
+    rivalPlan = { tricks, acc, early: acc >= SLAM_EDGE_EXEC && Math.random() < 0.4, blew };
+    rivalFed = { run: false, released: false, trickIdx: 0, slammed: false, slamUpAt: -1 };
+    if (nerve.label) console.info(`[DUNK-RIVAL] ${nerve.label} (deficit ${rivalTotal - playerTotal})`);
+    console.info(`[DUNK-RIVAL] ${foe.name} goes for ${tricks.map((t) => t.label).join(' → ') || 'a plain one'}${blew ? ' — and never finds the window' : ` · slam at execution ${acc.toFixed(2)}`} (reach ${reach.toFixed(1)})`);
+  }
+  /** Where the rival's SLAM lands this flight: off the beat by what his execution leaks, in the window as it is NOW. */
+  function rivalSlamAt(P: RivalAttempt): number | null {
+    if (P.blew) return null;
+    const half = (slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale) / 2;
+    return EASTBAY_TIMING.extend + rivalSlamOffset(P.acc, P.early, half);
+  }
+  /** The rival's pad, every frame of his attempt: stick + RUN to the line, RUN let go in the air, the trick(s), SLAM. */
+  function rivalDrive(ctx: ModeContext): void {
+    if (turn !== 'rival' || !rivalPlan) return;
+    const P = rivalPlan, F = rivalFed;
+    if (F.slamUpAt > 0 && performance.now() >= F.slamUpAt) { F.slamUpAt = -1; aiFeed(ctx, { t: 'button', btn: 'A', pressed: false }); }
+    if (phase === 'approach' && !F.run) {
+      F.run = true;
+      aiFeed(ctx, { t: 'stick', side: 'L', x: 0, y: -1 }); aiFeed(ctx, { t: 'trigger', side: 'R', value: 1 });
+      return;
+    }
+    if (phase !== 'cinematic') return;
+    if (!F.released) { F.released = true; aiFeed(ctx, { t: 'trigger', side: 'R', value: 0 }); aiFeed(ctx, { t: 'stick', side: 'L', x: 0, y: 0 }); }
+    // the first trick is thrown straight off the floor (it waits for its cue); each next one once the last has fired
+    const next = P.tricks[F.trickIdx];
+    const prevFired = F.trickIdx === 0 || (airTrick?.trick.id === P.tricks[F.trickIdx - 1].id && clipTime >= airTrick.t0 + 0.12);
+    if (next && clipTime >= 0.06 && prevFired && !qteWindowOpen) {
+      F.trickIdx++;
+      aiFeed(ctx, { t: 'dpad', dir: next.dir, pressed: true });
+      aiFeed(ctx, { t: 'button', btn: next.btn, pressed: true }); aiFeed(ctx, { t: 'button', btn: next.btn, pressed: false });
+      aiFeed(ctx, { t: 'dpad', dir: next.dir, pressed: false });
+    }
+    const slamAt = rivalSlamAt(P);
+    if (slamAt != null && !F.slammed && clipTime >= slamAt) {
+      F.slammed = true; F.slamUpAt = performance.now() + 90;
+      aiFeed(ctx, { t: 'button', btn: 'A', pressed: true });
+    }
+  }
   async function rivalRound(ctx: ModeContext): Promise<void> {
-    setPhase('rivalTurn');
-    // THE PLAYER WATCHES FROM THE SIDE (2026-09-15). The comment below says he "is standing off-camera by design", and
-    // nothing ever moved him: he stayed wherever his last dunk ended — under the rim — and the rival landed his own
-    // verdict in the same half-metre. Every rc capture's late frame is the two bodies drawn through each other (the
-    // Visuals review has charged it since rc10). He takes the bench opposite the rival's, facing the ring, in the idle.
+    // THE PLAYER WATCHES FROM THE SIDE (2026-09-15): the bench opposite the rival's, facing the ring, in the idle
     player.root.position.set(-3.2, 0, CFG.rimZ + 3);
     player.root.rotation.y = Math.atan2(rim.x - -3.2, rim.z - (CFG.rimZ + 3));
     player.root.rotation.z = 0; player.root.rotationQuaternion = null;
     playClip(SPORT_CLIP.idle, { loop: true });
-    // The camera follows the rival for this stretch, so the rival IS the hero
-    // on screen. FrameGuard watches heroRef and would otherwise spend the whole
-    // rival round reporting the player — who is standing off-camera by design —
-    // as lost, and after two strikes would recenter the camera off the rival
-    // mid-dunk. Point the guard at whoever the camera is actually following.
-    ctx.heroRef.current = rival.root;
-    ctx.setHud({ hint: 'RIVAL ROUND', judgeReveal: null });
-    for (let i = 0; i < DUNKS_PER_ROUND; i++) {
-      ctx.camDirector.snapTo(rival.root.position, rim);
-      // THE RIVAL'S CARD IS ROLLED BEFORE THE JUMP (2026-09-13, owner: "we need the ai's animations to look
-      // good too during the dunk contest"). It used to be rolled AFTER the hop, which meant the body could
-      // not perform the dunk it was about to be scored for: every rival attempt played dunkLaunchPower ->
-      // dunkScoreHang -> celebrate, the IDENTICAL animation whether it scored a 48 or blew it. The player
-      // has had finish variety since M111 — windmill, tomahawk, hang, blown, picked by how well the slam was
-      // timed — and the rival simply did not, so the contest looked like a person competing against a loop.
-      // Rolling first lets the rival run the SAME pickAerialFinish vocabulary off its own execution score.
-      // THE RIVAL FEELS THE CONTEST NOW. These were three fixed random ranges: identical on the first dunk
-      // and the last, identical twenty up and twenty down. It never went for one, never played it safe and
-      // never choked — most of what a dunk contest is to watch. `rivalNerve` moves reach and risk TOGETHER,
-      // so falling behind is never strictly better than leading.
-      const nerve = rivalNerve({
-        deficit: rivalTotal - playerTotal,
-        isFinalRound: round === TOTAL_ROUNDS,
-        attemptsLeft: DUNKS_PER_ROUND - i + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND,
-        // P8: the standard the player is setting tonight. A rival level on points against a player posting 46s used to
-        // feel nothing at all — he was level, so he played his neutral band and got outscored on every exchange.
-        playerPace: playerPace(),
-      });
-      const rExecBand = rivalExecution(nerve);
-      // THE OPPONENT'S OWN TEMPERAMENT, on top of the situation. `reach` and `risk` move together across the
-      // whole roster (DunkRivals holds the same invariant RivalNerve does), so a showman who goes for more
-      // also blows more -- otherwise a personality is just a difficulty increase with a name on it, and
-      // drawing the steady one becomes a punishment.
-      const rivalBlew = Math.random() < Math.min(0.85, nerve.blownChance * foe.risk);
-      const rDiff = rivalBlew ? 0.4 : (nerve.diffMin + Math.random() * (nerve.diffMax - nerve.diffMin)) * foe.reach;
-      const rExec = rivalBlew ? 0 : rExecBand.min + Math.random() * (rExecBand.max - rExecBand.min);
-      const rStyle = rivalBlew ? 0.5 : 2.2 + Math.random() * 3.2;
-      if (nerve.label) console.info(`[DUNK-RIVAL] ${nerve.label} (deficit ${rivalTotal - playerTotal})`);
-      // exec runs 3.4..6.8 on a made dunk; map it onto the same 0..1 accuracy the player's timing produces
-      // map onto the same 0..1 accuracy the player's timing produces — off the BAND that was actually
-      // rolled, not the old hardcoded 3.4..6.8, or a reaching rival reads as a clean one
-      const rAcc = rivalBlew ? 0
-        : Math.max(0, Math.min(1, (rExec - rExecBand.min) / Math.max(0.1, rExecBand.max - rExecBand.min)));
-      const rAerial = pickAerialFinish(!rivalBlew, rAcc);
-
-      const from = rival.root.position.clone();
-      // Soft-OPEN #3 (fel-full-app-50's measurement): the rival spawns at yaw 0 — facing the CAMERA — and flew its whole
-      // hop backwards (the rim sits at −139° from the bench spot); its 0.35 s launch clip then chained to idle IN THE AIR
-      // (219 of 288 airborne frames in idle_stand). Face the rim for the hop; launch → held hang until the verdict clip.
-      rival.root.rotation.y = Math.atan2(rim.x - from.x, rim.z - from.z);
-
-      // THE RUN-UP. The rival used to launch from a standstill at the bench and slide to the rim with the
-      // launch clip playing over the translation — the body was never running, so the approach read as a
-      // dolly rather than an athlete. It now covers the first third of the gap on the shared run loop and
-      // gathers where the hop begins, which is the same shape the player's runway has.
-      const gather = from.add(new Vector3(rim.x - from.x, 0, rim.z - from.z).scale(0.34));
-      rivalClip(SPORT_CLIP.moveLoop, { loop: true });
-      await new Promise<void>((res) => {
-        const r0 = performance.now();
-        const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-          const k = Math.min(1, (performance.now() - r0) / RIVAL_RUNUP_MS);
-          rival.root.position.x = from.x + (gather.x - from.x) * k;
-          rival.root.position.z = from.z + (gather.z - from.z) * k;
-          if (k >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
-        });
-      });
-      if (phase !== 'rivalTurn') return;
-      const liftOff = rival.root.position.clone();
-      // The hang is paced to span the rest of the hop (+150 ms so the verdict clip supersedes it, never a held pose): measured
-      // at speed 1 it ran out ~130 ms before the landing and the rival flew those frames with no clip at all.
-      const hopLeft = RIVAL_HOP_MS / 1000 - (rival.animator.durationOf(SPORT_CLIP.dunkLaunchPower) ?? 0.35) + 0.15;
-      // MOCAP DUNKS (2026-09-18): the finish's FLUSH key (~0.53 of the captured tomahawk / windmill) lands at the TOP of the hop
-      // (k 0.5), the clip's end holds the flush pose to the landing — spread across the whole rest of the hop it was still cocked
-      // back on the way down (measured: the ball let go at 1.8 m on the fallback beat, frames showing the hand at the hip)
-      const aerialDur = rival.animator.durationOf(rAerial) ?? hopLeft;
-      const launchDur = rival.animator.durationOf(SPORT_CLIP.dunkLaunchPower) ?? 0.35;
-      const hangRate = Math.max(0.5, Math.min(1.5, (aerialDur * RIVAL_FINISH_KEY_01) / Math.max(0.15, (RIVAL_HOP_MS / 1000) * 0.5 - launchDur)));
-      // launch -> the finish this attempt actually earned, rate-matched to span the rest of the hop so the
-      // body is never clip-less in the air (the measured failure this pacing exists for: the hang ran out
-      // ~130 ms early and the rival flew those frames with no clip at all)
-      // MOCAP DUNKS (2026-09-18, owner: "animate the rivals dunk to be something impressive … have the ball go through the rim"):
-      // the rival dunks WITH the ball. It rides his right palm up the hop (the captured tomahawk / windmill carries it over the
-      // iron) and at the top it FLUSHES through the ring on the player's own RimFlush — or clanks off the iron when he blows it.
-      // He used to hop empty-handed under the launch clip while the ball sat in the player's hand at the bench.
-      const rivalBall = !!ball && !lob.live;
-      let rivalFlush: FlushState | null = null, rivalReleased = false, rivalLastMs = performance.now();
-      if (rivalBall) { ballSim.stop(); looseBall = false; flush = null; attachBallToHand(ball, rival.skeleton, 'RightHand'); console.info('[DUNK-RIVAL] ball in hand'); }
-      rivalClip(SPORT_CLIP.dunkLaunchPower, { onEnd: () => rivalClip(rAerial, { speedRatio: hangRate, onEnd: () => {} }) });
-      const hopT0 = performance.now();
-      await new Promise<void>((res) => {
-        const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-          const nowMs = performance.now(); const rdt = Math.min(0.05, (nowMs - rivalLastMs) / 1000); rivalLastMs = nowMs;
-          const k = Math.min(1, (nowMs - hopT0) / RIVAL_HOP_MS);
-          // the hop ARRIVES at the ring by the flush beat and hangs there (it used to reach the rim only at the landing, so the
-          // flush left the palm mid-hop, 1.6 m wide of the iron — measured)
-          const ku = Math.min(1, k / RIVAL_AT_RIM_K);
-          rival.root.position.x = liftOff.x + (rim.x - liftOff.x) * ku;
-          rival.root.position.z = liftOff.z + (rim.z + 0.7 - liftOff.z) * ku;
-          rival.root.position.y = Math.sin(k * Math.PI) * 1.2;
-          ball.computeWorldMatrix(true);
-          const bpNow = ball.getAbsolutePosition();
-          if (rivalBall && !rivalReleased && k >= 0.25 && (bpNow.y >= rim.y - 0.06 || k >= RIVAL_FLUSH_K_MAX)) {
-            rivalReleased = true;
-            const at = clearOfIron(bpNow, rim, RIM_RADIUS, ballSim.radius);
-            releaseBall(ball); ball.position.set(at.x, at.y, at.z);
-            if (rivalBlew) { ballSim.launch(ball.position.clone(), clankOffRim(ball, rim)); looseBall = true; hoopJuice?.graze(); SoundKit.play('rattle', { volume: 0.3 }); console.info(`[DUNK-RIVAL] clank off the iron at k ${k.toFixed(2)} from (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)})`); }
-            else {
-              rivalFlush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * rAcc);
-              hoopJuice?.punch(); SoundKit.play('swish', { volume: 0.5 }); EffectsKit.burst(ctx.scene, rim, 'net');
-              console.info(`[DUNK-RIVAL] flush from (${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)}) at k ${k.toFixed(2)}`);
-            }
-          }
-          if (rivalFlush && rivalFlush.phase !== 'free') {
-            const st = stepFlush(rivalFlush, rim, RIM_RADIUS, ballSim.radius, rdt);
-            ball.position.set(st.pos.x, st.pos.y, st.pos.z);
-            if (st.phase === 'free') { ballSim.launch(ball.position.clone(), new Vector3(st.vel.x, st.vel.y, st.vel.z)); looseBall = true; console.info('[DUNK-RIVAL] through the net'); }
-          }
-          if (k >= 1 && (!rivalFlush || rivalFlush.phase === 'free')) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }
-          else if (k >= 1 && nowMs - hopT0 > RIVAL_HOP_MS + 1500) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); }   // a flush that never frees still ends the hop
-        });
-      });
-      if (phase !== 'rivalTurn') return;   // soft-OPEN #3: the watchdog advanced the contest under this hop — its end owns the rest
-      // The rival is a CONTENDER, not a wall. These inputs used to average a ~43 card, near the top of what
-      // a good player can produce, on every single attempt — so the contest was decided before the player
-      // took their second dunk. A real field is beatable and streaky: this averages high-30s, swings, and
-      // BLOWS one now and then. (The roll itself now happens before the jump — see above.)
-      const rScores = judgeDunk(rDiff, rExec, rStyle);
-      const rTotal = rScores.reduce((s, j) => s + j.score, 0);
-      rivalTotal += rTotal;
-      SoundKit.play(rivalBlew ? 'miss' : 'crowdGroan', { volume: 0.35 });
-      // the landing reads the CARD, exactly as the player's pickLanding does — a rival that just posted an
-      // eruption celebrates like one, and one that blew it does not
-      rivalClip(rivalBlew ? SPORT_CLIP.dunkFinishBlown : pickLanding(rTotal));   // soft-OPEN #3: the verdict clip plays out, then idle
-      ctx.setHud({ rivalScore: rivalTotal }); flash(ctx, rivalBlew ? `RIVAL BLOWS IT — ${rTotal}` : `RIVAL SCORES ${rTotal}`);
-      // The verdict plays out WHERE HE LANDED. He used to be teleported to the bench spot for this beat — which is
-      // behind the under-basket cut's lens — so the celebration was never seen and FrameGuard logged the rival round
-      // as a lost hero on every dunk (FINISH-RELEASE gauntlet: `hero off-screen 2x (BEHIND camera)` on /play/dunk
-      // and /try). Back to the bench only as the next run-up starts, or as the turn hands back to the player.
-      rival.root.position.y = 0;
-      await new Promise((r) => setTimeout(r, 1200));
-      if (phase !== 'rivalTurn') return;   // soft-OPEN #3: same — never a second advance from this loop
-      rival.root.position.set(3.2, 0, CFG.rimZ + 3);
-      rival.root.rotation.y = 0;   // back at the bench spot, facing the court as it spawned
-    }
-    clearBanner(ctx);
-    await advanceAfterRivalTurn(ctx);
+    turn = 'rival'; rivalDunkNum = 0; playerProp = prop; prop = 'none';
+    swapBodies(ctx);   // from here `player` is the rival: the dunker, whoever he is
+    runHeld = 0; runPressWas = false; stickX = 0; stickY = 0; heldDpad = null; aHeld = false;
+    flash(ctx, `${foe.name} IS UP`, 1400);
+    resetForNextAttempt(ctx);
+  }
+  /** The rival's dunks are done: back to his bench, the runway back to the player. */
+  function endRivalTurn(ctx: ModeContext): void {
+    player.root.position.set(3.2, 0, CFG.rimZ + 3); player.root.rotation.y = 0; player.root.rotation.z = 0; player.root.rotationQuaternion = null;
+    playClip(SPORT_CLIP.idle, { loop: true });
+    rivalPlan = null;
+    swapBodies(ctx);
+    turn = 'player'; prop = playerProp;
+    runHeld = 0; runPressWas = false; stickX = 0; stickY = 0; heldDpad = null; aHeld = false;
+    setPhase('rivalTurn');
+    void advanceAfterRivalTurn(ctx);
   }
 
   /** Round hand-off / contest end. Soft-OPEN #3: reached by rivalRound's own end AND by the rivalTurn watchdog (8 s) — the

@@ -80,6 +80,7 @@ import { attachBallToHand, releaseBall } from '../anim/ballRig';
 import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18)
 import { isFinishStyle, planDropStep, planShimmyFade, stickAtRim01, POST_DROP_STICK_MIN, SHIMMY_CONTEST_CUT, PUMP_MAX_SEC } from '../core/HoopsMoves';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
+import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1 (same seam as 1v1)
@@ -560,6 +561,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (ai) tintGarmentSlot(char, SLOT_KEYS.jersey, aiKind === 'teammate' ? TEAM_JERSEY.mine : TEAM_JERSEY.theirs);
         char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
         neverBindPose(char.animator, SPORT_CLIP.idle);
+        rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
         // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
@@ -1838,7 +1840,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     SoundKit.play('whoosh', { pitch: 0.85 });
     // BIOMECH-HOOPS-WAVE1 G6: the dribble parked, the ball in the palm through the flight; the launch's last frame HELD to feet-down (the 1v1's)
     carries.get(me)?.update(0, 0, false);
-    if (!ball.parent) attachBallToHand(ball, me.char.skeleton, 'RightHand');
+    const toDunkHand = dunkHandPass(ball, me.char.skeleton);   // DUNK MOTION phase 11: into the dunking hand over the take-off
     // WHICH DUNK THIS DRIVE EARNED — the same read 1v1 makes, off the same already-registered vocabulary (ClipScope
     // gives this mode the 'dunk' suite too). One clip for every dunk in the game was the fault; see HoopsDunks.
     const toRimNow3 = RIM_FLOOR.subtract(from); toRimNow3.y = 0;
@@ -1890,6 +1892,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       else if (hangLeft > 0 && flightMs / flightTotal >= RIM_HANG.k) { hangLeft -= realMs; scale = 0; if (!hangOn) { hangOn = true; me.tree.beat('dunk_score_hang', { fadeSec: 0.08, holdEnd: true }); console.info(`[3V3-DUNK] rim hang ${hangLeft.toFixed(0)} ms`); } }   // DUNK-FANATIC: the hang on the iron
       else if (showtime && flightMs / flightTotal >= SHOWTIME_HANG_FROM && flightMs / flightTotal <= SHOWTIME_HANG_TO) scale = SHOWTIME_HANG_SCALE;   // SHOWTIME: the hang
       flightMs += realMs * scale;
+      toDunkHand(flightMs / 1000);
       const k = Math.min(1, flightMs / flightTotal);
       { if (ball.parent && k <= DRIVE_DUNK.resolveK) handShift = stepShift(handShift, handShiftTarget(handForward(from, RIM, me.char.root.position, ball.getAbsolutePosition()), k, DRIVE_DUNK.resolveK)); const p = driveDunkPos(from, RIM, { x: RIM.x, z: RIM.z + DRIVE_DUNK.landAheadZ }, k, DRIVE_DUNK.resolveK, handShift); me.char.root.position.x = p.x; me.char.root.position.z = p.z; }   // DUNK-FANATIC: at the iron BY the resolve
       me.char.root.position.y = driveDunkY(k);
@@ -2761,7 +2764,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function driverDunk(ctx: ModeContext, shooter: Body): Promise<void> {
     return new Promise<void>((done) => {
       const tok = possessionToken;
-      if (!ball.parent) attachBallToHand(ball, shooter.char.skeleton, 'RightHand');
+      const toDunkHandD = dunkHandPass(ball, shooter.char.skeleton);   // DUNK MOTION phase 11: his dunking hand too
       const from = shooter.char.root.position.clone();
       const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
       const meDist = distXZ(me.char.root.position, shooter.char.root.position);
@@ -2803,6 +2806,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
         else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
         flightMs += realMs * scale;
+        toDunkHandD(flightMs / 1000);
         const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
         { if (ball.parent && k <= DRIVE_DUNK.resolveK) handShift = stepShift(handShift, handShiftTarget(handForward(from, RIM, shooter.char.root.position, ball.getAbsolutePosition()), k, DRIVE_DUNK.resolveK)); const p = driveDunkPos(from, RIM, { x: RIM.x, z: RIM.z + DRIVE_DUNK.landAheadZ }, k, DRIVE_DUNK.resolveK, handShift); shooter.char.root.position.x = p.x; shooter.char.root.position.z = p.z; }   // DUNK-FANATIC
         shooter.char.root.position.y = driveDunkY(k);

@@ -223,7 +223,7 @@ async function attempt(p: Page, trick: string): Promise<Rec | null> {
     await p.waitForTimeout(50); await dpad(p, air[0], false);
   }
   await p.evaluate('window.__armSlam()');
-  const end = launch + 3600;
+  const end = launch + Number(process.env.REC_MS ?? 3600);   // (phase 11: REC_MS=8000 reaches past the replay to the live drop and landing)
   while ((await p.evaluate('performance.now()') as number) < end) await p.waitForTimeout(100);
   const rec = await p.evaluate(`(() => { const R = window.__rec; R.on = false; return { names: R.names, frames: R.frames, marks: window.__smp.marks.filter((m) => m.t >= ${t0}), hud: window.__HUDLOG.filter((h) => h.t >= ${t0}).map((h) => h.s) }; })()`) as { names: string[]; frames: Frame[]; marks: { t: number; msg: string }[]; hud: string[] };
   return { trick, t0, launchAt: launch, ...rec };
@@ -403,7 +403,7 @@ export function measure(rec: Rec): Metrics {
   const handOverBall = hand0 && cF?.ball ? +(hand0[1] - cF.ball[1]).toFixed(3) : null;
   const beats: Record<string, number> = {};
   const addBeat = (k: string, re: RegExp) => { const t = markAt(re); if (t) beats[k] = Math.round(t - L); };
-  addBeat('trick', /\[DUNK-TRICK\] air/); addBeat('slam', /\[DUNK-SLAM\]/); addBeat('contact', /\[HANDS\] (contact|iron contact)/); addBeat('flush', /\[HANDS\] through the net/);
+  addBeat('trick', /\[DUNK-TRICK\] air/); addBeat('slam', /\[DUNK-SLAM\]/); addBeat('contact', /\[HANDS\] (contact|iron contact)/); addBeat('flush', /\[HANDS\] through the net/); addBeat('replayEnd', /\[HANDS\] replay end/); addBeat('landLive', /\[HANDS\] land dunk_/);
   if (landAt) beats.land = Math.round(landAt - L);
   const clips: string[] = []; for (const f of win) { const top = (f.clips ?? []).slice().sort((a, b) => b[1] - a[1])[0]; if (top && clips[clips.length - 1] !== top[0]) clips.push(top[0]); }
   return {
@@ -478,7 +478,9 @@ async function sheet(p: Page, rec: Rec, m: Metrics, file: string): Promise<void>
   let t0 = L - 250, t1 = L + land + 350;
   if (WIN === 'trick') { t0 = L + (m.beats.trick ?? 250) - 60; t1 = L + (m.beats.contact ?? land) + 300; }
   if (WIN === 'run') { t0 = L - 1500; t1 = L + 150; }   // the run-up: the dribble run into the gather and the plant
-  if (WIN === 'beat') { t0 = L - 900; t1 = L + 100; }   // DUNK MOTION phase 10b: a runway beat up close (the kick, the cartwheel)
+  if (WIN === 'beat') { t0 = L - 900; t1 = L + 100; }
+  if (WIN === 'after') { const re = m.beats.replayEnd ?? (land + 3500); t0 = L + re - 200; t1 = L + re + 1600; }   // phase 11: the replay hands the root back — the drop, the landing
+  if (WIN === 'land') { const c = m.beats.contact ?? m.beats.slam ?? 1500; t0 = L + c - 120; t1 = L + land + 450; }   // DUNK MOTION phase 11: the rim, the hang, the drop and the landing   // DUNK MOTION phase 10b: a runway beat up close (the kick, the cartwheel)
   if (WIN === 'gather') { t0 = L - 450; t1 = L + 200; }
   if (WIN === 'flush') { const c = m.beats.contact ?? m.beats.slam ?? 1500; t0 = L + c - 300; t1 = L + c + 250; }   // DUNK MOTION phase 9: the finish up close   // DUNK MOTION phase 8: push 1-2 up close — the pick-up, the push, 1, 2, the take-off
   const picks: Frame[] = [];

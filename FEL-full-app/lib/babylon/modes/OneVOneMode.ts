@@ -177,6 +177,7 @@ import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: 
 import { MomentumBus } from '../core/MomentumBus';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
+import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
@@ -676,6 +677,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       foe.secondary?.setLookTarget(() => ball?.position ?? null);
       neverBindPose(foe.animator, SPORT_CLIP.idle); installSafePlay(foe.animator, 'onevone-foe');
       ctx.groundLock?.track(foe.root, foe.skeleton);
+      // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): both players' dunk family onto the right hand
+      console.info(`[DUNK-HAND] 1v1 right-handed dunks: ${rightHandDunks(me.animator, me.skeleton)} / ${rightHandDunks(foe.animator, foe.skeleton)} clips mirrored`);
       onevoneVenue?.hidePlaceholders();  // M74
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -2002,7 +2005,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // the flight (it used to stay at the last bounce point on the floor while the body flew, measured ballY 0.85 through the
     // whole flight); the launch's last frame is HELD to feet-down (the 0.35 s clip ran out mid-air into the run loop)
     meCarry?.update(0, 0, false);
-    if (!ball.parent) attachBallToHand(ball, me.skeleton, 'RightHand');
+    const toDunkHand = dunkHandPass(ball, me.skeleton);   // DUNK MOTION phase 11: into the dunking hand over the take-off
     // WHICH DUNK THIS DRIVE EARNED (owner, 2026-09-16). Every dunk in this mode played `dunk_launch` — the same two
     // clips off a jog down the middle and off a full-speed baseline drive through a set body — while the whole
     // authored dunk vocabulary was ALREADY on the rig: ClipScope gives `onevone` the suites ['hoops', 'dunk'], so
@@ -2065,6 +2068,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       else if (hangLeft > 0 && flightMs / flightTotal >= RIM_HANG.k) { hangLeft -= realMs; scale = 0; if (!hangOn) { hangOn = true; meAnimTree.beat('dunk_score_hang', { fadeSec: 0.08, holdEnd: true }); hoopJuice?.hold(true); console.info(`[1V1-DUNK] rim hang ${hangLeft.toFixed(0)} ms`); } if (hangLeft <= 0) hoopJuice?.hold(false); }   // DUNK-FANATIC: the hang on the iron
       else if (showtime && flightMs / flightTotal >= SHOWTIME_HANG_FROM && flightMs / flightTotal <= SHOWTIME_HANG_TO) scale = SHOWTIME_HANG_SCALE;   // SHOWTIME: the hang
       flightMs += realMs * scale;
+      toDunkHand(flightMs / 1000);
       const k = Math.min(1, flightMs / flightTotal);
       { if (ball.parent && k <= DRIVE_DUNK.resolveK) handShift = stepShift(handShift, handShiftTarget(handForward(from, RIM, me.root.position, ball.getAbsolutePosition()), k, DRIVE_DUNK.resolveK)); const p = driveDunkPos(from, RIM, { x: RIM.x, z: RIM.z + DRIVE_DUNK.landAheadZ }, k, DRIVE_DUNK.resolveK, handShift); me.root.position.x = p.x; me.root.position.z = p.z; }   // DUNK-FANATIC: the root is at the iron BY the resolve (the ball used to leave the hand 1 m in front of the ring)
       me.root.position.y = driveDunkY(k);
@@ -3061,7 +3065,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function foeDunk(ctx: ModeContext): void {
     defPhase = 'shot'; gatherShown = false; foeShotWin = 'none';
     foeCarry?.update(0, 0, false);
-    if (!ball.parent) attachBallToHand(ball, foe.skeleton, 'RightHand');
+    const toDunkHandF = dunkHandPass(ball, foe.skeleton);   // DUNK MOTION phase 11: his dunking hand too
     const from = foe.root.position.clone();
     const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
     const inLane = distXZ(me.root.position, foe.root.position) < 1.5 && meStunSec === 0 && !meFloored;
@@ -3092,6 +3096,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (freezeMs > 0) { freezeMs -= realMs; scale = 0; }
       else if (slowMs > 0) { slowMs -= realMs; scale = BUMP_SLOW; }
       flightMs += realMs * scale;
+      toDunkHandF(flightMs / 1000);
       const k = Math.min(1, flightMs / DRIVE_DUNK.flightMs);
       { if (ball.parent && k <= DRIVE_DUNK.resolveK) handShift = stepShift(handShift, handShiftTarget(handForward(from, RIM, foe.root.position, ball.getAbsolutePosition()), k, DRIVE_DUNK.resolveK)); const p = driveDunkPos(from, RIM, { x: RIM.x, z: RIM.z + DRIVE_DUNK.landAheadZ }, k, DRIVE_DUNK.resolveK, handShift); foe.root.position.x = p.x; foe.root.position.z = p.z; }   // DUNK-FANATIC
       foe.root.position.y = driveDunkY(k);

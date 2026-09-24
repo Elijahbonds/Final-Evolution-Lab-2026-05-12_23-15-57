@@ -57,7 +57,9 @@ page.on('console', (m) => { const t = m.text(); if (/\[1V1|\[3V3|\[REF|\[LAB/.te
 { // LOGIN, AND CHECK IT TOOK (a click before hydration makes no POST and every /play answers 307 for the whole run)
   const lp = await ctx.newPage();
   for (let attempt = 0; attempt < 3; attempt++) {
-    await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+    // (an authed session is redirected off /login mid-load — "interrupted by another navigation" — which is the success case)
+    await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 180000 }).catch(() => undefined);
+    await lp.waitForLoadState('domcontentloaded').catch(() => undefined);
     if (await lp.evaluate(`fetch('/api/auth/session').then((r) => r.json()).then((j) => !!(j && j.user)).catch(() => false)`)) break;
     // …and an already-authed session is BOUNCED OFF /login to the hub, where `button[type=submit]` is some other
     // page's control sitting under a venue image — which is how this timed out for 60 s on a session that was fine.

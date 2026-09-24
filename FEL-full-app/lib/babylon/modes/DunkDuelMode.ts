@@ -42,7 +42,7 @@ import { BallSim } from '../core/BallPhysics';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK } from '../nexus/dressingFlags';
-import { attachBallToHand, releaseBall, runEastbayPath, runHandOffPath, handOffK, flushThroughRim, clankOffRim, EASTBAY_PASSES, handOffSpecAt, type HandOffSpec } from '../anim/ballRig';
+import { attachBallToHand, releaseBall, runHandOffPath, handOffK, flushThroughRim, clankOffRim, EASTBAY_PASSES, handOffSpecAt, type HandOffSpec } from '../anim/ballRig';
 import { OBSTACLE_SPECS, clipsObstacle, heightAt, nextObstacle, type ObstacleKind, OBSTACLE_KINDS } from '../core/DunkObstacles';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { boneNode } from '../anim/boneLookup';
@@ -51,7 +51,8 @@ import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK'; 
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3 (dunk mirror)
 import { PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the contest's Posture Poses, shared
 import { posturePose, type PostureInput } from '../core/DunkPosture';
-import { legPose } from '../core/DunkLegs';
+import { legPose, arcHeight } from '../core/DunkLegs';
+import { mirrorGroupsInPlace, mirrorSide } from '../anim/groupMirror';
 import { HOOPS_LEGS, HOOPS_POSTURE } from '../core/HoopsPosture';
 import type { PlayOpts } from '../anim/CharacterAnimator';
 import { SoundKit } from '../audio/SoundKit';
@@ -92,6 +93,13 @@ const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;   // Dunk play tip (2026-09-07): th
 const TURN_RATE = 10, RETREAT_Z = CFG.startZ + 1.5;   // the facing slew (rad/s); how far a pull-back may back off the runway
 const wrapYaw = (y: number): number => Math.atan2(Math.sin(y), Math.cos(y));   // the Euler yaw stays in (−π, π]
 // A+ P8 athlete hands, mirrored from DunkMode (PM brief VENICE-DUNK-A-PLUS-P8, 2026-09-07): the reach weight ramp, the fall rate.
+/** DUNK MOTION phase 11 (owner decision, 2026-09-23: right-handed "every dunk, every body"). The spawn resets the importer's root
+ *  mirror, so a body renders as its model's mirror image and a dunker authored around RightHand dunks left-handed; the contest's
+ *  fix (DunkMode, phase 8): mirror the dunk family onto the other side of each body and carry the ball in the rig's LEFT hand. */
+const RIGHT_HANDED = true;
+const hand = (n: 'LeftHand' | 'RightHand'): 'LeftHand' | 'RightHand' => (RIGHT_HANDED ? mirrorSide(n) as 'LeftHand' | 'RightHand' : n);
+/** The eastbay's two passes (ballRig.EASTBAY_PASSES) on the right-handed body. */
+const DUEL_EASTBAY: HandOffSpec[] = EASTBAY_PASSES.map((sp) => ({ ...sp, from: hand(sp.from), to: hand(sp.to) }));
 const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, REACH_POLE_CAP = Math.PI / 2, HAND_IK_FROM = EASTBAY_TIMING.carryUp - 0.05, FALL_SPEED = 2.6;
 /** HOLD = RUN (the contest's): the hold ramps the athlete toward the rim at up to the max run and launches at the takeoff line. */
 const HOLD_RUN_MAX = 7, HOLD_RUN_RAMP = 6;
@@ -219,7 +227,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     playClip(SPORT_CLIP.idle, { loop: true });
     bench().root.position.set(4.2, 0, CFG.rimZ + 4);
     bench().animator.play(SPORT_CLIP.idle, { loop: true });
-    attachBallToHand(ball, active().skeleton, 'RightHand');
+    attachBallToHand(ball, active().skeleton, hand('RightHand')); ebState.inLeftHand = hand('RightHand') === 'LeftHand';
     // the camera AND FrameGuard follow whose turn it is — before this, P2's
     // whole game was framed against P1 idling on the bench spot
     ctx.heroRef.current = active().root;
@@ -241,7 +249,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function launchDunk(ctx: ModeContext): void {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
-    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; earlySlam.clear(); ebState.inLeftHand = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; earlySlam.clear(); ebState.inLeftHand = hand('RightHand') === 'LeftHand'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false;   // A+ P8
     launchZ = active().root.position.z; obstacleOver = false; obstacleCleared = false; activeHandOff = null; ikSideK = 0;
@@ -519,6 +527,11 @@ export const DunkDuelMode: ModeDefinition = (() => {
       neverBindPose(p2.animator, SPORT_CLIP.idle);
       installSafePlay(p2.animator, 'dunkduel-p2');
       ctx.groundLock?.track(p2.root, p2.skeleton);
+      if (RIGHT_HANDED) for (const c of [p1, p2]) {   // DUNK MOTION phase 11: both duellists right-handed
+        const groups = (c.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
+        const done = mirrorGroupsInPlace([...groups.values()].filter((g) => g.name.startsWith('dunk_')), c.skeleton);
+        console.info(`[DUNK-HAND] duel body right-handed: ${done.length} dunk clips mirrored`);
+      }
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1: the reach, after the clips
       ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
       // BIOMECH-HOOPS-WAVE1: one Posture Poses layer per body; the layer owns the eyes (the secondary head-look stands down)
@@ -649,15 +662,16 @@ export const DunkDuelMode: ModeDefinition = (() => {
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         const c = active();
-        activeHandOff = style === 'sig' ? { spec: handOffSpecAt(EASTBAY_PASSES, clipTime), t: clipTime } : null;   // DUNK MOTION phase 10b: up the front to the off hand, back under the thigh
-        if (style === 'sig' && runEastbayPath(ball, c.skeleton, clipTime, ebState)) console.info(`[HANDS] handoff ${activeHandOff!.spec.from[0]}→${activeHandOff!.spec.to[0]} eastbay @${clipTime.toFixed(2)}`);
+        activeHandOff = style === 'sig' ? { spec: handOffSpecAt(DUEL_EASTBAY, clipTime), t: clipTime } : null;   // DUNK MOTION phase 10b: up the front to the off hand, back under the thigh (phase 11: on the right-handed body)
+        if (activeHandOff && runHandOffPath(ball, c.skeleton, clipTime, activeHandOff.spec, ebState)) console.info(`[HANDS] handoff ${activeHandOff.spec.from[0]}→${activeHandOff.spec.to[0]} eastbay @${clipTime.toFixed(2)}`);
         ikSideK = activeHandOff ? handOffK(activeHandOff.t, activeHandOff.spec) : (ebState.inLeftHand ? 1 : 0);
         // A+ P8 H4: the ball stays parented to the ball hand through the hang — a lost parent that is not a release re-attaches
         if (!ball.parent && !ball.metadata?.felReleased) { attachBallToHand(ball, c.skeleton, ebState.inLeftHand ? 'LeftHand' : 'RightHand'); console.info('[HANDS] ball re-attached'); }
-        const k = Math.min(1, clipTime / EASTBAY_TIMING.duration);
         // DUNK-CONTROL-JUICE (the contest's mirror): a parabola off the floor, a constant-speed carry from the takeoff line
         // to the rim's front edge at the extension — the car is a long jump from its own line. The run-up buys air.
-        c.root.position.y = 4 * k * (1 - k) * (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3);
+        // DUNK MOTION phase 11: the contest's flight — the top AT the rim (DunkLegs.arcHeight); the parabola peaked at clip 0.75 and the
+        // slam at 1.25 met the iron at 56 % of the jump, on the way down, the hand coming up at the ring from under it
+        c.root.position.y = arcHeight(clipTime, EASTBAY_TIMING.extend) * (1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3);
         const u = Math.min(1, clipTime / EASTBAY_TIMING.extend);
         c.root.position.z = launchZ + (rim.z + FLUSH_Z_AHEAD - launchZ) * u;
         faceToward(rim, dt * FACE_RIM_RATE);   // ease the facing onto the iron through the rise
