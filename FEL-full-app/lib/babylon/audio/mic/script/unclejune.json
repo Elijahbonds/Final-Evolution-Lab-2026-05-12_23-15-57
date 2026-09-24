@@ -1160,7 +1160,10 @@
   {
    "id": "three.fire.03",
    "moment": "three.fire",
-   "text": "Whole rack! Not a crumb left!"
+   "text": "Whole rack! Not a crumb left!",
+   "tags": [
+    "rack:clean"
+   ]
   },
   {
    "id": "three.fire.04",

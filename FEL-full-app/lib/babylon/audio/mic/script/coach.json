@@ -1,0 +1,900 @@
+{
+ "cast": "coach",
+ "lines": [
+  {
+   "id": "coach.penultimate.short.01",
+   "moment": "coach.penultimate.short",
+   "text": "Short penultimate, so the plant became a stomp. Longer and lower next time."
+  },
+  {
+   "id": "coach.penultimate.short.02",
+   "moment": "coach.penultimate.short",
+   "text": "Lengthen your penultimate. A longer, lower step lets the hips drop and load."
+  },
+  {
+   "id": "coach.penultimate.short.03",
+   "moment": "coach.penultimate.short",
+   "text": "Your second-to-last step was choppy. Stretch it out so you can gather."
+  },
+  {
+   "id": "coach.penultimate.short.04",
+   "moment": "coach.penultimate.short",
+   "text": "Think long penultimate, not late penultimate. That step is your gather."
+  },
+  {
+   "id": "coach.penultimate.long.01",
+   "moment": "coach.penultimate.long",
+   "text": "Your penultimate overreached, so the brake became a slide. Keep it long, but controlled."
+  },
+  {
+   "id": "coach.penultimate.long.02",
+   "moment": "coach.penultimate.long",
+   "text": "Brace your trunk on that long step, so you brake instead of sliding."
+  },
+  {
+   "id": "coach.penultimate.long.03",
+   "moment": "coach.penultimate.long",
+   "text": "Reel that step in a touch. Long and controlled beats long and sliding."
+  },
+  {
+   "id": "coach.penultimate.good.01",
+   "moment": "coach.penultimate.good",
+   "text": "Good penultimate. Long, low, and in control."
+  },
+  {
+   "id": "coach.penultimate.good.02",
+   "moment": "coach.penultimate.good",
+   "text": "That second-to-last step set up the whole jump."
+  },
+  {
+   "id": "coach.penultimate.good.03",
+   "moment": "coach.penultimate.good",
+   "text": "Long and low into the plant. That is your gather."
+  },
+  {
+   "id": "coach.penultimate.good.04",
+   "moment": "coach.penultimate.good",
+   "text": "Nice. You lowered your hips with control on that step."
+  },
+  {
+   "id": "coach.load.upright.01",
+   "moment": "coach.load.upright",
+   "text": "Pretty run, but you never loaded. Sink your hips into the gather."
+  },
+  {
+   "id": "coach.load.upright.02",
+   "moment": "coach.load.upright",
+   "text": "You stayed tall. Sit into the gather so your legs can load."
+  },
+  {
+   "id": "coach.load.upright.03",
+   "moment": "coach.load.upright",
+   "text": "Lower your hips a touch. No load, no spring."
+  },
+  {
+   "id": "coach.load.deep.01",
+   "moment": "coach.load.deep",
+   "text": "You sank too deep and lost your bounce. Try a quicker, shallower gather."
+  },
+  {
+   "id": "coach.load.deep.02",
+   "moment": "coach.load.deep",
+   "text": "Too much squat at that speed. Stay higher so the spring can fire."
+  },
+  {
+   "id": "coach.load.deep.03",
+   "moment": "coach.load.deep",
+   "text": "Shorter dip next time. Lingering low turns your spring into heat, not height."
+  },
+  {
+   "id": "coach.armswing.late.01",
+   "moment": "coach.armswing.late",
+   "text": "Your arms were late. Drive them down on the penultimate, then whip them up."
+  },
+  {
+   "id": "coach.armswing.late.02",
+   "moment": "coach.armswing.late",
+   "text": "Arms down as the second-to-last step lands, then up through the takeoff. That adds lift."
+  },
+  {
+   "id": "coach.armswing.late.03",
+   "moment": "coach.armswing.late",
+   "text": "Late swing, so the lift came after you left. Start the arms down sooner."
+  },
+  {
+   "id": "coach.armswing.none.01",
+   "moment": "coach.armswing.none",
+   "text": "No arm swing. Swing both arms, that's twenty to thirty-eight percent more jump."
+  },
+  {
+   "id": "coach.armswing.none.02",
+   "moment": "coach.armswing.none",
+   "text": "Your arms stayed quiet, and that's jump left on the floor. Swing both, hard."
+  },
+  {
+   "id": "coach.armswing.none.03",
+   "moment": "coach.armswing.none",
+   "text": "Swing both arms back, then whip them up. Free height, every single jump."
+  },
+  {
+   "id": "coach.armswing.good.01",
+   "moment": "coach.armswing.good",
+   "text": "Arms right on time. Down on the penultimate, up through takeoff."
+  },
+  {
+   "id": "coach.armswing.good.02",
+   "moment": "coach.armswing.good",
+   "text": "Great arm timing. That swing added real height."
+  },
+  {
+   "id": "coach.armswing.good.03",
+   "moment": "coach.armswing.good",
+   "text": "Down, then whip up. Your arms were working for you."
+  },
+  {
+   "id": "coach.armswing.good.04",
+   "moment": "coach.armswing.good",
+   "text": "Beautiful swing. Arms and feet were in sync."
+  },
+  {
+   "id": "coach.kneedrive.low.01",
+   "moment": "coach.kneedrive.low",
+   "text": "Your free knee stayed low. Drive it up for height and rhythm."
+  },
+  {
+   "id": "coach.kneedrive.low.02",
+   "moment": "coach.kneedrive.low",
+   "text": "Drive that free knee toward your chest. It lifts the whole body."
+  },
+  {
+   "id": "coach.kneedrive.low.03",
+   "moment": "coach.kneedrive.low",
+   "text": "Free leg, not a passenger. Drive that knee up for lift."
+  },
+  {
+   "id": "coach.kneedrive.good.01",
+   "moment": "coach.kneedrive.good",
+   "text": "Free knee drove up. That's height and rhythm."
+  },
+  {
+   "id": "coach.kneedrive.good.02",
+   "moment": "coach.kneedrive.good",
+   "text": "Nice knee drive. It pulled you right up."
+  },
+  {
+   "id": "coach.kneedrive.good.03",
+   "moment": "coach.kneedrive.good",
+   "text": "Good. That free leg did its job."
+  },
+  {
+   "id": "coach.lean.01",
+   "moment": "coach.lean",
+   "text": "Leaning at takeoff sends force out, not up. Stay tall over the plant."
+  },
+  {
+   "id": "coach.lean.02",
+   "moment": "coach.lean",
+   "text": "Force has direction. Chest proud over the plant, and every bit goes up."
+  },
+  {
+   "id": "coach.lean.03",
+   "moment": "coach.lean",
+   "text": "Get tall over the plant foot. Every degree of lean taxes your height."
+  },
+  {
+   "id": "coach.jump.height.01",
+   "moment": "coach.jump.height",
+   "text": "You got up…"
+  },
+  {
+   "id": "coach.jump.height.02",
+   "moment": "coach.jump.height",
+   "text": "That jump measured…"
+  },
+  {
+   "id": "coach.jump.height.03",
+   "moment": "coach.jump.height",
+   "text": "Off the floor…"
+  },
+  {
+   "id": "coach.jump.height.04",
+   "moment": "coach.jump.height",
+   "text": "Your jump reads…"
+  },
+  {
+   "id": "coach.jump.best.01",
+   "moment": "coach.jump.best",
+   "text": "That's a new personal best!"
+  },
+  {
+   "id": "coach.jump.best.02",
+   "moment": "coach.jump.best",
+   "text": "New best. Your highest jump yet."
+  },
+  {
+   "id": "coach.jump.best.03",
+   "moment": "coach.jump.best",
+   "text": "Personal record. The work is showing."
+  },
+  {
+   "id": "coach.jump.best.04",
+   "moment": "coach.jump.best",
+   "text": "Highest you've ever gone. Remember that feeling."
+  },
+  {
+   "id": "coach.jump.down.01",
+   "moment": "coach.jump.down",
+   "text": "A little under your usual. Check that long, low penultimate."
+  },
+  {
+   "id": "coach.jump.down.02",
+   "moment": "coach.jump.down",
+   "text": "Down a little. Rest a moment; tired legs leak height."
+  },
+  {
+   "id": "coach.jump.down.03",
+   "moment": "coach.jump.down",
+   "text": "Not your highest, and that's fine. Check your arm timing next rep."
+  },
+  {
+   "id": "coach.slam.early.01",
+   "moment": "coach.slam.early",
+   "text": "A touch early. Wait for the top, where your hand is highest."
+  },
+  {
+   "id": "coach.slam.early.02",
+   "moment": "coach.slam.early",
+   "text": "You swung before the peak. Let the jump rise, then finish."
+  },
+  {
+   "id": "coach.slam.early.03",
+   "moment": "coach.slam.early",
+   "text": "Patience at the top. Finish early and you give away height."
+  },
+  {
+   "id": "coach.slam.late.01",
+   "moment": "coach.slam.late",
+   "text": "A beat late, you were already falling. Finish right at the top."
+  },
+  {
+   "id": "coach.slam.late.02",
+   "moment": "coach.slam.late",
+   "text": "Late finish, and the rim got away. Strike at the top."
+  },
+  {
+   "id": "coach.slam.late.03",
+   "moment": "coach.slam.late",
+   "text": "Finish at the peak. On the way down, you've lost reach."
+  },
+  {
+   "id": "coach.slam.good.01",
+   "moment": "coach.slam.good",
+   "text": "Right at the top. Perfect timing."
+  },
+  {
+   "id": "coach.slam.good.02",
+   "moment": "coach.slam.good",
+   "text": "Finished at the peak. That's the window."
+  },
+  {
+   "id": "coach.slam.good.03",
+   "moment": "coach.slam.good",
+   "text": "Great timing. You met the rim at your highest."
+  },
+  {
+   "id": "coach.slam.good.04",
+   "moment": "coach.slam.good",
+   "text": "Top of the jump, ball through. Clean."
+  },
+  {
+   "id": "coach.offarm.01",
+   "moment": "coach.offarm",
+   "text": "Throw your off arm down as the finishing hand rises. It lifts your reach."
+  },
+  {
+   "id": "coach.offarm.02",
+   "moment": "coach.offarm",
+   "text": "Use the off arm. Drive it down and your finishing hand climbs higher."
+  },
+  {
+   "id": "coach.offarm.03",
+   "moment": "coach.offarm",
+   "text": "Play the off arm with intent. Down low sends your finishing hand higher."
+  },
+  {
+   "id": "coach.landing.stiff.01",
+   "moment": "coach.landing.stiff",
+   "text": "Stiff landing. Sit into your hips to spare your knees."
+  },
+  {
+   "id": "coach.landing.stiff.02",
+   "moment": "coach.landing.stiff",
+   "text": "That landing was rigid. Let ankles, knees and hips share the load."
+  },
+  {
+   "id": "coach.landing.stiff.03",
+   "moment": "coach.landing.stiff",
+   "text": "Bend your ankles when you land. They soak up the shock."
+  },
+  {
+   "id": "coach.landing.valgus.01",
+   "moment": "coach.landing.valgus",
+   "text": "Knees caved in. Track them over your midfoot to protect the joint."
+  },
+  {
+   "id": "coach.landing.valgus.02",
+   "moment": "coach.landing.valgus",
+   "text": "Land with knees over the middle of your feet. Knees stay safe."
+  },
+  {
+   "id": "coach.landing.valgus.03",
+   "moment": "coach.landing.valgus",
+   "text": "Your knees drifted in. Keep them over the midfoot, so they last."
+  },
+  {
+   "id": "coach.landing.good.01",
+   "moment": "coach.landing.good",
+   "text": "Good landing. Soft, organized, ready."
+  },
+  {
+   "id": "coach.landing.good.02",
+   "moment": "coach.landing.good",
+   "text": "Nice landing. You could go again right away."
+  },
+  {
+   "id": "coach.landing.good.03",
+   "moment": "coach.landing.good",
+   "text": "Landed on purpose. That's how you last."
+  },
+  {
+   "id": "coach.shot.early.01",
+   "moment": "coach.shot.early",
+   "text": "Early release. Let your legs lift the ball, and release near the top."
+  },
+  {
+   "id": "coach.shot.early.02",
+   "moment": "coach.shot.early",
+   "text": "Ride the jump a beat longer. The top gives you the cleanest release."
+  },
+  {
+   "id": "coach.shot.early.03",
+   "moment": "coach.shot.early",
+   "text": "You shot on the way up. Let the jump lift the ball first."
+  },
+  {
+   "id": "coach.shot.late.01",
+   "moment": "coach.shot.late",
+   "text": "Late release. Let go at the top while your legs still help."
+  },
+  {
+   "id": "coach.shot.late.02",
+   "moment": "coach.shot.late",
+   "text": "Shooting on the way down costs you power. Release at the top."
+  },
+  {
+   "id": "coach.shot.late.03",
+   "moment": "coach.shot.late",
+   "text": "You were already coming down. Let it go at the peak."
+  },
+  {
+   "id": "coach.shot.good.01",
+   "moment": "coach.shot.good",
+   "text": "Released near the top. Right on time."
+  },
+  {
+   "id": "coach.shot.good.02",
+   "moment": "coach.shot.good",
+   "text": "Good release point. The jump did the lifting."
+  },
+  {
+   "id": "coach.shot.good.03",
+   "moment": "coach.shot.good",
+   "text": "On time. Legs up, ball out at the peak."
+  },
+  {
+   "id": "coach.shot.good.04",
+   "moment": "coach.shot.good",
+   "text": "That's the timing. Top of the jump, soft release."
+  },
+  {
+   "id": "coach.shot.setpoint.01",
+   "moment": "coach.shot.setpoint",
+   "text": "Low set point, easy to block. Set it at your forehead."
+  },
+  {
+   "id": "coach.shot.setpoint.02",
+   "moment": "coach.shot.setpoint",
+   "text": "Raise your set point to the forehead. Higher is harder to block."
+  },
+  {
+   "id": "coach.shot.setpoint.03",
+   "moment": "coach.shot.setpoint",
+   "text": "Ball sat at your chin. Set it higher, out of reach."
+  },
+  {
+   "id": "coach.shot.elbow.01",
+   "moment": "coach.shot.elbow",
+   "text": "Your elbow flared out, so the ball went sideways. Tuck it under."
+  },
+  {
+   "id": "coach.shot.elbow.02",
+   "moment": "coach.shot.elbow",
+   "text": "Elbow under the ball. It keeps the shot on a straight line."
+  },
+  {
+   "id": "coach.shot.elbow.03",
+   "moment": "coach.shot.elbow",
+   "text": "Flared elbow. Line it up under the ball so it flies straight."
+  },
+  {
+   "id": "coach.shot.hitch.01",
+   "moment": "coach.shot.hitch",
+   "text": "Hitch at the set point. One motion keeps your legs in it."
+  },
+  {
+   "id": "coach.shot.hitch.02",
+   "moment": "coach.shot.hitch",
+   "text": "Two motions there. Flow through the set point so the power carries."
+  },
+  {
+   "id": "coach.shot.hitch.03",
+   "moment": "coach.shot.hitch",
+   "text": "Don't park the ball up top. One smooth motion, legs to fingertips."
+  },
+  {
+   "id": "coach.shot.follow.01",
+   "moment": "coach.shot.follow",
+   "text": "Hold that follow-through till the ball lands. It keeps the release clean."
+  },
+  {
+   "id": "coach.shot.follow.02",
+   "moment": "coach.shot.follow",
+   "text": "Early drop on the follow-through. Hold it, let the wrist finish."
+  },
+  {
+   "id": "coach.shot.follow.03",
+   "moment": "coach.shot.follow",
+   "text": "Hand came down early. Leave it up till the ball lands."
+  },
+  {
+   "id": "coach.strike.guard.01",
+   "moment": "coach.strike.guard",
+   "text": "Hands back to your guard after every strike. That's your protection."
+  },
+  {
+   "id": "coach.strike.guard.02",
+   "moment": "coach.strike.guard",
+   "text": "Low hands after the strike leave you open. Bring them right back."
+  },
+  {
+   "id": "coach.strike.guard.03",
+   "moment": "coach.strike.guard",
+   "text": "Strike, then home. Hands up protects you for the next exchange."
+  },
+  {
+   "id": "coach.strike.hips.01",
+   "moment": "coach.strike.hips",
+   "text": "All arm on that one. Turn your hips into it for power."
+  },
+  {
+   "id": "coach.strike.hips.02",
+   "moment": "coach.strike.hips",
+   "text": "Power starts at the floor. Rotate your hips through the strike."
+  },
+  {
+   "id": "coach.strike.hips.03",
+   "moment": "coach.strike.hips",
+   "text": "Turn the hips first, and the arm just delivers it."
+  },
+  {
+   "id": "coach.strike.chin.01",
+   "moment": "coach.strike.chin",
+   "text": "Chin down, eyes up. A raised chin is exposed."
+  },
+  {
+   "id": "coach.strike.chin.02",
+   "moment": "coach.strike.chin",
+   "text": "Your chin lifted. Tuck it so you stay protected."
+  },
+  {
+   "id": "coach.strike.chin.03",
+   "moment": "coach.strike.chin",
+   "text": "Tuck that chin, eyes still up. Safer and sharper."
+  },
+  {
+   "id": "coach.strike.good.01",
+   "moment": "coach.strike.good",
+   "text": "Clean strike. Hips in, hands home."
+  },
+  {
+   "id": "coach.strike.good.02",
+   "moment": "coach.strike.good",
+   "text": "That's it. Power from the hips, guard right back."
+  },
+  {
+   "id": "coach.strike.good.03",
+   "moment": "coach.strike.good",
+   "text": "Sharp. Everything turned together on that one."
+  },
+  {
+   "id": "coach.board.absorb.01",
+   "moment": "coach.board.absorb",
+   "text": "Straight legs on that landing. Bend your knees to soak it up."
+  },
+  {
+   "id": "coach.board.absorb.02",
+   "moment": "coach.board.absorb",
+   "text": "Let your knees be the suspension. Soft legs keep you riding."
+  },
+  {
+   "id": "coach.board.absorb.03",
+   "moment": "coach.board.absorb",
+   "text": "You landed stiff. Knees absorb it so you ride away clean."
+  },
+  {
+   "id": "coach.board.low.01",
+   "moment": "coach.board.low",
+   "text": "You stayed tall through that turn. Get low for balance."
+  },
+  {
+   "id": "coach.board.low.02",
+   "moment": "coach.board.low",
+   "text": "Sink lower, weight over the board. That's where your balance lives."
+  },
+  {
+   "id": "coach.board.low.03",
+   "moment": "coach.board.low",
+   "text": "Too upright in the turn. A lower stance grips the edge."
+  },
+  {
+   "id": "coach.board.good.01",
+   "moment": "coach.board.good",
+   "text": "Low and balanced. Nice riding."
+  },
+  {
+   "id": "coach.board.good.02",
+   "moment": "coach.board.good",
+   "text": "Great stance through that turn."
+  },
+  {
+   "id": "coach.board.good.03",
+   "moment": "coach.board.good",
+   "text": "Smooth. Knees soft, weight centered."
+  },
+  {
+   "id": "coach.encourage.01",
+   "moment": "coach.encourage",
+   "text": "Shake it off. Next one's yours."
+  },
+  {
+   "id": "coach.encourage.02",
+   "moment": "coach.encourage",
+   "text": "That's how you learn. Go again."
+  },
+  {
+   "id": "coach.encourage.03",
+   "moment": "coach.encourage",
+   "text": "No worries. Reset and breathe."
+  },
+  {
+   "id": "coach.encourage.04",
+   "moment": "coach.encourage",
+   "text": "Good effort. Every rep teaches you something."
+  },
+  {
+   "id": "coach.encourage.05",
+   "moment": "coach.encourage",
+   "text": "Stay with it. You're closer than you think."
+  },
+  {
+   "id": "coach.praise.01",
+   "moment": "coach.praise",
+   "text": "That's the one. Everything lined up."
+  },
+  {
+   "id": "coach.praise.02",
+   "moment": "coach.praise",
+   "text": "Beautiful rep, start to finish."
+  },
+  {
+   "id": "coach.praise.03",
+   "moment": "coach.praise",
+   "text": "Clean from the approach to the landing."
+  },
+  {
+   "id": "coach.praise.04",
+   "moment": "coach.praise",
+   "text": "Yes! That's the rep we're chasing."
+  },
+  {
+   "id": "coach.praise.05",
+   "moment": "coach.praise",
+   "text": "Textbook. Remember exactly how that felt."
+  },
+  {
+   "id": "coach.drill.intro.01",
+   "moment": "coach.drill.intro",
+   "text": "Drill time. Follow the targets and move with the rhythm."
+  },
+  {
+   "id": "coach.drill.intro.02",
+   "moment": "coach.drill.intro",
+   "text": "Here comes a drill. Hit each target as it lights up."
+  },
+  {
+   "id": "coach.drill.intro.03",
+   "moment": "coach.drill.intro",
+   "text": "Let's warm up. Watch the targets and match them."
+  },
+  {
+   "id": "coach.drill.go.01",
+   "moment": "coach.drill.go",
+   "text": "Go."
+  },
+  {
+   "id": "coach.drill.go.02",
+   "moment": "coach.drill.go",
+   "text": "Here we go."
+  },
+  {
+   "id": "coach.drill.go.03",
+   "moment": "coach.drill.go",
+   "text": "Start now."
+  },
+  {
+   "id": "coach.drill.go.04",
+   "moment": "coach.drill.go",
+   "text": "And go!"
+  },
+  {
+   "id": "coach.drill.nice.01",
+   "moment": "coach.drill.nice",
+   "text": "Nice."
+  },
+  {
+   "id": "coach.drill.nice.02",
+   "moment": "coach.drill.nice",
+   "text": "Good rhythm."
+  },
+  {
+   "id": "coach.drill.nice.03",
+   "moment": "coach.drill.nice",
+   "text": "That's it."
+  },
+  {
+   "id": "coach.drill.nice.04",
+   "moment": "coach.drill.nice",
+   "text": "Clean."
+  },
+  {
+   "id": "coach.drill.nice.05",
+   "moment": "coach.drill.nice",
+   "text": "Right on beat."
+  },
+  {
+   "id": "coach.drill.faster.01",
+   "moment": "coach.drill.faster",
+   "text": "Pick it up."
+  },
+  {
+   "id": "coach.drill.faster.02",
+   "moment": "coach.drill.faster",
+   "text": "Quicker now."
+  },
+  {
+   "id": "coach.drill.faster.03",
+   "moment": "coach.drill.faster",
+   "text": "Faster feet."
+  },
+  {
+   "id": "coach.drill.slower.01",
+   "moment": "coach.drill.slower",
+   "text": "Slow it down."
+  },
+  {
+   "id": "coach.drill.slower.02",
+   "moment": "coach.drill.slower",
+   "text": "Easy, control it."
+  },
+  {
+   "id": "coach.drill.slower.03",
+   "moment": "coach.drill.slower",
+   "text": "Smooth, not rushed."
+  },
+  {
+   "id": "coach.drill.hold.01",
+   "moment": "coach.drill.hold",
+   "text": "Hold it there."
+  },
+  {
+   "id": "coach.drill.hold.02",
+   "moment": "coach.drill.hold",
+   "text": "Stay right there."
+  },
+  {
+   "id": "coach.drill.hold.03",
+   "moment": "coach.drill.hold",
+   "text": "Freeze. Hold steady."
+  },
+  {
+   "id": "coach.drill.breathe.01",
+   "moment": "coach.drill.breathe",
+   "text": "In through the nose, slow out."
+  },
+  {
+   "id": "coach.drill.breathe.02",
+   "moment": "coach.drill.breathe",
+   "text": "Breathe in deep, then let it out slow."
+  },
+  {
+   "id": "coach.drill.breathe.03",
+   "moment": "coach.drill.breathe",
+   "text": "Nose in, and a long slow breath out."
+  },
+  {
+   "id": "coach.drill.switch.01",
+   "moment": "coach.drill.switch",
+   "text": "Switch sides."
+  },
+  {
+   "id": "coach.drill.switch.02",
+   "moment": "coach.drill.switch",
+   "text": "Other side now."
+  },
+  {
+   "id": "coach.drill.switch.03",
+   "moment": "coach.drill.switch",
+   "text": "Now the other side."
+  },
+  {
+   "id": "coach.drill.rest.01",
+   "moment": "coach.drill.rest",
+   "text": "Rest now. Shake it out."
+  },
+  {
+   "id": "coach.drill.rest.02",
+   "moment": "coach.drill.rest",
+   "text": "Take a breather."
+  },
+  {
+   "id": "coach.drill.rest.03",
+   "moment": "coach.drill.rest",
+   "text": "Good. Catch your breath."
+  },
+  {
+   "id": "coach.drill.last.01",
+   "moment": "coach.drill.last",
+   "text": "Last one."
+  },
+  {
+   "id": "coach.drill.last.02",
+   "moment": "coach.drill.last",
+   "text": "Final rep."
+  },
+  {
+   "id": "coach.drill.last.03",
+   "moment": "coach.drill.last",
+   "text": "One more, finish strong."
+  },
+  {
+   "id": "coach.drill.done.01",
+   "moment": "coach.drill.done",
+   "text": "Drill complete. Great work, that's timing and control in the bank."
+  },
+  {
+   "id": "coach.drill.done.02",
+   "moment": "coach.drill.done",
+   "text": "And that's the drill. Nice job, your body is learning the rhythm."
+  },
+  {
+   "id": "coach.drill.done.03",
+   "moment": "coach.drill.done",
+   "text": "Finished. Those clean reps are how a better athlete gets built."
+  },
+  {
+   "id": "coach.space.intro.01",
+   "moment": "coach.space.intro",
+   "text": "Before we play, step back until your whole body is in the picture, with clear space around you and overhead."
+  },
+  {
+   "id": "coach.space.intro.02",
+   "moment": "coach.space.intro",
+   "text": "Quick space check. Step back until I can see all of you, and clear the area around and above."
+  },
+  {
+   "id": "coach.space.back.01",
+   "moment": "coach.space.back",
+   "text": "Step back."
+  },
+  {
+   "id": "coach.space.back.02",
+   "moment": "coach.space.back",
+   "text": "A little farther back."
+  },
+  {
+   "id": "coach.space.back.03",
+   "moment": "coach.space.back",
+   "text": "Back up a bit."
+  },
+  {
+   "id": "coach.space.closer.01",
+   "moment": "coach.space.closer",
+   "text": "Come closer."
+  },
+  {
+   "id": "coach.space.closer.02",
+   "moment": "coach.space.closer",
+   "text": "Step in a little."
+  },
+  {
+   "id": "coach.space.closer.03",
+   "moment": "coach.space.closer",
+   "text": "Move in closer."
+  },
+  {
+   "id": "coach.space.left.01",
+   "moment": "coach.space.left",
+   "text": "Move to your left."
+  },
+  {
+   "id": "coach.space.left.02",
+   "moment": "coach.space.left",
+   "text": "A step to your left."
+  },
+  {
+   "id": "coach.space.right.01",
+   "moment": "coach.space.right",
+   "text": "Move to your right."
+  },
+  {
+   "id": "coach.space.right.02",
+   "moment": "coach.space.right",
+   "text": "A step to your right."
+  },
+  {
+   "id": "coach.space.feet.01",
+   "moment": "coach.space.feet",
+   "text": "Your feet need to be in the picture."
+  },
+  {
+   "id": "coach.space.feet.02",
+   "moment": "coach.space.feet",
+   "text": "I need to see your feet."
+  },
+  {
+   "id": "coach.space.arms.01",
+   "moment": "coach.space.arms",
+   "text": "Reach both arms overhead so I can check the headroom."
+  },
+  {
+   "id": "coach.space.arms.02",
+   "moment": "coach.space.arms",
+   "text": "Arms up high. Let's make sure nothing's above you."
+  },
+  {
+   "id": "coach.space.still.01",
+   "moment": "coach.space.still",
+   "text": "Stand still for a moment."
+  },
+  {
+   "id": "coach.space.still.02",
+   "moment": "coach.space.still",
+   "text": "Hold still, just a second."
+  },
+  {
+   "id": "coach.space.ready.01",
+   "moment": "coach.space.ready",
+   "text": "All set. Raise both hands to start."
+  },
+  {
+   "id": "coach.space.ready.02",
+   "moment": "coach.space.ready",
+   "text": "You're good to go. Hands up when ready."
+  },
+  {
+   "id": "coach.space.ready.03",
+   "moment": "coach.space.ready",
+   "text": "Space looks great. Lift both hands and we begin."
+  }
+ ]
+}

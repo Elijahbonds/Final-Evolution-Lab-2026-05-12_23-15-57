@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { CAST } from './cast';
-import { ALL_MOMENT_IDS, CROWD_MOMENTS, PLAYER_MOMENTS } from './moments';
+import { ALL_MOMENT_IDS, COACH_MOMENTS, CROWD_MOMENTS, PLAYER_MOMENTS } from './moments';
 import { lintLine, shortfalls, type ScriptFile } from './scriptRules';
 
 const DIR = join(__dirname, 'script');
@@ -26,10 +26,11 @@ describe('the scripts', () => {
     }
     expect(bad).toEqual([]);
   });
-  it('every MC and the sidekick meet their counts; the crowd and the players theirs', () => {
+  it('every MC and the sidekick meet their counts; the crowd, the players and the coach theirs', () => {
     for (const c of CAST) {
       const f = scripts.get(c.id); if (!f) continue;
       if (c.role === 'mc' || c.role === 'side') expect(shortfalls(f, c.role), c.id).toEqual([]);
+      if (c.role === 'coach') for (const m of COACH_MOMENTS) expect(f.lines.filter((l) => l.moment === m.id).length, `${c.id} ${m.id}`).toBeGreaterThanOrEqual(m.n);
       if (c.role === 'crowd') for (const m of CROWD_MOMENTS) expect(f.lines.filter((l) => l.moment === m.id).length, `${c.id} ${m.id}`).toBeGreaterThanOrEqual(m.n);
       if (c.role === 'player') {
         const kind = ['cass', 'ty', 'pilot', 'zo', 'stack'].includes(c.id) ? 'rival' : 'hooper';

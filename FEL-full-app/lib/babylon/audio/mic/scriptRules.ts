@@ -5,7 +5,7 @@
 // anyone, so nobody but the speaker gets a gendered pronoun; and a text-to-speech voice reads every line, so no digits, no
 // all-caps words and no stage directions.
 
-import { CROWD_MOMENTS, MOMENTS, PLAYER_MOMENTS, TIER_COUNTS, momentSpec } from './moments';
+import { COACH_MOMENTS, CROWD_MOMENTS, MOMENTS, PLAYER_MOMENTS, TIER_COUNTS, momentSpec } from './moments';
 
 export interface ScriptLine { id?: string; moment: string; text: string; tier?: 0 | 1 | 2; tags?: string[] }
 export interface ScriptFile { cast: string; lines: ScriptLine[] }
@@ -26,6 +26,7 @@ export function maxWordsFor(moment: string): number | null {
   const m = momentSpec(moment); if (m) return m.maxWords;
   const c = CROWD_MOMENTS.find((x) => x.id === moment); if (c) return c.maxWords;
   const p = PLAYER_MOMENTS.find((x) => x.id === moment); if (p) return p.maxWords;
+  const c2 = COACH_MOMENTS.find((x) => x.id === moment); if (c2) return c2.maxWords;
   return null;
 }
 
@@ -49,7 +50,7 @@ export function lintLine(l: ScriptLine): string[] {
   if (max !== null && wordCount(t) > max) why.push(`over ${max} words (${wordCount(t)})`);
   if (l.moment !== 'name' && max === null) why.push(`unknown moment ${l.moment}`);
   const spec = momentSpec(l.moment);
-  if (l.tags?.length && spec && !l.tags.every((x) => spec.tags?.includes(x))) why.push(`tag not in ${l.moment}`);
+  if (l.tags?.length && spec && !l.tags.every((x) => spec.tags?.includes(x) || spec.optionalTags?.includes(x))) why.push(`tag not in ${l.moment}`);
   if (l.tier !== undefined && !spec?.tiered) why.push('tier on an untiered moment');
   return why;
 }
@@ -73,7 +74,9 @@ export function requiredCounts(role: 'mc' | 'side'): Map<string, number> {
 export function countsOf(file: ScriptFile): Map<string, number> {
   const got = new Map<string, number>();
   for (const l of file.lines) {
-    const k = `${l.moment}|${l.tier ?? ''}|${l.tags?.length === 1 ? l.tags[0] : ''}`;
+    // an OPTIONAL tag (a line only true in that case) still counts toward the moment's untagged lines
+    const required = l.tags?.length === 1 && momentSpec(l.moment)?.tags?.includes(l.tags[0]) ? l.tags[0] : '';
+    const k = `${l.moment}|${l.tier ?? ''}|${required}`;
     got.set(k, (got.get(k) ?? 0) + 1);
   }
   return got;

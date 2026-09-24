@@ -344,8 +344,10 @@ const S = {
   /** Tiebreak playoffs run so far (a tied final is shot again by the tied shooters). */
   playoff: 0,
   revealT: 0,
-  /** True while the finalists' FINAL scores post before the player's run. */
+  /** True while the finalists' FINAL scores post before the player's run (never in a rivals-only playoff: no run follows). */
   finalistsPosting: false,
+  /** The player's final card, kept while a rivals-only playoff runs (its board no longer holds the player). */
+  finalCard: null as FinalCard | null,
   eliminated: false,
   /** Previous hero position, for the camera's velocity term. */
   prevPos: new Vector3(),
@@ -360,7 +362,9 @@ function resetState(): void {
   S.standingsT = 0;
   S.revealQueue = [];
   S.revealT = 0;
+  S.playoff = 0;   // S is module state: a second contest in the session started with the last one's playoffs spent
   S.finalistsPosting = false;
+  S.finalCard = null;
   S.eliminated = false;
   S.skills = RIVAL_NAMES.map(() => 0.25 + Math.random() * 0.7);
   S.field = [
@@ -526,14 +530,17 @@ function micShotCall(made: boolean, money: boolean, brick: boolean): MicEvent {
     return { moment: 'three.miss', priority: 1,
       crowd: money ? { moment: 'crowd.groan', n: 2 } : brick && Math.random() < 0.3 ? { moment: 'crowd.heckle', n: 1 } : undefined };
   }
-  // (only when the player is IN the final's field: a rivals-only tie at the top re-runs the player without a card on the
-  // board, and "it's won" there would be a lie the result then takes back)
+  // (only when the player is IN the final's field: a rivals-only playoff's board holds no card for the player, and "it's
+  // won" there would be a lie the result then takes back)
   if (S.round === 'final' && !micClinched && S.field.some((f) => f.isPlayer) && S.pts >= finalNeed()) {
     micClinched = true;   // past the number: this one wins it (unless the horn beats the ball to the rim: then it is the buzzer's)
     return { moment: 'three.clinch', priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } };
   }
   // on fire at five, and again at every five after (a call on every ball of a hot run would be a chant, not a call)
-  if (S.streak >= 5 && S.streak % 5 === 0) return { moment: 'three.fire', priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 } };
+  // `rack:clean` when the five are this whole rack (this is its last ball): the lines that say "clean rack" / "whole rack" need
+  // it once they are tagged in the scripts; a streak across two racks, after misses, is not one
+  if (S.streak >= 5 && S.streak % 5 === 0) return { moment: 'three.fire', priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 },
+    tags: S.ballIdx === BALLS_PER_RACK - 1 ? ['rack:clean'] : undefined };
   if (money) return { moment: 'three.make.money', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } };
   if (S.streak === 3 || S.streak === 4) return { moment: 'three.streak', priority: 2, crowd: { moment: 'crowd.cheer', n: 1 } };
   return { moment: 'three.make', priority: 1, crowd: Math.random() < 0.35 ? { moment: 'crowd.cheer', n: 1 } : undefined };
@@ -614,12 +621,14 @@ function advanceBall(ctx: ModeContext): void {
     S.phase = 'move';
     return;
   }
-  S.barT = Math.random() * Math.PI; meterBegin();   // desync the bar so it cannot be memorised
+  S.barT = Math.random(); meterBegin();   // desync the bar so it cannot be memorised (in range: ×π read up to 3.14 until the next frame's wrap, and a press on that frame was graded against it)
   S.phase = 'shoot';
   dressBall();
   // THE MIC: the gold ball is up (an ordinary call: it waits behind the last shot's call rather than cutting it); the last
   // rack's is the run's last ball, and the stands get up for it
-  if (isMoneyBall(S.ballIdx)) mic?.say({ moment: 'three.money', priority: 1, crowd: S.rack === RACKS - 1 ? { moment: 'crowd.hype', n: 2 } : undefined });
+  // Priority 0: said now or not at all. At 1 it queued behind the last shot's call and started after the gold ball had left the
+  // hand (mic probe, run 1: +0.82 s and +0.50 s), and the money ball's own call then queued behind it and landed late.
+  if (isMoneyBall(S.ballIdx)) mic?.say({ moment: 'three.money', priority: 0, crowd: S.rack === RACKS - 1 ? { moment: 'crowd.hype', n: 2 } : undefined });
 }
 
 /** The player's run for this round is over — post the score, run the field. */
@@ -658,7 +667,10 @@ function micRunOver(): void {
   if (buzzer) mic.say({ moment: 'three.buzzer', priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } });
   if (S.round === 'qualifying') { mic.then({ moment: 'three.results', priority: 2 }); return; }
   const board = standings();   // the same read afterStandings makes at the end of the hold
-  if (board.filter((f) => f.score === board[0].score).length > 1 && S.playoff < 3) return;
+  // a playoff the player is in waits for it; two rivals tied above the player settle it with no run for the player, so
+  // the player's result is known now
+  const top = board.filter((f) => f.score === board[0].score);
+  if (top.length > 1 && top.some((f) => f.isPlayer) && S.playoff < 3) return;
   if (board[0]?.isPlayer) mic.then({ moment: 'three.champion', priority: 3, side: 0.5, crowd: { moment: 'crowd.erupt', n: 3 } });
   else mic.then({ moment: 'outro.loss', priority: 3, side: 0.5, crowd: { moment: 'crowd.groan', n: 1 } });
 }
@@ -681,12 +693,16 @@ function afterStandings(ctx: ModeContext): void {
     // THE PLAYOFF (lock D-tiebreak, 2026-09-03): a tie at the top is shot
     // again by the tied shooters, as the real event does — it no longer goes
     // to the earlier poster.
-    const tied = board.filter((f) => f.score === board[0].score);
-    if (tied.length > 1 && S.playoff < 3) {
+    const step = settleFinal(board, S.playoff, S.finalCard);
+    if (step.kind === 'playoff') {
+      const { tied } = step;
       S.playoff += 1;
+      S.finalCard = step.card;
       S.field = tied.map((f) => ({ ...f, score: 0, shot: false }));
       S.skills = S.field.map(() => 0.35 + Math.random() * 0.6);
-      S.finalistsPosting = true;
+      // only a playoff the player is IN hands them a run: two rivals tied above the player post and the board settles
+      // after the hold (a run here posted nowhere and the contest ended on a missing row: 0 points, place 0)
+      S.finalistsPosting = step.playerIn;
       S.revealQueue = S.field.map((f, i) => ({ f, i })).filter(({ f }) => !f.isPlayer).map(({ i }) => i);
       S.revealT = 0;
       S.phase = 'standings';
@@ -697,10 +713,9 @@ function afterStandings(ctx: ModeContext): void {
       if (tied.some((f) => f.isPlayer)) mic?.then({ moment: 'three.final', priority: 2 });
       return;
     }
-    const won = me === 0;
     S.phase = 'done';
-    ctx.end(won ? 'win' : 'complete', myScore, {
-      points: myScore, bestStreak: S.best, place: me + 1, round: 2,
+    ctx.end(step.won ? 'win' : 'complete', step.score, {
+      points: step.score, bestStreak: S.best, place: step.place, round: 2,
     });
     return;
   }
@@ -756,6 +771,26 @@ export function resolveRound(field: Shooter[], round: Round): {
     advances: round === 'qualifying' && place >= 1 && place <= FINALISTS,
     champion: round === 'final' && place === 1,
   };
+}
+
+/** The player's posted card in the final: their points and their place on its board. */
+export interface FinalCard { score: number; place: number }
+export type FinalStep =
+  | { kind: 'playoff'; tied: Shooter[]; playerIn: boolean; card: FinalCard | null }
+  | { kind: 'end'; won: boolean; score: number; place: number };
+
+/**
+ * The final's board after its hold — pure, like resolveRound. A tie at the top is shot again by the tied shooters (up to
+ * three playoffs); only a playoff the player is IN hands them a run. Two rivals tied above the player settle it between
+ * themselves, and that playoff's board holds just the two of them, so the contest ends on the card the player posted
+ * (`kept`, carried as `card`), never on the missing row.
+ */
+export function settleFinal(board: Shooter[], playoffsRun: number, kept: FinalCard | null): FinalStep {
+  const me = board.findIndex((f) => f.isPlayer);
+  const card = me >= 0 ? { score: board[me].score, place: me + 1 } : kept;
+  const tied = board.filter((f) => f.score === board[0].score);
+  if (tied.length > 1 && playoffsRun < 3) return { kind: 'playoff', tied, playerIn: tied.some((f) => f.isPlayer), card };
+  return { kind: 'end', won: me === 0, score: card?.score ?? 0, place: card?.place ?? 0 };
 }
 
 export const ThreePointMode: ModeDefinition = {
@@ -969,7 +1004,8 @@ export const ThreePointMode: ModeDefinition = {
     const clockWas = S.clock;
     S.clock -= dt;
     // THE MIC: ten seconds left, once per run (the host turns the clock red on the same second)
-    if (clockWas > 10 && S.clock <= 10 && S.clock > 0) mic?.say({ moment: 'three.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
+    // The warning waits for the booth (then): said over a shot call it outranked, it cut "Docked!" after 0.15 s (mic probe)
+    if (clockWas > 10 && S.clock <= 10 && S.clock > 0) mic?.then({ moment: 'three.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
     if (S.clock <= 0) { endRun(ctx); return; }
 
     if (S.phase === 'move') {
@@ -985,17 +1021,19 @@ export const ThreePointMode: ModeDefinition = {
       if (S.moveT >= 1) {
         S.phase = 'shoot';
         S.fired = false;
-        S.barT = Math.random() * Math.PI; meterBegin();
+        S.barT = Math.random(); meterBegin();   // in range from this frame (see advanceBall)
         dressBall();
         setFeet();   // S2: the first ball of a rack is already in hand — the arrival at the rack is its catch
         pushHud(ctx, `RACK ${S.rack + 1}`);
         // THE MIC: the next rack (the first one is the run's opening: the welcome or the go has it); the last gets its own call
-        if (S.rack === RACKS - 1) mic?.say({ moment: 'three.lastrack', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
+        // the last rack lands on the ten-second mark at a typical pace (50–55 s): both wait for the booth, so they follow
+        // each other instead of one dropping the other (mic probe run 1: rack 5 at 50.85 s, 0.76 s into the clock call, lost)
+        if (S.rack === RACKS - 1) mic?.then({ moment: 'three.lastrack', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
         else if (S.rack > 0) mic?.say({ moment: 'three.rack', priority: 1 });
       }
     } else if (S.phase === 'shoot') {
-      // Triangle sweep 0..1..0 — a sine would linger at the extremes and make
-      // the sweet spot easier at the top of the arc than the bottom.
+      // Sawtooth sweep 0→1, then wraps back to 0 — linear, so the bar crosses the sweet spot at one steady speed (a sine
+      // would linger at the extremes and make the sweet spot easier at the top of the arc than the bottom).
       S.barT = (S.barT + dt / BAR_PERIOD) % 1;
       if (!S.fired) meter3d?.set(S.barT, player.root.position.add(new Vector3(0, 1.72, 0)));
       // Face the rim while loaded — slewed onto it (BIOMECH-HOOPS-WAVE1 G1/G3: a lookAt snap before), the ball in the hand.

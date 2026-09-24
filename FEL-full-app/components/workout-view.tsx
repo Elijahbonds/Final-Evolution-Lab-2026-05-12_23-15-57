@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Activity, Sparkles, ShieldCheck, Trash2, Video, Loader2, Dumbbell, ChevronRight } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
-import { PILLAR_LABELS, type Pillar } from '@/lib/workout/movement-screen';
+import { PILLAR_LABELS, analyzeMovement, defaultMetrics, type Pillar } from '@/lib/workout/movement-screen';
+import { buildAvatarSpec } from '@/lib/workout/avatar-builder';
 
 type Analysis = { pillars: Record<Pillar, number>; weakest: Pillar; overall: number; flags: string[] };
 type AvatarSpec = { heightScale: number; buildScale: number; reachScale: number; palette: { skin: string; primary: string; accent: string }; stance: string };
@@ -18,16 +20,13 @@ const KINDS = [
   { id: 'freestyle', label: 'Freestyle Play' },
 ];
 
-// Sandbox has no camera; a real device runs on-device pose extraction. We
-// derive plausible demo metrics with slight variance so the flow is testable.
-function demoMetrics(kind: string) {
-  const r = (a: number, b: number) => Math.round((a + Math.random() * (b - a)) * 10) / 10;
-  return {
-    jumpHeightCm: kind === 'jump' || kind === 'dunk' ? r(48, 78) : r(30, 55),
-    depthDeg: r(70, 118), asymmetryPct: r(2, 16),
-    valgusL: r(0.05, 0.4), valgusR: r(0.05, 0.4),
-    cadenceSpm: kind === 'run' ? r(160, 190) : r(150, 180), trunkLeanDeg: r(6, 28),
-  };
+// This page has no camera capture, so its scan is a DEMO: the sample baseline (defaultMetrics, the numbers the plan
+// route falls back to when it is sent no scan) analysed right here and never sent. It used to post random numbers to
+// /api/v1/workout/scan, which stored them as a real WorkoutScan, and playerIdentity reads the newest scan's
+// avatarSpec as a measured body. A real movement screen is the Mirror's, which measures with the camera.
+export function demoScan(): { analysis: Analysis; avatarSpec: AvatarSpec } {
+  const m = defaultMetrics();
+  return { analysis: analyzeMovement(m), avatarSpec: buildAvatarSpec(m) };
 }
 
 export function WorkoutView() {
@@ -41,20 +40,11 @@ export function WorkoutView() {
   const [plan, setPlan] = useState<any | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const runScan = async () => {
+  const runScan = () => {
     if (!consent || !ageOk) { toast.error('Please confirm consent and age first.'); return; }
-    setBusy('scan'); setPlan(null);
-    try {
-      const res = await fetch('/api/v1/workout/scan', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, metrics: demoMetrics(kind) }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error || 'scan failed');
-      setScanId(j.scanId); setAnalysis(j.analysis); setSpec(j.avatarSpec);
-      toast.success('Scan complete — your movement signature is ready.');
-    } catch (e: any) { toast.error(e?.message || 'Scan failed'); }
-    finally { setBusy(null); }
+    const d = demoScan();   // nothing is posted: a demo is not a measurement
+    setPlan(null); setScanId(null); setAnalysis(d.analysis); setSpec(d.avatarSpec);
+    toast.message('Demo scan: sample numbers, not a measurement of you. Nothing was saved.');
   };
 
   const buyPlan = async (tier: 'plan_4w' | 'program_12w') => {
@@ -76,13 +66,23 @@ export function WorkoutView() {
     finally { setBusy(null); }
   };
 
+  // The route deletes EVERY saved WorkoutScan and WorkoutPlan of this account: the Mirror's dunk history and movement
+  // screens and plans bought with shards, not just this page's demo (which saved nothing). So it says that, asks
+  // first, and only reports success when the route did delete.
   const deleteScans = async () => {
+    if (typeof window !== 'undefined' && !window.confirm(
+      'Delete everything saved from your movement scans? This removes your Mirror dunk history, your Mirror movement screens and any workout plans you bought. It cannot be undone.',
+    )) return;
     setBusy('delete');
+    let deleted = false;
     try {
-      await fetch('/api/v1/workout/scan', { method: 'DELETE' });
-    } catch { /* endpoint optional */ }
-    setScanId(null); setAnalysis(null); setSpec(null); setPlan(null); setBusy(null);
-    toast.success('Your scan data was cleared from this session.');
+      const res = await fetch('/api/v1/workout/scan', { method: 'DELETE' });
+      deleted = res.ok;
+    } catch { /* offline: reported below */ }
+    setBusy(null);
+    if (!deleted) { toast.error('Nothing was deleted. Sign in and try again.'); return; }
+    setScanId(null); setAnalysis(null); setSpec(null); setPlan(null);
+    toast.success('Deleted your saved scans, Mirror history and workout plans.');
   };
 
   return (
@@ -91,7 +91,8 @@ export function WorkoutView() {
         <Activity className="h-6 w-6 text-[#00E5FF]" />
         <h1 className="text-2xl font-bold text-white">Personalized Workout</h1>
       </div>
-      <p className="text-white/50 text-sm mb-5">Scan your movement, meet your mini-avatar, and unlock a plan animated with <span className="text-[#00E5FF]">you</span> performing every rep.</p>
+      {/* the scan here is a demo (see demoScan), so the page does not promise a scan of YOU */}
+      <p className="text-white/50 text-sm mb-5">Run the demo scan, meet the sample mini-avatar, and unlock a plan animated with it performing every rep. A real movement screen is measured in <Link href="/play/mirror" className="text-[#00E5FF] hover:underline">the Mirror</Link>.</p>
 
       {/* Consent + age gate */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4 space-y-2">
@@ -116,14 +117,20 @@ export function WorkoutView() {
           <button onClick={() => fileRef.current?.click()} data-test-ignore="opens-file-dialog" className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 py-3 text-white/70 hover:border-[#00E5FF]/60 hover:text-white text-sm">
             <Video className="h-4 w-4" /> Upload a video of yourself
           </button>
-          <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={() => toast.message('On-device analysis runs on a phone/webcam. Running a demo scan here.')} />
-          <button onClick={runScan} disabled={busy === 'scan' || !consent || !ageOk} title={!consent || !ageOk ? 'Confirm consent and age above to enable' : undefined} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-[#00E5FF] text-black font-semibold py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            {busy === 'scan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Run System Scan
+          <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={() => toast.message('Video analysis is not available here yet. Nothing was uploaded.')} />
+          <button onClick={runScan} disabled={!consent || !ageOk} title={!consent || !ageOk ? 'Confirm consent and age above to enable' : undefined} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-[#00E5FF] text-black font-semibold py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            <Sparkles className="h-4 w-4" /> Run Demo Scan
           </button>
         </div>
       </div>
 
-      {/* Results */}
+      {/* Results: always the demo, so say so where the numbers are */}
+      {analysis && spec && (
+        <p className="mb-2 text-xs text-[#FFD700]">
+          DEMO · sample numbers, not a measurement of you. Nothing was saved. For a real movement screen, use{' '}
+          <Link href="/play/mirror" className="underline hover:text-white">the Mirror</Link>.
+        </p>
+      )}
       {analysis && spec && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid md:grid-cols-2 gap-4 mb-4">
           {/* Mini avatar */}
@@ -159,7 +166,7 @@ export function WorkoutView() {
       {/* Plan unlock */}
       {analysis && !plan && (
         <div className="grid sm:grid-cols-2 gap-3 mb-4">
-          <PlanCard title="4-Week Plan" price="60 ◆" blurb="Targeted at your weakest pillar, 3 days/week." onClick={() => buyPlan('plan_4w')} busy={busy === 'plan_4w'} />
+          <PlanCard title="4-Week Plan" price="60 ◆" blurb="Targeted at the weakest pillar above, 3 days/week." onClick={() => buyPlan('plan_4w')} busy={busy === 'plan_4w'} />
           <PlanCard title="12-Week Program" price="200 ◆" blurb="Full periodized build — the complete evolution." highlight onClick={() => buyPlan('program_12w')} busy={busy === 'program_12w'} />
         </div>
       )}
@@ -168,7 +175,7 @@ export function WorkoutView() {
 
       {(analysis || scanId) && (
         <button onClick={deleteScans} disabled={busy === 'delete'} className="mt-5 flex items-center gap-1.5 text-xs text-white/40 hover:text-[#FF3366]">
-          <Trash2 className="h-3.5 w-3.5" /> Delete my scan data
+          <Trash2 className="h-3.5 w-3.5" /> Delete all my saved scans and plans
         </button>
       )}
     </div>

@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { readProgress, type DunkAttempt } from '@/lib/irl/dunkProgress';
-import type { DunkFamily } from '@/lib/irl/dunkTracker';
+import { MAX_VERTICAL_CM, type DunkFamily } from '@/lib/irl/dunkTracker';
 
 /**
  * A measured dunk, and the history it joins.
@@ -23,8 +23,9 @@ const FAMILIES = new Set<DunkFamily>([
   'BETWEEN-THE-LEGS', 'WINDMILL', '360', 'TOMAHAWK', 'ONE-HAND JAM', 'TWO-HAND JAM', 'ATTEMPT',
 ]);
 
-/** A measurement the camera could not really have produced is not a measurement. */
-const MAX_VERTICAL_CM = 130;   // the world record standing reach-to-rim differential, with room to spare
+/** A measurement the camera could not really have produced is not a measurement. MAX_VERTICAL_CM (130: the world
+ *  record standing reach-to-rim differential, with room to spare) lives in the tracker, which refuses the same
+ *  attempts first and says why; two copies let the tracker judge a 150 cm jump that this route then dropped. */
 const MAX_FLIGHT_MS = 1400;
 
 export async function GET() {

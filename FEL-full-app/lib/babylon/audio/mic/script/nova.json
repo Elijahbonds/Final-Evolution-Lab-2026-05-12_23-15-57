@@ -1155,7 +1155,10 @@
   {
    "id": "three.fire.02",
    "moment": "three.fire",
-   "text": "Clean rack! A perfect orbit!"
+   "text": "Clean rack! A perfect orbit!",
+   "tags": [
+    "rack:clean"
+   ]
   },
   {
    "id": "three.fire.03",

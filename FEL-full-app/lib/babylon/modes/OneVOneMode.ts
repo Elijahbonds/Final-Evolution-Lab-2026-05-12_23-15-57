@@ -1705,7 +1705,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             } else if (possession === 'defense' && defPhase !== 'over' && c.attacker === 'foe' && meDribble.vel.length() < 1.0) {
               // they ran through a SET defender: the charge (a moving defender who gets hit is just beaten)
               SoundKit.play('whistle');
-              swing('turnover');
+              swing('steal');   // I DREW it: my ball (it reported turnover, a stop by me that dropped my meter; the charge above reports steal)
               ctx.setHud({ momentum });
               bannerFlash(ctx, 'CHARGE — YOUR BALL', 1000);
               micWhistle({ moment: 'crowd.cheer', n: 2 });   // THE MIC

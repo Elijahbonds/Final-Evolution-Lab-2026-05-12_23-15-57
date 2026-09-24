@@ -12,7 +12,7 @@
 //   - the PLAYERS (one line each, at a time).
 // Nothing here touches audio: VoiceKit plays the cues, and a test can drive the director with a clock.
 
-export type MicRole = 'mc' | 'side' | 'crowd' | 'player';
+export type MicRole = 'mc' | 'side' | 'crowd' | 'player' | 'coach';
 export type Tier = 0 | 1 | 2;
 
 /** One pre-rendered line of a cast member's script. `moment` is a dotted family ('dunk.make', 'game.block', 'filler.dunk'). */
@@ -272,9 +272,12 @@ export class MicDirector {
     const cast = this.o.players?.[ev.who!]; if (!cast) return null;
     if ((this.playerUntil.get(cast) ?? 0) > now) return null;
     const l = this.pick(cast, ev); if (!l) return null;
-    const s = this.byCast.get(cast)!, sec = lineSec(l);
+    const s = this.byCast.get(cast)!;
+    // the same voice's own names after the line (the coach: "You got up… twenty-four inches.")
+    const names = (ev.stinger ?? []).map((k) => s.lines.find((x) => x.moment === 'name' && x.tags?.includes(`name:${k}`))).filter((x): x is MicLine => !!x);
+    const lines = [l, ...names], sec = lines.reduce((a, x) => a + lineSec(x), 0) + GAP * (lines.length - 1);
     this.playerUntil.set(cast, now + sec);
-    return { cast, role: 'player', channel: 'player', clips: [this.clipId(cast, l)], caption: l.text, speaker: s.name, sec, priority: priorityOf(ev), interrupt: false, pan: 0, gain: 0.9 };
+    return { cast, role: s.role, channel: 'player', clips: lines.map((x) => this.clipId(cast, x)), caption: lines.map((x) => x.text).join(' '), speaker: s.name, sec, priority: priorityOf(ev), interrupt: false, pan: 0, gain: 0.9 };
   }
   private fillerGap(): number { const [a, b] = this.filler?.every ?? [7, 12]; return a + this.rand() * (b - a); }
 }

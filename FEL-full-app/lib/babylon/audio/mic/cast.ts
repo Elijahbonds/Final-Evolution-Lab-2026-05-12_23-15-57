@@ -80,6 +80,15 @@ export const CAST: readonly CastMember[] = [
   { id: 'hooper_a', role: 'player', name: 'HOOPER', pa: false, persona: 'A court regular in the runs: confident, chirpy, loves to talk after a bucket.', voice: { mix: [['am_adam', 0.5], ['am_liam', 0.5]], speed: 1.08 } },
   { id: 'hooper_b', role: 'player', name: 'HOOPER', pa: false, persona: 'A court regular in the runs: quiet, gritty, a defender first.', voice: { mix: [['am_echo', 0.6], ['am_michael', 0.4]], speed: 1.0 } },
   { id: 'hooper_c', role: 'player', name: 'HOOPER', pa: false, persona: 'A court regular in the runs: a sharp-shooting woman with a quick tongue.', voice: { mix: [['af_kore', 0.5], ['af_jessica', 0.5]], speed: 1.1 } },
+  // ── the coach (movement play, 2026-09-24: "a new Coach voice" for the form read after each attempt) ─────────────────
+  // In your ear, not on the court's PA: one cue at a time, in the language of the owner's book (The Art of Dunking) and the
+  // Neuro-Mechanic Playbook. The owner can put his own voice behind it with a creator card, like the Venice mic.
+  {
+    id: 'coach', role: 'coach', name: 'COACH', pa: false,
+    persona: 'A calm, exact movement coach who has watched a thousand approaches: warm, direct, never harsh, one fix at a time, always the WHY in a few words. Speaks in the language of The Art of Dunking (the penultimate, the gather, the plant, arm swing timing, free-knee drive, the force vector, the landing) and the Neuro-Mechanic Playbook. Praises what was right before naming what to fix, and never lectures.',
+    voice: { mix: [['af_heart', 0.7], ['bf_emma', 0.3]], speed: 0.98 },
+    card: { slug: 'coach-voice', status: 'pending' },
+  },
 ];
 
 export const castById = (id: string): CastMember | undefined => CAST.find((c) => c.id === id);

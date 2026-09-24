@@ -123,6 +123,17 @@ describe('the crowd and the players', () => {
     expect(d.hear({ moment: 'player.dunk.brag', who: 'cass' }, 0.5)).toHaveLength(0);
     expect(d.hear({ moment: 'player.dunk.brag', who: 'nobody' }, 5)).toHaveLength(0);
   });
+  it('the coach reads a jump in its own voice: the line, then its own number and unit ("You got up… twenty-four. Inches.")', () => {
+    const coach: CastScript = { cast: 'coach', role: 'coach', name: 'COACH', lines: [
+      L('j1', 'coach.jump.height', 'You got up…', { sec: 0.8 }),
+      L('n24', 'name', 'Twenty-four', { tags: ['name:num:24'], sec: 0.6 }), L('in', 'name', 'Inches.', { tags: ['name:unit:in'], sec: 0.5 }),
+    ] };
+    const d = new MicDirector({ scripts: [mc, coach], booth: { mc: 'boardwalk' }, players: { coach: 'coach' } });
+    const [c] = d.hear({ moment: 'coach.jump.height', who: 'coach', stinger: ['num:24', 'unit:in'] }, 0);
+    expect(c.role).toBe('coach'); expect(c.speaker).toBe('COACH');
+    expect(c.clips).toEqual(['coach/j1', 'coach/n24', 'coach/in']);
+    expect(c.caption).toBe('You got up… Twenty-four Inches.');
+  });
   it('while the booth holds (a dunk in the air) the crowd still reacts on its own', () => {
     expect(make().crowd('crowd.erupt', 2, 0).length).toBe(2);
   });

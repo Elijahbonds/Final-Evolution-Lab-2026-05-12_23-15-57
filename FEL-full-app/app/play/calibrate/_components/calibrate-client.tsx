@@ -240,9 +240,9 @@ export function CalibrateClient() {
             </p>
             <p className="mt-1 text-xs text-white/40">
               {offset > 0
-                ? 'You tap slightly late — windows shift later to match.'
+                ? 'You tap slightly late on this device.'
                 : offset < 0
-                  ? 'You tap slightly early — windows shift earlier to match.'
+                  ? 'You tap slightly early on this device.'
                   : 'Dead on the beat.'}
             </p>
 

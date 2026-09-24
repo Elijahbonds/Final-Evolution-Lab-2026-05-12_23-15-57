@@ -9,7 +9,7 @@
 // integrated acceleration, and thrown-phone traces are rejected as cheating.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { GameProps } from '@/components/games/game-shell';
+import type { GameProps, GameResult } from '@/components/games/game-shell';
 import Link from 'next/link';
 import { ArrowLeft, Smartphone, Activity, RotateCcw, Square } from 'lucide-react';
 import {
@@ -29,6 +29,21 @@ const GOLD = '#FFD700';
 type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results';
 
 type DME = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
+
+/** The session as GameShell records it. `summarise` works in METRES (IRLCore's unit), so the score, the headline
+ *  and the stats are converted here: sent raw, a 60 cm jump went out as score 1 and "best 1 cm". */
+export function irlSessionResult(summary: IRLSession, elapsedMs: number): GameResult {
+  const bestCm = Math.round(summary.best * 100);
+  const averageCm = Math.round(summary.average * 100);
+  return {
+    score: bestCm,
+    won: summary.total > 0,
+    duration: Math.max(0, Math.round(elapsedMs / 1000)),
+    headline: `${summary.total} jumps · best ${bestCm} cm`,
+    stats: { jumps: summary.total, bestCm, averageCm },
+    outcome: summary.total > 0 ? 'logged' : 'no jumps detected',
+  };
+}
 
 // See acting-game: this mounted bare too, so a logged jump session reported nothing.
 export default function IrlGame({ onEnd }: GameProps) {
@@ -110,14 +125,8 @@ export default function IrlGame({ onEnd }: GameProps) {
     const summary = summarise(jumps);
     setSession(summary);
     setPhase('results');
-    onEnd({
-      score: Math.round(summary.best),
-      won: summary.total > 0,
-      duration: t0Ref.current ? Math.round((Date.now() - t0Ref.current) / 1000) : 0,
-      headline: `${summary.total} jumps · best ${Math.round(summary.best)} cm`,
-      stats: { jumps: summary.total, bestCm: Math.round(summary.best), averageCm: Math.round(summary.average) },
-      outcome: summary.total > 0 ? 'logged' : 'no jumps detected',
-    });
+    // t0 is a performance.now() stamp, so the elapsed time is read on that clock (Date.now() minus it is the epoch).
+    onEnd(irlSessionResult(summary, t0Ref.current ? performance.now() - t0Ref.current : 0));
   }, [stopListening, onEnd]);
 
   const reset = useCallback(() => {

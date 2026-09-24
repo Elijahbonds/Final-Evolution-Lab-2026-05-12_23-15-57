@@ -54,6 +54,13 @@ export interface CarnivalEvent {
 
 const cfg = { heroUrl: SHARED_CFG.heroUrl };
 
+// MOMENTUM (finish-release, 2026-09-24): the carnival reported nothing to the bus, so its crowd bed never swelled. Each
+// event reports its success beat at the weight a like beat carries in the full modes; a failure reports nothing.
+/** a mashed bag hit: every press lands here, so a third of a landed strike in the fight modes (9) */
+const MOMENTUM_BAG_HIT = 3;
+/** a landed trick (a sketchy one half); the TrickMachine's own combo reports ride on top, as on snow and surf */
+const MOMENTUM_TRICK = 6;
+
 // ── SLAM RUSH — as many dunks as you can charge-and-release in the clock ──
 export function slamRush(): CarnivalEvent {
   let player: SpawnedCharacter, ball: AbstractMesh, body: BeatOwner;
@@ -88,6 +95,7 @@ export function slamRush(): CarnivalEvent {
           if (made) {
             makes++;
             SoundKit.play('score', { pitch: 1.1 }); EffectsKit.burst(ctx.scene, rim, 'net');
+            ctx.momentum.report({ kind: 'big_make', weight: 7 });   // the shootout's make
             ctx.setHud({ banner: `MAKE ${makes}` });
           } else { SoundKit.play('miss'); ctx.setHud({ banner: 'MISS' }); }
           setTimeout(() => ctx.setHud({ banner: '' }), 400);
@@ -132,6 +140,7 @@ export function strikeStorm(): CarnivalEvent {
         bagBody.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // a mashed bag flinches again from the top
         SoundKit.play('impact', { pitch: 1.2, volume: 0.35 });
         EffectsKit.burst(ctx.scene, bag.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
+        ctx.momentum.report({ kind: 'clean_hit', weight: MOMENTUM_BAG_HIT });
         ctx.setHud({ banner: `${hits}` });
       }
     },
@@ -146,6 +155,8 @@ export function trickGauntlet(): CarnivalEvent {
   let stickX = 0, pump = 0, airT = 0, landBeatT = 0, bailBeatT = 0;
   let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
   const LAND_BEAT_SEC = 0.4, BAIL_BEAT_SEC = 0.8;   // board_land 0.42 s, skate_bail 0.75 s — the tree settles them when the window closes
+  let callT = 0;
+  const CALL_SEC = 0.9;   // the trick call's banner hold (snow and surf hold theirs as long)
 
   return {
     id: 'trick_gauntlet', title: 'TRICK GAUNTLET', durationSec: 20, pointsPerUnit: 0.4, rivalRange: [300, 900],
@@ -154,11 +165,14 @@ export function trickGauntlet(): CarnivalEvent {
       world = buildSkatepark(ctx.scene);
       rig = await buildRig(ctx, cfg.heroUrl, new Vector3(0, 0, -6), 0, world.ground, '#ffd75e');
       animTree = new BoardAnimTree(rig.char.animator);
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), {
+      // The machine's HUD keys are namespaced here: its `score` is the raw trick total, and the carnival's `score` is P1's
+      // night total (the host renders it), so a banked combo used to replace the night's points with a trick count.
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(Object.fromEntries(Object.entries(h).map(([k, v]) => [`trick${k[0].toUpperCase()}${k.slice(1)}`, v]))), {
         anim: 'external',   // the tree owns the rider's clips; the machine reports beats
+        momentum: ctx.momentum,   // deep combos light the building, as on snow and surf
         onBeat: (b) => { if (b === 'land' || b === 'land_sketchy') { landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean'; animTree.clearBeat('land_clean', 'land_sketchy'); } else { bailBeatT = BAIL_BEAT_SEC; animTree.clearBeat('bail'); } },
       });
-      stickX = 0; pump = 0; airT = 0; landBeatT = 0; bailBeatT = 0;
+      stickX = 0; pump = 0; airT = 0; landBeatT = 0; bailBeatT = 0; callT = 0;
       ctx.setHud({ hint: 'POP, flip in the air — stick sideways + TRICK spins — chain combos before you land' });
     },
     onInput(ctx, e) {
@@ -178,7 +192,15 @@ export function trickGauntlet(): CarnivalEvent {
     },
     tick(ctx, dt) {
       rig.rider.update(dt, stickX, pump);
-      tricks.update(dt);   // grades the touchdown BEFORE the tree sees this frame (the skate ordering lesson)
+      const landedBefore = tricks.landed;
+      const call = tricks.update(dt);   // grades the touchdown BEFORE the tree sees this frame (the skate ordering lesson)
+      // The call (the trick and its points, SKETCHY, BANKED, REPEAT, BAILED) is this event's banner, as MAKE and COUNTER are
+      // the others' (it was thrown away: the one event of six with no banner). Cleared on the event's own clock, not a timer:
+      // a call in the last second would have wiped the result card's banner.
+      if (call) { ctx.setHud({ banner: call }); callT = CALL_SEC; }
+      else if (callT > 0) { callT -= dt; if (callT <= 0) ctx.setHud({ banner: '' }); }
+      // a trick that paid (not a bail, not a repeat worth nothing) is heard in the stands
+      if (tricks.landed > landedBefore) ctx.momentum.report({ kind: 'clean_hit', weight: lastLanding === 'sketchy' ? MOMENTUM_TRICK / 2 : MOMENTUM_TRICK });
       const grounded = rig.rider.grounded;
       airT = grounded ? 0 : airT + dt;
       animTree.update({
@@ -195,7 +217,11 @@ export function trickGauntlet(): CarnivalEvent {
       rig.char.root.position.x = Math.max(-20, Math.min(20, rig.char.root.position.x));
       rig.char.root.position.z = Math.max(-20, Math.min(20, rig.char.root.position.z));
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, null);
-      return tricks.score;
+      // The whistle's read is tick(ctx, 0), and a zero step never runs the link window down, so a combo still open on the
+      // ground at the horn never banked and its points were lost. On the ground it is as good as banked (only a bail takes
+      // a combo, and a bail happens in the air), so it counts; one still in the air at the horn is unresolved and does not.
+      // (Only the whistle reads this value: the live loop ignores it.)
+      return tricks.score + (rig.rider.grounded ? tricks.comboPts : 0);
     },
     teardown() { rig?.dispose(); world?.dispose(); },
   };
@@ -245,7 +271,7 @@ export function hotShot(): CarnivalEvent {
         flight.step(dt);
         if (ball.position.z >= 10.9) {
           flight.active = false;
-          if (Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4) { goals++; SoundKit.play('score'); EffectsKit.burst(ctx.scene, goalCenter, 'confetti'); }
+          if (Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4) { goals++; SoundKit.play('score'); EffectsKit.burst(ctx.scene, goalCenter, 'confetti'); ctx.momentum.report({ kind: 'big_make', weight: 8 }); }
           else SoundKit.play('miss');
           ball.position.set(0, 0.11, 0);
           phase = 'aim';
@@ -321,6 +347,7 @@ export function coinStorm(): CarnivalEvent {
         SoundKit.play('uiTick', { pitch: 1.4 });
         if ((coins?.collected ?? 0) >= (wave % 2 === 1 ? 14 : 10)) {
           SoundKit.play('powerUp', { pitch: 1.2, volume: 0.4 });
+          ctx.momentum.report({ kind: 'clean_run', weight: 10 });   // the cleared pattern, not every coin in it
           layPattern(ctx);
         }
       }
@@ -369,6 +396,7 @@ export function counterStrike(): CarnivalEvent {
           parried = true;
           parries++;
           SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
+          ctx.momentum.report({ kind: 'near_miss', weight: 10 });   // the fight modes' parry
           EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
           body.beat(SPORT_CLIP.karateJab, { fadeSec: 0.06 });
           rivalBody.loop(SPORT_CLIP.karateStance); rivalBody.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.05 });   // countered out of the wind-up: he reels, the punch never comes

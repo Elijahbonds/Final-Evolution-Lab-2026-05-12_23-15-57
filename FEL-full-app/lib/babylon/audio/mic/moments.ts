@@ -23,6 +23,8 @@ export interface MomentSpec {
   tiered?: boolean;
   /** One line per tag, per MC, on top of `mc` untagged lines. */
   tags?: readonly string[];
+  /** Tags a line MAY carry without every MC owing one: a line that is only true in that case (a "whole rack" call). */
+  optionalTags?: readonly string[];
 }
 
 export const RIVAL_TAGS = ['rival:cass', 'rival:ty', 'rival:pilot', 'rival:zo', 'rival:stack'] as const;
@@ -81,7 +83,7 @@ export const MOMENTS: readonly MomentSpec[] = [
   { id: 'three.make.money', group: 'three', say: 'The money ball goes in.', maxWords: 5, mc: 4 },
   { id: 'three.miss', group: 'three', say: 'A miss. Tiny.', maxWords: 3, mc: 5 },
   { id: 'three.streak', group: 'three', say: 'Three or four in a row.', maxWords: 5, mc: 4 },
-  { id: 'three.fire', group: 'three', say: 'Five or more in a row: a clean rack, can\'t miss.', maxWords: 6, mc: 4, side: 2 },
+  { id: 'three.fire', group: 'three', say: 'Five or more in a row: can\'t miss. A line that says the whole RACK was clean carries the tag rack:clean (the mode passes it only when the five are one rack).', maxWords: 6, mc: 4, side: 2, optionalTags: ['rack:clean'] },
   { id: 'three.cold', group: 'three', say: 'Three misses in a row.', maxWords: 6, mc: 3 },
   { id: 'three.clock', group: 'three', say: 'Ten seconds left on the clock.', maxWords: 5, mc: 3 },
   { id: 'three.buzzer', group: 'three', say: 'A shot released before the horn goes in after it: it counts.', maxWords: 6, mc: 3 },
@@ -166,6 +168,80 @@ export const PLAYER_MOMENTS: readonly { id: string; who: 'rival' | 'hooper'; say
   { id: 'player.check', who: 'hooper', say: 'Checking the ball before a possession.', maxWords: 4, n: 2 },
 ];
 
+/**
+ * THE COACH (movement play, 2026-09-24): the form read after an attempt, one cue at a time, and the drill prompts. `n` lines
+ * each (variety for the ones heard often). The cues follow the owner's book: ch. 1 (the force vector, arm swing adds 20-38%),
+ * ch. 7 (the penultimate is the gather; its six faults; the free leg drives; arms down on the penultimate, then whip up),
+ * ch. 8 (the off arm and off leg as instruments, reach along the jump line), ch. 9 (the landing checklist).
+ */
+export const COACH_MOMENTS: readonly { id: string; say: string; maxWords: number; n: number }[] = [
+  // the approach and the take-off (dunk, layups, any jump)
+  { id: 'coach.penultimate.short', say: 'The penultimate (second-to-last step) was short: the hips never lowered, the plant became a stomp. Fix: a longer, lower penultimate.', maxWords: 14, n: 3 },
+  { id: 'coach.penultimate.long', say: 'The penultimate was too long and uncontrolled: braking turned into a slide. Fix: long but organised, the trunk stays pressurised.', maxWords: 14, n: 2 },
+  { id: 'coach.penultimate.good', say: 'A good penultimate: long, low, controlled.', maxWords: 10, n: 3 },
+  { id: 'coach.load.upright', say: 'Stayed upright and never loaded (pretty run, weak jump). Fix: sink into the gather.', maxWords: 12, n: 2 },
+  { id: 'coach.load.deep', say: 'Over-gathered into a deep squat at speed: the spring died, contact time ballooned. Fix: a quicker, shallower gather.', maxWords: 14, n: 2 },
+  { id: 'coach.armswing.late', say: 'The arms came up late. Fix: arms drive DOWN as the penultimate lands, then whip UP through the takeoff.', maxWords: 16, n: 3 },
+  { id: 'coach.armswing.none', say: 'No arm swing: that is 20 to 38 percent of the jump left on the floor. Fix: swing both arms.', maxWords: 16, n: 2 },
+  { id: 'coach.armswing.good', say: 'The arm swing was on time: down on the penultimate, up through the takeoff.', maxWords: 12, n: 3 },
+  { id: 'coach.kneedrive.low', say: 'One-foot takeoff: the free knee never drove. Fix: drive the free knee up hard.', maxWords: 12, n: 3 },
+  { id: 'coach.kneedrive.good', say: 'The free knee drove up: that is height and rhythm.', maxWords: 10, n: 2 },
+  { id: 'coach.lean', say: 'Leaned at the takeoff: the force goes sideways, not up. Fix: stay tall over the plant.', maxWords: 14, n: 2 },
+  { id: 'coach.jump.height', say: 'Reading the jump height; a number (in inches) is said right after this line ("You got up… twenty-four inches.").', maxWords: 5, n: 3 },
+  { id: 'coach.jump.best', say: 'A personal best jump.', maxWords: 8, n: 3 },
+  { id: 'coach.jump.down', say: 'Lower than your usual jump (fatigue, or the approach broke down). Encouraging, with one thing to check.', maxWords: 12, n: 2 },
+  // in the air and the finish
+  { id: 'coach.slam.early', say: 'Struck before the top of the jump. Fix: wait for the top, then finish.', maxWords: 12, n: 2 },
+  { id: 'coach.slam.late', say: 'Struck on the way down. Fix: finish at the top.', maxWords: 12, n: 2 },
+  { id: 'coach.slam.good', say: 'Finished right at the top of the jump.', maxWords: 10, n: 3 },
+  { id: 'coach.offarm', say: 'The off arm did nothing in the air. Fix: throw the off arm down as the finishing hand goes up (it lifts the finish).', maxWords: 16, n: 2 },
+  // the landing (ch. 9)
+  { id: 'coach.landing.stiff', say: 'A stiff landing. Fix: land soft, hips take the load, ankles bend.', maxWords: 12, n: 2 },
+  { id: 'coach.landing.valgus', say: 'The knees caved in on the landing. Fix: knees over the middle of the foot.', maxWords: 12, n: 2 },
+  { id: 'coach.landing.good', say: 'A good landing: soft and organised.', maxWords: 8, n: 2 },
+  // the shot
+  { id: 'coach.shot.early', say: 'Released well before the top. Fix: let the jump lift the ball, release near the top.', maxWords: 14, n: 2 },
+  { id: 'coach.shot.late', say: 'Shooting on the way down. Fix: release at the top.', maxWords: 12, n: 2 },
+  { id: 'coach.shot.good', say: 'Released right near the top: on time.', maxWords: 10, n: 3 },
+  { id: 'coach.shot.setpoint', say: 'The set point was low (chin, not forehead): easy to block. Fix: set it higher.', maxWords: 12, n: 2 },
+  { id: 'coach.shot.elbow', say: 'The elbow flared out: the ball leaves sideways. Fix: elbow under the ball.', maxWords: 12, n: 2 },
+  { id: 'coach.shot.hitch', say: 'The ball stopped at the set point (two motions). Fix: one smooth motion.', maxWords: 12, n: 2 },
+  { id: 'coach.shot.follow', say: 'Dropped the follow-through early. Fix: hold it until the ball lands.', maxWords: 12, n: 2 },
+  // combat
+  { id: 'coach.strike.guard', say: 'The hands stayed down after the strike. Fix: hands back to the guard every time.', maxWords: 12, n: 2 },
+  { id: 'coach.strike.hips', say: 'All arm, no hips. Fix: turn the hips into the strike.', maxWords: 12, n: 2 },
+  { id: 'coach.strike.chin', say: 'Chin up and exposed. Fix: chin down, eyes up.', maxWords: 10, n: 2 },
+  { id: 'coach.strike.good', say: 'Clean strike: hips in, hands home.', maxWords: 10, n: 2 },
+  // boards
+  { id: 'coach.board.absorb', say: 'Landed with straight legs. Fix: soak up the landing with the knees.', maxWords: 12, n: 2 },
+  { id: 'coach.board.low', say: 'Stayed tall through the turn. Fix: get low, weight over the board.', maxWords: 12, n: 2 },
+  { id: 'coach.board.good', say: 'Low and balanced through it.', maxWords: 8, n: 2 },
+  // general
+  { id: 'coach.encourage', say: 'After a miss or a rough attempt: short encouragement, no fix.', maxWords: 8, n: 4 },
+  { id: 'coach.praise', say: 'Everything read well: short praise.', maxWords: 8, n: 4 },
+  // the drills and warm-ups (the Playbook's ch. 5 wake-up, ch. 6 jumping and landing, ch. 7 SAQ, approach rhythm)
+  { id: 'coach.drill.intro', say: 'A drill is starting: follow the targets.', maxWords: 12, n: 2 },
+  { id: 'coach.drill.go', say: 'Go.', maxWords: 3, n: 3 },
+  { id: 'coach.drill.nice', say: 'A target hit cleanly, in rhythm.', maxWords: 4, n: 4 },
+  { id: 'coach.drill.faster', say: 'Speed it up.', maxWords: 4, n: 2 },
+  { id: 'coach.drill.slower', say: 'Slow down, control it.', maxWords: 4, n: 2 },
+  { id: 'coach.drill.hold', say: 'Hold the position.', maxWords: 4, n: 2 },
+  { id: 'coach.drill.breathe', say: 'Breathing pacer: in through the nose, slow out.', maxWords: 8, n: 2 },
+  { id: 'coach.drill.switch', say: 'Switch sides.', maxWords: 4, n: 2 },
+  { id: 'coach.drill.rest', say: 'Rest now.', maxWords: 6, n: 2 },
+  { id: 'coach.drill.last', say: 'Last one.', maxWords: 4, n: 2 },
+  { id: 'coach.drill.done', say: 'The drill is done: short praise and what it trained.', maxWords: 14, n: 2 },
+  { id: 'coach.space.intro', say: 'The space check before body play: step back until the whole body is in the picture, clear space around and above.', maxWords: 22, n: 1 },
+  { id: 'coach.space.back', say: 'Step back.', maxWords: 4, n: 2 },
+  { id: 'coach.space.closer', say: 'Come closer.', maxWords: 4, n: 2 },
+  { id: 'coach.space.left', say: 'Move to your left.', maxWords: 5, n: 1 },
+  { id: 'coach.space.right', say: 'Move to your right.', maxWords: 5, n: 1 },
+  { id: 'coach.space.feet', say: 'Your feet need to be in the picture.', maxWords: 8, n: 1 },
+  { id: 'coach.space.arms', say: 'Reach both arms overhead to check the headroom.', maxWords: 10, n: 1 },
+  { id: 'coach.space.still', say: 'Stand still for a moment.', maxWords: 6, n: 1 },
+  { id: 'coach.space.ready', say: 'All set: raise both hands to start.', maxWords: 10, n: 2 },
+];
+
 /** Every moment id any cast member can be asked for. */
-export const ALL_MOMENT_IDS: readonly string[] = [...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id), 'name'];
+export const ALL_MOMENT_IDS: readonly string[] = [...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id), ...COACH_MOMENTS.map((m) => m.id), 'name'];
 export const momentSpec = (id: string): MomentSpec | undefined => MOMENTS.find((m) => m.id === id);

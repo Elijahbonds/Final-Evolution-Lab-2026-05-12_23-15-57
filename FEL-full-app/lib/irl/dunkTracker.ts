@@ -34,6 +34,24 @@ const AIRBORNE_RISE = 0.03;       // TUNE(elijah): ankle rise above floor, image
 const MIN_FLIGHT_MS = 180;        // TUNE(elijah): matches IRLCore MIN_FLIGHT
 const MAX_FLIGHT_MS = 1200;       // TUNE(elijah): matches IRLCore MAX_FLIGHT
 const SETTLE_MS = 500;            // TUNE(elijah): landing = this long re-grounded
+const APPROACH_MS = 500;          // approachSpeed reads the hips over this long before takeoff
+// The hip trail is kept by TIME: one attempt's span from the start of its approach to its settle, including a
+// landing closed on the safety clock. A count cap (90) held 0.75 s at 120 Hz, so the approach was gone by the
+// time the landing settled and approachSpeed read 0.
+const HIP_TRAIL_MS = APPROACH_MS + MAX_FLIGHT_MS + 1500 + SETTLE_MS;
+
+/** The tallest vertical /api/mirror/dunks will store (it imports this). Anything above it is refused HERE, with a
+ *  reason, instead of being judged on screen and then silently dropped on upload. 130 cm is a ~1.03 s flight. */
+export const MAX_VERTICAL_CM = 130;
+/** Why a closed attempt was not measured. The route's own error codes, so a screen says what the route would. */
+export type DunkRefusal = 'implausible_vertical' | 'implausible_flight';
+
+/** What a screen can say about a refused attempt. */
+export function refusalLine(r: DunkRefusal): string {
+  return r === 'implausible_vertical'
+    ? `Not counted: that read over ${MAX_VERTICAL_CM} cm, so the camera lost your feet. Go again.`
+    : 'Not counted: the camera never saw you land. Keep your feet in the shot and go again.';
+}
 
 export type DunkFamily =
   | 'BETWEEN-THE-LEGS' | 'WINDMILL' | '360' | 'TOMAHAWK' | 'ONE-HAND JAM' | 'TWO-HAND JAM' | 'ATTEMPT';
@@ -95,6 +113,7 @@ export class DunkTracker {
   private landedAt = 0;
   private preFrames: TrackerFrame[] = [];
   private result: DunkMetrics | null = null;
+  private refusal: DunkRefusal | null = null;
 
   /** Reset for the next attempt. */
   reset(): void {
@@ -105,10 +124,13 @@ export class DunkTracker {
     this.airFrames = [];
     this.preFrames = [];
     this.result = null;
+    this.refusal = null;
   }
 
   get state(): Phase { return this.phase; }
   get lastResult(): DunkMetrics | null { return this.result; }
+  /** The refusal of the attempt that just closed, handed over once (feed() returns null for it). */
+  takeRefusal(): DunkRefusal | null { const r = this.refusal; this.refusal = null; return r; }
 
   private lm(f: TrackerFrame, idx: number): TrackerLandmark | null {
     const p = f.landmarks[idx];
@@ -124,10 +146,16 @@ export class DunkTracker {
     const rh = this.lm(f, DUNK_POSE_IDX.rightHip);
     if (!la || !ra || !lh || !rh) return null;
 
-    const ankleY = (la.y + ra.y) / 2;
+    // The LOWER ankle (y is down): a foot still on the floor keeps the body grounded. The mean let one lifted
+    // foot carry a planted one over the line, so a step read as a jump. The floor is calibrated on the SAME
+    // signal: a mean floor under a lower-ankle signal moved both lines by half the feet's stagger (a split
+    // stance needed a taller rise to take off and landed early).
+    const lowAnkleY = Math.max(la.y, ra.y);
     const hip = { x: (lh.x + rh.x) / 2, y: (lh.y + rh.y) / 2 };
-    this.hipTrail.push({ t: f.timestampMs, x: hip.x, y: hip.y });
-    if (this.hipTrail.length > 90) this.hipTrail.shift();
+    // adapter.detect() hands back the same frame until the video advances; a repeat adds nothing to the trail
+    const last = this.hipTrail[this.hipTrail.length - 1];
+    if (!last || f.timestampMs > last.t) this.hipTrail.push({ t: f.timestampMs, x: hip.x, y: hip.y });
+    while (this.hipTrail.length && this.hipTrail[0].t < f.timestampMs - HIP_TRAIL_MS) this.hipTrail.shift();
 
     switch (this.phase) {
       case 'idle':
@@ -135,7 +163,7 @@ export class DunkTracker {
         this.calibration = [];
         break;
       case 'calibrating':
-        this.calibration.push(ankleY);
+        this.calibration.push(lowAnkleY);
         if (this.calibration.length >= 20) {         // ~0.65s of stillness
           this.calibration.sort((a, b) => a - b);
           this.floorY = this.calibration[Math.floor(this.calibration.length / 2)];
@@ -146,7 +174,7 @@ export class DunkTracker {
         this.preFrames.push(f);
         if (this.preFrames.length > 20) this.preFrames.shift();
         // both feet off the floor line = airborne
-        if (ankleY < this.floorY - AIRBORNE_RISE) {
+        if (lowAnkleY < this.floorY - AIRBORNE_RISE) {
           this.phase = 'airborne';
           this.takeoffAt = f.timestampMs;
           this.airFrames = [f];
@@ -155,7 +183,8 @@ export class DunkTracker {
       }
       case 'airborne': {
         this.airFrames.push(f);
-        if (ankleY >= this.floorY - AIRBORNE_RISE * 0.5) {
+        // the first foot back down ends the flight (flight = both feet off)
+        if (lowAnkleY >= this.floorY - AIRBORNE_RISE * 0.5) {
           this.phase = 'settling';
           this.landedAt = f.timestampMs;
         }
@@ -179,13 +208,17 @@ export class DunkTracker {
   }
 
   private compute(): DunkMetrics | null {
+    this.refusal = null;
     const flightMs = this.landedAt - this.takeoffAt;
-    if (flightMs < MIN_FLIGHT_MS || flightMs > MAX_FLIGHT_MS || this.airFrames.length < 3) return null;
+    if (flightMs < MIN_FLIGHT_MS || this.airFrames.length < 3) return null;   // a hop, not an attempt
+    if (flightMs > MAX_FLIGHT_MS) { this.refusal = 'implausible_flight'; return null; }
 
     const verticalCm = (G * (flightMs / 1000) ** 2) / 8 * 100;
+    // checked on the value that is reported (and uploaded), so the tracker and the route agree at the boundary
+    if (Math.round(verticalCm * 10) / 10 > MAX_VERTICAL_CM) { this.refusal = 'implausible_vertical'; return null; }
 
     // approach speed: hip travel over the 0.5s before takeoff
-    const pre = this.hipTrail.filter((p) => p.t <= this.takeoffAt && p.t >= this.takeoffAt - 500);
+    const pre = this.hipTrail.filter((p) => p.t <= this.takeoffAt && p.t >= this.takeoffAt - APPROACH_MS);
     let travel = 0;
     for (let i = 1; i < pre.length; i++) travel += Math.hypot(pre[i].x - pre[i - 1].x, pre[i].y - pre[i - 1].y);
     const spanS = pre.length > 1 ? (pre[pre.length - 1].t - pre[0].t) / 1000 : 0;

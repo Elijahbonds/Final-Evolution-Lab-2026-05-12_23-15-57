@@ -20,7 +20,7 @@ import * as namesNs from '../../lib/babylon/audio/mic/names.ts';
 // the app's modules load as CommonJS under tsx: the named exports sit on the default
 const unwrap = <T,>(ns: T): T => ((ns as unknown as { default?: T }).default ?? ns);
 const { CAST } = unwrap(castNs);
-const { MOMENTS, CROWD_MOMENTS, PLAYER_MOMENTS, momentSpec } = unwrap(momentsNs);
+const { MOMENTS, CROWD_MOMENTS, PLAYER_MOMENTS, COACH_MOMENTS, momentSpec } = unwrap(momentsNs);
 const { allStingers } = unwrap(namesNs);
 
 const args = process.argv.slice(2);
@@ -35,10 +35,11 @@ const groupOf = (moment: string, role: string): string => {
   if (moment === 'name') return 'names';
   if (role === 'crowd') return 'crowd';
   if (role === 'player') return 'chatter';
+  if (role === 'coach') return 'coach';
   return momentSpec(moment)?.group ?? 'shared';
 };
 const sayOf = (moment: string): string =>
-  momentSpec(moment)?.say ?? CROWD_MOMENTS.find((m) => m.id === moment)?.say ?? PLAYER_MOMENTS.find((m) => m.id === moment)?.say ?? (moment === 'name' ? 'A name called right after a line.' : '');
+  momentSpec(moment)?.say ?? CROWD_MOMENTS.find((m) => m.id === moment)?.say ?? PLAYER_MOMENTS.find((m) => m.id === moment)?.say ?? COACH_MOMENTS.find((m) => m.id === moment)?.say ?? (moment === 'name' ? 'A name called right after a line.' : '');
 
 const casts = [];
 mkdirSync(RECORD, { recursive: true });
@@ -49,6 +50,9 @@ for (const c of CAST) {
   const script = JSON.parse(readFileSync(path, 'utf8')) as ScriptFile;
   const lines = script.lines.map((l) => ({ ...l, group: groupOf(l.moment, c.role) }));
   if (c.role === 'mc') for (const s of allStingers()) lines.push({ id: `name.${s.key.replace(/:/g, '.')}`, moment: 'name', text: s.text, tags: [`name:${s.key}`], group: 'names' });
+  // the coach reads a jump in inches: the numbers and the unit, in its own bank
+  if (c.role === 'coach') for (const s of [...allStingers().filter((x) => x.key.startsWith('num:')), { key: 'unit:in', text: 'Inches.' }])
+    lines.push({ id: `name.${s.key.replace(/:/g, '.')}`, moment: 'name', text: s.key.startsWith('num:') ? s.text.replace(/!$/, '') : s.text, tags: [`name:${s.key}`], group: 'coach' });
   // A REAL VOICE only behind a SIGNED card: their takes (MIC_RECORDINGS/<cast>/<line id>.wav) replace the rendered lines
   const recDir = process.env.MIC_RECORDINGS ? join(process.env.MIC_RECORDINGS, c.id) : null;
   const recordings = c.card?.status === 'signed' && recDir && existsSync(recDir) ? recDir : undefined;
@@ -57,7 +61,7 @@ for (const c of CAST) {
   const groups = c.role === 'mc' ? ['shared', 'dunk', 'three', 'game', 'carnival', 'names'] : c.role === 'side' ? ['shared', 'dunk', 'three', 'game', 'carnival'] : [];
   casts.push({ id: c.id, voice: c.voice, kbps: c.role === 'crowd' ? 24 : 32, lines, groups, ...(recordings ? { recordings } : {}) });
   // the recording script
-  const order = [...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id), 'name'];
+  const order = [...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id), ...COACH_MOMENTS.map((m) => m.id), 'name'];
   const md: string[] = [`# ${c.name}: recording script`, '', c.persona, '',
     'Record each line as its own take, named by its id (e.g. `dunk.make.t2.03.wav`). Say it your way: the words are a starting point, and a line can be rewritten in your own voice as long as it fits the moment and its length. Clean language only.', ''];
   for (const m of order) {

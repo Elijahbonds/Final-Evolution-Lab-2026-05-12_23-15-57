@@ -12,9 +12,11 @@ export default async function CalibratePage() {
     <div className="min-h-screen bg-[#050505] pb-20">
       <main className="mx-auto max-w-[720px] px-4 py-6">
         <h1 className="fel-heading text-3xl font-bold text-white">AUDIO CALIBRATION</h1>
+        {/* No rhythm mode reads the saved offset yet (loadAudioOffsetMs has no reader outside this screen), so the
+            copy must not say the windows move. lib/feel/rhythm-calibrate.test.ts holds it to that. */}
         <p className="mt-1 text-sm text-white/50">
-          Tap in time with the click to measure your device&apos;s audio latency. Every rhythm mode
-          shifts its timing windows by this offset so the beat feels centered on your setup.
+          Tap in time with the click to measure your device&apos;s audio delay. The offset is saved on this
+          device for rhythm modes to use; they do not apply it yet.
         </p>
         <CalibrateClient />
       </main>

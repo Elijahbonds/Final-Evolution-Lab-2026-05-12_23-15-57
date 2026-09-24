@@ -21,6 +21,8 @@ export interface ModeMicOpts {
   /** Who speaks on the court: a player id the mode uses → the voice (cast id). */
   players?: Record<string, string>;
   crowd?: boolean;
+  /** Load the coach (movement play: the form read after an attempt, spoken as who: 'coach'). */
+  coach?: boolean;
   seed?: number;
 }
 
@@ -111,13 +113,14 @@ export class ModeMic {
     for (const c of crowd) needs.push({ cast: c, group: 'crowd' });
     const players = [...new Set(Object.values(this.o.players ?? {}))];
     for (const p of players) needs.push({ cast: p, group: 'chatter' });
+    if (this.o.coach) needs.push({ cast: 'coach', group: 'coach' });
     const idx = await VoiceKit.load(needs);
     if (this.disposed) return;
     this.director = new MicDirector({
       scripts: toScripts(idx),
       booth: { mc: this.mc, side: SIDEKICK },
       crowd: crowd.filter((c) => idx.some((i) => i.cast === c)),
-      players: this.o.players,
+      players: this.o.coach ? { ...this.o.players, coach: 'coach' } : this.o.players,
       seed: this.o.seed ?? Math.floor(Math.random() * 2 ** 31),   // a fixed seed opened every session with the same two shouts
     });
     if (this.filler) this.director.setFiller(this.filler, now());

@@ -1,7 +1,7 @@
 // DunkDuelMode — NEW mode (`modeId: 'dunkduel'`, route `/play/dunkduel`).
 // The head-to-head dunk contest: TWO HUMANS, one device, pass-and-play.
 // Player 1 dunks, hands the device over, Player 2 answers, alternating two
-// dunks each; the same three judges (Silk/Doc/Prime) score every attempt,
+// dunks each; the same five judges (Silk/Doc/Mac/Reign/Prime, raw 30–50) score every attempt,
 // and the higher total takes the duel.
 //
 // HONEST SCOPE: this is real local head-to-head — the strongest two-player
@@ -470,7 +470,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
       totals[activeIdx] += dunkTotal;
       SoundKit.play('score', { pitch: 1.1 });
       EffectsKit.burst(ctx.scene, rim, 'net');
-      if (dunkTotal >= 27) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, active().root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
+      // the contest's eruption band (45 of 50): this was `>= 27`, the THREE-judge band, and five judges never card under 30 —
+      // every make got the full cheer and confetti, so a 31 landed like a 50
+      if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, active().root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     } else {
       setTimeout(() => SoundKit.play('crowdGroan', { volume: 0.35 }), 260);   // A+ P2: the clank was the one hit; the crowd groans a breath later, quietly
     }

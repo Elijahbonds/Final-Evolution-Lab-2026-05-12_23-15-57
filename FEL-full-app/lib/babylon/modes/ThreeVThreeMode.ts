@@ -127,6 +127,7 @@ import {
 } from '../core/TripleThreat';   // standing still with the ball is not idle — it is threatening
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { MomentumBus } from '../core/MomentumBus';   // Phase 6: the shared Game-Breaker layer
+import { heroSwing } from '../core/HoopsSwing';   // finish-release: a play between the sides reports on MY meter by who did it to whom
 import {
   dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
   type ContactDunkKind,
@@ -372,8 +373,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let mbus = new MomentumBus();
   let momentum = 0;
   let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
-  /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). */
-  function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
+  /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). Null = heroSwing says not mine. */
+  function swing(kind: Parameters<MomentumBus['report']>[0]['kind'] | null): void {
+    if (!kind) return;
     mbus.report({ kind });
     momentum = Math.round(mbus.score01 * 100);
   }
@@ -986,6 +988,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             : bigShot ? { moment: 'game.three', priority: 2, crowd: { moment: arcQuality === 'perfect' ? 'crowd.erupt' : 'crowd.cheer', n: 2 } }
             : { moment: rimFinish ? 'game.layup' : 'game.make', side: rimFinish ? 0 : 0.15, crowd: { moment: 'crowd.cheer', n: arcQuality === 'perfect' ? 2 : 1 } },
           nearestLiveFoe());
+          swing(heroSwing({ play: 'make', by: 'me' })); ctx.setHud({ momentum });   // my jumper / layup reported nothing (1v1's big_make); after the call, so a climb follows it
           if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
           if (andOneCall) {
             console.info(`[3V3-REF] ${andOneCall.id} → ${andOneCall.ball} (${foulAward(andOneCall)})`);
@@ -997,6 +1000,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         } else if (res === 'missed') {
           SoundKit.play('miss');
           me.shotWin = 'none';
+          swing(heroSwing({ play: 'miss', by: 'me' })); ctx.setHud({ momentum });   // 1v1's miss (fouled or not); at the iron, so the meter never tells it early
           // EARLY is short off the front and comes back at me, LATE is long off the back; a hand in my
           // face pushes it short on top of the timing. arcQuality / shotContest were already recorded
           // at the release, so the iron can answer the shot that was actually taken.
@@ -1598,6 +1602,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             SoundKit.play('crowdGroan', { volume: 0.35 });
             ctx.setHud({ banner: 'PICKED OFF! — you threw into coverage' });
             mic?.say({ moment: 'game.stolen', crowd: { moment: 'crowd.groan', n: 1 } }); micTalk(picker, 'player.trash.stop'); micSlump();   // THE MIC
+            swing(heroSwing({ play: 'steal', by: 'foe', on: 'me' })); ctx.setHud({ momentum });   // my pass taken: a turnover (it reported nothing)
             bannerClearLater(ctx, 1100);
             void opponentPossession(ctx);
           }
@@ -1794,6 +1799,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       micOurs(finish === 'alleyoop' ? { moment: 'game.alleyoop', priority: 2, crowd: { moment: 'crowd.erupt', n: 2 } }
         : lastPasserWasMe ? { moment: 'game.assist', crowd: { moment: 'crowd.cheer', n: 1 } } : null);
       if (finish !== 'alleyoop' && !lastPasserWasMe) mic?.crowd('crowd.cheer', 1);
+      swing(heroSwing({ play: 'make', by: 'mate', myPass: lastPasserWasMe })); ctx.setHud({ momentum });   // my assist is my bucket (his own is not mine)
     } else {
       SoundKit.play('miss');
       ctx.setHud({ banner: `MISS${rimPlaySuffix(mateArc.play)}` });   // Phase 9: the iron the pass's shot found
@@ -1983,8 +1989,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         protectorMet = true;
         const dist = Math.min(distXZ(protector.char.root.position, me.char.root.position), distXZ(protector.char.root.position, ball.getAbsolutePosition()));
         if (rimProtectorSwats({ k, jumpAge: protector.jumpAge, dist, set: c.contested ? c.set : true, strength01: c.contested ? c.strength01 : 0.7, roll })) {
-          swatted = true; made = false; swatBy = protector;
-          swing('block'); ctx.setHud({ momentum });
+          swatted = true; made = false; swatBy = protector;   // (no swing here: HIS block is my turnover, reported at feet-down)
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           const away = me.char.root.position.subtract(protector.char.root.position); away.y = 0; if (away.lengthSquared() < 1e-4) away.set(0, 0, 1); away.normalize();
           ballSim.launch(at, away.scale(3.0).add(new Vector3((Math.random() - 0.5) * 2, 1.6, 0)));
@@ -2003,8 +2008,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const handUp = foeHandUp === wall || wall.jumpAge <= HAND_UP_SEC;
         const swatChance = aiBlockChance('dunk', 0, handUp, c.set, c.strength01);
         if (swatChance > 0 && roll() < swatChance) {
-          swatted = true; made = false; swatBy = wall;
-          swing('block'); ctx.setHud({ momentum });
+          swatted = true; made = false; swatBy = wall;   // (no swing here: see the protector's swat)
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           ballSim.launch(at, c.dir.scale(-2.2).add(new Vector3((Math.random() - 0.5) * 2, 1.3, 0)));
           SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdGroan', { volume: 0.5 });
@@ -2077,6 +2081,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           : { moment: 'game.dunk', priority: 2, stinger: stingers3, crowd: { moment: picked3.flashy ? 'crowd.erupt' : 'crowd.cheer', n: 2 } },
         posterized ? wall : null);
         if (fouled && myScore < TARGET_SCORE) mic?.then({ moment: 'game.andone', priority: 2 });
+        if (!posterized) { swing('highlight_dunk'); ctx.setHud({ momentum }); }   // 1v1's clean slam (a poster reported at the victim's fall); it reported nothing
         if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
         later(400, () => void opponentPossession(ctx));
       } else {
@@ -2091,6 +2096,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         } else if (swatted) {   // D1: the ball went loose at the bump
           ctx.setHud({ banner: 'SWATTED AT THE RIM!' });
           mic?.say({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } }); micTalk(swatBy, 'player.trash.stop'); micSlump();   // THE MIC
+          swing(heroSwing({ play: 'block', by: 'foe', on: 'me', dunk: true })); ctx.setHud({ momentum });   // HIS swat is MY turnover (it reported swing('block'): a stop against me credited me); here, so a foul in the air wins (1v1)
           bannerClearLater(ctx, 1000);
           later(900, () => boardAfterMiss(ctx));
         } else {
@@ -2834,6 +2840,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     ctx.feel?.impact?.(0.4); ctx.juice.shake(0.08, 100);
     ctx.setHud({ shotType: '', shotMeterT: 0, banner: by.jumpAge <= HAND_UP_SEC ? 'BLOCKED!' : 'BLOCKED — HAND IN THE SHOT!' });
     mic?.say({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.heckle', n: 1 } }); micTalk(by, 'player.trash.stop'); micSlump();   // THE MIC
+    swing(heroSwing({ play: 'block', by: 'foe', on: 'me' })); ctx.setHud({ momentum });   // my shot sent back: 1v1's miss (it reported nothing)
     bannerClearLater(ctx, 900);
     console.info('[3V3-DEF] blocked at the release');
     startBoxOut('mine');
@@ -2850,6 +2857,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     ballSim.launch(from, toFoe.scale(1.6).add(new Vector3(0, 1.2, 0)));
     ctx.setHud({ banner }); bannerClearLater(ctx, 900);
     mic?.say({ moment: 'game.stolen', crowd: { moment: 'crowd.groan', n: 1 } }); micTalk(by, 'player.trash.stop'); micSlump();   // THE MIC
+    swing(heroSwing({ play: 'steal', by: 'foe', on: carrierId === 'me' ? 'me' : 'mate' })); ctx.setHud({ momentum });   // taken off ME: a turnover (it reported nothing); off a mate, not my meter
     console.info(`[3V3-DEF] strip by the ai: ${banner}`);
     later(750, () => void opponentPossession(ctx));
   }
@@ -2916,6 +2924,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           EffectsKit.burst(ctx.scene, at, 'sparks');
           ctx.setHud({ banner: 'REJECTED AT THE RIM!' });
           mic?.say({ moment: 'game.block', priority: 3, side: 0.5, crowd: { moment: 'crowd.erupt', n: 3 } });   // THE MIC: a swat on his dunk, the call before the gauge's
+          swing(heroSwing({ play: 'block', by: 'me', on: 'foe' })); ctx.setHud({ momentum });   // MY block: it reported nothing
           if (synergy.add('block')) igniteOverdrive(ctx);
           shooter.tree.beat('bball_contact_react', { fadeSec: 0.06, holdEnd: true }); ctx.camDirector.pulse(0.8, 0.5);   // DUNK-FANATIC: he takes the hit in the air
           console.info(`[3V3-DEF] swat at k ${k.toFixed(2)} jumpAge ${myJumpAge.toFixed(2)}`);
@@ -2977,6 +2986,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('whistle');
       bannerFlash(ctx, 'CHARGE — THEIR BALL', 1000);
       mic?.say({ moment: 'game.foul' }); micSlump();   // THE MIC: the whistle
+      swing('turnover'); ctx.setHud({ momentum });   // 1v1's charge: I ran through a set body and lost it (it reported nothing)
       console.info(`[3V3-CONTACT] charge ${closing.toFixed(1)} m/s into a set body`);
       void opponentPossession(ctx);
       return;
@@ -3102,8 +3112,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** The Game-Breaker meter climbing (only a climb). It fires inside the play that raised it, so it follows that play's call. */
   function micTier(tier: MomentumTier, prev: MomentumTier): void {
     const rank: Record<MomentumTier, number> = { cold: 0, warming: 1, hot: 2, on_fire: 3 };
-    // not inside my dunk's flight: the AI's swat of it reports swing('block') on MY meter (a wrong-side report), and "heating
-    // up" after being stuffed is a lie; a poster's own climb is drowned by the poster call anyway
+    // not inside my dunk's flight: a poster's own climb (the victim's fall, mid-flight) is drowned by the poster call anyway (the
+    // AI's swat of it used to report swing('block') here, a wrong-side climb; it is my turnover at feet-down now, a fall)
     if (!mic || ended || dunking || rank[tier] <= rank[prev]) return;
     // every tier, not just warming: the meter decays 2.2/s, so a hot stretch dips under 45 and a steal puts it back — "he's hot"
     // on every re-cross was the same call every ~10 s (the 1v1's 20 s per moment)
@@ -3232,6 +3242,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           console.info(`[3V3-REF] ${call.id} on the drive at k ${k.toFixed(2)} (defender ${drivePlanted ? 'set' : 'moving'}) → ${call.ball}`);
           ctx.setHud({ banner: `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}` });
           mic?.say({ moment: 'game.foul', crowd: { moment: call.ball === 'me' ? 'crowd.cheer' : 'crowd.groan', n: 1 } });   // THE MIC: the whistle
+          if (drivePlanted) { swing('steal'); ctx.setHud({ momentum }); }   // I DREW the charge: my ball (1v1's and the half-court charge's steal; it reported nothing)
           bannerClearLater(ctx, 1000);
           driveStolen = true;   // the drive is over either way; the award decides who restarts
           ctx.scene.onBeforeRenderObservable.remove(obs);
@@ -3273,6 +3284,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose
       ctx.setHud({ banner: 'REJECTED!' });
       mic?.say({ moment: 'game.block', priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 } });   // THE MIC: the call before the gauge's
+      swing(heroSwing({ play: 'block', by: 'me', on: 'foe' })); ctx.setHud({ momentum });   // MY block: it reported nothing
       if (synergy.add('block')) igniteOverdrive(ctx);
       setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 900);
       later(1000, () => resetPossession(true));
