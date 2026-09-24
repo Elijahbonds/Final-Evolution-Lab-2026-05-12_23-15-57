@@ -528,6 +528,11 @@ export const DunkMode: ModeDefinition = (() => {
   const SLAM_APEX_T = arcApexT(EASTBAY_TIMING.duration, PLANT_SEC, ARC_TOP_FRAC);   // clip 0.70: the top of the jump the runway hint names (98 % of the height; the apex is 0.80)
   let slamBufferAt = -1;                     // clip second of a SLAM press waiting for the window (−1 = none)
   let slamSeen = false;                      // an A press reached the flight at all (the miss banner names WHAT missed)
+  /** HOOPS-DEPTH phase 10 (2026-09-23): THE FIRST SLAM PRESS DECIDES. The buffer kept the NEWEST press, so a masher (8 presses a
+   *  second) always had one inside the window: the mechanics probe had MASH 60 / 76 / 38 against DELIBERATE 31 (the owner's
+   *  anti-mash bar is a release bar). A slam is ONE release, as in 2K: the first A of the flight is the slam, early or not, and
+   *  every later A in that flight is ignored. */
+  let slamCommitted = false;
   let slamCueOn = false;                     // the SLAM read is up: the buffer's edge through the window's close
   let beatCalled = false;                    // the NOW! call fires once a flight, ON the beat the card scores against
   // ── A+ P8 athlete hands ──
@@ -1157,7 +1162,7 @@ export const DunkMode: ModeDefinition = (() => {
       }
 
       // SLAM needs the ball: a lob still in the air cannot be flushed (the catch is what puts it in the hand)
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live) slamNow(ctx, clipTime);
+      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live) { if (slamCommitted) console.info(`[DUNK-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`); else slamNow(ctx, clipTime); }
       // PHONE CONTROLS (2026-09-15): SLAM tapped on the runway did nothing and said nothing (the phone check: SLAM SILENT)
       else if (e.t === 'button' && e.btn === 'A' && e.pressed && (phase === 'approach' || phase === 'charge')) refuse(ctx, 'SLAM AT THE TOP OF THE JUMP');
       // RIM HANG — hold SLAM through the flush to hang on the iron
@@ -1895,7 +1900,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  second the FINGER moved, not the frame this runs on. */
   function slamNow(ctx: ModeContext, at: number): void {
     if (phase !== 'cinematic' || lob.live) return;
-    slamBufferAt = -1; slamSeen = true;
+    slamBufferAt = -1; slamSeen = true; slamCommitted = true;
     const center = EASTBAY_TIMING.extend;
     const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
     // The execution curve is ONE curve over the whole accepted press — late of centre it falls across the window's own
@@ -1933,6 +1938,8 @@ export const DunkMode: ModeDefinition = (() => {
    *  logged and let go, never turned into a banner for a trick the player did not ask for. */
   function bufferSlam(): void {
     if (phase !== 'cinematic' || lob.live) return;
+    if (slamCommitted) { console.info(`[DUNK-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`); return; }
+    slamCommitted = true;
     slamSeen = true; slamBufferAt = clipTime;
     console.info(`[DUNK-SLAM] buffered @${clipTime.toFixed(2)} (window opens @${(EASTBAY_TIMING.extend - slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale / 2).toFixed(2)})`);
   }
@@ -2034,7 +2041,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
     rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
-    slamBufferAt = -1; slamSeen = false; slamCueOn = false; beatCalled = false;   // DUNK-BODY-MID: the slam buffer is per attempt
+    slamBufferAt = -1; slamSeen = false; slamCueOn = false; beatCalled = false; slamCommitted = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
