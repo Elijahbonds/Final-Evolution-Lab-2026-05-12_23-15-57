@@ -1,3 +1,10 @@
+// FROZEN PRE-P9 COPY: a test fixture, for lib/babylon/core/DanceCore.equivalence.test.ts ONLY. Never import it from
+// app code and never edit it. Everything below this header is
+// `git show 7ee51e4e:FEL-full-app/lib/babylon/core/danceTracks.ts` with exactly its three import lines changed so it
+// resolves from here: the two DanceCore imports point at the frozen ./DanceCore.base, and the DanceExport import is
+// spelled '@/lib/babylon/music/DanceExport'. The old core does not import this file; it is frozen so the test can hold
+// the cue lane (cueLane / HudCue) to the old one for press steps too.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // danceTracks — the three charts of The Cypher (A+ mission #1, Phase 3).
 //
 // One routine at fixed constants was the Phase 0 gap: the spec wants three
@@ -10,10 +17,9 @@
 // retry hands the player the same chart (its own rationale). Three tracks =
 // three charts, not three dice rolls.
 
-import type { DanceClip, DanceStep, Judgement } from './DanceCore';
-import type { CueZone, Limb, MoveKind } from './bodyTargets';
-import { readExportedTrack } from '../music/DanceExport';
-import { DANCE_LIBRARY, isBodyStep, stepLimb } from './DanceCore';
+import type { DanceClip, DanceStep, Judgement } from './DanceCore.base';
+import { readExportedTrack } from '@/lib/babylon/music/DanceExport';
+import { DANCE_LIBRARY } from './DanceCore.base';
 
 export interface DanceTrack {
   id: string;
@@ -136,29 +142,7 @@ export interface HudCue {
   glyph: string;
   color: string;
   mirrored: boolean;
-  /** What answers it: 'tap' for a press (every dance step), else the body move (bodyTargets.ts). */
-  move: MoveKind;
-  /** The limb a body target is for (a zone carries its own). */
-  limb?: Limb;
-  /** Where the target is drawn over the mirrored self-view, and which limb must reach it. */
-  zone?: CueZone;
-  /** A target to hold after it is hit: how long (s), for the lane's tail. */
-  holdSec?: number;
 }
-
-// Body targets (movement play, phase 9): one glyph and colour per move, the same couch-legible idea as the families.
-export const MOVE_GLYPH: Record<MoveKind, string> = {
-  tap: '●', touch: 'TCH', jump: 'JMP', land: 'LND', squat: 'SQT', step: 'STP', penultimate: 'PEN', knee: 'KNE',
-  punch: 'PCH', kick: 'KCK', hold: 'HLD',
-};
-export const MOVE_NAME: Record<MoveKind, string> = {
-  tap: 'TAP', touch: 'TOUCH', jump: 'JUMP', land: 'LAND', squat: 'SQUAT', step: 'STEP', penultimate: 'PENULTIMATE',
-  knee: 'KNEE UP', punch: 'PUNCH', kick: 'KICK', hold: 'HOLD',
-};
-export const MOVE_COLOR: Record<MoveKind, string> = {
-  tap: '#E8E8E8', touch: '#4FD1E8', jump: '#F4C542', land: '#7CE577', squat: '#C58BFF', step: '#E8E8E8',
-  penultimate: '#FF8A5B', knee: '#FF8A5B', punch: '#FF5E7A', kick: '#FF5E7A', hold: '#7CE577',
-};
 
 /** How far ahead the lane shows — about a bar at 96 BPM, readable from a couch. */
 export const CUE_LOOKAHEAD_SEC = 2.4;
@@ -175,23 +159,6 @@ export function cueLane(
   for (const u of upcoming) {
     const dt = u.time - now;
     if (dt < -CUE_LINGER_SEC || dt > lookahead) continue;
-    if (isBodyStep(u.step)) {
-      const move = u.step.move!;
-      const limb = stepLimb(u.step);
-      out.push({
-        in: Math.round(dt * 1000) / 1000,
-        name: u.step.label ?? MOVE_NAME[move],
-        family: move,
-        glyph: MOVE_GLYPH[move],
-        color: MOVE_COLOR[move],
-        mirrored: u.step.mirrored,
-        move,
-        ...(limb ? { limb } : {}),
-        ...(u.step.zone ? { zone: { ...u.step.zone } } : {}),
-        ...(u.step.holdSec ? { holdSec: u.step.holdSec } : {}),
-      });
-      continue;
-    }
     const clip = DANCE_LIBRARY.find((c) => c.id === u.step.clipId);
     const family = clip?.category ?? 'transition';
     out.push({
@@ -201,7 +168,6 @@ export function cueLane(
       glyph: FAMILY_GLYPH[family],
       color: FAMILY_COLOR[family],
       mirrored: u.step.mirrored,
-      move: 'tap',
     });
   }
   return out.sort((a, b) => a.in - b.in);
