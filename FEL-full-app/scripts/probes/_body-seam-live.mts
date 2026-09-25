@@ -13,6 +13,10 @@
 //   5. LOST    a 2 s ground dropout pauses a mode the body drives within ~1.3 s of the last tracked frame, never one it
 //              does not drive; a body back in frame does not resume it;
 //   6. RESUME  both hands up again: back to playing;
+//   7. DRIVE   the positive half (a silent floor would pass 1–6): each bound mode, on a fresh body-woken run, gets the
+//              take its other bindings exist for — punch_kick (combat: 3 A, 1 B), run_in_place (sprint: one d-pad pulse
+//              per step told, by foot; freerun: y ≤ −0.3 with x ≡ 0), shuffle_lateral (skate: |x| ≥ 0.8) — read off
+//              what the mode received (QA's presses, the bus's body sticks);
 //   COST       the seam's per-frame cost in the page (a frame pushed through the feed synchronously: the reader, the
 //              channels and the harness's own handling of the packet — an upper bound on the reader's) — the budget
 //              is a median under 1 ms.
@@ -25,13 +29,14 @@
 //   BASE=http://localhost:3011 MODES=skateboard,dunk \
 //     PATH=/opt/homebrew/bin:$PATH node node_modules/tsx/dist/cli.mjs scripts/probes/_body-seam-live.mts
 //   DRY=1 …   builds the streams and times the reader in node only (no browser, no server)
+//   SHOTS=<dir> …   also screenshots each mode at READY, after the hands-up, after the dropout, resumed, and driven
 //
 // The pad regression half of the live check is two other probes, run before and after the switch-over with the same
 // counts expected: scripts/probes/_trigger-count.mts and scripts/probes/_controller-stick-live-smoke.mts. (Run on a
 // checkout with no database: _trigger-count without its sign-in, PATHNAME=/dev/mode/football?agent=1; both headless
 // with --use-angle=metal — headless on --use-gl=angle never leaves 'loading'.)
 import { chromium, type Page } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromiumExe } from './_chromium.mts';
 import * as synNs from '../../lib/pose/synth.ts';
@@ -59,12 +64,24 @@ const BASE = (process.env.BASE ?? 'http://localhost:3000').replace(/\/$/, '');
 const MODES = (process.env.MODES ?? 'skateboard,karate_vs,sprint,freerun,mixedcombat,dunk,onevone,brainbrawl,who_scene_it').split(',').map((s) => s.trim()).filter(Boolean);
 /** Owner call 5: bound in P3 on the live probe's word — a misfire moves the mode to session-only. */
 const CUT_LINE = new Set(['freerun', 'mixedcombat']);
+/** 7 (DRIVE): the take each bound mode's non-hop bindings exist for (the gate's positive checks, live). */
+const DRIVE: Record<string, string> = {
+  karate_vs: 'punch_kick', mixedcombat: 'punch_kick', showdown: 'punch_kick',
+  sprint: 'run_in_place', bigair: 'run_in_place', freerun: 'run_in_place', skateboard: 'shuffle_lateral',
+};
 const DRY = process.env.DRY === '1';
 const HEADLESS = process.env.HEADED !== '1';
+// MOVEMENT PLAY P3 (2026-09-24, the step-3 live check): SHOTS=<dir> keeps each mode's READY, woken, paused and resumed
+// frames — the evidence a report points at (nothing is written without it)
+const SHOTS = process.env.SHOTS ?? '';
+if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+const shot = async (p: Page, name: string): Promise<void> => {
+  if (SHOTS) await p.screenshot({ path: join(SHOTS, `${name}.png`) }).catch(() => {});
+};
 
 // ── the streams (node side; the page plays them on its own clock: the feed retimes t and arrive) ────────────────────
 
-interface Stream { name: string; frames: PoseFrame[]; t0: number; lead: number; jumps: number; marks: Record<string, number> }
+interface Stream { name: string; frames: PoseFrame[]; t0: number; lead: number; jumps: number; marks: Record<string, number>; takeoffs?: number[] }
 const R0 = restPose();
 const ARMS_UP = armsSwing(R0, 1);
 const FIX = join(process.cwd(), 'lib/pose/__fixtures__');   // run from the app root, as the usage line says
@@ -89,7 +106,7 @@ function take(name: string, fx: PoseFixture, stand?: PoseFrame): Stream {
   const on = stand ?? standFrame(fx, fx.source?.kind === 'deepmotion' ? OWNER_STAND : undefined).frame;
   const lead = holdStill(on, { sec: STAND_SEC, fps: fx.settings.synth.fps, beforeT: t0 });
   const frames = [...lead, ...fx.frames];
-  return { name, frames, t0: frames[0].t, lead: lead.length, jumps: fx.gt.jumps.length, marks: { take: t0 } };
+  return { name, frames, t0: frames[0].t, lead: lead.length, jumps: fx.gt.jumps.length, marks: { take: t0 }, takeoffs: fx.gt.jumps.map((j) => j.takeoff.t) };
 }
 
 const S_START = scripted('stand, then hands up', [['stand', hold(R0, 2.0)], ['armsUp', hold(ARMS_UP, 1.2)], ['down', hold(R0, 1.2)]], 17);
@@ -134,7 +151,7 @@ interface Tap {
   bus: Tapped[];
   body: { at: number; tracking: boolean; calibrated: boolean; final: boolean }[];
   /** Every body event (its kind and capture time, page clock after the feed's retiming): to tell the splice's. */
-  events: { at: number; kind: string; t: number }[];
+  events: { at: number; kind: string; t: number; foot?: string }[];
   phases: { at: number; phase: string }[];
 }
 
@@ -153,7 +170,7 @@ async function open(p: Page, key: string): Promise<void> {
     bus.onBody((p: any) => {
       const at = performance.now();
       tap.body.push({ at, tracking: p.read.tracking, calibrated: p.read.calibrated, final: !!p.final });
-      for (const ev of p.events) tap.events.push({ at, kind: ev.kind, t: ev.t });
+      for (const ev of p.events) tap.events.push({ at, kind: ev.kind, t: ev.t, ...(ev.kind === 'step' ? { foot: ev.foot } : {}) });
     });
     // the dev runner prints the harness's phase ("DEV · key · phase"): the only place 'paused' is published. It prints
     // the ModePhase itself — 'ready' at READY (the ready marker's 'loaded' is its own word for the same phase)
@@ -274,9 +291,11 @@ for (const key of MODES) {
   const row: Record<string, unknown> = { profile: prof.bindings.map((b) => `${b.from}→${b.to} ${b.verb}`).join(', ') || 'session-only' };
   try {
     await open(page, key);
+    await shot(page, `${key}-1-ready`);
 
     // 1 + 2: the stand keeps READY; the hands-up hold wakes it
     const st = await play(page, S_START);
+    await shot(page, `${key}-2-after-hands-up`);
     let t = await tapOf(page);
     const upAt = st.from + (S_START.marks.armsUp - S_START.t0);
     const wokeAt = firstPhase(t, 'playing', st.from);
@@ -298,8 +317,13 @@ for (const key of MODES) {
       quiet[s.name] = { phase: phaseAt(t, w.to), bodyInputs: labels.length, misfires: bad, ...(splice ? { spliceTakeoffs: splice } : {}) };
       if (key === 'skateboard' && s.name === 'jump_two_foot_low') {
         const qa = await page.evaluate(() => (window as any).__FEL_QA__.events(4000) as { t: number; kind: string; key: string }[]);
-        const pops = qa.filter((e) => e.kind === 'press' && e.key === 'A' && e.t >= w.from && e.t <= w.to).length;
-        row.pop = { qaPops: pops, trueJumps: s.jumps, spliceTakeoffs: splice, verdict: pops === s.jumps + splice ? 'ONE POP PER JUMP' : 'MISMATCH' };
+        const popAt = qa.filter((e) => e.kind === 'press' && e.key === 'A' && e.t >= w.from && e.t <= w.to).map((e) => e.t);
+        const pops = popAt.length;
+        // MOVEMENT PLAY P3 (2026-09-24, the step-3 live check): each true take-off (page clock) and how long after it
+        // its POP reached the mode — the one after it, not before (a POP before the jump would be a misfire, not a lag)
+        const truth = (s.takeoffs ?? []).map((to) => w.from + (to - s.t0));
+        const popLagMs = truth.map((at) => { const p = popAt.find((x) => x >= at); return p == null ? null : Math.round(p - at); });
+        row.pop = { qaPops: pops, trueJumps: s.jumps, spliceTakeoffs: splice, popLagMs, verdict: pops === s.jumps + splice ? 'ONE POP PER JUMP' : 'MISMATCH' };
       }
     }
     row.quiet = quiet;
@@ -316,6 +340,7 @@ for (const key of MODES) {
     }
     row.lost = lost.row;
     const pausedAt = lost.pausedAt;
+    await shot(page, `${key}-3-after-dropout`);
 
     // 6: both hands up resumes a paused game
     if (pausedAt != null) {
@@ -324,6 +349,7 @@ for (const key of MODES) {
       const upAt2 = r.from + (S_RESUME.marks.armsUp - S_RESUME.t0);
       const back = firstPhase(t, 'playing', r.from);
       row.resume = { resumed: back != null, afterArmsUpMs: back != null ? Math.round(back - upAt2) : null };
+      await shot(page, `${key}-4-after-resume`);
     }
 
     // COST: frames pushed through the feed one at a time, timed around the push (the whole seam, synchronously)
@@ -346,6 +372,41 @@ for (const key of MODES) {
       row.cutLine = n ? `CUT: ${n} misfire(s) — ${key} goes session-only (owner call 5)` : 'KEEP: no misfire';
     }
     await page.evaluate(() => (window as any).__FEL_BODY__.stop());
+
+    // 7 (DRIVE): the positive half. A silent floor passes every check above, so each bound mode also gets the take its
+    // other bindings exist for, on a fresh run the body woke — and what the MODE received is read from QA (a press is
+    // logged there after the harness let it through, right before onInput) and the bus (the body's sticks).
+    const dn = DRIVE[key];
+    if (drives && dn) {
+      await open(page, key);
+      await play(page, S_START);
+      await newBody(page);
+      const s = take(dn, loadFx(dn));
+      const w = await play(page, s);
+      t = await tapOf(page);
+      const qa = await page.evaluate(() => (window as any).__FEL_QA__.events(4000) as { t: number; kind: string; key: string }[]);
+      const presses: Record<string, number> = {};
+      for (const e of qa) if (e.kind === 'press' && e.t >= w.from && e.t <= w.to) presses[e.key] = (presses[e.key] ?? 0) + 1;
+      const told: Record<string, number> = {};
+      for (const e of t.events) if (e.at >= w.from && e.at <= w.to) told[e.kind] = (told[e.kind] ?? 0) + 1;
+      const sticks = t.bus.filter((x) => x.at >= w.from && x.at <= w.to && x.e.src === 'body' && x.e.t === 'stick').map((x) => x.e);
+      const minY = sticks.length ? Math.min(...sticks.map((e) => e.y ?? 0)) : 0;
+      const maxAbsX = sticks.length ? Math.max(...sticks.map((e) => Math.abs(e.x ?? 0))) : 0;
+      const dpad = t.bus.filter((x) => x.at >= w.from && x.at <= w.to && x.e.src === 'body' && x.e.t === 'dpad' && x.e.pressed).map((x) => x.e.dir === 'left' ? 'L' : 'R').join('');
+      // by FOOT, as the gate has it: ◀ for each step the reader told on the left foot, ▶ on the right — the reader's own
+      // order, which is not always strict alternation (a take can hold two lefts running)
+      const feet = t.events.filter((e) => e.at >= w.from && e.at <= w.to && e.kind === 'step').map((e) => e.foot ?? '?').join('');
+      const ok = dn === 'punch_kick' ? presses.A === 3 && presses.B === 1
+        : dn === 'shuffle_lateral' ? maxAbsX >= 0.8
+          : prof.bindings.some((b) => b.from === 'cadence') ? minY <= -0.3 && maxAbsX === 0
+            : (presses.DPAD_LEFT ?? 0) + (presses.DPAD_RIGHT ?? 0) === feet.length && dpad.length > 0 && dpad === feet;
+      const stats = await page.evaluate(() => (window as any).__FEL_DEV__.input.bodyStats() as Record<string, { n: number; medMs: number; p90Ms: number }>);
+      const lagMs = Object.fromEntries(Object.entries(stats).filter(([k]) => ['step', 'punch', 'kick', 'takeoff'].includes(k))
+        .map(([k, v]) => [k, { n: v.n, med: Math.round(v.medMs), p90: Math.round(v.p90Ms) }]));
+      row.drive = { take: dn, phase: phaseAt(t, w.to), qaPresses: presses, readerTold: told, bodySticks: sticks.length, minY, maxAbsX, ...(dpad ? { dpadByFoot: dpad, feetTold: feet } : {}), lagMs, verdict: ok ? 'RECEIVED' : 'NOT RECEIVED' };
+      await shot(page, `${key}-5-drive-${dn}`);
+      await page.evaluate(() => (window as any).__FEL_BODY__.stop());
+    }
   } catch (e) {
     row.error = String((e as Error)?.message ?? e).slice(0, 240);
   }

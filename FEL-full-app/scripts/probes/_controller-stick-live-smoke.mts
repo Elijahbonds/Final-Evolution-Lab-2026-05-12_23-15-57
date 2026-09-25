@@ -67,8 +67,11 @@ const env = await page.evaluate(() => ({ keys: Object.keys((window as any).__FEL
 gates.G1_handle = { verdict: handleMs >= 0 && handleMs < 60000 ? 'PASS' : 'FAIL', status: res?.status(), buildId, handleMs, handleKeys: env.keys, sceneExposed: env.scene };
 if (handleMs < 0) { fs.writeFileSync(`${OUT}/gates.json`, JSON.stringify({ gates, logs }, null, 2)); console.log(JSON.stringify(gates, null, 2)); await browser.close(); process.exit(2); }
 await subscribe(page);
-// the bus starts after load (READY): wait for the start prompt before plugging
-await page.waitForFunction(() => /TAP TO START|press any button/i.test(document.body.innerText), null, { timeout: 90000 }).catch(() => {});
+// the bus starts after load (READY): wait for the start prompt before plugging.
+// MOVEMENT PLAY P3 (2026-09-24, the step-3 live check): TAP TO START alone — the USB hint ("…then press any button",
+// CONTROLLER-USB-QR-HELP) is on screen while the arena still loads, so "press any button" let this wait end early and
+// G4 read "no TAP TO START before the pads" as a FAIL, on the tree before P3 exactly as after it
+await page.waitForFunction(() => /TAP TO START/i.test(document.body.innerText), null, { timeout: 90000 }).catch(() => {});
 const readyMs = Date.now() - t0;
 const readyText = await text(page);
 await page.screenshot({ path: `${OUT}/00-ready.png` });
