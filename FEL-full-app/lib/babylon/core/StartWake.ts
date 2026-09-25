@@ -32,6 +32,10 @@ export const SPACE_TAP_MS = 250;
 export const WAKE_ECHO_MS = 80;
 
 export function isWakeInput(e: FelInput): boolean {
+  // MOVEMENT PLAY P3 (2026-09-24): the body starts a game only through its own START (both hands held up, an intent the
+  // harness reads off the body channel) — never through a FelInput the floor made. A lean or a crouch someone does
+  // while the READY card is up is a person getting ready, not a press (P3 Z4).
+  if (e.src === 'body') return false;
   switch (e.t) {
     case 'button': return e.pressed;
     case 'dpad': return e.pressed;

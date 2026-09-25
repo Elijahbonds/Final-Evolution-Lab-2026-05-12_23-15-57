@@ -26,6 +26,25 @@ describe('isWakeInput', () => {
   });
 });
 
+// MOVEMENT PLAY P3 (2026-09-24): the body starts a game through its own START (both hands held up) and nothing else —
+// a lean, a crouch or a jump the floor turned into a FelInput is a person getting ready, not a press (P3 Z4).
+describe('isWakeInput — the body never wakes a game through a FelInput', () => {
+  it('a body button or d-pad press never wakes', () => {
+    expect(isWakeInput({ t: 'button', btn: 'A', pressed: true, src: 'body' })).toBe(false);
+    expect(isWakeInput({ t: 'button', btn: 'B', pressed: true, src: 'body' })).toBe(false);
+    expect(isWakeInput({ t: 'dpad', dir: 'right', pressed: true, src: 'body' })).toBe(false);
+    expect(isWakeInput({ t: 'button', btn: 'A', pressed: true, src: 'key' })).toBe(true);   // the keyboard's tag still wakes
+  });
+  it('a body stick push never wakes, however far', () => {
+    expect(isWakeInput({ t: 'stick', side: 'L', x: 1, y: 0, src: 'body' })).toBe(false);
+    expect(isWakeInput({ t: 'stick', side: 'L', x: 0, y: -1, src: 'body' })).toBe(false);
+  });
+  it('a body trigger pull never wakes, not even at the Space-down marker', () => {
+    expect(isWakeInput({ t: 'trigger', side: 'R', value: 1, src: 'body' })).toBe(false);
+    expect(isWakeInput({ t: 'trigger', side: 'R', value: KEY_SPACE_DOWN, src: 'body' })).toBe(false);
+  });
+});
+
 describe('WakeLatch', () => {
   it('drops the waking button release so a hold-to-shoot does not fire on the first frame', () => {
     const l = new WakeLatch();

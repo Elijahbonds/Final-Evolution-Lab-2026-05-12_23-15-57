@@ -1,12 +1,16 @@
 // InputBus — every input source (keyboard, touch overlay, Gamepad API) emits the
 // same normalized FelInput events. Game logic ONLY subscribes here.
 
+/** MOVEMENT PLAY P3 (2026-09-24): `'body'` marks an event the body floor made (lib/input/bodyFloor, through emitBody
+ *  and the arbiter). Only the floor ever sets it, and the keyboard's events keep their exact shape (`'key'` or none). */
+export type InputSrc = 'key' | 'body';
+export type FelButton = 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS';
 export type FelInput =
-  | { t: 'stick'; side: 'L' | 'R'; x: number; y: number }
+  | { t: 'stick'; side: 'L' | 'R'; x: number; y: number; src?: 'body' }
   /** `src: 'key'` marks a keyboard ARROW: the arrows also drive the L stick (see onKey), so a mode whose d-pad
    *  means something else on the runway (the dunk's PROP) must skip keyboard d-pad presses — pad buttons 12–15,
    *  the touch d-pad and Controller Link carry no src and stay the real d-pad. */
-  | { t: 'dpad'; dir: 'up' | 'down' | 'left' | 'right'; pressed: boolean; src?: 'key' }
+  | { t: 'dpad'; dir: 'up' | 'down' | 'left' | 'right'; pressed: boolean; src?: InputSrc }
   /** `src: 'key'` on a BUTTON marks the keyboard's two shoulder keys (SHIFT = R1, F = L1). The hoops slot reads the
    *  tagged pair as its two TRIGGER verbs (turbo / post-up + intense D) because a keyboard has no analog triggers;
    *  every other reader sees the plain R1 / L1 it always did. A pad's shoulders carry no src.
@@ -14,9 +18,12 @@ export type FelInput =
    *  emitted them, so the Free Run brief's L3 look-back / R3 lock-on had no input to hang on.
    *  HOTFIX (2026-09-24): `src: 'space'` marks the A the bus makes up when SPACE comes back up (see onKey). It is the run
    *  key's release, not a press of J / A, and the dunk modes must tell the two apart; guessing it from the R stream broke
-   *  whenever an idle pad, the touch RUN hold or Controller Link wrote to that stream too. Every other reader sees a plain A. */
-  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS'; pressed: boolean; src?: 'key' | 'space' }
-  | { t: 'trigger'; side: 'L' | 'R'; value: number };
+   *  whenever an idle pad, the touch RUN hold or Controller Link wrote to that stream too. Every other reader sees a plain A.
+   *  (P3 rebase, 2026-09-25: `'space'` is the keyboard's own tag, beside `'key'`; the body floor never sets it — InputSrc.) */
+  | { t: 'button'; btn: FelButton; pressed: boolean; src?: InputSrc | 'space' }
+  | { t: 'trigger'; side: 'L' | 'R'; value: number; src?: 'body' };
+/** What a body floor emits (emitBody takes nothing else): every output carries `src: 'body'`. */
+export type BodyOut = FelInput & { src: 'body' };
 
 import { HAPTIC } from '../premium/Haptics';
 import { KEY_SPACE_DOWN } from './StartWake';   // the space-down marker the READY gate wakes on
@@ -27,10 +34,13 @@ import { profileFor, readPad, supportCheck, type CanonicalPad, type ControllerPr
 import { applyRemap, readRemap } from '@/lib/input/remap';
 import { MAX_SLOTS } from '@/lib/input/PlayerSlots';
 import { mergePads } from '@/lib/input/padMerge';
+import { BodyArbiter, type HoldKey } from '@/lib/input/arbiter';
+import type { BodyRead, BodyEvent, BodyEventKind } from '@/lib/pose/BodyReader';   // type-only; BodyReader imports lib/pose only
+import type { BodyChannels } from '@/lib/pose/bodyChannels';                        // type-only
 
 type Listener = (e: FelInput) => void;
 type SlotListener = (e: FelInput, slot: number) => void;
-type FelButton = 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS';
+type BodyListener = (p: BodyPacket) => void;
 type PadDirName = 'up' | 'down' | 'left' | 'right';
 const FEL_BUTTONS: readonly FelButton[] = ['A', 'B', 'X', 'Y', 'L1', 'R1', 'SELECT', 'START', 'LS', 'RS'];
 const DPAD_DIRS: readonly PadDirName[] = ['up', 'down', 'left', 'right'];
@@ -122,6 +132,31 @@ export function emitToLive(e: FelInput): void {
   LIVE.forEach((b) => b.emit(e));
 }
 
+/**
+ * MOVEMENT PLAY P3 (2026-09-24): THE BODY CHANNEL. What the camera reads is not a fifth FelInput shape — a mode that
+ * wants the body's own facts (the take-off's instant, the apex, the stride) gets them whole, on the capture clock —
+ * so it rides beside the input stream as one packet per camera frame. The harness turns it into ordinary FelInput
+ * (tagged `src: 'body'`) only where a mode's profile binds a move, and pauses / starts the game on it.
+ */
+export interface BodyPacket {
+  /** An absent read (present:false, fields null) = source live, nobody in frame. */
+  read: BodyRead;
+  events: readonly BodyEvent[];
+  channels: BodyChannels;
+  /** PoseFrame.arrive: when the frame reached the page (PoseService deps.now = performance.now). */
+  arrivedAt: number;
+  /** The publisher stopped (Body switched off, recalibrate, teardown): release, never pause. */
+  final?: true;
+}
+
+/** One camera frame of body to every running bus: beside emitToLive, for the same reason (a camera outlives modes). */
+export function publishBodyToLive(p: BodyPacket): void {
+  LIVE.forEach((b) => b.publishBody(p));
+}
+
+/** How many lags per event kind bodyStats keeps (the newest): a probe's median, not a history. */
+const BODY_STATS_KEEP = 256;
+
 export class InputBus {
   private listeners = new Set<Listener>();
   private slotListeners = new Set<SlotListener>();
@@ -132,6 +167,15 @@ export class InputBus {
   private spaceDownAt = 0;
   /** True while ANY local pad is held (the touch overlay hides on it). */
   public gamepadActive = false;
+  // ── the body channel (MOVEMENT PLAY P3) ──
+  private bodyListeners = new Set<BodyListener>();
+  /** The latest packet since start(); null before any, and after a final one. */
+  private latest: BodyPacket | null = null;
+  private lastArrive = -Infinity;
+  /** arrivedAt − ev.t per event kind (the newest BODY_STATS_KEEP), for probes. */
+  private lags = new Map<BodyEventKind, number[]>();
+  /** Composes the body with every other source; neutral (a pass-through) until the body writes something. */
+  private readonly arbiter = new BodyArbiter((k) => this.holds(k));
 
   start(): void {
     // IDEMPOTENT (2026-09-15). A second start() on the same bus left the FIRST pollPads chain running: two poll loops, two
@@ -141,6 +185,7 @@ export class InputBus {
     // A fresh start never inherits held state: a key or button held across a stop / start would otherwise stay logically
     // down forever (ported from elijahbonds-fel-upgrade-pass "one input owner per game", 2026-09-12).
     this.held.clear();
+    this.resetBody();   // …and no body state either: a new game starts from no source (body() === null)
     LIVE.add(this);
     this.spaceDownAt = 0;
     window.addEventListener('keydown', this.onKey);
@@ -153,6 +198,10 @@ export class InputBus {
   }
   stop(): void {
     LIVE.delete(this);
+    // MOVEMENT PLAY P3: the body lets go with the mode. Reset BEFORE releaseAll, so the releases below go out exactly as
+    // they always did rather than composed with a lean or a crouch nobody is running any more (the listeners are the
+    // torn-down mode's; they are never sent a body release).
+    this.resetBody();
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKey);
     window.removeEventListener('blur', this.onBlur);
@@ -185,6 +234,8 @@ export class InputBus {
     this.spaceDownAt = 0;
   }
 
+  // A blur releases the keys and the pad a hidden window can no longer see let go of — never the body: the camera still
+  // sees it (P3 Z7), and the arbiter composes what releaseAll sends with whatever the body is still doing.
   private onBlur = (): void => { this.releaseAll(); };
 
   on(fn: Listener): () => void {
@@ -192,8 +243,81 @@ export class InputBus {
     return () => this.listeners.delete(fn);
   }
   emit(e: FelInput): void {                        // touch overlay calls this directly
+    // MOVEMENT PLAY P3: a body event is the floor's, already arbitrated (emitBody) — and nobody pressed anything: no
+    // buzz. It must never go through external() either: that records it as a hand's value, and a lean or a crouch
+    // that went back to 0 would stay composed into every event after it.
+    if (e.src === 'body') { this.deliver(e); return; }
     if (e.t === 'button' && e.pressed) HAPTIC.tap();  // 10ms button-down buzz (throttled in Haptics) //TUNE(elijah)
+    // MOVEMENT PLAY P3: the same event, untouched, while the body holds nothing (Z1); composed with it otherwise —
+    // and tagged `src: 'body'` where the value it now carries is the body's (arbiter.ts, WHOSE EVENT IT IS)
+    this.deliver(this.arbiter.external(e, this.gamepadActive));
+  }
+  /** Straight to the listeners: for an event already arbitrated (a body output, a folded pad trigger, a resync). */
+  private deliver(e: FelInput): void {
     this.listeners.forEach((fn) => fn(e));
+  }
+
+  // ── the body channel (MOVEMENT PLAY P3, 2026-09-24) ──
+
+  /** One camera frame of body: kept as the latest (cleared by a final one) and handed to every onBody listener. */
+  publishBody(p: BodyPacket): void {
+    this.latest = p.final ? null : p;
+    this.lastArrive = p.arrivedAt;
+    for (const ev of p.events) {
+      let l = this.lags.get(ev.kind);
+      if (!l) this.lags.set(ev.kind, (l = []));
+      l.push(p.arrivedAt - ev.t);
+      if (l.length > BODY_STATS_KEEP) l.shift();
+    }
+    this.bodyListeners.forEach((fn) => fn(p));
+  }
+  onBody(fn: (p: BodyPacket) => void): () => void {
+    this.bodyListeners.add(fn);
+    return () => this.bodyListeners.delete(fn);
+  }
+  /** The latest packet: null = no source since start(), or after a final packet. */
+  body(): BodyPacket | null { return this.latest; }
+  /** arrivedAt of the latest packet (a final one included); -Infinity if none since start(). */
+  lastBodyAt(): number { return this.lastArrive; }
+  /** A body floor's output → the listeners, through the arbiter (§3). No haptic: nobody pressed anything. */
+  emitBody(e: BodyOut): void {
+    for (const out of this.arbiter.body(e, this.gamepadActive)) this.emit(out);
+  }
+  /** Re-emit the composed L/R sticks and triggers, past every on-change filter (a resume: P3 step 4b). */
+  resync(): void {
+    for (const e of this.arbiter.current()) this.deliver(e);
+  }
+  /** Per event kind: how late the page had it (arrivedAt − ev.t, ms) — the median and the 90th percentile. */
+  bodyStats(): Partial<Record<BodyEventKind, { n: number; medMs: number; p90Ms: number }>> {
+    const out: Partial<Record<BodyEventKind, { n: number; medMs: number; p90Ms: number }>> = {};
+    this.lags.forEach((l, kind) => {
+      if (!l.length) return;
+      const s = [...l].sort((a, b) => a - b);
+      const at = (q: number): number => s[Math.min(s.length - 1, Math.max(0, Math.ceil(q * s.length) - 1))];
+      out[kind] = { n: s.length, medMs: at(0.5), p90Ms: at(0.9) };
+    });
+    return out;
+  }
+  /** start() / stop(): no packet, no lags, a neutral arbiter. The listeners stay subscribed, as on() ones do. */
+  private resetBody(): void {
+    this.arbiter.reset();
+    this.latest = null;
+    this.lastArrive = -Infinity;
+    this.lags.clear();
+  }
+  /** The arbiter's view of `held`: the pad's and the keyboard's own edges, which the bus tracks exactly. */
+  private holds(k: HoldKey): boolean {
+    if (k.startsWith('d:')) {
+      const dir = k.slice(2);
+      return this.held.has(`pad_dpad_${dir}`) || this.held.has(`arrow${dir}`);
+    }
+    const btn = k.slice(2);
+    if (this.held.has(`pad_${btn}`)) return true;
+    for (const key of this.held) {
+      const m = KEYMAP[key];
+      if (m && m.t === 'button' && m.btn === btn) return true;
+    }
+    return false;
   }
 
   /**
@@ -381,9 +505,15 @@ export class InputBus {
       const canon = mergePads(canons);
       this.emitStick('L', canon.lx, canon.ly);
       this.emitStick('R', canon.rx, canon.ry);
-      this.emit({ t: 'trigger', side: 'L', value: canon.triggers.L });
+      // MOVEMENT PLAY P3 (bug 3): still every frame (DunkDuel's RT start and the slot's turboSeen read the stream), but
+      // FOLDED with the body's pull: the pad's exact event while the body pulls no deeper, the body's (tagged
+      // `src: 'body'`, so the READY gate and the play evidence know whose it is) while it does. Delivered straight to
+      // the listeners — folded already, it must never be taken for the pad's own value on the way (arbiter.foldTrigger).
+      // While Space is held the pad's R is NOT sent here (the HOTFIX above): the one R a frame goes out below, as the
+      // deeper of the Space depth and the pad, through emit() — a hand's value, which the arbiter composes like any other.
+      this.deliver(this.arbiter.foldTrigger('L', canon.triggers.L));
       padR = canon.triggers.R;
-      if (!spaceHeld) this.emit({ t: 'trigger', side: 'R', value: canon.triggers.R });
+      if (!spaceHeld) this.deliver(this.arbiter.foldTrigger('R', canon.triggers.R));
       // the keyboard arrows and the touch overlay's d-pad already emit these same events, so a real
       // controller's physical d-pad feeds the identical path
       for (const dir of DPAD_DIRS) {
