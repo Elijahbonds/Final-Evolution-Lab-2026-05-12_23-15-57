@@ -6,6 +6,7 @@
 // ShotMeter greens at t=0.62 over ~0.72s) need it aimed, or every shot misses.
 
 import { chromium } from 'playwright-core';
+import { chromiumExe } from './probes/_chromium.mts';
 import { mkdirSync } from 'node:fs';
 
 // NB: not named URL — that would shadow the global URL constructor.
@@ -34,7 +35,7 @@ const NAME = process.env.NAME ?? 'play';
 mkdirSync(OUT, { recursive: true });
 
 const b = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 // TIER=mobile: a phone-shaped, touch-capable context so detectQualityTier picks

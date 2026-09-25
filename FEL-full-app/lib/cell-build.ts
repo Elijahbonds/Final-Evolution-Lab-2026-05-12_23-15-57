@@ -38,7 +38,7 @@ import {
   assertContentAllowed,
   type CompliancePolicy,
 } from '@/lib/cell-compliance';
-import { decryptSecret } from '@/lib/cell-crypto';
+import { CellSecretMissingError, decryptSecret } from '@/lib/cell-crypto';
 
 // ── Context packing caps ──
 const MAX_CONTEXT_FILES = 3;
@@ -158,8 +158,10 @@ export async function loadBuildContext(projectId: string, userId: string | null)
       ctx.budgetUsd = settings.budgetUsd || 0;
       ctx.preferCheap = settings.preferCheap;
     }
-  } catch {
-    // fall back to Abacus routing
+  } catch (e) {
+    // A missing NEXTAUTH_SECRET is a server misconfiguration, not a missing key: swallowing it here would drop the
+    // user's stored keys without a word. Everything else (an unreachable database) still falls back to Abacus routing.
+    if (e instanceof CellSecretMissingError) throw e;
   }
   return ctx;
 }

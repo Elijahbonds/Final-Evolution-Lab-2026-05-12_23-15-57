@@ -284,6 +284,7 @@ export function StudioShell() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [budgetInput, setBudgetInput] = useState('');
   const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   const fetchCosts = useCallback(async (pid: string) => {
     try {
@@ -333,16 +334,24 @@ export function StudioShell() {
     const apiKey = (keyInputs[provider] || '').trim();
     if (!apiKey) return;
     setSavingSettings(true);
+    setKeyError(null);
     try {
       const res = await fetch('/api/cell/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, apiKey }),
       });
-      const j = await res.json();
-      if (j && Array.isArray(j.keys)) setSettings(j);
-      setKeyInputs((k) => ({ ...k, [provider]: '' }));
-    } catch {}
+      const j = await res.json().catch(() => null);
+      if (!res.ok) {
+        // keep what they pasted and say why, instead of clearing the field as if it had saved
+        setKeyError(j?.message || j?.error || `Key not saved (HTTP ${res.status}).`);
+      } else {
+        if (j && Array.isArray(j.keys)) setSettings(j);
+        setKeyInputs((k) => ({ ...k, [provider]: '' }));
+      }
+    } catch {
+      setKeyError('Key not saved: the server could not be reached.');
+    }
     setSavingSettings(false);
   }, [keyInputs]);
 
@@ -1527,6 +1536,7 @@ export function StudioShell() {
                       );
                     })}
                   </div>
+                  {keyError && <p className="mt-2 text-[11px] text-[#FF3366]">{keyError}</p>}
                 </div>
               </div>
             </motion.div>

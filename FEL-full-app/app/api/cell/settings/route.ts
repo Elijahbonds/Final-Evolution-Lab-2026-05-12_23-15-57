@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { encryptSecret, keyHint } from '@/lib/cell-crypto';
+import { CellSecretMissingError, encryptSecret, keyHint } from '@/lib/cell-crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,10 +66,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unsupported provider' }, { status: 400 });
     }
     const raw = body.apiKey.trim();
+    let keyCipher: string;
+    try {
+      keyCipher = encryptSecret(raw);
+    } catch (e) {
+      // No NEXTAUTH_SECRET is a server misconfiguration (Cell crypto fails closed). Answer it as JSON so Studio can
+      // say why the key was not saved, instead of Next's bare 500 page that the client cannot parse.
+      if (!(e instanceof CellSecretMissingError)) throw e;
+      console.error('[cell/settings]', e.message);
+      return NextResponse.json(
+        { error: 'server_misconfigured', message: 'Key not saved: the server has no NEXTAUTH_SECRET to encrypt it with.' },
+        { status: 500 },
+      );
+    }
     await prisma.cellApiKey.upsert({
       where: { userId_provider: { userId, provider } },
-      create: { userId, provider, keyCipher: encryptSecret(raw), hint: keyHint(raw) },
-      update: { keyCipher: encryptSecret(raw), hint: keyHint(raw) },
+      create: { userId, provider, keyCipher, hint: keyHint(raw) },
+      update: { keyCipher, hint: keyHint(raw) },
     });
   }
 

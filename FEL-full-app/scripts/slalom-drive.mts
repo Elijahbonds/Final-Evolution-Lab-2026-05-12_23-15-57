@@ -14,6 +14,7 @@
 //   npx tsx scripts/slalom-drive.mts
 
 import { chromium } from 'playwright-core';
+import { chromiumExe } from './probes/_chromium.mts';
 // DYNAMIC import, not a static one: this file is .mts (ESM, for top-level
 // await) while tsx transpiles the imported .ts as CJS, so a static named import
 // fails to resolve at load time even though the exports exist. Awaiting the
@@ -29,7 +30,7 @@ const GATES = Array.from({ length: SLALOM_GATES }, (_, i) => ({
 }));
 
 const b = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });

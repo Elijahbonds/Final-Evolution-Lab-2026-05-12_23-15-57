@@ -6,6 +6,7 @@
 //   URL=http://localhost:3001 npx tsx scripts/menu-audit.mts
 
 import { chromium } from 'playwright-core';
+import { chromiumExe } from './probes/_chromium.mts';
 import { mkdirSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -32,7 +33,7 @@ const ROUTES = [
 ] as const;
 
 const b = await chromium.launch({
-  executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
+  executablePath: chromiumExe(),
   args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1.5 });
