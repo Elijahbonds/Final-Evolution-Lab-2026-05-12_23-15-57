@@ -21,7 +21,7 @@ import { Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
-import { trickFor, bestFitting, asTrickDef, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { trickFor, bestFitting, airPressFor, asTrickDef, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
@@ -204,7 +204,14 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         // ("descends at 12–16 m/s straight"). The momentum model owns the ceiling; the Rider's cap only has to clear it.
         maxSpeed: snowTune.maxSpeed * 1.4,
       });
-      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), { momentum: trickMomentum, anim: 'external', onBeat: (b) => {
+      tricks = new TrickMachine(rig, (h) => ctx.setHud(h), {
+        momentum: trickMomentum, anim: 'external',
+        // HOTFIX (2026-09-24): X in the air is a grab now, and X's release ends it — so a keyboard tap under 0.1 s graded
+        // under GRAB_SKETCHY (0.4) and landed as a BAIL (combo wiped, speed cut to a quarter). A grab is held at least
+        // MIN_TAP_GRAB_SEC (one clean grab's worth): a tap is a clean minimum grab, a longer hold is the same grab as
+        // before. The trick pose lets the grab hand go when the grab really ends.
+        minGrabSec: TrickMachine.MIN_TAP_GRAB_SEC, onGrabEnd: () => trickLayer?.release(),
+        onBeat: (b) => {
         if (b === 'land' || b === 'land_sketchy') {
           landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean';   // phase 6: the body reads the grade
           // SCORECARD FEEL (2026-09-15): a landed trick pops at the rider — the run measured 4.5 juice beats a minute
@@ -288,8 +295,15 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         } else if (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') {
           const held = heldTrickDir(stickX, stickY);
           const air = Math.max(0.3, rig.rider.grounded ? 0 : AIR_BUDGET_SEC);
-          const want = trickFor('snow', held, e.btn as BoardTrick['btn']);
-          const fits = want && want.airSec <= air ? want : bestFitting('snow', e.btn as BoardTrick['btn'], air);
+          const btn = e.btn as BoardTrick['btn'];
+          // HOTFIX (2026-09-24): IN THE AIR, AN AIR TRICK — skate's ANIM-RESIDUAL fix, which snow never got. The whole-list
+          // search includes the ground links, and X's only snow trick is the rail BOARDSLIDE (airSec 0, so it always "fits"):
+          // every X off a kicker threw a BOARDSLIDE over open air. airPressFor names the air trick, and an X with no named air
+          // is the held direction's grab (X is the grab hold: its release ends it, below, after the minimum hold — see the
+          // TrickMachine's minGrabSec above). On a rail the links are the point.
+          let fits: BoardTrick | null;
+          if (rig.rider.grinding) { const want = trickFor('snow', held, btn); fits = want && want.airSec <= air ? want : bestFitting('snow', btn, air); }
+          else fits = airPressFor('snow', held, btn, air);
           if (fits) {
             tricks.start(asTrickDef(fits));
             trickLayer?.start(fits);
@@ -301,7 +315,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         }
       }
       if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1 (press AND release)
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') { tricks.endGrab(); trickLayer?.release(); }
+      // a grab inside its minimum hold ends later (onGrabEnd releases the pose then); with no grab in flight the pose is let go now
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release(); }
     },
 
     update(ctx: ModeContext, dt: number) {

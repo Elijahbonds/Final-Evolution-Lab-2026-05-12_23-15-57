@@ -525,8 +525,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const tok = possessionToken;
     setTimeout(() => { if (!ended && possessionToken === tok) fn(); }, ms);
   }
+  /** HOTFIX (2026-09-24): a possession change ENDS a live board. Neither resetPossession nor opponentPossession cleared it, so a
+   *  board still live when the possession moved on (the release-time race timer below, a whistle, the dev seams) kept running in
+   *  the NEXT possession: liveBoard went on awarding "YOUR BOARD" / "THEIR BOARD" off a ball that was already in a hand. */
+  function dropBoard(): void {
+    if (!board) return;
+    board = null; endChase(); ballSim.stop();
+  }
   function resetPossession(toMe = true): void {
     possessionToken++;
+    dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration
     for (const b of everyBody()) b.motion.reset();
@@ -695,7 +703,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       localSource.feed(e);
       if (e.t === 'trigger' && e.side === 'L') ltHeld = e.value > 0.5;   // HOOPS KINETIC: LT is the drift modifier
       // HOOPS KINETIC: the poke on defense is a PARRY-VAULT when the driver is arriving, a DRIVE-BY when I am running beside him
-      if (e.t === 'button' && e.btn === 'X' && e.pressed && carrierId === 'foeTeam' && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && !vault && !meFloored && !ended) {
+      // HOTFIX (2026-09-24): …while he still HAS it (ball.parent: his hand). His shot is up, his miss is a live board now (not a
+      // 900 ms race), and a poke at the empty-handed shooter "stripped" him and re-launched the rebound from wherever it was.
+      if (e.t === 'button' && e.btn === 'X' && e.pressed && carrierId === 'foeTeam' && driver && ball.parent && !driveStolen && !foeDunkFlight && meStunSec === 0 && !vault && !meFloored && !ended) {
         const d = driver.char.root.position.subtract(me.char.root.position); d.y = 0; const dist = d.length();
         const closing = dist > 1e-3 ? -(driverVelEst.x * d.x + driverVelEst.z * d.z) / dist : 0;
         if (parryVaultRead(dist, closing, driveK > 0 ? 'drive' : 'check')) { parryVault(ctx); return; }
@@ -837,7 +847,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const wantHandUp = !!me.slot.intent.contest && myJumpAge === Infinity && !meFloored && meStunSec === 0;
         if (wantHandUp !== meHandUp) { meHandUp = wantHandUp; if (meHandUp) console.info('[3V3-DEF] hand up (me)'); else me.tree.releaseHold(); }
         if (meHandUp && !me.tree.busy) me.tree.hold('bball_hand_up', { fadeSec: 0.14 });
-        if (me.slot.intent.steal && driver && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {
+        if (me.slot.intent.steal && driver && ball.parent && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {   // HOTFIX (2026-09-24): only on a man with the ball (above)
           me.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
           const exposure = bumpExposure(0.3, bumpAge);
           // THE MIC calls the poke here, where it is decided: the knock-loose branch in opponentPossession also runs after a charge,
@@ -874,6 +884,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           deflectMiss(mateMiss?.from ?? ball.position, mateMiss?.quality01 ?? 0.45, mateMiss?.short ?? 0.4, mateMiss?.lateral ?? 0, mateArc.play);
           board = { age: 0, contestedCalled: false, shooter: mateMiss?.team ?? 'foe' };
           mateMiss = null;
+          // HOTFIX (2026-09-24): THEIR SHOOTER'S DRIVE ENDS WITH HIS MISS. `driver` stayed set until the next possession, and
+          // the driver branch pins him (stands, faces the rim, skips his brain's chase) — with their miss a live board now
+          // (up to its 4 s stall guard, not a 0.9 s race) he stood frozen in his finish under the rim while the others crashed
+          // it, and my chest stayed on an empty-handed man. He lets go of the finish and goes for the ball like everyone else.
+          if (board.shooter === 'foe' && driver && !ball.parent) { driver.tree.release(); driver = null; }
         } else if (r === 'made') { const nk = netExitKindOf(mateArc.shotStyle); const v = netExitVelocity(nk); ballSim.launch(ball.position.clone(), new Vector3(v.x, v.y, v.z)); console.info(`[3V3-NET] ${nk} exit ${netExitMph(nk)} mph`); }   // NET EXIT
       }
       else if (dunkFlush) {   // DUNK-FANATIC: over the lip and down through the ring (RimFlush), never carried in flat from a metre out
@@ -3140,6 +3155,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   async function opponentPossession(ctx: ModeContext): Promise<void> {
     if (ended) return;
     possessionToken++;
+    dropBoard();   // HOTFIX (2026-09-24): their ball ends any board still live (see dropBoard)
     goaltendCalled = false; foeShotScored = false;   // …and again for theirs: the latch is per SHOT, not per game
     carrierId = 'foeTeam';
     myJumpAge = Infinity; foeShotBlocked = false;
@@ -3335,7 +3351,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     }
     setTimeout(() => ctx.setHud({ banner: '', hint: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' }), 800);
     if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('LOSS'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
-    if (made) later(900, () => resetPossession(true)); else later(900, () => boardAfterMiss(ctx));   // O2: their miss is a board too
+    // HOTFIX (2026-09-24): THEIR MISS IS THE LIVE BOARD'S, as a team-mate's already is (teammateShoots). This scheduled
+    // boardAfterMiss 900 ms after the release as well — but the arc flies 0.4–0.9 s plus its rim play, and its own miss branch
+    // sets a LIVE board for the same shot. Two owners for one outcome: the dice race handed the ball out while it was still in
+    // the air (or off the iron with six bodies going for it), and the live board kept running into the next possession. The
+    // board decides a miss (liveBoard, with its own stall guard); a goaltend decides its own; only a make is scheduled here.
+    if (made) later(900, () => resetPossession(true));
   }
 })();
 

@@ -18,6 +18,10 @@ export interface LoopOpts { fadeSec?: number; speedRatio?: number }
 export interface BeatOpts extends LoopOpts {
   /** Fires when the beat ENDS on its own (never when the owner cut it). */
   onSettle?: () => void;
+  /** HOLD the beat's last frame when it runs out, until the next beat or `settle()` (HOTFIX 2026-09-24, the basketballTree's
+   *  holdEnd): a ONE-WAY clip (a crouch into a load) that must stay loaded. Looped instead, it snapped back to its first
+   *  frame every cycle; settled, it stood the body back up. The held beat stays `busy`, so a `loop()` does not cut it. */
+  holdEnd?: boolean;
 }
 
 export class BeatOwner {
@@ -45,6 +49,9 @@ export class BeatOwner {
       loop: false, fadeSec: o.fadeSec ?? 0.1, speedRatio: o.speedRatio ?? 1, restart: true,
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / settle — Babylon raises the end from stop()
+        // parked on its last frame, still the body's. Called from INSIDE the clip's end callback: CharacterAnimator.freezeAtEnd
+        // starts the frozen loop after Babylon's end bookkeeping, not in it (HOTFIX 2026-09-24 — a restart in here was stranded).
+        if (o.holdEnd) { this.animator.freezeAtEnd(clip); o.onSettle?.(); return; }
         this.shot = null;
         o.onSettle?.();
         if (this.base) this.animator.play(this.base, { loop: true, ...this.baseOpts });
@@ -52,7 +59,7 @@ export class BeatOwner {
     });
   }
 
-  /** A beat is in flight. */
+  /** A beat is in flight (or held on its last frame). */
   get busy(): boolean { return this.shot !== null; }
   /** The beat in flight, if any. */
   get current(): string | null { return this.shot; }

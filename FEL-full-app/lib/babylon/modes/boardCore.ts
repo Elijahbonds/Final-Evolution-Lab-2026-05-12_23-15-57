@@ -92,6 +92,13 @@ export interface TrickMachineOpts {
   onBeat?: (beat: 'land' | 'land_sketchy' | 'bail') => void;
   /** The shared Game-Breaker bus. Pass one and deep combos light the building, as they do on a skateboard. */
   momentum?: MomentumBus;
+  /** HOTFIX (2026-09-24): THE SHORTEST GRAB A RELEASE CAN END, in seconds from the throw. A grab let go sooner is held
+   *  until this runs out (or the board lands), so a quick tap of the grab button is a clean minimum grab instead of a
+   *  0.05 s poke graded as a bail. Omitted / 0: the release ends the grab at once (surf, the carnival gauntlet). */
+  minGrabSec?: number;
+  /** A grab that a release asked to end has ended — at the release, or when the minimum hold runs out (the mode
+   *  lets the trick pose's grab hand go here, so the hand and the score agree). */
+  onGrabEnd?: () => void;
 }
 
 export class TrickMachine {
@@ -107,6 +114,9 @@ export class TrickMachine {
   static readonly LAND_CLEAN = 0.95;
   static readonly LAND_SKETCHY = 0.7;
   static readonly GRAB_SKETCHY = 0.4;
+  /** HOTFIX (2026-09-24): one CLEAN grab's worth of hold. A grab scores 4 a second against a need of 1 (update()), so a
+   *  grab held 0.25 s grades 1.0 — clean — and holding it longer pays no more. The snowboard's `minGrabSec`. */
+  static readonly MIN_TAP_GRAB_SEC = 0.25;
   private graceT = 0;
   /** phase 4: the labels landed in the combo so far — the repeat decay's memory and the line the bank names */
   private links: { key: string; rep: number }[] = [];
@@ -129,6 +139,9 @@ export class TrickMachine {
   private active: TrickDef | null = null;
   private spun = 0;
   private grabbing = false;
+  /** How long the grab in flight has been held, and whether its release came before the minimum hold (`minGrabSec`). */
+  private grabT = 0;
+  private grabReleaseAsked = false;
 
   constructor(private rig: BoardRig, private onHud: (h: Record<string, string | number>) => void, private opts: TrickMachineOpts = {}) {
     this.momentum = opts.momentum;
@@ -149,13 +162,23 @@ export class TrickMachine {
     if (this.rig.rider.grounded) return;                 // air tricks need air
     this.active = t;
     this.spun = 0;
-    if (t.clip) { this.grabbing = true; this.playClip(t.clip, { loop: true }); }
+    if (t.clip) { this.grabbing = true; this.grabT = 0; this.grabReleaseAsked = false; this.playClip(t.clip, { loop: true }); }
   }
+  /** The grab button was released. Ends the grab — or, inside the minimum hold (`minGrabSec`) of a trick still in the
+   *  air, when that runs out. */
   endGrab(): void {
-    if (this.grabbing) {
-      this.grabbing = false;
-      this.playClip('board_ride_idle', { loop: true });
-    }
+    if (!this.grabbing) return;
+    // HOTFIX (2026-09-24): the minimum is an AIR rule. A grab thrown with little air left, held through the touchdown and let
+    // go on the snow was deferred here — and only the air branch of update() ends a deferred grab, so it never ended:
+    // grabHeld stayed true on the ground and the next plain jump showed a grab that scored nothing. Landed (or between
+    // tricks), the release ends it now.
+    if (this.active && !this.rig.rider.grounded && this.grabT < (this.opts.minGrabSec ?? 0)) { this.grabReleaseAsked = true; return; }
+    this.finishGrab();
+  }
+  private finishGrab(): void {
+    this.grabbing = false; this.grabReleaseAsked = false;
+    this.playClip('board_ride_idle', { loop: true });
+    this.opts.onGrabEnd?.();
   }
 
   /** call every frame; returns banner text when something lands/bails */
@@ -171,12 +194,17 @@ export class TrickMachine {
         // now; this only grades how much of the turn the air held, on the same clock.
         this.spun = Math.min(this.spun + Math.abs(rate), Math.abs(t.turns) * 2 * Math.PI);
       }
-      if (this.grabbing) { this.spun += dt * 4; }        // grab scores with hold time
+      if (this.grabbing) {                               // grab scores with hold time
+        this.spun += dt * 4;
+        this.grabT += dt;
+        if (this.grabReleaseAsked && this.grabT >= (this.opts.minGrabSec ?? 0)) this.finishGrab();   // a tap's minimum hold ran out
+      }
       return null;
     }
     if (this.active && r.grounded) {                     // LANDING
       const t = this.active;
       this.active = null;
+      if (this.grabReleaseAsked) this.finishGrab();      // let go before the minimum and landed inside it: the grab is what the air held
       // a spin is graded on the turn it completed; a grab on how long it was held (spun += 4/s: a 0.25 s hold = 1)
       const needed = t.turns === 0 ? 1 : Math.abs(t.turns) * 2 * Math.PI;
       const done01 = Math.min(1, this.spun / needed);
@@ -224,7 +252,7 @@ export class TrickMachine {
   }
 
   bail(): void {
-    this.active = null; this.grabbing = false;
+    this.active = null; this.grabbing = false; this.grabReleaseAsked = false;
     this.comboPts = 0; this.combo = 0; this.links = []; this.graceT = 0;
     this.rig.rider.vel.scaleInPlace(0.25);
     this.playClip('skate_bail');   // SHARED-ANIM-BUS: the board's own bail (this borrowed the football tackle fall)

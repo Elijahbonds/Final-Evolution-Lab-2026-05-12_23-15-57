@@ -43,6 +43,12 @@ export class CharacterAnimator {
    *  gets replaced before it finishes can still stop its outgoing clip — see
    *  crossFade(). */
   private fadingOut: AnimationGroup | null = null;
+  /** The weight the in-flight fade has the outgoing clip at (so a freeze that starts under a fade joins it there). */
+  private fadingOutWeight = 1;
+  /** HOTFIX (2026-09-24): freezes asked for while their group was stopped, waiting for a safe point to start — see
+   *  freezeAtEnd. */
+  private pendingFreeze = new Set<AnimationGroup>();
+  private freezeFlushObs: (Observer<Scene> | null)[] = [];
   private endObs = new Map<AnimationGroup, Observer<AnimationGroup>>();
   /** SHARED-ANIM-BUS: the mode's clip scope (clipScope.ts). null = unscoped (every suite). */
   private scope: ClipScope | null = null;
@@ -158,11 +164,13 @@ export class CharacterAnimator {
     // in (a finish on the frame after the hang took over) used to restart at full weight — the half-blended pose snapped onto
     // that clip in one frame (the dunker's hands 0.47–0.61 m in a frame, measured). A clip at full weight fades exactly as before.
     const w0 = prev && prev !== next ? CharacterAnimator.weightOf(prev) : 1;
+    this.fadingOutWeight = w0;
     let t = 0;
     this.fadeObs = this.scene.onBeforeRenderObservable.add(() => {
       t += this.scene.getEngine().getDeltaTime() / 1000;
       const k = Math.min(1, t / fadeSec);
       next.setWeightForAllAnimatables(k);
+      this.fadingOutWeight = w0 * (1 - k);
       if (prev && prev !== next) prev.setWeightForAllAnimatables(w0 * (1 - k));
       if (k >= 1) {
         if (prev && prev !== next) prev.stop();
@@ -195,21 +203,79 @@ export class CharacterAnimator {
    * that settled after a beat did not fade in, it SNAPPED (the lab's smoothness recorder: a 0.91 m hand jump in one
    * frame at the follow-through's end, 0.6 m at every settle). The group is restarted as a loop parked on its final
    * frame at speed 0 and made current; play() then fades it out like any live clip. No-op if the clip is unknown.
+   *
+   * HOTFIX (2026-09-24): every caller asks for the freeze from the clip's own END callback — and Babylon 9.23 raises a
+   * group's end observable from INSIDE its bookkeeping: it notifies, then empties the group's animatable list. A restart
+   * made in that callback was dropped from the list the moment it returned, while its animatables went on playing in the
+   * scene at full weight. Nothing could fade or stop them again (setWeight and stop walk the emptied list), so every beat
+   * that ran out left one more copy of its last frame blended over everything after it: measured on a NullEngine, the
+   * body settled 4.9, then 6.6, then 7.4 of 10 units away from its idle over three beats, with 2, 3, 4 animatables on
+   * one bone (hoops beats, the 3PT pull-up gather, Slam Rush's held gather). So a group that is not running is never
+   * restarted here: it becomes the body's pose NOW (current, fades cleared — a play() straight after fades FROM it) and
+   * its frozen loop starts at the next safe point: right after this frame's animations (a natural end happens inside
+   * them, and the ending frame already evaluated the clip's last key) or before the next frame's (a stop from anywhere
+   * else). Evaluation never sees a gap. A running group is stopped and restarted at once, as before — its end callback
+   * has returned by then. (No caller freezes a running group today. Its stop() raises the end observable the same way, so
+   * an end callback that RESTARTS this group during that stop is stranded by Babylon exactly as above — and cannot be
+   * seen from here: stop() clears isStarted after the callbacks. Not supported; freeze from the end callback instead.)
    */
   freezeAtEnd(name: string): void {
     const r = resolveClip(name, this.clipNames);
     const g = this.groups.get(r.clip);
     if (!g) return;
-    if (g.isPlaying) g.stop();
+    const wasRunning = g.isPlaying;
+    if (wasRunning) g.stop();
+    if (this.fadingOut && this.fadingOut !== g) { this.fadingOut.stop(); this.fadingOut = null; }
+    this.fadeObs?.remove(); this.fadeObs = null;
+    this.current = g; this.currentName = r.clip; this.currentSpeed = CharacterAnimator.FREEZE_SPEED;
+    // HOTFIX (2026-09-24): a freezeAtEnd made by that stop()'s own end callback (a holdEnd beat) queued a deferred freeze
+    // for this group; this start owns it, and the flush skips a started group.
+    if (wasRunning) this.startFrozen(g, 1);
+    else this.deferFreeze(g);
+  }
+
+  /** The frozen loop's rate: 1/2000 — minutes on one half-frame. */
+  private static readonly FREEZE_SPEED = 0.0005;
+
+  private startFrozen(g: AnimationGroup, weight: number): void {
     // NOT speedRatio 0 + goToFrame: a runtime animation's frame is `from + elapsed × speed`, so at speed 0 it evaluates at
     // FROM — the beat's first pose flashed for a frame before the fade (measured as a two-frame 0.6 / 0.8 m hand pop).
     // A loop over the clip's last half-frame at 1/2000 speed sits on the end pose for minutes and is still a live blend source.
     const endA = Math.max(g.from, g.to - 0.5);
-    g.start(true, 0.0005, endA, g.to, false);
-    g.setWeightForAllAnimatables(1);
-    if (this.fadingOut && this.fadingOut !== g) { this.fadingOut.stop(); this.fadingOut = null; }
-    this.fadeObs?.remove(); this.fadeObs = null;
-    this.current = g; this.currentName = r.clip; this.currentSpeed = 0.0005;
+    g.start(true, CharacterAnimator.FREEZE_SPEED, endA, g.to, false);
+    g.setWeightForAllAnimatables(weight);
+    // HOTFIX (2026-09-24): the frozen rate is what this group asks for now. `requested` still held the beat's own speed, so
+    // a setTimeScale (Matrix Focus) during the hold set the frozen loop to beat speed × scale and the held pose cycled its
+    // last half-frame at 0.3× — a visible jitter on a body that should be still.
+    this.requested.set(g, CharacterAnimator.FREEZE_SPEED);
+  }
+
+  private deferFreeze(g: AnimationGroup): void {
+    this.pendingFreeze.add(g);
+    if (this.freezeFlushObs.length) return;
+    // Both hooks fire outside every group's end notification; whichever comes first starts the freeze.
+    const flush = () => this.flushFreezes();
+    this.freezeFlushObs = [this.scene.onAfterAnimationsObservable.add(flush), this.scene.onBeforeAnimationsObservable.add(flush)];
+  }
+
+  private flushFreezes(): void {
+    for (const o of this.freezeFlushObs) o?.remove();
+    this.freezeFlushObs = [];
+    const due = [...this.pendingFreeze];
+    this.pendingFreeze.clear();
+    for (const g of due) {
+      if (g.isStarted) continue;   // started since (a play() of this clip): that start owns it
+      // Still the body's pose → full weight. Being faded out by a play() made since → at the fade's weight, so the fade
+      // has something to fade FROM. Neither (cut, parked) → dropped.
+      if (g === this.current) this.startFrozen(g, 1);
+      else if (g === this.fadingOut) this.startFrozen(g, this.fadingOutWeight);
+    }
+  }
+
+  private dropPendingFreezes(): void {
+    for (const o of this.freezeFlushObs) o?.remove();
+    this.freezeFlushObs = [];
+    this.pendingFreeze.clear();
   }
 
   setSpeed(name: string, speedRatio: number): void {
@@ -257,6 +323,7 @@ export class CharacterAnimator {
    * which is the rule the board and combat trees already run on.
    */
   park(): void {
+    this.dropPendingFreezes();
     this.fadeObs?.remove();
     this.fadeObs = null;
     this.fadingOut = null;
@@ -266,6 +333,7 @@ export class CharacterAnimator {
   }
 
   dispose(): void {
+    this.dropPendingFreezes();
     this.fadeObs?.remove();
     this.endObs.forEach((o, g) => g.onAnimationGroupEndObservable.remove(o as never));
     this.groups.forEach((g) => g.stop());

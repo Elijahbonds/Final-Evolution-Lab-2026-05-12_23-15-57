@@ -5,6 +5,8 @@
 // long one RUNS AWAY, because that is the feedback loop a shooter learns their stroke from.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { Vector3 } from '@babylonjs/core';
 import { resolveRim, missProfileFor, forcedMissProfile, RIM_RADIUS, BALL_RADIUS } from './RimPhysics';
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from './LooseBall';
@@ -260,5 +262,55 @@ describe('a rebound that leaves the floor is dead, not a four-second wait', () =
 
   it('the measured failure: a ball every clamped body sits equidistant from is out', () => {
     expect(ballOutOfPlay({ x: 12, z: 6 }, B)).toBe(true);
+  });
+});
+
+// HOTFIX (2026-09-24): the 3v3 STALE BOARD. The rival's miss scheduled the old dice race (boardAfterMiss) 900 ms after the
+// release while the same shot's arc was setting a LIVE board — and neither possession change cleared `board`, so the live
+// board kept awarding rebounds in the next possession. The mode is one closure over a scene; its contract is read off the source.
+describe('3v3: one owner for a miss, and a possession change ends the board', () => {
+  const SRC = readFileSync(path.join(__dirname, '../modes/ThreeVThreeMode.ts'), 'utf8');
+  const CODE = SRC.replace(/\/\/.*$/gm, '');   // the comments may name the old call
+  /** One of the mode's own functions, up to the next one. */
+  const fn = (name: string): string => {
+    const at = CODE.indexOf(`function ${name}(`);
+    expect(at, name).toBeGreaterThan(-1);
+    const rest = CODE.slice(at + 1);
+    const end = rest.search(/\n {2}(async )?function |\n {2}return \{/);
+    return end < 0 ? rest : rest.slice(0, end);
+  };
+
+  it('dropBoard ends the board, its chase and the loose ball', () => {
+    const drop = fn('dropBoard');
+    expect(drop).toContain('board = null');
+    expect(drop).toContain('endChase()');
+    expect(drop).toContain('ballSim.stop()');
+  });
+
+  it('both possession changes drop the board', () => {
+    expect(fn('resetPossession')).toContain('dropBoard();');
+    expect(fn('opponentPossession')).toContain('dropBoard();');
+  });
+
+  it("their miss is not raced at the release: the live board decides it (a make is still scheduled)", () => {
+    const opp = fn('opponentPossession');
+    expect(opp).not.toContain('boardAfterMiss');
+    expect(opp).toMatch(/if \(made\) later\(900, \(\) => resetPossession\(true\)\);/);
+  });
+
+  it('while their miss is live, the pokes need a man WITH the ball (no strip of the empty-handed shooter)', () => {
+    // the parry-vault / drive-by press and the poke / reach-in: both read `driver`, who stays set until the next possession
+    expect(CODE.match(/driver && ball\.parent && !driveStolen/g) ?? []).toHaveLength(2);
+    expect(CODE).not.toMatch(/driver && !driveStolen/);
+  });
+
+  it('the miss that flies still sets the live board (the owner this defers to)', () => {
+    expect(CODE).toMatch(/if \(r === 'missed'\) \{[^}]*board = \{ age: 0, contestedCalled: false, shooter: mateMiss\?\.team \?\? 'foe' \};/);
+  });
+
+  it('their live miss ends their shooter\'s drive: he lets go of the finish and is no longer pinned as the driver', () => {
+    // the `f === driver` branch stands him still facing the rim and skips his brain's chase; the board can now run 4 s
+    const missed = CODE.slice(CODE.indexOf("if (r === 'missed') {"));
+    expect(missed.slice(0, missed.indexOf('} else if'))).toMatch(/if \(board\.shooter === 'foe' && driver && !ball\.parent\) \{ driver\.tree\.release\(\); driver = null; \}/);
   });
 });

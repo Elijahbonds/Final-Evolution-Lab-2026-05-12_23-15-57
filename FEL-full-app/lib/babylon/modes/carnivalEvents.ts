@@ -29,6 +29,8 @@ import { CoinField } from '../core/Pickups';
 import type { ModeContext } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
+import { dressBall } from '../visual/meshyProps';   // the hoops modes' Meshy ball (Slam Rush)
+import { attachBallToHand } from '../anim/ballRig';
 
 export interface CarnivalEvent {
   id: string;
@@ -65,7 +67,16 @@ const MOMENTUM_TRICK = 6;
 export function slamRush(): CarnivalEvent {
   let player: SpawnedCharacter, ball: AbstractMesh, body: BeatOwner;
   let charging = false, charge = 0, makes = 0, cooldown = 0;
+  let gathered = false;   // this charge's gather has been thrown (it is held, not looped — see gather())
   const rim = new Vector3(0, 3.05, -0.6);
+  /** HOTFIX (2026-09-24): THE GATHER IS ONE-WAY — the rip down into the loaded crouch the launch starts from (0.5 s). It was
+   *  LOOPED through the whole charge, so the body snapped back up to standing and crouched again twice a second. It plays
+   *  once and holds the load now. A launch still in flight is let finish (tick retries): the new charge follows it. */
+  function gather(): void {
+    if (gathered || body.busy) return;
+    gathered = true;
+    body.beat(SPORT_CLIP.dunkChargeGather, { fadeSec: 0.12, holdEnd: true });
+  }
 
   return {
     id: 'slam_rush', title: 'SLAM RUSH', durationSec: 20, pointsPerUnit: 12, rivalRange: [4, 9],
@@ -77,7 +88,11 @@ export function slamRush(): CarnivalEvent {
       body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.idle);
       ctx.groundLock?.track(player.root, player.skeleton);
       ball = MeshBuilder.CreateSphere('carn_ball', { diameter: 0.24 }, ctx.scene);
-      makes = 0; charging = false; charge = 0; cooldown = 0;
+      // HOTFIX (2026-09-24), owner: no untextured models. The ball was a bare grey sphere left at centre court, half through
+      // the floor. It is the hoops modes' ball now: the Meshy leather rides the sphere, and the sphere rides the dunker's hand.
+      void dressBall(ball, 'basketball');
+      attachBallToHand(ball, player.skeleton, 'RightHand');
+      makes = 0; charging = false; charge = 0; cooldown = 0; gathered = false;
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = rim;
       ctx.camDirector.setPreset('court');
@@ -86,12 +101,12 @@ export function slamRush(): CarnivalEvent {
     },
     onInput(ctx, e) {
       if (e.t === 'trigger' && e.side === 'R') {
-        if (e.value > 0.02) { charging = true; charge = Math.max(charge, e.value); body.loop(SPORT_CLIP.dunkChargeGather, { fadeSec: 0.12 }); }   // a launch in flight settles into the new charge
+        if (e.value > 0.02) { charging = true; charge = Math.max(charge, e.value); gather(); }   // a launch in flight settles into the new charge
         if (e.value === 0 && charging && cooldown <= 0) {
-          charging = false;
+          charging = false; gathered = false;
           const quality = 1 - Math.abs(charge - 0.85);   // sweet spot near-full charge
           const made = Math.random() < Math.max(0.15, Math.min(0.95, quality * 1.3));
-          body.loop(SPORT_CLIP.idle); body.beat(SPORT_CLIP.dunkLaunchPower, { fadeSec: 0.08 });
+          body.beat(SPORT_CLIP.dunkLaunchPower, { fadeSec: 0.08 });   // out of the held load; it settles into the idle loop
           if (made) {
             makes++;
             SoundKit.play('score', { pitch: 1.1 }); EffectsKit.burst(ctx.scene, rim, 'net');
@@ -100,10 +115,17 @@ export function slamRush(): CarnivalEvent {
           } else { SoundKit.play('miss'); ctx.setHud({ banner: 'MISS' }); }
           setTimeout(() => ctx.setHud({ banner: '' }), 400);
           charge = 0; cooldown = 0.5;
+        } else if (e.value === 0 && charging) {
+          // HOTFIX (2026-09-24): a release inside the cooldown was swallowed — `charging` stayed true, tick kept the load
+          // held, and the dunker sat crouched until the NEXT full squeeze and release. That release is a dropped charge
+          // now: nothing launches, and the body stands back up (only out of its own gather — a launch in flight plays out).
+          charging = false; charge = 0;
+          if (gathered && body.current === SPORT_CLIP.dunkChargeGather) body.settle();
+          gathered = false;
         }
       }
     },
-    tick(_ctx, dt) { cooldown = Math.max(0, cooldown - dt); return makes; },
+    tick(_ctx, dt) { cooldown = Math.max(0, cooldown - dt); if (charging) gather(); return makes; },
     teardown() { player?.dispose(); ball?.dispose(); },
   };
 }

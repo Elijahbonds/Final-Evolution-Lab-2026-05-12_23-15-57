@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, TRICKS_BY_DISCIPLINE,
-  allBoardTricks, trickFor, fitsAir, bestFitting, airTrickFor, scoreTrick, basePts, needsRail,
+  allBoardTricks, trickFor, fitsAir, bestFitting, airTrickFor, airPressFor, scoreTrick, basePts, needsRail,
   type BoardDiscipline,
 } from './BoardTricks';
 
@@ -186,5 +186,50 @@ describe('a mid-air press only ever throws an AIR trick', () => {
     const src = fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/SkateRunMode.ts'), 'utf8');
     expect(src).toMatch(/if \(!rig\.rider\.grounded && !popped\)/);
     expect(src).not.toMatch(/bestFitting\('skate'/);
+  });
+});
+
+// HOTFIX (2026-09-24): X in the air on the snowboard threw a BOARDSLIDE — snow's only X trick is the rail link, and the mode's
+// air branch searched the whole list (trickFor + bestFitting), ground links included.
+describe('an AIR press is an air trick, and X in the air is the grab hold', () => {
+  const dirs = [null, 'up', 'down', 'left', 'right'] as const;
+  it('the measured failure: the whole-list search names the rail link for a snow X', () => {
+    expect(trickFor('snow', null, 'X')?.id).toBe('boardslide_snow');
+    expect(airTrickFor('snow', null, 'X', 1.2)).toBeNull();                 // snow has no named X air at all
+  });
+  it('no discipline, direction, button or air budget resolves an air press to a manual, a grind or a revert', () => {
+    for (const d of ['skate', 'snow', 'surf'] as BoardDiscipline[]) for (const dir of dirs) for (const btn of ['A', 'B', 'X', 'Y'] as const) {
+      for (const air of [0, 0.25, 0.5, 1.2, 1.5]) {
+        const t = airPressFor(d, dir, btn, air);
+        if (t) expect(t.kind, `${d} ${dir}+${btn} @${air}`).toBe('air');
+      }
+    }
+  });
+  it('a snow X off a kicker is a straight grab, and the held direction picks its shape', () => {
+    for (const dir of dirs) {
+      const t = airPressFor('snow', dir, 'X', 1.2);
+      expect(t?.grab, `${dir}`).not.toBe('none');
+      expect([t?.spinDeg, t?.flipDeg], `${dir}`).toEqual([0, 0]);          // a hold is a hold: no 540 MELON on the grab button
+    }
+    expect(airPressFor('snow', 'up', 'X', 1.2)?.id).toBe('indy_snow');
+    expect(airPressFor('snow', 'left', 'X', 1.2)?.id).toBe('method');
+    expect(airPressFor('snow', 'right', 'X', 1.2)?.id).toBe('stalefish');
+    expect(airPressFor('snow', 'down', 'X', 1.2)?.id).toBe('tailgrab');
+    expect(airPressFor('snow', null, 'X', 1.2)?.id).toBe('indy_snow');      // a bare press: the simplest grab
+  });
+  it('a grab the air cannot hold falls back to the simplest one that fits, and none fits a hop', () => {
+    expect(airPressFor('snow', 'left', 'X', 0.45)?.id).toBe('indy_snow');   // METHOD wants 0.55 s
+    expect(airPressFor('snow', 'up', 'X', 0.3)).toBeNull();
+  });
+  it('the other buttons are unchanged: a named air is still the named air', () => {
+    for (const d of ['skate', 'snow', 'surf'] as BoardDiscipline[]) for (const dir of dirs) for (const btn of ['A', 'B', 'Y'] as const) {
+      expect(airPressFor(d, dir, btn, 1.2)).toBe(airTrickFor(d, dir, btn, 1.2));
+    }
+  });
+  it('the snowboard reads its air presses through it (SnowboardSlalomMode source)', () => {
+    const src = fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/SnowboardSlalomMode.ts'), 'utf8');
+    expect(src).toMatch(/else fits = airPressFor\('snow', held, btn, air\);/);
+    // the whole-list search survives only on a rail, where the links are the point
+    expect(src).toMatch(/if \(rig\.rider\.grinding\) \{ const want = trickFor\('snow'/);
   });
 });

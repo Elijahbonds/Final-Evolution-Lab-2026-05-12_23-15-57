@@ -209,6 +209,22 @@ export function airTrickFor(discipline: BoardDiscipline, dir: BoardTrick['dir'],
 }
 
 /**
+ * The trick an AIR press throws, the GRAB hold included (HOTFIX 2026-09-24).
+ *
+ * X is the grab HOLD on every board (its release ends the grab), but snow names its grabs on B, so X has no air trick of its
+ * own there — and the snowboard's whole-list search handed a mid-air X the only X trick snow has: the BOARDSLIDE, a rail link,
+ * thrown over open air. So an X the table has no air for is the held direction's STRAIGHT grab (no spin, no flip: a hold is a
+ * hold); a bare press, or a direction whose grab this air cannot hold, is the simplest grab that fits.
+ */
+export function airPressFor(discipline: BoardDiscipline, dir: BoardTrick['dir'], btn: BoardTrick['btn'], airSec: number): BoardTrick | null {
+  const named = airTrickFor(discipline, dir, btn, airSec);
+  if (named || btn !== 'X') return named;
+  const grabs = TRICKS_BY_DISCIPLINE[discipline].filter((t) => t.kind === 'air' && t.grab !== 'none' && t.spinDeg === 0 && t.flipDeg === 0 && fitsAir(t, airSec));
+  if (!grabs.length) return null;
+  return grabs.find((t) => t.dir === dir) ?? grabs.reduce((easy, t) => (t.difficulty < easy.difficulty ? t : easy));
+}
+
+/**
  * Score a landed trick.
  *
  * `landed01` is how much of the spin the rider actually completed — a trick rotated 80% of the way is a sketchy land

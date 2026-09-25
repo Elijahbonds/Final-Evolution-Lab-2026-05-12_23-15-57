@@ -15,6 +15,12 @@ import type { FelInput } from '../core/InputBus';
 
 const rider = { grounded: true, vel: new Vector3(0, 0, 0), update: () => undefined, jump: () => undefined };
 const coinGain = { next: 0 };
+/** Every BeatOwner the events build, and what each was asked to play (Slam Rush's gather, HOTFIX 2026-09-24). */
+type BeatCall = { fn: 'loop' | 'beat' | 'settle'; clip: string; holdEnd?: boolean };
+type MockOwner = { busy: boolean; current: string | null; calls: BeatCall[]; autoEnd: boolean; end(): void };
+const owners: MockOwner[] = [];
+/** What the Slam Rush ball was dressed as, and which hand it rides. */
+const ballRig = { dressed: [] as Array<{ name: string; kind: unknown }>, hands: [] as string[] };
 
 vi.mock('../core/CharacterLibrary', () => ({
   CharacterLibrary: {
@@ -27,7 +33,32 @@ vi.mock('../core/CharacterLibrary', () => ({
 vi.mock('../anim/importSanitizer', () => ({ neverBindPose: () => undefined }));
 vi.mock('../anim/clipRegistry', () => ({ installSafePlay: () => undefined, SPORT_CLIP: new Proxy({}, { get: (_t, k) => String(k) }) }));
 vi.mock('../anim/beatOwner', () => ({
-  BeatOwner: class { loop(): void {} beat(_c: string, o?: { onSettle?: () => void }): void { o?.onSettle?.(); } },
+  // The real BeatOwner's contract: a beat is `busy` until its clip runs out; a holdEnd beat stays busy (held) after it runs
+  // out; settle() cuts it. `autoEnd` (the default) runs every beat out at once, as the events' other tests expect; a test
+  // that needs a beat to take its time turns it off and calls end() when the clip would run out.
+  BeatOwner: class {
+    busy = false; current: string | null = null; calls: BeatCall[] = []; autoEnd = true;
+    private shot: { holdEnd?: boolean; onSettle?: () => void } | null = null;
+    constructor() { owners.push(this); }
+    loop(clip: string): void { this.calls.push({ fn: 'loop', clip }); }
+    beat(clip: string, o: { onSettle?: () => void; holdEnd?: boolean } = {}): void {
+      this.calls.push({ fn: 'beat', clip, holdEnd: o.holdEnd }); this.current = clip; this.busy = true; this.shot = o;
+      if (this.autoEnd) this.end();
+    }
+    end(): void {
+      const o = this.shot; if (!o) return;
+      this.shot = null;
+      if (!o.holdEnd) { this.busy = false; this.current = null; }
+      o.onSettle?.();
+    }
+    settle(): void { this.calls.push({ fn: 'settle', clip: this.current ?? '' }); this.current = null; this.busy = false; this.shot = null; }
+  },
+}));
+vi.mock('../visual/meshyProps', () => ({
+  dressBall: async (b: { name: string }, kind: unknown) => { ballRig.dressed.push({ name: b.name, kind }); return true; },
+}));
+vi.mock('../anim/ballRig', () => ({
+  attachBallToHand: (_b: unknown, _sk: unknown, hand: string) => { ballRig.hands.push(hand); return true; },
 }));
 vi.mock('../anim/boardTree', () => ({ BoardAnimTree: class { update(): void {} clearBeat(): void {} } }));
 vi.mock('../visual/VenueKit', () => ({ VenueKit: { buildCourt: () => undefined, buildDojo: () => undefined, buildField: () => undefined } }));
@@ -88,7 +119,7 @@ function fakeCtx() {
 }
 const press = (btn: string): FelInput => ({ t: 'button', btn, pressed: true } as unknown as FelInput);
 
-beforeEach(() => { rider.grounded = true; rider.vel.set(0, 0, 0); coinGain.next = 0; vi.useFakeTimers(); });
+beforeEach(() => { rider.grounded = true; rider.vel.set(0, 0, 0); coinGain.next = 0; owners.length = 0; ballRig.dressed.length = 0; ballRig.hands.length = 0; vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('TRICK GAUNTLET: the call is the banner (1), the machine keeps off the night total (2), a landing is heard (3)', () => {
@@ -212,6 +243,123 @@ describe('every carnival event reports its successes to the momentum bus (3)', (
     f.run(ev, 0.45);                                                // 0.45 s into it: inside 0.35–0.65
     ev.onInput(f.ctx, press('A'));
     expect(f.report).toHaveBeenCalledWith(expect.objectContaining({ kind: 'near_miss' }));
+    f.dispose();
+  });
+});
+
+// HOTFIX (2026-09-24): Slam Rush LOOPED the gather — a one-way clip (standing into the loaded crouch), so the dunker snapped
+// back up and crouched again twice a second through a held charge — and its ball was a bare sphere at centre court.
+describe('SLAM RUSH: the gather is held, not looped, and the ball is the hoops ball', () => {
+  const trigger = (value: number): FelInput => ({ t: 'trigger', side: 'R', value } as unknown as FelInput);
+  const gathers = (o: { calls: BeatCall[] }): BeatCall[] => o.calls.filter((c) => c.fn === 'beat' && c.clip === 'dunkChargeGather');
+
+  it('a charge throws the gather ONCE as a held beat, however long it is held', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    const body = owners.at(-1)!;
+    ev.onInput(f.ctx, trigger(0.3)); ev.onInput(f.ctx, trigger(0.6)); ev.onInput(f.ctx, trigger(0.85));
+    f.run(ev, 2);
+    expect(gathers(body)).toEqual([{ fn: 'beat', clip: 'dunkChargeGather', holdEnd: true }]);
+    ev.onInput(f.ctx, trigger(0));
+    expect(body.calls.at(-1)).toMatchObject({ fn: 'beat', clip: 'dunkLaunchPower' });
+    expect(body.calls.some((c) => c.fn === 'loop' && c.clip !== 'idle')).toBe(false);   // the base loop never leaves the idle
+    f.run(ev, 1);                                                    // past the cooldown: the next charge gathers again
+    ev.onInput(f.ctx, trigger(0.5));
+    expect(gathers(body)).toHaveLength(2);
+    f.dispose();
+  });
+
+  it('a charge squeezed during the launch lets it finish, then gathers', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    const body = owners.at(-1)!;
+    body.busy = true;                                                // the launch still in flight
+    ev.onInput(f.ctx, trigger(0.4)); ev.tick(f.ctx, 1 / 60);
+    expect(gathers(body)).toHaveLength(0);
+    body.busy = false;                                               // it settled
+    ev.tick(f.ctx, 1 / 60);
+    expect(gathers(body)).toEqual([{ fn: 'beat', clip: 'dunkChargeGather', holdEnd: true }]);
+    f.dispose();
+  });
+
+  // HOTFIX (2026-09-24): a release inside the 0.5 s cooldown was swallowed and the dunker stayed crouched in the load
+  it('a release inside the cooldown drops the charge: no launch, the body stands up, the next squeeze gathers anew', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    const body = owners.at(-1)!;
+    const launches = () => body.calls.filter((c) => c.clip === 'dunkLaunchPower').length;
+    ev.onInput(f.ctx, trigger(0.85)); ev.onInput(f.ctx, trigger(0));   // a dunk: the cooldown starts
+    expect(launches()).toBe(1);
+    f.run(ev, 0.1);
+    ev.onInput(f.ctx, trigger(0.6));                                 // squeezed again inside the cooldown: the load is thrown
+    expect(gathers(body)).toHaveLength(2);
+    ev.onInput(f.ctx, trigger(0));                                   // …and let go inside it
+    expect(launches()).toBe(1);
+    expect(body.calls.at(-1)).toEqual({ fn: 'settle', clip: 'dunkChargeGather' });
+    f.run(ev, 1);
+    expect(gathers(body)).toHaveLength(2);                           // nothing is still charging
+    ev.onInput(f.ctx, trigger(0.5));
+    expect(gathers(body)).toHaveLength(3);                           // a fresh charge
+    ev.onInput(f.ctx, trigger(0));
+    expect(launches()).toBe(2);
+    f.dispose();
+  });
+
+  // HOTFIX (2026-09-24), the common case: the launch clip outlasts the 0.5 s cooldown, so a squeeze inside the cooldown
+  // lands on a body still busy with the launch — the gather waits for it.
+  it('squeezed and let go during a launch that outlasts the cooldown: no gather, no settle, no second launch', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    const body = owners.at(-1)!;
+    body.autoEnd = false;                                            // every beat takes its time now
+    const launches = () => body.calls.filter((c) => c.clip === 'dunkLaunchPower').length;
+    ev.onInput(f.ctx, trigger(0.85));
+    expect(gathers(body)).toHaveLength(1);
+    body.end();                                                      // the gather runs out and HOLDS the load
+    expect(body.busy).toBe(true);
+    ev.onInput(f.ctx, trigger(0));                                   // the dunk: the launch is in flight, the cooldown starts
+    expect(launches()).toBe(1);
+    f.run(ev, 0.1);
+    ev.onInput(f.ctx, trigger(0.6)); f.run(ev, 0.1);                 // squeezed inside the cooldown, during the launch
+    expect(gathers(body)).toHaveLength(1);                           // the launch plays out; the gather waits
+    ev.onInput(f.ctx, trigger(0));                                   // …and let go, still inside the cooldown
+    expect(launches()).toBe(1);
+    expect(body.calls.some((c) => c.fn === 'settle')).toBe(false);   // the launch is never cut
+    body.end();                                                      // the launch runs out: the body settles to its idle
+    expect(body.busy).toBe(false);
+    f.run(ev, 1);
+    expect(gathers(body)).toHaveLength(1);                           // the dropped charge does not come back as a crouch
+    ev.onInput(f.ctx, trigger(0.5));
+    expect(gathers(body)).toHaveLength(2);                           // a fresh squeeze gathers
+    f.dispose();
+  });
+
+  it('a squeeze held through the launch gathers when it lands; let go inside the cooldown, the body stands back up', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    const body = owners.at(-1)!;
+    body.autoEnd = false;
+    const launches = () => body.calls.filter((c) => c.clip === 'dunkLaunchPower').length;
+    ev.onInput(f.ctx, trigger(0.85)); body.end(); ev.onInput(f.ctx, trigger(0));
+    ev.onInput(f.ctx, trigger(0.6)); f.run(ev, 0.1);                 // squeezed during the launch
+    body.end(); f.run(ev, 1 / 60);                                   // the launch lands, the squeeze is still held
+    expect(gathers(body)).toHaveLength(2);                           // tick throws the new gather
+    ev.onInput(f.ctx, trigger(0));                                   // let go, still inside the 0.5 s cooldown
+    expect(launches()).toBe(1);
+    expect(body.calls.at(-1)).toEqual({ fn: 'settle', clip: 'dunkChargeGather' });
+    f.dispose();
+  });
+
+  it('a release inside the cooldown never cuts a launch still in flight', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    const body = owners.at(-1)!;
+    ev.onInput(f.ctx, trigger(0.85)); ev.onInput(f.ctx, trigger(0));
+    body.busy = true;                                                // the launch still playing: the gather waits
+    ev.onInput(f.ctx, trigger(0.4)); ev.onInput(f.ctx, trigger(0));
+    expect(body.calls.some((c) => c.fn === 'settle')).toBe(false);
+    expect(body.calls.at(-1)).toMatchObject({ fn: 'beat', clip: 'dunkLaunchPower' });
+    f.dispose();
+  });
+
+  it("the ball wears the hoops modes' Meshy leather and rides the dunker's right hand", async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    expect(ballRig.dressed).toEqual([{ name: 'carn_ball', kind: 'basketball' }]);
+    expect(ballRig.hands).toEqual(['RightHand']);
     f.dispose();
   });
 });
