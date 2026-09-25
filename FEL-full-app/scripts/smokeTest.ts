@@ -137,6 +137,8 @@ check('every active Babylon mode mounts a world (venue or terrain) and ambient',
 // ── 4. Global crash boundary + telemetry + play layout ──────────────────
 check('global error boundary, crash telemetry route, and play layout are present', () => {
   assert.ok(existsSync(join(ROOT, 'components/reliability/global-error-boundary.tsx')));
+  // HOTFIX (2026-09-24): the root crash screen, for a crash outside /play or in the root layout itself
+  assert.ok(existsSync(join(ROOT, 'app/global-error.tsx')), 'app/global-error.tsx missing');
   assert.ok(existsSync(join(ROOT, 'app/api/telemetry/crash/route.ts')));
   const layout = read('app/play/layout.tsx');
   assert.ok(layout.includes('GlobalErrorBoundary'), 'play layout does not wrap children in the boundary');

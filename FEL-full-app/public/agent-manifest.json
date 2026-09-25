@@ -2,11 +2,6 @@
   "$comment": "Served at /agent-manifest.json. STATIC discovery: an agent fetches this BEFORE loading the app, so it knows what exists without booting a 3D scene first. The live window.__NEXUS_AGENT__.describe() is authoritative at runtime; this file must be kept in step with the app's mode registry.",
   "schemaVersion": "1.0.0",
   "product": "Final Evolution Lab",
-  "hosts": [
-    "https://finalevolution.abacusai.app",
-    "https://nexusllm.abacusai.app"
-  ],
-  "hostNote": "Both hosts serve the SAME application and the same build. Verified 2026-07-26: identical title and landing markup on each. Session cookies are host-scoped, so a session captured on one host will NOT authenticate the other — capture per host.",
   "auth": {
     "required": true,
     "note": "Every /play/* route is behind a sign-in wall. An unauthenticated agent lands on the marketing page, which renders a canvas and can be mistaken for a loaded game. Check #fel-ready, never the presence of a canvas."
@@ -56,11 +51,5 @@
       "[FEL-AGENT]": "control bridge"
     },
     "fatalPatterns": ["MISSING CLIP", "SKINNING STALL", "WATCHDOG", "[FEL-FRAME]"]
-  },
-  "pipeline": {
-    "entryPoint": "node tools/nexus_agent.mjs",
-    "verbs": ["plan", "verify", "build", "deploy", "smoke", "run"],
-    "output": "--json emits NDJSON, one record per line, status in {ok, failed, skipped}",
-    "note": "`skipped` is never coerced to `ok`. A step that cannot run reports why."
   }
 }
