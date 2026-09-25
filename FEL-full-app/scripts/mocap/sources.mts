@@ -2,9 +2,10 @@
 // 2026-09-14). lib/babylon/anim/mocapRetarget.ts takes it from there.
 //
 //   deepmotion  the owner's takes (.bvh): Mixamo names without the prefix, cm, 24–60 fps.   Owner's own capture.
-//   cmu         CMU Graphics Lab subject 06 (.bvh, the cgspeed DAZ-friendly conversion): hip / abdomen / chest / rShldr…,
-//               120 fps. License: free to include in commercially-sold products; the data itself may not be resold,
-//               even converted (mocap.cs.cmu.edu). Owner approved these terms 2026-09-14.
+//   cmu         CMU Graphics Lab subjects (.bvh, the cgspeed DAZ-friendly conversion): hip / abdomen / chest / rShldr…
+//               Every cgspeed header says 120 fps; the TRUE rate is per subject (CMU_TRUE_FPS below). License: free to
+//               include in commercially-sold products; the data itself may not be resold, even converted
+//               (mocap.cs.cmu.edu). Owner approved these terms 2026-09-14.
 //   ual         Quaternius Universal Animation Library 2 [Standard] (.glb): UE mannequin names (pelvis, upperarm_l…),
 //               one glTF animation per move. CC0 1.0.
 import { readFileSync } from 'node:fs';
@@ -50,6 +51,45 @@ const MAPS: Record<SourceKind, Record<Canon, string>> = {
   },
 };
 
+/**
+ * THE TRUE FRAME RATE of the cgspeed CMU files (HOOPS MOTION phase 2b, 2026-09-25). Every cgspeed header carries
+ * `Frame Time: 0.00833333` (120 fps), but CMU captured some subjects at 60 Hz and the conversion kept the header, so a
+ * 60-fps subject's window read in header seconds holds twice the motion it says. Read off the motion itself with
+ * scripts/mocap/fps-check.mts: gravity fitted to the hips over every real flight (a body in the air falls at 9.8 m/s²;
+ * at the stated rate a 60-fps subject falls at 4 g), split into JUMP flights and run-STRIDE flights, and a run's step
+ * cadence (the hips bob once per step: a human runs at 150–200 steps/min, never 330+, and 100/min with flight phases is
+ * no gait at all).
+ *
+ *   subject  flights (jumps / strides)  votes 120:60   hips g at the header   at the table: jumps / strides   cadence header→table   fps
+ *   06       1 / 0                      1 : 0          9.1                    9.1 (06_15 jump shot)           —                      120
+ *   124      5 / 0                      5 : 0          9.4                    9.4                             —                      120
+ *   78       0 / 8                      8 : 0          12.9                   — / 12.9 (3.2 if 60)            195 → 195 (98 if 60)   120
+ *   75       33 / 3                     0 : 36         37.9                   9.4 / 11.1                      379 → 189              60
+ *   88       19 / 0                     5 : 14         31.2                   7.8 (flips: hips off the COM)   —                      60
+ *   141      9 / 12                     1 : 20         41.1                   8.8 / 12.6                      343 → 171              60
+ *   143      25 / 6                     2 : 29         40.2                   10.0 / 15.1                     343 → 171              60
+ *
+ * The plan (docs/PLAN-HOOPS-MOTION-13PHASE.md §2b) listed 78 as 60 fps; it is 120. It has no jump trial, and its stride
+ * flights read high the way 141's and 143's do at their true rate (strides 12.6 / 15.1 against jumps 8.8 / 10.0), but
+ * every one of them is nearer 9.8 at 120 than at 60, its runs step at 185–200/min at 120 (92–100 at 60, a walking
+ * cadence with flight phases), and its dribbling hand repeats every 0.57–0.60 s in the drives 78_32/33 (1.15–1.20 s at
+ * 60: longer than a ball dropped from that 1.05 m hand takes to fall and come back, 0.93 s). So the hoops captures were
+ * never sped up by the header; only the four subjects below are. scripts/body/synth-streams.mts found the same four in
+ * movement play P1. Subject 87 (the style clips' butterfly and backflip) votes both ways (8 : 7) and stays at its header;
+ * both of its clips hold explicit durations, so they play the same whichever it is.
+ */
+export const CMU_TRUE_FPS: Readonly<Record<string, number>> = { 75: 60, 88: 60, 141: 60, 143: 60 };
+/** The CMU subject a file path names (`…/cmu/78/78_12.bvh` → '78'), or null for a non-CMU path. */
+export const cmuSubjectOf = (file: string): string | null => /(?:^|\/)(\d{2,3})_\d{2}\.bvh$/.exec(file)?.[1] ?? null;
+/** The frame rate a BVH really plays at: the table's rate for a mis-stamped CMU subject, else the header's. The table
+ *  rescales the header's OWN rate (0.00833333 s is 1/120.000048, so a 60-fps subject reads at 60.000024): a window written
+ *  in true seconds (twice its header seconds) then cuts exactly the frames it cut before, down to the float rounding. */
+export function trueFps(file: string, kind: SourceKind, headerFps: number): number {
+  const subj = kind === 'cmu' ? cmuSubjectOf(file) : null;
+  const table = subj ? CMU_TRUE_FPS[subj] : undefined;
+  return table ? headerFps * (table / Math.round(headerFps)) : headerFps;
+}
+
 export function readBvhStream(file: string, kind: 'deepmotion' | 'cmu'): JointStream {
   const bvh = B.parseBvh(readFileSync(file, 'utf8'));
   const map = MAPS[kind];
@@ -62,7 +102,7 @@ export function readBvhStream(file: string, kind: 'deepmotion' | 'cmu'): JointSt
     const fk = B.forwardKinematics(bvh, f);
     return Object.fromEntries(RT.CANON.map((c) => [c, fk.pos[idx[c]]])) as Record<Canon, V3>;
   });
-  return { fps: 1 / bvh.frameTime, frames };
+  return { fps: trueFps(file, kind, 1 / bvh.frameTime), frames };
 }
 
 // ── glTF: sample each node's TRS at t, compose world matrices down the hierarchy ──────────────────────────────────

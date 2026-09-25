@@ -7,9 +7,11 @@
 // swaps the name at play time. So no mode changes: the 1v1 foe's tree still asks for `bball_crossover_left`, and the
 // body plays the capture.
 //
-// ONLY OPPONENTS. The player's clips are tuned against his controls — the meter-paced shot, the dribble IK, the dunk
-// hands — and swapping them is a different pass with its own sign-off. CharacterLibrary installs this on every spawn it
-// decides is not the player (athleteRoster's rule), so it is one place, not N modes.
+// OPPONENTS FIRST, THEN THE HERO TOO. It began as opponent-only (the player's clips were tuned against his controls —
+// the meter-paced shot, the dribble IK, the dunk hands). Since HOOPS MOVEMENT (2026-09-15) the hero installs the same
+// captures for the hoops, fight and dunk sets (HERO_CAPTURE below), so the two bodies on one court move like one game;
+// the football capture (football_mc_run) is still the opponents' until its own pass. CharacterLibrary installs this on
+// every spawn, so it is one place, not N modes.
 //
 // Build cost is paid only for what the mode may play: a clip is built when its SCOPE allows it (a board mode's rival
 // builds none of the hoops captures).
@@ -51,8 +53,11 @@ export const HERO_CAPTURE = (name: string): boolean => name.startsWith('bball_mc
 // captures as well, so a string you throw looks like a person throwing it — and like the partner and the horde beside you.
 
 /** Where the ball leaves the hand, as a fraction of each shot clip. The authored `jumpshot` releases at 0.45
- *  (BallHandling.RELEASE_FRAME_01). The CMU 06_15 window (2.20–3.10 s) sets at the chin, dips 2.30–2.55, rises, and
- *  the shooting hand extends forward 2.80–2.95 (hoops-timeline.mts): the release is 0.68 s in, 0.75 of the clip. */
+ *  (BallHandling.RELEASE_FRAME_01). The capture is CMU 124_05 (DEFENSE-LOOK 2026-09-17; the 06_15 window shot
+ *  two-handed): its 2.45–3.62 s window dips 2.45–2.6, rises, and the shooting hand is extended with the guide hand
+ *  dropping at 3.35 s (scripts/mocap/opponent-clips.json) — 0.77 of the window; the release key sits just ahead of
+ *  that, at 0.75 of the clip. Subject 124 is a true 120-fps capture (scripts/mocap/fps-check.mts: its jumps fit 9.4 m/s²
+ *  at 120), so the window is in real seconds; the clip plays it in 0.9 s, 1.31× real, until phase 7 re-cuts the jumper. */
 export const CAPTURE_RELEASE_01: Readonly<Record<string, number>> = { bball_mc_jumpshot: 0.75 };
 
 /** The release fraction of whatever clip a request for `name` really plays on this animator. */

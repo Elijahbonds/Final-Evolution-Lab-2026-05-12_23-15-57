@@ -31,6 +31,16 @@ export interface StrideRef {
    *  same calibration as `run` (3.6 for a 5.9 leg/s capture → 0.61 m/s per leg/s). */
   walk?: number;
   jog?: number;
+  /** HOOPS MOTION 2b (2026-09-25): the dribbling SPRINT (drive, sprint_dribble) split off `run`, so each can take the
+   *  stride of the clip it plays. Absent on the authored set, where both play the one run clip: the sprint reads `run`. */
+  sprint?: number;
+  /** HOOPS MOTION 2b: a state whose clip is not its kind's — another capture (the hard slide, the backpedal, the slide the
+   *  other way), or an AUTHORED clip on a captured rig (the closeout, the carry strafes) — paces against its own number,
+   *  read before the kind's. */
+  byState?: Readonly<Record<string, number>>;
+  /** HOOPS MOTION 2b: a state's own rate ceiling, read before RATE_MAX — for a capture slower than the bodies that play it
+   *  (the right slide, below). */
+  rateMaxByState?: Readonly<Record<string, number>>;
 }
 
 /**
@@ -53,13 +63,57 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
 
 /**
  * The same references for the CAPTURED hoops loops (HOOPS MOVEMENT, 2026-09-15) — the hero and the AI both run CMU 78
- * strides now, and a capture's stride is its own: bball_mc_run covers 3.9 leg lengths in its 0.65 s window, played in
- * 0.6 s, where the authored run was keyed for 3.6 m/s. Calibrated with scripts/probes/_footplant-probe.mts (see the
- * sweep in the HOOPS-MOVEMENT commit), `?strideRun=` / `?strideSlide=` override both tables for that sweep.
+ * strides now, and a capture's stride is its own.
+ *
+ * HOOPS MOTION 2b (2026-09-25): DERIVED, not tuned — scripts/mocap/clip-strides.mts prints this table and says MATCH.
+ * Each captured loop now plays its cut window in real time (no `duration` in scripts/mocap/opponent-clips.json; CMU 78
+ * is a true 120-fps capture, scripts/mocap/fps-check.mts), and a state's reference is the ground speed the captured body
+ * was really moving at over the window of the clip that state PLAYS on a hoops rig (hips travel per real second, scaled to
+ * the reference leg):
+ *
+ *     state                               plays (capture)                         reference
+ *     run                                 run_forward → bball_mc_drive (78_06)     4.57   (the ball-less runner plays the
+ *                                                                                          dribbling capture until phase 3)
+ *     drive, sprint_dribble               bball_mc_dribble_run (78_06)            4.57   sprint
+ *     speed_dribble                       bball_mc_dribble_jog (78_10)            3.87   jog
+ *     walk_dribble                        bball_mc_dribble_walk (06_01)           0.97   walk
+ *     defend_slide / defend_slide_right   bball_mc_defend_slide_left / _right     2.40 / 1.70   (78_30, the two ways)
+ *     defend_slide_hard(_right)           bball_mc_defend_slide_hard_* (78_26)    2.69
+ *     defend_backpedal, carry_back        bball_mc_defend_backpedal (78_24)       3.31
+ *     closeout; carry_slide(_right)       AUTHORED (bball_closeout; strafe_*)     3.6; 2.0 — HOOPS_STRIDE's, unchanged
+ *
+ * (bball_mc_run, 78_12, is 4.69 m/s at real time; no tree state plays it yet.) The previous table (run 3.6, slide 2.0,
+ * walk 0.72, jog 2.8, one number per kind) was calibrated by the foot-slide probe while the loops played 0.79–1.37× their
+ * real speed through hand-set `duration`s, and read a 25–35% skate band that barely moved between 3.3 and 4.8. At the
+ * tree's gears (walk 1.6 / jog 4.2 / sprint 6.4 m/s) the rates are now 1.65 / 1.09 / 1.40, all inside RATE_MAX — the
+ * cap the plan feared a real-speed sprint would need raising (1.9 for a 60-fps 78) is not reached, because 78 is 120.
+ * lib/babylon/anim/authored/mocapPins.test.ts pins every state to its played clip's measured speed.
+ *
+ * THE RIGHT SLIDE'S CEILING (2b review, 2026-09-25). Its capture is the slowest slide (1.70 m/s against the left's 2.40), so at
+ * RATE_MAX its feet cover 1.70 × 1.85 = 3.15 m/s — but the bodies that play it move faster: on every body's frames it tops in
+ * hoopsmotion/p2's base2 and p2 recordings, the root runs at a median 3.58 m/s (p90 4.20; 57% of frames above 3.15, the same in
+ * both). Before 2b the same 0.633 s window was squeezed into 0.5 s (1.27× real) and paced against 2.0, so its feet reached
+ * 1.70 × 1.27 × 1.85 = 3.98 m/s. It keeps that ceiling: up to 2.34× real, the same clip at the same top cadence it played at
+ * a37a90ce (21–23% of those frames are above 3.98). The owner's 4.2 m/s defender needs the stepping clips phase 5 authors (the
+ * standing "stepping defence" decision); every other defence state reaches 4.2 m/s inside RATE_MAX.
  */
-export const HOOPS_STRIDE_CAPTURE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 2.8 };
+export const HOOPS_STRIDE_CAPTURE: StrideRef = {
+  run: 4.57, sprint: 4.57, jog: 3.87, walk: 0.97, slide: 2.4,
+  byState: {
+    defend_slide_right: 1.7, defend_slide_hard: 2.69, defend_slide_hard_right: 2.69, defend_backpedal: 3.31, carry_back: 3.31,
+    closeout: HOOPS_STRIDE.run, carry_slide: HOOPS_STRIDE.slide, carry_slide_right: HOOPS_STRIDE.slide,
+  },
+  rateMaxByState: { defend_slide_right: 2.34 },
+};
 
-/** `?strideRun=4.8&strideSlide=2.4` — the calibration sweep's knob. Read once. */
+/**
+ * `?strideRun=4.8&strideSlide=2.4` — the calibration sweep's knob. Read once.
+ *
+ * A knob sets ONE reference for its whole kind, as it did before 2b split the table: `strideRun` paces every run and sprint state
+ * (run, crossover, drive, sprint_dribble, closeout), `strideSlide` every slide state (both slides, both hard slides, the backpedal,
+ * the carry strafes and carry_back). The overridden kind's per-state numbers and ceilings are dropped, so no state keeps a fixed
+ * reference while the sweep moves the others (scripts/probes/_footplant-probe.mts, `QS=strideSlide=2.4`).
+ */
 const STRIDE_OVERRIDE: Partial<StrideRef> = (() => {
   try {
     if (typeof window === 'undefined') return {};
@@ -68,9 +122,22 @@ const STRIDE_OVERRIDE: Partial<StrideRef> = (() => {
     return { run: num('strideRun'), slide: num('strideSlide') };
   } catch { return {}; }
 })();
+/** A table with the sweep's knobs applied (the table itself when neither is set). */
+export function withStrideOverride(base: StrideRef, o: Partial<Pick<StrideRef, 'run' | 'slide'>>): StrideRef {
+  if (o.run === undefined && o.slide === undefined) return base;
+  const overridden = (state: string) => {
+    const k = strideKindFor(state);
+    return (o.run !== undefined && (k === 'run' || k === 'sprint')) || (o.slide !== undefined && k === 'slide');
+  };
+  const keep = (m?: Readonly<Record<string, number>>) => m && Object.fromEntries(Object.entries(m).filter(([s]) => !overridden(s)));
+  return {
+    ...base,
+    run: o.run ?? base.run, sprint: o.run ?? base.sprint, slide: o.slide ?? base.slide,
+    byState: keep(base.byState), rateMaxByState: keep(base.rateMaxByState),
+  };
+}
 export function strideRef(captured: boolean): StrideRef {
-  const base = captured ? HOOPS_STRIDE_CAPTURE : HOOPS_STRIDE;
-  return { run: STRIDE_OVERRIDE.run ?? base.run, slide: STRIDE_OVERRIDE.slide ?? base.slide, walk: base.walk, jog: base.jog };
+  return withStrideOverride(captured ? HOOPS_STRIDE_CAPTURE : HOOPS_STRIDE, STRIDE_OVERRIDE);
 }
 
 /**
@@ -85,16 +152,16 @@ export const RATE_MIN = 0.55, RATE_MAX = 1.85;
 /**
  * The playback rate a loop should run at to cover the ground the body is covering.
  *
- * `speed` is the body's planar speed in m/s, `ref` the speed the clip was authored for.
+ * `speed` is the body's planar speed in m/s, `ref` the speed the clip was authored for, `max` the state's own ceiling.
  */
-export function strideRate(speed: number, ref: number): number {
+export function strideRate(speed: number, ref: number, max = RATE_MAX): number {
   if (!(ref > 0) || !Number.isFinite(speed)) return 1;
   const want = Math.abs(speed) / ref;
-  return Math.max(RATE_MIN, Math.min(RATE_MAX, want));
+  return Math.max(RATE_MIN, Math.min(max, want));
 }
 
 /** Which reference a locomotion state is measured against. */
-export type StrideKind = 'run' | 'slide' | 'walk' | 'jog' | 'none';
+export type StrideKind = 'run' | 'sprint' | 'slide' | 'walk' | 'jog' | 'none';
 
 /**
  * Is this state LOCOMOTION, and against which reference?
@@ -104,8 +171,9 @@ export type StrideKind = 'run' | 'slide' | 'walk' | 'jog' | 'none';
  */
 export function strideKindFor(state: string): StrideKind {
   switch (state) {
-    case 'drive': case 'sprint_dribble': case 'run': case 'crossover':
+    case 'run': case 'crossover':
       return 'run';
+    case 'drive': case 'sprint_dribble': return 'sprint';   // HOOPS MOTION 2b: the dribbling sprint, split off the run
     case 'speed_dribble': return 'jog';        // DRIBBLE GEARS: the jog loop is its own capture now
     case 'walk_dribble': return 'walk';
     case 'defend_slide': case 'defend_slide_right':
@@ -125,7 +193,7 @@ export function strideKindFor(state: string): StrideKind {
 export function rateFor(state: string, speed: number, ref: StrideRef = HOOPS_STRIDE): number | null {
   const kind = strideKindFor(state);
   if (kind === 'none') return null;
-  return strideRate(speed, kind === 'run' ? ref.run : kind === 'slide' ? ref.slide : kind === 'walk' ? (ref.walk ?? ref.run * 0.2) : (ref.jog ?? ref.run * 0.78));
+  return strideRate(speed, ref.byState?.[state] ?? (kind === 'run' ? ref.run : kind === 'sprint' ? (ref.sprint ?? ref.run) : kind === 'slide' ? ref.slide : kind === 'walk' ? (ref.walk ?? ref.run * 0.2) : (ref.jog ?? ref.run * 0.78)), ref.rateMaxByState?.[state]);
 }
 
 /**

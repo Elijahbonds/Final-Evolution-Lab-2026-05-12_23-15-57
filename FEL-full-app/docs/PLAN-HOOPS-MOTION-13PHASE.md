@@ -27,6 +27,7 @@ All were asked with AskUserQuestion. In rounds 2 and 3 the owner took the recomm
 - **Parallel with movement play.** Hoops motion owns 1v1, 3v3, 3PT, the carnival and the basketball clips. Movement play's P6 (hoops by body) waits until this pass has landed phase 5. Both passes build in isolated worktrees and land gated commits in the lane.
 - **Right-handed everywhere:** shots, layups, handles and the carry, on every body. The clips are mirrored, as the dunk pass did.
 - **CMU true fps.** Fix the frame rate for every subject (75, 78, 88, 141 and 143 are 60 fps, not 120) and regenerate. Hoops clips then play at real speed. Combat and Free Run clips keep today's feel through a temporary speed pin until their own passes.
+  - **Superseded by measurement (phase 2b, 2026-09-25): 78 is a true 120-fps capture; 75, 88, 141 and 143 are 60.** The list above counts 78 among the 60-fps subjects; 2b's fit, cadence and dribble period say 120 (see §2b), so its hoops loops were never sped up by the header. **Flagged to the owner:** this departs from the list as he approved it, and reading 78 at 60 would halve every hoops loop's speed.
 - **Thirteen phases, one deploy.**
 
 **Round 3, the re-cut (2026-09-24, about 22:55)**
@@ -66,6 +67,7 @@ All were asked with AskUserQuestion. In rounds 2 and 3 the owner took the recomm
 - **Every measurement runs on a virtual clock.** `performance.now`, `requestAnimationFrame`, `setTimeout` and `setInterval` are replaced in the page, and each rendered frame advances the game by exactly 16.667 ms. `Math.random` is seeded by take name.
   - Machine load changes how long a run takes, not what it measures.
   - 1v1 offence and 3PT reproduce exactly, idle or at 2× wall-time load.
+    - *Measured in phase 2 (`hoopsmotion/p2/det/`, `p2/p2r/`):* on the 2a clock, under load, the takes, anchors, frame counts and window metrics repeat; the recorded poses do not (up to 1.16 m apart, mostly past the scored window). And a change to an AI body's clips alone moves the hero's 1v1 offence windows: p2 → p2r (only the right slide's ceiling changed) moved 83 of 126 hero 1v1-off attempts in some measure (16 by ≥ 2 pops or whips), and 24 of 167 1v1-off pairs changed clip sequence, with every take the same length. So compare hero offence on same-play pairs, and read a clip change to the AI as a change to the hero's windows too.
   - Defence and AI runs can still diverge, so their gates use the mean of at least 5 attempts.
 - **Evidence** goes to `~/Claude/outbox/finish-release/hoopsmotion/<tag>/`. Phase 1's is in `p1-baseline/`: `BASELINE.md` has every number, and `README.md` explains how to re-run it.
 
@@ -209,7 +211,7 @@ Phase 1 ran at lane 71ea8f3 and was re-measured by the audit: 81 actions and 382
 | # | Theme | What changes | Gate (headline; each phase section has the full list) |
 |---|---|---|---|
 | 1 | Instrument + baseline | the probe on a virtual clock, 81 actions, the audit, this plan | done (this commit) |
-| 2 | Rebase, instrument II, true fps, the decode | `base2` at the rebased tip; the attempt runners folded into the probe plus 14 new metrics; CMU at true fps with the non-hoops speed pins; `SPEC-HOOPS-MOTION-DECODE.md` from the 10 reels and real mechanics | gravity fit 9.8 ± 1.5 m/s² on every hoops subject; subject-78 clips 0.9–1.15× real (base 1.55–4.0×); pinned clips' durations unchanged; every catalogue action decoded |
+| 2 | Rebase, instrument II, true fps, the decode | `base2` at the rebased tip; the attempt runners folded into the probe plus 14 new metrics; CMU at true fps with the non-hoops speed pins; `SPEC-HOOPS-MOTION-DECODE.md` from the 10 reels and real mechanics | every hoops subject's rate by the 120:60 vote (gravity 9.8 ± 1.5 m/s² on its jumps; cadence and dribble period where it has none); subject-78 loops 0.9–1.15× real (measured base 0.79–1.37×); pinned clips' durations unchanged; every catalogue action decoded |
 | 3 | Feet and ball | right-handed on screen (mirror + one visual-side helper); a carry on every body with a stride-locked dribble and a real hand switch; FootPlant, acceleration and a ball-less run; the dunk tooling ported (smoothing, anatomical poles, LimbDrag, WristLayer, hinged arm); one owner per body | hero ball drawn right ≥ 95% (base 16% held / 1.2% dribble); slide p90 ≤ 3 cm on every loop (base 8.4); both hands move on every ball action (base: frozen in 381 of 382 windows); wrong-way elbow ≤ 1 per window (base 12.3) |
 | 4 | Handles and moves | real hand-offs; the move owns the arm, not the carry IK; re-cut captures; spin, hesi, in-and-out, step-back, snatch, PAUSIN' | ball changes sides on ≥ 95% of crossing moves (base 0 / 25); ball ≤ 0.15 m per frame (base 0.52 m jump); ≤ 4 pops, 0 severe per handle |
 | 5 | Defensive slides + AI bodies | stepping slides and closeout for 4.2 m/s; AI acceleration; AI arms drawn; no defence thrash; no body inside another | AI root acceleration p99 ≤ 34 m/s² (base about 216); defence slide p90 ≤ 3 cm (base 11.3); AI drawn hand ≤ 0.05 m off its bone |
@@ -270,10 +272,12 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
   - Normalise the quaternions in `_dunk-motion-probe.mts` (the same wrist-still artefact, AUD 2).
   - Put it on the same virtual clock; its phase 13 numbers were taken on the wall clock (V:tooling).
   - Re-run the 21 contest dunks as `dunkmotion/p13-vclock`, the control for phase 8.
+  - *After 2b (measured, `dunkmotion/P13-VCLOCK-2B.md`):* `p13-vclock` was recorded before 2b re-timed the runway loop (`bball_mc_dribble_run` 0.6 → 0.66 s at rate 1) and before the clock installed paused, so it is not phase 8's control. On the 2a+2b tree the contest was re-taken twice before DunkMode's TEMP runway pin (`p13-vclock-2b-nopin-a`/`-b`: severe pops 17 → 28 and 32 on the 21 shared dunks, all new ones on the runway → gather blend) and twice with it (`p13-vclock-2b-a`/`-b`: 11 and 12, pops 4.00 per dunk in both). **`p13-vclock-2b-a`/`-b` is phase 8's control;** its own spread is small (pops differ on 2 of 25 dunks), and the unpinned pair's is larger (9 of 25, 0.48 per dunk).
 - **Re-take the whole catalogue as `base2`.** Take at least 5 attempts per action where the game allows, and always at least 5 for defence and the AI.
 - **Add driver variants** for more than one dunk type (B: 9 of 9 were DOUBLE CLUTCH) and for a 3v3 layup outside traffic.
 
 **2b. CMU at true fps**
+- **Measured 2026-09-25 (phase 2b; evidence `hoopsmotion/p2/fps/`): subject 78 is a true 120-fps capture, not 60.** It has no jump trial; all 8 of its stride flights fit nearer 9.8 m/s² at 120 than at 60 (median 12.9 at 120, 3.2 at 60; stride flights read high on 141 and 143 too, 12.6 / 15.1 against their jumps' 8.8 / 10.0), its runs step at 185–200/min at 120 (92–100 at 60), and its drives' dribbling hand repeats every 0.57–0.60 s (1.15–1.20 s at 60, longer than a ball dropped from that 1.05 m hand takes to come back, 0.93 s). 75, 88, 141 and 143 are 60 (jumps 7.8–10.0 m/s² at 60, 31–41 at the header). 06 (9.1, its one jump) and 124 (9.4) are 120. So the hoops windows were never sped up by the header: before 2b the 78 loops played 0.79–1.37× real through hand-set `duration`s, and the one-shots below play half the ratios this section assumed (pivot 2.02×, pump fake 1.94×, step-through 1.82×, spin 1.26×, feint 1.29×). Only the 141 uppercut and the five 88/75 style clips moved to true seconds, all pinned.
 - **Per-subject true fps.** `scripts/mocap/sources.mts:65` returns `fps: 1 / bvh.frameTime`. Replace it with a per-subject table: 75, 78, 88, 141 and 143 are 60 fps (LEDGER §4; V:clips A; memory: jumps at the stated rate fall at 30–42 m/s²).
   - Confirm each subject with the gravity fit that `lib/pose/synth.test.ts:262` already uses: gravity fitted to the hips over a jump or step flight must be about 9.8 m/s².
   - Check subjects 06 and 124 the same way before trusting them.
@@ -282,6 +286,7 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
   - One-shots that the plan re-paces won't slow down from the fps fix alone (V:clips trap 1): pivot 4.0×, pump fake 3.86×, step-through 3.6×, spin 2.5×, feint 2.55×. Their windows are re-cut in phases 4, 6 and 7.
 - **Recalibrate the strides.** Re-derive `HOOPS_STRIDE_CAPTURE` (`core/StrideMatch.ts:60`; run 3.6, slide 2.0, walk 0.72, jog 2.8) from the regenerated clips' own measured strides.
   - At true speed, a 4.6 m/s sprint on the 78_06 run would need rate 1.9, above `RATE_MAX` 1.85 (`:83`). Split the run reference into jog, run and sprint rather than raising the cap blindly (V:clips trap 2).
+  - *Measured in 2b (`scripts/mocap/clip-strides.mts`, MATCH):* each state paces against the clip it plays. Run and sprint 4.57, jog 3.87, walk 0.97, slide 2.40; per state, the right slide 1.70, the hard slides 2.69 and the backpedal 3.31. The closeout and the carry strafes play authored clips and keep 3.6 and 2.0. The gears pace at 1.65 / 1.09 / 1.40, all inside `RATE_MAX` (78 is 120, so the feared 1.9 is not reached). The right slide alone would lose headroom (1.70 × 1.85 = 3.15 m/s), so it keeps a37a90ce's ceiling of 3.98 m/s (phase 5). `?strideRun=` and `?strideSlide=` still set one reference for their whole kind in a sweep.
 - **Temporary speed pins.** These non-hoops clips keep today's played duration exactly, marked `TEMP` until the combat and boards passes:
   - `football_mc_run` (78_12)
   - `karate_mc_uppercut` (141_24)
@@ -337,12 +342,57 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
   - The review could not record an idle pair either: other agents' dev servers and probes shared the machine throughout. Until one exists, "1v1 offence and 3PT reproduce exactly" means the same takes, anchors, frames and window metrics under load; the AI windows in 1v1-off do not reproduce.
 - **`base2`:** every catalogue action that has a code path is recorded (76 of 81 catalogue actions plus the 5 supplemental windows).
   - *Measured in 2a:* 75 of 81 plus 5 of 5. `hero_3v3_def_steal` gave no hero steal in 74 takes at a37a90ce: the hotfix's poke gate takes a poke only from an unstunned hero within 1.6 m of a holder whose ball is in his hand.
-- **Gravity fit** on the hips flight of every capture subject a hoops clip uses: 9.8 ± 1.5 m/s² (subject 78 at the stated rate: 30–42).
-- **Speed:** every subject-78 `bball_mc_*` clip plays at 0.9–1.15× real speed at rate 1 (base 1.55–4.0×). The re-paced one-shots are listed with their real/played ratio for phases 4, 6 and 7.
+- **True fps by the 120:60 vote** (`scripts/mocap/fps-check.mts`) on every capture subject a hoops clip uses (06, 78, 124): gravity fitted to the hips over its JUMP flights is 9.8 ± 1.5 m/s² at the rate the table reads it at. A subject with no jump trial is decided by its stride flights' vote, its run cadence and its dribble period.
+  - *Measured in 2b (`hoopsmotion/p2/fps/`):* 06 9.1 (1 jump) and 124 9.4 (5 jumps) at 120. 78 has no jump trial. Its 8 stride flights vote 8:0 for 120 and fit 12.9 m/s² there (11.7–15.2; 3.2 at 60). That is OUT of the band, as stride flights read high on 141 and 143 too (12.6 and 15.1, against their jumps' 8.8 and 10.0). Its runs step at 185–200/min at 120, and its dribbling hand repeats every 0.57–0.60 s at 120. At 60 that would be 1.15–1.20 s, longer than a ball dropped from the hand takes to come back (0.92–0.93 s). So 78 is read at 120.
+  - The non-hoops 60-fps subjects: 75 9.4, 141 8.8, 143 10.0 on jumps at 60, and 88 7.8 (OUT, its whole-body centre of mass 8.7; 14 of 19 votes for 60). At the header rate they read 31–41.
+  - *Before 2b this line read "subject 78 at the stated rate: 30–42", which assumed 78 was 60 fps.*
+- **Speed:** every subject-78 `bball_mc_*` LOOP plays at 0.9–1.15× real speed at rate 1.
+  - *Measured in 2b:* the loops played 0.79–1.37× at a37a90ce (through hand-set `duration`s) and play 0.99–1.01× now. The "base 1.55–4.0×" this line carried assumed 78 was 60 fps.
+  - The one-shots keep the beat their modes are timed on, and are listed with their real/played ratio for phases 4, 6 and 7: pivot 2.02×, pump fake 1.94×, step-through 1.82×, feint 1.29×, spin 1.26×.
 - **Pinned durations:** the seven pinned non-hoops clips play the same duration as before, to the millisecond (a unit test).
 - **The spec** has a row with a measurable target for every catalogue action, plus the 5 no-code-path actions. Each row cites a reel timestamp or a named reference.
-- **The dunk control** exists (`p13-vclock`).
+- **The dunk control** exists (`p13-vclock`; after 2b, `p13-vclock-2b-a` and `-b`).
 - **Build:** `tsc` 0 errors, the full `vitest` green, the count in the commit.
+
+**2b regression ledger** (measured, review 2026-09-25; `hoopsmotion/p2/p2r/LEDGER.md`, base2 → p2r). Phase 2b reads these rows worse than
+`base2`: on the same play (same take length, frames and clip sequence) by more than the floor, or beyond base2's spread between
+attempts. **The phase that owns a row gates it against `base2`, not against p2r:** it brings the row back to its base2 mean or
+better, on top of its own gate. 42 cells over 29 actions:
+- **Phase 4** (handles):
+  - `ai_1v1_cross`: slide p90 cm 13.78 → 16.10 (beyond the spread, n5).
+  - `ai_1v1_hesi`: pops 8.60 → 13.40 (beyond the spread, n5); whips 11.80 → 17.00 (beyond the spread, n5).
+  - `hero_1v1_drive`: pops 10.80 → 13.20 (same play, n5; also beyond the spread).
+- **Phase 5** (defence and AI bodies):
+  - `ai_1v1_block`: severe 3.00 → 5.00 (same play, n1).
+  - `ai_1v1_contest`: slide p90 cm 8.79 → 11.19 (same play, n4).
+  - `ai_1v1_def_backpedal`: pops 3.60 → 6.80 (beyond the spread, n5).
+  - `ai_1v1_steal`: pops 1.00 → 5.00 (same play, n1; also beyond the spread); severe 1.00 → 3.00 (same play, n1).
+  - `ai_3v3_block`: pops 3.20 → 6.60 (beyond the spread, n5).
+  - `ai_3v3_closeout`: slide p90 cm 11.97 → 16.71 (beyond the spread, n5).
+  - `ai_3v3_contest`: pops 7.33 → 9.33 (same play, n3); slide p90 cm 12.56 → 14.46 (same play, n3).
+  - `hero_1v1_def_block`: wrong-way elbow 0.40 → 5.80 (beyond the spread, n5).
+  - `hero_1v1_def_contest`: locked elbow 0.00 → 29.80 (beyond the spread, n5).
+  - `hero_1v1_def_stance`: pops 2.00 → 5.60 (beyond the spread, n5); skating frames 3.20 → 6.80 (beyond the spread, n5).
+  - `ai_1v1_react`: whips 41.50 → 44.50 (same play, n2).
+- **Phase 6** (layups and post):
+  - `ai_1v1_layup`: severe 8.60 → 11.00 (beyond the spread, n5); whips 22.20 → 28.00 (beyond the spread, n5).
+  - `hero_1v1_drive_finish`: pops 11.11 → 14.11 (same play, n9); whips 19.00 → 26.44 (same play, n9; also beyond the spread).
+  - `hero_1v1_layup`: pops 10.00 → 16.00 (same play, n2; also beyond the spread); severe 3.00 → 4.50 (same play, n2; also beyond the spread); whips 13.00 → 16.50 (same play, n2; also beyond the spread).
+  - `hero_3v3_drive_finish`: severe 0.00 → 2.00 (same play, n1); slide p90 cm 9.66 → 10.85 (same play, n1).
+  - `hero_1v1_post_hook`: slide p90 cm 5.79 → 7.73 (same play, n5).
+  - `hero_1v1_post_up`: pops 11.12 → 13.50 (same play, n8).
+- **Phase 7** (jumpers):
+  - `ai_3v3_jumper`: slide p90 cm 13.92 → 16.00 (beyond the spread, n5).
+  - `hero_1v1_pullup`: slide p90 cm 8.26 → 9.55 (same play, n5; also beyond the spread).
+  - `hero_1v1_stepback`: severe 2.60 → 4.00 (same play, n5).
+  - `hero_3v3_jumper_set`: pops 14.00 → 19.40 (beyond the spread, n5); severe 5.40 → 8.40 (beyond the spread, n5); whips 22.20 → 26.00 (beyond the spread, n5).
+- **Phase 8** (game dunks):
+  - `ai_1v1_dunk`: slide p90 cm 10.63 → 13.10 (same play, n1); wrong-way elbow 13.80 → 25.80 (beyond the spread, n5).
+  - `ai_3v3_dunk`: pops 6.50 → 10.50 (same play, n2).
+  - `hero_1v1_dunk`: wrong-way elbow 35.17 → 40.08 (same play, n12).
+- **Phase 11** (rebounds and box-outs):
+  - `ai_1v1_boxout`: severe 0.00 → 2.00 (same play, n1); wrong-way elbow 24.00 → 46.00 (same play, n1).
+  - `ai_1v1_rebound_board`: wrong-way elbow 0.00 → 33.00 (same play, n2; also beyond the spread).
 
 ### 3. Feet and ball
 
@@ -469,6 +519,7 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
   - A sprinting chop-step closeout: sprint, then 3 or more chops over the last 1.5 m, hips dropping, a high hand at the stop.
   - Author or re-cut from 78_26 / 78_30 at true fps.
   - Don't cap the defender's speed.
+  - *After 2b (measured):* at real speed the 78_30 right slide covers 1.70 m/s at rate 1, against the left's 2.40. It keeps a37a90ce's ceiling through its own rate cap (`HOOPS_STRIDE_CAPTURE.rateMaxByState`, 2.34× real, feet up to 3.98 m/s). 21–23% of the frames it tops run faster than that (base2 and p2, every body). The stepping clips replace it, and the cap goes with it. Every other defence state reaches 4.2 m/s inside `RATE_MAX` (`mocapPins.test.ts`).
 - **AI bodies move like players** (MAP D-gap 1):
   - acceleration and deceleration (from phase 3);
   - the `sprint` flag honoured (a closeout "sprint" is the slide speed today);
@@ -621,7 +672,7 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
 - **CAMERA HOLD lifted** for the dunk run-up follow camera (audit decision 10).
 - **The show** on posterizers is phase 12.
 
-**Gate** (the dunk probe's definitions, scored against the phase 2a virtual-clock dunk control)
+**Gate** (the dunk probe's definitions, scored against the virtual-clock dunk control `p13-vclock-2b-a`/`-b`, taken twice on the 2a+2b tree with DunkMode's runway pin; a change inside the two runs' spread is not a change)
 - **Pops, per game dunk,** hero and AI, 1v1 and 3v3, at least 5 dunk types:
   - pops ≤ 5 (base hero 18.2, AI 14.5; contest at phase 13: 4.48);
   - whips ≤ 3 (base hero 27.5);
@@ -786,7 +837,7 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
 ### 13. Re-measure + the reel + deploy
 
 - **Re-take the whole catalogue** with the probe (≥ 5 attempts per action) and compare with `base2` (`_hoops-motion-compare.mts`). `base-audit` is context only: its recordings predate the audit's clock fix (see "Phase by phase").
-- **Re-run the contest dunks** against the phase 2a control.
+- **Re-run the contest dunks** against the control (`p13-vclock-2b-a`/`-b`).
 - **The eye grades a reel of every family, and the owner reviews ONE reel** (owner round 3).
 - **Summary:** `~/Claude/outbox/finish-release/hoopsmotion/HOOPS-MOTION-PASS-SUMMARY.md`.
 - **One Firebase deploy,** then fast-forward `main` to the lane.

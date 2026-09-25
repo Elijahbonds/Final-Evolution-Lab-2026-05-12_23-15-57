@@ -56,7 +56,22 @@ describe('one stride covers the ground the body covers', () => {
 
 describe('ONLY locomotion is rate-scaled', () => {
   it('running states are', () => {
-    for (const s of ['drive', 'sprint_dribble', 'run', 'crossover']) expect(strideKindFor(s)).toBe('run');
+    for (const s of ['run', 'crossover']) expect(strideKindFor(s)).toBe('run');
+    // HOOPS MOTION 2b (2026-09-25): the dribbling sprint is its own capture (78_06) with its own stride
+    for (const s of ['drive', 'sprint_dribble']) expect(strideKindFor(s)).toBe('sprint');
+  });
+
+  it('the sprint falls back to the run reference on a table without one (the authored set)', () => {
+    expect(rateFor('drive', HOOPS_STRIDE.run, HOOPS_STRIDE)).toBeCloseTo(1, 5);
+    expect(rateFor('sprint_dribble', 5, { run: 4, slide: 2, sprint: 5 })).toBeCloseTo(1, 5);
+  });
+
+  it('a per-state reference is read before its kind\'s (HOOPS MOTION 2b: the clip a state plays sets its pace)', () => {
+    const ref = { run: 4, slide: 2, byState: { defend_backpedal: 3, closeout: 3.6 } };
+    expect(rateFor('defend_backpedal', 3, ref)).toBeCloseTo(1, 6);
+    expect(rateFor('defend_slide', 2, ref)).toBeCloseTo(1, 6);        // no entry: the kind's
+    expect(rateFor('closeout', 3.6, ref)).toBeCloseTo(1, 6);
+    expect(rateFor('shot_release', 3, ref)).toBeNull();               // a per-state number never makes a non-locomotion state paced
   });
 
   it('the defensive slides are, against their own reference', () => {
@@ -208,12 +223,58 @@ describe('combat strides, and the backwards-step trap', () => {
 });
 
 describe('DRIBBLE GEARS (2026-09-17)', () => {
-  it('the walk and the jog dribble loops pace against their own references; the sprint against the run', async () => {
+  it('the walk, the jog and the sprint dribble loops pace against their own references', async () => {
     const m = await import('./StrideMatch');
     expect(m.strideKindFor('walk_dribble')).toBe('walk');
     expect(m.strideKindFor('speed_dribble')).toBe('jog');
-    expect(m.strideKindFor('sprint_dribble')).toBe('run');
+    expect(m.strideKindFor('sprint_dribble')).toBe('sprint');
     expect(m.rateFor('walk_dribble', 1.6)!).toBeCloseTo(Math.min(m.RATE_MAX, 1.6 / 0.72), 6);
     expect(m.rateFor('speed_dribble', 4.2)!).toBeCloseTo(4.2 / 2.8, 6);
+  });
+
+  it('HOOPS MOTION 2b: the captured walk no longer clamps at the walking gear (1.6 m/s); the authored one still does', async () => {
+    const m = await import('./StrideMatch');
+    expect(m.rateFor('walk_dribble', 1.6, m.HOOPS_STRIDE_CAPTURE)!).toBeLessThan(m.RATE_MAX);
+    expect(m.rateFor('walk_dribble', 1.6, m.HOOPS_STRIDE)).toBe(m.RATE_MAX);
+    expect(m.strideRef(true).sprint).toBe(m.HOOPS_STRIDE_CAPTURE.sprint);
+    expect(m.strideRef(true).byState).toBe(m.HOOPS_STRIDE_CAPTURE.byState);
+    expect(m.strideRef(false).sprint).toBeUndefined();
+    expect(m.strideRef(false).byState).toBeUndefined();
+  });
+});
+
+describe('HOOPS MOTION 2b review: the sweep knob and the right slide\'s ceiling', () => {
+  it('?strideRun= paces EVERY run and sprint state, ?strideSlide= every slide state — the per-state numbers of that kind stand aside', async () => {
+    const m = await import('./StrideMatch');
+    const cap = m.HOOPS_STRIDE_CAPTURE;
+    const run = m.withStrideOverride(cap, { run: 4.8 });
+    for (const s of ['run', 'crossover', 'drive', 'sprint_dribble', 'closeout']) expect(m.rateFor(s, 4.8, run)!, s).toBeCloseTo(1, 6);
+    for (const s of ['defend_slide_right', 'defend_backpedal', 'walk_dribble', 'speed_dribble']) expect(m.rateFor(s, 3, run), s).toBe(m.rateFor(s, 3, cap));
+    const slide = m.withStrideOverride(cap, { slide: 2.4 });
+    for (const s of ['defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'carry_slide', 'carry_slide_right', 'carry_back']) {
+      expect(m.rateFor(s, 2.4, slide)!, s).toBeCloseTo(1, 6);
+      expect(m.rateFor(s, 9, slide), `${s}: the sweep drops the kind's own ceilings too`).toBe(m.RATE_MAX);
+    }
+    for (const s of ['drive', 'closeout', 'speed_dribble']) expect(m.rateFor(s, 3, slide), s).toBe(m.rateFor(s, 3, cap));
+    // on the authored table the knobs do what they always did
+    const authored = m.withStrideOverride(m.HOOPS_STRIDE, { run: 4.2, slide: 2.2 });
+    expect(authored).toEqual({ ...m.HOOPS_STRIDE, run: 4.2, sprint: 4.2, slide: 2.2, byState: undefined, rateMaxByState: undefined });
+  });
+
+  it('no knob, no copy: strideRef hands back the table itself', async () => {
+    const m = await import('./StrideMatch');
+    expect(m.withStrideOverride(m.HOOPS_STRIDE_CAPTURE, {})).toBe(m.HOOPS_STRIDE_CAPTURE);
+    expect(m.strideRef(true)).toBe(m.HOOPS_STRIDE_CAPTURE);
+    expect(m.strideRef(false)).toBe(m.HOOPS_STRIDE);
+  });
+
+  it('a state\'s own ceiling is read before RATE_MAX, and only for that state', async () => {
+    const m = await import('./StrideMatch');
+    const ref = { run: 4, slide: 2, byState: { defend_slide_right: 1.7 }, rateMaxByState: { defend_slide_right: 2.34 } };
+    expect(m.rateFor('defend_slide_right', 3.6, ref)!).toBeCloseTo(3.6 / 1.7, 6);   // 2.12: above RATE_MAX, inside its own ceiling
+    expect(m.rateFor('defend_slide_right', 9, ref)).toBe(2.34);
+    expect(m.rateFor('defend_slide', 9, ref)).toBe(m.RATE_MAX);
+    expect(m.rateFor('defend_slide_right', 0.2, ref)).toBe(m.RATE_MIN);
+    expect(m.strideRate(9, 1)).toBe(m.RATE_MAX);                                       // the two-argument form is unchanged
   });
 });

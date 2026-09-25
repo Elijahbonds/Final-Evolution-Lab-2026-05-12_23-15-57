@@ -24,6 +24,12 @@ interface Entry {
    *  2×crouch (the shins stay near their line) and the hips drop by the leg's shortening (0.9·(1−cos crouch)), so the feet stay
    *  on the floor. A crouch of 18° lowers the hips ~4.4 cm and reads as a low, set handle. */
   crouch?: number;
+  /** TRUE FPS (hoops motion 2b, 2026-09-25): a non-hoops clip whose `duration` is held on purpose (TEMP) until its own
+   *  motion pass; the text says what it holds. lib/babylon/anim/authored/mocapPins.test.ts keeps it to the millisecond. */
+  pin?: string;
+  /** The retarget's Gaussian smoothing in REAL seconds (mocapRetarget default 0.035). A pinned 60-fps clip carries 0.07: the
+   *  default read at the header's 120 was 4.2 frames, 70 ms of the true time, so the same kernel keeps its keys as they were. */
+  smoothSec?: number;
 }
 const ROOT = join(process.env.HOME ?? '', 'Downloads/fel-mocap-sources');
 const CROUCH_DROP_K = Number(process.env.CROUCH_DROP_K ?? 1);   // LOWER STANCES: the drop's calibration against the floor test
@@ -69,7 +75,7 @@ for (const e of manifest.clips) {
   }
   let [from, to] = [e.from, e.to];
   if (e.loop && e.refineLoop) [from, to] = refineLoop(s, from, to, e.refineLoop);
-  const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack });
+  const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack, smoothSec: e.smoothSec });
   if (e.extend) {
     const ex = e.extend; const m = !!e.mirror;
     const tgt = (side: 'Left' | 'Right') => { const src = m ? (side === 'Left' ? ex.Right : ex.Left) : ex[side]; return src ? [m ? -src[0] : src[0], src[1], src[2]] as [number, number, number] : null; };
@@ -98,7 +104,7 @@ for (const e of manifest.clips) {
     }
   }
   const hands = r.keys.map((k) => Math.max(k.hands!.Left![1], k.hands!.Right![1]));
-  console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m`);
+  console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s @${s.fps.toFixed(0)} → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m${e.pin ? '  PIN' : ''}`);
   out.push(`  {
     name: '${e.name}', replaces: '${e.replaces}', duration: ${r.duration}, loop: ${!!e.loop},${STYLES ? ` style: '${e.style}', label: '${e.label ?? e.name}',` : ''}
     source: '${e.source}:${e.file.split('/').pop()}${e.anim ? '#' + e.anim : ''} ${from.toFixed(2)}–${to.toFixed(2)}s${e.mirror ? ' mirrored' : ''}', license: ${JSON.stringify(LICENSE[e.source])},
@@ -116,7 +122,9 @@ if (STYLES) {
 // Each clip is pose keys INSIDE the pelvis frame plus a ROOT TRACK (the pelvis orientation + hips height), because a
 // cartwheel, a flip or a windmill turns the whole body over (mocapRetarget.rootTrack). anim/styleMotion.ts builds a
 // vocabulary's clips onto a rig and swaps the base move names; anim/MoveRootLayer.ts plays the root tracks.
-// Source: CMU Graphics Lab Motion Capture Database — free in commercial products, the data may not be resold.
+// Source: CMU Graphics Lab Motion Capture Database — free in commercial products, the data may not be resold. Each
+// subject is read at its TRUE frame rate (scripts/mocap/sources.mts CMU_TRUE_FPS: 75 and 88 are 60 fps, stamped 120);
+// the windows in \`source\` are true seconds.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type PoseKey } from '../poseClip';
 import type { RootKey } from '../mocapRetarget';
@@ -143,9 +151,13 @@ writeFileSync(OUT, `// mocapOpponents — the AI bodies' motion, from REAL captu
 // Every clip is a window of a capture retargeted to POSE KEYS (lib/babylon/anim/mocapRetarget.ts), so the two-bone
 // solver fits it to whichever body plays. \`replaces\` names the authored clip an opponent plays this instead of
 // (lib/babylon/anim/opponentMotion.ts). Sources and licenses ride on every clip:
-//   cmu  — CMU Graphics Lab Motion Capture Database, subject 06 (basketball). Free to include in commercially-sold
-//          products; the data may not be resold, even converted. (mocap.cs.cmu.edu)
+//   cmu  — CMU Graphics Lab Motion Capture Database: subjects 06, 78 and 124 (basketball), 80, 135 and 141 (boxing,
+//          karate). Free to include in commercially-sold products; the data may not be resold, even converted.
+//          (mocap.cs.cmu.edu) Each subject is read at its TRUE frame rate (scripts/mocap/sources.mts CMU_TRUE_FPS:
+//          141 is 60 fps, stamped 120); the windows in \`source\` are true seconds. A hoops LOOP plays its cut span
+//          at rate 1 (real time) and StrideMatch paces it; a beat keeps the duration its mode is timed on.
 //   ual  — Quaternius Universal Animation Library 2 [Standard]. CC0 1.0.
+//   deepmotion — the owner's own DeepMotion takes.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type PoseKey } from '../poseClip';
 
