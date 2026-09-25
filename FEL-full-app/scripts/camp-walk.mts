@@ -2,7 +2,14 @@
 // Login is the real NextAuth credentials flow (csrf → callback), no bypass.
 //   BASE=http://localhost:3000 npx tsx scripts/camp-walk.mts
 import { request } from 'playwright-core';
+import { registerHooks } from 'node:module';
+// HOTFIX (2026-09-24): the certification answer key is server-only now (lib/curriculum/assessments.ts
+// imports 'server-only', which only Next resolves). This local walk certifies a playtest account, so it
+// maps that one import to the same empty stub vitest uses before it loads the bank. Nothing else changes.
+const SERVER_ONLY_STUB = new URL('../tests/stubs/server-only.ts', import.meta.url).href;
+registerHooks({ resolve: (specifier, context, next) => (specifier === 'server-only' ? { url: SERVER_ONLY_STUB, shortCircuit: true } : next(specifier, context)) });
 const { CURRICULUM } = await import('../lib/curriculum/blueprint.ts');
+const { answerKeyForPresented } = await import('../lib/curriculum/assessments.ts');
 const BASE = process.env.BASE ?? 'http://localhost:3000';
 const FAC = { email: 'playtest@fel.local', password: 'playtest-local-only' };
 const MENTEE = { email: 'mentee@fel.local', password: 'playtest-local-only' };
@@ -27,11 +34,14 @@ const mentee = await login(MENTEE);
 log('mentee', mentee.userId ? `logged in ${mentee.userId}` : `LOGIN FAILED ${JSON.stringify(mentee.session)}`);
 if (!fac.userId || !mentee.userId) { console.log(out.join('\n')); process.exit(1); }
 
-// 1) certification: answer every required module correctly
+// 1) certification: answer every required module correctly. The paper comes from the server as a real
+// user sees it (options shuffled, no answers); the right POSITIONS come from the server-only bank.
+const paper = await jr(await fac.ctx.get('/api/v1/camp/assess'));
 for (const t of CURRICULUM.tracks) for (const m of t.modules) {
-  const answers = Object.fromEntries(m.lessons.flatMap((l) => l.assessment.map((q) => [q.key, q.answer])));
-  const r = await fac.ctx.post('/api/v1/camp/assess', { data: { trackKey: t.key, moduleKey: m.key, answers } });
-  const j = await jr(r); log(`assess ${t.key}/${m.key}`, `${r.status()} score=${j.score} passed=${j.passed} status=${j.status}`);
+  const shown = (paper.modules ?? []).find((x: { ref: string }) => x.ref === `${t.key}/${m.key}`);
+  const answers = answerKeyForPresented(t.key, m.key);
+  const r = await fac.ctx.post('/api/v1/camp/assess', { data: { trackKey: t.key, moduleKey: m.key, presentationId: shown?.presentationId, answers } });
+  const j = await jr(r); log(`assess ${t.key}/${m.key}`, `${r.status()} score=${j.score} passed=${j.passed} status=${j.status} ${j.error ?? ''}`);
 }
 const st = await jr(await fac.ctx.get('/api/v1/camp/assess')); log('cert status', `${st.status} missing=${JSON.stringify(st.missingModules)}`);
 

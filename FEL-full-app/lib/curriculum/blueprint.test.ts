@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRICULUM, PASS_MARK, allLessons, gradeModule, lessonByRef, requiredModules } from './blueprint';
+import { allLessons, lessonByRef, requiredModules } from './blueprint';
 import { TRACKS } from '../game-data';
 
 describe('the Blueprint curriculum', () => {
@@ -8,34 +8,21 @@ describe('the Blueprint curriculum', () => {
       expect(lessonByRef(`${t.key}/${m.key}/${l.key}`), `${t.key}/${m.key}/${l.key}`).toBeDefined();
     }
   });
-  it('every lesson has prose, key points, a drill on a real mode key and at least one question with a valid answer', () => {
+  it('every lesson has prose, key points and a drill on a real mode key', () => {
     for (const l of allLessons()) {
       expect(l.body.length, l.ref).toBeGreaterThan(0);
       expect(l.keyPoints.length, l.ref).toBeGreaterThan(0);
       expect(l.drill.modeKey, l.ref).toMatch(/^[a-z_]+$/);
-      expect(l.assessment.length, l.ref).toBeGreaterThan(0);
-      for (const q of l.assessment) { expect(q.answer).toBeGreaterThanOrEqual(0); expect(q.answer).toBeLessThan(q.options.length); }
     }
   });
-  it('question keys are unique within a module', () => {
-    for (const t of CURRICULUM.tracks) for (const m of t.modules) {
-      const keys = m.lessons.flatMap((l) => l.assessment.map((q) => q.key));
-      expect(new Set(keys).size, `${t.key}/${m.key}`).toBe(keys.length);
-    }
+  // HOTFIX (2026-09-24): the question/answer/grading checks that lived here moved with the answer key to
+  // lib/curriculum/assessments.test.ts. This module ships to the browser, so what it must prove now is the
+  // opposite: that it carries no assessment at all.
+  it('no lesson carries an assessment — this module is in the client bundle', () => {
+    for (const l of allLessons()) expect(l as unknown as Record<string, unknown>, l.ref).not.toHaveProperty('assessment');
   });
   it('certification requires the three Blueprint modules', () => {
     expect(requiredModules()).toEqual(['blueprint/m1', 'blueprint/m2', 'blueprint/m3']);
-  });
-  it('grades a module at the 80% pass mark', () => {
-    const mod = CURRICULUM.tracks[0].modules[0];
-    const qs = mod.lessons.flatMap((l) => l.assessment);
-    const perfect = Object.fromEntries(qs.map((q) => [q.key, q.answer]));
-    expect(gradeModule('blueprint', 'm1', perfect)).toMatchObject({ score: 100, passed: true });
-    const wrongOne = { ...perfect, [qs[0].key]: (qs[0].answer + 1) % qs[0].options.length };
-    const r = gradeModule('blueprint', 'm1', wrongOne);
-    expect(r.score).toBe(Math.round(((qs.length - 1) / qs.length) * 100));
-    expect(r.passed).toBe(r.score >= PASS_MARK);
-    expect(gradeModule('blueprint', 'nope', {})).toEqual({ score: 0, passed: false, graded: [] });
   });
 });
 
@@ -45,7 +32,7 @@ describe('the Blueprint curriculum', () => {
 // per PRQ attribute, m1 + m2). Module 4 adds the four mechanism lessons the brief names. These tests hold
 // the count and — more importantly — hold the two things that could quietly break work people already own.
 
-import { CURRICULUM as C12, allLessons as all12, requiredModules as req12, gradeModule as grade12, PASS_MARK as PM12 } from './blueprint';
+import { CURRICULUM as C12, allLessons as all12, requiredModules as req12 } from './blueprint';
 
 describe('the Academy is twelve athlete lessons', () => {
   const blueprint = C12.tracks.find((t) => t.key === 'blueprint')!;
@@ -91,21 +78,9 @@ describe('the Academy is twelve athlete lessons', () => {
       expect(l.body.length, l.ref).toBeGreaterThanOrEqual(3);
       expect(l.body.join(' ').length, l.ref).toBeGreaterThan(600);
       expect(l.keyPoints.length, l.ref).toBeGreaterThanOrEqual(3);
-      expect(l.assessment.length, l.ref).toBeGreaterThanOrEqual(3);
       expect(l.drill.modeKey, l.ref).toBeTruthy();
     }
-  });
-
-  it('and the new module grades like any other', () => {
-    const m4 = C12.tracks.find((t) => t.key === 'blueprint')!.modules.find((m) => m.key === 'm4')!;
-    const allRight = Object.fromEntries(m4.lessons.flatMap((l) => l.assessment).map((a) => [a.key, a.answer]));
-    const perfect = grade12('blueprint', 'm4', allRight);
-    expect(perfect.score).toBe(100);
-    expect(perfect.passed).toBe(true);
-    const nothing = grade12('blueprint', 'm4', {});
-    expect(nothing.score).toBe(0);
-    expect(nothing.passed).toBe(false);
-    expect(PM12).toBe(80);
+    // (the three-questions-per-lesson floor and "grades like any other" moved to assessments.test.ts)
   });
 
   it('no clinical language in the new lessons', () => {

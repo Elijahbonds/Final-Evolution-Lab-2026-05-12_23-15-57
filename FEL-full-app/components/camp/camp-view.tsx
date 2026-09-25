@@ -7,13 +7,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles, BookOpen } from 'lucide-react';
 import Link from 'next/link';
+// HOTFIX (2026-09-24): blueprint.ts is lesson content only now. The certification questions and their
+// answer key are server-only (lib/curriculum/assessments.ts); this page gets each paper from GET
+// /api/v1/camp/assess with no answers, and the server grades. lib/curriculum/answerKeyBoundary.test.ts
+// fails if anything this file imports ever reaches the key again.
 import { allLessons } from '@/lib/curriculum/blueprint';
+import { describeGate, type AttemptGate } from '@/lib/camp/assessPolicy';
 import { ARC, BRIDGE_PROMPTS, CAMP_BLUEPRINT_VERSION, MEASURES, PATHWAY_FIELDS, PROGRAM, REPLICATION, STANDARDS, THESIS, TRACKS, arcMilestones, arcWeek, bridgePromptFor, weekOf } from '@/lib/camp/curriculum';
 
 type Tab = 'certify' | 'plans' | 'session' | 'templates' | 'curriculum';
 interface ModuleQ { key: string; prompt: string; options: string[] }
-interface ModuleInfo { ref: string; title: string; summary: string; required: boolean; questions: ModuleQ[] }
-interface AssessState { status: string; missingModules: string[]; passedModules: string[]; modules: ModuleInfo[]; credentials: { trackKey: string; moduleKey: string; score: number; passed: boolean }[]; curriculumVersion: string }
+interface ModuleInfo { ref: string; title: string; summary: string; required: boolean; questions: ModuleQ[]; presentationId: string; attempt: AttemptGate }
+interface AssessState { status: string; missingModules: string[]; passedModules: string[]; modules: ModuleInfo[]; credentials: { trackKey: string; moduleKey: string; score: number; passed: boolean }[]; curriculumVersion: string; passMark?: number; policy?: { cooldownSec: number; attemptCap: number; windowSec: number } }
+interface AssessPost { score: number; passed: boolean; correct: number; total: number; status: string; attempt?: AttemptGate; retryAfterSec?: number | null; attemptsLeft?: number; missing?: number }
 interface Plan { id: string; goalText: string; status: string; menteeId: string; facilitatorUserId: string; linkedModuleKeys: string[]; tags: string[]; createdAt: string; lockedAt?: string | null; pathwayMap?: Record<string, string> | null; sessions?: CampSessionRow[] }
 interface CampSessionRow { id: string; date: string; moduleKeys: string[]; gameSessionIds: string[]; prqDelta: Record<string, number> | null; resiliency: { attempts: number; failures: number; retryRate: number; returnedAfterLoss: boolean | null } | null; notes: string | null }
 interface Template { id: string; name: string; description: string | null; version: number; curriculumVersion: string; published: boolean; uses: number; forkedFromId: string | null; structure: { blocks: { label: string; sessions: { label: string }[] }[] } }
@@ -75,26 +81,52 @@ export function CampView() {
 }
 
 // ── Certify ────────────────────────────────────────────────────────────────
-function Certify({ state, onDone }: { state: AssessState | null; onDone: () => Promise<void> }) {
+export function Certify({ state, onDone }: { state: AssessState | null; onDone: () => Promise<void> }) {
   const [open, setOpen] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
+  // A closed module's wait is computed when the page loads; reload when the soonest one ends so the
+  // button opens on time instead of staying greyed out until something else refreshes the page.
+  useEffect(() => {
+    const waits = (state?.modules ?? []).flatMap((m) => (m.attempt && !m.attempt.open && m.attempt.retryAfterSec != null ? [m.attempt.retryAfterSec] : []));
+    if (!waits.length) return;
+    const t = setTimeout(() => { void onDone(); }, (Math.min(...waits) + 1) * 1000);
+    return () => clearTimeout(t);
+  }, [state, onDone]);
   if (!state) return <Loading />;
   const passed = new Set(state.passedModules);
+  // HOTFIX (2026-09-24): passedModules lists REQUIRED modules only (certificationStatusFor), so a passed
+  // optional module (m4) would draw as a greyed-out "Take assessment". The gate knows every module.
+  const isPassed = (m: ModuleInfo) => passed.has(m.ref) || m.attempt?.reason === 'already_passed';
   const submit = async (m: ModuleInfo) => {
     const [trackKey, moduleKey] = m.ref.split('/');
     const unanswered = m.questions.filter((q) => answers[q.key] == null).length;
     if (unanswered) { toast.error(`${unanswered} question${unanswered > 1 ? 's' : ''} unanswered`); return; }
     setBusy(true);
-    const r = await api<{ score: number; passed: boolean; status: string }>('/api/v1/camp/assess', { method: 'POST', body: JSON.stringify({ trackKey, moduleKey, answers }) });
+    // `answers` holds the positions as SHOWN; the server maps them back to its key. presentationId says
+    // which paper they answer, so a paper that changed underneath is refused rather than mis-graded.
+    const r = await api<AssessPost>('/api/v1/camp/assess', { method: 'POST', body: JSON.stringify({ trackKey, moduleKey, presentationId: m.presentationId, answers }) });
     setBusy(false);
-    if (r.error) { toast.error(r.error); return; }
-    toast[r.passed ? 'success' : 'error'](`${r.score}% — ${r.passed ? 'passed' : 'below the 80% mark, try again'}`);
+    if (r.error) {
+      if (r.error === 'cooldown' || r.error === 'attempt_cap' || r.error === 'already_passed') {
+        toast.error(describeGate({ open: false, reason: r.error, retryAfterSec: r.retryAfterSec ?? null }) ?? r.error);
+        setOpen(null); setAnswers({}); await onDone(); return;
+      }
+      if (r.error === 'stale_questions') { toast.error('This assessment was updated while you had it open. Nothing was submitted; it has been reloaded.'); setOpen(null); setAnswers({}); await onDone(); return; }
+      if (r.error === 'incomplete_answers') { toast.error(`${r.missing ?? 'Some'} question${r.missing === 1 ? '' : 's'} unanswered`); return; }
+      if (r.error === 'concurrent_attempt') { toast.error('The server was busy and nothing was recorded; try again.'); await onDone(); return; }
+      toast.error(r.error); return;
+    }
+    const next = r.attempt ? describeGate(r.attempt) : null;
+    toast[r.passed ? 'success' : 'error'](`${r.score}% (${r.correct}/${r.total}) — ${r.passed ? 'passed' : `below the ${state.passMark ?? 80}% mark.${next ? ` ${next}` : ''}`}`);
     setOpen(null); setAnswers({}); await onDone();
   };
+  const rules = state.policy
+    ? ` After a miss a module rests ${Math.round(state.policy.cooldownSec / 60)} min; ${state.policy.attemptCap} attempts per module every ${Math.round(state.policy.windowSec / 3600)} h.`
+    : '';
   return (
     <section className="space-y-3">
-      <p className="text-xs text-white/50">Curriculum {state.curriculumVersion}. Pass every required module at 80% to certify. Your Creator Card becomes a Facilitator Card when you do.</p>
+      <p className="text-xs text-white/50">Curriculum {state.curriculumVersion}. Pass every required module at {state.passMark ?? 80}% to certify. Your Creator Card becomes a Facilitator Card when you do.{rules}</p>
       {state.modules.map((m) => (
         <div key={m.ref} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
           <div className="flex items-start justify-between gap-3">
@@ -102,9 +134,14 @@ function Certify({ state, onDone }: { state: AssessState | null; onDone: () => P
               <h3 className="text-sm font-semibold">{m.title} {m.required && <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-white/60">required</span>}</h3>
               <p className="mt-1 text-xs text-white/50">{m.summary}</p>
             </div>
-            {passed.has(m.ref) ? <span className="flex items-center gap-1 text-xs text-emerald-300"><Check className="h-3.5 w-3.5" /> passed</span>
-              : <button onClick={() => { setOpen(open === m.ref ? null : m.ref); setAnswers({}); }} className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-bold text-cyan-300">{open === m.ref ? 'Close' : 'Take assessment'}</button>}
+            {isPassed(m) ? <span className="flex items-center gap-1 text-xs text-emerald-300"><Check className="h-3.5 w-3.5" /> passed</span>
+              : <button disabled={m.attempt?.open === false && open !== m.ref} onClick={() => { setOpen(open === m.ref ? null : m.ref); setAnswers({}); }} className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 text-xs font-bold text-cyan-300 disabled:opacity-40">{open === m.ref ? 'Close' : 'Take assessment'}</button>}
           </div>
+          {!isPassed(m) && m.attempt && (
+            <p className="mt-2 text-[11px] text-white/45" data-testid="assess-gate">
+              {describeGate(m.attempt) ?? `${m.attempt.attemptsLeft} attempt${m.attempt.attemptsLeft === 1 ? '' : 's'} left in this window.`}
+            </p>
+          )}
           {open === m.ref && (
             <div className="mt-4 space-y-4">
               {m.questions.map((q, i) => (
