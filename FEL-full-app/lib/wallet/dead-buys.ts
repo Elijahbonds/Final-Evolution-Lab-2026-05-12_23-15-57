@@ -22,28 +22,39 @@
  * player already owned: a /store tab loaded before a Profile buy, or a second /store tab, charged again and upserted the
  * same row, which delivered nothing.
  *
- * Left out on purpose: class_pass_single and class_monthly. They are held, not dead (NOT_ON_SALE in catalog.ts). Their
- * entitlement rows are what a /live with a player would read, so a refund would turn into a free pass that day. The
- * owner's call.
+ * Owner additions 2026-09-25:
+ *   - The two /live class passes are refunded too (they were held, not refunded, on the 24th): live classes have not
+ *     started, so nothing has ever read a pass. The refund deletes the PlayerEntitlement row spend() wrote with the
+ *     charge, in the same transaction, so a pass bought again once classes exist is charged again. Both SKUs stay in
+ *     NOT_ON_SALE until then (dead-buys.test.ts pins it).
+ *   - A workout plan bought on /store is refunded without proof that nothing was erased since: the owner accepts that a
+ *     plan delivered by Workout and then erased by delete-my-data may be paid back too.
+ *   - A session booking whose slot is over and never had a join link is refunded: the player paid for a session they
+ *     were never told how to join (endedBookings and unlinkedBookings below, the rules; dead-buy-refunds.ts, the
+ *     sweep). Admins' and the owner's own bookings are treated like anyone's.
  */
 
+import { isPrivateKey, normaliseJoinUrl, sessionEnded, sessionEndsAtMs } from '@/lib/sessions/joinLink';
 import { REASON, type WalletCurrency } from './reward-rules';
 
 /**
  * How a dead buy of a SKU is told apart from a delivering one.
  *
  *   client_key    every row of the SKU whose key the browser made is dead. The one route that delivers it composes its
- *                 key on the server (music:<player>:<sku>, card_slot:<player>_<ms>), or no route delivers it at all.
+ *                 key on the server (music:<player>:<sku>, card_slot:<player>_<ms>), or no route delivers it at all
+ *                 (the class passes: nothing has ever read one, so the refund also takes back the entitlement row).
  *   wearable      the Closet's buy (app/api/v1/closet/buy) writes OwnedWearable just after its charge and refuses an item
  *                 already owned, and nothing deletes a store wearable's row (the season pass withdraws only its own ids).
  *                 The row made at or just before OwnedWearable.acquiredAt delivered; any other row of that item did not.
  *   session       Sessions (app/api/v1/sessions/book) writes one SessionBooking just after each charge, and nothing
- *                 deletes a booking. Each booking claims the latest row of its SKU made at or before it; a row no booking
- *                 claims delivered nothing.
- *   workout_plan  Workout (app/api/v1/workout/plan) writes a WorkoutPlan just after each charge, but delete-my-data
- *                 (DELETE /api/v1/workout/scan) erases every plan AND every scan, leaving no trace. A row no plan claims
- *                 might be a plan that was delivered and erased, so it is refunded only when a plan or scan made BEFORE it
- *                 still exists: that proves nothing was erased since, so a delivered plan would still be there.
+ *                 deletes a booking. Each booking claims the latest charge of its SKU made at or before it
+ *                 (bookingCharges), out of EVERY charge of the SKU, whatever its key and whether or not it was paid
+ *                 back, and each booking does, whatever its status: a booking paid back for having no join link still
+ *                 claims its charge, so nothing else can. A row no booking claims delivered nothing.
+ *   workout_plan  Workout (app/api/v1/workout/plan) writes a WorkoutPlan just after each charge, within
+ *                 PLAN_CLAIM_WINDOW_MS. A row no plan claims is refunded. delete-my-data (DELETE /api/v1/workout/scan)
+ *                 erases every plan, so a plan that was delivered and then erased is paid back too: the owner's call
+ *                 (2026-09-25), over holding every unmatched charge back for want of proof.
  *   first_charge  the entitlement row IS the delivery, and spend() writes it with the first charge of the SKU; nothing
  *                 else writes it and nothing deletes it. The player's earliest charge of the SKU (whatever its key)
  *                 delivered; a later one whose key the browser made upserted the same row and delivered nothing.
@@ -60,13 +71,21 @@ export interface DeadCatalogBuy {
   match: DeadBuyMatch;
   /** The SessionBooking.kind or WorkoutPlan.tier the delivering route writes for this SKU. */
   deliveredAs?: string;
+  /** What the refund takes back with the currency: the PlayerEntitlement row spend() wrote for the SKU. */
+  undo?: 'entitlement';
+  /** What the note says after the name, when it is not "it didn't deliver anything". */
+  reason?: string;
   /** Why a /store buy of it delivered nothing. */
   why: string;
 }
 
+/** Why a class pass is paid back (owner decision 2026-09-25). */
+export const CLASS_PASS_REASON = "live classes haven't started yet";
+
 /**
  * Every SKU a /store buy took a balance for and delivered nothing, keyed on the raw SKU string (three of these are no
- * longer in CATALOG, and old ledger rows still carry them). Traced against 71ea8f30, the tree before the hotfix.
+ * longer in CATALOG, and old ledger rows still carry them). Traced against 71ea8f30, the tree before the hotfix, plus
+ * the two class passes /live sold through the same route (the owner's addition of 2026-09-25).
  */
 export const DEAD_CATALOG_BUYS: Readonly<Record<string, DeadCatalogBuy>> = {
   dunk_retry_token: { currency: 'coins', name: 'Dunk Retry Token', match: 'client_key', why: 'no code ever read the entitlement, and only /store sold it' },
@@ -76,8 +95,10 @@ export const DEAD_CATALOG_BUYS: Readonly<Record<string, DeadCatalogBuy>> = {
   music_kit_neon: { currency: 'shards', name: 'NEON kit', match: 'client_key', why: 'the Music Room keeps kits on the device and charges under music:<player>:<sku>; nothing calls the entitlement read' },
   music_kit_dust: { currency: 'shards', name: 'DUST kit', match: 'client_key', why: 'the Music Room keeps kits on the device and charges under music:<player>:<sku>; nothing calls the entitlement read' },
   music_cell_assist: { currency: 'shards', name: 'Cell foundation', match: 'client_key', why: 'the Music Room charges each foundation as it is used, under its own key; a bought one was never used' },
-  workout_plan_4w: { currency: 'shards', name: '4-Week Workout Plan', match: 'workout_plan', deliveredAs: 'plan_4w', why: 'a plan is a WorkoutPlan row, which only Workout writes' },
-  workout_program_12w: { currency: 'shards', name: '12-Week Workout Program', match: 'workout_plan', deliveredAs: 'program_12w', why: 'a plan is a WorkoutPlan row, which only Workout writes' },
+  workout_plan_4w: { currency: 'shards', name: '4-Week Workout Plan', match: 'workout_plan', deliveredAs: 'plan_4w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too)' },
+  workout_program_12w: { currency: 'shards', name: '12-Week Workout Program', match: 'workout_plan', deliveredAs: 'program_12w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too)' },
+  class_pass_single: { currency: 'shards', name: 'Single Class Pass', match: 'client_key', undo: 'entitlement', reason: CLASS_PASS_REASON, why: 'no live class has ever run, so nothing has read the pass; only the generic spend route sold it' },
+  class_monthly: { currency: 'shards', name: 'Monthly All-Access Pass', match: 'client_key', undo: 'entitlement', reason: CLASS_PASS_REASON, why: 'no live class has ever run, so nothing has read the pass; only the generic spend route sold it' },
   session_group_workout: { currency: 'shards', name: 'Group Workout session', match: 'session', deliveredAs: 'group_workout', why: 'a seat is a SessionBooking row, which only Sessions writes' },
   seminar_seat: { currency: 'shards', name: 'Seminar seat', match: 'session', deliveredAs: 'seminar', why: 'a seat is a SessionBooking row, which only Sessions writes (it has never booked a seminar)' },
   private_1on1: { currency: 'shards', name: 'Private 1-on-1 session', match: 'session', deliveredAs: 'private_1on1', why: 'a seat is a SessionBooking row, which only Sessions writes (and it refuses a minor)' },
@@ -175,6 +196,8 @@ export interface DeadBuy {
   item: string;
   match: DeadBuyMatch | 'shop_card';
   deliveredAs?: string;
+  undo?: 'entitlement';
+  reason?: string;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -191,7 +214,10 @@ export function deadBuyOf(row: DeadBuyRow, playerId: string): DeadBuy | null {
     const sku = str(meta.skuId);
     const dead = Object.prototype.hasOwnProperty.call(DEAD_CATALOG_BUYS, sku) ? DEAD_CATALOG_BUYS[sku] : null;
     if (!dead || row.currency !== dead.currency || !isClientMadeKey(row.idempotencyKey)) return null;
-    return { row, amount: -row.delta, currency: dead.currency, name: dead.name, item: sku, match: dead.match, deliveredAs: dead.deliveredAs };
+    return {
+      row, amount: -row.delta, currency: dead.currency, name: dead.name, item: sku, match: dead.match, deliveredAs: dead.deliveredAs,
+      ...(dead.undo ? { undo: dead.undo } : {}), ...(dead.reason ? { reason: dead.reason } : {}),
+    };
   }
   if (row.reasonCode === SHOP_PURCHASE_REASON && row.currency === 'lc') {
     const prefix = `shop:${playerId}:`;
@@ -215,35 +241,41 @@ export function refundedRowIds(rows: readonly DeadBuyRow[]): Set<string> {
 
 /**
  * Each delivery claims one row: the latest one not yet claimed that was made at or before it (and, with a window, no
- * earlier than `windowMs` before it). Returns the buys no delivery claimed. Deliveries are taken oldest first, so a
- * later purchase never changes what an earlier delivery claimed, and a refund once decided stays decided.
+ * earlier than `windowMs` before it). Deliveries are taken oldest first, so a later purchase never changes what an
+ * earlier delivery claimed, and a refund once decided stays decided. Returns delivery -> the buy it claimed.
  */
-export function unclaimed<T extends { row: { createdAt: Date } }>(buys: readonly T[], deliveredAt: readonly Date[], windowMs = Infinity): T[] {
+function claims<T extends { row: { createdAt: Date } }, D>(buys: readonly T[], deliveries: readonly D[], at: (d: D) => Date, windowMs = Infinity): Map<D, T> {
   const open = [...buys].sort((a, b) => a.row.createdAt.getTime() - b.row.createdAt.getTime());
-  const claimed = new Set<T>();
-  for (const d of [...deliveredAt].sort((a, b) => a.getTime() - b.getTime())) {
-    const at = d.getTime();
+  const out = new Map<D, T>();
+  const taken = new Set<T>();
+  for (const d of [...deliveries].sort((a, b) => at(a).getTime() - at(b).getTime())) {
+    const when = at(d).getTime();
     let pick: T | null = null;
     for (const b of open) {
       const t = b.row.createdAt.getTime();
-      if (t > at + CLAIM_SLACK_MS) break;
-      if (claimed.has(b) || t < at - windowMs) continue;
+      if (t > when + CLAIM_SLACK_MS) break;
+      if (taken.has(b) || t < when - windowMs) continue;
       pick = b;   // ascending, so the last fit is the latest
     }
-    if (pick) claimed.add(pick);
+    if (pick) { taken.add(pick); out.set(d, pick); }
   }
-  return open.filter((b) => !claimed.has(b));
+  return out;
+}
+
+/** The buys no delivery claimed (see claims), oldest first. */
+export function unclaimed<T extends { row: { createdAt: Date } }>(buys: readonly T[], deliveredAt: readonly Date[], windowMs = Infinity): T[] {
+  const claimed = new Set(claims(buys, deliveredAt.map((d) => ({ d })), (x) => x.d, windowMs).values());
+  return [...buys].sort((a, b) => a.row.createdAt.getTime() - b.row.createdAt.getTime()).filter((b) => !claimed.has(b));
 }
 
 /** What the delivering routes wrote for this player, as far as the sweep's candidates need it. */
 export interface DeliveryEvidence {
   wearables: readonly { itemId: string; acquiredAt: Date }[];
-  bookings: readonly { kind: string; createdAt: Date }[];
   plans: readonly { tier: string; createdAt: Date }[];
-  /** When the oldest WorkoutScan still on file was made, or null when none is. */
-  oldestScanAt: Date | null;
   /** SKU -> the id of the player's earliest charge of it, whatever its key (firstChargeIds). */
   firstCharges: ReadonlyMap<string, string>;
+  /** The ids of the charges the player's bookings claim (bookingCharges). */
+  bookedCharges: ReadonlySet<string>;
 }
 
 /** The player's earliest SPEND_CATALOG_ITEM charge of each SKU, from their own ledger rows: SKU -> row id. */
@@ -259,17 +291,18 @@ export function firstChargeIds(rows: readonly DeadBuyRow[]): Map<string, string>
   return new Map([...first].map(([sku, r]) => [sku, r.id]));
 }
 
-/** Which families of candidate need evidence read before they can be decided. */
-export function evidenceNeeded(buys: readonly DeadBuy[]): { wearables: string[]; bookingKinds: string[]; plans: boolean } {
+/**
+ * Which families of candidate need evidence read before they can be decided. Bookings are not among them: the sweep
+ * reads every one of the player's bookings anyway, for their own refunds (bookingCharges).
+ */
+export function evidenceNeeded(buys: readonly DeadBuy[]): { wearables: string[]; plans: boolean } {
   const wearables = new Set<string>();
-  const kinds = new Set<string>();
   let plans = false;
   for (const b of buys) {
     if (b.match === 'wearable') wearables.add(b.item);
-    else if (b.match === 'session' && b.deliveredAs) kinds.add(b.deliveredAs);
     else if (b.match === 'workout_plan') plans = true;
   }
-  return { wearables: [...wearables], bookingKinds: [...kinds], plans };
+  return { wearables: [...wearables], plans };
 }
 
 /** The candidates that delivered nothing, per their SKU's rule (see DeadBuyMatch). */
@@ -280,22 +313,19 @@ export function refundableDeadBuys(buys: readonly DeadBuy[], ev: DeliveryEvidenc
     if (b.match === 'client_key' || b.match === 'shop_card') { out.push(b); continue; }
     // the earliest charge is the one that delivered; with no earliest known, nothing is refunded
     if (b.match === 'first_charge') { if (ev.firstCharges.has(b.item) && ev.firstCharges.get(b.item) !== b.row.id) out.push(b); continue; }
+    // a booking claims its charge out of every charge of the SKU, not just these candidates (bookingCharges)
+    if (b.match === 'session') { if (!ev.bookedCharges.has(b.row.id)) out.push(b); continue; }
     const list = byItem.get(b.item) ?? [];
     list.push(b);
     byItem.set(b.item, list);
   }
-  // the oldest plan or scan still on file: anything newer than it cannot have had its plan erased
-  const planTimes = ev.plans.map((p) => p.createdAt.getTime());
-  const oldest = Math.min(ev.oldestScanAt ? ev.oldestScanAt.getTime() : Infinity, ...planTimes);
   for (const [item, list] of byItem) {
     const rule = list[0];
     if (rule.match === 'wearable') {
       out.push(...unclaimed(list, ev.wearables.filter((w) => w.itemId === item).map((w) => w.acquiredAt)));
-    } else if (rule.match === 'session') {
-      out.push(...unclaimed(list, ev.bookings.filter((k) => k.kind === rule.deliveredAs).map((k) => k.createdAt)));
     } else if (rule.match === 'workout_plan') {
-      const left = unclaimed(list, ev.plans.filter((p) => p.tier === rule.deliveredAs).map((p) => p.createdAt), PLAN_CLAIM_WINDOW_MS);
-      out.push(...left.filter((b) => oldest < b.row.createdAt.getTime()));
+      // a plan claims only the charge just before it; every other charge is paid back, an erased plan's included
+      out.push(...unclaimed(list, ev.plans.filter((p) => p.tier === rule.deliveredAs).map((p) => p.createdAt), PLAN_CLAIM_WINDOW_MS));
     }
   }
   return out.sort((a, b) => a.row.createdAt.getTime() - b.row.createdAt.getTime());
@@ -308,9 +338,123 @@ const UNITS: Record<WalletCurrency, [string, string]> = {
 };
 
 /** The note the player reads, once in a toast and for good in the wallet history. */
-export function refundNote(amount: number, currency: WalletCurrency, name: string): string {
+export function refundNote(amount: number, currency: WalletCurrency, name: string, reason = "it didn't deliver anything"): string {
   const [one, many] = UNITS[currency];
-  return `We refunded ${amount.toLocaleString('en-US')} ${amount === 1 ? one : many} for ${name}: it didn't deliver anything. Sorry about that.`;
+  return `We refunded ${amount.toLocaleString('en-US')} ${amount === 1 ? one : many} for ${name}: ${reason}. Sorry about that.`;
+}
+
+// ── Session bookings with no join link (owner decision 2026-09-25) ───────────────────────────────────────────────────
+//
+// Sessions charged shards and wrote a SessionBooking, and until 110560be there was no way to be told where the session
+// was. A CONFIRMED booking whose session is over (lib/sessions/joinLink.ts sessionEnded: its start plus its kind's
+// length) and whose slot never had a link this player could open (linkedSlotsFor) is paid back: what the charge it
+// claims took (bookingCharges), at most its shardsPaid, in shards, and the booking's status becomes 'refunded' in the
+// same transaction. The credit is keyed on that charge (refund:<chargeId>, the key a /store refund of it would take), so
+// the charge comes back once whatever claims it, and its own key replays nothing afterwards (wallet-service
+// spendReplay). A booking that claims no charge was never paid for: until 2026-09-25 the booking route answered a used
+// key with its old receipt and booked another slot on it. That booking, one whose charge is already paid back and one of
+// 0 shards are only closed. A slot with a link is never paid back, however the session went, and once a session has
+// started its link can be replaced but not taken down (app/api/v1/sessions/join-link). Cancelled, pending and refunded
+// rows are never touched. The SessionJoinLink table may not exist yet (it is new): then nothing can be proven and NO
+// booking is paid back on that read (dead-buy-refunds.ts). Two guards make it once: the status flip is conditional on
+// 'confirmed', and the credit's key is unique across the ledger.
+
+/** A confirmed SessionBooking as the sweep reads it. */
+export interface BookingRow { id: string; kind: string; sessionKey: string; shardsPaid: number; startsAt: Date }
+
+/** SessionBooking.kind -> the SKU Sessions charges for it (the session SKUs' deliveredAs, read the other way). */
+export const BOOKING_SKU: ReadonlyMap<string, string> = new Map(
+  Object.entries(DEAD_CATALOG_BUYS).filter(([, d]) => d.match === 'session' && d.deliveredAs).map(([sku, d]) => [d.deliveredAs as string, sku]),
+);
+
+/** A SessionBooking of any status, as the claim reads it. */
+export interface ClaimingBooking { id: string; kind: string; createdAt: Date }
+
+/**
+ * The charge each of a player's bookings claims: booking id -> its SPEND_CATALOG_ITEM row. Per kind, the bookings
+ * oldest first each take the latest charge of the kind's SKU not yet taken that was made at or before them (claims),
+ * out of every charge of that SKU, whatever its key and whether or not it was paid back, and every booking, whatever
+ * its status. So what a booking claims never moves, and no two bookings share a charge. A tie on time goes to the lower
+ * id, so every server instance decides alike.
+ */
+export function bookingCharges(bookings: readonly ClaimingBooking[], rows: readonly DeadBuyRow[]): Map<string, DeadBuyRow> {
+  const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const out = new Map<string, DeadBuyRow>();
+  for (const [kind, sku] of BOOKING_SKU) {
+    const currency = DEAD_CATALOG_BUYS[sku].currency;
+    const charges = rows
+      .filter((r) => r.reasonCode === REASON.SPEND_CATALOG_ITEM && r.delta < 0 && r.currency === currency && str(((r.metadata ?? {}) as Record<string, unknown>).skuId) === sku)
+      .sort(byId).map((row) => ({ row }));
+    const mine = bookings.filter((b) => b.kind === kind).sort(byId);
+    for (const [b, c] of claims(charges, mine, (x) => x.createdAt)) out.set(b.id, c.row);
+  }
+  return out;
+}
+
+/**
+ * What an ended booking with no link is paid back: what the charge it claims took, at most what the booking says it
+ * paid. 0 when it claims no charge, that charge is already paid back, or the booking cost nothing: it is only closed.
+ */
+export function bookingRefundAmount(b: BookingRow, charge: DeadBuyRow | undefined, refunded: ReadonlySet<string>): number {
+  if (!charge || refunded.has(charge.id) || !(b.shardsPaid > 0)) return 0;
+  return Math.min(b.shardsPaid, -charge.delta);
+}
+
+/** Why a booking is paid back. */
+export const NO_LINK_REASON = 'no link to join was ever posted';
+
+const KIND_LABELS: Record<string, string> = { group_workout: 'Group Workout', private_1on1: 'Private 1-on-1', seminar: 'Seminar' };
+const PT = 'America/Los_Angeles';
+
+/**
+ * What the note calls a booking: its kind and its start, in the studio's time (the schedule's labels use the same).
+ * Newer ICU builds put a narrow no-break space before AM/PM; the note is stored, so it is written with a plain space
+ * whatever Node formats it.
+ */
+export function bookingName(kind: string, startsAt: Date | string): string {
+  const at = new Date(startsAt);
+  const when = Number.isFinite(at.getTime())
+    ? `${new Intl.DateTimeFormat('en-US', { timeZone: PT, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(at).replace(/\u202f/g, ' ')} PT`
+    : 'date unknown';
+  return `${KIND_LABELS[kind] ?? kind}, ${when}`;
+}
+
+export function bookingRefundNote(amount: number, kind: string, startsAt: Date | string): string {
+  return refundNote(amount, 'shards', bookingName(kind, startsAt), NO_LINK_REASON);
+}
+
+/**
+ * A player's confirmed bookings, split: the ones whose session is over, and when the next one ends (null with none
+ * still to come). The sweep looks at a player again after `nextEndsAt`, since a booking becomes dead by the clock,
+ * not by anything the player does.
+ */
+export function endedBookings(rows: readonly BookingRow[], now: Date): { ended: BookingRow[]; nextEndsAt: number | null } {
+  const ended: BookingRow[] = [];
+  let nextEndsAt: number | null = null;
+  for (const b of rows) {
+    if (sessionEnded(b.kind, b.startsAt, now.getTime())) { ended.push(b); continue; }
+    const end = sessionEndsAtMs(b.kind, b.startsAt);
+    if (Number.isFinite(end) && (nextEndsAt === null || end < nextEndsAt)) nextEndsAt = end;
+  }
+  ended.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  return { ended, nextEndsAt };
+}
+
+/**
+ * The slots whose link this player could open, from the SessionJoinLink rows of their slots: a stored link that passes
+ * the link rules (joinLinkServer.readJoinLinks drops one that does not), and for a private 1-on-1 only its holder's
+ * (privateHolders: a second booker who raced in is never shown it). The rule /sessions shows a link by, so what the
+ * page says about an ended session and what the wallet pays back agree.
+ */
+export function linkedSlotsFor(playerId: string, links: readonly { sessionKey: string; url: string }[], holders: ReadonlyMap<string, string>): Set<string> {
+  return new Set(links
+    .filter((l) => normaliseJoinUrl(l.url).ok && (!isPrivateKey(l.sessionKey) || holders.get(l.sessionKey) === playerId))
+    .map((l) => l.sessionKey));
+}
+
+/** The ended bookings no link was ever posted for. `linked` is every slot whose link this player could open. */
+export function unlinkedBookings(ended: readonly BookingRow[], linked: ReadonlySet<string>): BookingRow[] {
+  return ended.filter((b) => !linked.has(b.sessionKey));
 }
 
 /** A refund's note as the wallet read hands it to the client. `id` is the refund's ledger row. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
-import { BookingRow, HostingPanel, NOT_POSTED, doubleBookedNote, type BookingWithLink } from './join-links';
+import { BookingRow, HostingPanel, ENDED, ENDED_NO_LINK, NOT_POSTED, doubleBookedNote, type BookingWithLink } from './join-links';
 import { BOOKED_TOAST, BOOKING_REFUSED } from '@/components/sessions-view';
 
 // /sessions took the shards and said "Booked! See you there." with no way in. Owner decision 2026-09-24: a join link
@@ -44,8 +44,27 @@ describe('/sessions, a booking and its join link', () => {
 
   it('stops promising a link once the session is over', () => {
     const m = row(booking({ joinUrl: 'https://zoom.us/j/1', joinHost: 'zoom.us' }), start + 2 * 3_600_000);
-    expect(m).toContain('This session has ended.');
+    expect(m).toContain(ENDED);
+    expect(m).not.toContain(ENDED_NO_LINK);
     expect(m).not.toContain('<a ');
+  });
+
+  // Owner decision 2026-09-25: a session that ended with no link ever posted is paid back by the wallet.
+  it('says the shards come back when the session is over and no link was ever posted', () => {
+    const m = row(booking({ noLinkRefund: true }), start + 2 * 3_600_000);
+    expect(m).toContain(ENDED_NO_LINK);
+    expect(ENDED_NO_LINK).toBe('This session has ended. No link was posted, so your shards come back to your wallet.');
+    expect(m).not.toContain(NOT_POSTED);
+    // not before it is over: the link may still be on its way
+    expect(row(booking({ noLinkRefund: true }), start + 30 * 60_000)).toContain(NOT_POSTED);
+  });
+
+  it('promises nothing back when the server could not say the wallet will pay it (the links could not be read)', () => {
+    for (const b of [booking(), booking({ noLinkRefund: false })]) {
+      const m = row(b, start + 2 * 3_600_000);
+      expect(m).toContain(ENDED);
+      expect(m).not.toContain(ENDED_NO_LINK);
+    }
   });
 
   it('shows the start in the viewer\'s own time zone, with the zone named, not a fixed PT', () => {
@@ -85,6 +104,17 @@ describe('/sessions, the host\'s panel', () => {
     expect(m.match(/players booked this private slot/g)).toHaveLength(1);
     expect(m).toContain(doubleBookedNote(2));
     expect(doubleBookedNote(2)).toBe('2 players booked this private slot. Only the first to book sees the link.');
+  });
+
+  it('offers to take a link down only before its session starts; after that it can only be replaced', () => {
+    const rows = [{ sessionKey: 'gw_2026-09-25', kind: 'group_workout', startsAtIso: new Date(start).toISOString(), booked: 12, url: 'https://meet.google.com/abc-defg-hij', host: 'meet.google.com' }];
+    const panel = (nowMs: number) => renderToStaticMarkup(createElement(HostingPanel, { rows, onChanged: () => {}, nowMs }));
+    expect(panel(start - 60_000)).toContain('Take down');
+    for (const nowMs of [start, start + 30 * 60_000, start + 2 * 3_600_000]) {
+      const m = panel(nowMs);
+      expect(m, String(nowMs)).not.toContain('Take down');
+      expect(m, String(nowMs)).toContain('Paste a new link to replace it');
+    }
   });
 
   it('renders nothing for a viewer who hosts nothing', () => {

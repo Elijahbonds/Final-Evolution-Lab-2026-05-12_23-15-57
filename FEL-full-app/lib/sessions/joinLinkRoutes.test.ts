@@ -250,6 +250,24 @@ describe('DELETE /api/v1/sessions/join-link', () => {
     expect(m.links.has(key)).toBe(false);
     expect((await send(DELETE, { sessionKey: key })).status).toBe(200); // already gone is fine
   });
+
+  // Found in review 2026-09-25: the wallet pays back a session that never had a link, so a link taken down after the
+  // session would have paid back every booker of a session that ran.
+  it('refuses to take a link down once its session has started (409), leaves it up, and still lets a new link replace it', async () => {
+    const key = 'gw_2026-09-23'; // Wed Sep 23, 5:30 PM PT: started, and over
+    book('p1', key, 'confirmed', new Date('2026-09-24T00:30:00Z'));
+    m.links.set(key, { sessionKey: key, url: ZOOM, setById: 'admin1' });
+    as('admin1');
+    const res = await send(DELETE, { sessionKey: key });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'join_link_locked', message: 'This session has started, so its link stays up. Paste a new link to replace it.' });
+    expect(m.links.get(key)?.url).toBe(ZOOM);
+    expect((await send(POST, { sessionKey: key, url: 'https://meet.google.com/abc-defg-hij' })).status).toBe(200);
+    expect(m.links.get(key)?.url).toBe('https://meet.google.com/abc-defg-hij');
+    // a player is still refused first, before the clock is looked at
+    as('p1');
+    expect((await send(DELETE, { sessionKey: key })).status).toBe(403);
+  });
 });
 
 describe('GET /api/v1/sessions: who reads a link', () => {
@@ -353,6 +371,22 @@ describe('GET /api/v1/sessions: who reads a link', () => {
   it('still refuses a caller with no session', async () => {
     expect((await GET()).status).toBe(401);
   });
+
+  // The page promises the shards back for an ended session only on the rule the wallet pays by (lib/wallet/dead-buys.ts).
+  it('says per booking whether an ended session would be paid back: only when the links were read and this player has none', async () => {
+    const key = SLOT().sessionKey;
+    book('p1', key);
+    as('p1');
+    expect((await sessions()).body.myBookings[0]).toMatchObject({ joinUrl: null, noLinkRefund: true });
+    post(key);
+    expect((await sessions()).body.myBookings[0]).toMatchObject({ joinUrl: ZOOM, noLinkRefund: false });
+    m.links.clear();
+    m.linkTable = false; // unreadable: nothing is promised, since the wallet pays nothing back until it can read them
+    expect((await sessions()).body.myBookings[0]).toMatchObject({ joinUrl: null, noLinkRefund: false });
+    m.linkTable = true;
+    m.accessor = false;
+    expect((await sessions()).body.myBookings[0]).toMatchObject({ joinUrl: null, noLinkRefund: false });
+  });
 });
 
 describe('GET /api/v1/sessions: the bookings that carry a link', () => {
@@ -372,6 +406,19 @@ describe('GET /api/v1/sessions: the bookings that carry a link', () => {
     book('p1', 'gw_2026-09-23', 'confirmed', new Date(Date.now() - 61 * 60_000));
     as('p1');
     expect((await sessions()).body.myBookings.map((b: Row) => b.sessionKey)).toEqual(['gw_2026-09-24']);
+  });
+
+  // Owner decision 2026-09-25: the wallet pays back a booking whose session ended with no link and marks it refunded.
+  it('does not list a booking the wallet refunded, even one still inside the running window', async () => {
+    const key = SLOT().sessionKey;
+    book('p1', 'pv_2026-09-25_09', 'refunded', new Date(Date.now() - 50 * 60_000));
+    book('p1', key);
+    post(key);
+    as('p1');
+    const { body } = await sessions();
+    expect(body.myBookings.map((b: Row) => b.sessionKey)).toEqual([key]);
+    as('admin1');
+    expect((await sessions()).body.hosting.some((r: Row) => r.sessionKey === 'pv_2026-09-25_09')).toBe(false);
   });
 
   function post(key: string, url = ZOOM) { m.links.set(key, { sessionKey: key, url, setById: 'admin1' }); }
@@ -432,7 +479,8 @@ describe('a private 1-on-1 holds one player', () => {
     as('p2');
     const res = await GET();
     const text = await res.text();
-    expect(JSON.parse(text).myBookings[0]).toMatchObject({ sessionKey: slot.sessionKey, joinUrl: null });
+    // the second booker never sees the link, so the wallet pays their ended session back, and the page says so
+    expect(JSON.parse(text).myBookings[0]).toMatchObject({ sessionKey: slot.sessionKey, joinUrl: null, noLinkRefund: true });
     expect(text).not.toContain('zoom.us');
     as('admin1');
     expect((await sessions()).body.hosting.find((r: Row) => r.sessionKey === slot.sessionKey)).toMatchObject({ booked: 2, url: ZOOM });

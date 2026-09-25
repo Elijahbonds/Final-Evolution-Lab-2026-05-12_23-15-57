@@ -11,10 +11,11 @@
  *  - WHO POSTS IT: an admin (role admin|owner — lib/camp/server isOwner) or the slot's coach (slotCoachId below).
  *  - WHO READS IT: a player holding a CONFIRMED booking for the slot, the coach and admins. A cancelled, refunded or
  *    pending row reads nothing.
+ *  - TAKING IT DOWN: only before the session starts (mayTakeDownJoinLink). After that it can be replaced, not removed.
  *
  * No Prisma, no DOM; lib/sessions/joinLinkServer.ts does the reads and writes.
  */
-import { GROUP_CONFIG } from './schedule';
+import { GROUP_CONFIG, slotStartsAt } from './schedule';
 
 export const JOIN_URL_MAX = 500;
 
@@ -80,6 +81,17 @@ export function mayPostJoinLink(staff: JoinLinkStaff): boolean {
   return staff.isAdmin || staff.isCoach;
 }
 
+/**
+ * May a slot's link still be taken down? Only before its session starts. From then on the link is the record that the
+ * booked players were told how to join: the wallet pays back a session that never had one (lib/wallet/dead-buys.ts),
+ * so taking it down would pay back a session that ran. A wrong link is replaced instead. An id that names no real start
+ * keeps its link.
+ */
+export function mayTakeDownJoinLink(sessionKey: string, nowMs: number): boolean {
+  const start = slotStartsAt(sessionKey);
+  return !!start && nowMs < start.getTime();
+}
+
 export interface BookingRowLike { userId: string; sessionKey: string; status: string }
 
 /** A private 1-on-1 slot (pv_…): it holds one player. */
@@ -123,11 +135,19 @@ export const SESSION_LENGTH_MIN: Record<string, number> = { group_workout: GROUP
 /** The longest session runs this long: a booking that started longer ago than this is over, whatever its kind. */
 export const LONGEST_SESSION_MIN = Math.max(GROUP_CONFIG.durationMin, ...Object.values(SESSION_LENGTH_MIN));
 
-/** True once the session is over, so the page stops promising a link for it. */
-export function sessionEnded(kind: string, startsAtIso: string, nowMs: number): boolean {
-  const start = new Date(startsAtIso).getTime();
-  if (!Number.isFinite(start)) return false;
-  return nowMs > start + (SESSION_LENGTH_MIN[kind] ?? GROUP_CONFIG.durationMin) * 60_000;
+/** When the session is over: its start plus how long its kind runs (a group workout's length for a kind not listed). */
+export function sessionEndsAtMs(kind: string, startsAtIso: string | Date): number {
+  return new Date(startsAtIso).getTime() + (SESSION_LENGTH_MIN[kind] ?? GROUP_CONFIG.durationMin) * 60_000;
+}
+
+/**
+ * True once the session is over, so the page stops promising a link for it. The wallet's sweep uses the same rule: a
+ * booking whose session is over and never had a link is paid back (lib/wallet/dead-buys.ts).
+ */
+export function sessionEnded(kind: string, startsAtIso: string | Date, nowMs: number): boolean {
+  const end = sessionEndsAtMs(kind, startsAtIso);
+  if (!Number.isFinite(end)) return false;
+  return nowMs > end;
 }
 
 export interface HostingRow {
@@ -170,6 +190,7 @@ export const JOIN_LINK_ERROR_COPY: Record<string, string> = {
   url_has_login: 'Links with a name@ before the site are not allowed.',
   url_bad_host: 'That link has no real site name in it.',
   forbidden: 'Only the session’s coach or an admin can post this link.',
+  join_link_locked: 'This session has started, so its link stays up. Paste a new link to replace it.',
   slot_unavailable: 'That session is not on the schedule.',
   join_links_not_ready: 'Join links are not switched on yet. The database needs its update first.',
 };

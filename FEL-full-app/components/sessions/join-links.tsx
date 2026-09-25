@@ -7,12 +7,22 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Check, ExternalLink, Link2, Loader2 } from 'lucide-react';
-import { JOIN_LINK_ERROR_COPY, JOIN_URL_MAX, normaliseJoinUrl, sessionEnded } from '@/lib/sessions/joinLink';
+import { JOIN_LINK_ERROR_COPY, JOIN_URL_MAX, mayTakeDownJoinLink, normaliseJoinUrl, sessionEnded } from '@/lib/sessions/joinLink';
 
-export type BookingWithLink = { id: string; kind: string; sessionKey: string; startsAt: string; shardsPaid: number; joinUrl: string | null; joinHost: string | null };
+export type BookingWithLink = {
+  id: string; kind: string; sessionKey: string; startsAt: string; shardsPaid: number; joinUrl: string | null; joinHost: string | null;
+  /** The server read the links and this player has none: if the session ends like this, the wallet pays it back. */
+  noLinkRefund?: boolean;
+};
 export type HostingSlot = { sessionKey: string; kind: string; startsAtIso: string; booked: number; url: string | null; host: string | null };
 
 export const NOT_POSTED = 'Link not posted yet — it appears here before the start';
+/**
+ * A session that is over with no link ever posted: the wallet pays the shards back on its next read
+ * (lib/wallet/dead-buys.ts). Said only when the server could read the links (noLinkRefund).
+ */
+export const ENDED_NO_LINK = 'This session has ended. No link was posted, so your shards come back to your wallet.';
+export const ENDED = 'This session has ended.';
 
 /** A private slot holds one player; two bookings that raced can both land. The host is told, and who gets the link. */
 export const doubleBookedNote = (booked: number) => `${booked} players booked this private slot. Only the first to book sees the link.`;
@@ -52,7 +62,7 @@ export function BookingRow({ b, nowMs }: { b: BookingWithLink; nowMs: number }) 
       </div>
       <div className="mt-1.5 text-xs">
         {ended ? (
-          <span className="text-white/40">This session has ended.</span>
+          <span className="text-white/40">{!href && b.noLinkRefund ? ENDED_NO_LINK : ENDED}</span>
         ) : href ? (
           <span className="flex flex-wrap items-center gap-x-2"><JoinAnchor url={href} label="Join session" /><span className="text-white/40">opens {hostOf(href, b.joinHost)}</span></span>
         ) : (
@@ -63,10 +73,12 @@ export function BookingRow({ b, nowMs }: { b: BookingWithLink; nowMs: number }) 
   );
 }
 
-function HostRow({ row, onChanged }: { row: HostingSlot; onChanged: () => void }) {
+function HostRow({ row, onChanged, nowMs }: { row: HostingSlot; onChanged: () => void; nowMs: number }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const href = safeHref(row.url);
+  // once the session starts its link stays up (the server refuses too): it can be replaced, not taken down
+  const canTakeDown = mayTakeDownJoinLink(row.sessionKey, nowMs);
 
   const send = async (method: 'POST' | 'DELETE') => {
     if (method === 'POST') {
@@ -99,7 +111,7 @@ function HostRow({ row, onChanged }: { row: HostingSlot; onChanged: () => void }
         {href ? (
           <>
             <JoinAnchor url={href} label="Posted link" /><span className="text-white/40">opens {hostOf(href, row.host)}</span>
-            <button type="button" onClick={() => send('DELETE')} disabled={busy} className="text-red-300/80 hover:text-red-300 disabled:opacity-50">Take down</button>
+            {canTakeDown && <button type="button" onClick={() => send('DELETE')} disabled={busy} className="text-red-300/80 hover:text-red-300 disabled:opacity-50">Take down</button>}
           </>
         ) : <span className="text-white/40">No link posted yet.</span>}
       </div>
@@ -120,14 +132,14 @@ function HostRow({ row, onChanged }: { row: HostingSlot; onChanged: () => void }
 }
 
 /** For the slot's coach and admins: paste the link each slot's booked players join by. */
-export function HostingPanel({ rows, onChanged }: { rows: HostingSlot[]; onChanged: () => void }) {
+export function HostingPanel({ rows, onChanged, nowMs = Date.now() }: { rows: HostingSlot[]; onChanged: () => void; nowMs?: number }) {
   if (!rows.length) return null;
   return (
     <section className="mb-8">
       <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-cyan-300"><Link2 className="h-4 w-4" /> Join links you post</h2>
       <p className="mb-3 text-xs text-white/40">Players booked on a slot see its link under Your upcoming sessions. Only https links.</p>
       <div className="space-y-2">
-        {rows.map((r) => <HostRow key={r.sessionKey} row={r} onChanged={onChanged} />)}
+        {rows.map((r) => <HostRow key={r.sessionKey} row={r} onChanged={onChanged} nowMs={nowMs} />)}
       </div>
     </section>
   );

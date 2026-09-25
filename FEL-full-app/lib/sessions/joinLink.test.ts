@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  JOIN_URL_MAX, JOIN_LINK_ERROR_COPY, normaliseJoinUrl, isSessionKey, readableKeys, mayPostJoinLink, sessionEnded, hostingRows, slotCoachId,
-  privateHolders, isPrivateKey, LONGEST_SESSION_MIN,
+  JOIN_URL_MAX, JOIN_LINK_ERROR_COPY, normaliseJoinUrl, isSessionKey, readableKeys, mayPostJoinLink, sessionEnded, sessionEndsAtMs, hostingRows, slotCoachId,
+  privateHolders, isPrivateKey, LONGEST_SESSION_MIN, mayTakeDownJoinLink,
 } from './joinLink';
+import { privateSlots, slotStartsAt, upcomingGroupSlots } from './schedule';
 
 const refused = (raw: unknown) => {
   const r = normaliseJoinUrl(raw);
@@ -78,7 +79,7 @@ describe('a join link, as pasted', () => {
   });
 
   it('has plain words for every refusal the coach can meet', () => {
-    for (const e of ['url_required', 'url_too_long', 'url_not_https', 'url_invalid', 'url_has_login', 'url_bad_host', 'forbidden', 'slot_unavailable', 'join_links_not_ready']) {
+    for (const e of ['url_required', 'url_too_long', 'url_not_https', 'url_invalid', 'url_has_login', 'url_bad_host', 'forbidden', 'slot_unavailable', 'join_links_not_ready', 'join_link_locked']) {
       expect(JOIN_LINK_ERROR_COPY[e], e).toMatch(/^[A-Z].{8,}/);
     }
   });
@@ -151,12 +152,42 @@ describe('the slot around the link', () => {
     expect(LONGEST_SESSION_MIN).toBe(60);
   });
 
+  // Found in review 2026-09-25: the wallet pays back a session that never had a link, and a link taken down after the
+  // session left no trace that it had one. From the start on, a link can be replaced but not taken down.
+  it('reads a slot\'s start off its id, the same instant the schedule offers it at, and nothing for an id that is no real slot', () => {
+    expect(slotStartsAt('gw_2026-09-23')?.toISOString()).toBe('2026-09-24T00:30:00.000Z');
+    expect(slotStartsAt('pv_2026-09-24_16')?.toISOString()).toBe('2026-09-24T23:00:00.000Z');
+    // across the change to standard time on Nov 1, every slot the schedule offers reads back to its own start
+    const now = new Date('2026-10-27T12:00:00Z');
+    for (const s of [...upcomingGroupSlots(now, 6), ...privateSlots(now, 12)]) expect(slotStartsAt(s.sessionKey)?.toISOString(), s.sessionKey).toBe(s.startsAtIso);
+    for (const bad of ['gw_2026-02-30', 'gw_2026-13-01', 'gw_2026-00-10', 'pv_2026-09-24_24', 'gw_2026-09-23_16', 'pv_2026-09-24', 'nope']) {
+      expect(slotStartsAt(bad), bad).toBeNull();
+    }
+  });
+
+  it('a link can be taken down only before its session starts; a slot id with no real start keeps its link', () => {
+    const at = Date.parse('2026-09-24T00:30:00.000Z');   // gw_2026-09-23 starts
+    expect(mayTakeDownJoinLink('gw_2026-09-23', at - 1)).toBe(true);
+    expect(mayTakeDownJoinLink('gw_2026-09-23', at)).toBe(false);
+    expect(mayTakeDownJoinLink('gw_2026-09-23', at + 30 * 60_000)).toBe(false);   // running
+    expect(mayTakeDownJoinLink('gw_2026-09-23', at + 2 * 3_600_000)).toBe(false);   // over
+    expect(mayTakeDownJoinLink('gw_2026-02-30', 0)).toBe(false);
+    expect(JOIN_LINK_ERROR_COPY.join_link_locked).toBe('This session has started, so its link stays up. Paste a new link to replace it.');
+  });
+
   it('a group workout ends 60 minutes in and a private 1-on-1 45 minutes in', () => {
     expect(sessionEnded('group_workout', start, t + 59 * 60_000)).toBe(false);
     expect(sessionEnded('group_workout', start, t + 61 * 60_000)).toBe(true);
     expect(sessionEnded('private_1on1', start, t + 44 * 60_000)).toBe(false);
     expect(sessionEnded('private_1on1', start, t + 46 * 60_000)).toBe(true);
     expect(sessionEnded('group_workout', 'not a date', t)).toBe(false);
+    // the end itself, which the wallet's sweep waits for (lib/wallet/dead-buys.ts endedBookings): a Date start works too,
+    // and a kind the schedule does not know runs a group workout's length
+    expect(sessionEndsAtMs('group_workout', start)).toBe(t + 60 * 60_000);
+    expect(sessionEndsAtMs('private_1on1', new Date(start))).toBe(t + 45 * 60_000);
+    expect(sessionEndsAtMs('seminar', start)).toBe(t + 60 * 60_000);
+    expect(sessionEndsAtMs('group_workout', 'not a date')).toBeNaN();
+    expect(sessionEnded('group_workout', new Date(start), t + 61 * 60_000)).toBe(true);
   });
 
   it('hosts see every upcoming group workout plus each booked private slot, soonest first, with booked counts', () => {

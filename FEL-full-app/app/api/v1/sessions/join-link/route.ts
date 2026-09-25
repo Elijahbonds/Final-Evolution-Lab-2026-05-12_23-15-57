@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { upcomingGroupSlots, privateSlots } from '@/lib/sessions/schedule';
-import { isSessionKey, mayPostJoinLink, normaliseJoinUrl, JOIN_LINK_ERROR_COPY } from '@/lib/sessions/joinLink';
+import { isSessionKey, mayPostJoinLink, mayTakeDownJoinLink, normaliseJoinUrl, JOIN_LINK_ERROR_COPY } from '@/lib/sessions/joinLink';
 import { joinLinkStaff, saveJoinLink, clearJoinLink } from '@/lib/sessions/joinLinkServer';
 
 type Caller = { userId: string; sessionKey: string; body: any } | NextResponse;
@@ -62,11 +62,16 @@ export async function POST(req: NextRequest) {
 /**
  * DELETE /api/v1/sessions/join-link
  * Body: { sessionKey }
- * Takes a wrong link down; the booked players see "not posted yet" again.
+ * Takes a wrong link down before the session starts; the booked players see "not posted yet" again. Once it has started
+ * the link stays (409 join_link_locked) and a wrong one is replaced with POST: the wallet pays back a session that never
+ * had a link, and a link taken down would leave no trace that it had one (lib/sessions/joinLink.ts mayTakeDownJoinLink).
  */
 export async function DELETE(req: NextRequest) {
   const c = await staffCaller(req);
   if (c instanceof NextResponse) return c;
+  if (!mayTakeDownJoinLink(c.sessionKey, Date.now())) {
+    return NextResponse.json({ error: 'join_link_locked', message: JOIN_LINK_ERROR_COPY.join_link_locked }, { status: 409 });
+  }
   const cleared = await clearJoinLink(c.sessionKey);
   if (!cleared.ok) return writeFailed(cleared.error);
   return NextResponse.json({ ok: true, sessionKey: c.sessionKey, link: null });

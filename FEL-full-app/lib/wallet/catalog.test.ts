@@ -104,21 +104,32 @@ describe('spend() and a held SKU', () => {
     }
   });
 
-  it('a retried key of a pass bought before the hold gets its original receipt back, not a refusal', async () => {
-    // the player's own charge of this same SKU, and no refund of it: a retry, not another purchase's key
-    const prior = {
-      id: 'entry_1', walletId: 'w1', currency: 'shards', delta: BigInt(-40), reasonCode: 'SPEND_CATALOG_ITEM', idempotencyKey: 'k_old',
-      metadata: { skuId: 'class_pass_single', quantity: 1, unitPrice: 40 }, createdAt: new Date(0),
+  // Owner decision 2026-09-25: every pass charge is paid back by the wallet's sweep once it is older than the sweep's
+  // grace (lib/wallet/dead-buys.ts). A retry seconds after the click is still answered with its receipt; the same key
+  // minutes later is refused, or the player would keep the receipt and the refund both.
+  it('a retried key of a pass bought before the hold gets its original receipt back inside the grace, and a refusal after it', async () => {
+    const KEY = '3f2b8c1e-9d4a-4e7b-8c2d-1a2b3c4d5e6f'; // what the browser makes
+    const stand = (createdAt: Date) => {
+      // the player's own charge of this same SKU, and no refund of it
+      const prior = {
+        id: 'entry_1', walletId: 'w1', currency: 'shards', delta: BigInt(-40), reasonCode: 'SPEND_CATALOG_ITEM', idempotencyKey: KEY,
+        metadata: { skuId: 'class_pass_single', quantity: 1, unitPrice: 40 }, createdAt,
+      };
+      const wallet = { id: 'w1', coins: BigInt(5), shards: BigInt(60), lc: BigInt(0), version: BigInt(3), updatedAt: new Date(0) };
+      return {
+        walletLedgerEntry: { findUnique: vi.fn(async ({ where }: { where: { idempotencyKey: string } }) => (where.idempotencyKey === KEY ? prior : null)) },
+        wallet: { findUnique: vi.fn(async () => wallet), create: vi.fn(), updateMany: vi.fn() },
+        $transaction: vi.fn(async () => { throw new Error('a replay must not open a transaction'); }),
+      };
     };
-    const wallet = { id: 'w1', coins: BigInt(5), shards: BigInt(60), lc: BigInt(0), version: BigInt(3), updatedAt: new Date(0) };
-    const db = {
-      walletLedgerEntry: { findUnique: vi.fn(async ({ where }: { where: { idempotencyKey: string } }) => (where.idempotencyKey === 'k_old' ? prior : null)) },
-      wallet: { findUnique: vi.fn(async () => wallet), create: vi.fn(), updateMany: vi.fn() },
-      $transaction: vi.fn(async () => { throw new Error('a replay must not open a transaction'); }),
-    };
-    const res = await spend(db as never, { playerId: 'p1', idempotencyKey: 'k_old', skuId: 'class_pass_single', quantity: 1 });
+    const fresh = stand(new Date(Date.now() - 5_000));
+    const res = await spend(fresh as never, { playerId: 'p1', idempotencyKey: KEY, skuId: 'class_pass_single', quantity: 1 });
     expect(res).toEqual({ spent: { currency: 'shards', amount: 40 }, balances: { coins: 5, shards: 60, lc: 0 }, entry_id: 'entry_1' });
-    expect(db.$transaction).not.toHaveBeenCalled();
-    expect(db.wallet.updateMany).not.toHaveBeenCalled();
+    expect(fresh.$transaction).not.toHaveBeenCalled();
+    expect(fresh.wallet.updateMany).not.toHaveBeenCalled();
+    const stale = stand(new Date(Date.now() - 11 * 60_000));
+    await expect(spend(stale as never, { playerId: 'p1', idempotencyKey: KEY, skuId: 'class_pass_single', quantity: 1 })).rejects.toMatchObject({ code: 'REPLAYED_KEY' });
+    expect(stale.$transaction).not.toHaveBeenCalled();
+    expect(stale.wallet.updateMany).not.toHaveBeenCalled();
   });
 });

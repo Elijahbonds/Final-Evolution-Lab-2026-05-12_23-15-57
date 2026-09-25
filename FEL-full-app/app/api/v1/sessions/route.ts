@@ -14,7 +14,9 @@ import { isCertifiedCoach } from '@/lib/coach/server';
  * Each booking carries its join link (joinUrl + joinHost, null until posted). Admins and a slot's coach also get
  * `hosting`: the slots they post links for, each with its booked count and current link. Anyone else gets null.
  * `myBookings` is the sessions still to come (or running now), soonest first; a private slot somebody else holds is not
- * offered.
+ * offered. CONFIRMED rows only: a booking the wallet paid back because its session ended with no link (status
+ * 'refunded', lib/wallet/dead-buys.ts) is not listed. `noLinkRefund` says the links were read and this player has
+ * none for that booking, the rule the wallet pays an ended session back by; the page promises the shards only then.
  */
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -60,12 +62,15 @@ export async function GET() {
     hosting = isAdmin ? rows : rows.filter((r) => slotCoachId(r.sessionKey) === userId);
   }
   const readable = new Set([...readableKeys(userId, myBookings, holders), ...(hosting ?? []).map((r) => r.sessionKey)]);
-  const links = await readJoinLinks([...readable]);
-  const linkOf = (key: string) => (readable.has(key) ? links.get(key) ?? null : null);
+  // every booked slot is looked up, so a failed read is known even when none is readable; linkOf hands out readable ones only
+  const links = await readJoinLinks([...new Set([...readable, ...myBookings.map((b) => b.sessionKey)])]);
+  const linkOf = (key: string) => (readable.has(key) ? links?.get(key) ?? null : null);
 
   return NextResponse.json({
     group, seminars, privateOpen, private: priv, pricing: SESSION_PRICING,
-    myBookings: myBookings.map((b) => ({ ...b, joinUrl: linkOf(b.sessionKey)?.url ?? null, joinHost: linkOf(b.sessionKey)?.host ?? null })),
+    myBookings: myBookings.map((b) => ({
+      ...b, joinUrl: linkOf(b.sessionKey)?.url ?? null, joinHost: linkOf(b.sessionKey)?.host ?? null, noLinkRefund: links !== null && !linkOf(b.sessionKey),
+    })),
     hosting: hosting?.map((r) => ({ ...r, url: linkOf(r.sessionKey)?.url ?? null, host: linkOf(r.sessionKey)?.host ?? null })) ?? null,
   });
 }

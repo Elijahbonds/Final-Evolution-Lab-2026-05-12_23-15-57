@@ -39,9 +39,10 @@ export async function joinLinkStaff(userId: string, sessionKey: string): Promise
 /**
  * The posted links for these slots. The CALLER decides which keys this viewer may read (readableKeys for a player,
  * staff for a host); a key missing from the map is "not posted yet". A stored row that no longer passes
- * normaliseJoinUrl is dropped rather than shown.
+ * normaliseJoinUrl is dropped rather than shown. Null when the links could not be read: every one then shows as not
+ * posted, and nothing may be promised about an ended session (the wallet pays nothing back until they can be read).
  */
-export async function readJoinLinks(sessionKeys: string[]): Promise<Map<string, JoinLink>> {
+export async function readJoinLinks(sessionKeys: string[]): Promise<Map<string, JoinLink> | null> {
   const out = new Map<string, JoinLink>();
   if (!sessionKeys.length) return out;
   try {
@@ -50,10 +51,11 @@ export async function readJoinLinks(sessionKeys: string[]): Promise<Map<string, 
       const v = normaliseJoinUrl(r.url);
       if (v.ok) out.set(r.sessionKey, { url: v.url, host: v.host });
     }
+    return out;
   } catch (err) {
     console.warn('[sessions] join links unreadable, shown as not posted:', errorCode(err));
+    return null;
   }
-  return out;
 }
 
 export type JoinLinkWrite = { ok: true } | { ok: false; error: 'join_links_not_ready' | 'join_link_save_failed' };
@@ -69,7 +71,10 @@ export async function saveJoinLink(sessionKey: string, url: string, setById: str
   }
 }
 
-/** Takes a slot's link down (a wrong paste). Clearing a link that was never posted is not an error. */
+/**
+ * Takes a slot's link down (a wrong paste, before the session starts: the route checks mayTakeDownJoinLink). Clearing a
+ * link that was never posted is not an error.
+ */
 export async function clearJoinLink(sessionKey: string): Promise<JoinLinkWrite> {
   try {
     await prisma.sessionJoinLink.deleteMany({ where: { sessionKey } });

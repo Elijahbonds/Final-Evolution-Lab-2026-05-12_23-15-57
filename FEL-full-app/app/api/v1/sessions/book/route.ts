@@ -19,7 +19,11 @@ const SKU_FOR_KIND: Record<string, string> = {
  * Pays with SHARDS. Server verifies the slot exists before charging. Minors
  * (dobYear implies <18) cannot book private 1-on-1. A private 1-on-1 slot holds
  * one player: once anyone holds a confirmed booking for it, the next player is
- * refused (409 slot_taken) before any shards move.
+ * refused (409 slot_taken) before any shards move. Booking the same slot again
+ * answers alreadyBooked; any other use of a key already in the ledger books
+ * nothing (409 replayed_key). Its old receipt once booked another slot on the
+ * same charge, and a booked session that ends with no link is paid back
+ * (lib/wallet/dead-buys.ts).
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await spend(prisma, { playerId: userId, idempotencyKey, skuId, quantity: 1 });
+    const result = await spend(prisma, { playerId: userId, idempotencyKey, skuId, quantity: 1, rejectReplay: true });
     const booking = await prisma.sessionBooking.create({
       data: { userId, kind, sessionKey, shardsPaid: result.spent.amount, startsAt: startsAt! },
     });
@@ -75,7 +79,8 @@ export async function POST(req: NextRequest) {
       const bal = await readWallet(prisma, userId);
       return NextResponse.json({ error: 'insufficient_funds', balances: { coins: bal.coins, shards: bal.shards }, needShards: true }, { status: 409 });
     }
-    // The key is another purchase's (spend() says which it is not): nothing was charged, so nothing is booked.
+    // The key was used before (another slot's booking, a retry racing its first try, another purchase): nothing was
+    // charged, so nothing is booked.
     if (e instanceof WalletError && e.code === 'REPLAYED_KEY') return NextResponse.json({ error: 'replayed_key' }, { status: 409 });
     throw e;
   }

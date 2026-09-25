@@ -72,7 +72,8 @@ export function getSku(skuId: string): CatalogSku | null {
 // them before any balance moves, because each one delivers nothing yet. /live has no video player, so a class pass
 // bought a class nobody could watch, and nothing reads the class_monthly entitlement. The owner's economy-honesty call
 // (A): refuse the sale now, no redesign. /live reads skuOnSale, so a held SKU is not offered there. Take a SKU out of
-// this set the day what it buys exists.
+// this set the day what it buys exists. Every pass bought before the hold is paid back and its entitlement row deleted
+// (owner decision 2026-09-25, lib/wallet/dead-buys.ts), so a pass bought once classes exist is charged again.
 export const NOT_ON_SALE: ReadonlySet<string> = new Set(['class_pass_single', 'class_monthly']);
 
 /** Can this SKU be bought right now? An unknown SKU and a held one both answer no. */

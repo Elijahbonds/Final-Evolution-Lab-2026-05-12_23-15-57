@@ -93,6 +93,20 @@ export function upcomingGroupSlots(now: Date, count = 6): SessionSlot[] {
   return out;
 }
 
+/**
+ * When a slot starts, read off its id: gw_YYYY-MM-DD at the group workout's PT time, pv_YYYY-MM-DD_HH at HH:00 PT. Null
+ * for an id that names no real day and hour.
+ */
+export function slotStartsAt(sessionKey: string): Date | null {
+  const m = /^(gw|pv)_(\d{4})-(\d{2})-(\d{2})(?:_(\d{1,2}))?$/.exec(sessionKey);
+  if (!m || (m[1] === 'gw') !== (m[5] === undefined)) return null;
+  const y = Number(m[2]), mo = Number(m[3]), day = Number(m[4]);
+  const hour = m[5] === undefined ? GROUP_CONFIG.hour : Number(m[5]);
+  const minute = m[5] === undefined ? GROUP_CONFIG.minute : 0;
+  if (mo < 1 || mo > 12 || hour > 23 || new Date(Date.UTC(y, mo - 1, day)).getUTCDate() !== day) return null;
+  return ptWallClockToUtc(y, mo, day, hour, minute);
+}
+
 export interface Seminar { sessionKey: string; title: string; startsAtIso: string; seats: number; shards: number }
 
 /** Private 1-on-1 is only offered when no seminar is scheduled in next 14 days. */

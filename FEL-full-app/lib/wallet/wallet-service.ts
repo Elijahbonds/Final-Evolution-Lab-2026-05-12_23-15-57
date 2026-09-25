@@ -94,18 +94,25 @@ export async function getOrCreateWallet(db: Db, playerId: string) {
 
 export async function readWallet(db: Db, playerId: string): Promise<WalletView> {
   let w = await getOrCreateWallet(db, playerId);
-  // DEAD-BUY REFUNDS (owner decision 2026-09-24): before the balance is shown, anything this player bought that
-  // delivered nothing is paid back (lib/wallet/dead-buy-refunds.ts). One query on a player's first read in a server
-  // instance, none after; it never throws. When it wrote a credit, the balance is read again so the refund shows.
+  // DEAD-BUY REFUNDS (owner decision 2026-09-24, added to 2026-09-25): before the balance is shown, anything this
+  // player bought that delivered nothing is paid back (lib/wallet/dead-buy-refunds.ts): dead /store and /shop buys,
+  // the class passes, and a booked session that ended with no join link. Two queries on a player's first read in a
+  // server instance, one small one after (has the player booked since?) until a booked session of theirs ends; it never
+  // throws. When it wrote a credit, the balance is read again so the refund shows.
   if (await refundDeadBuysOnRead(db, playerId, w?.id, creditDeadBuyRefund)) w = await getOrCreateWallet(db, playerId);
   return { coins: n(w.coins), shards: n(w.shards), lc: n(w.lc ?? 0), version: n(w.version), updated_at: w.updatedAt.toISOString() };
 }
 
 /**
  * The credit a dead-buy refund writes: `amount` back in `currency`, reason DEAD_BUY_REFUND, source refund, under the
- * caller's idempotency key (refund:<rowId>). Coins and shards go through applyDelta, the same transaction every credit
- * uses (balance and ledger row together; a unique-key race rolls ours back and returns the winner's row). Lab Credits
- * go through applyLc, the one LC mover, in a transaction that also removes the /shop card the refund undoes.
+ * caller's idempotency key (refund:<rowId>; a booking's is its charge's). Coins and shards go through applyDelta, the
+ * same transaction every credit uses (balance and ledger row together; a unique-key race rolls ours back and returns
+ * the winner's row). Lab Credits go through applyLc, the one LC mover, in a transaction that also removes the /shop
+ * card the refund undoes.
+ *
+ * What the refund takes back rides in that transaction (owner additions 2026-09-25): a class pass's PlayerEntitlement
+ * row is deleted, and a session booking's status becomes 'refunded' — conditionally, so a booking some other read
+ * already closed aborts the credit rather than paying it twice. Nothing of it lands on a replay.
  *
  * A row already under that key counts as "already refunded" only when it IS this refund (see isRefundOf). Anything
  * else throws, so the sweep writes no note, is not marked done, and tries again on a later read.
@@ -117,6 +124,13 @@ export async function creditDeadBuyRefund(prisma: PrismaClient, a: DeadBuyCredit
     const applied = await applyDelta(prisma, {
       playerId: a.playerId, currency: a.currency, delta: a.amount, reasonCode: REASON.DEAD_BUY_REFUND, source: 'refund',
       idempotencyKey: a.idempotencyKey, metadata: a.metadata,
+      also: async (tx) => {
+        if (a.entitlementSku) await (tx as any).playerEntitlement.deleteMany({ where: { playerId: a.playerId, skuId: a.entitlementSku } });
+        if (a.bookingId) {
+          const flipped = await (tx as any).sessionBooking.updateMany({ where: { id: a.bookingId, status: 'confirmed' }, data: { status: 'refunded' } });
+          if (flipped.count !== 1) throw new Error(`booking ${a.bookingId} is no longer confirmed; nothing is paid back for it here`);
+        }
+      },
     });
     r = { entryId: applied.entryId, replayed: applied.replayed };
   } else {
@@ -313,9 +327,20 @@ export async function earn(
 // ---------------------------------------------------------------------------
 export async function spend(
   prisma: PrismaClient,
-  args: { playerId: string; idempotencyKey: string; skuId: string; quantity: number }
+  args: {
+    playerId: string; idempotencyKey: string; skuId: string; quantity: number;
+    /**
+     * Refuse a key already in the ledger (REPLAYED_KEY) instead of answering with its receipt. For a route that hands
+     * over a new thing per call whatever the key: Sessions booked a second slot on one charge's receipt.
+     */
+    rejectReplay?: boolean;
+  }
 ): Promise<SpendResult> {
   const { playerId, idempotencyKey, skuId } = args;
+  const replay = (prior: Parameters<typeof spendReplay>[3]) => {
+    if (args.rejectReplay) throw new WalletError('REPLAYED_KEY', 'this idempotency key was already used');
+    return spendReplay(prisma, playerId, skuId, prior);
+  };
   const quantity = Math.max(1, Math.floor(args.quantity || 1));
   const sku = getSku(skuId);
   if (!sku) throw new WalletError('UNKNOWN_SKU');
@@ -325,7 +350,7 @@ export async function spend(
   // Another wallet's row under the key is not looked at (isOwnEntry): the purchase is answered as a fresh key would be,
   // so a held SKU is still NOT_ON_SALE, and anything else fails on the key at the insert below and is refused.
   const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
-  if (prior && (await isOwnEntry(prisma, playerId, prior))) return spendReplay(prisma, playerId, skuId, prior);
+  if (prior && (await isOwnEntry(prisma, playerId, prior))) return replay(prior);
   // HOTFIX (2026-09-24): a SKU that delivers nothing yet is refused before any write (see NOT_ON_SALE). The check sits
   // after the idempotency lookup on purpose: a retry of a purchase made before the SKU was held gets its original
   // receipt back, not a refusal of a purchase that already happened.
@@ -361,7 +386,7 @@ export async function spend(
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
-      if (original && (await isOwnEntry(prisma, playerId, original))) return spendReplay(prisma, playerId, skuId, original);
+      if (original && (await isOwnEntry(prisma, playerId, original))) return replay(original);
       if (original) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
     }
     throw e;
@@ -375,8 +400,8 @@ export async function spend(
  * spend() returns, so a receipt for any other row is that item for free: a refund row (refund:<rowId>, whose row id the
  * player's own ledger history shows), another SKU's charge, or a charge a dead-buy refund paid back.
  *
- * A charge the dead-buy sweep may still pay back (deadBuyOf: a browser-made key for an item /store sold dead) is a
- * receipt only while it is younger than the sweep's grace. A real retry comes seconds after its click; later, a
+ * A charge the dead-buy sweep may still pay back (deadBuyOf: a browser-made key for an item /store or /live sold dead,
+ * a class pass included) is a receipt only while it is younger than the sweep's grace. A real retry comes seconds after its click; later, a
  * receipt could be handed out while another read of the same wallet writes the refund, and the player keeps both.
  */
 async function spendReplay(
@@ -491,6 +516,8 @@ interface ApplyArgs {
   playerId: string; currency: WalletCurrency; delta: number; reasonCode: string;
   source: 'gameplay' | 'milestone' | 'purchase' | 'spend' | 'admin_adjust' | 'refund';
   idempotencyKey: string; metadata: Record<string, unknown>; clampToZero?: boolean;
+  /** Runs in the credit's transaction after its ledger row, and never on a replay: what the credit undoes lands with it or not at all. */
+  also?: (tx: Prisma.TransactionClient) => Promise<void>;
 }
 async function applyDelta(
   prisma: PrismaClient, a: ApplyArgs
@@ -523,6 +550,7 @@ async function applyDelta(
           idempotencyKey: a.idempotencyKey, metadata: a.metadata as any,
         },
       });
+      if (a.also) await a.also(tx);
       return { entryId: entry.id, delta: effectiveDelta, balances: { coins: n(after.coins), shards: n(after.shards), lc: n(after.lc) }, replayed: false };
     });
   } catch (e) {

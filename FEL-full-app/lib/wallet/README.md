@@ -33,8 +33,8 @@ separate from the legacy LC economy (`lib/economy.ts`, `lib/ledger.ts`,
 | `validation.ts` | trick vocab, `validateChain`, `validateDunkAttempt`, `payloadHash` (PURE) |
 | `catalog.ts` | spend SKUs + coin packs (server-owned prices; no shard pack) |
 | `wallet-service.ts` | `earn` / `spend` / `grantCoinPurchase` / `refundCoins` / reads |
-| `dead-buys.ts` | the purchases that took a balance and delivered nothing, and how each is told apart (PURE) |
-| `dead-buy-refunds.ts` | pays those back on the next `readWallet`, once per row (`refund:<rowId>`), with a note |
+| `dead-buys.ts` | the purchases that took a balance and delivered nothing (the class passes and a booked session that ended with no join link included), and how each is told apart (PURE) |
+| `dead-buy-refunds.ts` | pays those back on the next `readWallet`, once per row (`refund:<rowId>`; a booking gets back the charge it claims, under that charge's key), with a note; a pass's entitlement and a booking's status go in the same transaction |
 | `client.ts` | browser best-effort `reportEarn` (fire-and-forget, never blocks play) |
 
 ## Endpoints (`app/api/v1/wallet/`)

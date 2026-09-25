@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOG, SPEND_ROUTE_SKUS } from './catalog';
+import { CATALOG, NOT_ON_SALE, SPEND_ROUTE_SKUS } from './catalog';
 import { SHOP_CARDS, shopCardOnSale } from '@/lib/game-data';
 import { REASON } from './reward-rules';
 import {
-  DEAD_CATALOG_BUYS, HOLLOW_SHOP_CARDS, PLAN_CLAIM_WINDOW_MS,
-  deadBuyOf, firstChargeIds, isClientMadeKey, refundKey, refundNote, refundToastTexts, refundableDeadBuys, refundedRowIds, shopPurchaseKey,
-  unclaimed, unseenRefundNotes,
-  type DeadBuyRow, type DeliveryEvidence,
+  BOOKING_SKU, CLASS_PASS_REASON, DEAD_CATALOG_BUYS, HOLLOW_SHOP_CARDS, NO_LINK_REASON, PLAN_CLAIM_WINDOW_MS,
+  bookingCharges, bookingName, bookingRefundAmount, bookingRefundNote, deadBuyOf, endedBookings, firstChargeIds, isClientMadeKey,
+  linkedSlotsFor, refundKey, refundNote, refundToastTexts, refundableDeadBuys, refundedRowIds, shopPurchaseKey, unclaimed,
+  unlinkedBookings, unseenRefundNotes,
+  type BookingRow, type DeadBuyRow, type DeliveryEvidence,
 } from './dead-buys';
 
 // Owner decision 2026-09-24: refund every purchase that took a balance and delivered nothing. This file pins WHICH
 // purchases those are (traced against 71ea8f30, the tree before hotfix 6/6) and how each is told apart from a purchase
-// of the same item that did deliver. The sweep that writes the refunds is dead-buy-refunds.test.ts.
+// of the same item that did deliver. Owner additions 2026-09-25: the class passes, plans without the erased-plan
+// proof, and a booked session that ended with no join link. The sweep that writes the refunds is
+// dead-buy-refunds.test.ts.
 
 const UUID = '3f2b8c1e-9d4a-4e7b-8c2d-1a2b3c4d5e6f';
 const T0 = Date.parse('2026-09-21T12:00:00Z');
@@ -24,12 +27,13 @@ const row = (over: Partial<DeadBuyRow> & { sku?: string } = {}): DeadBuyRow => {
     idempotencyKey: UUID, metadata: { skuId: sku ?? 'cap_nexus', quantity: 1, unitPrice: 300 }, createdAt: at(0), ...rest,
   };
 };
-const NONE: DeliveryEvidence = { wearables: [], bookings: [], plans: [], oldestScanAt: null, firstCharges: new Map() };
+const NONE: DeliveryEvidence = { wearables: [], plans: [], firstCharges: new Map(), bookedCharges: new Set() };
 const buy = (r: DeadBuyRow, player = 'p1') => deadBuyOf(r, player)!;
 
 describe('the refundable set', () => {
-  // The 24 SKUs /store sold through the generic spend route that delivered nothing (hotfix 6/6's economy trace), and
-  // the six boost cards, whose first charge delivered and whose later /store charges did not.
+  // The 24 SKUs /store sold through the generic spend route that delivered nothing (hotfix 6/6's economy trace), the
+  // six boost cards, whose first charge delivered and whose later /store charges did not, and (2026-09-25) the two
+  // class passes /live sold through the same route.
   const EXPECTED = [
     'dunk_retry_token', 'dunk_style_slot', 'scan_personalized', 'creative_card_slot',
     'music_kit_neon', 'music_kit_dust', 'music_cell_assist',
@@ -37,11 +41,12 @@ describe('the refundable set', () => {
     'cap_nexus', 'band_flow', 'top_lab', 'top_bonds', 'top_baseball', 'top_football',
     'shorts_court', 'shorts_glitch', 'shoes_evo', 'shoes_flight', 'acc_chain', 'acc_sleeve',
   ];
+  const PASSES = ['class_pass_single', 'class_monthly'];
   const BOOSTS = Object.keys(CATALOG).filter((s) => s.startsWith('boost_card_'));
 
-  it('is exactly the 24 dead /store SKUs plus the six boost cards, keyed on raw SKU strings', () => {
+  it('is exactly the 24 dead /store SKUs, the two class passes and the six boost cards, keyed on raw SKU strings', () => {
     expect(BOOSTS).toHaveLength(6);
-    expect(Object.keys(DEAD_CATALOG_BUYS).sort()).toEqual([...EXPECTED, ...BOOSTS].sort());
+    expect(Object.keys(DEAD_CATALOG_BUYS).sort()).toEqual([...EXPECTED, ...PASSES, ...BOOSTS].sort());
   });
 
   it('keeps the three SKUs the catalog is deleting, because old ledger rows still carry them', () => {
@@ -51,10 +56,23 @@ describe('the refundable set', () => {
     }
   });
 
-  it('lists every boost card for its later charges only (first_charge), and leaves out what is held (the class passes)', () => {
+  it('lists every boost card for its later charges only (first_charge)', () => {
     for (const sku of BOOSTS) expect(DEAD_CATALOG_BUYS[sku], sku).toMatchObject({ match: 'first_charge', currency: 'shards' });
-    expect(DEAD_CATALOG_BUYS.class_pass_single).toBeUndefined();
-    expect(DEAD_CATALOG_BUYS.class_monthly).toBeUndefined();
+  });
+
+  // Owner decision 2026-09-25: the passes were held, not refunded, on the 24th. Now every charge of one comes back,
+  // its entitlement row goes with it, and it says why in its own words. Both stay held until a class can be watched.
+  it('lists both class passes: every browser-keyed charge, the entitlement taken back, a reason of their own, still held', () => {
+    for (const sku of PASSES) {
+      expect(DEAD_CATALOG_BUYS[sku], sku).toMatchObject({ match: 'client_key', currency: 'shards', undo: 'entitlement', reason: CLASS_PASS_REASON });
+      expect(NOT_ON_SALE.has(sku), sku).toBe(true);
+    }
+    expect(DEAD_CATALOG_BUYS.class_pass_single.name).toBe('Single Class Pass');
+    expect(DEAD_CATALOG_BUYS.class_monthly.name).toBe('Monthly All-Access Pass');
+    // nothing else takes an entitlement back or has its own reason
+    for (const [sku, d] of Object.entries(DEAD_CATALOG_BUYS)) {
+      if (!PASSES.includes(sku)) { expect(d.undo, sku).toBeUndefined(); expect(d.reason, sku).toBeUndefined(); }
+    }
   });
 
   it('charges each SKU in the currency the catalog charges it in', () => {
@@ -70,8 +88,8 @@ describe('the refundable set', () => {
     }
   });
 
-  it('cannot grow: the generic spend route refuses every one of them today (403 or unknown)', () => {
-    for (const sku of Object.keys(DEAD_CATALOG_BUYS)) expect(SPEND_ROUTE_SKUS.has(sku), sku).toBe(false);
+  it('cannot grow: the generic spend route refuses every one of them today (403, unknown, or held before any write)', () => {
+    for (const sku of Object.keys(DEAD_CATALOG_BUYS)) expect(!SPEND_ROUTE_SKUS.has(sku) || NOT_ON_SALE.has(sku), sku).toBe(true);
   });
 
   it('lists the eight /shop cards by name, none of which is on sale', () => {
@@ -103,11 +121,19 @@ describe('what the row itself proves', () => {
     expect(deadBuyOf(row({ delta: 300 }), 'p1')).toBeNull();
     expect(deadBuyOf(row({ delta: 0 }), 'p1')).toBeNull();
     expect(deadBuyOf(row({ sku: 'boost_card_neural-max', currency: 'shards', delta: -400, idempotencyKey: 'boost_card:p1:neural-max' }), 'p1')).toBeNull();
-    expect(deadBuyOf(row({ sku: 'class_monthly', currency: 'shards', delta: -300 }), 'p1')).toBeNull();
     expect(deadBuyOf(row({ currency: 'shards' }), 'p1')).toBeNull();
     expect(deadBuyOf(row({ reasonCode: 'ARENA_ENTRY' }), 'p1')).toBeNull();
     expect(deadBuyOf(row({ metadata: null }), 'p1')).toBeNull();
     expect(deadBuyOf(row({ metadata: { skuId: 'constructor' } }), 'p1')).toBeNull();
+  });
+
+  it('takes a class pass charge, whichever pass, for what it took, with its entitlement to take back and its own reason', () => {
+    expect(buy(row({ sku: 'class_monthly', currency: 'shards', delta: -300 })))
+      .toMatchObject({ amount: 300, currency: 'shards', item: 'class_monthly', match: 'client_key', undo: 'entitlement', reason: CLASS_PASS_REASON });
+    expect(buy(row({ sku: 'class_pass_single', currency: 'shards', delta: -40, idempotencyKey: 'k_1758456000000_4fzyo82mvyr' })))
+      .toMatchObject({ amount: 40, item: 'class_pass_single', undo: 'entitlement' });
+    // a pass in the wrong currency is not a pass charge; a refunded pass's key replays nothing (dead-buy-refunds.test.ts)
+    expect(deadBuyOf(row({ sku: 'class_monthly', currency: 'coins', delta: -300 }), 'p1')).toBeNull();
   });
 
   it('takes a /shop card only from its own buyer\'s key', () => {
@@ -155,29 +181,34 @@ describe('telling a dead buy from a delivered one', () => {
   });
 
   it('a session: each booking claims its own charge, and a charge with no booking is refunded', () => {
-    const mk = (min: number) => buy(row({ sku: 'session_group_workout', currency: 'shards', delta: -150, createdAt: at(min) }));
+    const mk = (min: number, key = UUID) => row({ sku: 'session_group_workout', currency: 'shards', delta: -150, createdAt: at(min), idempotencyKey: key });
     const store = mk(0), booked1 = mk(60), booked2 = mk(120);
-    const ev = { ...NONE, bookings: [{ kind: 'group_workout', createdAt: at(60.01) }, { kind: 'group_workout', createdAt: at(120.01) }] };
-    expect(refundableDeadBuys([store, booked1, booked2], ev)).toEqual([store]);
+    const ev = (bookings: { id: string; kind: string; createdAt: Date }[], rows: DeadBuyRow[]) =>
+      ({ ...NONE, bookedCharges: new Set([...bookingCharges(bookings, rows).values()].map((r) => r.id)) });
+    const both = [{ id: 'bk1', kind: 'group_workout', createdAt: at(60.01) }, { id: 'bk2', kind: 'group_workout', createdAt: at(120.01) }];
+    expect(refundableDeadBuys([store, booked1, booked2].map((r) => buy(r)), ev(both, [store, booked1, booked2])).map((b) => b.row)).toEqual([store]);
     // a booking of another kind is not this SKU's delivery
-    expect(refundableDeadBuys([booked1], { ...NONE, bookings: [{ kind: 'private_1on1', createdAt: at(60.01) }] })).toEqual([booked1]);
+    expect(refundableDeadBuys([buy(booked1)], ev([{ id: 'bk1', kind: 'private_1on1', createdAt: at(60.01) }], [booked1]))).toEqual([buy(booked1)]);
+    // a booking whose own charge carried a server-shaped key claims that charge, so the older /store charge is still dead
+    const server = mk(60, 'mine:1');
+    expect(refundableDeadBuys([buy(store)], ev([{ id: 'bk1', kind: 'group_workout', createdAt: at(60.01) }], [store, server])).map((b) => b.row)).toEqual([store]);
   });
 
-  it('a workout plan is refunded only with proof that nothing was erased since it was bought', () => {
+  // Owner decision 2026-09-25: no proof that nothing was erased is asked for any more. A charge no plan claims is paid
+  // back, a plan that Workout delivered and delete-my-data then erased included.
+  it('a workout plan: a charge no plan claims is refunded, with or without a plan or scan on file', () => {
     const mk = (min: number) => buy(row({ sku: 'workout_plan_4w', currency: 'shards', delta: -60, createdAt: at(min) }));
     const store = mk(0);
-    // no plan and no scan on file: the plan may have been delivered and erased by delete-my-data, so no refund
-    expect(refundableDeadBuys([store], NONE)).toEqual([]);
-    // a scan made before the buy is still here, so nothing was erased since: the buy delivered nothing
-    expect(refundableDeadBuys([store], { ...NONE, oldestScanAt: at(-5) })).toEqual([store]);
-    // only a scan made AFTER the buy: proves nothing about before it
-    expect(refundableDeadBuys([store], { ...NONE, oldestScanAt: at(5) })).toEqual([]);
-    // the Workout buy claims its plan; the earlier /store buy is proven dead by an older plan still on file
+    expect(refundableDeadBuys([store], NONE)).toEqual([store]);
+    // the Workout buy claims its plan (written one request after the charge); the earlier /store buy is paid back
     const workout = mk(30);
-    const ev = { ...NONE, plans: [{ tier: 'plan_4w', createdAt: at(-60) }, { tier: 'plan_4w', createdAt: at(30.02) }] };
-    expect(refundableDeadBuys([store, workout], ev)).toEqual([store]);
-    // a plan claims only a charge made just before it
-    expect(refundableDeadBuys([store], { ...NONE, oldestScanAt: at(-5), plans: [{ tier: 'plan_4w', createdAt: new Date(at(0).getTime() + PLAN_CLAIM_WINDOW_MS + 1) }] })).toEqual([store]);
+    expect(refundableDeadBuys([store, workout], { ...NONE, plans: [{ tier: 'plan_4w', createdAt: at(30.02) }] })).toEqual([store]);
+    expect(refundableDeadBuys([workout], { ...NONE, plans: [{ tier: 'plan_4w', createdAt: at(30.02) }] })).toEqual([]);
+    // a plan claims only a charge made within PLAN_CLAIM_WINDOW_MS before it, and only a plan of its tier
+    expect(refundableDeadBuys([store], { ...NONE, plans: [{ tier: 'plan_4w', createdAt: new Date(at(0).getTime() + PLAN_CLAIM_WINDOW_MS + 1) }] })).toEqual([store]);
+    expect(refundableDeadBuys([store], { ...NONE, plans: [{ tier: 'program_12w', createdAt: at(0.02) }] })).toEqual([store]);
+    // a booking's claim is not evidence for a plan, and vice versa
+    expect(refundableDeadBuys([store], { ...NONE, bookedCharges: new Set([store.row.id]) })).toEqual([store]);
   });
 
   it('a boost card: the earliest charge of it delivered, whatever its key; a later /store charge did not', () => {
@@ -207,6 +238,117 @@ describe('telling a dead buy from a delivered one', () => {
   });
 });
 
+// Owner decision 2026-09-25: a CONFIRMED booking whose session is over and whose slot never had a join link is paid
+// back. The sweep (dead-buy-refunds.test.ts) reads the rows and the link table; these are the rules it applies.
+describe('a booked session that ended with no link', () => {
+  // Wed Sep 23 2026 17:30 PT is 00:30Z on the 24th; a private slot Thu Sep 24 16:00 PT is 23:00Z the same day
+  const bk = (over: Partial<BookingRow> = {}): BookingRow => ({ id: 'bk1', kind: 'group_workout', sessionKey: 'gw_2026-09-23', shardsPaid: 150, startsAt: new Date('2026-09-24T00:30:00Z'), ...over });
+  const NOW = new Date('2026-09-25T18:00:00Z');
+
+  it('tells a session that is over from one still to come by its start and its kind\'s length, and says when the next one ends', () => {
+    const over = bk();
+    const running = bk({ id: 'bk2', sessionKey: 'gw_2026-09-25', startsAt: new Date(NOW.getTime() - 59 * 60_000) });
+    const later = bk({ id: 'bk3', sessionKey: 'gw_2026-09-30', startsAt: new Date(NOW.getTime() + 5 * 86_400_000) });
+    const pv = bk({ id: 'bk4', kind: 'private_1on1', sessionKey: 'pv_2026-09-25_09', startsAt: new Date(NOW.getTime() - 46 * 60_000) });
+    const { ended, nextEndsAt } = endedBookings([later, running, pv, over], NOW);
+    expect(ended.map((b) => b.id)).toEqual(['bk1', 'bk4']);   // a private slot runs 45 min, a group workout 60; oldest first
+    expect(nextEndsAt).toBe(running.startsAt.getTime() + 60 * 60_000);
+    expect(endedBookings([later], NOW).nextEndsAt).toBe(later.startsAt.getTime() + 60 * 60_000);
+    expect(endedBookings([over], NOW)).toEqual({ ended: [over], nextEndsAt: null });
+    expect(endedBookings([], NOW)).toEqual({ ended: [], nextEndsAt: null });
+    // a booking with no readable start is neither over nor due
+    expect(endedBookings([bk({ startsAt: new Date('x') })], NOW)).toEqual({ ended: [], nextEndsAt: null });
+  });
+
+  it('a slot that had a link is never paid back, whatever the session was like', () => {
+    const a = bk(), b = bk({ id: 'bk2', sessionKey: 'pv_2026-09-24_16', kind: 'private_1on1' });
+    expect(unlinkedBookings([a, b], new Set(['gw_2026-09-23']))).toEqual([b]);
+    expect(unlinkedBookings([a, b], new Set())).toEqual([a, b]);
+    expect(unlinkedBookings([a, b], new Set(['gw_2026-09-23', 'pv_2026-09-24_16']))).toEqual([]);
+  });
+
+  it('a slot has a link for this player only if it passes the link rules, and a private slot\'s only for its holder', () => {
+    const zoom = 'https://us02web.zoom.us/j/81234567890';
+    const links = [
+      { sessionKey: 'gw_2026-09-23', url: zoom },
+      { sessionKey: 'pv_2026-09-24_16', url: zoom },
+      { sessionKey: 'gw_2026-09-18', url: 'javascript:alert(1)' },   // edited by hand: never shown, so never had
+    ];
+    const holders = new Map([['pv_2026-09-24_16', 'p1']]);
+    expect([...linkedSlotsFor('p1', links, holders)]).toEqual(['gw_2026-09-23', 'pv_2026-09-24_16']);
+    // a second booker who raced in was never shown the private slot's link: for them it had none
+    expect([...linkedSlotsFor('p2', links, holders)]).toEqual(['gw_2026-09-23']);
+    expect([...linkedSlotsFor('p2', links, new Map())]).toEqual(['gw_2026-09-23']);
+  });
+
+  // Found in review 2026-09-25: a replayed key booked a second slot on one charge's receipt, and each booking was paid
+  // back its own shardsPaid. A booking now gets back only the charge it claims, keyed on that charge.
+  describe('what a booking is paid back', () => {
+    const charge = (id: string, min: number, over: Partial<DeadBuyRow> & { sku?: string } = {}) =>
+      row({ id, sku: 'session_group_workout', currency: 'shards', delta: -150, createdAt: at(min), ...over });
+    const booking = (id: string, min: number, kind = 'group_workout') => ({ id, kind, createdAt: at(min) });
+
+    it('knows which SKU each kind of booking is charged under', () => {
+      expect(Object.fromEntries(BOOKING_SKU)).toEqual({ group_workout: 'session_group_workout', seminar: 'seminar_seat', private_1on1: 'private_1on1' });
+    });
+
+    it('one charge backs one booking: the rest of the bookings made on its receipt claim nothing', () => {
+      const c = charge('c1', 0, { idempotencyKey: 'mine:1' });
+      const claims = bookingCharges([booking('bk3', 2), booking('bk1', 0.01), booking('bk2', 1)], [c]);
+      expect([...claims]).toEqual([['bk1', c]]);
+    });
+
+    it('each booking claims the latest charge at or before it, whatever the key, the status, or a refund already made', () => {
+      const store = charge('c_store', 0), mine = charge('c_mine', 30, { idempotencyKey: 'mine:1' }), later = charge('c_later', 90);
+      const paidBack = charge('c_back', 120);
+      const claims = bookingCharges([booking('bk1', 30.01), booking('bk2', 90.01), booking('bk3', 120.01)], [store, mine, later, paidBack]);
+      expect(Object.fromEntries([...claims].map(([b, r]) => [b, r.id]))).toEqual({ bk1: 'c_mine', bk2: 'c_later', bk3: 'c_back' });
+    });
+
+    it('takes only charges of the kind\'s own SKU and currency, and never a credit or another reason', () => {
+      const rows = [
+        charge('c_pv', 0, { sku: 'private_1on1', delta: -900 }),
+        charge('c_coins', 0, { currency: 'coins' }),
+        charge('c_credit', 0, { delta: 150 }),
+        charge('c_arena', 0, { reasonCode: 'ARENA_ENTRY' }),
+      ];
+      expect([...bookingCharges([booking('bk1', 1)], rows)]).toEqual([]);
+      expect([...bookingCharges([booking('bk1', 1, 'private_1on1')], rows)].map(([b, r]) => [b, r.id])).toEqual([['bk1', 'c_pv']]);
+    });
+
+    it('decides a tie on time by id, so every server instance claims alike', () => {
+      const a = charge('c_a', 0), b = charge('c_b', 0);
+      const one = bookingCharges([booking('bk_b', 1), booking('bk_a', 1)], [b, a]);
+      const two = bookingCharges([booking('bk_a', 1), booking('bk_b', 1)], [a, b]);
+      expect([...one].map(([k, r]) => [k, r.id]).sort()).toEqual([...two].map(([k, r]) => [k, r.id]).sort());
+    });
+
+    it('pays back what the charge took, at most what the booking says, and nothing for no charge or one already back', () => {
+      const b = { id: 'bk1', kind: 'group_workout', sessionKey: 'gw_2026-09-23', shardsPaid: 150, startsAt: at(0) };
+      expect(bookingRefundAmount(b, charge('c1', 0), new Set())).toBe(150);
+      expect(bookingRefundAmount({ ...b, shardsPaid: 900 }, charge('c1', 0), new Set())).toBe(150);
+      expect(bookingRefundAmount(b, charge('c1', 0, { delta: -900 }), new Set())).toBe(150);
+      expect(bookingRefundAmount(b, undefined, new Set())).toBe(0);
+      expect(bookingRefundAmount(b, charge('c1', 0), new Set(['c1']))).toBe(0);
+      expect(bookingRefundAmount({ ...b, shardsPaid: 0 }, charge('c1', 0), new Set())).toBe(0);
+    });
+
+    it('is keyed on the charge, so the charge reads as paid back and its key replays nothing afterwards', () => {
+      expect(refundedRowIds([row({ reasonCode: REASON.DEAD_BUY_REFUND, delta: 150, idempotencyKey: refundKey('c1') })]).has('c1')).toBe(true);
+    });
+  });
+
+  it('names the session by its kind and its start in the studio\'s time, and says why the shards are back', () => {
+    expect(bookingName('group_workout', new Date('2026-09-24T00:30:00Z'))).toBe('Group Workout, Wed, Sep 23, 5:30 PM PT');
+    expect(bookingName('private_1on1', '2026-09-24T23:00:00Z')).toBe('Private 1-on-1, Thu, Sep 24, 4:00 PM PT');
+    expect(bookingName('seminar', new Date('2026-09-24T23:00:00Z'))).toMatch(/^Seminar, /);
+    expect(bookingName('other_kind', new Date('x'))).toBe('other_kind, date unknown');
+    expect(bookingRefundNote(150, 'group_workout', new Date('2026-09-24T00:30:00Z')))
+      .toBe('We refunded 150 shards for Group Workout, Wed, Sep 23, 5:30 PM PT: no link to join was ever posted. Sorry about that.');
+    expect(NO_LINK_REASON).toBe('no link to join was ever posted');
+  });
+});
+
 describe('the note the player reads', () => {
   it('says what came back, for what, and why, in plain words', () => {
     expect(refundNote(300, 'coins', 'Nexus Visor')).toBe("We refunded 300 coins for Nexus Visor: it didn't deliver anything. Sorry about that.");
@@ -214,6 +356,8 @@ describe('the note the player reads', () => {
     expect(refundNote(80, 'lc', 'Jab Flow Drill')).toBe("We refunded 80 Lab Credits for Jab Flow Drill: it didn't deliver anything. Sorry about that.");
     expect(refundNote(1, 'shards', 'Dunk Style Slot')).toBe("We refunded 1 shard for Dunk Style Slot: it didn't deliver anything. Sorry about that.");
     expect(refundNote(1200, 'coins', 'X')).toContain('1,200 coins');
+    // a class pass says why in its own words
+    expect(refundNote(300, 'shards', 'Monthly All-Access Pass', CLASS_PASS_REASON)).toBe("We refunded 300 shards for Monthly All-Access Pass: live classes haven't started yet. Sorry about that.");
   });
 
   it('is shown once per device: seen ids are skipped, the rest come oldest first', () => {
