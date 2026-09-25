@@ -33,7 +33,7 @@ type MirrorModule = typeof import('@/lib/babylon/nexus/neuro-mirror');
 let mirrorModPromise: Promise<MirrorModule> | null = null;
 const loadMirror = (): Promise<MirrorModule> =>
   (mirrorModPromise ??= import('@/lib/babylon/nexus/neuro-mirror'));
-import { DunkTracker, type DunkMetrics } from '@/lib/irl/dunkTracker';
+import { DunkTracker, refusalLine, type DunkMetrics } from '@/lib/irl/dunkTracker';
 // THE REASON TO COME BACK. DunkTracker has always measured a jump beautifully and then thrown it away when the
 // session ended. This keeps the numbers — and only the numbers; the clip never leaves the phone.
 import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/lib/irl/dunkProgress';
@@ -277,6 +277,9 @@ export function MirrorHarness() {
               void recordDunk(got);
               jumpTrackerRef.current.reset();
             }
+            // a jump the route would refuse is refused here first, and said, rather than shown and then dropped
+            const why = jumpTrackerRef.current.takeRefusal();
+            if (why) { const line = refusalLine(why); setDunkSaid(line); speak(line); }
           }
           // the corrective squat: the guided session breathes, checks, works
           if (patternRef.current === 'squat' && squat) {

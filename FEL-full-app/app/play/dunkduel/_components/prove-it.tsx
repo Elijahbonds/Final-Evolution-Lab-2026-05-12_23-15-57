@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { setReady } from '@/lib/babylon/core/readyMarker';
 import { Camera, CameraOff, RotateCcw, Users, Trophy } from 'lucide-react';
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
-import { DunkTracker, scoreIrlDunk, type DunkMetrics } from '@/lib/irl/dunkTracker';
+import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
 
 const BG = '#050505';
@@ -47,6 +47,8 @@ export default function ProveIt() {
   const [attempts, setAttempts] = useState<[Attempt[], Attempt[]]>([[], []]);
   const [current, setCurrent] = useState<Attempt | null>(null);
   const [trackerState, setTrackerState] = useState('idle');
+  // an attempt the tracker refused (the dunks route would too): said on the pill instead of vanishing
+  const [refused, setRefused] = useState<DunkRefusal | null>(null);
 
   useEffect(() => {
     fetch('/api/profile').then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -65,21 +67,39 @@ export default function ProveIt() {
     else if (stage === 'final') setReady('dunkduel', 'ended');
   }, [stage]);
 
+  // Bumped by every stopAll(), so a start whose await lands after the page was left (or after a retry began) knows it
+  // is stale and frees what it got instead of switching a camera on for nobody.
+  const genRef = useRef(0);
+
   const stopAll = useCallback(() => {
+    genRef.current++;
     liveRef.current = false;
     cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    // The landmarker holds a wasm heap; leaving the page without closing it leaked one per visit. One still loading
+    // when this runs is freed when it lands: startCamera's stale check after init() disposes it.
+    adapterRef.current?.dispose();
+    adapterRef.current = null;
   }, []);
   useEffect(() => () => stopAll(), [stopAll]);
 
   const startCamera = useCallback(async () => {
+    // TRY AGAIN after a refusal: the last attempt's model (and any camera it opened) go first, or each retry leaked one.
+    stopAll();
+    const gen = genRef.current;
+    const stale = () => gen !== genRef.current;
     setError(null);
     setStage('loading-model');
     try {
       const adapter = new MediaPipePoseAdapter();
+      adapterRef.current = adapter;   // owned while it loads, so leaving the page mid-download frees it
       await adapter.init();
-      adapterRef.current = adapter;
+      // LEFT MID-DOWNLOAD (MOVEMENT PLAY P2, 2026-09-24): the model landed after the page was left. stopAll()'s
+      // dispose() ran while there was no landmarker yet, and an adapter that cannot cancel a load in flight still keeps
+      // it when it arrives, so this is the last place anyone holds it: closed here or leaked. (An adapter that refuses
+      // a disposed load rejects init() instead, and the catch below returns.)
+      if (stale()) { adapter.dispose(); return; }
       const stream = await navigator.mediaDevices.getUserMedia({
         // the environment camera watches the dunker; the phone is propped.
         // IDEAL, not hard — a hard 'environment' constraint rejects devices
@@ -88,18 +108,23 @@ export default function ProveIt() {
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 960 }, height: { ideal: 540 } },
         audio: false,
       });
+      // Allowed after the page was left: this camera has no owner, so it goes off now.
+      if (stale()) { stream.getTracks().forEach((t) => t.stop()); return; }
       streamRef.current = stream;
       const v = videoRef.current!;
       v.srcObject = stream;
       await v.play();
+      if (stale()) return;
       setStage('prop-phone');
     } catch (e) {
+      if (stale()) return;   // left or restarted meanwhile: stopAll() already freed this attempt
+      stopAll();             // a camera that opened but would not play must not stay on behind "no camera"
       setError(e instanceof DOMException && e.name === 'NotAllowedError'
         ? 'Camera access was denied. Prove It measures your dunk through the camera — allow it to play.'
         : 'No usable camera on this device. Prove It needs to see you.');
       setStage('camera-off');
     }
-  }, []);
+  }, [stopAll]);
 
   // the pose loop — runs only while an attempt is armed
   const runLoop = useCallback(() => {
@@ -111,6 +136,9 @@ export default function ProveIt() {
         const frame = adapter.detect(v, performance.now());
         const got = trackerRef.current.feed(frame);
         setTrackerState(trackerRef.current.state);
+        const why = trackerRef.current.takeRefusal();
+        if (why) setRefused(why);
+        else if (trackerRef.current.state === 'airborne') setRefused(null);
         if (got) {
           const s = scoreIrlDunk(got, prq);
           const scores = judgeDunk(s.difficulty, s.execution, s.style);
@@ -135,6 +163,7 @@ export default function ProveIt() {
   const armAttempt = useCallback(() => {
     trackerRef.current.reset();
     setCurrent(null);
+    setRefused(null);
     setStage('watching');
     liveRef.current = true;
     runLoop();
@@ -236,8 +265,8 @@ export default function ProveIt() {
         )}
         {stage === 'watching' && (
           <div className="pointer-events-none absolute inset-x-0 top-3 text-center">
-            <span className="fel-panel px-4 py-2 text-sm font-bold" style={{ color: trackerState === 'airborne' ? GOLD : CYAN }}>
-              {trackerState === 'airborne' ? 'AIRBORNE' : trackerState === 'ready' ? 'TRACKING — GO WHEN READY' : trackerState === 'settling' ? 'LANDING…' : 'CALIBRATING — HOLD STILL'}
+            <span className="fel-panel px-4 py-2 text-sm font-bold" style={{ color: trackerState === 'airborne' ? GOLD : refused && trackerState === 'ready' ? RED : CYAN }}>
+              {trackerState === 'airborne' ? 'AIRBORNE' : trackerState === 'ready' ? (refused ? refusalLine(refused) : 'TRACKING — GO WHEN READY') : trackerState === 'settling' ? 'LANDING…' : 'CALIBRATING — HOLD STILL'}
             </span>
           </div>
         )}
