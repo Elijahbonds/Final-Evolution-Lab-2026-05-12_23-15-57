@@ -580,6 +580,31 @@ describe('the session rows', () => {
       expect(last.frame, `s${seed}: at the final packet`).toBe(s.packets[s.packets.length - 1].frame + 1);
     }
   });
+
+  // MOVEMENT PLAY P3 step 4b, the review (2026-09-24): the gate's phase machine resumes the way the harness does, so a
+  // scripted pad sees the same stream a real mode would. Before, the seam replay modelled a resume with no latch, no
+  // re-send and no ledger, and the gate did not cover step 4b at all.
+  it('step 4b: a pad pauses and resumes — the thumb let go of during the pause arrives at once, the resuming A never', () => {
+    const s = stream('stand_still');
+    const t0 = s.packets[0].arrivedAt;
+    const r = machine(SKATE, s, { padSeated: true, inputs: [
+      { at: t0 + 503, e: { t: 'stick', side: 'L', x: 0, y: -1 } },   // off the tick grid: what the resume
+      { at: t0 + 807, e: { t: 'button', btn: 'START', pressed: true } },   // hands over is told apart from the
+      { at: t0 + 887, e: { t: 'button', btn: 'START', pressed: false } },  // pad frames by its instant
+      { at: t0 + 1203, e: { t: 'stick', side: 'L', x: 0, y: 0 } },      // let go of while paused: dropped
+      { at: t0 + 1605, e: { t: 'button', btn: 'A', pressed: true } },    // resumes
+      { at: t0 + 1705, e: { t: 'button', btn: 'A', pressed: false } },
+    ] });
+    expect(r.phases.map((x) => [x.phase, x.why])).toEqual([['playing', 'start'], ['paused', 'input'], ['playing', 'input']]);
+    const back = r.phases[2];
+    const after = r.events.filter((x) => x.seq > back.seq);
+    // what the resume itself handed the mode: the thumb's (0, 0), and nothing that did not change (the resting
+    // triggers ride the pad's own frames, as they always did)
+    expect(after.filter((x) => x.at === back.at).map((x) => x.e)).toStrictEqual([{ t: 'stick', side: 'L', x: 0, y: 0 }]);
+    expect(after.filter((x) => x.e.t === 'stick')).toHaveLength(1);
+    expect(after.filter((x) => x.e.t === 'trigger').length).toBeGreaterThan(0);
+    expect(after.filter((x) => x.e.t === 'button')).toEqual([]);                // A's press resumed; its release is the latch's
+  });
 });
 
 // ── the evidence ─────────────────────────────────────────────────────────────────────────────────────────────────

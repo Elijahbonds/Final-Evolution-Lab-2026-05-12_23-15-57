@@ -10,12 +10,14 @@
 //       under a held Space with a pad seated), haptic buzzes included;
 //   the trigger fold (bug 3): a seated pad's per-frame trigger carries the body's RT instead of clobbering it;
 //   Z6  haptics only for real presses; Z7 a blur never releases the body, stop() clears it;
-//   the packet channel itself: latest / final / live buses / lag stats.
+//   the packet channel itself: latest / final / live buses / lag stats;
+//   step 4b (the review): what a MODE receives across a pause and a resume — only what the pause changed.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { InputBus, liveInputBuses, publishBodyToLive, type BodyOut, type BodyPacket, type FelInput } from './InputBus';
-import { isWakeInput } from './StartWake';
+import { isWakeInput, WakeLatch, PauseLedger } from './StartWake';
+import { LocalInputSource } from './PlayerSlot';
 import { HAPTIC } from '../premium/Haptics';
 import type { BodyEvent, BodyRead } from '@/lib/pose/BodyReader';
 import type { BodyChannels } from '@/lib/pose/bodyChannels';
@@ -510,5 +512,125 @@ describe('the body channel', () => {
     ];
     expect(on(r.log)).toStrictEqual([...once, ...once]);
     expect(buzzes(r.log)).toBe(0);
+  });
+});
+
+// MOVEMENT PLAY P3 step 4b, the review (2026-09-24): what a MODE receives across a pause and a resume, through the real
+// bus — not what the bus emits. The harness's input path (ModeHarness's input.on handler and resume(), step 4b) over the
+// bus, the wake latch, the ledger and the hoops slot's own reader (PlayerSlot.LocalInputSource), which is where an
+// unasked trigger 0 did its damage: before the review the resume re-sent all four sticks and triggers, and a keyboard
+// player holding W + Shift + F came back with turbo, sprint and intense D all off (and a WASD-only one lost the
+// stick-magnitude sprint for the run, turboSeen). The seam scan pins that the harness's resume() is this one.
+describe('step 4b: what a mode receives across a pause (through the bus, the latch and the ledger)', () => {
+  function harness(r: Rig) {
+    const latch = new WakeLatch(), ledger = new PauseLedger(), slot = new LocalInputSource();
+    const mode: FelInput[] = [];
+    let phase: 'ready' | 'playing' | 'paused' = 'ready';
+    const hand = (e: FelInput): void => { mode.push(e); slot.feed(e); };
+    function resume(e: FelInput | null): void {
+      phase = 'playing';
+      if (e?.t === 'button') latch.wake(e, performance.now(), true);
+      latch.hold(ledger.heldUnseen());
+      r.bus.resync((x) => ledger.changed(x));
+      ledger.replay((x) => { if (phase === 'playing') hand(x); });
+    }
+    r.bus.on((e) => {
+      const now = performance.now();
+      if (phase === 'ready' && isWakeInput(e)) { phase = 'playing'; ledger.reset(); if (!latch.wake(e, now)) return; }
+      if (phase === 'playing' && e.t === 'button' && e.btn === 'START' && e.pressed) { phase = 'paused'; return; }
+      if (phase === 'paused' && e.t === 'button' && e.pressed && e.src !== 'body') { resume(e); return; }
+      if (phase === 'paused') { ledger.drop(e); return; }
+      if (!latch.pass(e, now)) return;
+      ledger.saw(e);
+      hand(e);
+    });
+    const verbs = () => { const i = slot.poll(); return { turbo: i.turbo, sprint: i.sprint, intense: i.intense }; };
+    return { mode, verbs, phase: () => phase };
+  }
+  const later = (ms = 120): void => { clock += ms; };
+
+  it('a keyboard player who touched nothing during the pause gets nothing: W + Shift + F held, turbo / sprint / intense kept', () => {
+    const r = rig(); r.bus.start();
+    const h = harness(r);
+    r.key('w'); later(); r.key('Shift'); later(); r.key('f'); later();
+    expect(h.verbs()).toEqual({ turbo: true, sprint: true, intense: true });
+    r.key('Escape'); r.key('Escape', false); later(2000);
+    expect(h.phase()).toBe('paused');
+    const before = h.mode.length;
+    r.key('j'); later(); r.key('j', false);                     // resume with all three still held
+    expect(h.phase()).toBe('playing');
+    expect(h.mode.slice(before)).toEqual([]);                    // no re-sent value, and J's release is the latch's
+    expect(h.verbs()).toEqual({ turbo: true, sprint: true, intense: true });
+  });
+
+  it('a WASD-only player keeps the stick-magnitude sprint through a resume (no trigger ever reported)', () => {
+    const r = rig(); r.bus.start();
+    const h = harness(r);
+    r.key('w'); later();
+    expect(h.verbs()).toEqual({ turbo: false, sprint: true, intense: false });
+    r.key('Escape'); r.key('Escape', false); later(2000);
+    r.key('k'); later(); r.key('k', false);
+    expect(h.verbs()).toEqual({ turbo: false, sprint: true, intense: false });
+  });
+
+  it('what the pause did change is re-sent: W let go of during the pause stops the hero; a Space charge let go reaches 0', () => {
+    const r = rig(); r.bus.start();
+    const h = harness(r);
+    r.key('w'); later(); r.key(' '); r.tick(); r.tick();           // running, and a Space charge climbing
+    r.key('Escape'); r.key('Escape', false);
+    r.tick(); r.tick();                                             // the charge climbs on, unheard
+    r.key('w', false); later(2000);
+    const before = h.mode.length;
+    r.key(' ', false);                                              // Space up: its R 0 is dropped, and its A resumes
+    expect(h.phase()).toBe('playing');
+    expect(h.mode.slice(before)).toStrictEqual([
+      { t: 'stick', side: 'L', x: 0, y: 0 },
+      { t: 'trigger', side: 'R', value: 0 },
+    ]);
+  });
+
+  it('a pad: a thumb and a trigger let go of during the pause get their 0 at once; a resting one is not re-sent', () => {
+    const r = withPad();
+    const h = harness(r);
+    pads[0]!.axes = [0, -1, 0, 0]; r.tick();                       // the push wakes it
+    pull(pads[0]!, 7, 1); r.tick();                                // RT held when the game pauses
+    press(pads[0]!, 9); r.tick(); press(pads[0]!, 9, false); r.tick();
+    expect(h.phase()).toBe('paused');
+    pads[0]!.axes = [0, 0, 0, 0]; pull(pads[0]!, 7, 0); r.tick(); r.tick();   // both let go of while paused
+    const before = h.mode.length;
+    press(pads[0]!, 0); r.tick();                                  // A resumes
+    expect(h.mode.slice(before)).toStrictEqual([
+      { t: 'stick', side: 'L', x: 0, y: 0 },
+      { t: 'trigger', side: 'R', value: 0 },
+    ]);
+    press(pads[0]!, 0, false); r.tick();
+    expect(h.mode.slice(before).filter((e) => e.t === 'button')).toEqual([]);   // A's release: the latch's
+  });
+
+  it('an arrow pressed during the pause and let go after the resume: the mode gets the stick, never an unpaired d-pad release', () => {
+    const r = rig(); r.bus.start();
+    const h = harness(r);
+    r.key('w'); later(); r.key('w', false); later();
+    r.key('Escape'); r.key('Escape', false); later(500);
+    r.key('ArrowLeft'); later(500);                                // a d-pad press does not resume
+    r.key('j'); later(); r.key('j', false); later();
+    r.key('ArrowLeft', false);
+    const dpad = h.mode.filter((e) => e.t === 'dpad');
+    expect(dpad).toEqual([]);
+    const sticks = h.mode.filter((e) => e.t === 'stick').slice(-2);
+    expect(sticks).toStrictEqual([{ t: 'stick', side: 'L', x: -1, y: 0 }, { t: 'stick', side: 'L', x: 0, y: 0 }]);
+  });
+
+  it('a listener that throws on a re-sent value costs the others nothing, and the resume goes on', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const r = rig(); r.bus.start();
+    r.bus.emit({ t: 'stick', side: 'L', x: 0.9, y: 0 });
+    r.bus.emit({ t: 'trigger', side: 'L', value: 0.7 });
+    const other: FelInput[] = [];
+    r.bus.on((e) => { if (e.t === 'stick') throw new Error('onInput blew up on the stick'); });
+    r.bus.on((e) => other.push(e));
+    expect(() => r.bus.resync()).not.toThrow();
+    expect(other.map((e) => e.t)).toEqual(['stick', 'stick', 'trigger', 'trigger']);
+    expect(err).toHaveBeenCalledTimes(2);                         // both sticks reported, not swallowed silently
   });
 });

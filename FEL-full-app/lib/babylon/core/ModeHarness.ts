@@ -47,7 +47,7 @@ import { makeAnimProbe } from '../anim/animProbe';   // SHARED-ANIM-BUS: the pro
 import type { PrqGrade } from '../../prq';
 type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
-import { isWakeInput, WakeLatch } from './StartWake';   // SHARED-START-UNSTICK: any press/push/pull → playing
+import { isWakeInput, WakeLatch, PauseLedger } from './StartWake';   // SHARED-START-UNSTICK: any press/push/pull → playing
 // MOVEMENT PLAY P3 (2026-09-24): the body seam — the mode's profile, the floor that presses it, the session that starts and
 // pauses the game on the body (all built by bodySeamFor), and the one store the UI reads (plan §4.4).
 import type { BodyRead, BodyEvent } from '@/lib/pose/BodyReader';
@@ -291,6 +291,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
 
   let phase: ModePhase = 'loading';
   let startedAt = 0;
+  // MOVEMENT PLAY P3 step 4b (2026-09-24): the releases a pause ate, handed to the mode on the resume (StartWake). Beside
+  // the phase, not the wake latch: wake() resets it, and the agent bridge's start() can call wake() once it is attached.
+  const pauseLedger = new PauseLedger();
   let ambientStarted = false;   // M43: crowd/dojo bed starts once, on first input
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
@@ -598,6 +601,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (phase === 'playing' && e.t === 'button' && e.btn === 'START' && e.pressed) { releaseBody(); setPhase('paused'); store.setPause('input'); return; }
     // any real press or tap resumes (owner call 2); a body press never does — a paused body's way back is the hands-up hold
     if (phase === 'paused' && e.t === 'button' && e.pressed && e.src !== 'body') { resume(e); return; }
+    // MOVEMENT PLAY P3 step 4b: everything else is still dropped while paused — but the release of a key the mode saw go
+    // down is written down, and the mode gets it on the resume (a re-press during the pause clears it again); a press
+    // the mode never saw (a d-pad) is written down too, so the resume can latch its release
+    if (phase === 'paused') { pauseLedger.drop(e); return; }
     if (phase === 'playing' && e.t === 'button' && e.btn === 'SELECT' && e.pressed) { camDirector.toggle(); return; }
     if (phase === 'playing') {
       const now = performance.now();
@@ -619,6 +626,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
           if (was < 0.5 && e.value >= 0.5 && t - qaTrigAt[e.side] > 120) { qaTrigAt[e.side] = t; qa.press(`${e.side}T`); }
         }
       }
+      pauseLedger.saw(e);   // MOVEMENT PLAY P3 step 4b: the mode's view of what is down, for the pause's ledger
       def.onInput(ctx, e);
     }
   });
@@ -664,6 +672,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     store.beginRun(def.modeId);
     evidence.reset();
     floor.begin(); session.begin(performance.now(), by);
+    pauseLedger.reset();   // step 4b: nothing the mode held in a run before (a retried load) is owed to this one
   }
   /** PAUSED → 'playing': a real press or tap (e), or the body's hands-up hold (null). */
   function resume(e: FelInput | null): void {
@@ -671,6 +680,28 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     setPhase('playing');
     store.setPause(null);
     floor.begin(); session.begin(performance.now(), e ? 'external' : 'body');
+    // MOVEMENT PLAY P3 step 4b (2026-09-24): resume and wake hygiene — the resume is a wake in the middle of a run, and it
+    // now gets the wake's care (map:session §1; pad players had this latent bug before there was a body):
+    //   • the press that resumed is not a gameplay press: latched like the waking one, so its release never reaches the
+    //     mode unpaired (a hold-to-shoot fired on it) — keeping what the latch already held (StartWake);
+    //   • a key pressed during the pause (a d-pad does not resume) and still down is latched the same way: the mode never
+    //     saw it go down, so its release is not the mode's (the review);
+    //   • the sticks and triggers are re-sent as they are NOW: a thumb or a Space let go during the pause reached nobody,
+    //     so the mode kept steering, or charging, on the value it had when the game paused. Only a value the pause
+    //     CHANGED (the review): the ledger knows what the mode was last handed, and a keyboard player who touched nothing
+    //     gets nothing — an unasked trigger 0 read as Shift and F let go in the hoops slot (Z1);
+    //   • the releases the pause ate go to the mode, in order (PauseLedger) — straight to onInput, past the latch that
+    //     now holds the resuming press (a resume on the same key as a release owed gets that release). Each on its own,
+    //     and only while the run is still playing (the review): a re-sent value can end it (a charge let go launches),
+    //     and a mode that throws on one release must not take the rest, or the frame the resume runs in, with it.
+    // After floor/session.begin: the re-sent values reach 'playing' as input the game received, like any other.
+    if (e?.t === 'button') wakeLatch.wake(e, performance.now(), true);
+    wakeLatch.hold(pauseLedger.heldUnseen());
+    input.resync((r) => pauseLedger.changed(r));
+    pauseLedger.replay((r) => {
+      if (phase !== 'playing') return;
+      try { def.onInput(ctx, r); } catch (err) { console.error(`[FEL-MODE] ${def.modeId} onInput threw on a release the pause owed:`, err); }
+    });
   }
 
   const qaSteps = qaSpeedParam();

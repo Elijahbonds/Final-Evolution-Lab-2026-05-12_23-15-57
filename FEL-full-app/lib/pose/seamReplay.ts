@@ -21,7 +21,7 @@ import type { PoseFrame } from './landmarks';
 import type { Emitted, Replay } from './baseline';
 import { BodySession, type BodyIntent, type SessionStep } from '../babylon/core/BodySession';
 import { bodySeamFor } from '../babylon/core/bodySeam';
-import { isWakeInput, WakeLatch } from '../babylon/core/StartWake';
+import { isWakeInput, WakeLatch, PauseLedger } from '../babylon/core/StartWake';
 import type { BodyOut, BodyPacket, FelInput } from '../babylon/core/InputBus';
 import type { ModePhase } from '../babylon/core/ModeHarness';
 import { BodyArbiter, type HoldKey } from '../input/arbiter';
@@ -108,6 +108,9 @@ export function seamReplay(packets: readonly StreamPacket[], opt: SeamOptions): 
   const held = new Set<HoldKey>();                   // the pad's / keys' own held buttons (the bus's `held`)
   const arbiter = new BodyArbiter((k) => held.has(k));
   const latch = new WakeLatch();
+  // MOVEMENT PLAY P3 step 4b (the review, 2026-09-24): the harness's resume hygiene, so a scripted pad or key that
+  // pauses and resumes reaches this "mode" the way it reaches a real one (ModeHarness resume(); the StartWake ledger)
+  const ledger = new PauseLedger();
   const padT = { L: 0, R: 0 };
 
   const out: SeamReplay = {
@@ -135,12 +138,14 @@ export function seamReplay(packets: readonly StreamPacket[], opt: SeamOptions): 
         if (!latch.wake(e, now)) return;
       }
       if (phase === 'playing' && e.t === 'button' && e.btn === 'START' && e.pressed) { releaseBody(); setPhase('paused', 'input'); return; }
-      if (phase === 'paused' && e.t === 'button' && e.pressed && e.src !== 'body') { resume('input'); return; }
+      if (phase === 'paused' && e.t === 'button' && e.pressed && e.src !== 'body') { resume('input', e); return; }
+      if (phase === 'paused') { ledger.drop(e); return; }
     }
     if (phase !== 'playing') return;
     if (!latch.pass(e, now)) return;
     const c = evidence.count(e, now);
     if (c) { out.evidence[c]++; session.noteInput(c, now); }
+    ledger.saw(e);
     out.events.push({ e, ...stamp() });
   };
   const emitBody = (e: BodyOut): void => {
@@ -156,10 +161,17 @@ export function seamReplay(packets: readonly StreamPacket[], opt: SeamOptions): 
   function wake(why: 'input' | 'body'): void {
     setPhase('playing', why);
     floor.begin(); session.begin(now, why === 'body' ? 'body' : 'external');
+    ledger.reset();
   }
-  function resume(why: 'input' | 'body'): void {
+  /** The harness's resume (step 4b): the resuming press latched (and any the mode never saw), the sticks and triggers
+   *  the pause changed re-sent on the bus, and the releases the pause ate straight to the mode, while it still plays. */
+  function resume(why: 'input' | 'body', e: FelInput | null = null): void {
     setPhase('playing', why);
     floor.begin(); session.begin(now, why === 'body' ? 'body' : 'external');
+    if (e?.t === 'button') latch.wake(e, now, true);
+    latch.hold(ledger.heldUnseen());
+    for (const x of arbiter.current()) if (ledger.changed(x)) deliver(x);
+    ledger.replay((r) => { if (phase === 'playing') out.events.push({ e: r, ...stamp() }); });
   }
   const applyBody = (s: SessionStep): void => {
     if (s.release) releaseBody();                     // releases FIRST, still 'playing'

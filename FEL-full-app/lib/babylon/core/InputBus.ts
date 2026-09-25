@@ -264,7 +264,7 @@ export class InputBus {
     // and tagged `src: 'body'` where the value it now carries is the body's (arbiter.ts, WHOSE EVENT IT IS)
     this.deliver(this.arbiter.external(e, this.gamepadActive));
   }
-  /** Straight to the listeners: for an event already arbitrated (a body output, a folded pad trigger, a resync). */
+  /** Straight to the listeners: for an event already arbitrated (a hand's, through external(); a folded pad trigger). */
   private deliver(e: FelInput): void {
     this.listeners.forEach((fn) => fn(e));
   }
@@ -301,9 +301,21 @@ export class InputBus {
   emitBody(e: BodyOut): void {
     for (const out of this.arbiter.body(e, this.gamepadActive)) this.emit(out);
   }
-  /** Re-emit the composed L/R sticks and triggers, past every on-change filter (a resume: P3 step 4b). */
-  resync(): void {
-    for (const e of this.arbiter.current()) this.deliver(e);
+  /**
+   * Re-emit the composed L/R sticks and triggers, past every on-change filter (a resume: P3 step 4b).
+   * The step-4b review (2026-09-24):
+   *   • `changed` is asked about each value first, and only what it calls news goes out. The harness asks its
+   *     PauseLedger (what the mode was last handed on that channel). All four unasked handed every keyboard player an
+   *     R and an L trigger 0 on each resume, and the hoops slot took them for Shift and F let go.
+   *   • Each listener gets each value on its own (bodyFault), like a body delivery. A resume runs inside a key handler,
+   *     a pad frame (pollPads, whose rAF chain a throw would end) or a body frame, and one listener throwing on a stick
+   *     must not cost the other values, or whatever the resume does after this.
+   */
+  resync(changed?: (e: FelInput) => boolean): void {
+    for (const e of this.arbiter.current()) {
+      if (changed && !changed(e)) continue;
+      this.listeners.forEach((fn) => { try { fn(e); } catch (err) { bodyFault(`a listener threw on a resync ${e.t}`, err); } });
+    }
   }
   /** Per event kind: how late the page had it (arrivedAt − ev.t, ms) — the median and the 90th percentile. */
   bodyStats(): Partial<Record<BodyEventKind, { n: number; medMs: number; p90Ms: number }>> {

@@ -10,6 +10,8 @@
 //   Z4  a body event never retries a failed load or resumes a pause (only the hands-up intent starts or resumes);
 //   the release comes first: every pause lets go of what the body holds while the mode is still 'playing';
 //   every way into 'playing' begins the floor and the session (the step-2 review), and the body's wake starts the bed;
+//   step 4b: a resume latches its press (and any the mode never saw), re-sends the sticks and triggers the pause changed,
+//   and hands the mode the releases the pause ate — each on its own, while the run still plays;
 //   Z9  QA grading is unchanged: the raw body events go to bodyLog, which summary() never reads;
 //   the legacy mapper is frozen (three importers), and the result sink that posted to a missing route is gone.
 import { describe, it, expect } from 'vitest';
@@ -121,6 +123,36 @@ describe('the harness reads the body (plan §4.4)', () => {
     expect(harness).toMatch(/unsub = input\.on\(\(e\) => \{\s*firstInput\(\);/);
     // the play evidence is counted from every source, after the wake latch, before the mode sees the event
     expect(harness).toMatch(/if \(!wakeLatch\.pass\(e, now\)\) return;\s*const c = evidence\.count\(e, now\);\s*if \(c\) \{ store\.count\(c\); session\.noteInput\(c, now\); \}/);
+  });
+
+  // step 4b (2026-09-24): resume and wake hygiene — the resume is a wake in the middle of a run, and gets the wake's care
+  it('step 4b: a button resume arms the wake latch (its release never reaches the mode unpaired), and the pause keeps a ledger', () => {
+    const resume = fnBody(harness, 'resume');
+    expect(resume).toMatch(/if \(e\?\.t === 'button'\) wakeLatch\.wake\(e, performance\.now\(\), true\);/);
+    // armed once the game is playing again — the latch only judges what arrives in 'playing'
+    expect(resume.indexOf('wakeLatch.wake(')).toBeGreaterThan(resume.indexOf("setPhase('playing')"));
+    // the ledger: what a pause drops goes in (the resuming press excepted: the latch has it), and it knows what is down
+    // for the mode from exactly what the mode is handed — after the latch, right before onInput
+    expect(harness).toMatch(/if \(phase === 'paused' && e\.t === 'button' && e\.pressed && e\.src !== 'body'\) \{ resume\(e\); return; \}\s*if \(phase === 'paused'\) \{ pauseLedger\.drop\(e\); return; \}/);
+    expect(harness).toMatch(/pauseLedger\.saw\(e\);\s*def\.onInput\(ctx, e\);\s*\}\s*\}\);/);
+  });
+
+  it('step 4b: the resume re-sends the sticks and triggers the pause changed (input.resync) and hands the mode the releases it ate', () => {
+    const resume = fnBody(harness, 'resume');
+    // after the floor and the session begin, so the re-sent values are input the game received like any other; the
+    // ledger's releases straight to onInput, past the latch that now holds the resuming press
+    expect(resume).toMatch(/floor\.begin\(\); session\.begin\([^;]*\);[\s\S]*input\.resync\(\(r\) => pauseLedger\.changed\(r\)\);\s*pauseLedger\.replay\(/);
+    // the review (2026-09-24): only what the pause CHANGED is re-sent — an unasked trigger 0 read as Shift and F let go
+    // on a keyboard (the behaviour: InputBus.body's step-4b block); the resume's alone (the READY wake forwards the
+    // waking push itself: WakeLatch.wake → true)
+    expect([...harness.matchAll(/input\.resync\(/g)]).toHaveLength(1);
+    expect(harness).not.toMatch(/input\.resync\(\)/);
+    // the review: a press the mode never saw (a d-pad pressed during the pause) is latched with the resuming one
+    expect(resume).toMatch(/wakeLatch\.wake\(e, performance\.now\(\), true\);\s*wakeLatch\.hold\(pauseLedger\.heldUnseen\(\)\);\s*input\.resync\(/);
+    // the review: each owed release only while the run still plays (a re-sent value can end it), each on its own
+    expect(resume).toMatch(/pauseLedger\.replay\(\(r\) => \{\s*if \(phase !== 'playing'\) return;\s*try \{ def\.onInput\(ctx, r\); \} catch \(err\) \{ console\.error\([^;]*\); \}\s*\}\);\s*$/);
+    // a new run owes nothing from the one before (a retried load wakes again)
+    expect(fnBody(harness, 'wake')).toMatch(/pauseLedger\.reset\(\);/);
   });
 
   it('the result sink is the host\'s: defaultResultSink is gone from the tree and resultSink is required', () => {
