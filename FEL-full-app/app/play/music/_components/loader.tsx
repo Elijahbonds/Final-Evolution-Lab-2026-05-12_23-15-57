@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
 import { CELL_ASSIST_SHARDS, CELL_ASSIST_SKU, kitSkuId } from '@/lib/babylon/music/purchases';
@@ -45,6 +46,11 @@ export function MusicLoader() {
     }
   }, []);
 
+  // ARENA SETS ONLY (owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays
+  // endless"). A duel launches the Academy with ?arena=<matchId>, the same query GameShell submits the score under, so
+  // the run the shell stakes is exactly the run whose PERFORM set has an end. Without it the set runs until END SET.
+  const arenaSet = Boolean(useSearchParams().get('arena'));
+
   // MUSIC IS BOTH (owner, 2026-09-16). The Academy mounts through GameShell like every
   // other mode; the STAGE pick on its boot splash decides which half you get. STUDIO
   // reports nothing — a tool has no run to post — and PERFORM ends on a card through
@@ -56,7 +62,7 @@ export function MusicLoader() {
       venue="The Academy"
       Game={StudioMode}
       ownControls
-      gameProps={{ spendShards }}
+      gameProps={{ spendShards, arenaSet }}
     />
   );
 }

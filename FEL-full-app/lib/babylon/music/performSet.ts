@@ -6,12 +6,17 @@
 // Arena could not bound a staked set (its old limit, 500,000, fell to about 72 s of perfect play). A set is now
 // PERFORM_SET_BARS bars of the sequencer: every step of those bars is one note, and after the last note's window closes
 // the set ends on its own. The judge is the one StudioMode used, moved here unchanged.
+//
+// ARENA SETS ONLY (owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays
+// endless"). The cap is there so a staked score can be checked; free play stakes nothing, so it has no cap. A set is
+// built as one or the other: `new PerformSet({ arena: true })` is the staked set the Arena's ceiling describes, and
+// `{ arena: false }` offers a note on every step until END SET.
 
 /** Sequencer steps in a bar (StudioMode's STEPS: 16ths). */
 export const PERFORM_STEPS_PER_BAR = 16;
-/** How long a set lasts, in bars. TUNE(elijah): 32 bars is 83 s at the default 92 BPM, 48 s at 160, 128 s at 60. */
+/** How long an Arena set lasts, in bars. TUNE(elijah): 32 bars is 83 s at the default 92 BPM, 48 s at 160, 128 s at 60. */
 export const PERFORM_SET_BARS = 32;
-/** Every step of the set is a note to hit. */
+/** Every step of an Arena set is a note to hit. */
 export const PERFORM_SET_NOTES = PERFORM_SET_BARS * PERFORM_STEPS_PER_BAR;
 /** A note not hit this long after it sounds is a miss (and breaks the combo). */
 export const PERFORM_EXPIRE_S = 0.25;
@@ -27,11 +32,20 @@ export function performHitPoints(perfect: boolean, comboBefore: number): number 
   return (perfect ? PERFORM_PERFECT_PTS : PERFORM_GOOD_PTS) * (1 + Math.floor(comboBefore / PERFORM_COMBO_STEP));
 }
 
-/** The most a set can score: every note of it hit PERFECT in one unbroken combo. */
+/** The most an Arena set can score: every note of it hit PERFECT in one unbroken combo. */
 export function performSetMax(notes: number = PERFORM_SET_NOTES): number {
   let total = 0;
   for (let i = 0; i < notes; i++) total += performHitPoints(true, i);
   return total;
+}
+
+/** What an Arena set tells the player before and while it plays. Free play shows nothing of the kind. */
+export const ARENA_SET_NOTE = `Arena set: it ends on its own after ${PERFORM_SET_BARS} bars.`;
+
+/** The line beside TAP. An Arena set counts its bars against its length; free play has no length, so no bar count. */
+export function performStatusLine(s: { bars: number | null; bar: number; score: number; combo: number; judgement: string }): string {
+  const tally = `score ${s.score} · combo x${s.combo} · ${s.judgement}`;
+  return s.bars === null ? tally : `bar ${s.bar}/${s.bars} · ${tally}`;
 }
 
 export type PerformJudgement = 'PERFECT' | 'GOOD' | 'EARLY';
@@ -40,18 +54,28 @@ export type PerformJudgement = 'PERFECT' | 'GOOD' | 'EARLY';
 export class PerformSet {
   score = 0;
   combo = 0;
-  /** Notes offered so far (at most PERFORM_SET_NOTES). */
+  /** Notes offered so far (at most PERFORM_SET_NOTES in an Arena set). */
   notes = 0;
+  /** The set's length in bars: PERFORM_SET_BARS for an Arena set, null in free play (it runs until END SET). */
+  readonly bars: number | null;
+  private readonly maxNotes: number;
   private expected: { step: number; time: number }[] = [];
   private lastNoteAt = -Infinity;
 
+  /** `arena`: the run was launched from an Arena duel, so this is the staked set with an end. */
+  constructor(opts: { arena: boolean }) {
+    this.bars = opts.arena ? PERFORM_SET_BARS : null;
+    this.maxNotes = opts.arena ? PERFORM_SET_NOTES : Infinity;
+  }
+
   /**
-   * A sequencer step became audible at `time`, seen at `now`. It is a note while the set has notes left; past the set's
-   * length the music plays on and scores nothing. Returns how many notes expired unhit (each is a MISS: the combo breaks).
+   * A sequencer step became audible at `time`, seen at `now`. It is a note while the set has notes left; past an Arena
+   * set's length the music plays on and scores nothing. Returns how many notes expired unhit (each is a MISS: the combo
+   * breaks).
    */
   note(step: number, time: number, now: number): { offered: boolean; missed: number } {
     let offered = false;
-    if (this.notes < PERFORM_SET_NOTES) {
+    if (this.notes < this.maxNotes) {
       this.expected.push({ step, time });
       this.notes++;
       this.lastNoteAt = time;
@@ -82,11 +106,14 @@ export class PerformSet {
     return perfect ? 'PERFECT' : 'GOOD';
   }
 
-  /** The bar the set is in (1-based, held at the last bar once every note has been offered). */
-  get bar(): number { return Math.min(PERFORM_SET_BARS, Math.floor(this.notes / PERFORM_STEPS_PER_BAR) + 1); }
+  /**
+   * The bar of the latest note offered (1-based; bar 1 before the first). It counted notes offered, so the last step of
+   * a bar already read as the next one. An Arena set offers no note past its length, so it holds at its last bar.
+   */
+  get bar(): number { return Math.floor(Math.max(0, this.notes - 1) / PERFORM_STEPS_PER_BAR) + 1; }
 
-  /** Every note has been offered and the last one's window has closed: the set is over. */
+  /** An Arena set whose every note has been offered and whose last note's window has closed is over. Free play never is. */
   over(now: number): boolean {
-    return this.notes >= PERFORM_SET_NOTES && now - this.lastNoteAt > PERFORM_EXPIRE_S;
+    return this.notes >= this.maxNotes && now - this.lastNoteAt > PERFORM_EXPIRE_S;
   }
 }

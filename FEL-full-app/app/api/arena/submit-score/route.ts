@@ -12,7 +12,7 @@ import {
   ArenaError,
   arenaModeKey,
 } from '@/lib/arena';
-import { drawRivalScore, median } from '@/lib/arena-rivals';
+import { drawRivalScore, median, ownDuelScores, RIVAL_FROM_DUEL_SCORES, storedModeKeys } from '@/lib/arena-rivals';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { forWire } from '@/lib/mp/dunkCard';
 import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena-score-integrity';
@@ -98,24 +98,41 @@ export async function POST(req: NextRequest) {
         // HOTFIX (2026-09-24): sessions are read under the key GameShell saves them under. A duel stored as 'musicAcademy'
         // reads 'music' here. Raw, it found no sessions and drew its rival off the default baseline of 100 on a 5000 scale.
         const sessionMode = arenaModeKey(match.mode);
+        // A mode whose sessions are on another scale than a staked run (music: free play has no end, an Arena set does)
+        // is banded on this player's own past duel scores in the mode, never their sessions, and on the baseline until
+        // they have one. Past scores above today's ceiling came from before it, and are left out.
+        const fromDuels = RIVAL_FROM_DUEL_SCORES.has(sessionMode);
         const [recent, population] = await Promise.all([
-          tx.gameSession.findMany({
-            where: { userId, mode: sessionMode, createdAt: { lt: match.createdAt } },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
-            select: { score: true },
-          }),
-          tx.gameSession.findMany({
-            where: { mode: sessionMode, createdAt: { lt: match.createdAt } },
-            orderBy: { createdAt: 'desc' },
-            take: 200,
-            select: { score: true },
-          }),
+          fromDuels
+            ? tx.competitionMatch.findMany({
+              where: {
+                currency: 'LC', mode: { in: storedModeKeys(sessionMode) }, createdAt: { lt: match.createdAt },
+                OR: [{ player1Id: userId, player1Score: { not: null } }, { player2Id: userId, player2Score: { not: null } }],
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+              select: { player1Id: true, player1Score: true, player2Score: true },
+            }).then((rows: { player1Id: string; player1Score: number | null; player2Score: number | null }[]) =>
+              ownDuelScores(rows, userId, check.ceilingApplied ? check.ceiling.max : Infinity))
+            : tx.gameSession.findMany({
+              where: { userId, mode: sessionMode, createdAt: { lt: match.createdAt } },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+              select: { score: true },
+            }).then((rows: { score: number }[]) => rows.map((r) => r.score)),
+          fromDuels
+            ? []
+            : tx.gameSession.findMany({
+              where: { mode: sessionMode, createdAt: { lt: match.createdAt } },
+              orderBy: { createdAt: 'desc' },
+              take: 200,
+              select: { score: true },
+            }),
         ]);
         const draw = drawRivalScore({
           seed: match.seed,
           mode: sessionMode,
-          playerHistory: recent.map((r: { score: number }) => r.score),
+          playerHistory: recent,
           populationMedian: population.length ? median(population.map((r: { score: number }) => r.score)) : null,
         });
         // HOTFIX (2026-09-24): the house is held to the same ceiling as the player. A cold-start baseline on another

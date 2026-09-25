@@ -224,9 +224,9 @@ function carnivalEventRuns(): Record<string, number> {
   };
 }
 
-/** The PERFORM set through the real PerformSet at the fastest tempo, tapped dead on every note, well past its end. */
-function performRun(bpm: number): { score: number; notes: number; overAt: number } {
-  const set = new PerformSet();
+/** An Arena PERFORM set through the real PerformSet at the fastest tempo, tapped dead on every note, well past its end. */
+function performRun(bpm: number, arena = true): { score: number; notes: number; overAt: number } {
+  const set = new PerformSet({ arena });
   const stepSec = 60 / bpm / 4;
   let overAt = -1;
   for (let i = 0; i < (PERFORM_SET_BARS + 8) * PERFORM_STEPS_PER_BAR; i++) {
@@ -471,7 +471,7 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     }
   });
 
-  it('music (HIGH): the set is PERFORM_SET_BARS long, ends itself, and a perfect set at 160 BPM scores exactly the ceiling', () => {
+  it('music (HIGH): an Arena set is PERFORM_SET_BARS long, ends itself, and a perfect set at 160 BPM scores exactly the ceiling', () => {
     for (const bpm of [60, 92, 160]) {
       const r = performRun(bpm);
       expect(r.notes, `${bpm} BPM`).toBe(PERFORM_SET_NOTES);
@@ -485,9 +485,22 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     expect(checkStakeScore({ mode: 'music', score: s }).ok).toBe(true);
     expect(checkStakeScore({ mode: 'musicAcademy', score: s }).ok).toBe(true);   // a duel stored under the old key
     // one note past the set pays nothing: the note is never offered
-    const set = new PerformSet();
+    const set = new PerformSet({ arena: true });
     for (let i = 0; i < PERFORM_SET_NOTES + 40; i++) { const t = i * 0.1; expect(set.note(0, t, t).offered).toBe(i < PERFORM_SET_NOTES); set.tap(t); }
     expect(set.score).toBe(SCORE_CEILINGS.music.max);
+    expect(checkStakeScore({ mode: 'music', score: set.score }).ok).toBe(true);        // the staked maximum is accepted
+    expect(checkStakeScore({ mode: 'music', score: set.score + 1 }).ok).toBe(false);   // and one point over it is not
+  });
+
+  // Owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays endless". The ceiling
+  // is the Arena set's; a free set has no end, so its score has no ceiling, and that is why only the Arena set is staked.
+  it('music: a free set is not what the ceiling describes — it never ends, and the same perfect play runs past the ceiling', () => {
+    const free = performRun(160, false);
+    expect(free.overAt).toBe(-1);                                                // it never ends itself
+    expect(free.notes).toBe((PERFORM_SET_BARS + 8) * PERFORM_STEPS_PER_BAR);     // every step past bar 32 is still a note
+    expect(free.score).toBeGreaterThan(SCORE_CEILINGS.music.max);
+    expect(checkStakeScore({ mode: 'music', score: free.score }).ok).toBe(false);
+    expect(SCORE_CEILINGS.music.why).toContain(`${PERFORM_SET_BARS}-bar Arena set`);
   });
 
   it('skate (MEDIUM): the reviewer\'s honest expert line — alternating 1.5 s grind / manual for the whole run — is accepted at any refresh rate', () => {
@@ -844,13 +857,14 @@ describe('drift guards — the numbers mirrored out of mode files still match th
 
   it('music: StudioMode scores PERFORM through PerformSet and nowhere else', () => {
     const studio = src('lib/babylon/music/StudioMode.tsx');
-    expect(studio).toContain("import { PerformSet, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './performSet'");
+    expect(studio).toContain("import { PerformSet, PERFORM_STEPS_PER_BAR, ARENA_SET_NOTE, performStatusLine } from './performSet'");
     expect(studio).toContain('const STEPS = PERFORM_STEPS_PER_BAR;');
     expect(studio).toContain('set.note(s, t, now)');
     expect(studio).toContain('set.tap(eng.context.currentTime)');
     expect(studio).toContain('if (set.over(now)) endSetRef.current();');
     expect(studio).toContain('const { score, combo } = setRef.current;');
-    expect(studio).toContain('setRef.current = new PerformSet();');
+    expect(studio).toContain('setRef.current = new PerformSet({ arena: arenaSet });');   // an Arena set only on an Arena run
+    expect(studio).not.toMatch(/new PerformSet\(\{ arena: true \}\)/);                  // never capped by default
     expect(studio).not.toMatch(/setScore\(\(s\) =>/);                            // no second tally beside the set's
     expect(src('lib/babylon/music/AudioEngine.ts')).toMatch(/this\.onStepAudible\?\.\(s\.step, s\.time\)/);   // one note per step
   });

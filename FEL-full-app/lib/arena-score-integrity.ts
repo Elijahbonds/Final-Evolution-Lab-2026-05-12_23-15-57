@@ -11,7 +11,7 @@
  *   1. A CEILING PER STAKEABLE MODE, in the pattern of `chainScoreCeiling` (lib/wallet/validation.ts): a count times a
  *      per-unit maximum, from the mode's own rules. A score above it is refused, never settled. Two kinds:
  *        - 'rules' — the rules end the game and every term comes from them (first to 11, five racks of five, four dunks
- *                    of 60, a 32-bar set...). The ceiling is exactly the most the game can award.
+ *                    of 60, a 32-bar Arena set...). The ceiling is exactly the most the game can award.
  *        - 'bound' — the rules set no maximum (a THPS combo whose multiplier grows with every link, endless waves, a
  *                    drive that ends only on a tackle). The ceiling is a flawless run of the longest length the mode
  *                    allows — its own clock, or UNTIMED_RUN_SEC where it has none — scoring as fast as its cooldowns,
@@ -509,10 +509,13 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   // HOTFIX (2026-09-24): keyed 'music', the key the Arena, the catalogue and the Academy's GameShell use (lib/game-data.ts
   // LEGACY_MODE_KEYS). A duel stored as 'musicAcademy' finds this row through canonicalStakeMode.
+  // Only an Arena set has an end (owner, 2026-09-24: "Cap only Arena sets"): a duel launches the Academy with ?arena=,
+  // and that run's PERFORM set is `new PerformSet({ arena: true })`. Free play runs until END SET and is never staked, and
+  // its sessions never set a staked rival either: a music rival is banded on past Arena scores (RIVAL_FROM_DUEL_SCORES).
   music: {
     max: performSetMax(), kind: 'rules', swapsUnderKillSwitch: false,
-    why: `a ${PERFORM_SET_BARS}-bar set, every one of its ${PERFORM_SET_NOTES} notes hit PERFECT in one combo`,
-    basis: 'performSet PERFORM_SET_NOTES (PERFORM_SET_BARS × 16 steps, every step a note), each performHitPoints(PERFECT, combo) = 100 × (1 + floor(combo / 5)); the set ends itself after its last note',
+    why: `a ${PERFORM_SET_BARS}-bar Arena set, every one of its ${PERFORM_SET_NOTES} notes hit PERFECT in one combo`,
+    basis: 'performSet PERFORM_SET_NOTES (PERFORM_SET_BARS × 16 steps, every step a note), each performHitPoints(PERFECT, combo) = 100 × (1 + floor(combo / 5)); an Arena set ends itself after its last note',
   },
   // ── bound: the rules set no maximum (see the header) ──────────────────────────────────────────────────────────────
   skateboarding: {

@@ -26,7 +26,7 @@
 
 import type { DbClient } from '@/lib/ledger';
 import { applyLc, getOrCreateWallet } from '@/lib/wallet/wallet-service';
-import { canonicalModeKey } from '@/lib/game-data';
+import { canonicalModeKey, LEGACY_MODE_KEYS } from '@/lib/game-data';
 
 // ---------------------------------------------------------------------------
 // House rival roster
@@ -184,6 +184,35 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
 /** Symmetric skill-band half-width: the rival scores within ±18% of the
  *  band center. TUNE(elijah). */
 export const RIVAL_BAND = 0.18;
+
+/**
+ * Modes whose sessions are not on the scale of a staked run, so the rival is banded on the player's own past Arena
+ * scores in the mode instead of their sessions, and on the cold-start baseline until they have one.
+ *
+ * Music (owner, 2026-09-24: "Cap only Arena sets"): an Arena set ends after 32 bars, free play runs until END SET, and
+ * both save a session under 'music'. The combo multiplier grows with the set, so a 4-minute free set scores two to three
+ * times a 32-bar set played as well, and a rival centred on free sets would outscore the player on every staked set.
+ */
+export const RIVAL_FROM_DUEL_SCORES: ReadonlySet<string> = new Set(['music']);
+
+/** Every key a duel of this mode may be stored under: the current one and its old spellings (LEGACY_MODE_KEYS). */
+export function storedModeKeys(mode: string): string[] {
+  return [mode, ...Object.keys(LEGACY_MODE_KEYS).filter((k) => LEGACY_MODE_KEYS[k] === mode)];
+}
+
+/**
+ * The player's own scores from their past duels, in the order given (newest first from the query), from CompetitionMatch
+ * rows on either side. A score above `max` is dropped: it came from before the mode's ceiling, and no staked run can
+ * reach it now.
+ */
+export function ownDuelScores(
+  rows: readonly { player1Id: string; player1Score: number | null; player2Score: number | null }[],
+  userId: string, max = Infinity,
+): number[] {
+  return rows
+    .map((r) => (r.player1Id === userId ? r.player1Score : r.player2Score))
+    .filter((s): s is number => typeof s === 'number' && Number.isFinite(s) && s >= 0 && s <= max);
+}
 
 export interface RivalDraw {
   score: number;

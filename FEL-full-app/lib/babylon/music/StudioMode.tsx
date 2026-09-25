@@ -39,7 +39,7 @@ import {
   type MusicProgress,
 } from './MusicTiers';
 import type { GameProps } from '@/components/games/game-shell';
-import { PerformSet, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './performSet';
+import { PerformSet, PERFORM_STEPS_PER_BAR, ARENA_SET_NOTE, performStatusLine } from './performSet';
 
 // HOTFIX (2026-09-24): the grid's steps and PERFORM's set are one number, so the set's length in bars is the grid's bars.
 const STEPS = PERFORM_STEPS_PER_BAR;
@@ -96,17 +96,22 @@ export default function StudioMode({
   onPublish,
   profile = { id: 'me', name: 'You' },
   spendShards,
+  arenaSet = false,
 }: GameProps & {
   onPublish?: (payload: unknown) => void;
   profile?: { id: string; name: string };
   /** SHARDS SEAM — wire to the real economy; absent = allowed + logged. */
   spendShards?: (cost: number, reason: string) => Promise<boolean>;
+  /** The run came from an Arena duel (?arena=<matchId>, passed by app/play/music's loader): PERFORM is the staked set,
+   *  PERFORM_SET_BARS long. Absent = free play, which runs until END SET. */
+  arenaSet?: boolean;
 }) {
   const engineRef = useRef<AudioEngine | null>(null);
   const modeRef = useRef<Mode>('build');
   // HOTFIX (2026-09-24): PERFORM's notes, judge and score live in PerformSet (pure, performSet.ts) — the same rules the
-  // Arena's server check reads — and a set is PERFORM_SET_BARS long. It used to run until END SET, so no score was too big.
-  const setRef = useRef(new PerformSet());
+  // Arena's server check reads. An Arena set is PERFORM_SET_BARS long, so its score has a ceiling; free play runs until
+  // END SET, as it always did (owner, 2026-09-24: "Cap only Arena sets").
+  const setRef = useRef(new PerformSet({ arena: arenaSet }));
   /** endSet as of the last render, for the engine callback that ends a finished set (its closure is from mount). */
   const endSetRef = useRef<() => void>(() => {});
   const playerRef = useRef<HTMLAudioElement | null>(null);
@@ -174,7 +179,7 @@ export default function StudioMode({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [judgement, setJudgement] = useState('');
-  const [perfBar, setPerfBar] = useState(1);   // HOTFIX (2026-09-24): the bar of the set, shown beside the score
+  const [perfBar, setPerfBar] = useState(1);   // HOTFIX (2026-09-24): the set's bar, shown beside the score on an Arena set
   const flipTrigger = useRef<((pad: number) => void) | null>(null);   // filled by FlipPad; hit by paired phones
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -207,7 +212,7 @@ export default function StudioMode({
       const { missed } = set.note(s, t, now);
       if (missed) { setCombo(0); setJudgement('MISS'); }
       setPerfBar(set.bar);
-      if (set.over(now)) endSetRef.current();   // the last bar is out and its last note's window has closed
+      if (set.over(now)) endSetRef.current();   // an Arena set's last bar is out and its last note's window has closed
     };
     return () => eng.dispose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,13 +346,13 @@ export default function StudioMode({
   // tapped PERFORM reported the whole ten minutes as their set. That is the "both" path,
   // and it is the normal one: the stage pick chooses where you land, not where you stay.
   const enterPerform = useCallback(() => {
-    setRef.current = new PerformSet();   // a fresh set: no notes, no score, nothing left over from the last one
+    setRef.current = new PerformSet({ arena: arenaSet });   // a fresh set: no notes, no score, nothing left over
     setMode('perform');
     setScore(0);
     setCombo(0);
     setPerfBar(1);
     setStartedAt.current = Date.now();
-  }, []);
+  }, [arenaSet]);
 
   // The scored half's finish line. Reports the set to the shell, which posts the
   // session and shows the card — the same path every other mode ends on. Back to the
@@ -503,10 +508,12 @@ export default function StudioMode({
             {mode === 'perform' && (
               <>
                 <button style={S.btn} onClick={performTap}>TAP</button>
-                <span style={{ fontSize: 13 }}>bar {perfBar}/{PERFORM_SET_BARS} · score {score} · combo x{combo} · {judgement}</span>
+                <span style={{ fontSize: 13 }}>{performStatusLine({ bars: setRef.current.bars, bar: perfBar, score, combo, judgement })}</span>
                 {/* A scored half needs a finish line, or it can never reach a card. STUDIO
                     has no END SET because a tool does not end — that is the whole split. */}
                 <button style={S.btn} onClick={endSet}>END SET</button>
+                {/* Only a staked set has a length, so only a staked set says so. */}
+                {arenaSet && <span style={{ fontSize: 12, color: '#ffd75e' }}>{ARENA_SET_NOTE}</span>}
               </>
             )}
           </div>
