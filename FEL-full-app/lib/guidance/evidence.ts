@@ -12,20 +12,22 @@
 
 import type { Discipline } from '../creator/creative-card-types';
 import type { ActivityEvidence } from './pathways';
+import { canonicalModeKey } from '../game-data';
 
-/** Mode key -> the discipline that playing it is evidence of. Absent means "this tells us nothing". */
+/** Mode key -> the discipline that playing it is evidence of. Absent means "this tells us nothing".
+ *  HOTFIX (2026-09-24): the keys are the ones GameShell saves sessions under, because sessions are what this reads. */
 export const MODE_DISCIPLINE: Record<string, Discipline> = {
   // Hoops, combat, boards, racing, field — all of it is sport.
   dunkContest: 'sport', hoops1v1: 'sport', hoops3v3: 'sport', threePoint: 'sport', dunkduel: 'sport',
   karateEndless: 'sport', karateVersus: 'sport', mixedcombat: 'sport', duel: 'sport', showdown: 'sport',
   skateboarding: 'sport', snowboarding: 'sport', surfing: 'sport', bigAir: 'sport',
-  velocitykart: 'sport', aeroaces: 'sport', freerun: 'sport', sprint: 'sport',
+  velocityKart: 'sport', aeroAces: 'sport', freerun: 'sport', sprint: 'sport',   // HOTFIX (2026-09-24): was 'velocitykart' / 'aeroaces', which matched no racing session
   football: 'sport', soccer: 'sport', baseball: 'sport', tennis: 'sport', volleyball: 'sport',
   golf: 'sport', tiebreak: 'sport', training: 'sport',
 
   // The craft modes each map to their own thing.
   dance: 'dance',
-  musicAcademy: 'music',
+  music: 'music',   // HOTFIX (2026-09-24): the key the Academy's sessions are saved under (GameShell mode="music"); 'musicAcademy' matched no row
   acting: 'acting',
   storyMode: 'scene',
   whoSceneIt: 'scene',
@@ -34,7 +36,10 @@ export const MODE_DISCIPLINE: Record<string, Discipline> = {
 };
 
 export function disciplineForMode(modeKey: string): Discipline | null {
-  return MODE_DISCIPLINE[modeKey] ?? null;
+  // HOTFIX (2026-09-24): an old spelling ('musicAcademy', 'velocitykart', 'aeroaces') still reads as its mode. Own keys
+  // only, so 'constructor' is not a discipline.
+  const k = canonicalModeKey(modeKey);
+  return Object.prototype.hasOwnProperty.call(MODE_DISCIPLINE, k) ? MODE_DISCIPLINE[k] : null;
 }
 
 export interface SessionRow { mode: string; createdAt: Date | string }

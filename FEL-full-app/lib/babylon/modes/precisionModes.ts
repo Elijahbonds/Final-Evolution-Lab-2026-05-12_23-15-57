@@ -23,11 +23,11 @@ import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
 import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
-import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
-import type { AbstractMesh, Mesh, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
@@ -1208,10 +1208,8 @@ export const DerbyMode: ModeDefinition = (() => {
       }
       throwIn = 0; pendingThrow = null;
       pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
-      // ANIM-SURGICAL: the PCI ring is a torus built flat (XZ) under a billboard, which turns its PLANE edge-on to the camera —
-      // behind the batter it drew as a glowing cyan stick beside the fists, a second 'bat' (the eye's bat-detach frames).
-      // Stood up once in its own vertices, the billboard shows the ring it was meant to be. (Shared Reticle: follow-up.)
-      (pci.mesh as Mesh).bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));
+      // HOTFIX (2026-09-24): the PCI ring used to draw edge-on, a glowing cyan stick beside the fists, a second 'bat' (the eye's
+      // bat-detach frames, ANIM-SURGICAL). The shared Reticle stands its ring up itself now (aimSwingCore); a second bake here would lay it flat again.
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
       flight = new Flight(ball, -6);
@@ -1444,6 +1442,9 @@ export const PenaltyMode: ModeDefinition = (() => {
   let keepPlan: RivalKickPlan | null = null;
   let keepT = 0;                               // seconds into the rival's run-up
   let keepStruck = false, keepStrikeAt = 0, keepDive: DiveSign = 0, keepDiveAt: number | null = null;
+  /** HOTFIX (2026-09-24): your kick is decided and their kick has not started (resolveKick → startKeeperRound, 1.2 s).
+   *  resolveKick leaves phase 'aim' for that beat, and the old PLACE kick below read 'aim' as a fresh kick. */
+  let betweenKicks = false;
   const KEEP_RUNUP_SEC = 1.15;
   const SPOT = new Vector3(0, 0, 0), GOAL_LINE = new Vector3(0, 0, 10.4);
   let feints = 0, lastFlickSign = 0, lastFlickMs = 0;
@@ -1617,10 +1618,20 @@ export const PenaltyMode: ModeDefinition = (() => {
     // YOUR kick, then THEIR kick — and their kick is yours to keep.
     setTimeout(() => { if (!ended) startKeeperRound(ctx); }, 1200);
     phase = 'aim'; brk.on = false; brk.counterLive = false; ctx.setHud({ clock: 0, flow: -1, kinetic: '' }); me.root.position.y = 0;
+    betweenKicks = true;   // HOTFIX (2026-09-24): the result beat takes no kick input (onInput)
   }
 
   function kickLabel(): string {
     return round <= REGULATION_KICKS ? `KICK ${round}/${REGULATION_KICKS}` : 'SUDDEN DEATH';
+  }
+
+  /** HOTFIX (2026-09-24): the aim ring is shown only while it aims the kick, which is the PLACE kick's aim and power
+   *  phases. The BREAKAWAY shot aims off the stick (strikeNow) and never reads the ring, and every kick is a breakaway
+   *  now, so in play the ring stays hidden. Stood up by the shared Reticle fix, it sat face-on in the middle of the goal
+   *  mouth all breakaway ('aim here', and it did not follow the shot) and behind you all through their kick. */
+  function syncReticle(): void {
+    const aiming = (phase === 'aim' || phase === 'power') && !brk.on && !betweenKicks;
+    if (reticle.mesh.isEnabled(false) !== aiming) reticle.mesh.setEnabled(aiming);
   }
 
   function nextKick(ctx: ModeContext): void {
@@ -1643,7 +1654,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         : 'BREAKAWAY — run at him, A shoots; LT slide, R1 off the glass';
     ctx.setHud({
       round: kickLabel(), feints: 0, ...kicksHud(), dive: '', weather: weather.describe(), kickShape: '',
-      score: `${goals}–${themGoals}`,
+      score: goals * 20 + stylePts,   // HOTFIX (2026-09-24): one type. This was the string '2–1', so the chip flipped to '40 PTS' after every kick; the kicks panel draws goals–themGoals
       hint,
     });
     startBreakaway(ctx);   // BREAKAWAY: your kick is the run
@@ -1656,6 +1667,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     const sd = round > REGULATION_KICKS;
     keepPlan = planRivalKick(Math.random, sd);
     keepT = 0; keepStruck = false; keepDive = 0; keepDiveAt = null;
+    betweenKicks = false;
     ctx.setHud({ ...kicksHud(), dive: 'THEIR KICK — read the run-up · DIVE ◀ ▶ as he strikes', kickPower: null });
     phase = 'keep';
     keeper.root.position.set(SPOT.x, 0, SPOT.z - 2.2); keeper.root.rotation.set(0, 0, 0);
@@ -1757,6 +1769,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       weather = WeatherKit.fromPick(readWeather('soccer'), 'course', Math.floor(Date.now() / 1000) % 100000);
       weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook('penalty')?.sky });   // a place with its own sky keeps it
       reticle = new Reticle(ctx.scene, new Vector3(0, 1.2, 11), { x: 3.3, y: 1.05 });
+      reticle.mesh.setEnabled(false);   // HOTFIX (2026-09-24): hidden until it aims a kick (syncReticle), so no first-frame flash
       meter = new PowerMeter();
       ctx.objectiveRef.current = new Vector3(0, 1.2, 11);
       ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight');
@@ -1786,14 +1799,14 @@ export const PenaltyMode: ModeDefinition = (() => {
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'KEEP-PP');
 
-      round = 0; goals = 0; stylePts = 0; ended = false;
+      round = 0; goals = 0; stylePts = 0; ended = false; betweenKicks = false;
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       SoundKit.startAmbient('stadium');
       ctx.setHud({ score: 0 });   // net/precision phase 3: the score is the NUMBER the result reports; the kicks panel draws the board
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).soccer = {   // BREAKAWAY probes
           state: () => ({ phase, clock: brk.clock, flow: brk.flow, wall: brk.wall, counterLive: brk.counterLive, struck: brk.struck, x: me.root.position.x, y: me.root.position.y, z: me.root.position.z, vx: brk.run.vx, vz: brk.run.vz, keeperX: keeper.root.position.x, keeperZ: keeper.root.position.z, keeperSliding: !!brk.keeperSlide, rainbowReady: phase === 'break' && brk.vaultT < 0 && rainbowRead(me2(), vel2(), { x: keeper.root.position.x, z: keeper.root.position.z }), slideSec: brk.slideSec, ...brkStats, goals, themGoals, round, ended, ballActive: pball.active, ballZ: ball.position.z }),
-          diveNow: (side: -1 | 1) => { if (phase === 'keep' && keepDiveAt == null) { keepDive = side; keepDiveAt = performance.now(); dive(meAnim, side); meDove = true; meDiveSign = side; } },
+          diveNow: (side: -1 | 1) => { if (phase === 'keep' && keepPlan && keepDiveAt == null) { keepDive = side; keepDiveAt = performance.now(); dive(meAnim, side); meDove = true; meDiveSign = side; } },
         };
       }
       nextKick(ctx);
@@ -1802,6 +1815,9 @@ export const PenaltyMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (phase === 'keep') {
+        // HOTFIX (2026-09-24): their kick is decided (keepPlan cleared) and the 1.3 s result beat runs in 'keep'. A press
+        // there played a dive after the ball was already in or saved, so the beat takes no input.
+        if (!keepPlan) return;
         // one dive per kick: d-pad or a decisive stick flick picks the side
         const side: DiveSign = e.t === 'dpad' && e.pressed ? (e.dir === 'left' ? -1 : e.dir === 'right' ? 1 : 0)
           : e.t === 'stick' && e.side === 'L' && Math.abs(e.x) > 0.6 ? (e.x < 0 ? -1 : 1) : 0;
@@ -1831,6 +1847,10 @@ export const PenaltyMode: ModeDefinition = (() => {
         }
         return;
       }
+      // HOTFIX (2026-09-24): the result beat after your kick takes no kick input. Its phase is 'aim', and the PLACE path
+      // below took that as a new kick: A, A ran the meter and fired a second kick for the same round from wherever the
+      // ball lay, often the net. That meant a second pip, a possible second goal and a second keeper round.
+      if (betweenKicks) { if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; } return; }
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; detectFeint(ctx, e.x); }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'KICK at the top of the wave' }); SoundKit.play('uiTick', { pitch: 1.1 }); ctx.juice.callout('POWER — KICK AT THE TOP', '#8fe0a0', 800); }   // PHONE CONTROLS: the run-up is SAID
@@ -1874,6 +1894,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       meter.update(dt);
+      syncReticle();
       if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100), kickPower: Math.round(meter.value * 100), kickZones: METER_ZONES.map((z) => `${z.to}:${z.label}`).join(','), kickShape: stickY < -0.5 ? 'CHIP' : Math.abs(stickX) > 0.3 ? `CURL ${stickX < 0 ? '◀' : '▶'}` : kickZone(meter.value) });
       if (phase === 'aim') {
         reticle.update(dt, stickX, stickY);
@@ -1984,7 +2005,10 @@ export const PenaltyMode: ModeDefinition = (() => {
             if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
             ctx.setHud({
-              score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals dive: '',
+              score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals
+              // HOTFIX (2026-09-24): `dive: ''` sat inside the comment above, so the DIVE ◀ ▶ prompt stayed up under the
+              // SAVED! / THEM: banner through the whole result beat, asking for a dive after the kick was decided.
+              dive: '',
               banner: r.saved ? (timing === 'perfect' ? 'SAVED! — read it perfectly' : 'SAVED!')
                 : r.why === 'wrong_way' ? (keepPlan.feint ? 'THEM: SOLD YOU — the run-up was a feint' : 'THEM: WRONG WAY')
                 : r.why === 'too_slow' ? 'THEM: BURIES IT — dive as he strikes'

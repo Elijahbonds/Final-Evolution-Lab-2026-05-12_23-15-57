@@ -17,7 +17,7 @@
 //
 // All of it is pure so the page, the API and the tests agree on one answer.
 
-import { MODE_INFO, VENUES } from '../game-data';
+import { MODE_INFO, VENUES, canonicalModeKey } from '../game-data';
 
 export type OnboardingPath = 'play' | 'body';
 
@@ -34,9 +34,11 @@ export function isPath(v: unknown): v is OnboardingPath {
   return v === 'play' || v === 'body';
 }
 
-/** A mode key is usable only if something can actually be opened with it. */
+/** A mode key is usable only if something can actually be opened with it.
+ *  HOTFIX (2026-09-24): an old spelling of a key counts (canonicalModeKey), so a saved pick or a creator card written
+ *  before the catalogue took the session keys still opens its game. */
 export function isPlayableMode(key: string | null | undefined): boolean {
-  const k = String(key ?? '');
+  const k = canonicalModeKey(key);
   return Boolean(k && MODE_INFO[k]?.href);
 }
 
@@ -54,8 +56,10 @@ export function resolveFirstGame(opts: {
   creatorMode?: string | null;
   chosen?: string | null;
 }): string {
-  if (isPlayableMode(opts.creatorMode)) return String(opts.creatorMode);
-  if (isPlayableMode(opts.chosen)) return String(opts.chosen);
+  // HOTFIX (2026-09-24): returned as the catalogue spells it now. A pick saved as 'musicAcademy' and a creator card that
+  // stores 'velocitykart' both still land in their game.
+  if (isPlayableMode(opts.creatorMode)) return canonicalModeKey(opts.creatorMode);
+  if (isPlayableMode(opts.chosen)) return canonicalModeKey(opts.chosen);
   return DEFAULT_FIRST_GAME;
 }
 
@@ -80,7 +84,7 @@ export function hostFrom(card: { displayName?: string | null; mode?: string | nu
                          fallbackName?: string | null): FirstRunHost | null {
   const name = String(card?.displayName ?? fallbackName ?? '').trim();
   if (!name) return null;
-  const mode = isPlayableMode(card?.mode) ? String(card?.mode) : null;
+  const mode = isPlayableMode(card?.mode) ? canonicalModeKey(card?.mode) : null;   // HOTFIX (2026-09-24): an old spelling is read as the current key
   const accent = /^#[0-9A-Fa-f]{6}$/.test(String(card?.accent ?? '')) ? String(card?.accent) : null;
   return { name, mode, accent };
 }
@@ -91,7 +95,8 @@ export function hostFrom(card: { displayName?: string | null; mode?: string | nu
  * than a broken image.
  */
 export function artFor(modeKey: string): string | null {
-  const href = MODE_INFO[modeKey]?.href;
+  // HOTFIX (2026-09-24): an old spelling finds its venue art too.
+  const href = MODE_INFO[canonicalModeKey(modeKey)]?.href;
   if (!href) return null;
   return VENUES.find((v) => v.href === href)?.image ?? null;
 }
@@ -106,6 +111,8 @@ export function carouselOrder(firstGame?: string | null): string[] {
   const withArt = keys.filter((k) => artFor(k));
   const without = keys.filter((k) => !artFor(k));
   const ordered = [...withArt, ...without];
-  const lead = isPlayableMode(firstGame) ? String(firstGame) : null;
+  // HOTFIX (2026-09-24): the lead is spelled as the carousel spells it. Raw, an old spelling would lead the carousel and
+  // the same game would show again under its current key.
+  const lead = isPlayableMode(firstGame) ? canonicalModeKey(firstGame) : null;
   return lead ? [lead, ...ordered.filter((k) => k !== lead)] : ordered;
 }

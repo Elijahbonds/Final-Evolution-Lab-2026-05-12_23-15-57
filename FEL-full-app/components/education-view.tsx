@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { CheckCircle2, Circle, Lock, GraduationCap, Dumbbell, ChevronDown, Loader2, Zap, Brain } from 'lucide-react';
-import { TRACKS, MODE_INFO } from '@/lib/game-data';
+import { TRACKS, MODE_INFO, canonicalModeKey } from '@/lib/game-data';
 
 /** NEXUS adaptive queue item (from /api/nexus/queue) */
 interface NexusQueueItem {
@@ -114,7 +114,9 @@ export function EducationView() {
             </div>
             <div className="mt-4 space-y-2">
               {nexusQueue.map((item) => {
-                const modeInfo = (MODE_INFO as any)?.[item.mode];
+                // HOTFIX (2026-09-24): the sequencer's key is read as the catalogue spells it now. An item still saying
+                // 'musicAcademy', 'velocitykart' or 'aeroaces' fell back to /modes instead of opening its game.
+                const modeInfo = MODE_INFO[canonicalModeKey(item.mode)];
                 const href = modeInfo?.href ?? '/modes';
                 return (
                   <div key={item.id} className="fel-card rounded-lg hover:border-[#A855F7]/30 transition-colors">

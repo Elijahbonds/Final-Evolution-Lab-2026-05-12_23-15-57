@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Dumbbell, Gamepad2 } from 'lucide-react';
 import { ModeCarousel } from '@/components/onboarding/mode-carousel';
-import { MODE_INFO } from '@/lib/game-data';
+import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
 import {
   DEFAULT_FIRST_GAME, destinationFor, resolveFirstGame, type OnboardingPath,
 } from '@/lib/onboarding/firstRun';
@@ -44,7 +44,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   useEffect(() => {
     // The last game they picked, so somebody coming back is offered what they chose before rather than the default.
     try {
-      const saved = localStorage.getItem('fel:firstGame');
+      // HOTFIX (2026-09-24): a pick saved under an old key ('musicAcademy', 'velocitykart') is read as its current key.
+      const saved = canonicalModeKey(localStorage.getItem('fel:firstGame'));
       if (saved && MODE_INFO[saved]?.href) setFirstGame(saved);
     } catch { /* a blocked or empty store is not an error here */ }
     try {
@@ -328,6 +329,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             <a href="/privacy" target="_blank" className="hover:text-[#00E5FF] hover:underline">Privacy</a>
             <span className="mx-2">·</span>
             <a href="/support" target="_blank" className="hover:text-[#00E5FF] hover:underline">Support</a>
+            {/* HOTFIX (2026-09-24): the licence notices sit with the other legal links, named so they do not read as
+                the Lab Credits wallet. */}
+            <span className="mx-2">·</span>
+            <a href="/credits" target="_blank" className="hover:text-[#00E5FF] hover:underline">Credits &amp; licences</a>
           </p>
         )}
       </motion.div>

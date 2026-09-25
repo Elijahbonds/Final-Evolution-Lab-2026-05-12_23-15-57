@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import Link from 'next/link';
-import { Mail, FileText, Shield } from 'lucide-react';
+import { Mail, FileText, Shield, Award } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,9 @@ export default async function SupportPage() {
           </p>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {/* HOTFIX (2026-09-24): a third card for the credits page. Support is the legal hub a signed-in player reaches
+            from the Profile tab, so the licence notices belong here too. */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Link
             href="/terms"
             className="fel-card flex items-center gap-3 rounded-xl p-5 transition-all hover:border-white/20"
@@ -58,6 +60,16 @@ export default async function SupportPage() {
             <div>
               <h3 className="fel-heading text-sm font-bold text-white">Privacy Policy</h3>
               <p className="text-[10px] text-white/40">How we handle your data</p>
+            </div>
+          </Link>
+          <Link
+            href="/credits"
+            className="fel-card flex items-center gap-3 rounded-xl p-5 transition-all hover:border-white/20"
+          >
+            <Award className="h-5 w-5 text-[#00E5FF]" />
+            <div>
+              <h3 className="fel-heading text-sm font-bold text-white">Credits &amp; Licences</h3>
+              <p className="text-[10px] text-white/40">Who made what we use</p>
             </div>
           </Link>
         </div>

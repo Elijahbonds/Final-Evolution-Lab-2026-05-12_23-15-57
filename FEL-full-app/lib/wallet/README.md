@@ -35,7 +35,8 @@ separate from the legacy LC economy (`lib/economy.ts`, `lib/ledger.ts`,
 
 - `GET  /api/v1/wallet` — caller balance (`{coins,shards,version,updated_at}`)
 - `POST /api/v1/wallet/earn` — `{idempotency_key,event_type,payload}` → grant
-- `POST /api/v1/wallet/spend` — `{idempotency_key,sku_id,quantity?}` → 409 on funds
+- `POST /api/v1/wallet/spend` — `{idempotency_key,sku_id,quantity?}` → 409 on funds; 403 `not_sold_here` for a SKU
+  outside `SPEND_ROUTE_SKUS` (it grants only an entitlement row, so a SKU another route delivers is sold there)
 - `GET  /api/v1/wallet/ledger?limit&cursor` — read-only audit trail
 - `POST /api/v1/wallet/stripe-webhook` — coins-only mint, idempotent on event id
 

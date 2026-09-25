@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { spend, readWallet, WalletError } from '@/lib/wallet/wallet-service';
+import { getSku, SPEND_ROUTE_SKUS } from '@/lib/wallet/catalog';
 
 /**
  * POST /api/v1/wallet/spend
@@ -32,6 +33,13 @@ export async function POST(req: NextRequest) {
   const quantity = Number.isFinite(body?.quantity) ? Number(body.quantity) : 1;
   if (!idempotencyKey || !skuId) {
     return NextResponse.json({ error: 'missing_idempotency_key_or_sku_id' }, { status: 400 });
+  }
+  // HOTFIX (2026-09-24): this route only grants a PlayerEntitlement row, so it sells only SPEND_ROUTE_SKUS
+  // (lib/wallet/catalog.ts). A wearable, a session, a workout plan, a kit or a card slot bought here took the balance
+  // and delivered nothing. Each is now refused before any balance is read, and is still sold by its own route, which
+  // calls spend() directly. That is why the check is here and not in spend(). An unknown SKU still answers 404 below.
+  if (getSku(skuId) && !SPEND_ROUTE_SKUS.has(skuId)) {
+    return NextResponse.json({ error: 'not_sold_here' }, { status: 403 });
   }
 
   try {

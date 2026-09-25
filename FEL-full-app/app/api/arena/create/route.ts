@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import {
   ARENA_RAKE_PERCENT,
   isArenaMode,
+  arenaModeKey,
   validateArenaFee,
   generateMatchSeed,
   arenaExpiry,
@@ -27,7 +28,9 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const mode = String(body?.mode ?? '');
+  // HOTFIX (2026-09-24): a client still running old code may post 'musicAcademy'. The duel is stored under the key the
+  // mode's sessions are saved under, because that is what the ghost draw and the lobby read.
+  const mode = arenaModeKey(String(body?.mode ?? ''));
   const feeLc = Number(body?.feeLc);
 
   if (!isArenaMode(mode)) {

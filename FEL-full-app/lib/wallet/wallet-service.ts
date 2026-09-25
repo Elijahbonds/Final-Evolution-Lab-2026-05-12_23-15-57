@@ -30,14 +30,14 @@ import {
   type RewardRuleConfig,
   type WalletCurrency,
 } from './reward-rules';
-import { getSku } from './catalog';
+import { getSku, NOT_ON_SALE } from './catalog';
 import { postLc } from '../ledger';
 import { payloadHash, validateDunkAttempt } from './validation';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
 export class WalletError extends Error {
-  constructor(public code: 'INSUFFICIENT_FUNDS' | 'UNKNOWN_SKU' | 'SHARD_PURCHASE_FORBIDDEN' | 'RULE_INACTIVE' | 'RULE_NOT_FOUND' | 'INVALID_AMOUNT' | 'REPLAYED_KEY', message?: string) {
+  constructor(public code: 'INSUFFICIENT_FUNDS' | 'UNKNOWN_SKU' | 'NOT_ON_SALE' | 'SHARD_PURCHASE_FORBIDDEN' | 'RULE_INACTIVE' | 'RULE_NOT_FOUND' | 'INVALID_AMOUNT' | 'REPLAYED_KEY', message?: string) {
     super(message ?? code);
     this.name = 'WalletError';
   }
@@ -243,6 +243,10 @@ export async function spend(
     const bal = await readWallet(prisma, playerId);
     return { spent: { currency: prior.currency as WalletCurrency, amount: n(prior.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: prior.id };
   }
+  // HOTFIX (2026-09-24): a SKU that delivers nothing yet is refused before any write (see NOT_ON_SALE). The check sits
+  // after the idempotency lookup on purpose: a retry of a purchase made before the SKU was held gets its original
+  // receipt back, not a refusal of a purchase that already happened.
+  if (NOT_ON_SALE.has(skuId)) throw new WalletError('NOT_ON_SALE');
 
   try {
     return await prisma.$transaction(async (tx) => {

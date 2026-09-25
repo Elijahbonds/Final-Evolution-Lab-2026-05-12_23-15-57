@@ -34,7 +34,7 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
 import {
-  pickNight, rollRival, rivalProgress, freshTally, bankEvent, nightChampion, nightBoard, type NightTally,
+  pickNight, rollRival, rivalProgress, freshTally, bankEvent, nightChampion, nightBoard, type NightTally, EVENTS_PER_NIGHT,
 } from '../core/CarnivalNight';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the MC calls Game Night, the stands react
 
@@ -360,8 +360,11 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const q = qs?.get('players') ?? null;
       // `?events=slam_rush,counter_strike` names the night's draw in order (probes / dev); the seeded draw otherwise.
+      // HOTFIX (2026-09-24): a named night is still EVENTS_PER_NIGHT events at most. The list was taken whole, so a URL
+      // naming forty events played a forty-event night — on a staked Game Night that is a score no four-event night can
+      // reach, and the Arena's check (lib/arena-score-integrity.ts) bounds a night by EVENTS_PER_NIGHT.
       const pool = allCarnivalEvents();
-      const named = (qs?.get('events') ?? '').split(',').map((id) => pool.find((e) => e.id === id.trim())).filter((e): e is CarnivalEvent => !!e);
+      const named = (qs?.get('events') ?? '').split(',').map((id) => pool.find((e) => e.id === id.trim())).filter((e): e is CarnivalEvent => !!e).slice(0, EVENTS_PER_NIGHT);
       const S: St = {
         scene: ctx.scene, events: named.length ? named : pickNight(pool, Date.now() % 100000), idx: 0, phase: 'pick', phaseSec: 0, pickSec: 0,
         // Nothing is built before the harness is PLAYING: an event built inside load() had its camera reset by the

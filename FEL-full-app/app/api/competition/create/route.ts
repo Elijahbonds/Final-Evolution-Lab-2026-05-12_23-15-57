@@ -14,6 +14,7 @@ import {
   appendMatchEvent,
 } from '@/lib/competition';
 import { ledgerEscrowLock } from '@/lib/stripe-helpers';
+import { scoreCeilingFor } from '@/lib/arena-score-integrity';
 
 /**
  * POST /api/competition/create
@@ -37,6 +38,11 @@ export async function POST(req: NextRequest) {
   };
 
   if (!mode) return NextResponse.json({ error: 'mode is required' }, { status: 400 });
+  // HOTFIX (2026-09-24): money is only locked on a mode whose score the server can bound — submit-score refuses a score
+  // above the mode's ceiling, and a mode with no ceiling could never settle.
+  if (!scoreCeilingFor(mode)) {
+    return NextResponse.json({ error: 'NO_SCORE_CEILING', detail: `"${mode}" has no score ceiling, so it cannot be staked.` }, { status: 400 });
+  }
   if (!['H2H', 'SCORE_DUEL', 'GHOST_DUEL'].includes(matchType)) {
     return NextResponse.json({ error: 'Invalid matchType' }, { status: 400 });
   }

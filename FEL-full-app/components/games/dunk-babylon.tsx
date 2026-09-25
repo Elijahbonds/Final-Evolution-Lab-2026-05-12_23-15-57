@@ -82,6 +82,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         duration: r.durationSec,
         headline: won ? 'CONTEST WON' : 'CONTEST OVER',
         tallies: { hits: r.stats?.makes ?? 0, misses: r.stats?.misses ?? 0, dodges: 0, combos: r.stats?.bestChain ?? 0 },   // PACK #3: make/miss proof
+        // HOTFIX (2026-09-24): the night's dunk card (SessionResult.detail) was dropped right here, so the arena submit never
+        // had one to send — the other player never saw a card and the server never checked one against the score.
+        ...(r.detail === undefined ? {} : { detail: r.detail }),
       };
       onEndRef.current(result);
     };

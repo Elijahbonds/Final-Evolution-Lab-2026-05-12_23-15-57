@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { Radio, Loader2, Play, Sparkles, Ticket, Calendar, ShieldQuestion } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
+import { skuOnSale } from '@/lib/wallet/catalog';
 import { PROGRAMS, AD_SLOTS, pickAd, type StreamProgram } from '@/lib/stream/program-guide';
 
 const CAT_ACCENT: Record<string, string> = {
@@ -26,7 +27,14 @@ export function LiveView() {
   const live = PROGRAMS.filter((p) => p.live);
   const onDemand = PROGRAMS.filter((p) => !p.live);
 
+  // HOTFIX (2026-09-24): no class can be watched here yet (no video player, no stream URL), so a pass bought nothing.
+  // Both pass SKUs are held in lib/wallet/catalog.ts NOT_ON_SALE, the server's spend refuses them, and the buttons
+  // below say 'Not on sale yet'. They come back on their own when the SKUs leave that set.
+  const singleOnSale = skuOnSale('class_pass_single');
+  const monthlyOnSale = skuOnSale('class_monthly');
+
   const buyPass = async (sku: 'class_pass_single' | 'class_monthly') => {
+    if (!skuOnSale(sku)) return;
     setBuying(sku);
     try {
       const res = await fetch('/api/v1/wallet/spend', {
@@ -64,32 +72,36 @@ export function LiveView() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white"><Ticket className="h-4 w-4 text-cyan-400" /> Single Class Pass</div>
           <p className="mt-1 text-xs text-white/50">Drop into any one live class.</p>
-          <button onClick={() => buyPass('class_pass_single')} disabled={buying === 'class_pass_single'} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-2 text-sm font-bold text-white transition hover:bg-white/20 disabled:opacity-60">
-            {buying === 'class_pass_single' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-300" />} 40 shards
+          <button onClick={() => buyPass('class_pass_single')} disabled={!singleOnSale || buying === 'class_pass_single'} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-2 text-sm font-bold text-white transition hover:bg-white/20 disabled:opacity-60">
+            {!singleOnSale ? 'Not on sale yet' : <>{buying === 'class_pass_single' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-purple-300" />} 40 shards</>}
           </button>
         </div>
         <div className="rounded-2xl border border-purple-400/30 bg-purple-400/[0.06] p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white"><Ticket className="h-4 w-4 text-purple-300" /> Monthly All-Access</div>
           <p className="mt-1 text-xs text-white/50">Unlimited live classes for a month.</p>
-          <button onClick={() => buyPass('class_monthly')} disabled={buying === 'class_monthly'} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-purple-500 py-2 text-sm font-bold text-white transition hover:bg-purple-400 disabled:opacity-60">
-            {buying === 'class_monthly' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} 300 shards
+          <button onClick={() => buyPass('class_monthly')} disabled={!monthlyOnSale || buying === 'class_monthly'} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-purple-500 py-2 text-sm font-bold text-white transition hover:bg-purple-400 disabled:opacity-60">
+            {!monthlyOnSale ? 'Not on sale yet' : <>{buying === 'class_monthly' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} 300 shards</>}
           </button>
         </div>
       </div>
 
-      {/* Live now */}
+      {/* HOTFIX (2026-09-24): this said "Live now" with a pulsing on-air dot, and each card wore a LIVE badge, for programs
+          that are only flagged live in the static guide (lib/stream/program-guide.ts). Nothing streams here yet, so the
+          heading and the badge say these are live classes that are not on air yet. */}
       {live.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-red-400"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" /></span> Live now</h2>
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-red-400/80"><span className="inline-flex h-2 w-2 rounded-full bg-red-500/60" /> Live classes</h2>
+          <p className="mb-3 text-xs text-white/50">Not streaming yet. These run live once the studio connects a stream.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {live.map((p) => <ProgramCard key={p.id} p={p} live />)}
           </div>
         </section>
       )}
 
-      {/* On demand / scheduled */}
+      {/* On demand / scheduled. HOTFIX (2026-09-24): this said "Classes & on-demand", as if these could be watched now;
+          nothing plays here yet, so it is the program guide. */}
       <section className="mb-8">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-white/60">Classes &amp; on-demand</h2>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-white/60">Program guide</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {onDemand.map((p) => <ProgramCard key={p.id} p={p} />)}
         </div>
@@ -98,7 +110,7 @@ export function LiveView() {
       {/* Provider note (honest) */}
       <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/50">
         <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
-        <p>Live video streams connect to a licensed streaming provider when configured. Passes, schedule, and watch-rewards are fully active now; the video player activates once a stream URL is provided by the studio. Chat is disabled for members under 18.</p>
+        <p>Live video streams connect to a licensed streaming provider when configured. No class can be watched here yet: the video player activates once a stream URL is provided by the studio, and class passes go on sale then, so nothing is charged before a class can be watched. Chat is disabled for members under 18.</p>
       </div>
     </div>
   );
@@ -110,7 +122,7 @@ function ProgramCard({ p, live }: { p: StreamProgram; live?: boolean }) {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="relative h-28" style={{ background: `linear-gradient(135deg, ${accent}, transparent)` }}>
         <span className="absolute left-3 top-3 rounded bg-black/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">{p.category}</span>
-        {live && <span className="absolute right-3 top-3 rounded bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">LIVE</span>}
+        {live && <span className="absolute right-3 top-3 rounded bg-black/50 px-2 py-0.5 text-[10px] font-bold text-red-300">LIVE CLASS · NOT ON AIR YET</span>}
         <button className="absolute inset-0 flex items-center justify-center" onClick={() => toast('Stream player activates when the studio provides a live URL.', { icon: '📺' })} aria-label={`Play ${p.title}`}>
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50 backdrop-blur transition hover:scale-110"><Play className="h-5 w-5 text-white" /></span>
         </button>

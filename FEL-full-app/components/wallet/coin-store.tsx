@@ -3,31 +3,38 @@
 /**
  * components/wallet/coin-store.tsx — Coin store + spend catalog (monetization).
  *
- * Three sections:
+ * Two sections:
  *   1. Coin packs  — real-money purchase via Stripe Checkout (coins ONLY).
- *   2. Spend catalog — spend earned coins / shards on entitlements.
- *   3. Owned — the player's current entitlements.
+ *   2. Spend Your Balance — where coins and shards are spent: the page that
+ *      sells each thing and delivers it (HOTFIX 2026-09-24, see WHERE_TO_SPEND).
  *
- * All prices are SERVER-OWNED; the client only sends a pack id / sku id and
- * an idempotency key. Balances are always the authoritative server values.
+ * All prices are SERVER-OWNED; the client only sends a pack id. Balances are
+ * always the authoritative server values.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Coins, Gem, Loader2, Check, ShoppingCart, Sparkles, History } from 'lucide-react';
+import { Coins, Gem, Loader2, ShoppingCart, Sparkles, History, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { COIN_STORE_PACKS, CATALOG, coinStorePackTotal, type CatalogSku } from '@/lib/wallet/catalog';
-import { newIdempotencyKey, syncWalletBalances } from '@/lib/wallet/client';
+import { COIN_STORE_PACKS, coinStorePackTotal } from '@/lib/wallet/catalog';
 import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 
 interface Balances { coins: number; shards: number }
 
-const SKU_META: Record<string, { name: string; blurb: string }> = {
-  dunk_retry_token: { name: 'Dunk Retry Token', blurb: 'Instantly retry a failed dunk routine without losing your streak.' },
-  dunk_style_slot: { name: 'Dunk Style Slot', blurb: 'Unlock a permanent extra style slot for signature dunk chains.' },
-};
+// HOTFIX (2026-09-24): "Spend Your Balance" used to list every SKU in CATALOG with a Buy button on the generic spend,
+// 30 of them, most shown as a raw id ("private_1on1 900 Buy"). 24 took the coins or shards and delivered nothing,
+// because each is delivered by its own page and route (SPEND_ROUTE_SKUS in lib/wallet/catalog.ts has the list). The
+// owner's economy-honesty call: refuse dead-end buys. So /store sells coin packs and points at the pages whose buy is
+// the real one. Every href here is a page in app/ (components/wallet/storefronts.test.tsx checks it).
+export const WHERE_TO_SPEND: { href: string; place: string; what: string; currency: 'coins' | 'shards' }[] = [
+  { href: '/closet', place: 'Closet', what: 'Wearables for your athlete', currency: 'coins' },
+  { href: '/profile', place: 'Profile', what: 'Creator boost cards', currency: 'shards' },
+  { href: '/workout', place: 'Workout', what: 'Personalized training plans', currency: 'shards' },
+  { href: '/sessions', place: 'Sessions', what: 'Group workouts and private 1-on-1s', currency: 'shards' },
+  { href: '/play/music', place: 'Music Room', what: 'Sound kits and the Cell foundation', currency: 'shards' },
+];
 
 function usd(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
@@ -39,24 +46,14 @@ export function CoinStore() {
   // separately" while /shop/shards showed COMING SOON with every Buy disabled. Both now read the same flag and the same copy.
   const purchasesEnabled = usePurchasesEnabled();
   const copy = shardSaleCopy(purchasesEnabled);
-  const [owned, setOwned] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
   const loadWallet = useCallback(async () => {
     try {
-      const [w, e] = await Promise.all([
-        fetch('/api/v1/wallet', { cache: 'no-store' }),
-        fetch('/api/v1/wallet/entitlements', { cache: 'no-store' }),
-      ]);
+      const w = await fetch('/api/v1/wallet', { cache: 'no-store' });
       if (w.ok) {
         const d = await w.json();
         setBalances({ coins: Number(d.coins) || 0, shards: Number(d.shards) || 0 });
-      }
-      if (e.ok) {
-        const d = await e.json();
-        const map: Record<string, number> = {};
-        for (const it of d.entitlements ?? []) map[it.sku_id] = it.quantity;
-        setOwned(map);
       }
     } catch {
       /* non-fatal */
@@ -89,42 +86,6 @@ export function CoinStore() {
       setBusy(null);
     }
   }, []);
-
-  const spendSku = useCallback(async (sku: CatalogSku) => {
-    setBusy(sku.skuId);
-    try {
-      const res = await fetch('/api/v1/wallet/spend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotency_key: newIdempotencyKey(), sku_id: sku.skuId, quantity: 1 }),
-      });
-      const d = await res.json();
-      if (res.status === 409) {
-        toast.error('Not enough ' + sku.currency, { description: `You need ${sku.unitPrice} ${sku.currency}.` });
-        if (d?.balances) setBalances(d.balances);
-        return;
-      }
-      if (!res.ok) {
-        toast.error('Purchase failed', { description: d?.error ?? 'Please try again.' });
-        return;
-      }
-      const meta = SKU_META[sku.skuId];
-      toast.success(`Unlocked ${meta?.name ?? sku.skuId}`, {
-        description: `-${sku.unitPrice} ${sku.currency}`,
-      });
-      if (d?.balances) {
-        setBalances(d.balances);
-        syncWalletBalances(d.balances); // update the header HUD (no toast)
-      }
-      void loadWallet();
-    } catch {
-      toast.error('Purchase failed');
-    } finally {
-      setBusy(null);
-    }
-  }, [loadWallet]);
-
-  const skus = Object.values(CATALOG);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-10">
@@ -197,45 +158,31 @@ export function CoinStore() {
         </div>
       </section>
 
-      {/* Spend catalog */}
+      {/* Spend Your Balance: where each thing is sold and delivered (see WHERE_TO_SPEND) */}
       <section>
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-1 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#00FF9D]" />
           <h2 className="text-lg font-semibold text-white">Spend Your Balance</h2>
         </div>
+        <p className="mb-3 text-xs text-white/50">Coins and shards are spent on the page that uses what you buy.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {skus.map((sku) => {
-            const meta = SKU_META[sku.skuId] ?? { name: sku.skuId, blurb: '' };
-            const isShard = sku.currency === 'shards';
-            const ownedQty = owned[sku.skuId] ?? 0;
-            const canAfford = (isShard ? balances.shards : balances.coins) >= sku.unitPrice;
-            const permanentOwned = !sku.consumable && ownedQty > 0;
+          {WHERE_TO_SPEND.map((w) => {
+            const isShard = w.currency === 'shards';
             return (
-              <div key={sku.skuId} className="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white">{meta.name}</span>
-                  <span className={`inline-flex items-center gap-1 font-mono text-sm ${isShard ? 'text-[#C79BFF]' : 'text-[#FFD700]'}`}>
-                    {isShard ? <Gem className="h-3.5 w-3.5" /> : <Coins className="h-3.5 w-3.5" />} {sku.unitPrice}
-                  </span>
-                </div>
-                <div className="mb-3 flex-1 text-xs text-white/50">{meta.blurb}</div>
-                {ownedQty > 0 && (
-                  <div className="mb-2 text-[11px] text-white/40">Owned: {ownedQty}{sku.consumable ? '' : ' (permanent)'}</div>
-                )}
-                {permanentOwned ? (
-                  <span className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#00FF9D]/40 bg-[#00FF9D]/10 px-3 py-2 text-sm font-semibold text-[#00FF9D]">
-                    <Check className="h-4 w-4" /> Unlocked
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => spendSku(sku)}
-                    disabled={busy === sku.skuId || !canAfford}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-50"
-                  >
-                    {busy === sku.skuId ? <Loader2 className="h-4 w-4 animate-spin" /> : canAfford ? (sku.consumable ? 'Buy' : 'Unlock') : 'Not enough ' + sku.currency}
-                  </button>
-                )}
-              </div>
+              <Link
+                key={w.href}
+                href={w.href}
+                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.06]"
+              >
+                <span>
+                  <span className="block text-sm font-semibold text-white">{w.place}</span>
+                  <span className="block text-xs text-white/50">{w.what}</span>
+                </span>
+                <span className={`inline-flex items-center gap-1 text-xs ${isShard ? 'text-[#C79BFF]' : 'text-[#FFD700]'}`}>
+                  {isShard ? <Gem className="h-3.5 w-3.5" /> : <Coins className="h-3.5 w-3.5" />} {w.currency}
+                  <ChevronRight className="h-4 w-4 text-white/40" />
+                </span>
+              </Link>
             );
           })}
         </div>

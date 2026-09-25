@@ -30,7 +30,10 @@ export interface ShardSaleCopy {
   shardBuyLabel: string;
 }
 
-const SHARD_ROLE = 'Shards are the premium currency for plans, scans, class passes, seminars & 1-on-1s.';
+// HOTFIX (2026-09-24): class passes left this line when they went NOT_ON_SALE (lib/wallet/catalog.ts); the Shard Store
+// was still promising them above a Buy button, the same promise the wallet's Get Shards widget made. Scans and seminars
+// left it too: the movement scan is free, and Sessions books group workouts and 1-on-1s, not seminar seats.
+const SHARD_ROLE = 'Shards are the premium currency for plans, group workouts & 1-on-1s.';
 
 export function shardSaleCopy(enabled: PurchasesState): ShardSaleCopy {
   if (enabled === true) {

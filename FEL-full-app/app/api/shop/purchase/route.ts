@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
-import { SHOP_CARDS } from '@/lib/game-data';
+import { SHOP_CARDS, shopCardOnSale } from '@/lib/game-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +18,10 @@ export async function POST(req: Request) {
     const cardKey = String(body?.cardKey ?? '');
     const card = SHOP_CARDS.find((c) => c?.key === cardKey);
     if (!card) return NextResponse.json({ error: 'Unknown card' }, { status: 400 });
+    // HOTFIX (2026-09-24): a card that unlocks nothing is refused before any LC moves. See shopCardOnSale in lib/game-data.ts.
+    if (!shopCardOnSale(card.key)) {
+      return NextResponse.json({ error: 'Not on sale yet: this card does not unlock anything yet', code: 'not_on_sale' }, { status: 409 });
+    }
 
     const owned = await prisma.cardOwnership.findUnique({
       where: { userId_cardKey: { userId, cardKey } },

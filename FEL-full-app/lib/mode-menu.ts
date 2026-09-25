@@ -23,7 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { CARNIVAL_EXTERNAL_POOL } from './carnival-run';
-import { MODE_INFO } from './game-data';
+import { MODE_INFO, canonicalModeKey } from './game-data';
 
 export interface ModeMenuMeta {
   icon: LucideIcon;
@@ -33,8 +33,10 @@ export interface ModeMenuMeta {
 
 export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   // Both of these shipped with a route and no menu row, so nothing in the app linked to them (2026-09-19).
-  velocitykart: { icon: Timer, color: '#FFD700', desc: 'Kart racing on the Sovereign Circuit. Drift the corners, bank the boost, hold the line.' },
-  aeroaces: { icon: Mountain, color: '#00E5FF', desc: 'Low-altitude air racing. Thread the pylons, roll through the gates, chase the leader.' },
+  // HOTFIX (2026-09-24): keyed 'velocityKart' / 'aeroAces', the keys MODE_INFO and their GameShells use, not the
+  // Babylon modeIds. Under the old keys a menu row and a catalogue row for the same game could not meet.
+  velocityKart: { icon: Timer, color: '#FFD700', desc: 'Kart racing on the Sovereign Circuit. Drift the corners, bank the boost, hold the line.' },
+  aeroAces: { icon: Mountain, color: '#00E5FF', desc: 'Low-altitude air racing. Thread the pylons, roll through the gates, chase the leader.' },
   karateEndless: { icon: Swords, color: '#FF3366', desc: 'Wave-survival fighter. Chain jabs, kicks and specials - survive escalating waves.' },
   dunkContest: { icon: Trophy, color: '#00E5FF', desc: 'Charge your jump, hit the apex QTE, pick your style. First to 21 style points.' },
   tennis: { icon: CircleDot, color: '#00FF9D', desc: 'Rally-based match play vs adaptive AI. First to 5 points takes the match.' },
@@ -63,7 +65,8 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   showdown: { icon: Shield, color: '#FF3366', desc: 'Storm-style showdown. Spend support assists and substitutions to swing a duel in your favor.' },
   duel: { icon: Swords, color: '#A855F7', desc: 'Weapon duel fundamentals: reach, footwork and clean-hit windows decide the score.' },
   sprint: { icon: Footprints, color: '#FFD700', desc: 'Beach Sprint. Alternate stride rhythm and hold form under pressure to beat the rival.' },
-  musicAcademy: { icon: Timer, color: '#A855F7', desc: 'Groove Academy. Lock into the beat clock and translate rhythm timing into session progress.' },
+  // HOTFIX (2026-09-24): keyed 'music' (was 'musicAcademy'), the key MODE_INFO and the Academy's GameShell use.
+  music: { icon: Timer, color: '#A855F7', desc: 'Groove Academy. Lock into the beat clock and translate rhythm timing into session progress.' },
   dance: { icon: Sparkles, color: '#FF3366', desc: 'The Cypher. Hit choreography cues, keep streak timing alive and cash out performance flow.' },
   acting: { icon: Eye, color: '#A855F7', desc: 'The Read. Practice delivery, timing and presence through a scored creative discipline.' },
   irl: { icon: Trophy, color: '#00E5FF', desc: 'Hang Time. Capture real-world jump evidence locally and turn measured effort into progress.' },
@@ -85,7 +88,9 @@ export const DEFAULT_MODE_MENU_META: ModeMenuMeta = {
 };
 
 export function modeMenuMetaFor(key: string): ModeMenuMeta {
-  return MODE_MENU_META[key] ?? DEFAULT_MODE_MENU_META;
+  // HOTFIX (2026-09-24): an old spelling ('musicAcademy', 'velocitykart', 'aeroaces') still finds its row, because a
+  // stored key or a creator card can still carry one.
+  return MODE_MENU_META[canonicalModeKey(key)] ?? DEFAULT_MODE_MENU_META;
 }
 
 export function visibleModeEntries() {

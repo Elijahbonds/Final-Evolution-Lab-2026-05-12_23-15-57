@@ -151,5 +151,66 @@ export const KitchenMarket = {
   },
 };
 
+export type KitchenCheckout = (priceLookupKey: string, description: string) => Promise<boolean>;
+
+// HOTFIX (2026-09-24): the checkout the hub uses when no Stripe seam is injected, which today is always (app/kitchens
+// mounts <KitchenHub /> with no props). The hub used to "simulate" success here, so SUBSCRIBE said "Subscribed — eat
+// well" and a shift said "Shift is yours" with nothing charged and nothing booked. The owner's economy-honesty call: say
+// checkout is not live instead of pretending. Payments stay on HOLD with the owner, like the Instacart key. It reports
+// failure, so subscribeShift/subscribeMeals write nothing.
+export const CHECKOUT_NOT_LIVE_NOTE = 'Checkout is not live yet. Nothing was charged and nothing was booked.';
+export async function checkoutNotLive(): Promise<boolean> {
+  return false;
+}
+
+/** The hub's checkout: the injected STRIPE SEAM when there is one, otherwise checkoutNotLive (never a simulated yes). */
+export function hubCheckout(startCheckout?: KitchenCheckout): { live: boolean; checkout: KitchenCheckout } {
+  return startCheckout ? { live: true, checkout: startCheckout } : { live: false, checkout: checkoutNotLive };
+}
+
+/** What the hub says after a shift booking or a meal-plan SUBSCRIBE. */
+export function checkoutNote(what: 'shift' | 'meals', ok: boolean, live: boolean): string {
+  if (ok) return what === 'shift' ? 'Shift is yours — publish your meal plan from COOK' : 'Subscribed — eat well';
+  if (!live) return CHECKOUT_NOT_LIVE_NOTE;
+  return what === 'shift' ? 'Shift unavailable' : 'Checkout failed';
+}
+
+// HOTFIX (2026-09-24): LIST IT said "Kitchen listed with 3 bookable shifts" right under the NOT LIVE YET banner that says
+// a booking books nothing. Without a live checkout nobody can book the shifts, so the note does not call them bookable.
+export function listedNote(live: boolean): string {
+  return live
+    ? 'Kitchen listed with 3 bookable shifts'
+    : 'Kitchen listed on this device only. Its 3 shifts can be booked once checkout is live.';
+}
+
+// HOTFIX (2026-09-24): the records the old simulated checkout already wrote on a device. Before this fix a SUBSCRIBE or a
+// shift booking with no seam "succeeded" and was saved to localStorage (fel_meal_subs_v1, fel_kitchen_subs_v1, a shift
+// set taken), so a returning player still saw a green SUBSCRIBED ✓, shifts marked TAKEN, and a held kitchen to publish
+// from, right under the banner that says a booking books nothing. The records stay (they are the player's own device
+// data), but while checkout is not live the hub labels them as what they are: saved here, never booked or paid.
+export const SAVED_NOT_BOOKED = 'SAVED ON THIS DEVICE · NOT BOOKED';
+
+/** The badge on a meal plan this player subscribed to. */
+export function mealSubLabel(live: boolean): string {
+  return live ? 'SUBSCRIBED ✓' : SAVED_NOT_BOOKED;
+}
+
+/** The suffix on a shift that is marked taken. */
+export function takenShiftLabel(live: boolean): string {
+  return live ? ' · TAKEN' : ' · HELD ON THIS DEVICE (not booked)';
+}
+
+/** The suffix on a kitchen this chef holds a shift at, in the "where's it made?" list. */
+export function heldKitchenLabel(live: boolean): string {
+  return live ? '' : ' (held on this device, not booked)';
+}
+
+/** What the hub says after GO LIVE publishes a plan. */
+export function planPublishedNote(live: boolean): string {
+  return live
+    ? 'Plan live on the EAT floor'
+    : 'Plan saved on this device only. Nobody can subscribe to it until checkout is live.';
+}
+
 export const COMPLIANCE_NOTICE =
   'FEL is a marketplace facilitator. Kitchen partners are responsible for their own licensing, permits and insurance; chefs for food-safety certification and local commissary/cottage-food law. Certification fields are operator-entered claims until verified by FEL operations.';

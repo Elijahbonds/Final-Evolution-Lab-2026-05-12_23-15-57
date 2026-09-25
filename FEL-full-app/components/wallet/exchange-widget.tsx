@@ -3,9 +3,12 @@
 /**
  * Coin → Shard exchange. Shards are never sold directly; this converts the
  * real-money coin balance into shards at a server-owned rate, giving a
- * purchase-driven path to the shard-gated premium surfaces (workouts, scans,
- * class passes, sessions). Client sends only the shard amount; price is owned
- * by the server.
+ * purchase-driven path to the shard-gated premium surfaces (workouts,
+ * sessions). Client sends only the shard amount; price is owned by the server.
+ * HOTFIX (2026-09-24): class passes left this list (and the copy below) when they
+ * went NOT_ON_SALE in lib/wallet/catalog.ts: nothing can be watched on /live yet.
+ * Scans left it too: the movement scan is free (app/api/v1/workout/scan), and the
+ * shard scan SKU (scan_personalized) is sold nowhere.
  */
 
 import { useEffect, useState } from 'react';
@@ -58,7 +61,7 @@ export function ExchangeWidget() {
           <Gem className="h-5 w-5 text-[#C79BFF]" />
           <h2 className="fel-heading text-lg font-bold text-white">Get Shards</h2>
         </div>
-        <p className="mb-4 text-xs text-white/50">Shards unlock personalized plans, scans, class passes, and live sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
+        <p className="mb-4 text-xs text-white/50">Shards unlock personalized plans and live sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
 
         {bal && (
           <div className="mb-4 flex items-center gap-4 text-sm">

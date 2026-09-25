@@ -26,6 +26,7 @@
 
 import type { DbClient } from '@/lib/ledger';
 import { applyLc, getOrCreateWallet } from '@/lib/wallet/wallet-service';
+import { canonicalModeKey } from '@/lib/game-data';
 
 // ---------------------------------------------------------------------------
 // House rival roster
@@ -175,7 +176,7 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
   carnival: 300,
   mixedcombat: 100,
   dunkduel: 90,
-  musicAcademy: 5000,
+  music: 5000,
   dance: 5000,
   training: 50,
 };
@@ -216,7 +217,8 @@ export function drawRivalScore(opts: {
     center = opts.populationMedian;
     source = 'population';
   } else {
-    center = ARENA_SCORE_BASELINES[opts.mode] ?? 100;
+    // HOTFIX (2026-09-24): a duel stored as 'musicAcademy' has to find the music baseline, not the default of 100.
+    center = ARENA_SCORE_BASELINES[canonicalModeKey(opts.mode)] ?? 100;
     source = 'baseline';
   }
   const u = seedU(opts.seed, 'rival-score');

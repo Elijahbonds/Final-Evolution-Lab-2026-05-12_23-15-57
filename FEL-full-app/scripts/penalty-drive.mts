@@ -62,10 +62,16 @@ let kickNum = 0;
 for (let g = 0; g < 4000 && Date.now() < deadline; g++) {
   const t = await text();
   const h = await hud();
-  // key on round AND scoreline: every sudden-death round reads 'SUDDEN DEATH',
-  // and keying on the label alone means never taking kick TWO of the tiebreak
-  const kick = typeof h.round === 'string' && /KICK \d\/5|SUDDEN DEATH/.test(h.round)
-    ? `${h.round}|${String(h.score)}` : '';
+  // key on round AND how many kicks THEY have taken: every sudden-death round reads 'SUDDEN DEATH', and keying on the
+  // label alone means never taking kick TWO of the tiebreak. HOTFIX (2026-09-24): this used to key on h.score, which
+  // was the '2–1' string at each kick's start and a number after it. The score is always the number now, and it does
+  // not move on a level sudden-death round (both miss), so the driver would stall there. Their pips move once per
+  // round. A kick only starts once the HUD has left the keeper round: nextKick replaces the 'THEIR KICK' hint, which
+  // stays up through their kick's result beat because this driver never dives (a dive clears it). `dive` now clears
+  // with their result, so it only marks the kick itself.
+  const inKeeperRound = Boolean(h.dive) || /^THEIR KICK/.test(String(h.hint ?? ''));
+  const kick = typeof h.round === 'string' && /KICK \d\/5|SUDDEN DEATH/.test(h.round) && !inKeeperRound
+    ? `${h.round}|${String(h.kicksThem)}` : '';
   if (/HE'S READING THAT SIDE/.test(t)) found.keeperRead = true;
   if (/THEM: (BURIES IT|SAVED!)/.test(t)) found.rivalAnswered = true;
   if (/SUDDEN DEATH/.test(t)) found.suddenDeath = true;
@@ -99,7 +105,12 @@ for (let g = 0; g < 4000 && Date.now() < deadline; g++) {
   }
   await p.waitForTimeout(120);
 }
-const scoreline = /\d–\d/.exec(await text())?.[0] ?? '?';
+// HOTFIX (2026-09-24): the scoreline comes from the HUD's own goals / themGoals. The HUD chip shows 'N PTS' now,
+// so a run that had not ended read '?' from the page text. The end card's 'goals–themGoals' is the fallback.
+const hEnd = await hud();
+const scoreline = typeof hEnd.goals === 'number' && typeof hEnd.themGoals === 'number'
+  ? `${hEnd.goals}–${hEnd.themGoals}`
+  : /\d–\d/.exec(await text())?.[0] ?? '?';
 console.log('final scoreline:', scoreline);
 console.log('summary:', JSON.stringify(found));
 const frame = logs.filter((l) => /FEL-FRAME/.test(l));

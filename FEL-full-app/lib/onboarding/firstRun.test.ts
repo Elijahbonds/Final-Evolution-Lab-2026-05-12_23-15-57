@@ -56,6 +56,31 @@ describe('whose choice the first game is', () => {
   });
 });
 
+describe('HOTFIX (2026-09-24): an old spelling of a mode key still opens its game', () => {
+  // The catalogue key moved to what the shell saves: 'musicAcademy' -> 'music', 'velocitykart' -> 'velocityKart',
+  // 'aeroaces' -> 'aeroAces'. A pick already saved in a browser, and a creator card (which stores the multiplayer
+  // challenge key 'velocitykart'), must keep landing in their game, and come back spelled the current way.
+  it('resolves a saved pick under the old key to the current key and its route', () => {
+    expect(isPlayableMode('musicAcademy')).toBe(true);
+    expect(resolveFirstGame({ chosen: 'musicAcademy' })).toBe('music');
+    expect(destinationFor('play', 'musicAcademy')).toBe('/play/music');
+    expect(destinationFor('play', 'velocitykart')).toBe('/play/velocity-kart');
+    expect(destinationFor('play', 'aeroaces')).toBe('/play/aero-aces');
+  });
+
+  it("keeps a creator card's racing signature mode", () => {
+    expect(resolveFirstGame({ creatorMode: 'velocitykart', chosen: 'tennis' })).toBe('velocityKart');
+    expect(hostFrom({ displayName: 'Ace', mode: 'aeroaces' })?.mode).toBe('aeroAces');
+  });
+
+  it('leads the carousel with the current key, once', () => {
+    const order = carouselOrder('velocitykart');
+    expect(order[0]).toBe('velocityKart');
+    expect(order.filter((k) => k === 'velocityKart')).toHaveLength(1);
+    expect(order).not.toContain('velocitykart');
+  });
+});
+
 describe('where they land', () => {
   it('opens the chosen game itself, not a menu about it', () => {
     expect(destinationFor('play', 'skateboarding')).toBe(MODE_INFO.skateboarding.href);

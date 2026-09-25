@@ -60,7 +60,10 @@ interface MyDuel {
   /** True when the opponent is a House Rival (Quick Match) — labelled, never disguised. */
   ghost?: boolean;
   myScore: number | null;
+  /** Null until both have posted (or the duel is over): the number to beat is not shown before your run. */
   oppScore: number | null;
+  /** The opponent has posted — said even while their score is held back. */
+  oppSubmitted?: boolean;
   mySubmitted: boolean;
   /** What each player actually threw. Null on older duels, and the row degrades to the scores. */
   myCard?: unknown;
@@ -512,11 +515,12 @@ export function ArenaView() {
                         )}
                         {d.status === 'VOIDED' && <span className="text-[#A855F7]"> &middot; refunded</span>}
                       </div>
-                      {(d.myScore !== null || d.oppScore !== null) && (
+                      {(d.myScore !== null || d.oppScore !== null || d.oppSubmitted) && (
                         <div className="mt-1 font-mono text-[11px] text-white/55">
                           You{' '}
                           <span className="text-white">{d.myScore ?? '—'}</span> &middot; Opponent{' '}
-                          <span className="text-white">{d.oppScore ?? '—'}</span>
+                          {/* HOTFIX (2026-09-24): their score is held back until you post yours — say that they posted */}
+                          <span className="text-white">{d.oppScore ?? (d.oppSubmitted ? 'posted — shown once you post' : '—')}</span>
                         </div>
                       )}
                       {/* WHAT THEY THREW, not just what it added up to. Only rendered when a card exists —
@@ -571,12 +575,20 @@ export function ArenaView() {
       </section>
 
       {/* Fair-play footnote */}
+      {/* HOTFIX (2026-09-24): this promised "the identical seeded challenge" — no mode reads the match seed, so each
+          athlete plays their own run of the mode. It now says that, and what the server does check: a mode's limit is
+          the most its rules can award, or — for a mode with no maximum (a combo, endless waves) — the Arena's own limit
+          (lib/arena-score-integrity.ts BOUND_MARGIN × a flawless run), never a claim that the score was impossible. */}
       <div className="flex items-start gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3 font-mono text-[11px] text-white/35">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#00FF9D]" />
         <span>
           Lab Credits are an in-app skill currency with no cash value and cannot be
           purchased. The Arena is a game of skill &mdash; both athletes play the
-          identical seeded challenge and the higher score wins. Duels labelled
+          same mode, each on their own run (the runs are not seeded alike), and the
+          higher score wins. A score above a mode&apos;s limit is refused, never
+          settled: the limit is the most its rules can award or, for an open-ended
+          mode, the Arena&apos;s own limit &mdash; twice a flawless run of the mode&apos;s
+          length (30 minutes where it has no clock). Duels labelled
           HOUSE are played against simulated athletes whose scores are drawn from
           the match seed, banded to your own recent form &mdash; never from your
           submitted score.

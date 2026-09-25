@@ -9,7 +9,7 @@
 // ballistic flight solver. Athletes are real characters with swing clips.
 
 import { VenueKit } from '../visual/VenueKit';
-import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Matrix, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { spawnMeshyProp } from '../visual/meshyProps';
@@ -66,7 +66,14 @@ export class Reticle {
   pos: Vector3;
   constructor(scene: Scene, private center: Vector3, private half: { x: number; y: number }) {
     this.pos = center.clone();
-    this.mesh = MeshBuilder.CreateTorus('reticle', { diameter: 0.55, thickness: 0.05 }, scene);
+    const ring = MeshBuilder.CreateTorus('reticle', { diameter: 0.55, thickness: 0.05 }, scene);
+    // HOTFIX (2026-09-24): the ANIM-SURGICAL follow-up. A torus is built lying flat (XZ), and billboard ALL lines the
+    // mesh's local XY up with the screen, so the ring's PLANE met the camera edge-on and drew as a glowing cyan stick
+    // (penalty, Hot Shot).
+    // Stood up once in its own vertices, the billboard shows the ring. Derby used to bake this at its own call site; it
+    // lives here now, so no caller bakes it again (twice is edge-on again).
+    ring.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));
+    this.mesh = ring;
     this.mesh.material = mat(scene, '#22d3ee', 0.9);
     this.mesh.billboardMode = 7;                          // face the camera
     this.mesh.position = this.pos;

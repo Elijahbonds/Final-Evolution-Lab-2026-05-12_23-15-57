@@ -17,6 +17,7 @@
 
 import type { DbClient } from '@/lib/ledger';
 import { applyLc, WalletError } from '@/lib/wallet/wallet-service';
+import { canonicalModeKey } from '@/lib/game-data';
 import {
   rakeAmount,
   winnerPayout,
@@ -88,13 +89,28 @@ export const ARENA_MODES: readonly string[] = [
   // 'duel' + 'showdown' retired from the v1 roster with the combat-family
   // trim (owner, 2026-09-01 — karate-vs is the Storm mode; combat is three
   // modes). A stake on a redirecting route is a trap, same as sprint.
-  'musicAcademy',
+  // HOTFIX (2026-09-24): 'music', not 'musicAcademy'. The key has to be the one GameShell posts (app/play/music mounts
+  // mode="music"), because a ghost duel draws its rival from GameSession rows WHERE mode = match.mode. Under
+  // 'musicAcademy' it found none, and every rival came off the cold-start baseline. Duels stored under the old key are
+  // still read: see arenaModeKey.
+  'music',
   'dance',
   'training',
 ];
 
 export function isArenaMode(mode: string): boolean {
   return ARENA_MODES.includes(mode);
+}
+
+/**
+ * HOTFIX (2026-09-24): the mode key of a duel, as the catalogue and GameSession rows spell it now. A CompetitionMatch
+ * stored before the rename carries 'musicAcademy'. Read raw, it has no lobby name, a '#' PLAY link, and a ghost draw
+ * that finds no sessions and falls to the default baseline of 100 on a 5000-point scale. Every place that reads
+ * match.mode, or takes a mode from a client that may be running old code, goes through this. New duels are stored
+ * under the current key.
+ */
+export function arenaModeKey(mode: string | null | undefined): string {
+  return canonicalModeKey(mode);
 }
 
 // ---------------------------------------------------------------------------

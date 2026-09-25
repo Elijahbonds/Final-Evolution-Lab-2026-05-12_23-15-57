@@ -50,7 +50,11 @@ describe('the mode shelf', () => {
 
   it('looks up both ways', () => {
     expect(familyOf('dunkContest')?.id).toBe('hoops');
+    expect(familyOf('velocityKart')?.id).toBe('racing');
+    // HOTFIX (2026-09-24): the racers are keyed by their session keys now; an old spelling still finds the shelf
     expect(familyOf('velocitykart')?.id).toBe('racing');
+    expect(familyOf('aeroaces')?.id).toBe('racing');
+    expect(familyOf('musicAcademy')?.id).toBe('craft');
     expect(familyOf('mirror')).toBeNull();          // off the shelf on purpose
     expect(familyById('board')?.label).toBe('Board');
     expect(familyById('nope')).toBeNull();

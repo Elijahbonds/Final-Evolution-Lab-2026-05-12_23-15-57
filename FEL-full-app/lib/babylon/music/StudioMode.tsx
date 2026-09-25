@@ -39,9 +39,10 @@ import {
   type MusicProgress,
 } from './MusicTiers';
 import type { GameProps } from '@/components/games/game-shell';
+import { PerformSet, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './performSet';
 
-const STEPS = 16;
-const EXPIRE_S = 0.25;
+// HOTFIX (2026-09-24): the grid's steps and PERFORM's set are one number, so the set's length in bars is the grid's bars.
+const STEPS = PERFORM_STEPS_PER_BAR;
 const CELL_ASSIST_COST = 50;
 
 const OKTA_TIPS = [
@@ -103,7 +104,11 @@ export default function StudioMode({
 }) {
   const engineRef = useRef<AudioEngine | null>(null);
   const modeRef = useRef<Mode>('build');
-  const expectedRef = useRef<{ step: number; time: number }[]>([]);
+  // HOTFIX (2026-09-24): PERFORM's notes, judge and score live in PerformSet (pure, performSet.ts) — the same rules the
+  // Arena's server check reads — and a set is PERFORM_SET_BARS long. It used to run until END SET, so no score was too big.
+  const setRef = useRef(new PerformSet());
+  /** endSet as of the last render, for the engine callback that ends a finished set (its closure is from mount). */
+  const endSetRef = useRef<() => void>(() => {});
   const playerRef = useRef<HTMLAudioElement | null>(null);
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<View>('studio');
@@ -169,6 +174,7 @@ export default function StudioMode({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [judgement, setJudgement] = useState('');
+  const [perfBar, setPerfBar] = useState(1);   // HOTFIX (2026-09-24): the bar of the set, shown beside the score
   const flipTrigger = useRef<((pad: number) => void) | null>(null);   // filled by FlipPad; hit by paired phones
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -196,14 +202,12 @@ export default function StudioMode({
     eng.onStep = (s) => setPlayhead(s);
     eng.onStepAudible = (s, t) => {
       if (modeRef.current !== 'perform') return;
-      const exp = expectedRef.current;
-      exp.push({ step: s, time: t });
-      const cutoff = eng.context.currentTime - EXPIRE_S;
-      while (exp.length && exp[0].time < cutoff) {
-        exp.shift();
-        setCombo(0);
-        setJudgement('MISS');
-      }
+      const set = setRef.current;
+      const now = eng.context.currentTime;
+      const { missed } = set.note(s, t, now);
+      if (missed) { setCombo(0); setJudgement('MISS'); }
+      setPerfBar(set.bar);
+      if (set.over(now)) endSetRef.current();   // the last bar is out and its last note's window has closed
     };
     return () => eng.dispose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -257,23 +261,11 @@ export default function StudioMode({
   const performTap = (): void => {
     const eng = engineRef.current;
     if (!eng || mode !== 'perform') return;
-    const now = eng.context.currentTime;
-    const exp = expectedRef.current;
-    let best = -1, bestDt = EXPIRE_S;
-    for (let i = 0; i < exp.length; i++) {
-      const dt = Math.abs(now - exp[i].time);
-      if (dt < bestDt) { bestDt = dt; best = i; }
-    }
-    if (best >= 0) {
-      exp.splice(best, 1);
-      const perfect = bestDt < 0.08;
-      setScore((s) => s + (perfect ? 100 : 50) * (1 + Math.floor(combo / 5)));
-      setCombo((c) => c + 1);
-      setJudgement(perfect ? 'PERFECT' : 'GOOD');
-    } else {
-      setCombo(0);
-      setJudgement('EARLY');
-    }
+    const set = setRef.current;
+    const j = set.tap(eng.context.currentTime);
+    setScore(set.score);
+    setCombo(set.combo);
+    setJudgement(j);
   };
 
   const publishTrack = async (): Promise<void> => {
@@ -349,9 +341,11 @@ export default function StudioMode({
   // tapped PERFORM reported the whole ten minutes as their set. That is the "both" path,
   // and it is the normal one: the stage pick chooses where you land, not where you stay.
   const enterPerform = useCallback(() => {
+    setRef.current = new PerformSet();   // a fresh set: no notes, no score, nothing left over from the last one
     setMode('perform');
     setScore(0);
     setCombo(0);
+    setPerfBar(1);
     setStartedAt.current = Date.now();
   }, []);
 
@@ -359,7 +353,10 @@ export default function StudioMode({
   // session and shows the card — the same path every other mode ends on. Back to the
   // BUILD floor afterwards so the room is still there to keep working in.
   const endSet = useCallback(() => {
+    if (modeRef.current !== 'perform') return;   // HOTFIX (2026-09-24): the set's own end and END SET can meet; one card
+    modeRef.current = 'build';                   // no more notes before the effect catches up
     const seconds = setStartedAt.current ? Math.round((Date.now() - setStartedAt.current) / 1000) : 0;
+    const { score, combo } = setRef.current;     // the set's own tally, never a render behind
     onEnd?.({
       score,
       won: score > 0,
@@ -371,7 +368,8 @@ export default function StudioMode({
     setMode('build');
     setScore(0);
     setCombo(0);
-  }, [onEnd, score, combo, kit]);
+  }, [onEnd, kit]);
+  useEffect(() => { endSetRef.current = endSet; }, [endSet]);
 
   const allTracks = StudioLibrary.list();
   const creators = [...new Map(allTracks.map((t) => [t.authorId, t.authorName])).entries()];
@@ -505,7 +503,7 @@ export default function StudioMode({
             {mode === 'perform' && (
               <>
                 <button style={S.btn} onClick={performTap}>TAP</button>
-                <span style={{ fontSize: 13 }}>score {score} · combo x{combo} · {judgement}</span>
+                <span style={{ fontSize: 13 }}>bar {perfBar}/{PERFORM_SET_BARS} · score {score} · combo x{combo} · {judgement}</span>
                 {/* A scored half needs a finish line, or it can never reach a card. STUDIO
                     has no END SET because a tool does not end — that is the whole split. */}
                 <button style={S.btn} onClick={endSet}>END SET</button>

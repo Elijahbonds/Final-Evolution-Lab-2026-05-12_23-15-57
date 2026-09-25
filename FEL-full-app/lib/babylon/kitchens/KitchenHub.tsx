@@ -2,10 +2,14 @@
 // KITCHENS (partners list spaces + recurring shifts), COOK (chefs browse,
 // subscribe to a shift, publish meal-prep plans — only from a kitchen they
 // hold), EAT (weekly meal-prep subscriptions). Stripe checkout rides the
-// injected seam; the compliance notice renders permanently.
+// injected seam (absent = checkout is not live, and the hub says so); the
+// compliance notice renders permanently.
 
 import React, { useState } from 'react';
-import { KitchenMarket, COMPLIANCE_NOTICE, type KitchenShift } from './KitchenMarket';
+import {
+  KitchenMarket, COMPLIANCE_NOTICE, checkoutNote, heldKitchenLabel, hubCheckout, listedNote, mealSubLabel, planPublishedNote,
+  takenShiftLabel, type KitchenCheckout, type KitchenShift,
+} from './KitchenMarket';
 
 type Floor = 'eat' | 'cook' | 'kitchens';
 
@@ -14,8 +18,8 @@ export default function KitchenHub({
   startCheckout,
 }: {
   profile?: { id: string; name: string };
-  /** STRIPE SEAM — M60 subscription pattern. Absent = simulated success + console note. */
-  startCheckout?: (priceLookupKey: string, description: string) => Promise<boolean>;
+  /** STRIPE SEAM — M60 subscription pattern. Absent = checkout is not live: nothing is charged or booked, and the hub says so. */
+  startCheckout?: KitchenCheckout;
 }) {
   const [floor, setFloor] = useState<Floor>('eat');
   const [rev, setRev] = useState(0);
@@ -31,11 +35,9 @@ export default function KitchenHub({
   void rev;
 
   const say = (m: string) => { setNote(m); setTimeout(() => setNote(''), 3000); };
-  const checkout = async (key: string, desc: string): Promise<boolean> => {
-    if (startCheckout) return startCheckout(key, desc);
-    console.info(`[FEL-KITCHEN] STRIPE SEAM not wired — simulating checkout for "${desc}" (price lookup_key: ${key})`);
-    return true;
-  };
+  // HOTFIX (2026-09-24): no seam = no checkout. This used to return true ("simulating checkout"). See hubCheckout in
+  // KitchenMarket.ts.
+  const { live: checkoutLive, checkout } = hubCheckout(startCheckout);
 
   const listKitchen = (): void => {
     if (!kName.trim() || !kCity.trim()) { say('Name and city first'); return; }
@@ -52,13 +54,13 @@ export default function KitchenHub({
     });
     setKName(''); setKCity(''); setKBlurb(''); setKAmenities(''); setKCerts('');
     setRev((r) => r + 1);
-    say('Kitchen listed with 3 bookable shifts');
+    say(listedNote(checkoutLive));
   };
 
   const takeShift = async (kitchenId: string, shiftId: string): Promise<void> => {
     const ok = await KitchenMarket.subscribeShift(kitchenId, shiftId, profile.id, checkout);
     setRev((r) => r + 1);
-    say(ok ? 'Shift is yours — publish your meal plan from COOK' : 'Shift unavailable');
+    say(checkoutNote('shift', ok, checkoutLive));
   };
 
   const publishPlan = (): void => {
@@ -74,7 +76,7 @@ export default function KitchenHub({
     if (!rec) { say('You need an active shift at that kitchen first (COOK → subscribe)'); return; }
     setPTitle(''); setPMenu('');
     setRev((r) => r + 1);
-    say('Plan live on the EAT floor');
+    say(planPublishedNote(checkoutLive));
   };
 
   const S: Record<string, React.CSSProperties> = {
@@ -93,6 +95,7 @@ export default function KitchenHub({
     tag: { fontSize: 11, padding: '3px 8px', borderRadius: 10, background: '#3a2a14', color: '#e8cf9e' },
     compliance: { marginTop: 14, padding: '8px 12px', borderLeft: '3px solid #ffb347', fontSize: 11, opacity: 0.8, lineHeight: 1.5 },
     note: { marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#8a6a3a', color: '#fff', width: 'fit-content' },
+    notLive: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #ffb347', fontSize: 12, color: '#ffd9a0' },
   };
 
   return (
@@ -103,6 +106,11 @@ export default function KitchenHub({
       </a>
       <div style={S.h1}>FEL KITCHENS</div>
       <div style={{ fontSize: 12, opacity: 0.75 }}>idle kitchens working · chefs cooking · meal prep on subscription</div>
+      {!checkoutLive && (
+        <div style={S.notLive}>
+          NOT LIVE YET — checkout isn&apos;t connected, so SUBSCRIBE and shift bookings charge nothing and book nothing. Listings stay on this device.
+        </div>
+      )}
 
       <div style={S.tabs}>
         {([['eat', 'EAT'], ['cook', 'COOK'], ['kitchens', 'LIST A KITCHEN']] as [Floor, string][]).map(([f, l]) => (
@@ -119,14 +127,18 @@ export default function KitchenHub({
             return (
               <div key={p.id} style={S.card}>
                 <div style={{ fontWeight: 700 }}>{p.title} <span style={{ opacity: 0.6, fontWeight: 400 }}>· {p.chefName}</span></div>
+                {/* HOTFIX (2026-09-24): with no live checkout nobody has subscribed, so a count here is only the device's
+                    own simulated subscriptions from before the fix. It shows when checkout is live. */}
                 <div style={{ fontSize: 12, opacity: 0.8 }}>
-                  {p.mealsPerWeek} meals/wk · ${(p.weeklyUsdCents / 100).toFixed(2)}/wk · made at {kitchen?.name ?? 'a partner kitchen'}{kitchen ? `, ${kitchen.city}` : ''} · {p.subscribers} subscribed
+                  {p.mealsPerWeek} meals/wk · ${(p.weeklyUsdCents / 100).toFixed(2)}/wk · made at {kitchen?.name ?? 'a partner kitchen'}{kitchen ? `, ${kitchen.city}` : ''}{checkoutLive ? ` · ${p.subscribers} subscribed` : ''}
                 </div>
                 <div style={S.tagRow}>{p.weeklyMenu.slice(0, 5).map((m, i) => <span key={i} style={S.tag}>{m}</span>)}</div>
                 <div style={S.row}>
+                  {/* HOTFIX (2026-09-24): a subscription saved by the old simulated checkout reads as saved, not booked
+                      (see mealSubLabel). */}
                   {mine
-                    ? <span style={{ color: '#7ee2a0', fontWeight: 700 }}>SUBSCRIBED ✓</span>
-                    : <button style={S.btn} onClick={() => void KitchenMarket.subscribeMeals(p.id, profile.id, checkout).then((ok) => { setRev((r) => r + 1); say(ok ? 'Subscribed — eat well' : 'Checkout failed'); })}>SUBSCRIBE</button>}
+                    ? <span style={{ color: checkoutLive ? '#7ee2a0' : '#ffd9a0', fontWeight: 700 }}>{mealSubLabel(checkoutLive)}</span>
+                    : <button style={S.btn} onClick={() => void KitchenMarket.subscribeMeals(p.id, profile.id, checkout).then((ok) => { setRev((r) => r + 1); say(checkoutNote('meals', ok, checkoutLive)); })}>SUBSCRIBE</button>}
                 </div>
               </div>
             );
@@ -150,7 +162,7 @@ export default function KitchenHub({
                   <button key={s.id} style={{ ...S.btnAlt, ...(s.taken ? { opacity: 0.4, cursor: 'default' } : {}) }}
                     disabled={s.taken}
                     onClick={() => void takeShift(k.id, s.id)}>
-                    {s.days} {s.hours} — ${(s.monthlyUsdCents / 100).toFixed(0)}/mo{s.taken ? ' · TAKEN' : ''}
+                    {s.days} {s.hours} — ${(s.monthlyUsdCents / 100).toFixed(0)}/mo{s.taken ? takenShiftLabel(checkoutLive) : ''}
                   </button>
                 ))}
               </div>
@@ -163,7 +175,7 @@ export default function KitchenHub({
               <option value="">where's it made?</option>
               {KitchenMarket.myKitchenSubs(profile.id).map((s) => {
                 const k = KitchenMarket.kitchen(s.kitchenId);
-                return k ? <option key={s.kitchenId + s.shiftId} value={k.id}>{k.name}</option> : null;
+                return k ? <option key={s.kitchenId + s.shiftId} value={k.id}>{`${k.name}${heldKitchenLabel(checkoutLive)}`}</option> : null;
               })}
             </select>
             <label style={{ fontSize: 12 }}>meals/wk

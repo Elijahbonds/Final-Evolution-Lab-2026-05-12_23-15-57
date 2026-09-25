@@ -6,7 +6,7 @@ import { FAMILIES } from '../nav/families';
 describe('what a mode is evidence of', () => {
   it('reads the craft modes as their own craft, not as sport', () => {
     expect(disciplineForMode('dance')).toBe('dance');
-    expect(disciplineForMode('musicAcademy')).toBe('music');
+    expect(disciplineForMode('music')).toBe('music');
     expect(disciplineForMode('acting')).toBe('acting');
     expect(disciplineForMode('storyMode')).toBe('scene');
   });
@@ -39,6 +39,30 @@ describe('building the evidence', () => {
     const ev = evidenceFrom([{ mode: 'dunkContest', createdAt: day(1) }, { mode: 'dance', createdAt: day(1) }], []);
     expect(ev.sessionsByDiscipline.sport).toBe(1);
     expect(ev.sessionsByDiscipline.dance).toBe(1);
+  });
+
+  it('reads the Academy by the key its sessions are SAVED under — GameShell mode="music", never "musicAcademy"', () => {
+    const ev = evidenceFrom([{ mode: 'music', createdAt: day(1) }, { mode: 'music', createdAt: day(2) }], []);
+    expect(ev.sessionsByDiscipline.music).toBe(2);
+    expect(ev.activeDaysByDiscipline?.music).toBe(2);
+  });
+
+  it('HOTFIX (2026-09-24): reads the racers by their saved keys — GameShell posts velocityKart / aeroAces', () => {
+    // Before the fix the map said 'velocitykart' / 'aeroaces' (the Babylon modeIds), so a racing session was evidence
+    // of nothing. These are the rows the kart and the plane actually write.
+    const ev = evidenceFrom([
+      { mode: 'velocityKart', createdAt: day(1) }, { mode: 'aeroAces', createdAt: day(2) }, { mode: 'dunkContest', createdAt: day(2) },
+    ], []);
+    expect(ev.sessionsByDiscipline.sport).toBe(3);
+    expect(ev.activeDaysByDiscipline?.sport).toBe(2);
+  });
+
+  it('HOTFIX (2026-09-24): an old spelling still reads as its mode, and a prototype key is not a discipline', () => {
+    expect(disciplineForMode('musicAcademy')).toBe('music');
+    expect(disciplineForMode('velocitykart')).toBe('sport');
+    expect(disciplineForMode('aeroaces')).toBe('sport');
+    expect(disciplineForMode('constructor')).toBeNull();
+    expect(disciplineForMode('toString')).toBeNull();
   });
 
   it('counts DISTINCT DAYS, because persistence beats one long evening', () => {

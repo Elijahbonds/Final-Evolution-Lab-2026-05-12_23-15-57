@@ -22,9 +22,11 @@ export default async function ArenaPage() {
             TRIUMPH <span className="text-[#FF3366]">ARENA</span>
           </h1>
         </div>
+        {/* HOTFIX (2026-09-24): "the same seeded challenge" was never true — no mode reads the match seed. Each player
+            plays their own run of the same mode. */}
         <p className="mt-1 max-w-2xl font-mono text-xs text-white/50">
           Head-to-head skill duels wagered in Lab Credits. Post a stake, match an
-          opponent, then play the same seeded challenge. Highest score takes the
+          opponent, then each of you plays the same mode. Highest score takes the
           pot &mdash; ties are refunded in full.
         </p>
         <ArenaView />

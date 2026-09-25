@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { MODE_INFO } from '@/lib/game-data';
+import { arenaModeKey } from '@/lib/arena';
 import { parseCard } from '@/lib/mp/dunkCard';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
@@ -50,14 +51,15 @@ export async function GET() {
   const nameMap: Record<string, string> = {};
   for (const u of users) nameMap[u.id] = u.name || 'Athlete';
 
-  const modeMeta = (key: string) => ({
-    name: MODE_INFO[key]?.name ?? key,
-    href: MODE_INFO[key]?.href ?? '#',
-  });
+  // HOTFIX (2026-09-24): read a stored key through arenaModeKey. A duel stored as 'musicAcademy' otherwise lists under
+  // its raw key, with a '#' PLAY link that leads nowhere while its stake stays locked.
+  const modeMeta = (stored: string) => {
+    const key = arenaModeKey(stored);
+    return { mode: key, name: MODE_INFO[key]?.name ?? key, href: MODE_INFO[key]?.href ?? '#' };
+  };
 
   const open = openRaw.map((m) => ({
     id: m.id,
-    mode: m.mode,
     ...modeMeta(m.mode),
     feeLc: m.entryFeeCents,
     rakePercent: m.rakePercent,
@@ -93,6 +95,9 @@ export async function GET() {
     // the opponent's card is released only once BOTH have posted — otherwise a player could read the dunks
     // they have to beat before taking their own run, which on a staked duel is a fairness hole
     const bothIn = myScore !== null && myScore !== undefined && oppScore !== null && oppScore !== undefined;
+    // HOTFIX (2026-09-24): the opponent's SCORE follows the card's rule — shown once both are in (or the duel no longer
+    // takes scores), not before: the number to beat was a target list of its own (post it plus one).
+    const oppScoreShown = (bothIn || !['ACTIVE', 'WAITING'].includes(m.status)) ? (oppScore ?? null) : null;
     const slot = cardsByMatch.get(m.id) ?? {};
     const myCard = (isP1 ? slot.p1 : slot.p2) ?? null;
     const oppCard = bothIn ? ((isP1 ? slot.p2 : slot.p1) ?? null) : null;
@@ -101,7 +106,6 @@ export async function GET() {
       oppCard,
       oppCardLocked: !bothIn,
       id: m.id,
-      mode: m.mode,
       ...modeMeta(m.mode),
       feeLc: m.entryFeeCents,
       rakePercent: m.rakePercent,
@@ -112,7 +116,8 @@ export async function GET() {
       // simulated opponent is never dressed up as a human with stakes on.
       ghost: m.matchType === 'GHOST_DUEL',
       myScore: myScore ?? null,
-      oppScore: oppScore ?? null,
+      oppScore: oppScoreShown,
+      oppSubmitted: oppScore !== null && oppScore !== undefined,
       mySubmitted: myScore !== null && myScore !== undefined,
       winnerId: m.winnerId,
       iWon: m.winnerId ? m.winnerId === userId : null,

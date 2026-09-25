@@ -22,6 +22,20 @@ const KINDS: { id: ListingKind; label: string }[] = [
   { id: 'art', label: 'ART' }, { id: 'music', label: 'MUSIC' },
 ];
 
+// HOTFIX (2026-09-24): with no shards seam the Marketplace is a PREVIEW that takes nothing (see `preview` below). Every
+// shard figure on it has to agree with the banner, so the receipt and the ✦ Cell tool prices come from here.
+/** The note after a BUY: a real receipt with a seam, and the plain truth in the preview. */
+export function buyNote(preview: boolean, sellerNetShards: number): string {
+  return preview
+    ? 'Yours in this preview. No Shards were spent and the seller was not paid.'
+    : `Yours! Seller nets ${sellerNetShards}◈`;
+}
+
+/** The price tag on a ✦ Cell tool button: its shard cost with a seam, "free in preview" without one. */
+export function cellToolPrice(preview: boolean, costShards: number): string {
+  return preview ? 'free in preview' : `${costShards}◈`;
+}
+
 export default function MarketplaceHub({
   profile = { id: 'me', name: 'You' },
   pass = null,
@@ -30,7 +44,7 @@ export default function MarketplaceHub({
 }: {
   profile?: { id: string; name: string };
   pass?: PassState | null;
-  /** ECONOMY SEAM — same contract as the Studio's. Absent = allowed + logged. */
+  /** ECONOMY SEAM — same contract as the Studio's. Absent = PREVIEW: allowed free + logged, and the hub says so on screen. */
   spendShards?: (cost: number, reason: string) => Promise<boolean>;
   /** Optional bridge to StudioLibrary playback for music listings. */
   playStudioTrack?: (trackId: string) => void;
@@ -53,6 +67,11 @@ export default function MarketplaceHub({
   void rev;
 
   const say = (m: string) => { setNote(m); setTimeout(() => setNote(''), 2600); };
+  // HOTFIX (2026-09-24): nothing passes spendShards (app/market mounts <MarketplaceHub /> with no props), so every BUY
+  // and every ✦ Cell tool is free, and listings and purchases live only in this browser's localStorage. It takes
+  // nothing real, but it read as a real shop ("Yours! Seller nets 135◈"). The owner's economy-honesty call: label it a
+  // preview, on the page, in the receipt and on the Cell tool buttons, until the seam and the server sync exist.
+  const preview = !spendShards;
   const trySpend = async (cost: number, reason: string): Promise<boolean> => {
     if (spendShards) return spendShards(cost, reason);
     console.info(`[FEL-MARKET] SHARDS SEAM not wired — allowing "${reason}" (${cost}) for free`);
@@ -103,7 +122,7 @@ export default function MarketplaceHub({
     const receipt = await Marketplace.buy(l.id, trySpend, l.sellerHasPass ? { active: true, currentPeriodEnd: null, cancelAtPeriodEnd: false } : null);
     if (!receipt) { say('Purchase failed'); return; }
     setRev((r) => r + 1);
-    say(`Yours! Seller nets ${receipt.sellerNetShards}◈`);
+    say(buyNote(preview, receipt.sellerNetShards));
   };
 
   const startOutline = async (): Promise<void> => {
@@ -140,6 +159,7 @@ export default function MarketplaceHub({
     reader: { marginTop: 10, padding: 14, borderRadius: 10, background: '#171220', maxHeight: 380, overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: 14, width: '100%' },
     area: { width: '100%', minHeight: 160, padding: 10, borderRadius: 8, border: '1px solid #8a6d3a', background: '#1c1526', color: '#f2ecdf', fontFamily: 'inherit' },
     note: { marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#8a6d3a', color: '#fff', width: 'fit-content' },
+    preview: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #e8b84a', fontSize: 12, color: '#f5d88e' },
   };
 
   const listings = Marketplace.list(floor === 'shop' ? kind : undefined);
@@ -148,6 +168,11 @@ export default function MarketplaceHub({
     <div style={S.root}>
       <div style={S.h1}>THE FEL MARKETPLACE</div>
       <div style={{ fontSize: 12, opacity: 0.75 }}>books · audiobooks · art · music — creator to creator, priced in Shards</div>
+      {preview && (
+        <div style={S.preview}>
+          PREVIEW — no Shards are spent here yet. BUY and the ✦ Cell tools are free, sellers are not paid, and listings and purchases stay in this browser.
+        </div>
+      )}
 
       <div style={S.tabs}>
         {([['shop', 'SHOP'], ['sell', 'SELL'], ['author', 'AUTHOR DESK'], ['shelf', 'MY SHELF']] as [Floor, string][]).map(([f, label]) => (
@@ -173,7 +198,7 @@ export default function MarketplaceHub({
                 <div style={{ fontSize: 11, opacity: 0.75 }}>{l.sellerName} · {l.kind} · {l.sales} sold</div>
                 <div style={{ fontSize: 12 }}>{l.blurb}</div>
               </div>
-              <div style={{ fontWeight: 800, color: '#e8b84a' }}>{l.priceShards}◈</div>
+              <div style={{ fontWeight: 800, color: '#e8b84a' }}>{l.priceShards}◈{preview ? ' list price, free in preview' : ''}</div>
               {Marketplace.owned(l.id) || l.sellerId === profile.id ? (
                 <>
                   {l.kind === 'book' && <button style={S.btn} onClick={() => setReading(reading?.id === l.id ? null : l)}>READ</button>}
@@ -236,7 +261,7 @@ export default function MarketplaceHub({
             <div style={S.row}>
               <input style={{ ...S.input, minWidth: 240 }} placeholder="what's the book about?" value={topic} onChange={(e) => setTopic(e.target.value)} />
               <button style={S.btn} onClick={() => void startOutline()}>
-                ✦ CELL: 20-CHAPTER OUTLINE ({OUTLINE_COST_SHARDS}◈)
+                ✦ CELL: 20-CHAPTER OUTLINE ({cellToolPrice(preview, OUTLINE_COST_SHARDS)})
               </button>
             </div>
           ) : (
@@ -248,7 +273,7 @@ export default function MarketplaceHub({
                   ))}
                 </select>
                 <button style={S.btnAlt} onClick={() => void scaffoldChapter()}>
-                  ✦ SCAFFOLD THIS CHAPTER ({CHAPTER_DRAFT_COST_SHARDS}◈)
+                  ✦ SCAFFOLD THIS CHAPTER ({cellToolPrice(preview, CHAPTER_DRAFT_COST_SHARDS)})
                 </button>
               </div>
               <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
@@ -283,7 +308,7 @@ export default function MarketplaceHub({
               <div key={p.listingId + p.at} style={S.card}>
                 <div style={{ minWidth: 150 }}>
                   <div style={{ fontWeight: 700 }}>{l.title}</div>
-                  <div style={{ fontSize: 11, opacity: 0.75 }}>{l.kind} · bought for {p.paidShards}◈</div>
+                  <div style={{ fontSize: 11, opacity: 0.75 }}>{l.kind} · {preview ? `${p.paidShards}◈ list price, not charged (preview)` : `bought for ${p.paidShards}◈`}</div>
                 </div>
                 {l.kind === 'book' && <button style={S.btn} onClick={() => setReading(reading?.id === l.id ? null : l)}>READ</button>}
                 {l.kind === 'audiobook' && l.payload.audioDataUrl && <audio controls src={l.payload.audioDataUrl} style={{ height: 32 }} />}

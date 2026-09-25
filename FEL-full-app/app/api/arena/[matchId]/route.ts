@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { MODE_INFO } from '@/lib/game-data';
+import { arenaModeKey } from '@/lib/arena';
 import { parseCard } from '@/lib/mp/dunkCard';
 
 /**
@@ -35,6 +36,11 @@ export async function GET(_req: NextRequest, { params }: { params: { matchId: st
   // read the dunks they have to beat before taking their own run, which turns an async duel into a target
   // list — and this is a money-adjacent surface, so that is a fairness hole rather than a nicety.
   const bothIn = myScore !== null && myScore !== undefined && oppScore !== null && oppScore !== undefined;
+  // HOTFIX (2026-09-24): the same rule for the opponent's SCORE. The card was held back while the number beside it was
+  // not, so the second player knew the exact score to beat — and a cheater posted it plus one, which sits under any
+  // ceiling. The score shows once both are in, or once the duel no longer takes scores; until then only THAT they posted.
+  const oppSubmitted = oppScore !== null && oppScore !== undefined;
+  const oppScoreShown = (bothIn || !['ACTIVE', 'WAITING'].includes(m.status)) ? (oppScore ?? null) : null;
   let myCard: unknown = null, oppCard: unknown = null;
   try {
     const evs = await prisma.matchEvent.findMany({
@@ -51,17 +57,20 @@ export async function GET(_req: NextRequest, { params }: { params: { matchId: st
     }
   } catch { /* a match with no readable events returns exactly what it always did */ }
 
+  // HOTFIX (2026-09-24): a duel stored as 'musicAcademy' reads as 'music', so it keeps its name and a working PLAY link.
+  const mode = arenaModeKey(m.mode);
   return NextResponse.json({
     id: m.id,
-    mode: m.mode,
-    name: MODE_INFO[m.mode]?.name ?? m.mode,
-    href: MODE_INFO[m.mode]?.href ?? '#',
+    mode,
+    name: MODE_INFO[mode]?.name ?? mode,
+    href: MODE_INFO[mode]?.href ?? '#',
     feeLc: m.entryFeeCents,
     rakePercent: m.rakePercent,
     status: m.status,
     role: isP1 ? 'p1' : 'p2',
     myScore: myScore ?? null,
-    oppScore: oppScore ?? null,
+    oppScore: oppScoreShown,
+    oppSubmitted,
     mySubmitted: myScore !== null && myScore !== undefined,
     hasOpponent: Boolean(m.player2Id),
     winnerId: m.winnerId,

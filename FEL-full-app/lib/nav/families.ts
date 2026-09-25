@@ -12,6 +12,7 @@
 // Pure data and pure lookups. The tab shell renders it; nothing here knows what a component is.
 
 import { PALETTE } from '@/lib/design/palette';
+import { canonicalModeKey } from '@/lib/game-data';
 
 export type FamilyId = 'hoops' | 'combat' | 'board' | 'racing' | 'field' | 'party' | 'craft';
 
@@ -46,7 +47,9 @@ export const FAMILIES: Family[] = [
   },
   {
     id: 'racing', label: 'Racing', blurb: 'Karts on the boardwalk, planes through canyons.', accent: PALETTE.violet,
-    modes: ['velocitykart', 'aeroaces', 'freerun', 'sprint'],
+    // HOTFIX (2026-09-24): the session keys, as MODE_INFO now spells them. Under 'velocitykart' / 'aeroaces' the shelf
+    // and the catalogue named the same games two ways.
+    modes: ['velocityKart', 'aeroAces', 'freerun', 'sprint'],
   },
   {
     id: 'field', label: 'Field & Court', blurb: 'The other sports, one skill each.', accent: PALETTE.emerald,
@@ -58,7 +61,8 @@ export const FAMILIES: Family[] = [
   },
   {
     id: 'craft', label: 'Craft', blurb: 'Rhythm, performance and the story.', accent: PALETTE.indigo,
-    modes: ['dance', 'musicAcademy', 'acting', 'storyMode'],
+    // HOTFIX (2026-09-24): 'music' (was 'musicAcademy'), the key MODE_INFO and the Academy's GameShell use.
+    modes: ['dance', 'music', 'acting', 'storyMode'],
   },
 ];
 
@@ -78,7 +82,8 @@ for (const f of FAMILIES) for (const m of f.modes) BY_MODE.set(m, f);
 
 /** The family a mode belongs to, or null when it is deliberately off the shelf. */
 export function familyOf(modeKey: string): Family | null {
-  return BY_MODE.get(modeKey) ?? null;
+  // HOTFIX (2026-09-24): an old spelling ('musicAcademy', 'velocitykart', 'aeroaces') still finds its shelf.
+  return BY_MODE.get(canonicalModeKey(modeKey)) ?? null;
 }
 
 export function familyById(id: string): Family | null {

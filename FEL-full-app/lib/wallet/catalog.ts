@@ -69,6 +69,35 @@ export function getSku(skuId: string): CatalogSku | null {
   return CATALOG[skuId] ?? null;
 }
 
+// HOTFIX (2026-09-24): NOT ON SALE. These SKUs stay registered at their price, but spend() refuses a new purchase of
+// them before any balance moves, because each one delivers nothing yet. /live has no video player, so a class pass
+// bought a class nobody could watch, and nothing reads the class_monthly entitlement. The owner's economy-honesty call
+// (A): refuse the sale now, no redesign. /live reads skuOnSale, so a held SKU is not offered there. Take a SKU out of
+// this set the day what it buys exists.
+export const NOT_ON_SALE: ReadonlySet<string> = new Set(['class_pass_single', 'class_monthly']);
+
+/** Can this SKU be bought right now? An unknown SKU and a held one both answer no. */
+export function skuOnSale(skuId: string): boolean {
+  return getSku(skuId) !== null && !NOT_ON_SALE.has(skuId);
+}
+
+// HOTFIX (2026-09-24): what the generic spend route (POST /api/v1/wallet/spend) may sell. That route grants nothing but
+// a PlayerEntitlement row. /store used to call it for every SKU on sale (30 of the 32), and 24 of them took the coins
+// or shards and delivered nothing:
+//   - a wearable is worn from OwnedWearable, which only the Closet's buy writes;
+//   - a session is a SessionBooking, which only Sessions writes (it also refuses a private 1-on-1 to a minor);
+//   - a workout plan is a WorkoutPlan, which only Workout writes after charging again, so the plan was paid twice;
+//   - the creative card slot is counted by the card creator, not read from the entitlement;
+//   - the Music Room keeps its kits on the device and charges under its own key, so a kit was paid twice, and it
+//     charges each Cell foundation as it is used, so a bought one sat unused;
+//   - dunk_retry_token, dunk_style_slot and scan_personalized have no reader anywhere, so they are sold nowhere;
+//   - the boost cards do read the entitlement, but they have their own route (app/api/cards/boosts), which refuses a
+//     card already owned. The Profile's boost shelf sells them there.
+// Each of those is still sold where it is delivered, by a route that calls spend() directly. The generic route keeps
+// only the /live class passes, its one storefront, and NOT_ON_SALE holds those. Add a SKU here only when something
+// reads its entitlement row back.
+export const SPEND_ROUTE_SKUS: ReadonlySet<string> = new Set<string>(['class_pass_single', 'class_monthly']);
+
 // Stripe price-id -> coin pack. Coins ONLY (§5 stripe-webhook). There is no
 // shard entry here and there must never be one.
 export interface CoinPack { coins: number; label: string }
@@ -101,7 +130,7 @@ export interface CoinStorePack {
 
 // TUNE(elijah) — pack sizing / pricing ladder.
 export const COIN_STORE_PACKS: CoinStorePack[] = [
-  { id: 'coins_starter', coins: 500,  bonus: 0,    priceUsdCents: 199,  label: 'Starter Stack', blurb: 'A quick top-up to grab a retry token.' },
+  { id: 'coins_starter', coins: 500,  bonus: 0,    priceUsdCents: 199,  label: 'Starter Stack', blurb: 'A quick top-up for the Closet.' }, // HOTFIX (2026-09-24): a retry token is sold nowhere (see SPEND_ROUTE_SKUS)
   { id: 'coins_pro',     coins: 1500, bonus: 150,  priceUsdCents: 499,  label: 'Pro Pouch',     blurb: '+150 bonus coins.', tag: 'Popular' },
   { id: 'coins_elite',   coins: 3500, bonus: 500,  priceUsdCents: 999,  label: 'Elite Vault',   blurb: '+500 bonus coins.', tag: 'Best value' },
   { id: 'coins_legend',  coins: 8000, bonus: 2000, priceUsdCents: 1999, label: 'Legend Hoard',  blurb: '+2000 bonus coins for the grind.' },

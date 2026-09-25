@@ -10,10 +10,12 @@ import {
   arenaRefund,
   appendMatchEvent,
   ArenaError,
+  arenaModeKey,
 } from '@/lib/arena';
 import { drawRivalScore, median } from '@/lib/arena-rivals';
 import { recordServerEvent } from '@/lib/analytics-server';
-import { parseCard, forWire } from '@/lib/mp/dunkCard';
+import { forWire } from '@/lib/mp/dunkCard';
+import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena-score-integrity';
 
 /**
  * POST /api/arena/submit-score
@@ -21,6 +23,11 @@ import { parseCard, forWire } from '@/lib/mp/dunkCard';
  * Records the caller's score for their Arena duel. When BOTH players have
  * submitted, the duel auto-settles atomically: higher score takes the pot
  * (minus rake); a tie refunds both players.
+ *
+ * HOTFIX (2026-09-24): a score is checked against its mode before anything is written — above the mode's limit (the
+ * most its rules can award, or the Arena's limit on an open-ended mode), or a Flight Night score that is not its dunk
+ * card's total, is refused with a 422 and never settles (lib/arena-score-integrity.ts). This route settled a pot on any
+ * non-negative integer the client sent.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -30,11 +37,11 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const matchId = String(body?.matchId ?? '');
   const score = Number(body?.score);
-  // THE CARD (2026-09-13, owner: "in multiplayer we should see other peoples dunk and score"). Optional and
-  // parsed defensively: a duel from a client that does not send one settles exactly as it always did, and a
-  // malformed card is dropped rather than rejecting a score somebody actually earned. It rides in the
-  // MatchEvent payload that already exists, so there is no schema change and no migration.
-  const card = parseCard(body?.card) ?? null;
+  // THE CARD (2026-09-13, owner: "in multiplayer we should see other peoples dunk and score"). Optional: a duel from a
+  // client that does not send one settles on the mode's ceiling alone, and a card that does not parse is dropped. It
+  // rides in the MatchEvent payload that already exists, so there is no schema change and no migration.
+  // HOTFIX (2026-09-24): a card that parses must ADD UP — checked with the ceiling inside the transaction below, where
+  // the match's mode is known, and stored only on a Flight Night duel.
   if (!matchId) return NextResponse.json({ error: 'matchId is required' }, { status: 400 });
   if (!Number.isInteger(score) || score < 0) {
     return NextResponse.json({ error: 'score must be a non-negative integer' }, { status: 400 });
@@ -54,6 +61,13 @@ export async function POST(req: NextRequest) {
       }
       // A duel needs both players before scores count.
       if (!match.player2Id) throw new ArenaError('WAITING_OPPONENT', 'Waiting for an opponent to join.', 409);
+
+      // HOTFIX (2026-09-24): the score must be inside this mode's limit, and a dunk card must add up to it. A refusal
+      // throws before the first write, so nothing is recorded, no ghost is drawn and nothing settles.
+      const check = checkStakeScore({ mode: match.mode, score, card: body?.card, killSwitch: killSwitchOn() });
+      if (!check.ok) throw new ArenaError(check.code, check.detail, STAKE_REFUSAL_STATUS);
+      if (!check.ceilingApplied) console.warn(`[arena/submit-score] ${match.mode}: NEXT_PUBLIC_DISABLE_3D=1 serves the fallback game, whose scale the ceiling table does not describe — ceiling not applied`);
+      const card = check.card;
 
       // Idempotent per player: first submission wins, later ones are ignored.
       const alreadySubmitted = isP1 ? match.player1Score !== null : match.player2Score !== null;
@@ -81,15 +95,18 @@ export async function POST(req: NextRequest) {
       const ghostScoreMissing =
         ghostSide === 'p1' ? match.player1Score === null : match.player2Score === null;
       if (ghostSide && ghostScoreMissing && match.seed) {
+        // HOTFIX (2026-09-24): sessions are read under the key GameShell saves them under. A duel stored as 'musicAcademy'
+        // reads 'music' here. Raw, it found no sessions and drew its rival off the default baseline of 100 on a 5000 scale.
+        const sessionMode = arenaModeKey(match.mode);
         const [recent, population] = await Promise.all([
           tx.gameSession.findMany({
-            where: { userId, mode: match.mode, createdAt: { lt: match.createdAt } },
+            where: { userId, mode: sessionMode, createdAt: { lt: match.createdAt } },
             orderBy: { createdAt: 'desc' },
             take: 10,
             select: { score: true },
           }),
           tx.gameSession.findMany({
-            where: { mode: match.mode, createdAt: { lt: match.createdAt } },
+            where: { mode: sessionMode, createdAt: { lt: match.createdAt } },
             orderBy: { createdAt: 'desc' },
             take: 200,
             select: { score: true },
@@ -97,21 +114,25 @@ export async function POST(req: NextRequest) {
         ]);
         const draw = drawRivalScore({
           seed: match.seed,
-          mode: match.mode,
+          mode: sessionMode,
           playerHistory: recent.map((r: { score: number }) => r.score),
           populationMedian: population.length ? median(population.map((r: { score: number }) => r.score)) : null,
         });
+        // HOTFIX (2026-09-24): the house is held to the same ceiling as the player. A cold-start baseline on another
+        // scale (tennis draws around 21 in a first-to-4-games match) posted a score no human could reach.
+        const ghostScore = check.ceilingApplied ? Math.min(draw.score, check.ceiling.max) : draw.score;
         const ghostData =
-          ghostSide === 'p1' ? { player1Score: draw.score, player1SubmittedAt: new Date() } : { player2Score: draw.score, player2SubmittedAt: new Date() };
+          ghostSide === 'p1' ? { player1Score: ghostScore, player1SubmittedAt: new Date() } : { player2Score: ghostScore, player2SubmittedAt: new Date() };
         await tx.competitionMatch.update({ where: { id: matchId }, data: ghostData });
         await appendMatchEvent(tx, matchId, 'GHOST_SCORED', null, {
           player: ghostSide,
-          score: draw.score,
+          score: ghostScore,
           bandCenter: draw.center,
           bandSource: draw.source,
+          ...(ghostScore !== draw.score ? { drawnAboveCeiling: draw.score } : {}),
         });
-        if (ghostSide === 'p1') match.player1Score = draw.score;
-        else match.player2Score = draw.score;
+        if (ghostSide === 'p1') match.player1Score = ghostScore;
+        else match.player2Score = ghostScore;
       }
 
       const p1Score = isP1 && !alreadySubmitted ? score : match.player1Score;

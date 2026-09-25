@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { arenaLockEntry, appendMatchEvent, ArenaError } from '@/lib/arena';
+import { arenaLockEntry, appendMatchEvent, ArenaError, arenaModeKey } from '@/lib/arena';
 import { recordServerEvent } from '@/lib/analytics-server';
 
 /**
@@ -41,9 +41,11 @@ export async function POST(req: NextRequest) {
       return updated;
     });
 
-    recordServerEvent({ name: 'arena_match_joined', props: { matchId: result.id, mode: result.mode }, userId }).catch(() => {});
+    // HOTFIX (2026-09-24): a duel stored as 'musicAcademy' answers and logs as 'music', as the lobby and the duel page do.
+    const mode = arenaModeKey(result.mode);
+    recordServerEvent({ name: 'arena_match_joined', props: { matchId: result.id, mode }, userId }).catch(() => {});
 
-    return NextResponse.json({ ok: true, matchId: result.id, mode: result.mode, seed: result.seed, status: result.status });
+    return NextResponse.json({ ok: true, matchId: result.id, mode, seed: result.seed, status: result.status });
   } catch (err: any) {
     if (err instanceof ArenaError) {
       return NextResponse.json({ error: err.code, detail: err.message }, { status: err.httpStatus });

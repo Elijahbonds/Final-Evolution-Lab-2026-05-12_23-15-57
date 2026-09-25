@@ -1,3 +1,5 @@
+import { CARD_CATALOG } from './card-catalog';
+
 export interface Venue {
   key: string;
   name: string;
@@ -68,6 +70,19 @@ export const SHOP_CARDS: ShopCard[] = [
   { key: 'course-dunk-adv', name: 'Advanced Dunk Theory', type: 'COURSE', price: 150, description: 'Deep-dive course: approach vectors, gather steps, contact windows.', accent: '#00FF9D' },
   { key: 'course-karate-adv', name: 'Advanced Strike Systems', type: 'COURSE', price: 150, description: 'Counter-window theory and multi-opponent spacing.', accent: '#FF3366' },
 ];
+
+// HOTFIX (2026-09-24): /shop is NOT ON SALE. None of the eight cards above unlocks anything: their keys are not ids in
+// lib/card-catalog.ts, and lib/entitlements.ts drops every CardOwnership row whose key is not a catalog id, so a /shop
+// purchase took Lab Credits and delivered nothing. /shop still shows the cards, marked NOT ON SALE YET, and
+// /api/shop/purchase refuses them before any LC moves. A card goes on sale only when someone adds its key to
+// SHOP_CARDS_ON_SALE on purpose, and even then only if the key is a catalog id (anything else would still unlock
+// nothing). A catalog match on its own never sells a card: /cards already sells catalog cards at card.costLC, and a
+// second storefront would mean a second price and a second ledger path for the same card.
+export const SHOP_CARDS_ON_SALE: ReadonlySet<string> = new Set<string>([]);
+
+export function shopCardOnSale(key: string, onSale: ReadonlySet<string> = SHOP_CARDS_ON_SALE): boolean {
+  return onSale.has(key) && CARD_CATALOG.some((c) => c.id === key);
+}
 
 export interface Lesson {
   key: string;
@@ -156,8 +171,10 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   // BOTH OF THESE SHIPPED UNREACHABLE (owner, 2026-09-19: "its also missing from the registry on the link"). They are
   // in ENABLED_BABYLON_MODES and they have routes, but with no MODE_INFO row nothing on /modes ever linked to them —
   // the only way in was to type the URL.
-  velocitykart: { name: 'Velocity Kart', venue: 'Sovereign Circuit', href: '/play/velocity-kart' },
-  aeroaces: { name: 'Aero Aces', venue: 'The Flyway', href: '/play/aero-aces' },
+  // HOTFIX (2026-09-24): keyed by what their GameShells save the session under ('velocityKart', 'aeroAces'), not by the
+  // Babylon modeId. Under 'velocitykart' / 'aeroaces' the counsellor matched no racing session, ever. See LEGACY_MODE_KEYS.
+  velocityKart: { name: 'Velocity Kart', venue: 'Sovereign Circuit', href: '/play/velocity-kart' },
+  aeroAces: { name: 'Aero Aces', venue: 'The Flyway', href: '/play/aero-aces' },
   dunkContest: { name: 'Flight Night', venue: 'Venice Beach Court', href: '/play/dunk' },
   tennis: { name: 'Match Point', venue: 'Venice Tennis Court', href: '/play/tennis' },
   brainBrawl: { name: 'Brain Brawl', venue: 'NeuroArena', href: '/play/brain-brawl' },
@@ -193,7 +210,9 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
   duel: { name: 'Duel', venue: 'Shimogamo Dojo', href: '/play/duel' },
   sprint: { name: 'Beach Sprint', venue: 'Muscle Beach Gym', href: '/play/sprint' },
-  musicAcademy: { name: 'Groove Academy', venue: 'Studio', href: '/play/music' },
+  // HOTFIX (2026-09-24): keyed 'music', the mode the Academy's GameShell saves the session under. The Arena and the
+  // counsellor read sessions by this key; under 'musicAcademy' they matched none. See LEGACY_MODE_KEYS.
+  music: { name: 'Groove Academy', venue: 'Studio', href: '/play/music' },
   dance: { name: 'The Cypher', venue: 'The Cypher', href: '/play/dance' },
   acting: { name: 'The Read', venue: 'Acting Stage', href: '/play/acting' },
   irl: { name: 'Hang Time', venue: 'Real World', href: '/play/irl' },
@@ -203,3 +222,28 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   marketplace: { name: 'Marketplace', venue: 'The Market', href: '/market' },
   kitchens: { name: 'FEL Kitchens', venue: 'The Kitchen', href: '/kitchens' },
 };
+
+/**
+ * HOTFIX (2026-09-24): ONE KEY PER MODE, and it is the key the mode's GameShell saves its sessions under.
+ *
+ * Three catalogue keys had drifted from their shells. The Academy was 'musicAcademy' while its shell posts 'music'. The
+ * two racers took their Babylon modeIds 'velocitykart' / 'aeroaces' while their shells post 'velocityKart' / 'aeroAces',
+ * as they have since the routes were added; no app code ever posted a session under the old spellings. The Arena's
+ * ghost draw and the counsellor read GameSession rows by the catalogue key, so they matched nothing. The catalogue now
+ * uses the session key.
+ *
+ * The old spellings are still out there: stored Arena duels, a first-game pick saved in a browser, and creator cards,
+ * which store the multiplayer challenge key ('velocitykart'). Anything that reads a stored key goes through
+ * canonicalModeKey, so an old spelling still resolves. New rows are written under the new key.
+ */
+export const LEGACY_MODE_KEYS: Readonly<Record<string, string>> = {
+  musicAcademy: 'music',
+  velocitykart: 'velocityKart',
+  aeroaces: 'aeroAces',
+};
+
+/** A mode key as the catalogue spells it now: an old spelling maps to its current key, anything else is returned as is. */
+export function canonicalModeKey(key: string | null | undefined): string {
+  const k = String(key ?? '');
+  return Object.prototype.hasOwnProperty.call(LEGACY_MODE_KEYS, k) ? LEGACY_MODE_KEYS[k] : k;
+}
