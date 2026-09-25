@@ -4,8 +4,9 @@
 // recorder lived inside a template literal, and a backtick in a comment there ends it (this repo has sprung that four times).
 //
 // Four jobs:
-//   1. THE VIRTUAL CLOCK. performance.now, requestAnimationFrame, setTimeout and setInterval are replaced so that every
-//      rendered frame advances game time by exactly one fixed step (VDT, default 1000/60 ms) whatever the wall clock did.
+//   1. THE VIRTUAL CLOCK (phase 2a: in _vclock-page.js, evaluated first, shared with the dunk probe). performance.now,
+//      requestAnimationFrame, setTimeout and setInterval are replaced so that every rendered frame advances game time by
+//      exactly one fixed step (VDT, default 1000/60 ms) whatever the wall clock did.
 //      This is the capped clock of the clothing and car-clip probes with the cap equal to the floor: a frame that took
 //      80 ms of wall time on a loaded machine still advances the game 16.67 ms, and so does one that took 9 ms. Babylon's
 //      engine delta, the animation clock, the harness dt, the modes' later() timers, the agent bridge's hold queue and
@@ -15,8 +16,9 @@
 //      3PT / carnival: me + every other rigged body near the court as b0, b1 …), bound to their skeleton's bone nodes.
 //   3. THE RECORDER. On onAfterRenderObservable (after the clips, posture, carry IK, rim reach, foot planting — the pose
 //      the player saw): per body the root transform, every bone's local rotation, the Hips position, the world position of
-//      the 22 joints, the joint audit (bend, hinge error, upper-bone roll) and the playing clips with weights; per frame the
-//      ball (world position, the node it is parented to and whose body that is, released or not) and a small mode state.
+//      the 22 joints, the joint audit (bend, hinge error, upper-bone roll), the playing clips with weights, and (2a) where the
+//      face points and where the DRAWN hands are (the skinned vertices, for the AI-ARMS metric); per frame the ball (world
+//      position, the node it is parented to and whose body that is, released or not) and a small mode state.
 //   4. THE DRIVERS. Each take is a play run IN THE PAGE on the virtual clock: the agent bridge for 1v1 / 3v3 (the slot
 //      reads the bridge under ?agent=1 and bypasses local input by design), the right stick and the keyboard through the
 //      real InputBus (InputBus.emit / a KeyboardEvent on window: the J key is A, space is the analog R trigger).
@@ -28,98 +30,13 @@
   const MODE = dev.modeId;
   const HM = (window.__hm = { mode: MODE, marks: [], errors: [], version: 1 });
 
-  // ── 1. the virtual clock ─────────────────────────────────────────────────────────────────────────────────────────
-  const DT = Number(CFG.dt) > 0 ? Number(CFG.dt) : 1000 / 60;
-  const realNow = performance.now.bind(performance);
-  const nRaf = window.requestAnimationFrame.bind(window);
-  const nST = window.setTimeout.bind(window), nCT = window.clearTimeout.bind(window), nSI = window.setInterval.bind(window);
-  // AUDIT 2026-09-25 — THE CLOCK WAS NOT REPRODUCIBLE. Two identical runs (same tip, seed, takes, an idle machine) diverged from the
-  // FIRST recorded frame of every take (a clip fade one frame apart, joints up to 5 m apart later, take lengths ±50 ms). Cause: vt
-  // started at Math.ceil(realNow()) — a different number every run — and was ACCUMULATED (vt += 16.666…), so a timer that is an
-  // exact number of frames long (sleep(150) = 9 frames, act(…, 600) = 36) fired on frame k or k+1 by floating-point luck (simulated:
-  // 34 % of start points fire sleep(150) a frame late), and every engine dt differed in its last bits. Now: a FIXED base (the same
-  // bits every run), vt = base + frames × DT (never accumulated), timers compared with a 1e-6 ms tolerance (an exact multiple of the
-  // frame fires on exactly that frame), and Babylon's own clocks (the engine's frame-time monitor, the scene's animation clock) are
-  // re-based onto it below so the first frame after the install is one DT, not a jump.
-  const VT_BASE = (() => { const b = Number(CFG.vtBase) > 0 ? Number(CFG.vtBase) : 4e6; return realNow() < b - 6e5 ? b : Math.ceil((realNow() + 6e5) / 1e6) * 1e6; })();
-  const C = (HM.clock = { dt: DT, vt: VT_BASE, vt0: VT_BASE, frames: 0, lastTs: -1, timers: new Map(), seq: 50000000, wall0: realNow(), frozen: false, renderedFrames: 0 });
-  const EPS = 1e-6;
-  let flushing = false;
-  const flush = () => {
-    if (flushing) return;
-    flushing = true;
-    try {
-      const due = [];
-      C.timers.forEach((x, id) => { if (x.due <= C.vt + EPS) due.push([id, x]); });
-      due.sort((a, b) => a[1].due - b[1].due || a[0] - b[0]);
-      for (const [id, x] of due) {
-        if (!C.timers.has(id)) continue;
-        if (x.every) x.due += x.every; else C.timers.delete(id);   // an interval that fell behind runs once per frame and catches up
-        try { x.fn.apply(window, x.args); } catch (e) { HM.errors.push('timer: ' + String((e && e.message) || e).slice(0, 180)); }
-      }
-    } finally { flushing = false; }
-  };
-  // ONE step per browser frame: every rAF callback of a frame sees the same timestamp, the first one to run advances.
-  // AUDIT 2026-09-25: the timers due at the previous frame's time are flushed HERE too, synchronously, before the step — the
-  // native setTimeout(0) below normally runs them between frames, but on a loaded main thread Chrome may serve the next frame's
-  // rAF first, and a driver's step then landed a frame late (load-dependent). Whichever path runs them, the same set runs before
-  // the next step. Math.random is reseeded EVERY FRAME from (take seed, frame): the audio kit fills noise buffers with
-  // Math.random when a voice line decodes (a real-time event), which moved the dice stream by a load-dependent amount mid-take.
-  const advance = (ts) => {
-    if (ts === C.lastTs) return; C.lastTs = ts; if (C.frozen) return;
-    flush();
-    C.frames++; C.vt = C.vt0 + C.frames * DT;
-    if (HM.frameSeed) HM.frameSeed(C.frames);
-    nST(flush, 0);
-  };
-  performance.now = () => C.vt;
-  window.requestAnimationFrame = (cb) => nRaf((ts) => { advance(ts); cb(C.vt); });
-  // HOG (the instrument's own load test, AUDIT 2026-09-25): burn 0..hogMs of WALL time inside every frame (a native LCG, never
-  // Math.random) — what a loaded machine does to a frame. With a sound virtual clock the recording must not change at all.
-  let hogA = 12345;
-  const hog = () => { const H = Number(CFG.hogMs) || 0; if (!H || C.frozen) return; hogA = (Math.imul(hogA, 1103515245) + 12345) >>> 0; const e = realNow() + (H * (hogA >>> 8)) / 16777216; while (realNow() < e) { /* burn */ } };
-  const ticker = (ts) => { advance(ts); hog(); nRaf(ticker); };   // time moves even in a frame the engine did not ask for
-  nRaf(ticker);
-  window.setTimeout = (fn, ms, ...args) => {
-    if (typeof fn !== 'function') return nST(fn, ms);
-    const id = ++C.seq; C.timers.set(id, { due: C.vt + Math.max(0, Number(ms) || 0), fn, args, every: 0 }); return id;
-  };
-  window.setInterval = (fn, ms, ...args) => {
-    if (typeof fn !== 'function') return nSI(fn, ms);
-    const id = ++C.seq; const every = Math.max(DT, Number(ms) || 0); C.timers.set(id, { due: C.vt + every, fn, args, every }); return id;
-  };
-  window.clearTimeout = window.clearInterval = (id) => { if (id == null) return; if (C.timers.has(id)) C.timers.delete(id); else nCT(id); };
-  // PAUSE BETWEEN TAKES: node pulls a take's frames over wall-clock round trips; with the render loop running the game played on
-  // through them, so the next reset landed at a different clip phase each run (measured: two identical smokes differed by up to
-  // 0.047 in a bone quaternion). Paused, no frame is drawn, no game time passes and no timer fires until the next take resumes.
-  // AUDIT 2026-09-25: a pause that lands after this frame's step but before its render (the sync flush above resolves the take's
-  // last sleep inside the frame) rolls the clock back to the last RENDERED frame, so the next take's first frame is always one DT.
-  scene.onAfterRenderObservable.add(() => { C.renderedFrames = C.frames; });
-  HM.pause = () => { if (C.paused) return; const eng = scene.getEngine(); C.loops = (eng._activeRenderLoops || []).slice(); eng.stopRenderLoop(); C.frozen = true; C.paused = true; if (C.frames !== C.renderedFrames) { C.frames = C.renderedFrames; C.vt = C.vt0 + C.frames * DT; } };
-  HM.resume = () => { if (!C.paused) return; const eng = scene.getEngine(); C.frozen = false; C.paused = false; for (const fn of C.loops || []) eng.runRenderLoop(fn); };
-  HM.now = () => C.vt;
-  HM.wallMs = () => realNow() - C.wall0;
-  const mulberry = (seed) => { let a = (Number(seed) >>> 0) || 1; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-  HM.reseed = (seed) => {
-    HM.seedBase = (Number(seed) >>> 0) || 1; HM.seedFrame0 = C.frames;
-    Math.random = mulberry(HM.seedBase);
-  };
-  // per frame, relative to the reseed: the same take on the same frame draws the same numbers whatever ran between frames
-  HM.frameSeed = CFG.frameSeed === false ? null : (fr) => { if (HM.seedBase == null) return; Math.random = mulberry((HM.seedBase ^ Math.imul((fr - HM.seedFrame0) | 0, 0x9e3779b1)) >>> 0); };
-  if (CFG.seed != null) HM.reseed(CFG.seed);
-  // RE-BASE BABYLON onto the fixed base (no jump): the engine's dt is the frame-time monitor's last sample, the animation clock
-  // is the scene's _animationTimeLast; the animation time itself and every running animatable's offset shift together, so a
-  // running clip keeps its phase and the time base is the same bits every run.
-  try { const eng = scene.getEngine(); const pm = eng.performanceMonitor || eng._performanceMonitor; if (pm) { pm.reset(); pm._lastFrameTimeMs = C.vt; } } catch (e) { HM.errors.push('rebase pm: ' + e); }
-  try {
-    if (scene._animationTimeLast) scene._animationTimeLast = C.vt;
-    const ANIM_BASE = 1e5, shift = ANIM_BASE - (scene._animationTime || 0);
-    scene._animationTime = ANIM_BASE;
-    for (const a of scene._activeAnimatables || []) { if (a._localDelayOffset != null) a._localDelayOffset += shift; if (a._pausedDelay != null) a._pausedDelay += shift; }
-    // and every running loop restarts from its first frame: the phase an idle loop had reached depended on how long the real-time
-    // boot took (the first take's dribble bounce was at a different point every run)
-    for (const g of scene.animationGroups) if (g.isPlaying) for (const a of g.animatables || []) { try { if (a.loopAnimation) a.goToFrame(a.fromFrame); } catch (e) {} }
-  } catch (e) { HM.errors.push('rebase anim: ' + e); }
+  // ── 1. the virtual clock — shared with the dunk probe since phase 2a: scripts/probes/_vclock-page.js (evaluated first) ──
+  const VC = window.__vc;
+  if (!VC) throw new Error('_vclock-page.js must be evaluated before _hoops-motion-page.js');
+  const DT = VC.DT, C = (HM.clock = VC.C), realNow = VC.realNow;
+  HM.pause = VC.pause; HM.resume = VC.resume; HM.now = VC.now; HM.wallMs = VC.wallMs; HM.reseed = VC.reseed;
+  Object.defineProperty(HM, 'frameSeed', { get: () => VC.frameSeed, set: (f) => { VC.frameSeed = f; } });
+  for (const e of VC.errors) HM.errors.push(e);
 
   // console marks (every bracket-tagged line the modes log), stamped on the virtual clock, only while recording
   const markRe = /^\[[0-9A-Z][0-9A-Z-]*\]/;
@@ -159,16 +76,58 @@
       if (dt3(qr(rot, aL), fL) < 0) h = [-h[0], -h[1], -h[2]];
       out.push({ key, U, L, E, h, aL, prevQ: null });
     }
-    return out;
+    // PHASE 2a (LOOK): the body's bind-pose front expressed in the Head bone's own bind frame — at runtime the head's
+    // absolute rotation applied to it is where the face points, whatever the rig's axis convention is
+    const headN = byName.get('Head');
+    const headFwdL = headN ? qr(qi(bindWorld(headN).q), front) : null;
+    return { limbs: out, headFwdL };
+  };
+  // PHASE 2a (AI-ARMS): the DRAWN hand — the skinned vertices the Hand bone moves (and the visible end of the forearm),
+  // against the hand bone's own position. Every AI body is the Meshy Body.001, whose skin barely weights the hands
+  // (RightHand: 3 dominant vertices, 69 touched, summed weight 13, against the kit hero's 1777 / 1880 / 1796 — measured
+  // in-page at a37a90ce), so the bone can be a hand's length from anything drawn. Per side: the hand-weighted centroid
+  // (weights = the Hand bone's weight) and the ARM TIP (the mean of the 8 % of forearm-or-hand-dominated vertices farthest
+  // from the forearm joint), both skinned here exactly as the vertex shader does (bone matrices, then the mesh's world).
+  const skinSets = (root, byName) => {
+    const sets = [];
+    const meshes = root.getChildMeshes(false).filter((m) => m.skeleton && m.isEnabled() && m.getTotalVertices() > 0 && m.getVerticesData('matricesIndices'));
+    for (const m of meshes) {
+      const bones = m.skeleton.bones;
+      const bi = (nm) => bones.findIndex((bn) => clean(bn.name) === nm);
+      const pos = m.getVerticesData('position'), idx = m.getVerticesData('matricesIndices'), wts = m.getVerticesData('matricesWeights');
+      const idx2 = m.getVerticesData('matricesIndicesExtra'), wts2 = m.getVerticesData('matricesWeightsExtra');
+      const n = m.getTotalVertices();
+      const side = {};
+      for (const sd of ['Left', 'Right']) {
+        const H = bi(sd + 'Hand'), F = bi(sd + 'ForeArm'); if (H < 0 || F < 0) continue;
+        const hand = [], arm = [];
+        for (let v = 0; v < n; v++) {
+          let hw = 0, best = -1, bw = 0;
+          for (let k = 0; k < 4; k++) { const b = idx[v * 4 + k], w = wts[v * 4 + k]; if (b === H) hw += w; if (w > bw) { bw = w; best = b; } }
+          if (idx2 && wts2) for (let k = 0; k < 4; k++) { const b = idx2[v * 4 + k], w = wts2[v * 4 + k]; if (b === H) hw += w; if (w > bw) { bw = w; best = b; } }
+          if (hw > 0.01) hand.push([v, hw]);
+          if (best === H || best === F) arm.push(v);
+        }
+        if (!hand.length && !arm.length) continue;
+        const cap = (a, max) => { if (a.length <= max) return a; const st = a.length / max, o = []; for (let i = 0; i < a.length; i += st) o.push(a[Math.floor(i)]); return o; };
+        side[sd[0]] = { hand: cap(hand, 400), arm: cap(arm, 400), armNode: byName.get(sd + 'ForeArm') || null, nHand: hand.length, nArm: arm.length };
+      }
+      if (Object.keys(side).length) sets.push({ m, pos, idx, wts, idx2, wts2, side });
+    }
+    return sets;
   };
   const makeBody = (id, root) => {
     const sk = skelOf(root); if (!sk) return null;
     const nodes = sk.bones.map((b) => b.getTransformNode()).filter(Boolean);
     const byName = new Map(nodes.map((n) => [clean(n.name), n]));
-    return { id, root, sk, nodes, names: nodes.map((n) => n.name), set: new Set(nodes), jn: JN.map((j) => byName.get(j) || null), byName, limbs: limbsFor(root, sk, byName) };
+    const lf = limbsFor(root, sk, byName);
+    let skins = []; try { skins = skinSets(root, byName); } catch (e) { HM.errors.push('skin ' + id + ': ' + String((e && e.message) || e).slice(0, 120)); }
+    return { id, root, sk, nodes, names: nodes.map((n) => n.name), set: new Set(nodes), jn: JN.map((j) => byName.get(j) || null), byName, limbs: lf.limbs, headFwdL: lf.headFwdL, skins,
+      skinInfo: skins.map((S) => ({ mesh: S.m.name, L: S.side.L ? [S.side.L.nHand, S.side.L.nArm] : null, R: S.side.R ? [S.side.R.nHand, S.side.R.nArm] : null })) };
   };
   const bodies = (HM.bodies = new Map());
   const groupOwner = new Map();
+  const nodeBody = new Map();   // bone node -> body id (the scene-side animatable census below)
   HM.bind = () => {
     const want = [];
     const h = dev.hero && dev.hero(); if (h) want.push(['me', topOf(h)]);
@@ -201,7 +160,7 @@
       bodies.set(id, b); changed = true;
     }
     for (const [id, b] of [...bodies]) if (!keep.has(id) || (b.root.isDisposed && b.root.isDisposed())) { bodies.delete(id); changed = true; }
-    if (changed) groupOwner.clear();
+    if (changed) { groupOwner.clear(); nodeBody.clear(); for (const b of bodies.values()) for (const n of b.nodes) nodeBody.set(n, b.id); }
     return [...bodies.keys()];
   };
   const ownerOf = (g) => {
@@ -245,15 +204,74 @@
     }
     return jt;
   };
+  const r3 = (v) => Math.round(v * 1e3) / 1e3;
+  /** The drawn hands of a body this frame: { L: [hand centroid, arm tip] | null, R: … }, skinned as the shader skins them. */
+  const drawnHands = (b) => {
+    const out = {};
+    for (const S of b.skins) {
+      let mats; try { mats = S.m.skeleton.getTransformMatrices(S.m); } catch (e) { continue; }
+      if (!mats) continue;
+      const wm = S.m.getWorldMatrix().m;
+      const skin = (v) => {
+        const x = S.pos[v * 3], y = S.pos[v * 3 + 1], z = S.pos[v * 3 + 2]; let ox = 0, oy = 0, oz = 0;
+        const acc = (b, w) => { if (w <= 0) return; const o = b * 16; ox += w * (x * mats[o] + y * mats[o + 4] + z * mats[o + 8] + mats[o + 12]); oy += w * (x * mats[o + 1] + y * mats[o + 5] + z * mats[o + 9] + mats[o + 13]); oz += w * (x * mats[o + 2] + y * mats[o + 6] + z * mats[o + 10] + mats[o + 14]); };
+        for (let k = 0; k < 4; k++) acc(S.idx[v * 4 + k], S.wts[v * 4 + k]);
+        if (S.idx2 && S.wts2) for (let k = 0; k < 4; k++) acc(S.idx2[v * 4 + k], S.wts2[v * 4 + k]);
+        return [ox * wm[0] + oy * wm[4] + oz * wm[8] + wm[12], ox * wm[1] + oy * wm[5] + oz * wm[9] + wm[13], ox * wm[2] + oy * wm[6] + oz * wm[10] + wm[14]];
+      };
+      for (const sd of ['L', 'R']) {
+        const sel = S.side[sd]; if (!sel || out[sd]) continue;
+        let hc = null;
+        if (sel.hand.length) { let sx = 0, sy = 0, sz = 0, sw = 0; for (const [v, w] of sel.hand) { const q = skin(v); sx += q[0] * w; sy += q[1] * w; sz += q[2] * w; sw += w; } if (sw > 0) hc = [r3(sx / sw), r3(sy / sw), r3(sz / sw)]; }
+        let tip = null;
+        if (sel.arm.length && sel.armNode) {
+          const e = sel.armNode.getAbsolutePosition(); const pts = sel.arm.map((v) => { const q = skin(v); return [Math.hypot(q[0] - e.x, q[1] - e.y, q[2] - e.z), q]; }).sort((a, b) => b[0] - a[0]);
+          const k = Math.max(1, Math.round(pts.length * 0.08)); let sx = 0, sy = 0, sz = 0; for (let i = 0; i < k; i++) { sx += pts[i][1][0]; sy += pts[i][1][1]; sz += pts[i][1][2]; }
+          tip = [r3(sx / k), r3(sy / k), r3(sz / k)];
+        }
+        out[sd] = [hc, tip];
+      }
+    }
+    return out;
+  };
+  // PHASE 2a — THE crossFade QUESTION FROM THE SCENE'S SIDE. A group-level weight log cannot see the hotfix's failure mode: a restart
+  // made inside a group's end callback was dropped from the group's animatable list while its animatables played on in the scene
+  // (setWeight and stop walk the emptied list). So every RUNNING animatable is mapped back to its group through its Animation, and
+  // per body the recorder keeps: an = how many animatables drive the Hips node this frame (a clip keys the Hips' rotation AND its
+  // position, so on the kit hero one clip reads 2, a crossfade 4, three groups 6 — measured), ao = the ORPHANS — animatables their
+  // group no longer lists — as [group, weight, count].
+  const animOwner = new Map();   // Animation -> its group (rebuilt on a miss: groups are cloned per body at spawn)
+  const ownerGroupOf = (anim) => {
+    let g = animOwner.get(anim);
+    if (g === undefined) { animOwner.clear(); for (const gr of scene.animationGroups) for (const ta of gr.targetedAnimations) animOwner.set(ta.animation, gr); g = animOwner.get(anim); if (g === undefined) animOwner.set(anim, null); }
+    return g || null;
+  };
+  const census = () => {
+    const listed = new Set(); for (const g of scene.animationGroups) for (const a of g.animatables || []) listed.add(a);
+    const out = {};
+    for (const a of scene._activeAnimatables || []) {
+      const id = nodeBody.get(a.target); if (id === undefined) continue;
+      const o = (out[id] = out[id] || { an: 0, orph: new Map() });
+      const b = bodies.get(id); if (b && a.target === b.jn[0]) o.an++;
+      if (!listed.has(a)) {
+        const ra = a.getAnimations ? a.getAnimations()[0] : null; const g = ra ? ownerGroupOf(ra.animation) : null;
+        const k = g ? g.name : '?'; const e = o.orph.get(k) || [k, 0, 0]; e[1] = Math.max(e[1], typeof a.weight === 'number' ? Math.round(a.weight * 100) / 100 : 1); e[2]++; o.orph.set(k, e);
+      }
+    }
+    return out;
+  };
   scene.onAfterRenderObservable.add(() => {
     if (!R.on) return;
-    const clips = {};
+    let cen = {}; try { cen = census(); } catch (e) { cen = {}; }
+    const clips = {}, zero = {};
     for (const g of scene.animationGroups) {
       if (!g.isPlaying) continue;
       const o = ownerOf(g); if (!o) continue;
       const a = g.animatables && g.animatables[0];
       const w = a && typeof a.weight === 'number' && a.weight >= 0 ? a.weight : g.weight >= 0 ? g.weight : 1;
-      if (w <= 0.02) continue;
+      // PHASE 2a (the crossFade re-entrancy, V:3pt N1): a group PLAYING at weight ~0 is kept by name — a clip stranded at 0 by a
+      // prev.stop() inside a crossfade shows here for frame after frame, where a normal fade-in is above 0.02 on its first frame
+      if (w <= 0.02) { (zero[o] = zero[o] || []).push(g.name); continue; }
       // AUDIT 2026-09-25: a group whose weight was never set (−1) is recorded as 1 like before, with a third element −1: Babylon
       // writes an unweighted group straight to the bones and lets any weighted group on the same bones override it, while two
       // explicit 1.0 weights are slerped 50/50 — the two read the same without this flag
@@ -268,10 +286,14 @@
       for (let i = 0; i < b.nodes.length; i++) { const r = b.nodes[i].rotationQuaternion; if (r) { q[i * 4] = r5(r.x); q[i * 4 + 1] = r5(r.y); q[i * 4 + 2] = r5(r.z); q[i * 4 + 3] = r5(r.w); } else { q[i * 4] = 0; q[i * 4 + 1] = 0; q[i * 4 + 2] = 0; q[i * 4 + 3] = 1; } }
       const hips = b.jn[0];
       const j = b.jn.map((n) => { if (!n) return null; const a = n.getAbsolutePosition(); return [r4(a.x), r4(a.y), r4(a.z)]; });
+      // PHASE 2a: hf = where the face points (the head's absolute rotation on its bind front); dh = the drawn hands
+      let hf = null; try { const hn = b.jn[5]; if (hn && b.headFwdL) { const aq = hn.absoluteRotationQuaternion; hf = qr([aq.x, aq.y, aq.z, aq.w], b.headFwdL).map(r3); } } catch (e) {}
+      let dh = null; try { dh = b.skins.length ? drawnHands(b) : null; } catch (e) { dh = null; }
       f.B[b.id] = {
         rp: [r4(rp.x), r4(rp.y), r4(rp.z)], rq: rq ? [r5(rq.x), r5(rq.y), r5(rq.z), r5(rq.w)] : null,
         rr: [r5(root.rotation.x), r5(root.rotation.y), r5(root.rotation.z)], rs: [r4(root.scaling.x), r4(root.scaling.y), r4(root.scaling.z)],
-        q, hp: hips ? [r5(hips.position.x), r5(hips.position.y), r5(hips.position.z)] : null, j, jt: audit(b), c: clips[b.id] || [],
+        q, hp: hips ? [r5(hips.position.x), r5(hips.position.y), r5(hips.position.z)] : null, j, jt: audit(b), c: clips[b.id] || [], hf, dh, cz: zero[b.id] || undefined,
+        an: cen[b.id] ? cen[b.id].an : 0, ao: cen[b.id] && cen[b.id].orph.size ? [...cen[b.id].orph.values()] : undefined,
       };
     }
     const ball = findBall();
@@ -287,7 +309,7 @@
   });
   HM.pull = (from, n) => {
     const fr = R.frames.slice(from || 0, (from || 0) + (n || R.frames.length));
-    return { bodies: Object.fromEntries([...bodies.values()].map((b) => [b.id, b.names])), frames: fr, total: R.frames.length, marks: from ? [] : HM.marks.slice(), errors: HM.errors.slice(-20) };
+    return { bodies: Object.fromEntries([...bodies.values()].map((b) => [b.id, b.names])), skins: Object.fromEntries([...bodies.values()].map((b) => [b.id, b.skinInfo])), frames: fr, total: R.frames.length, marks: from ? [] : HM.marks.slice(), errors: HM.errors.slice(-20) };
   };
 
   // ── 4. the drivers ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -370,16 +392,65 @@
   // THE LAYUP FROM THE WING: straight down the middle the defender stays on the hip and the read is a running HOOK
   // (measured at 6.2 m/s, 2.70 m out); in from the wing he trails, and the read is the layup's
   const wing = async (x) => { const t0 = C.vt; while (C.vt - t0 < 1500) { const v = stickTo(x, 2.2); if (!v) break; const r = heroRoot(); if (r && Math.hypot(r.position.x - x, r.position.z - 2.2) < 0.7) break; await act({ moveX: v.x, moveY: v.y, sprint: false }, 130); } };
+  /** Walk to a floor point (a jog, no sprint), up to maxMs — the layup's baseline approach, shared with the dunk variants. */
+  /** The screen is OFF (its screener rolls or pops, HoopsOffball's ScreenPhase after the hold), read from the jobs seam. AUDIT 2a:
+   *  phase 1 waited for the '[3V3-OFF] screen pop by …' line only — a screen that ROLLS logs 'screen roll by …', and the play
+   *  then waited its full 2.5 s. */
+  const screenOff = () => { const s = seam(); return !!(s && s.jobs && s.jobs().some((j) => /^mate/.test(j.id) && (j.job === 'roll' || j.job === 'pop'))); };
+  const toPoint = async (x, z, maxMs) => { const t0 = C.vt; while (C.vt - t0 < (maxMs || 3000)) { const v = stickTo(x, z); if (!v) break; const r = heroRoot(); if (r && Math.hypot(r.position.x - x, r.position.z - z) < 0.7) break; await act({ moveX: v.x, moveY: v.y, sprint: false }, 130); } };
   P.layup = async (o) => {
-    if (o.baseline) { const t0 = C.vt; while (C.vt - t0 < 3000) { const v = stickTo(4.2, -0.3); if (!v) break; const r = heroRoot(); if (r && Math.hypot(r.position.x - 4.2, r.position.z + 0.3) < 0.7) break; await act({ moveX: v.x, moveY: v.y, sprint: false }, 130); } }
-    else await wing(o.wing ?? 3.2);
-    const mag = o.mag ?? 0.8; await driveTo(o.stop ?? 2.8, mag, null, 2600); await shoot(o.charge ?? 0.8, { moveX: 0, moveY: mag }, o.green);
+    if (o.baseline) await toPoint(4.2, -0.3, 3000);
+    // PHASE 2a (a 3v3 layup OUTSIDE traffic): screen = call the screen and drive on the pop; fromCheck = go at once, before the
+    // coverage sets (the catalogue's wing walk gives the defence 1.5 s to load the paint)
+    else if (o.screen) { await act({ screen: true }, 80); await until(screenOff, 2500); await wing(o.wing ?? 3.2); }
+    else if (!o.fromCheck) await wing(o.wing ?? 3.2);
+    const mag = o.mag ?? 0.8; await driveTo(o.stop ?? 2.8, mag, null, 2600); await shoot(o.charge ?? 0.8, { moveX: 0, moveY: mag, sprint: mag > 0.85 }, o.green);
   };
   /** A shot at the check with the AI's rolls HELD OFF on the dribble (no strip) and let loose at the squeeze (luck 0: the block
    *  jump or the hand-up lands, whichever his read allows — a block needs him inside 2.2 m, facing, at the gather). */
   P.contested = async (o) => { const s = seam(); await act({ moveX: 0, moveY: o.creep ?? 0.25 }, o.hold ?? 350); if (s && s.luck) s.luck(o.luckShot ?? 0); await shoot(o.charge ?? 0.8, null, o.green); };
   P.floater = async (o) => { await driveTo(3.0, 0.45, null, 4000); await act({ moveX: 0, moveY: 0 }, 150); await shoot(o.charge ?? 0.8, null, o.green); };
-  P.dunk = async (o) => { if (o.wing) await wing(o.wing); await driveTo(2.4, 1); await shoot(o.charge ?? 0.8, { moveX: 0, moveY: 1, sprint: true, turbo: true }, o.green); };
+  // PHASE 2a (driver variants — B: 9 of 9 game dunks were DOUBLE CLUTCH): HoopsDunks picks from the drive — a baseline drive
+  // (lateral ≥ 0.72) is the REVERSE, across the face at speed the WINDMILL, the same angle slow the CRADLE, straight and fast
+  // the TOMAHAWK, a jog the POWER SLAM; a body inside the lane (contest ≥ 0.45) is the double clutch. So: baseline = the
+  // layup's baseline walk first; wing = the wing walk; mag < 0.85 = no sprint. With no option this is the catalogue's take.
+  P.dunk = async (o) => {
+    if (o.baseline) await toPoint(4.2, -0.3, 3000); else if (o.wing) await wing(o.wing);
+    const mag = o.mag ?? 1; await driveTo(o.stop ?? 2.4, mag, null, 2600);
+    await shoot(o.charge ?? 0.8, { moveX: 0, moveY: mag, sprint: mag > 0.85, turbo: mag > 0.85 }, o.green);
+  };
+  /** PHASE 2a (more than one dunk type): the 1v1 seam's own probe geometry — poster() puts a SET defender 1.3 m out between me
+   *  and the ring and me 5.2 m out at 6.2 m/s (the read's poster branch: the TOMAHAWK); standing() puts me a stride from the ring
+   *  with the rival stunned and the tank full (R2 + the squeeze: the TWO-HAND FLUSH). The drive after poster() goes STRAIGHT at the
+   *  ring (driveTo would go around him); the read is a poster only if he is still SET at the take-off (measured: he closes out, and
+   *  the take reads the double clutch). */
+  P.dunkSeam = async (o) => {
+    const s = seam(); if (!s || typeof s[o.seam] !== 'function') { HM.giveDid = 'no seam ' + o.seam; return; }
+    await act({ moveX: 0, moveY: 0 }, 50);
+    const ok = s[o.seam](); HM.giveDid = o.seam + (ok ? '' : ' refused');
+    // R2 + the squeeze with no run-up: the turbo gate (sprintOk) wants the sprint HELD while MOVING, and the standing read wants
+    // under DUNK_MIN_SPEED — so a creep at the ring with sprint in
+    if (o.seam === 'standing') { const v0 = stickTo(RIM.x, RIM.z) || { x: 0, y: 1 }; const k = o.creep ?? 0.3; await shoot(o.charge ?? 0.8, { moveX: v0.x * k, moveY: v0.y * k, sprint: true, turbo: true }, o.green); return; }
+    const t0 = C.vt; while (C.vt - t0 < 1600 && distRim() > (o.stop ?? 2.4)) { const v = stickTo(RIM.x, RIM.z); if (!v) break; await act({ moveX: v.x, moveY: v.y, sprint: true, turbo: true }, 50); }
+    const v = stickTo(RIM.x, RIM.z) || { x: 0, y: 1 };
+    await shoot(o.charge ?? 0.8, { moveX: v.x, moveY: v.y, sprint: true, turbo: true }, o.green);
+  };
+  /** PHASE 2a: SPIN BY HIM, THEN DUNK — the spin's shoulder beat inside 2.4 m of the defender stuns him (SPIN_STUN_SEC), and a
+   *  stunned defender is no contest for the dunk read (1v1 passes a null defender): the drive's own angle and speed pick the dunk. */
+  P.spinDunk = async (o) => {
+    const t0 = C.vt; let spun = '';
+    while (C.vt - t0 < 4500) {
+      const r = heroRoot(), g = guardRoot(); if (!r) break;
+      if (spun && distRim() <= (o.stop ?? 2.4)) break;
+      const v = stickTo(RIM.x, RIM.z); if (!v) break;
+      const gap = g ? Math.hypot(r.position.x - g.position.x, r.position.z - g.position.z) : 99;
+      if (!spun && gap <= (o.at ?? 1.8)) { spun = 'spin@' + gap.toFixed(2); const sw = sweep(); await act({ moveX: v.x, moveY: v.y, sprint: true }, 320); await sw; continue; }
+      await act({ moveX: v.x, moveY: v.y, sprint: true }, 50);
+    }
+    HM.giveDid = spun || 'never spun';
+    const v = stickTo(RIM.x, RIM.z) || { x: 0, y: 1 };
+    await shoot(o.charge ?? 0.8, { moveX: v.x, moveY: v.y, sprint: true, turbo: true }, o.green);
+  };
   P.handle = async (o) => {
     const jog = act({ moveX: 0, moveY: 0.35 }, 1700);
     await sleep(500);
@@ -417,7 +488,7 @@
   // a set defence was picked off in both first takes — so the pass goes at the CHECK (before the coverage sets), or to the
   // screener as he POPS (o.afterScreen: call the screen, pass on the pop)
   P.pass = async (o) => {
-    if (o.afterScreen) { await act({ screen: true }, 80); await until(() => HM.marks.some((m) => /screen pop/.test(m.msg)), 2500); }
+    if (o.afterScreen) { await act({ screen: true }, 80); await until(screenOff, 2500); }
     else await act({ moveX: 0, moveY: 0 }, o.wait ?? 0);
     await act({ pass: true }, 80); await act({ moveX: 0, moveY: 0 }, 1800);
   };
@@ -435,11 +506,80 @@
     await act({ moveX: 0, moveY: 0 }, 1800);
   };
   P.screen = async (o) => { await act({ screen: true }, 80); await sleep(400); await driveTo(3.2, 0.8); await shoot(o.charge ?? 0.8, null, o.green); };
+  // ── folded in from the phase 1 attempts runners (2a) ──
+  const mates = () => { const s = seam(); return s && s.jobs ? s.jobs().filter((j) => /^mate/.test(j.id)) : []; };
+  /** The teammate's shot: a lob to a mate cutting inside 3.2 m at ≥ 1.5 m/s toward the rim (the alley-oop) … */
+  P.oopWait = async (o) => {
+    const prev = new Map(); const t0 = C.vt; let fired = '';
+    while (C.vt - t0 < (o.waitMs || 7000) && !fired) {
+      const now = C.vt;
+      for (const j of mates()) { const d = Math.hypot(j.x - RIM.x, j.z - RIM.z); const p = prev.get(j.id); prev.set(j.id, { d, t: now }); if (p && now > p.t && d < 3.2 && (p.d - d) / ((now - p.t) / 1000) >= 1.5) fired = j.id; }
+      if (fired) { await act({ moveX: 0, moveY: 0, pass: true }, 80); break; }
+      await act({ moveX: 0, moveY: 0 }, 17);
+    }
+    HM.oopFired = fired || 'none';
+    if (!fired) await act({ moveX: 0, moveY: 0, pass: true }, 80);
+    await act({ moveX: 0, moveY: 0 }, 1800);
+  };
+  /** … or a pass aimed at a mate already inside 3 m of the rim (his only other shot: a 1 %-a-frame roll while he carries there). */
+  P.passNearRim = async (o) => {
+    const t0 = C.vt; let fired = '';
+    while (C.vt - t0 < (o.waitMs || 7000) && !fired) {
+      const m = mates().map((j) => ({ j, d: Math.hypot(j.x - RIM.x, j.z - RIM.z) })).filter((x) => x.d < 3.0).sort((a, b) => a.d - b.d)[0];
+      if (m) { const v = stickTo(m.j.x, m.j.z); if (v) { fired = m.j.id; await act({ moveX: v.x, moveY: v.y, pass: true }, 80); break; } }
+      await act({ moveX: 0, moveY: 0 }, 17);
+    }
+    HM.rimFired = fired || 'none';
+    await act({ moveX: 0, moveY: 0 }, 1800);
+  };
+  /** P.handle with the jog magnitude and the sprint as parameters (jog 0.35, no sprint = the catalogue's own take): standing
+   *  still and at speed, the pro-stick map reads speed01 / sprint (a crossover at pace is the momentum cross). */
+  P.handleV = async (o) => {
+    const jog = act({ moveX: 0, moveY: o.jog, sprint: !!o.sprint }, 1700);
+    await sleep(500);
+    if (o.move === 'spin') await sweep(); else { const v = HANDLE[o.move] || HANDLE.crossover; await flick(v[0] * ballMir(), v[1]); }
+    await jog;
+  };
+  /** The 1v1 rival only dunks a lane he has BEATEN (AttackerBrain: beaten && !inLane at layup range): get beaten on purpose —
+   *  a block jump or a reach at `at` metres once he is past the check. */
+  P.giveDunk = async (o) => {
+    const s = seam(); if (!s) return; const t0 = C.vt; let did = '';
+    while (C.vt - t0 < (o.maxMs || 6000) && s.possession() === 'defense') {
+      const me = heroRoot(); const him = s.foeRoot;
+      const gap = me && him ? Math.hypot(me.position.x - him.position.x, me.position.z - him.position.z) : 99;
+      const ph = s.attackPhase ? s.attackPhase() : '';
+      if (!did && gap < (o.at || 2.1) && ph !== 'check' && ph !== 'gather') {
+        did = o.how + '@' + gap.toFixed(2) + ' ' + ph;
+        if (o.how === 'jump') { if (s.block) s.block(); } else await act({ moveX: 0, moveY: 0, steal: true }, 60);
+      }
+      await act({ moveX: 0, moveY: 0 }, 50);
+    }
+    HM.giveDid = did || 'never';
+    await act({ moveX: 0, moveY: 0 }, o.after || 1500);
+  };
+  /** CONTAIN, THEN WHIFF: sit in his lane (a metre off, rim side) until AttackerBrain reads him contained (phase 'sidestep') for
+   *  `cont` frames inside 2.2 m, then reach from a standstill between lo and hi metres (a whiff) and STAND — the lane is open. */
+  P.containReach = async (o) => {
+    const s = seam(); if (!s) return; const t0 = C.vt; let did = ''; let cont = 0;
+    while (C.vt - t0 < (o.maxMs || 6000) && s.possession() === 'defense') {
+      const me = heroRoot(); const him = s.foeRoot; const ph = s.attackPhase ? s.attackPhase() : '';
+      if (!me || !him) { await act({ moveX: 0, moveY: 0 }, 50); continue; }
+      const hp = him.position; const gap = Math.hypot(me.position.x - hp.x, me.position.z - hp.z);
+      cont = ph === 'sidestep' ? cont + 1 : 0;
+      if (!did && cont >= (o.cont || 12) && gap < (o.hi || 2.0) && gap > (o.lo || 1.3)) { await act({ moveX: 0, moveY: 0 }, 50); did = 'reach@' + gap.toFixed(2) + ' after ' + cont + ' contained frames'; await act({ moveX: 0, moveY: 0, steal: true }, 60); continue; }
+      if (did) { await act({ moveX: 0, moveY: 0 }, 50); continue; }
+      const dx = RIM.x - hp.x, dz = RIM.z - hp.z, dl = Math.hypot(dx, dz) || 1;
+      const v = stickTo(hp.x + (dx / dl) * 1.0, hp.z + (dz / dl) * 1.0);
+      await act(v ? { moveX: v.x * 0.8, moveY: v.y * 0.8, sprint: false } : { moveX: 0, moveY: 0 }, 50);
+    }
+    HM.giveDid = did || 'never';
+    await act({ moveX: 0, moveY: 0 }, o.after || 1500);
+  };
   /** Defense: stay a metre off the handler on the rim side (3v3: drop to the rim once the drive starts), then the style. */
   P.defend = async (o) => {
     const s = seam(); if (!s) return;
     const onD = () => (MODE === 'onevone' ? s.possession() === 'defense' : s.carrier() === 'foeTeam');
-    const t0 = C.vt; let lastPh = ''; let poked = false;
+    const t0 = C.vt; let lastPh = ''; let poked = false; let lastPoke = -1e9;
     while (C.vt - t0 < (o.maxMs || 7000) && onD()) {
       const him = MODE === 'onevone' ? s.foeRoot : (s.driverRoot && s.driverRoot()) || s.foeRoot;
       const ph = s.attackPhase ? s.attackPhase() : '';
@@ -448,17 +588,22 @@
       const intent = { moveX: 0, moveY: 0 };
       if (him) {
         const hp = him.position; let tx, tz;
-        if (MODE === 'threevthree' && ph !== '' && ph !== 'check' && o.style !== 'steal') { const rl = Math.hypot(hp.x - RIM.x, hp.z - RIM.z) || 1; tx = RIM.x + ((hp.x - RIM.x) / rl) * 1.0; tz = RIM.z + ((hp.z - RIM.z) / rl) * 1.0; }
+        if (MODE === 'threevthree' && ph !== '' && ph !== 'check' && (o.style !== 'steal' || o.drop)) { const rl = Math.hypot(hp.x - RIM.x, hp.z - RIM.z) || 1; tx = RIM.x + ((hp.x - RIM.x) / rl) * 1.0; tz = RIM.z + ((hp.z - RIM.z) / rl) * 1.0; }
         else { const dx = RIM.x - hp.x, dz = RIM.z - hp.z, dl = Math.hypot(dx, dz) || 1; tx = hp.x + (dx / dl) * 1.0; tz = hp.z + (dz / dl) * 1.0; }
-        if (o.style === 'steal') { tx = hp.x + (tx - hp.x) * 0.35; tz = hp.z + (tz - hp.z) * 0.35; }   // the poke needs his dribble inside 1.7 m: play up on him
-        const v = stickTo(tx, tz); if (v) { intent.moveX = v.x * 0.8; intent.moveY = v.y * 0.8; intent.sprint = false; }
+        // drop (2a, 3v3): the steal waits for him at the rim (the rim-side target above) — the 3v3 poke needs him HOLDING the ball
+        if (o.style === 'steal' && !o.drop) { tx = hp.x + (tx - hp.x) * 0.35; tz = hp.z + (tz - hp.z) * 0.35; }   // the poke needs his dribble inside 1.7 m: play up on him
+        if (o.rush) { tx = hp.x; tz = hp.z; }   // rush (2a): straight at the ball, sprinting — the 3v3 poke needs 1.6 m of a man holding it
+        const v = stickTo(tx, tz); if (v) { const k = o.rush ? 1 : 0.8; intent.moveX = v.x * k; intent.moveY = v.y * k; intent.sprint = !!o.rush; }
         const r = heroRoot(); const gap = r ? Math.hypot(r.position.x - hp.x, r.position.z - hp.z) : 99;
         if (o.style === 'contest' && (ph === 'gather' || (s.post && s.post().shooting))) intent.contest = true;
         if (o.style === 'contest' && gap < 2.4 && ph !== 'drive') intent.contest = true;
         if (o.style === 'steal' && !poked && gap < 1.7) { poked = true; intent.steal = true; }
+        // repoke (2a): 3v3 takes a poke only inside 1.6 m of a man HOLDING the ball (the hotfix's ball.parent gate) — one poke at
+        // 1.7 m on the dribble was ignored every time; poke again every repokeMs (default 360) while inside 1.5 m
+        if (o.style === 'steal' && o.repoke && gap < 1.5 && C.vt - lastPoke >= (o.repokeMs ?? 360)) { lastPoke = C.vt; intent.steal = true; }
         if (o.style === 'box') intent.brace = true;
       }
-      await act(intent, 120);
+      await act(intent, o.stepMs || 120);
     }
   };
   /** 3PT: the J key on the bar's own tell — pressed the first frame the HUD meter reaches the target (0.72). */
@@ -495,8 +640,8 @@
     // their window (the clip was already on when the play began: hero_1v1_def_stance, ai_3v3_help, ai_3v3_drive, the first 3PT rack
     // shot …) and the anchor fell on the take's first frame, which is not an onset. The prep frames are kept; the node side searches
     // play anchors from tPlay and cuts every window at a reset.
-    const recPrep = o.rec !== false && CFG.recPrep === true && !!o.prep;   // opt-in: the attempts runners' anchor code predates it
-    HM.bind(); R.frames = []; HM.marks = []; R.on = recPrep;
+    const recPrep = o.rec !== false && CFG.recPrep === true && !!o.prep;   // the probe turns it on (REC_PREP=0 turns it off)
+    HM.bind(); R.frames = []; HM.marks = []; R.on = recPrep; HM.giveDid = ''; HM.oopFired = ''; HM.rimFired = '';
     const tPrep = C.vt;
     if (o.prep === 'offense' && s && s.offense) {
       // A STABLE reset: a make's pending hand-over (3v3 alternates possessions: later(200, opponentPossession)) could fire
@@ -531,7 +676,7 @@
     if (luck !== undefined && s && s.luck) s.luck(null);
     const ended = !!(s && s.ended && s.ended());
     HM.pause();
-    return { name, prepOk, luck, ended, t0, tPlay: t0, tPrep, t1: C.vt, virtualMs: Math.round(C.vt - t0), wallMs: Math.round(realNow() - w0), frames: R.frames.length, err, bodies: [...bodies.keys()], clock: { vt0: C.vt0, frames: C.frames } };
+    return { name, prepOk, luck, ended, t0, tPlay: t0, tPrep, t1: C.vt, virtualMs: Math.round(C.vt - t0), wallMs: Math.round(realNow() - w0), frames: R.frames.length, err, bodies: [...bodies.keys()], clock: { vt0: C.vt0, frames: C.frames }, did: HM.giveDid || HM.oopFired || HM.rimFired || '' };
   };
   HM.ended = () => { const s = seam(); return !!(s && s.ended && s.ended()); };
   /** Wake the mode (the agent bridge's start), the carnival's first press, the settle — then pause until the first take. */

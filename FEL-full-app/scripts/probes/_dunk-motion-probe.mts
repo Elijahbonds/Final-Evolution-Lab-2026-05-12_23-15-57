@@ -16,19 +16,37 @@
 //   TRICKS=windmill,tomahawk,plain,rw:backflip   (air ids as in DUNK_TRICKS; 'plain' = no call; rw:<id> = a runway beat)
 //   SCRUB=0  — numbers only, no sheets        PER_PAGE=4 — attempts per contest page
 //   FROM_REC=<dir> — skip the recording, re-measure / re-sheet recordings already on disk
+//
+// HOOPS MOTION phase 2a (2026-09-25) — THE CONTROL FOR PHASE 8 (game dunks = contest dunks) is taken the way the hoops probe
+// takes everything:
+//   · ON THE VIRTUAL CLOCK (scripts/probes/_vclock-page.js, shared with _hoops-motion-probe): every rendered frame advances the
+//     game exactly VDT ms, and the ATTEMPT RUNS IN THE PAGE (attemptInPage below: the pad pressed on virtual time, the slam on
+//     the window's own NOW! as before). Phase 13's numbers were taken on the wall clock with the pad driven from node, so a
+//     press landed a round trip late and a slow frame was a long dt (V:tooling). The game is paused between attempts, and the
+//     dice are seeded by trick name (SEED). VCLOCK=0 keeps the old wall-clock path. HOG=<ms> is the clock's load self-test.
+//   · qAngleDeg NORMALISED (AUD 2): the recorder rounds each component to 5 decimals, so an unchanged rotation read as motion
+//     (5.9–19.6°/s) and the "held" fractions were the artefact. Pops (≥ 600°/s) and whips are unaffected.
+//   BASE=http://127.0.0.1:3098 TAG=p13-vclock TRICKS=all npx tsx scripts/probes/_dunk-motion-probe.mts
 import { chromium, type Page, type Browser } from 'playwright-core';
 import fs from 'node:fs';
+import path from 'node:path';
 import sharp from 'sharp';
+import { fileURLToPath } from 'node:url';
 import { chromiumExe } from './_chromium.mts';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3011';
 const TAG = process.env.TAG ?? 'run';
-const OUT = `${process.env.HOME}/Claude/outbox/finish-release/dunkmotion/${TAG}`;
+const OUT = TAG.startsWith('/') ? TAG : `${process.env.HOME}/Claude/outbox/finish-release/dunkmotion/${TAG}`;   // (2a: or an absolute dir)
 fs.mkdirSync(OUT, { recursive: true });
 const SCRUB = process.env.SCRUB !== '0';
 const PER_PAGE = Number(process.env.PER_PAGE ?? 4);
 const QS = process.env.QS ?? '';
 const FROM_REC = process.env.FROM_REC ?? '';
+const VCLOCK = process.env.VCLOCK !== '0';
+const VDT = Number(process.env.VDT ?? 1000 / 60);
+const SEED = Number(process.env.SEED ?? 7);
+const HOG = Number(process.env.HOG ?? 0);
+const VCLOCK_JS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '_vclock-page.js'), 'utf8');
 
 type Dir = 'up' | 'down' | 'left' | 'right'; type Btn = 'A' | 'B' | 'X' | 'Y';
 const AIR: Record<string, [Dir, Btn]> = {
@@ -153,9 +171,87 @@ const PAD_INIT = `(() => {
   window.__name = window.__name || function (f) { return f; };
 })()`;
 
+// ── PHASE 2a: the in-page half on the virtual clock ─────────────────────────────────────────────────────────────────
+// Plain functions handed to page.evaluate (no template literal, so no backtick / backslash trap); they read only their
+// argument and the page's globals. PAD_INIT defines window.__name for the helpers esbuild wraps nested functions in.
+interface PadLike { buttons: { pressed: boolean; value: number }[]; axes: number[]; timestamp: number }
+interface DunkWin { __vc: { pause(): void; resume(): void; reseed(seed: number): void; C: { vt: number; frames: number } }; __rec: { on: boolean; frames: Frame[]; names: string[] }; __smp: { marks: { t: number; msg: string }[] }; __PAD: PadLike; __hud(): Record<string, unknown>; __armSlam(): void; __HUDLOG: { t: number; s: string }[] }
+/** Wake the contest (A on the title), wait for '· playing', settle 2.5 s — on the virtual clock — then pause until the first attempt. */
+async function startInPage(settleMs: number): Promise<{ playing: boolean; frames: number }> {
+  const w = window as unknown as DunkWin; const pad = w.__PAD;
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  w.__vc.resume();
+  pad.buttons[0].pressed = true; pad.buttons[0].value = 1; pad.timestamp = performance.now();
+  await sleep(70);
+  pad.buttons[0].pressed = false; pad.buttons[0].value = 0; pad.timestamp = performance.now();
+  const t0 = performance.now(); let playing = false;
+  while (performance.now() - t0 < 30000) { if (document.body.innerText.includes('· playing')) { playing = true; break; } await sleep(50); }
+  await sleep(settleMs);
+  w.__vc.pause();
+  return { playing, frames: w.__vc.C.frames };
+}
+interface AttemptCfg { trick: string; seed: number; air: [number, number] | null; again: number; runway: [number, number | null] | null; recMs: number }
+type AttemptOut = { err: string } | { t0: number; launchAt: number; names: string[]; frames: Frame[]; marks: { t: number; msg: string }[]; hud: string[] };
+/** One attempt, exactly the node-driven attempt() below but IN THE PAGE: the same presses at the same (virtual) times, the launch
+ *  read from the mode's own line, the slam on NOW!, the recording to launch + REC_MS; paused again before it returns. */
+async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
+  const w = window as unknown as DunkWin; const pad = w.__PAD;
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const now = () => performance.now();
+  const setB = (i: number, on: boolean) => { pad.buttons[i].pressed = on; pad.buttons[i].value = on ? 1 : 0; pad.timestamp = now(); };
+  const tap = async (i: number, ms: number) => { setB(i, true); await sleep(ms); setB(i, false); };
+  w.__vc.resume(); w.__vc.reseed(c.seed);
+  try {
+    let ok = false; const a0 = now();
+    while (now() - a0 < 30000) {
+      const t = document.body.innerText;
+      if (/HOLD to run|Pick your PROP|FINAL ROUND/.test(t) && !/SLAM!|CONFER|CARD|RIVAL ROUND/.test(t)) { ok = true; break; }
+      if (/CONTEST|result/.test(t) && !/· playing/.test(t)) break;
+      await sleep(120);
+    }
+    if (!ok) return { err: 'no approach' };
+    await sleep(400);
+    const R = w.__rec; R.frames = []; R.on = true; const t0 = now();
+    const launchedAt = (): number | null => { const m = w.__smp.marks.find((x) => x.t >= t0 && /JUICE-SOFT\] launch|\[DUNK-LAUNCH\]/.test(x.msg)); return m ? m.t : null; };
+    if (c.trick === 'rw:selflob') { await tap(3, 60); await sleep(120); }
+    pad.axes[1] = -1; setB(7, true);
+    if (c.trick === 'plain2') setB(6, true);
+    const hold0 = now(); let threw = !c.trick.startsWith('rw:') || c.trick === 'rw:selflob'; let launch: number | null = null;
+    let committed = c.trick !== 'plainJ';
+    while (now() - hold0 < 3600) {
+      const dblReady = c.trick === 'rw:doubleup' ? /DOUBLE-UP/.test(String(w.__hud().hint ?? '')) : true;
+      if (!committed && now() - hold0 >= 350) { committed = true; await tap(3, 60); }
+      if (!threw && now() - hold0 >= 700 && dblReady && c.runway) {
+        threw = true; const [b, d] = c.runway;
+        if (d != null) { setB(d, true); await sleep(60); }
+        await tap(b, 60);
+        if (d != null) { await sleep(40); setB(d, false); }
+      }
+      launch = launchedAt(); if (launch) break;
+      await sleep(25);
+    }
+    pad.axes[1] = 0; setB(7, false); setB(6, false);
+    if (!launch) { const r0 = now(); while (!launch && now() - r0 < 2000) { await sleep(40); launch = launchedAt(); } }
+    if (!launch) { R.on = false; return { err: 'never launched' }; }
+    if (c.air) {
+      setB(c.air[0], true); await sleep(80); await tap(c.air[1], 60);
+      if (c.again) { await sleep(Math.max(0, c.again - 60)); await tap(c.air[1], 60); }
+      await sleep(50); setB(c.air[0], false);
+    }
+    w.__armSlam();
+    const end = launch + c.recMs;
+    while (now() < end) await sleep(100);
+    R.on = false;
+    return { t0, launchAt: launch, names: R.names, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0), hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
+  } finally { w.__vc.pause(); }
+}
+function nameSeed(n: string): number { let h = 2166136261; for (let i = 0; i < n.length; i++) { h ^= n.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 997; }
+
 async function boot(b: Browser, recorder: boolean): Promise<{ p: Page; errors: string[] }> {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
   await ctx.addInitScript(PAD_INIT);
+  // PHASE 2a: Math.random seeded from the first line of the page (mulberry32), as the hoops probe does: the load's own rolls repeat
+  if (recorder && VCLOCK) await ctx.addInitScript({ content: `(() => { let a = ${SEED >>> 0 || 1}; Math.random = () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })()` });
   const p = await ctx.newPage();
   const errors: string[] = [];
   p.on('console', (m) => { const t = m.text(); if (m.type() === 'error' && !/status of 401|favicon|gamepad/.test(t)) errors.push(t.slice(0, 200)); });
@@ -164,6 +260,17 @@ async function boot(b: Browser, recorder: boolean): Promise<{ p: Page; errors: s
   await p.waitForSelector('canvas', { timeout: 120000 });
   await p.waitForFunction(() => !!(window as unknown as { __FEL_DEV__?: { hero: () => unknown } }).__FEL_DEV__?.hero?.(), null, { timeout: 180000 });
   await p.waitForFunction(() => document.body.innerText.includes('· ready'), null, { timeout: 120000 });
+  if (recorder && VCLOCK) {
+    // the clock goes in a second after the mode says ready (the hoops probe's BOOT_SETTLE_MS), BEFORE the recorder: the recorder's
+    // marks, its HUD log interval and the slam's NOW! watcher all read it
+    await p.waitForTimeout(Number(process.env.BOOT_SETTLE_MS ?? 1500));
+    await p.evaluate(`window.__VC_CFG = ${JSON.stringify({ dt: VDT, seed: SEED, hogMs: HOG })}`);
+    const clock = await p.evaluate(VCLOCK_JS);
+    await p.evaluate(RECORDER);
+    const st = await p.evaluate(startInPage, 2500);
+    console.log(`[boot] clock ${JSON.stringify(clock)} · start ${JSON.stringify(st)}`);
+    return { p, errors };
+  }
   if (recorder) await p.evaluate(RECORDER);
   await tapBtn(p, 'A');
   await p.waitForFunction(() => document.body.innerText.includes('· playing'), null, { timeout: 30000 });
@@ -188,6 +295,14 @@ async function waitApproach(p: Page, ms = 30000): Promise<boolean> {
 }
 
 async function attempt(p: Page, trick: string): Promise<Rec | null> {
+  if (VCLOCK) {
+    const air = AIR[trick], rw = trick.startsWith('rw:') ? RUNWAY[trick.slice(3)] : null;
+    const cfg: AttemptCfg = { trick, seed: SEED * 1000 + nameSeed(trick), air: air ? [DPAD_I[air[0]], BTN_I[air[1]]] : null, again: SECOND_PRESS_MS[trick] ?? 0,
+      runway: rw ? [BTN_I[rw[0]], rw[1] ? DPAD_I[rw[1]] : null] : null, recMs: Number(process.env.REC_MS ?? 3600) };
+    const out = await Promise.race([p.evaluate(attemptInPage, cfg), new Promise<AttemptOut>((r) => setTimeout(() => r({ err: 'no answer in 240 wall s' }), 240000))]);
+    if ('err' in out) { console.log(`  ${trick}: ${out.err}`); return null; }
+    return { trick, ...out };
+  }
   if (!(await waitApproach(p))) return null;
   await p.waitForTimeout(400);
   const t0 = await p.evaluate('(() => { window.__rec.frames = []; window.__rec.on = true; return performance.now(); })()') as number;
@@ -272,7 +387,9 @@ function local(f: Frame, p: number[]): V {
   const d = sub(p, f.rp); const a = -yawOf(f); const c = Math.cos(a), s = Math.sin(a);
   return [d[0] * c + d[2] * s, d[1], -d[0] * s + d[2] * c];
 }
-function qAngleDeg(a: number[], b: number[]): number { const d = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]); return (2 * Math.acos(Math.min(1, d)) * 180) / Math.PI; }
+/** HOOPS MOTION phase 2a (AUD 2): NORMALISED — the recorder rounds each component to 5 decimals, so an unchanged rotation's self-dot
+ *  is |q|² ≠ 1 and acos read it as motion (5.9–19.6°/s on a still bone): the "held" fractions were that artefact. */
+function qAngleDeg(a: number[], b: number[]): number { const na = Math.hypot(a[0], a[1], a[2], a[3]) || 1, nb = Math.hypot(b[0], b[1], b[2], b[3]) || 1; const d = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]) / (na * nb); return (2 * Math.acos(Math.min(1, d)) * 180) / Math.PI; }
 
 export interface Metrics {
   trick: string; frames: number; fps: number; flightMs: number; launchToLandMs: number | null;

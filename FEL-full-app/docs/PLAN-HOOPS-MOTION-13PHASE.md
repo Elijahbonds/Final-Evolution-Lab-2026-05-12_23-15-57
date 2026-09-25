@@ -227,6 +227,7 @@ Phase 1 ran at lane 71ea8f3 and was re-measured by the audit: 81 actions and 382
 Each phase lists what it changes and why (with the source), then its gate. A gate is written as base → target.
 - **Base** is the audited phase 1 number.
 - **`base2`** is the same catalogue re-taken in 2a, on the rebased tip with the fixed probe. Where `base2` differs from phase 1 by more than the spread between attempts, both numbers go in the phase's commit message and the absolute target stands.
+  - **Measured in 2a: every delta is taken against `base2`, never against phase 1.** Phase 1's figures mix clocks. Its 382 recordings (the family table above, and `base-audit`) were taken before the audit fixed the clock and only re-measured after it. The audit's own 17 live re-recordings on the fixed clock, at the same tip 71ea8f3 (`audit-rerun`), read higher on the 16 actions they share with `base2`: pops 7.81 → 12.06, severe 1.06 → 2.50, whips 7.00 → 12.12, slide p90 7.79 → 9.16 cm. So a phase 1 → `base2` difference is not a measure of what the tip changed (`hoopsmotion/p2/README.md`). The phase 1 figures written as "base" in the gates below are context; the absolute targets stand.
 - **Every phase is also compared with the previous phase's tag.**
 - **A phase may not make an earlier gate worse.**
 
@@ -331,7 +332,11 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
 
 **Gate**
 - **Determinism:** two idle runs and one `HOG=60` run of `1v1-off` and `3pt` are identical in take lengths, frames and anchors, with SPARC within 0.04. Defence spreads are reported.
+  - *Measured in 2a (`hoopsmotion/p2/det/`): FAILED as written.* No idle pair exists: A, B and C all ran while other probe browsers loaded the machine (C also with `HOG=60`). `DET=1` prints DETERMINISM FAIL (6) for A vs B, (7) for A vs C and (1) for B vs C. Take lengths and frames agree in every pair (29/29 1v1-off, 3/3 3PT); every failure is an AI window in 1v1-off (anchors 32/34 in A vs B, SPARC up to 0.30).
+  - The hero and 3PT recordings agree in anchors, frame counts and window metrics in all three pairs, but the recordings are not identical: the recorded hero poses differ by up to 1.16 m, mostly on frames past the scored window.
+  - The review could not record an idle pair either: other agents' dev servers and probes shared the machine throughout. Until one exists, "1v1 offence and 3PT reproduce exactly" means the same takes, anchors, frames and window metrics under load; the AI windows in 1v1-off do not reproduce.
 - **`base2`:** every catalogue action that has a code path is recorded (76 of 81 catalogue actions plus the 5 supplemental windows).
+  - *Measured in 2a:* 75 of 81 plus 5 of 5. `hero_3v3_def_steal` gave no hero steal in 74 takes at a37a90ce: the hotfix's poke gate takes a poke only from an unstunned hero within 1.6 m of a holder whose ball is in his hand.
 - **Gravity fit** on the hips flight of every capture subject a hoops clip uses: 9.8 ± 1.5 m/s² (subject 78 at the stated rate: 30–42).
 - **Speed:** every subject-78 `bball_mc_*` clip plays at 0.9–1.15× real speed at rate 1 (base 1.55–4.0×). The re-paced one-shots are listed with their real/played ratio for phases 4, 6 and 7.
 - **Pinned durations:** the seven pinned non-hoops clips play the same duration as before, to the millisecond (a unit test).
@@ -780,7 +785,7 @@ Each phase lists what it changes and why (with the source), then its gate. A gat
 
 ### 13. Re-measure + the reel + deploy
 
-- **Re-take the whole catalogue** with the probe (≥ 5 attempts per action) and compare with `base2` and `base-audit` (`_hoops-motion-compare.mts`).
+- **Re-take the whole catalogue** with the probe (≥ 5 attempts per action) and compare with `base2` (`_hoops-motion-compare.mts`). `base-audit` is context only: its recordings predate the audit's clock fix (see "Phase by phase").
 - **Re-run the contest dunks** against the phase 2a control.
 - **The eye grades a reel of every family, and the owner reviews ONE reel** (owner round 3).
 - **Summary:** `~/Claude/outbox/finish-release/hoopsmotion/HOOPS-MOTION-PASS-SUMMARY.md`.
