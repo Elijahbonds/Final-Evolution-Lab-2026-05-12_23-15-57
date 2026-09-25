@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { flashFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash too
 
 // Surf Break: ride the pocket. Keep your board inside the moving sweet spot to build flow; hit CUTBACK prompts for bonus. Balance empties = wipeout.
 export default function SurfGame({ grade, prq, onEnd, gamepad }: GameProps) {
@@ -67,7 +68,7 @@ export default function SurfGame({ grade, prq, onEnd, gamepad }: GameProps) {
       const pts = perfect ? 200 : 120;
       st.score += pts; st.combo++;
       rec.recordHit(perfect); rec.recordChain(st.combo);
-      say(`${perfect ? 'PERFECT ' : ''}CUTBACK +${pts}`, '#A855F7'); st.flash = 0.12;
+      say(`${perfect ? 'PERFECT ' : ''}CUTBACK +${pts}`, '#A855F7'); st.flash = flashFor(0.12);
       for (let i = 0; i < 14; i++) st.particles.push({ x: st.x, y: rideY, vx: (Math.random() - 0.5) * 420, vy: -Math.random() * 320, life: 0.7, color: '#00E5FF' });
     };
 

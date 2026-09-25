@@ -399,7 +399,8 @@ function ZonePanel({
                 className="text-[10px] font-medium uppercase tracking-[0.3em]"
                 style={{ color: zone.accent }}
               >
-                Act {zone.act} · {zone.mode}
+                {/* HOTFIX (2026-09-24): was the raw route id ("onevone") — the name the rest of the app shows */}
+                Act {zone.act} · {zone.modeLabel}
               </p>
               <h2 className="mt-1 text-lg font-bold text-white">{zone.title}</h2>
             </div>
@@ -521,7 +522,8 @@ function NodeRow({
             {node.description}
           </span>
           <span className="mt-1 flex items-center gap-3 text-[11px] tabular-nums text-slate-500">
-            <span>Target {node.targetScore.toLocaleString()}</span>
+            {/* HOTFIX (2026-09-24): "Target 1,000" had no unit and a boss is now a win — the server says the goal */}
+            <span>{node.goal}</span>
             <span className="text-cyan-400/80">+{node.rewardLC} LC</span>
             {node.badge ? (
               <span className="text-amber-400/80">{node.badge.name}</span>

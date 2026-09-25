@@ -25,13 +25,13 @@ export const IRL_DUNK_TUNING: IrlSessionTuning = {
   tieGoesTo: null, // TUNE(elijah) — a tie is a draw (no winner)
 };
 
-/** SFX/shake presets per IRL session event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per IRL session event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. Sound belongs to the host that renders the mode (the Babylon modes play synthesized SoundKit
+ * cues); no live host builds this core today. See lib/feel/sensory-bus.ts.
+ */
 export const IRL_DUNK_SENSORY: Partial<Record<IrlSensoryEvent, SensoryEvent>> = {
-  runStart: { sfx: '/audio/sfx_ui_click.mp3', volume: 0.4 }, // TUNE(elijah)
-  firstRun: { sfx: '/audio/sfx_score.mp3', volume: 0.6 }, // TUNE(elijah)
-  newRecord: { sfx: '/audio/sfx_score.mp3', volume: 1.0, shake: 0.14 }, // TUNE(elijah)
-  noBeat: { sfx: '/audio/sfx_ui_click.mp3', volume: 0.35 }, // TUNE(elijah)
-  h2hScore: { sfx: '/audio/sfx_score.mp3', volume: 0.5 }, // TUNE(elijah)
-  h2hWin: { sfx: '/audio/sfx_score.mp3', volume: 0.9, shake: 0.12 }, // TUNE(elijah)
-  submitted: { sfx: '/audio/sfx_ui_click.mp3', volume: 0.5 }, // TUNE(elijah)
+  newRecord: { shake: 0.14 }, // TUNE(elijah)
+  h2hWin: { shake: 0.12 }, // TUNE(elijah)
 };

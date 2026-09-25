@@ -6,6 +6,7 @@ import { Matrix, Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, TargetCamera, TransformNode, Observer } from '@babylonjs/core';
 import { replayWindow } from './replayWindow';
 import { cutCamera, cutSec, type CutSpec } from '../core/DunkCuts';
+import { motionPolicy } from '../../a11y/reducedMotion';
 
 const WINDOW_S = 4, RATE_HZ = 30, SPEED = 0.5;
 
@@ -202,6 +203,7 @@ export class DunkReplayRecorder {
     const segs = cuts.map((c) => ({ c, dur: cutSec(c), t0: contactAt - c.lead, t1: contactAt + c.tail }));
     const freeze = Math.max(0, opts.freezeSec ?? 0);
     const total = segs.reduce((s, g) => s + g.dur, 0) + freeze;
+    const handheld = motionPolicy().shake;   // HOTFIX (2026-09-24): reduced motion — the phone cut is held steady (no wobble)
     this.playing = true;
     return new Promise<void>((resolve) => {
       let rt = 0, seg = -1, frozenFrames = 0;
@@ -238,7 +240,7 @@ export class DunkReplayRecorder {
         if (!frozen) {
           const c = segs[s].c, cam = cutCamera(c.id, rim, { x: contact.cp.x, y: contact.cp.y, z: contact.cp.z }, approach);
           const push = 1 - 0.06 * (left / segs[s].dur);   // a slow push-in through the cut
-          const w = cam.shake ? cam.shake * Math.sin(rt * 37) : 0, w2 = cam.shake ? cam.shake * Math.cos(rt * 29) : 0;
+          const w = cam.shake && handheld ? cam.shake * Math.sin(rt * 37) : 0, w2 = cam.shake && handheld ? cam.shake * Math.cos(rt * 29) : 0;
           this.camera.position.set(cam.target.x + (cam.pos.x - cam.target.x) * push + w, cam.target.y + (cam.pos.y - cam.target.y) * push + w2, cam.target.z + (cam.pos.z - cam.target.z) * push);
           this.camera.setTarget(Vector3.Lerp(new Vector3(cam.target.x, cam.target.y, cam.target.z), Vector3.Lerp(a.bp, b.bp, k), 0.25));
         } else if (++frozenFrames === 2) opts.onFreeze?.();   // the frozen frame has drawn once: the poster reads it

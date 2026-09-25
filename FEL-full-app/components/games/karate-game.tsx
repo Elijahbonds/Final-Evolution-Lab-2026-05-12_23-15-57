@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
-import { createShake, triggerShake, updateShake, applyShake, resetShake, addPopup, createPopups, updatePopups, drawPopups, createFlash as createJFlash, triggerFlash as triggerJFlash, drawFlash as drawJFlash } from '@/lib/canvas-juice';
+import { createShake, triggerShake, updateShake, applyShake, resetShake, addPopup, createPopups, updatePopups, drawPopups, createFlash as createJFlash, triggerFlash as triggerJFlash, drawFlash as drawJFlash, flashFor } from '@/lib/canvas-juice';
 import { SessionRecorder } from '@/lib/game-systems';
 import { createDragonMoment, triggerDragonMoment, updateDragonMoment, drawDragonOverlay, applyDragonZoom, type DragonMomentState } from '@/lib/camera-director';
 import { createHitStop, triggerHitStop, updateHitStop } from '@/lib/impact-system';
@@ -225,7 +225,7 @@ export default function KarateGame({ grade, prq, onEnd, gamepad }: GameProps) {
           if (f.dying <= 0) {
             f.alive = false; f.dying = 0;
             st.kills += 1; st.waveKills += 1;
-            st.slowmo = 0.35; st.flash = 0.15;
+            st.slowmo = 0.35; st.flash = flashFor(0.15);   // HOTFIX (2026-09-24): the slow-mo is the game's clock and stays; the flash obeys reduced motion
             for (let i = 0; i < 16; i++) st.particles.push({ x: f.x, y: f.y - 60, vx: (Math.random() - 0.5) * 400, vy: -Math.random() * 320, life: 0.8, color: '#FFD700' });
           }
           continue;
@@ -246,7 +246,7 @@ export default function KarateGame({ grade, prq, onEnd, gamepad }: GameProps) {
               st.counterT = 0.15;
               for (let i = 0; i < 6; i++) st.particles.push({ x: st.px + st.pface * 30, y: st.py - 70, vx: (Math.random() - 0.5) * 200, vy: -Math.random() * 150, life: 0.4, color: '#00FF9D' });
             } else {
-              st.php -= 7 + st.wave; st.flash = 0.1;
+              st.php -= 7 + st.wave; st.flash = flashFor(0.1);
             }
           }
         } else if (f.attackCd <= 0 && Math.abs(dx) < 120) {

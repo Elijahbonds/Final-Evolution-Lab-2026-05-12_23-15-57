@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { createGameSystems, type GameSystems } from '@/lib/game-systems';
+import { flashFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash too
 import { createApexFollow, updateApexFollow, applyApexOffset, type ApexFollowState } from '@/lib/camera-director';
 import {
   createHitStop, triggerHitStop, updateHitStop,
@@ -99,7 +100,7 @@ export default function DunkGame({ grade, prq, onEnd, gamepad }: GameProps) {
       const off = Math.abs(t - w / 2) / (w / 2);
       st.qteResult = off < 0.2 ? 'PERFECT' : off < 0.5 ? 'GREAT' : 'GOOD';
       st.phase = 'fall';
-      st.flash = 0.15;
+      st.flash = flashFor(0.15);
       for (let i = 0; i < 14; i++) st.particles.push({ x: rimX, y: rimY, vx: (Math.random() - 0.5) * 400, vy: -Math.random() * 300, life: 0.7, color: st.qteResult === 'PERFECT' ? '#FFD700' : '#00E5FF' });
     };
 
@@ -188,7 +189,7 @@ export default function DunkGame({ grade, prq, onEnd, gamepad }: GameProps) {
             spawnBurst(st.crowdBurst, rimX, rimY, 22, {         // crowd pop // TUNE(elijah)
               colors: ['#FFD700', '#00E5FF', '#ffffff'], speed: 260, spread: -80, life: 0.8, size: 3.2,
             });
-            st.flash = Math.max(st.flash, 0.15);
+            st.flash = Math.max(st.flash, flashFor(0.15));
           }
           setTimeout(() => {
             st.x = 200; st.hangTime = 0;

@@ -66,13 +66,18 @@ export const SNOWBOARD_THEME = {
   playerColor: '#D0552E', // TUNE(elijah)
 };
 
-/** SFX/shake presets per ride event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per ride event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. Sound belongs to the host that renders the mode (the Babylon modes play synthesized SoundKit
+ * cues); no live host builds this core today. See lib/feel/sensory-bus.ts.
+ */
 export const SNOWBOARD_SENSORY: Partial<Record<RideSensoryEvent, SensoryEvent>> = {
-  ollie: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.55, shake: 0.06 }, // TUNE(elijah)
-  landClean: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.55, shake: 0.2, hitStopMs: 45 }, // TUNE(elijah)
-  landStuck: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.65, shake: 0.26, hitStopMs: 70, rumbleMs: 140 }, // TUNE(elijah)
-  landSketchy: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.4, shake: 0.14 }, // TUNE(elijah)
-  bail: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.95, shake: 0.55, hitStopMs: 130, rumbleMs: 340, rumbleStrength: 0.85 }, // TUNE(elijah)
-  railContact: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.45, shake: 0.09 }, // TUNE(elijah)
-  grindPop: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.6, shake: 0.12 }, // TUNE(elijah)
+  ollie: { shake: 0.06 }, // TUNE(elijah)
+  landClean: { shake: 0.2, hitStopMs: 45 }, // TUNE(elijah)
+  landStuck: { shake: 0.26, hitStopMs: 70, rumbleMs: 140 }, // TUNE(elijah)
+  landSketchy: { shake: 0.14 }, // TUNE(elijah)
+  bail: { shake: 0.55, hitStopMs: 130, rumbleMs: 340, rumbleStrength: 0.85 }, // TUNE(elijah)
+  railContact: { shake: 0.09 }, // TUNE(elijah)
+  grindPop: { shake: 0.12 }, // TUNE(elijah)
 };

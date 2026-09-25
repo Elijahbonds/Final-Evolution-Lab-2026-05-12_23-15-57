@@ -13,6 +13,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { timingWon } from './timing-won';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
@@ -69,11 +70,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
         // `hits/rounds CLEAN` — an outcome and stats none of these five modes send — so no run here was ever a win.
         const st = r.stats ?? {};
         const n = (k: string, d = 0) => Number(st[k] ?? d);
-        const o = r.outcome;
-        const won = o === 'win' || o === 'WIN' || o === 'SHOOTOUT_WIN' || o === 'GREAT'
-          || (o === 'CARD_IN' && n('overPar', 99) <= 0)
-          || (o === 'DERBY_END' && n('homers') >= 3)
-          || (o === 'MATCH_END' && n('hits') >= Math.ceil(n('rounds', 1) * 0.6));
+        // HOTFIX (2026-09-24): the verdict is a pure function now (./timing-won) — three Story bosses complete on it.
+        const won = timingWon(r.outcome, st);
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`

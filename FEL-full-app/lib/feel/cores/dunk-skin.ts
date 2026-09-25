@@ -69,10 +69,8 @@ export function makeDunkSkin(opts: DunkSkinOpts = {}): CourtSkin {
   };
 }
 
-/** SFX map for the dunk (the app already ships these MP3s). */
-export const DUNK_SENSORY_SFX = {
-  swoosh: '/audio/sfx_basketball_swoosh.mp3',
-  crowd: '/audio/sfx_crowd_cheer.mp3',
-} as const;
+// HOTFIX (2026-09-24): DUNK_SENSORY_SFX is gone. Nothing imported it, and its two MP3s (sfx_basketball_swoosh,
+// sfx_crowd_cheer) were never under public/ despite a comment saying the app ships them. The live dunk plays
+// SoundKit cues from lib/babylon/modes.
 
 export default makeDunkSkin;

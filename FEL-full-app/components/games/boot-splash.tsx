@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
+import { MotionSetting } from '@/components/settings/motion-setting';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -267,6 +268,10 @@ export function BootSplash(props: {
             : `radial-gradient(120% 90% at 50% 0%, ${v.tint}22, rgba(5,6,10,.96) 70%)`,
           backgroundSize: 'cover', backgroundPosition: 'center',
         }} />
+      {/* HOTFIX (2026-09-24): MOTION on every mode — the flashes, shake and hit-stops follow the device's reduce-motion
+          setting; this is the override, reachable before the first flash (a guest never sees the Profile tab). In the
+          corner, out of the picker column. */}
+      {(props.phase === 'ready' || props.phase === 'loading') && <MotionSetting compact className="absolute left-3 top-3 z-10" />}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>

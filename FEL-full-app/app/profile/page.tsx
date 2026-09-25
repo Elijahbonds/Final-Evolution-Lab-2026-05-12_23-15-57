@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Gem, Shirt, Store, CalendarDays } from 'lucide-react';
+import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { readWallet } from '@/lib/wallet/wallet-service';
@@ -13,6 +13,7 @@ import { ProfileView } from '@/components/profile-view';
 import { BoostShelf } from '@/components/cards/boost-shelf';
 import { ReferralCard } from '@/components/marketing/referral-card';
 import { CardEditor } from '@/components/creator/card-editor';
+import { MotionSetting } from '@/components/settings/motion-setting';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,9 @@ export default async function ProfilePage() {
   const shards = wallet?.shards ?? 0;
 
   const shortcuts = [
+    // HOTFIX (2026-09-24): the athlete creator shipped with no link anywhere -- reachable only by typing
+    // /creator/athlete. It is who you are on court, so it sits first, beside the Closet that dresses the same body.
+    { href: '/creator/athlete', icon: PersonStanding, accent: '#FFD700', label: 'Athlete' },
     { href: '/closet', icon: Shirt, accent: '#00E5FF', label: 'Closet' },
     { href: '/store', icon: Store, accent: '#FF7A2F', label: 'Store' },
     { href: '/wallet', icon: Gem, accent: '#A855F7', label: 'Wallet' },
@@ -111,6 +115,8 @@ export default async function ProfilePage() {
       </section>
 
       <div className="mt-8"><ReferralCard /></div>
+      {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
+      <div className="mt-8"><MotionSetting /></div>
       <DoorsRow tab="profile" />
     </TabPage>
   );

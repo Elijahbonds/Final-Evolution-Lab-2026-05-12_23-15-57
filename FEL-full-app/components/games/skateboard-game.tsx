@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { flashFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash too
 
 interface Trick { key: string; name: string; pts: number; color: string; lane: number }
 const TRICKS: Trick[] = [
@@ -74,7 +75,7 @@ export default function SkateboardGame({ grade, prq, onEnd, gamepad }: GameProps
       const pts = Math.round(note.trick.pts * j.mult * comboMult);
       st.score += pts;
       st.msg = `${j.grade} ${note.trick.name} +${pts}`; st.msgColor = note.trick.color; st.msgT = 1.1;
-      st.flash = j.grade === 'PERFECT' ? 0.12 : 0;
+      st.flash = j.grade === 'PERFECT' ? flashFor(0.12) : 0;
       st.wheelSpin = 1;
       for (let i = 0; i < 10; i++) st.particles.push({ x: hitX, y: groundY - 60, vx: (Math.random() - 0.5) * 360, vy: -Math.random() * 320, life: 0.6, color: note.trick.color });
     };

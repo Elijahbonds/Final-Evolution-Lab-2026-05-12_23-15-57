@@ -59,12 +59,19 @@ export const BIG_AIR_TRICK: AirTrickOpts = {
   stickWindowMs: 220, // TUNE(elijah) — generous stick window on a big landing
 };
 
-/** SFX/shake presets per air-session event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per air-session event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. The live host, lib/babylon/modes/AirSessionMode.ts, plays Big Air's own SoundKit cues (trick
+ * whoosh, landing score / miss, crash impact). It also builds this core with no bus of its own, so the core's bare
+ * bus has no camera and no loop: the shake and hitStopMs numbers below reach nothing until a host passes one. Of
+ * this table only the landStuck / landCrash rumble reaches a player (a gamepad); the shake and hit-stop felt in Big
+ * Air are the mode's own ctx.juice calls. See lib/feel/sensory-bus.ts.
+ */
 export const BIG_AIR_SENSORY: Partial<Record<AirSessionSensoryEvent, SensoryEvent>> = {
-  launch: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.6, shake: 0.08 }, // TUNE(elijah)
-  trickTap: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.4 }, // TUNE(elijah)
-  landClean: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.7, shake: 0.14, hitStopMs: 50 }, // TUNE(elijah)
-  landStuck: { sfx: '/audio/sfx_crowd_cheer.mp3', volume: 0.9, shake: 0.2, hitStopMs: 90, rumbleMs: 160, rumbleStrength: 0.7 }, // TUNE(elijah)
-  landSketchy: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.5, shake: 0.1 }, // TUNE(elijah)
-  landCrash: { sfx: '/audio/sfx_punch_impact.mp3', volume: 1.0, shake: 0.3, hitStopMs: 110, rumbleMs: 320, rumbleStrength: 0.9 }, // TUNE(elijah)
+  launch: { shake: 0.08 }, // TUNE(elijah)
+  landClean: { shake: 0.14, hitStopMs: 50 }, // TUNE(elijah)
+  landStuck: { shake: 0.2, hitStopMs: 90, rumbleMs: 160, rumbleStrength: 0.7 }, // TUNE(elijah)
+  landSketchy: { shake: 0.1 }, // TUNE(elijah)
+  landCrash: { shake: 0.3, hitStopMs: 110, rumbleMs: 320, rumbleStrength: 0.9 }, // TUNE(elijah)
 };

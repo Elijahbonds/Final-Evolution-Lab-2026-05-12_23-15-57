@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { flashFor, shakeFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash and shake too
 
 // Slalom descent: steer through gates, hit ramps and tap SPACE at the apex for tricks. 5 crashes ends the run.
 export default function SnowboardGame({ grade, prq, onEnd, gamepad }: GameProps) {
@@ -67,12 +68,12 @@ export default function SnowboardGame({ grade, prq, onEnd, gamepad }: GameProps)
       st.score += pts; st.combo++;
       rec.recordHit(); rec.recordChain(st.combo);
       st.trickDone = name;
-      say(`${name} +${pts}`, '#A855F7'); st.flash = 0.12;
+      say(`${name} +${pts}`, '#A855F7'); st.flash = flashFor(0.12);
       for (let i = 0; i < 12; i++) st.particles.push({ x: st.x, y: riderY - 60, vx: (Math.random() - 0.5) * 380, vy: -Math.random() * 280, life: 0.7, color: '#A855F7' });
     };
 
     const crash = (label: string) => {
-      st.misses++; st.combo = 0; st.shake = 0.35;
+      st.misses++; st.combo = 0; st.shake = shakeFor(0.35);
       rec.recordMiss();
       say(st.misses >= 5 ? 'WIPEOUT!' : `${label} · ${st.misses}/5`, '#FF3366');
       if (st.misses >= 5) endRun(true);

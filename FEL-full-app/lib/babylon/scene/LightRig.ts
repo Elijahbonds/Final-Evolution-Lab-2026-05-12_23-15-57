@@ -9,6 +9,7 @@ import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/cor
 import { MOODS, type VenueMood } from './moods';
 import { tierRigSettings, type QualityTier } from './QualityTier';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
+import { motionPolicy } from '../../a11y/reducedMotion';
 
 export interface LightRigHandle {
   hemi: HemisphericLight; sun: DirectionalLight;
@@ -152,6 +153,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   return {
     hemi, sun, shadows, pipeline, tier,
     flashBeat() {
+      // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
+      // the thunder still rolls, the sky just does not strobe)
+      if (!motionPolicy().flash) return;
       const base = M.exposure;
       pipeline.imageProcessing.exposure = base * 1.35;            //TUNE(elijah)
       if (flashObs) return;

@@ -1,4 +1,5 @@
 import { readPad, type PadLike } from '@/lib/input/profiles';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 /**
  * Canvas Juice Utilities — screen shake, floating score popups, hit flash.
  * Import into any game-*.tsx and call from the game loop.
@@ -17,6 +18,7 @@ export function createShake(): ShakeState {
 }
 
 export function triggerShake(s: ShakeState, intensity = 6, durationMs = 200) {
+  if (!motionPolicy().shake) return;   // HOTFIX (2026-09-24): reduced motion — the 2-D games hold still too
   s.t = durationMs;
   s.intensity = intensity;
 }
@@ -85,9 +87,19 @@ export function createFlash(): FlashState {
 }
 
 export function triggerFlash(f: FlashState, color = '#ffffff', durationMs = 80) {
+  if (!motionPolicy().flash) return;   // HOTFIX (2026-09-24): reduced motion — no full-canvas flash
   f.t = durationMs;
   f.color = color;
 }
+
+/**
+ * HOTFIX (2026-09-24): the games that keep their OWN flash or shake timer (`st.flash = 0.1` then a full-canvas fillRect;
+ * snowboard's `st.shake`; the 3-D board fallback's chase-camera shake) set it through these, so reduced motion reaches
+ * them too — the story boss's red damage flash on every hit was one. 0 under reduced motion (nothing draws, nothing
+ * moves), the amount asked for otherwise. Read at the moment the effect fires, like triggerFlash / triggerShake.
+ */
+export function flashFor(sec: number): number { return motionPolicy().flash ? sec : 0; }
+export function shakeFor(sec: number): number { return motionPolicy().shake ? sec : 0; }
 
 export function drawFlash(ctx: CanvasRenderingContext2D, f: FlashState, W: number, H: number, dt: number) {
   if (f.t <= 0) return;

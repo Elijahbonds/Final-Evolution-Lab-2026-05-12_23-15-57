@@ -70,6 +70,7 @@ import {
 } from '../../lib/feel/board-flow';
 import { BoardAudio } from '../../lib/board/board-audio';
 import { BoardInput } from '../../lib/board/board-input';
+import { shakeFor } from '../../lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion — the chase camera holds still on a landing or a bail
 
 import { BoardEnvironment, pickTimeOfDay, type TimeOfDayId } from '../three/board-environment';
 import { BoardParticles, type ParticleEmitHandle } from '../three/board-particles';
@@ -521,7 +522,7 @@ function Simulation({
           }
           audio.trickLand(_events.landingQuality);
           if (_events.landingQuality === 'sketchy') bus.emit({ kind: 'sketchy' });
-          shakeRef.current = Math.min(1, 0.3 + _events.landingAirTimeMs / 2500);
+          shakeRef.current = shakeFor(Math.min(1, 0.3 + _events.landingAirTimeMs / 2500));
           burstFxRef.current?.emit(
             phys.x, phys.y + 0.05, phys.z,
             0, 0.6, 0, 14, 1.1, 2.4
@@ -782,7 +783,7 @@ function Simulation({
       breakGrindChain(s.grindChain); // Part 6 Fix 4: a wipeout kills the chain
       s.railChainMult = 1;
       s.timeScale = 0.35; // slow-mo sting, eases back automatically
-      shakeRef.current = 1;
+      shakeRef.current = shakeFor(1);
       audio.bail();
       bus.emit({ kind: 'bail', lost, reason });
       burstFxRef.current?.emit(

@@ -96,6 +96,12 @@ describe('nothing in the app is orphaned', () => {
       .toEqual([]);
   });
 
+  it('the athlete creator is linked, not only the /creator hub above it', () => {
+    // HOTFIX (2026-09-24): the walk above sees top-level routes only, and /creator is linked -- so /creator/athlete
+    // shipped with nothing pointing at it while this file stayed green. Its door is on Profile.
+    expect(hrefs.has('/creator/athlete')).toBe(true);
+  });
+
   it('the not-navigable list has not gone stale', () => {
     // A route that was excused and then deleted leaves a lie behind in the list.
     const gone = Object.keys(NOT_NAVIGABLE).filter((r) => r.startsWith('/') && !r.includes('.') && !routes.includes(r));

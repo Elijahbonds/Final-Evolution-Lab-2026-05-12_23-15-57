@@ -58,13 +58,18 @@ export const SKATE_RAIL: RideRail = {
   snapMs: 200, // TUNE(elijah) — ArcDrive snap-to-rail time
 };
 
-/** SFX/shake presets per ride event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per ride event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. Sound belongs to the host that renders the mode (the Babylon modes play synthesized SoundKit
+ * cues); no live host builds this core today. See lib/feel/sensory-bus.ts.
+ */
 export const SKATE_SENSORY: Partial<Record<RideSensoryEvent, SensoryEvent>> = {
-  ollie: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.5, shake: 0.05 }, // TUNE(elijah)
-  landClean: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.6, shake: 0.18, hitStopMs: 40 }, // TUNE(elijah)
-  landStuck: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.7, shake: 0.24, hitStopMs: 60, rumbleMs: 120 }, // TUNE(elijah)
-  landSketchy: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.4, shake: 0.12 }, // TUNE(elijah)
-  bail: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.9, shake: 0.5, hitStopMs: 120, rumbleMs: 300, rumbleStrength: 0.8 }, // TUNE(elijah)
-  railContact: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.4, shake: 0.08 }, // TUNE(elijah)
-  grindPop: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.55, shake: 0.1 }, // TUNE(elijah)
+  ollie: { shake: 0.05 }, // TUNE(elijah)
+  landClean: { shake: 0.18, hitStopMs: 40 }, // TUNE(elijah)
+  landStuck: { shake: 0.24, hitStopMs: 60, rumbleMs: 120 }, // TUNE(elijah)
+  landSketchy: { shake: 0.12 }, // TUNE(elijah)
+  bail: { shake: 0.5, hitStopMs: 120, rumbleMs: 300, rumbleStrength: 0.8 }, // TUNE(elijah)
+  railContact: { shake: 0.08 }, // TUNE(elijah)
+  grindPop: { shake: 0.1 }, // TUNE(elijah)
 };

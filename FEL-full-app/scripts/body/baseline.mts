@@ -59,6 +59,8 @@ let madeSummary = { n: 0, list: '', accidental: false, lead: '', how: '' };
 const approachMenus = new Map<string, number>();
 /** Carried from §1: the attempts where R2 never rose, with why. */
 let noRunTakes: string[] = [];
+/** Carried from §1: attempts whose jump A the modes drop as the take-off's own (HOTFIX 2026-09-24), and of those, how many had no slam left. */
+let echoSummary = { n: 0, attempts: 0, noSlam: 0, afterMs: [] as number[] };
 /** Carried from §2: A (the 3v3 pass) against the real release, ms. */
 let passVsRelease: number[] = [];
 /** Carried from §3: what the punches pressed (stand calibration). */
@@ -203,7 +205,7 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
 {
   const dunkNames = ['dunk_elijah_two_foot', 'dunk_elijah_one_foot', 'dunk_approach_two_foot', 'jump_two_foot_high', 'jump_one_foot_runup', 'jump_two_foot_low', 'jumpshot', 'jumpshot_dribble', 'run_in_place'];
   const rows: (string | number)[][] = [], shippedRows: (string | number)[][] = [];
-  const agg = { attempts: 0, made: [] as string[], tooEarly: [] as number[], clips: [] as number[], launchCap: [] as number[], feetDown: 0, rLaunch: 0, openVsLand: [] as number[], taps: 0, noRun: [] as string[], makes: [] as { take: string; leadMs: number; verdict: string; taps: number }[] };
+  const agg = { attempts: 0, made: [] as string[], tooEarly: [] as number[], clips: [] as number[], launchCap: [] as number[], feetDown: 0, rLaunch: 0, openVsLand: [] as number[], taps: 0, noRun: [] as string[], makes: [] as { take: string; leadMs: number; verdict: string; taps: number }[], echoes: [] as number[], echoNoSlam: 0 };
   for (const n of dunkNames) {
     const fx = fixtures.get(n)!;
     for (const [label, r] of [['stand', stand.get(n)!], ['as shipped', shipped.get(n)!]] as const) {
@@ -215,15 +217,16 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
       const aFrom = d.slam ? jumpOfT(fx, d.slam.t) : null;
       const strike = j ? strikeIn(fx, j) : null;
       const verdict = d.verdict === 'too early' ? `refused TOO EARLY — ${d.tooEarlyMs} ms`
-        : d.verdict === 'no launch' ? 'no run' : d.verdict === 'no slam' ? 'no A in the flight' : `${d.verdict}, execution ${f2(d.execution)}`;
+        : d.verdict === 'no launch' ? 'no run' : d.verdict === 'no slam' ? (d.echo ? 'no slam: its only A was the take-off\'s' : 'no A in the flight') : `${d.verdict}, execution ${f2(d.execution)}`;
       const result = d.made ? '**MADE**' : d.verdict === 'no launch' ? '– (no attempt)' : `miss: ${d.missWhy === 'IRON' ? 'iron' : d.missWhy}`;
       const launchTxt = `${sgn(rel(d.launch))}${d.launchBy === 'the line (est.)' ? ' (the line, est.)' : ''}`;
       if (label === 'stand') {
         rows.push([n, j ? jumpLabel(fx, j) : '– (ms into the take)', sgn(rel(d.run)), f2(d.chargePeak), launchTxt, sgn(rel(d.launchT)),
+          d.echo ? `${sgn(rel(d.echo.at))} (${d.echo.afterLaunchMs} ms after the launch)` : '–',
           d.slam ? (aFrom ? `${sgn(rel(d.slam.at))} (jump ${jumpLabel(fx, aFrom).split(' ')[0]})` : `${sgn(rel(d.slam.at))} (no jump)`) : '–',
           j && d.slam ? sgn(d.slam.at - j.apex.t) : '–', strike && d.slam ? sgn(d.slam.at - strike.at.t) : '–', f2(d.slam?.clip),
           j && d.windowOpen !== null ? sgn(d.windowOpen - j.landing.t) : '–', d.styleTaps, verdict, result]);
-      } else shippedRows.push([n, launchTxt, sgn(rel(d.launchT)), sgn(rel(d.slam?.at)), f2(d.slam?.clip), verdict, result]);
+      } else shippedRows.push([n, launchTxt, sgn(rel(d.launchT)), d.echo ? sgn(rel(d.echo.at)) : '–', sgn(rel(d.slam?.at)), f2(d.slam?.clip), verdict, result]);
       if (label === 'stand') for (const nt of d.notes) {
         const m = /^(B: STYLE|X: PROP|Y: SELF-LOB|L1: CALL)/.exec(nt.what);
         if (m && (d.launch === null || nt.at < d.launch)) approachMenus.set(m[1], (approachMenus.get(m[1]) ?? 0) + 1);
@@ -235,6 +238,7 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
         continue;
       }
       agg.attempts++;
+      if (d.echo) { agg.echoes.push(d.echo.afterLaunchMs); if (!d.slam) agg.echoNoSlam++; }
       if (d.made) { agg.made.push(`${n} (${label})`); agg.makes.push({ take: `${n} (${label})`, leadMs: j ? j.takeoff.t - d.launchT : NaN, verdict: d.verdict, taps: d.styleTaps }); }
       else if (d.slam) agg.clips.push(d.slam.clip);
       if (d.tooEarlyMs !== null) agg.tooEarly.push(d.tooEarlyMs);
@@ -246,12 +250,13 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
   const w0 = B.slamWindow(0);
   say('## 1. Dunk contest (DunkMode)',
     '**How the mode reads the body** (`DunkMode.ts`):',
-    '- **The run:** R2 > 0.02 in the approach starts it (`:1418`, `beginRun :2958`).',
-    '- **The launch:** R2 back to exactly 0 during the run launches (`:1422`, `launchDunk :2456`). An R2 held for about 0.9 s or more would reach the line and launch there (est.).',
-    `- **The slam:** the first A in the flight is the slam, committed (\`bufferSlam :2328\`, \`slamCommitted\`).`,
+    '- **The run:** R2 > 0.02 in the approach starts it (`:1435`, `beginRun :2984`).',
+    '- **The launch:** R2 back to exactly 0 during the run launches (`:1439`, `launchDunk :2479`). An R2 held for about 0.9 s or more would reach the line and launch there (est.).',
+    `- **The take-off's own A is not the slam** (HOTFIX 2026-09-24, \`core/slamPress\` TakeoffEcho). The A that launched, or one inside ${B.TAKEOFF_ECHO_MS} ms of the launch, is dropped as the take-off's. After a launch at the line, the first A inside ${B.LATE_JUMP_MS} ms is dropped as the jump pressed late. The keyboard's Space release is tagged by InputBus and dropped until the SLAM read is up. The body's R2 → 0 and its jump A are one jump, so the same rule applies to it.`,
+    `- **The slam:** the first A in the flight that is left is the slam, committed (\`SlamLatch\` in \`core/slamPress\`: \`bufferSlam\`, the in-window press).`,
     `  - The window is ${f2(w0.openAt)}–${f2(w0.closeAt)} on the flight clock.`,
     `  - A press from ${f2(w0.openAt - w0.holdSec)} is held and fires when the window opens.`,
-    '  - Anything earlier is refused "TOO EARLY — n ms BEFORE THE WINDOW" (`:1840`), and the attempt resolves as "THREW IT AT THE IRON TOO EARLY" (`:2568`).',
+    '  - Anything earlier is refused "TOO EARLY — n ms BEFORE THE WINDOW" (`:1860`), and the attempt resolves as "THREW IT AT THE IRON TOO EARLY" (`:2594`).',
     `- **The flight clock** runs 1:1 to the rise, 0.4× for 400 ms, then 1:1 again. The window opens ${Math.round(B.realAt(w0.openAt) * 1000)} ms and closes ${Math.round(B.realAt(w0.closeAt) * 1000)} ms after the launch.`,
     '- **Other buttons in the air:**',
     '  - B after the rise is a style tap: the window shrinks 25 %.',
@@ -260,10 +265,11 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
     '',
     '**Stand calibration.** The dunk takes are measured against the dunk jump, and the others against the jump the launch leads into. Times are ms from that jump\'s take-off; negative means the feet are still down.',
     '- **Launch frame** is the capture time of the frame that launched.',
-    '- **A** is the first A in the flight, labelled with the jump its frame belongs to.',
-    table(['fixture', 'reference jump', 'run', 'charge', 'launch (app)', 'launch frame (capture)', 'A (app)', 'A vs apex', 'A vs strike', 'A flight clock', 'window opens vs landing', 'style taps', 'verdict', 'result'], rows),
+    `- **Take-off A** is an A the mode drops as the take-off's own (inside ${B.TAKEOFF_ECHO_MS} ms of the launch, or ${B.LATE_JUMP_MS} ms after a launch at the line).`,
+    '- **A** is the first A in the flight the mode takes as the slam, labelled with the jump its frame belongs to.',
+    table(['fixture', 'reference jump', 'run', 'charge', 'launch (app)', 'launch frame (capture)', 'take-off A (app, dropped)', 'A (app)', 'A vs apex', 'A vs strike', 'A flight clock', 'window opens vs landing', 'style taps', 'verdict', 'result'], rows),
     '**As shipped** (calibrated on the take\'s first frames):',
-    table(['fixture', 'launch (app)', 'launch frame (capture)', 'A (app)', 'A flight clock', 'verdict', 'result'], shippedRows),
+    table(['fixture', 'launch (app)', 'launch frame (capture)', 'take-off A (app, dropped)', 'A (app)', 'A flight clock', 'verdict', 'result'], shippedRows),
   );
   const madeTakes = [...new Set(agg.made.map((m) => m.split(' ')[0]))];
   noRunTakes = agg.noRun;
@@ -273,20 +279,23 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
   const how = agg.makes.map((m) => `${m.take}: ${m.verdict === 'buffered' ? 'the early buffer' : 'in the window'}, ${m.taps} style tap${m.taps === 1 ? '' : 's'}`).join('; ');
   madeSummary = { n: agg.made.length, list: agg.made.join(', '), accidental: leads.length === agg.makes.length && leads.every((v) => v > 300), lead, how };
   const after = agg.launchCap.filter((v) => v >= 0);
+  echoSummary = { n: agg.echoes.length, attempts: agg.attempts, noSlam: agg.echoNoSlam, afterMs: agg.echoes };
+  const clipSpan = agg.clips.length ? `${f2(Math.min(...agg.clips))}–${f2(Math.max(...agg.clips))}` : '–';
+  const earlySpan = agg.tooEarly.length ? `${Math.min(...agg.tooEarly)}–${Math.max(...agg.tooEarly)}` : '–';
   say(`- **${agg.attempts} attempts reached the flight** across ${dunkNames.length} takes and the two calibrations, and **${agg.made.length} were made**${madeTakes.length ? ` (${madeTakes.length === 1 ? 'one take' : `${madeTakes.length} takes`}: ${agg.made.join(', ')})` : ''}.${madeSummary.accidental ? ' Every make is an accident:' : ''}`,
     ...(madeSummary.accidental ? [
       `  - An approach bounce or dip launched the flight ${lead} before the real take-off.`,
       `  - The real jump's A then happened to land where the mode takes it (${how}).`,
       '  - So the avatar dunked before the player jumped.',
     ] : []),
-    `- **Every other attempt missed.** The first A came at flight clock ${f2(Math.min(...agg.clips))}–${f2(Math.max(...agg.clips))}, against a window that opens at ${f2(w0.openAt)} (held from ${f2(w0.openAt - w0.holdSec)}). It was refused TOO EARLY by ${Math.min(...agg.tooEarly)}–${Math.max(...agg.tooEarly)} ms.`,
+    `- **Every other attempt missed.**${agg.echoes.length ? ` In ${agg.echoes.length} of them the jump's own A came ${span(agg.echoes, ' ms')} after the launch, inside the take-off echo, and was dropped (HOTFIX 2026-09-24); ${agg.echoNoSlam} of those had no A left to slam with.` : ''} The first A the mode took came at flight clock ${clipSpan}, against a window that opens at ${f2(w0.openAt)} (held from ${f2(w0.openAt - w0.holdSec)}). It was refused TOO EARLY by ${earlySpan} ms.`,
     `- **The launch.** Of the ${agg.rLaunch} launches that came from releasing R2, **${agg.feetDown} were triggered by a frame captured before the take-off**, with the feet still down; the range is ${span(agg.launchCap, ' ms')} on the capture clock. ${after.length ? `The other ${after.length} came ${span(after, ' ms')} after it${Math.max(...after) <= 34 ? ', within a frame' : ''}.` : ''}`,
     `- **The window** opens ${span(agg.openVsLand, ' ms')} from the real landing on the missed attempts. It is after the landing in ${agg.openVsLand.filter((v) => v > 0).length} of ${agg.openVsLand.length}; the rest had launched on an approach bounce, long before the jump.`,
     `- **Style taps.** In ${agg.taps} of ${agg.attempts} attempts a raised right hand (B) or an arm out (L1) in the air counts as a style tap, which shrinks the window.`,
     approachMenus.size ? `- **The approach menus change by accident** (stand calibration, before the launch): ${[...approachMenus].map(([k, v]) => `${k} ×${v}`).join(', ')}. A raised hand or arms out cycle the style or the prop, throw the self-lob, or cycle the call.` : '',
     agg.noRun.length ? `- **No run at all** in ${agg.noRun.join('; ')}. R2 never rises, so every A lands in the approach and is refused "SLAM AT THE TOP OF THE JUMP".` : '',
   );
-  key.push(`**Dunk:** ${agg.attempts} attempts reached the flight, and ${agg.made.length} were made. ${madeTakes.length ? `The makes (${agg.made.join(', ')}) ${madeSummary.accidental ? `are all accidents: the flight launched on an approach bounce or dip ${lead} before the real take-off` : 'are in §1'}. ` : ''}Every other attempt missed. ${agg.feetDown} of ${agg.rLaunch} launches were triggered by a frame with the feet still down (capture ${span(agg.launchCap, ' ms')} from the take-off). The first A landed at flight clock ${f2(Math.min(...agg.clips))}–${f2(Math.max(...agg.clips))} against a window that opens at ${f2(w0.openAt)}, so it was refused TOO EARLY by ${Math.min(...agg.tooEarly)}–${Math.max(...agg.tooEarly)} ms. The window opened after the real landing in ${agg.openVsLand.filter((v) => v > 0).length} of the ${agg.openVsLand.length} misses (up to ${sgn(Math.max(...agg.openVsLand), ' ms')}).`);
+  key.push(`**Dunk:** ${agg.attempts} attempts reached the flight, and ${agg.made.length} were made. ${madeTakes.length ? `The makes (${agg.made.join(', ')}) ${madeSummary.accidental ? `are all accidents: the flight launched on an approach bounce or dip ${lead} before the real take-off` : 'are in §1'}. ` : ''}Every other attempt missed. ${agg.feetDown} of ${agg.rLaunch} launches were triggered by a frame with the feet still down (capture ${span(agg.launchCap, ' ms')} from the take-off). ${agg.echoes.length ? `In ${agg.echoes.length} attempts the jump's own A was inside the take-off echo and dropped (${agg.echoNoSlam} left no slam at all). ` : ''}The first A the mode took landed at flight clock ${clipSpan} against a window that opens at ${f2(w0.openAt)}, so it was refused TOO EARLY by ${earlySpan} ms. The window opened after the real landing in ${agg.openVsLand.filter((v) => v > 0).length} of the ${agg.openVsLand.length} misses (up to ${sgn(Math.max(...agg.openVsLand), ' ms')}).`);
 
   // the duel
   const drows: (string | number)[][] = [];
@@ -296,14 +305,13 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
     const j = n.startsWith('dunk_') ? biggest(fx) : d.launch !== null ? jumpAfter(fx, d.launch) : null;
     const hitAt = d.presses.findIndex((p) => p.kind === 'clean' || p.kind === 'early');
     if (d.hit && j && d.launch !== null) duelHits.push(`${n}: press ${hitAt + 1} of the flight, ${sgn(d.presses[hitAt].at - j.takeoff.t, ' ms')} from the take-off, in a flight launched ${sgn(d.launch - j.takeoff.t, ' ms')} from it`);
-    drows.push([n, j && d.launch !== null ? sgn(d.launch - j.takeoff.t) : '–', d.presses.map((p) => `${f2(p.clip)} ${p.kind}`).join(', ') || '–', d.launch === null ? '– (no run)' : d.hit ? `**hit** ${f2(d.accuracy)}` : 'miss']);
+    drows.push([n, j && d.launch !== null ? sgn(d.launch - j.takeoff.t) : '–', d.presses.map((p) => `${f2(p.clip)} ${p.kind}`).join(', ') || '–', d.launch === null ? '– (no run)' : d.hit ? `**hit** ${f2(d.accuracy)}` : d.tooEarlyMs !== null ? `miss (TOO EARLY — ${d.tooEarlyMs} ms)` : 'miss']);
   }
   say('### Dunk Duel (DunkDuelMode)',
-    `The run and launch work the same way (\`DunkDuelMode.ts:588-601\`). Each A in the flight goes to \`judgePress\`: the window is ${f2(w0.openAt)}–${f2(w0.closeAt)}, with grace back to ${f2(B.DUEL_EARLIEST_CLIP)}. The first press that is too early waits in \`EarlyPress\`, and later presses are still judged (\`:671-675\`). Stand calibration:`,
+    `The run and launch work the same way, and A on the run takes off as in the contest (HOTFIX 2026-09-24: the duel's hint said "tap jump" and A never jumped; \`DunkDuelMode.ts:671-693\`). The flight's A first passes the take-off echo (the A that launched, one inside ${B.TAKEOFF_ECHO_MS} ms of the launch, the jump pressed late after the line, or the keyboard Space's own before the grace, is dropped: "echo"), then goes to ONE \`FirstPress\` (HOTFIX 2026-09-24): the window is ${f2(w0.openAt)}–${f2(w0.closeAt)}, with grace back to ${f2(B.DUEL_EARLIEST_CLIP)}. The first press is the verdict; one too early for the grace waits and is refused TOO EARLY when the window opens, and every A after the first is spent. Stand calibration:`,
     table(['fixture', 'launch vs take-off', 'A presses in the flight (flight clock, verdict)', 'result'], drows),
-    `- **The duel scores ${duelHits.length} hits**, and neither is the jump working:`,
+    duelHits.length ? `- **The duel scores ${duelHits.length} hit${duelHits.length === 1 ? '' : 's'}:**` : '- **The duel scores no hits.** The late re-presses that used to score after a too-early first A are spent now: the first press decides.',
     ...duelHits.map((h) => `  - ${h}.`),
-    '- The duel judges every A in the flight, not only the first, so a late re-press can score. The body drops out as it leaves the frame and after the landing, and A is pressed again when it comes back.',
   );
 }
 
@@ -428,7 +436,7 @@ function dropped(fx: PoseFixture): { lost: number; inJump: number } {
 // ── §5 the map's claims ──────────────────────────────────────────────────────────────────────────────────────────
 say('## 5. The map\'s claims against the numbers',
   '### Confirmed',
-  '- **Dunk (map dunk §0.1).** The dip turns R2 on and starts the run. Rising out of it sends R2 to 0 and launches, with the feet down or within a frame of the take-off. The hips then cross `jumpOn` and send A into the flight, where it is buffered and refused TOO EARLY, and any later A is ignored because the first press decides. **Every attempt launched by the jump\'s own dip missed this way** (§1).',
+  `- **Dunk (map dunk §0.1).** The dip turns R2 on and starts the run. Rising out of it sends R2 to 0 and launches, with the feet down or within a frame of the take-off. The hips then cross \`jumpOn\` and send A into the flight. Inside ${B.TAKEOFF_ECHO_MS} ms of the launch that A is the take-off's own and the modes drop it (${echoSummary.n} of ${echoSummary.attempts} attempts; ${echoSummary.noSlam} of them then had no slam at all); later, it is buffered and refused TOO EARLY, and any later A is ignored because the first press decides. **Every attempt launched by the jump\'s own dip missed** (§1).`,
   '- **Dunk style taps (map dunk §0.1).** A raised right hand in the air is a style tap that shrinks the window. Arms out (L1) are a new case: they fire the backboard double-launch, or the backboard swing, which is another style tap.',
   '- **Dunk flight (map dunk §0.2).** The game\'s flight outlasts the body: the window opens after the real landing, so the body cannot react to NOW!.',
   `- **Hoops (map hoops §4.1, §4.3, §4.4).** The dip holds the turbo. The jump is A, the 3v3 pass, and it fires ${span(passVsRelease, ' ms')} from the real release. 3PT fires on whichever of A/B/X comes first, against a random-phase bar.`,
@@ -448,8 +456,8 @@ say('## 5. The map\'s claims against the numbers',
   ...(noRunTakes.length ? [`- **A neutral taken low starts no dunk at all**: ${noRunTakes.join('; ')}. Nothing dips ${vertCm(THRESH.squatStart)} cm below it, so R2 never rises and every A is refused "SLAM AT THE TOP OF THE JUMP".`] : []),
   '- **Running in place starts the dunk run on the first bounce that dips far enough, and launches as it comes up**, with no jump at all (run_in_place).',
   '- **The approach menus change by accident** (§1): a raised hand or arms out cycle STYLE (B) or PROP (X), throw the SELF-LOB (Y), or cycle the CALL (L1).',
-  '- **The Dunk Duel judges every A in the flight, not only the first**, so a late re-press can score. The owner\'s two-foot dunk "hit" on its third A, after the landing, when the body came back into view.',
-  '- **Pad-path bug** (read in the code, not run): **A on the run launches (`DunkMode.ts:1304`), and the same event then reaches `airButton` (`:1343`), which buffers it as the slam at flight clock 0.** A pad player who takes off with A would then be refused TOO EARLY every time. Worth one probe.',
+  '- **The Dunk Duel judged every A in the flight, not only the first**, so a late re-press could score: the owner\'s two-foot dunk "hit" on a re-press after the landing, when the body came back into view. **Fixed in code, not yet seen in a browser (HOTFIX 2026-09-24):** one `FirstPress`, the first press decides, as in the contest (§1, Dunk Duel). Proven on the pure cores and the real InputBus in unit tests; the live /dev/mode dunkduel check has not been run.',
+  '- **Pad-path bug**: A on the run launched (`DunkMode.ts:1312`), and the same event then reached `airButton` (`:1360`), which buffered it as the slam at flight clock 0, refused TOO EARLY. The keyboard had the same bug from its Space release (R 0 launches, then an A). **Fixed in code, not yet seen in a browser (HOTFIX 2026-09-24):** `core/slamPress` TakeoffEcho drops the take-off\'s own A in both dunk modes. Proven on the pure cores and the real InputBus in unit tests; the live /dev/mode dunk and dunkduel checks (keyboard and pad) have not been run.',
 );
 say('## 6. Limits of this baseline',
   '- **The mode reads are models of `onInput` and the flight clock, not the running modes.** Frame quantisation, the gather stride, props and the harness are not modelled. The auto-launch at the line uses an estimated 0.9 s floor; only the rows marked "the line" reached it.',

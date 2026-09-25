@@ -8,7 +8,10 @@
  *
  * Validates:
  *   - Session exists and belongs to the user
- *   - Session score meets the node’s target
+ *   - Session was played in the node’s mode (judgeStorySession, lib/progression)
+ *   - Session is a win, when the node asks for one (a boss of a winnable mode) — or at its `orScore`, where it has one
+ *   - Session has not already completed a DIFFERENT node (one session, one node)
+ *   - Session score meets the node’s target (on the mode's own scale — lib/story-yardstick.ts)
  *   - Node is currently playable (unlocked, not already completed)
  * Then atomically creates StoryNodeProgress + awards LC via economy.
  */
@@ -19,7 +22,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getNodeById } from '@/lib/story-data';
 import { loadProgressionInput } from '@/lib/story-service';
-import { isNodePlayable, evaluateCampaign, newlyUnlockedZones } from '@/lib/progression';
+import { isNodePlayable, evaluateCampaign, newlyUnlockedZones, judgeStorySession } from '@/lib/progression';
 import { awardStoryReward } from '@/lib/story-economy';
 
 export const dynamic = 'force-dynamic';
@@ -47,24 +50,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Validate session if provided
-    let sessionScore = 0;
+    let gameSession: { mode: string; score: number; won: boolean } | null = null;
     if (sessionId) {
-      const gameSession = await prisma.gameSession.findFirst({
+      gameSession = await prisma.gameSession.findFirst({
         where: { id: sessionId, userId },
-        select: { score: true },
+        select: { mode: true, score: true, won: true },
       });
       if (!gameSession) {
         return NextResponse.json({ error: 'Session not found' }, { status: 404 });
       }
-      sessionScore = gameSession.score;
+    }
+    const sessionScore = gameSession?.score ?? 0;
+
+    // HOTFIX (2026-09-24): only the score was checked, so a high-scoring run in any mode completed any node. The
+    // session must be this node's mode, a win when the node asks for one, then at or over the target — in that order.
+    // lib/story-complete-route.test.ts drives this handler and holds all three.
+    const verdict = judgeStorySession(node, gameSession);
+    if (!verdict.ok) {
+      // the verdict IS the body (error, required, achieved — and a win boss's orScore + score), minus the flag
+      const { ok: _ok, ...refusal } = verdict;
+      return NextResponse.json(refusal, { status: 422 });
     }
 
-    // Check score meets target
-    if (sessionScore < node.targetScore) {
-      return NextResponse.json(
-        { error: 'Score below target', required: node.targetScore, achieved: sessionScore },
-        { status: 422 },
-      );
+    // HOTFIX (2026-09-24): one session completes one node. StoryNodeProgress.sessionId is @unique, so the database
+    // already refused a second node on the same session — but the P2002 below answered it `ok: true,
+    // alreadyCompleted: true`, reporting a completion that never happened. Asked first and answered as what it is.
+    const usedBy = await prisma.storyNodeProgress.findUnique({ where: { sessionId }, select: { nodeId: true } });
+    if (usedBy && usedBy.nodeId !== nodeId) {
+      return NextResponse.json({ error: 'Session already used', nodeId: usedBy.nodeId }, { status: 409 });
     }
 
     // Check node is playable
@@ -125,6 +138,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       'code' in error &&
       (error as { code: string }).code === 'P2002'
     ) {
+      // HOTFIX (2026-09-24): the two unique keys mean different things. (userId, nodeId) is this node, already done —
+      // idempotent. sessionId is a race of the check above: the session completed ANOTHER node first, and nothing
+      // was written for this one, so it is not "completed".
+      const target = (error as { meta?: { target?: unknown } }).meta?.target;
+      if (Array.isArray(target) ? target.includes('sessionId') : String(target ?? '').includes('sessionId')) {
+        return NextResponse.json({ error: 'Session already used' }, { status: 409 });
+      }
       return NextResponse.json({ ok: true, alreadyCompleted: true });
     }
     console.error('[api/story/complete] POST failed:', error);

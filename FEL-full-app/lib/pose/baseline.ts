@@ -24,7 +24,8 @@ import { slamExecution } from '../babylon/core/DunkSystem';
 import { slamBufferSec, arcTopT, ARC_TOP_FRAC } from '../babylon/core/DunkLegs';
 import { RIM_CLEAN } from '../babylon/core/DunkCard';
 import { DOUBLE_LAUNCH } from '../babylon/core/DunkParkour';
-import { judgePress, PRESS_GRACE } from '../babylon/core/timingPress';
+import { FirstPress, PRESS_GRACE } from '../babylon/core/timingPress';
+import { SlamLatch, TakeoffEcho, TAKEOFF_ECHO_MS, LATE_JUMP_MS, type TakeoffEchoKind } from '../babylon/core/slamPress';
 import { DASH } from '../babylon/core/StormCombat';
 import { SHOT_TARGET, PERFECT_BAND, GOOD_BAND } from '../babylon/core/shootoutHud';
 import type { PoseFrame } from './landmarks';
@@ -197,15 +198,15 @@ export function stickAt(events: Emitted[], at: number): { x: number; y: number }
 
 /** modeConfigs.ts:27 CFG.qteWindowSec — the slam window at TV factor 1. */
 export const QTE_WINDOW_SEC = 0.28;
-/** DunkMode.ts:648 — how early a SLAM press is still held for the window, at least. */
+/** DunkMode.ts:649 — how early a SLAM press is still held for the window, at least. */
 export const SLAM_BUFFER_SEC = 0.22;
-/** DunkMode.ts:649 — the top of the arc on the flight clock. */
+/** DunkMode.ts:650 — the top of the arc on the flight clock. */
 export const SLAM_APEX_T = arcTopT(EASTBAY_TIMING.extend, ARC_TOP_FRAC);
-/** DunkMode.ts:1623-1626 → JuiceKit.ts:90-93: crossing the rise starts slowMo(0.4, 400): 400 ms real at 0.4×. */
+/** DunkMode.ts:1640-1643 → JuiceKit.ts:90-93: crossing the rise starts slowMo(0.4, 400): 400 ms real at 0.4×. */
 export const HANG_SLOWMO = { scale: 0.4, sec: 0.4 };
 /**
- * The earliest the hold-run can reach the gather line and launch on its own (DunkMode.ts:1576-1581), est.: 6.3 m of
- * runway (CFG.startZ −1.2 → gatherZ −7.5) from 2 m/s ramping 6 m/s² to 7 (HOLD_RUN_RAMP/MAX, DunkMode.ts:113) ≈ 1.2 s;
+ * The earliest the hold-run can reach the gather line and launch on its own (DunkMode.ts:1598-1603), est.: 6.3 m of
+ * runway (CFG.startZ −1.2 → gatherZ −7.5) from 2 m/s ramping 6 m/s² to 7 (HOLD_RUN_RAMP/MAX, DunkMode.ts:114) ≈ 1.2 s;
  * a faster walk-up start shortens it, so ~0.9 s is the floor.
  */
 export const LINE_SEC_MIN = 0.9;
@@ -224,7 +225,7 @@ export function realAt(clip: number): number {
   if (clip <= top) return r + (clip - r) / s.scale;
   return r + s.sec + (clip - top);
 }
-/** The slam window on the flight clock (DunkMode.ts:1792-1794), shrunk 25 % per style tap. */
+/** The slam window on the flight clock (DunkMode.ts:1810-1812), shrunk 25 % per style tap. */
 export function slamWindow(styleTaps: number): { openAt: number; closeAt: number; holdSec: number } {
   const w = QTE_WINDOW_SEC * (1 - styleTaps * 0.25), c = EASTBAY_TIMING.extend;
   const openAt = c - w / 2;
@@ -232,7 +233,7 @@ export function slamWindow(styleTaps: number): { openAt: number; closeAt: number
 }
 
 export interface DunkRead {
-  /** App ms: the run began (R2 > 0.02 in the approach, DunkMode.ts:1418). */
+  /** App ms: the run began (R2 > 0.02 in the approach, DunkMode.ts:1435). */
   run: number | null;
   chargePeak: number;
   /** App ms of launchDunk, and what fired it. */
@@ -240,10 +241,15 @@ export interface DunkRead {
   launchBy: 'R2 released' | 'A on the run' | 'the line (est.)' | null;
   /** Capture time (ms) of the camera frame that launched it (NaN for the line). */
   launchT: number;
-  /** The first A in the flight — the slam, committed (bufferSlam DunkMode.ts:2328 / slamNow :2287); t = its frame's capture ms. */
+  /** The first A in the flight that the mode takes — the slam, committed (SlamLatch: bufferSlam / the in-window press);
+   *  t = its frame's capture ms. */
   slam: { at: number; t: number; clip: number } | null;
+  /** The first A the mode drops as the take-off's own (HOTFIX 2026-09-24, core/slamPress TakeoffEcho): the A that launched or one
+   *  inside TAKEOFF_ECHO_MS of the launch ('takeoff'), the first inside LATE_JUMP_MS of a launch at the line ('late'), or the
+   *  keyboard Space's own A before the SLAM read is up ('space'). `afterLaunchMs` = app ms after the launch. */
+  echo: { at: number; t: number; kind: TakeoffEchoKind; afterLaunchMs: number } | null;
   verdict: 'no launch' | 'no slam' | 'too early' | 'buffered' | 'in window';
-  /** What the banner prints: (window open − press) in ms of flight clock (DunkMode.ts:1840). */
+  /** What the banner prints: (window open − press) in ms of flight clock (DunkMode.ts:1860). */
   tooEarlyMs: number | null;
   execution: number | null;
   made: boolean;
@@ -257,17 +263,19 @@ export interface DunkRead {
 }
 
 /**
- * One attempt through DunkMode.onInput (DunkMode.ts:1176-1428) and its flight clock (:1620-1843). The player's turn,
+ * One attempt through DunkMode.onInput (DunkMode.ts:1187-1449) and its flight clock (:1635-1863). The player's turn,
  * no prop, POWER style, TV factor 1, no lob. Later attempts are not modelled: after the verdict the judges refuse input.
+ * The slam rule is the mode's own code (core/slamPress: TakeoffEcho, then SlamLatch), not a copy of it.
  */
 export function dunkRead(events: Emitted[], from = -Infinity): DunkRead {
-  const r: DunkRead = { run: null, chargePeak: 0, launch: null, launchBy: null, launchT: NaN, slam: null, verdict: 'no launch', tooEarlyMs: null, execution: null, made: false, missWhy: null, styleTaps: 0, windowOpen: null, windowClose: null, notes: [] };
+  const r: DunkRead = { run: null, chargePeak: 0, launch: null, launchBy: null, launchT: NaN, slam: null, echo: null, verdict: 'no launch', tooEarlyMs: null, execution: null, made: false, missWhy: null, styleTaps: 0, windowOpen: null, windowClose: null, notes: [] };
   let phase: 'approach' | 'charge' | 'cinematic' | 'done' = 'approach';
-  let committed = false, bufferedAt = -1, doubleLaunched = false, boardSwung = false;
+  let doubleLaunched = false, boardSwung = false;
+  const echo = new TakeoffEcho(), latch = new SlamLatch();
   const note = (at: number, what: string) => r.notes.push({ at, what });
   const clipOf = (at: number) => clipAt((at - r.launch!) / 1000);
   const appOf = (clip: number) => r.launch! + realAt(clip) * 1000;
-  const launch = (at: number, by: DunkRead['launchBy'], t = NaN) => { phase = 'cinematic'; r.launch = at; r.launchBy = by; r.launchT = t; };
+  const launch = (at: number, by: DunkRead['launchBy'], t = NaN) => { phase = 'cinematic'; r.launch = at; r.launchBy = by; r.launchT = t; latch.clear(); echo.launched(at, by === 'the line (est.)' ? 'auto' : 'press'); };
   /** The flight's own beats up to app time `at`: the window opening (a buffered press fires or is refused), and the close.
    *  True once the attempt is over. */
   const flightTo = (at: number): boolean => {
@@ -276,15 +284,14 @@ export function dunkRead(events: Emitted[], from = -Infinity): DunkRead {
     const openApp = appOf(w.openAt), closeApp = appOf(w.closeAt);
     if (r.windowOpen === null && at >= openApp) {
       r.windowOpen = openApp;
-      if (bufferedAt >= 0) {
-        if (w.openAt - bufferedAt <= w.holdSec + 1e-6) score(bufferedAt, openApp, 'buffered');
-        else { r.verdict = 'too early'; r.tooEarlyMs = Math.round((w.openAt - bufferedAt) * 1000); note(openApp, `refused: TOO EARLY — ${r.tooEarlyMs} ms BEFORE THE WINDOW`); bufferedAt = -1; }
-      }
+      const held = latch.open(w.openAt, w.holdSec);
+      if (held && 'slamAt' in held) score(held.slamAt, openApp, 'buffered');
+      else if (held) { r.verdict = 'too early'; r.tooEarlyMs = Math.round(held.tooEarlySec * 1000); note(openApp, `refused: TOO EARLY — ${r.tooEarlyMs} ms BEFORE THE WINDOW`); }
     }
     if (phase === 'cinematic' && at >= closeApp) {
       r.windowClose = closeApp;
       phase = 'done';
-      r.missWhy = r.slam ? 'THREW IT AT THE IRON TOO EARLY' : 'NO SLAM';   // resolveDunk, DunkMode.ts:2568
+      r.missWhy = r.slam ? 'THREW IT AT THE IRON TOO EARLY' : 'NO SLAM';   // resolveDunk, DunkMode.ts:2594
       if (!r.slam) r.verdict = 'no slam';
     }
     return phase === 'done';
@@ -299,8 +306,9 @@ export function dunkRead(events: Emitted[], from = -Infinity): DunkRead {
 
   for (const x of events) {
     if (x.at < from) continue;
-    // the hold-run reaches the line on its own when R2 is held long enough (est.)
+    // the hold-run reaches the line on its own when R2 is held long enough (est.) — an update() BEFORE this input
     if (phase === 'charge' && r.run !== null && x.at - r.run >= LINE_SEC_MIN * 1000) launch(r.run + LINE_SEC_MIN * 1000, 'the line (est.)');
+    echo.see();   // a new input (DunkMode.onInput's first line)
     if (flightTo(x.at)) break;
     const v = trig(x), b = btnOf(x), down = x.e.t === 'button' && x.e.pressed;
     if (phase === 'approach') {
@@ -314,18 +322,26 @@ export function dunkRead(events: Emitted[], from = -Infinity): DunkRead {
     }
     if (phase === 'charge') {
       if (v !== null) { r.chargePeak = Math.max(r.chargePeak, v); if (v === 0) launch(x.at, 'R2 released', x.t); continue; }
-      // A on the run is the take-off (DunkMode.ts:1304) — and the SAME press then reaches airButton below it (:1343), so it
-      // is also buffered as the slam at clip 0: fall through to the flight
+      // A on the run is the take-off (DunkMode.ts:1312), and the SAME press then reaches the flight's dispatch (:1360): it falls
+      // through, and TakeoffEcho drops it there as the slam (HOTFIX 2026-09-24; it used to be buffered at clip 0)
       if (down && b === 'A') launch(x.at, 'A on the run', x.t);
       else { if (down && b === 'B') note(x.at, 'B: KICK-UP runway trick'); if (down && b === 'X') note(x.at, 'X: BACK HANDSPRING runway trick'); if (down && b === 'Y') note(x.at, 'Y: commits the J'); continue; }
     }
-    // cinematic (DunkMode.ts:1343-1433): R2 is not read here
+    // cinematic (DunkMode.ts:1337-1449): R2 is not read here
     if (!down || !b) continue;
     const clip = clipOf(x.at), w = slamWindow(r.styleTaps), open = clip >= w.openAt && clip <= w.closeAt;
     if (b === 'A') {
-      if (open) { if (!committed) { committed = true; r.slam = { at: x.at, t: x.t, clip }; score(clip, x.at, 'in window'); } else note(x.at, 'A: ignored — the first press decides'); }
-      else if (!committed) { committed = true; bufferedAt = clip; r.slam = { at: x.at, t: x.t, clip }; }   // airButton → bufferSlam
-      else note(x.at, 'A: ignored — the first press decides');
+      // the take-off's own A, a late jump press after the line, or the keyboard Space's before the SLAM read (slamCueOn): never the slam
+      const k = echo.of(x.e, x.at, clip >= w.openAt - w.holdSec && clip <= w.closeAt);
+      if (k) {
+        const after = Math.round(x.at - r.launch!);
+        if (!r.echo) r.echo = { at: x.at, t: x.t, kind: k, afterLaunchMs: after };
+        note(x.at, `A: ${k === 'space' ? "the Space release's own" : k === 'late' ? `the jump pressed ${after} ms after the line took off` : `the take-off's own (${after} ms after the launch)`} — not the slam`);
+        continue;
+      }
+      const p = latch.press(clip, open);   // open: the in-window slam; before it: airButton → bufferSlam
+      if (p === 'spent') note(x.at, 'A: ignored — the first press decides');
+      else { r.slam = { at: x.at, t: x.t, clip }; if (p === 'slam') score(clip, x.at, 'in window'); }
     } else if (b === 'B' || b === 'X' || b === 'Y') {
       if (open) note(x.at, `${b}: refused TOO LATE FOR A TRICK`);
       else if (b === 'B' && clip >= EASTBAY_TIMING.rise && r.styleTaps < 2) { r.styleTaps++; note(x.at, `B: STYLE TAP ×${r.styleTaps} (window −25 %)`); }
@@ -343,36 +359,68 @@ export function dunkRead(events: Emitted[], from = -Infinity): DunkRead {
 
 // ── Dunk Duel (DunkDuelMode) ─────────────────────────────────────────────────────────────────────────────────────
 
-export interface DuelRead { launch: number | null; presses: { at: number; clip: number; kind: 'clean' | 'early' | 'miss' | 'held' }[]; hit: boolean; accuracy: number }
+export interface DuelRead {
+  launch: number | null;
+  /** What launched it: RUN let go, A on the run (HOTFIX 2026-09-24: the duel's A jumps now, as in the contest), or the line. */
+  launchBy: DunkRead['launchBy'];
+  /** Every A in the flight up to the resolve: its verdict ('held' waits for the window), 'spent' after the first press, or
+   *  'echo' — the take-off's own A, dropped (HOTFIX 2026-09-24). */
+  presses: { at: number; clip: number; kind: 'clean' | 'early' | 'miss' | 'held' | 'spent' | 'echo' }[];
+  hit: boolean;
+  accuracy: number;
+  /** The held first press was refused at the window: ms before it (DunkDuelMode's TOO EARLY callout). */
+  tooEarlyMs: number | null;
+}
 
 /**
- * One duel attempt (DunkDuelMode.ts:588-675, window :773-786): the handoff already dismissed, R2 runs, its release
- * launches, every A in the flight is judged by judgePress until one hits; the first too-early A waits in a one-slot
- * EarlyPress and is judged when the window opens.
+ * One duel attempt (DunkDuelMode.ts:641-703, window :801-813): the handoff already dismissed, R2 runs, its release,
+ * A on the run or the line launches. The flight's A runs the mode's own code: TakeoffEcho drops the take-off's A (and a late
+ * jump press after the line), then ONE FirstPress — the first press is the verdict, a press too early for the grace waits and
+ * is judged (a miss) when the window opens, and every A after the first is spent (HOTFIX 2026-09-24: every A used to be judged
+ * until one hit).
  */
 export function duelRead(events: Emitted[], from = -Infinity): DuelRead {
-  const out: DuelRead = { launch: null, presses: [], hit: false, accuracy: 0 };
+  const out: DuelRead = { launch: null, launchBy: null, presses: [], hit: false, accuracy: 0, tooEarlyMs: null };
   const W = { centre: EASTBAY_TIMING.extend, width: QTE_WINDOW_SEC };
-  let run: number | null = null, early: number | null = null;
+  const openAt = W.centre - W.width / 2;
+  const echo = new TakeoffEcho(), first = new FirstPress();
+  let run: number | null = null, opened = false;
+  /** The window's opening frame: the held press is judged from when it was pressed. */
+  const openWindow = () => {
+    if (opened) return;
+    opened = true;
+    const v = first.open(W);
+    if (v?.hit) { out.hit = true; out.accuracy = v.accuracy; }
+    else if (v) out.tooEarlyMs = Math.round((openAt - (first.pressedAt ?? 0)) * 1000);
+  };
+  const launch = (at: number, by: DunkRead['launchBy']) => { out.launch = at; out.launchBy = by; echo.launched(at, by === 'the line (est.)' ? 'auto' : 'press'); };
   for (const x of events) {
     if (x.at < from) continue;
     const v = trig(x);
+    // the line (est.): an update() BEFORE this input — which is then in the flight
+    if (out.launch === null && run !== null && x.at - run >= LINE_SEC_MIN * 1000) launch(run + LINE_SEC_MIN * 1000, 'the line (est.)');
+    echo.see();   // a new input (DunkDuelMode.onInput's first line)
     if (out.launch === null) {
-      if (run === null && v !== null && v > 0.02) run = x.at;
-      else if (run !== null && x.at - run >= LINE_SEC_MIN * 1000) out.launch = run + LINE_SEC_MIN * 1000;
-      else if (run !== null && v === 0) out.launch = x.at;
-      continue;
+      if (run === null) { if (v !== null && v > 0.02) run = x.at; continue; }
+      if (v === 0) { launch(x.at, 'R2 released'); continue; }
+      if (!isPress(x, 'A')) continue;
+      launch(x.at, 'A on the run');   // HOTFIX (2026-09-24): …and the same press falls through, dropped as the take-off's own
     }
-    if (!isPress(x, 'A') || out.hit) continue;
-    const clip = clipAt((x.at - out.launch) / 1000);
+    if (!isPress(x, 'A')) continue;
+    const clip = clipAt((x.at - out.launch!) / 1000);
     if (clip > W.centre + W.width / 2) break;              // resolved
-    const v2 = judgePress(clip, W);
-    if (v2.hit) { out.hit = true; out.accuracy = v2.accuracy; out.presses.push({ at: x.at, clip, kind: v2.kind }); }
-    else if (clip < W.centre) { if (early === null) early = clip; out.presses.push({ at: x.at, clip, kind: 'held' }); }
+    if (clip >= openAt) openWindow();
+    if (echo.of(x.e, x.at, clip >= DUEL_EARLIEST_CLIP)) { out.presses.push({ at: x.at, clip, kind: 'echo' }); continue; }
+    const p = first.press(clip, W);
+    if (p === 'spent' || p === 'held') out.presses.push({ at: x.at, clip, kind: p });
+    else { out.presses.push({ at: x.at, clip, kind: p.kind }); if (p.hit) { out.hit = true; out.accuracy = p.accuracy; } }
   }
-  if (!out.hit && early !== null) { const v = judgePress(early, W); if (v.hit) { out.hit = true; out.accuracy = v.accuracy; } }
+  if (out.launch !== null) openWindow();                   // the flight plays out after the last input
   return out;
 }
+/** An A this soon after the launch (app ms) is the take-off's own, in both dunk modes; after a launch at the line, the first A
+ *  inside LATE_JUMP_MS is the player's late jump press (core/slamPress). */
+export { TAKEOFF_ECHO_MS, LATE_JUMP_MS };
 /** The earliest flight-clock second the duel still honours a press (window open − PRESS_GRACE). */
 export const DUEL_EARLIEST_CLIP = EASTBAY_TIMING.extend - QTE_WINDOW_SEC / 2 - PRESS_GRACE;
 

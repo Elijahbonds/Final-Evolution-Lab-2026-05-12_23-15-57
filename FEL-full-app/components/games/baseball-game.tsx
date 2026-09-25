@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { flashFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash too
 
 interface PitchType { name: string; speed: number; wobble: number; color: string }
 const PITCHES: PitchType[] = [
@@ -87,7 +88,7 @@ export default function BaseballGame({ grade, prq, onEnd, gamepad }: GameProps) 
       st.totalDist += pr.dist; st.best = Math.max(st.best, pr.dist);
       if (hr) {
         st.homers++; rec.recordHit(true);
-        say(`HOME RUN! ${pr.dist}m`, '#00FF9D'); st.flash = 0.18;
+        say(`HOME RUN! ${pr.dist}m`, '#00FF9D'); st.flash = flashFor(0.18);
         for (let i = 0; i < 20; i++) st.particles.push({ x: plateX + 40, y: plateY - 80, vx: (Math.random() - 0.2) * 460, vy: -Math.random() * 420, life: 0.9, color: i % 2 ? '#FFD700' : '#00FF9D' });
       } else {
         st.outs++; rec.recordMiss();

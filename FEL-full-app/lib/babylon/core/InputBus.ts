@@ -11,8 +11,11 @@ export type FelInput =
    *  tagged pair as its two TRIGGER verbs (turbo / post-up + intense D) because a keyboard has no analog triggers;
    *  every other reader sees the plain R1 / L1 it always did. A pad's shoulders carry no src.
    *  LS / RS (racing pass, 2026-09-23) are the STICK CLICKS — L3 / R3. The pad profiles always read them; the bus never
-   *  emitted them, so the Free Run brief's L3 look-back / R3 lock-on had no input to hang on. */
-  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS'; pressed: boolean; src?: 'key' }
+   *  emitted them, so the Free Run brief's L3 look-back / R3 lock-on had no input to hang on.
+   *  HOTFIX (2026-09-24): `src: 'space'` marks the A the bus makes up when SPACE comes back up (see onKey). It is the run
+   *  key's release, not a press of J / A, and the dunk modes must tell the two apart; guessing it from the R stream broke
+   *  whenever an idle pad, the touch RUN hold or Controller Link wrote to that stream too. Every other reader sees a plain A. */
+  | { t: 'button'; btn: 'A' | 'B' | 'X' | 'Y' | 'L1' | 'R1' | 'SELECT' | 'START' | 'LS' | 'RS'; pressed: boolean; src?: 'key' | 'space' }
   | { t: 'trigger'; side: 'L' | 'R'; value: number };
 
 import { HAPTIC } from '../premium/Haptics';
@@ -257,7 +260,7 @@ export class InputBus {
     // was inferred from stick magnitude, and a key is always full magnitude, so every keyboard drive was a sprint.
     if (key === ' ') {
       if (down) { this.spaceDownAt = performance.now(); this.emit({ t: 'trigger', side: 'R', value: KEY_SPACE_DOWN }); }
-      else { this.emit({ t: 'trigger', side: 'R', value: 0 }); this.emit({ t: 'button', btn: 'A', pressed: true }); }
+      else { this.emit({ t: 'trigger', side: 'R', value: 0 }); this.emit({ t: 'button', btn: 'A', pressed: true, src: 'space' }); }   // HOTFIX (2026-09-24): tagged — the run key's A, not J's
       return;
     }
     const mapped = KEYMAP[key];
@@ -367,13 +370,20 @@ export class InputBus {
       canons.push(canon);
       if (this.slotListeners.size) this.emitSlotPad(slot, s, canon);
     });
+    // HOTFIX (2026-09-24): while SPACE is held the keyboard is pulling R too, and the two share ONE R stream. The merged pad
+    // re-sends its trigger every frame, so an idle pad plugged in wrote R 0 between every Space depth — the dunk read that 0
+    // as RUN let go and launched about three frames (~50 ms) after Space went down, and every hold-to-charge mode saw the
+    // same flicker. While Space is held the frame's R is sent once, below, as the deeper of the two (a pad pulled deeper wins).
+    const spaceHeld = this.held.has(' ');
+    let padR = 0;
     // The merged hero. It also runs on the ONE frame after the last pad leaves, so that pad's latches are released.
     if (canons.length || this.mergedLive) {
       const canon = mergePads(canons);
       this.emitStick('L', canon.lx, canon.ly);
       this.emitStick('R', canon.rx, canon.ry);
       this.emit({ t: 'trigger', side: 'L', value: canon.triggers.L });
-      this.emit({ t: 'trigger', side: 'R', value: canon.triggers.R });
+      padR = canon.triggers.R;
+      if (!spaceHeld) this.emit({ t: 'trigger', side: 'R', value: canon.triggers.R });
       // the keyboard arrows and the touch overlay's d-pad already emit these same events, so a real
       // controller's physical d-pad feeds the identical path
       for (const dir of DPAD_DIRS) {
@@ -392,9 +402,9 @@ export class InputBus {
       if (!this.mergedLive) { this.lastL = null; this.lastR = null; console.info('[PAD] no pads held'); }
     }
     // Space analog charge depth while held (0→1 over 1.1s)
-    if (this.held.has(' ')) {
+    if (spaceHeld) {
       const depth = Math.min(1, (performance.now() - this.spaceDownAt) / 1100);
-      this.emit({ t: 'trigger', side: 'R', value: depth });
+      this.emit({ t: 'trigger', side: 'R', value: Math.max(depth, padR) });   // one R a frame (the HOTFIX above)
     }
     this.raf = requestAnimationFrame(this.pollPads);
   };

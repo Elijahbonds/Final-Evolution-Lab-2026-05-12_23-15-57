@@ -63,6 +63,7 @@ import type { PlayOpts } from '../anim/CharacterAnimator';
 import { DunkReplayRecorder } from '../scene/DunkReplayCam';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
+import { SlamLatch, TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
 import { VenueKit } from '../visual/VenueKit';
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
@@ -647,13 +648,18 @@ export const DunkMode: ModeDefinition = (() => {
   // resolves to a trick which cannot fire falls through to that buffer instead of a banner.
   const SLAM_BUFFER_SEC = 0.22;              // how early a SLAM press still counts (clip seconds) — the least; slamBufferSec reaches back to the top of the arc
   const SLAM_APEX_T = arcTopT(EASTBAY_TIMING.extend, ARC_TOP_FRAC);   // DUNK MOTION phase 9: the top is at the rim now (clip ~0.94 reaches 98 %)   // clip 0.70: the top of the jump the runway hint names (98 % of the height; the apex is 0.80)
-  let slamBufferAt = -1;                     // clip second of a SLAM press waiting for the window (−1 = none)
   let slamSeen = false;                      // an A press reached the flight at all (the miss banner names WHAT missed)
   /** HOOPS-DEPTH phase 10 (2026-09-23): THE FIRST SLAM PRESS DECIDES. The buffer kept the NEWEST press, so a masher (8 presses a
    *  second) always had one inside the window: the mechanics probe had MASH 60 / 76 / 38 against DELIBERATE 31 (the owner's
    *  anti-mash bar is a release bar). A slam is ONE release, as in 2K: the first A of the flight is the slam, early or not, and
-   *  every later A in that flight is ignored. */
-  let slamCommitted = false;
+   *  every later A in that flight is ignored. (HOTFIX 2026-09-24: the rule lives in core/slamPress's SlamLatch now, unchanged,
+   *  so it can be driven without Babylon; it also holds the press waiting for the window.) */
+  const slamLatch = new SlamLatch();
+  /** HOTFIX (2026-09-24): the A that took off is the take-off's, never the slam. The keyboard's take-off is the Space release,
+   *  which InputBus sends as R 0 and then an A (tagged `src: 'space'`), and a pad's A on the run is the take-off itself: either A
+   *  reached the flight as its FIRST press, was held, and was refused TOO EARLY at the window, and the real slam was then
+   *  ignored. The same for the "tap JUMP" that lands just after the line has launched the run on its own. */
+  const slamEcho = new TakeoffEcho();
   let slamCueOn = false;                     // the SLAM read is up: the buffer's edge through the window's close
   let beatCalled = false;                    // the NOW! call fires once a flight, ON the beat the card scores against
   // ── A+ P8 athlete hands ──
@@ -1180,6 +1186,7 @@ export const DunkMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
+      slamEcho.see();   // HOTFIX (2026-09-24): a new input — first, before anything in here can launch
       // DUNK MOTION phase 11: on the rival's turn the runway is HIS — the AI's pad is the only one read; the player's presses are
       // answered, never obeyed (his analog streams are dropped quietly)
       if (turn === 'rival' && !aiFeeding) {
@@ -1302,7 +1309,7 @@ export const DunkMode: ModeDefinition = (() => {
         // DUNK MOTION phase 10 (owner decision): A on the run is the TAKE-OFF — over the Dubble Up's helper, or from wherever you are. The
         // runway's two-foot hop was a misreading of "double-up" and is gone.
         if (e.btn === 'A' && phase === 'charge') {
-          if (!runwayBeat) launchDunk(ctx);
+          if (!runwayBeat) launchDunk(ctx, 'press');
         } else if (rt && !runwayBeat) {
           // DUNK-SOFTS-NAMED: a runway trick that cannot happen says so (it used to be a silent nothing)
           if (isOop(prop)) refuse(ctx, `${rt.label} — THE PASSER HAS THE BALL`);
@@ -1340,7 +1347,17 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'R1' || e.btn === 'L1') && qteWindowOpen && !qteHit) {
         refuse(ctx, e.btn === 'L1' ? 'NO GLASS FROM HERE — FINISH IT' : 'NO RIDE LEFT — FINISH IT');
       }
-      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen) airButton(ctx, e);   // X reads in the air
+      // HOTFIX (2026-09-24, BASELINE.md:245): the take-off's own A is not the slam. launchDunk moves the phase to 'cinematic' on the
+      // spot, so the A that jumped (a pad's A on the run: this same event; the keyboard's Space release: the A InputBus sends right
+      // after its R 0) came on down to airButton and was buffered as the SLAM at flight clock 0 — refused TOO EARLY at the window,
+      // and, the first press deciding, every real slam after it ignored. Read AFTER the launch above (core/slamPress TakeoffEcho):
+      //   'takeoff' / 'late' — the A that jumped, or the "tap JUMP" landing just after the line launched the run itself. It still
+      //     arms a trick under a fresh direction (the rival throws his first at clip 0.06); it is never the slam.
+      //   'space' — the Space coming up (tagged by InputBus) before the SLAM read is up: the run key, not an air press at all. Once
+      //     the read is up (slamCueOn: the buffer's reach through the window) letting go of Space IS a slam press, as it always was.
+      const echoA = phase === 'cinematic' ? slamEcho.of(e, performance.now(), slamCueOn) : null;
+      if (echoA === 'space') console.info(`[DUNK-SLAM] the Space release's own A @${clipTime.toFixed(2)} — the run key, not the slam`);
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && !qteWindowOpen && echoA !== 'space') airButton(ctx, e, echoA !== null);   // X reads in the air
       // THE SKY TIER (owner, 2026-09-18): R1 in the air is the tap off whatever hangs over the lane — a second lift and the drop into
       // the slam; honest only inside the window with the hand up to its underside (a full run, a rebound or a backboard kick gets there)
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && e.btn === 'R1' && !qteWindowOpen) {
@@ -1419,12 +1436,12 @@ export const DunkMode: ModeDefinition = (() => {
         if (phase === 'charge') {
           charge = Math.max(charge, e.value);
           ctx.setHud({ charge: Math.round(charge * 100) });
-          if (e.value === 0) launchDunk(ctx);
+          if (e.value === 0) launchDunk(ctx, 'press');
         }
       }
 
       // SLAM needs the ball: a lob still in the air cannot be flushed (the catch is what puts it in the hand)
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live) { if (slamCommitted) console.info(`[DUNK-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`); else slamNow(ctx, clipTime); }
+      if (e.t === 'button' && e.btn === 'A' && e.pressed && qteWindowOpen && !lob.live && !echoA) { if (phase === 'cinematic' && slamLatch.press(clipTime, true) === 'spent') console.info(`[DUNK-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`); else slamNow(ctx, clipTime); }
       // PHONE CONTROLS (2026-09-15): SLAM tapped on the runway did nothing and said nothing (the phone check: SLAM SILENT)
       else if (e.t === 'button' && e.btn === 'A' && e.pressed && (phase === 'approach' || phase === 'charge')) refuse(ctx, 'SLAM AT THE TOP OF THE JUMP');
       // RIM HANG — hold SLAM through the flush to hang on the iron
@@ -1622,7 +1639,7 @@ export const DunkMode: ModeDefinition = (() => {
         clipTime += dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1);
         if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
           hangSlowMoLatch = true;
-          ctx.juice.slowMo(0.4, 400);
+          ctx.juice.slowMo(0.4, 400, { gameplay: true });   // HOTFIX (2026-09-24): the flight clock above rides this — reduced motion keeps it whole, so the slam window never moves
           ctx.camDirector.pulse(0.4, 0.45); // ~13% soft push-in; rimCamCut stays the one hard cut
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
@@ -1831,14 +1848,16 @@ export const DunkMode: ModeDefinition = (() => {
         }
         if (!slamCueOn && !qteWindowOpen && (wasCue || wasOpen)) ctx.setHud({ slamPulse: false, slamBeat: '' });
         // a press the buffer was holding fires on the frame the window opens — its execution is scored from where the finger was
-        if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live && openAt - slamBufferAt <= holdSec + 1e-6) slamNow(ctx, slamBufferAt);   // resolveDunk moves the phase; the resolve block below picks the jam up on this same frame. The hold is measured from the window's EDGE, not the frame that crossed it (a press at the top missed by one frame's overshoot, 316 ms against 310)
+        // (resolveDunk moves the phase; the resolve block below picks the jam up on this same frame. The hold is measured from the
+        // window's EDGE, not the frame that crossed it: a press at the top missed by one frame's overshoot, 316 ms against 310)
         // A PRESS TOO EARLY EVEN FOR THE BUFFER USED TO VANISH. The review measured three attempts out of
         // six that scored nothing and explained nothing, and this is the purest case: the finger moved, the
         // buffer could not hold it that long, and the game said nothing at all. It says so now. The press is
         // still let go — this is feedback, not a second chance.
-        else if (qteWindowOpen && !wasOpen && slamBufferAt >= 0 && !lob.live) {
-          refuse(ctx, `TOO EARLY — ${Math.round((openAt - slamBufferAt) * 1000)} ms BEFORE THE WINDOW`);
-          slamBufferAt = -1;
+        if (qteWindowOpen && !wasOpen && !lob.live) {
+          const held = slamLatch.open(openAt, holdSec);
+          if (held && 'slamAt' in held) slamNow(ctx, held.slamAt);
+          else if (held) refuse(ctx, `TOO EARLY — ${Math.round(held.tooEarlySec * 1000)} ms BEFORE THE WINDOW`);
         }
         if (clipTime >= closeAt) { meter3d?.end(lob.live ? 'brick' : 'late'); if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
       }
@@ -2286,7 +2305,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  second the FINGER moved, not the frame this runs on. */
   function slamNow(ctx: ModeContext, at: number): void {
     if (phase !== 'cinematic' || lob.live) return;
-    slamBufferAt = -1; slamSeen = true; slamCommitted = true;
+    slamSeen = true;   // the latch has the press (SlamLatch.press / .open) — HOTFIX (2026-09-24)
     const center = EASTBAY_TIMING.extend;
     const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
     // The execution curve is ONE curve over the whole accepted press — late of centre it falls across the window's own
@@ -2325,18 +2344,20 @@ export const DunkMode: ModeDefinition = (() => {
   /** DUNK-BODY-MID: a SLAM press the window has not opened for yet. Held (the newest press wins) and fired on the frame
    *  it opens, if it is still inside SLAM_BUFFER_SEC by then. A press earlier than that is a genuine mistime — it is
    *  logged and let go, never turned into a banner for a trick the player did not ask for. */
-  function bufferSlam(): void {
+  function bufferSlam(takeoffEcho = false): void {
     if (phase !== 'cinematic' || lob.live) return;
-    if (slamCommitted) { console.info(`[DUNK-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`); return; }
-    slamCommitted = true;
-    slamSeen = true; slamBufferAt = clipTime;
+    // HOTFIX (2026-09-24): the take-off's own A (core/slamPress: the jump's, or a late "tap JUMP" after the line) is not the attempt's press
+    if (takeoffEcho) { console.info(`[DUNK-SLAM] the take-off's own A @${clipTime.toFixed(2)} — not the slam`); return; }
+    if (slamLatch.press(clipTime, false) === 'spent') { console.info(`[DUNK-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`); return; }
+    slamSeen = true;
     console.info(`[DUNK-SLAM] buffered @${clipTime.toFixed(2)} (window opens @${(EASTBAY_TIMING.extend - slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale / 2).toFixed(2)})`);
   }
 
   /** A trick button in the air: the cue table decides — before the trick's beat it is ARMED (fires on the beat), inside
    *  its window it fires now, after its last beat it is refused with a banner. A bare button (no direction) after the rise
-   *  is the style tap. DUNK-BIOMECH (2026-09-08): a 360 tapped at the carry-up used to spin through the flush. */
-  function airButton(ctx: ModeContext, e: FelInput): void {
+   *  is the style tap. DUNK-BIOMECH (2026-09-08): a 360 tapped at the carry-up used to spin through the flush.
+   *  `takeoffEcho`: this A is the take-off's own (core/slamPress) — it may still arm a trick, it is never the slam. */
+  function airButton(ctx: ModeContext, e: FelInput, takeoffEcho = false): void {
     const isA = e.t === 'button' && e.btn === 'A';
     // DUNK MOTION phase 10: the Dubble Up's trick is thrown WITH the ball — pressed before the grab, it fires on the grab
     // (read NOW, while the direction is held — replayed at the grab the d-pad was long released and nothing matched: the trick never fired)
@@ -2349,7 +2370,7 @@ export const DunkMode: ModeDefinition = (() => {
     // still earn a refusal banner when their beat has passed.
     if (!trick || (isA && flight.recognizer.dirSpent)) {
       if (clipTime >= EASTBAY_TIMING.rise) styleTap(ctx, e);
-      if (isA) { if (trick) console.info(`[DUNK-CUE] ${trick.id}'s direction is spent — the press is the SLAM`); bufferSlam(); }
+      if (isA) { if (trick) console.info(`[DUNK-CUE] ${trick.id}'s direction is spent — the press is the SLAM`); bufferSlam(takeoffEcho); }
       return;
     }
     // DUNK MOTION phase 10b — THE 720: the 360 thrown AGAIN — twice before the rise, or once more while the first turn is still going
@@ -2379,7 +2400,7 @@ export const DunkMode: ModeDefinition = (() => {
     }
     if (v === 'late') {
       console.info(`[DUNK-CUE] late ${trick.id} @${clipTime.toFixed(2)} (window ${cueFireAt(trick).toFixed(2)}–${cueLastAt(trick).toFixed(2)})`);
-      if (isA) { bufferSlam(); return; }   // the beat has gone; the button in his hand is still the slam
+      if (isA) { bufferSlam(takeoffEcho); return; }   // the beat has gone; the button in his hand is still the slam
       refuse(ctx, `TOO LATE FOR THE ${trick.label} — ARM IT BY ${CUE_BEAT_LABEL[cue.last]}`);
       return;
     }
@@ -2453,7 +2474,9 @@ export const DunkMode: ModeDefinition = (() => {
     }
   }
 
-  function launchDunk(ctx: ModeContext): void {
+  /** `cause`: the player's own press launched it (RUN let go, A on the run) or the mode did (the line, a beat, the bus, the
+   *  watchdog) — after an automatic launch the player's "tap JUMP" is still coming, and is not the slam (core/slamPress). */
+  function launchDunk(ctx: ModeContext, cause: LaunchCause = 'auto'): void {
     if (phase === 'cinematic') return;
     if (runwayBeat) endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
     runwayBeat = null; launchQueued = false;
@@ -2478,7 +2501,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
     rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
-    slamBufferAt = -1; slamSeen = false; slamCueOn = false; beatCalled = false; slamCommitted = false;   // DUNK-BODY-MID: the slam buffer is per attempt
+    slamLatch.clear(); slamSeen = false; slamCueOn = false; beatCalled = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
@@ -2541,6 +2564,9 @@ export const DunkMode: ModeDefinition = (() => {
     // crossfaded out of. A launch clip that ends while the flight is still in the air now flows into the held hang; the
     // resolve's finish supersedes it (the token guard kills this chain once superseded). Ends at the flush → nothing here.
     playClip(launchClip(), { speedRatio: 1, onEnd: () => { if (phase === 'cinematic') { const c = carryClip(); console.info(`[HANDS] launch → ${c}`); playAir(c, carryRateToResolve(c), CARRY_FLOW_FADE_SEC); } } });
+    // HOTFIX (2026-09-24): stamped LAST, once the launch's own work is done — a first launch that hitches (clips, the lob re-aim)
+    // must not age the echo of an A pressed in the same frame as the take-off
+    slamEcho.launched(performance.now(), cause);
   }
 
   /** The dunk dies at the prop: clip it mid-flight and the attempt is blown
@@ -3571,7 +3597,7 @@ export const DunkMode: ModeDefinition = (() => {
   function contactPunch(ctx: ModeContext): void {
     if (contactLatch) return;
     contactLatch = true;
-    ctx.juice.hitStop(70);
+    ctx.juice.hitStop(70, { gameplay: true });   // HOTFIX (2026-09-24): paired with the gameplay freeze below — reduced motion keeps both 70 ms, so the limbs never move while the root and ball hold
     feelHitStop(70);   // DUNK-HANDS-RIM H3: the mode's clock stops on the iron too (the ball on the ring, the body) — one beat, composed; never a second slow-mo
     ctx.juice.shake(0.12, 140);
     ctx.juice.flash('#fff6dd', 120);

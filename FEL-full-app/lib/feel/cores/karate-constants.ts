@@ -61,18 +61,17 @@ export const PRQ_DELTAS = {
  * shake / hitStopMs / rumble tuned to read on the contact frame. // TUNE(elijah)
  */
 export const KARATE_SENSORY = {
-  lightHit: { sfx: 'punch', shake: 0.10, hitStopMs: 40, rumbleMs: 60, rumbleStrength: 0.4 }, // TUNE(elijah)
-  heavyHit: { sfx: 'punch', shake: 0.22, hitStopMs: 90, rumbleMs: 110, rumbleStrength: 0.7 }, // TUNE(elijah)
-  block: { sfx: 'punch', shake: 0.06, hitStopMs: 30, rumbleMs: 40, rumbleStrength: 0.3 }, // TUNE(elijah) — perfect guard
-  dragonStrike: { sfx: 'punch', shake: 0.40, hitStopMs: 300, rumbleMs: 200, rumbleStrength: 1.0 }, // TUNE(elijah) — crimson + slow-mo
-  ko: { sfx: 'crowd', shake: 0.45, hitStopMs: 300, rumbleMs: 260, rumbleStrength: 1.0 }, // TUNE(elijah) — 0.3s KO hit-stop
+  lightHit: { shake: 0.10, hitStopMs: 40, rumbleMs: 60, rumbleStrength: 0.4 }, // TUNE(elijah)
+  heavyHit: { shake: 0.22, hitStopMs: 90, rumbleMs: 110, rumbleStrength: 0.7 }, // TUNE(elijah)
+  block: { shake: 0.06, hitStopMs: 30, rumbleMs: 40, rumbleStrength: 0.3 }, // TUNE(elijah) — perfect guard
+  dragonStrike: { shake: 0.40, hitStopMs: 300, rumbleMs: 200, rumbleStrength: 1.0 }, // TUNE(elijah) — crimson + slow-mo
+  ko: { shake: 0.45, hitStopMs: 300, rumbleMs: 260, rumbleStrength: 1.0 }, // TUNE(elijah) — 0.3s KO hit-stop
 } as const;
 
-/** SFX name→url map (the app already ships these MP3s). */
-export const KARATE_SFX = {
-  punch: '/audio/sfx_punch_impact.mp3',
-  crowd: '/audio/sfx_crowd_cheer.mp3',
-} as const;
+// HOTFIX (2026-09-24): KARATE_SFX is gone. It mapped 'punch' and 'crowd' to /audio/sfx_punch_impact.mp3 and
+// /audio/sfx_crowd_cheer.mp3 under a comment saying the app ships them; neither was ever under public/, so every
+// hit and KO above was silent. Combat sound is the host's (the Babylon combat modes play SoundKit cues); no live
+// host builds a KarateBout today.
 
 /** Fighter footwork bounds (matches live karate-3d ARENA ±6). // TUNE(elijah) */
 export const KARATE_ARENA = { minX: -6, maxX: 6, minZ: -6, maxZ: 6 } as const;

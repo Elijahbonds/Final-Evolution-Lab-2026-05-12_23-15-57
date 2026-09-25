@@ -34,18 +34,19 @@ export const STORY_TUNING: StoryTuning = {
   defeatedHoldMs: 1200, // TUNE(elijah) — victory pause before returning to traversal
 };
 
-/** SFX/shake presets per story event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per story event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. Sound belongs to the host that renders the mode (the Babylon modes play synthesized SoundKit
+ * cues); no live host builds this core today. See lib/feel/sensory-bus.ts.
+ */
 export const STORY_SENSORY: Partial<Record<StorySensoryEvent, SensoryEvent>> = {
-  roll: { sfx: '/audio/sfx_ui_click.mp3', volume: 0.5 }, // TUNE(elijah)
-  hop: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.35 }, // TUNE(elijah)
-  land: { sfx: '/audio/sfx_ui_click.mp3', volume: 0.4 }, // TUNE(elijah)
-  bonus: { sfx: '/audio/sfx_score.mp3', volume: 0.6 }, // TUNE(elijah)
-  carnival: { sfx: '/audio/sfx_score.mp3', volume: 0.7, shake: 0.05 }, // TUNE(elijah)
-  obstacle: { sfx: '/audio/sfx_impact.mp3', volume: 0.6, shake: 0.12, rumbleMs: 120 }, // TUNE(elijah)
-  bossEncounter: { sfx: '/audio/sfx_impact.mp3', volume: 0.8, shake: 0.18, rumbleMs: 200 }, // TUNE(elijah)
-  strike: { sfx: '/audio/sfx_impact.mp3', volume: 0.7, shake: 0.1 }, // TUNE(elijah)
-  bossDamage: { sfx: '/audio/sfx_impact.mp3', volume: 0.6, shake: 0.14, rumbleMs: 140 }, // TUNE(elijah)
-  retreat: { sfx: '/audio/sfx_impact.mp3', volume: 0.9, shake: 0.22, rumbleMs: 260 }, // TUNE(elijah)
-  bossDefeated: { sfx: '/audio/sfx_score.mp3', volume: 0.9, shake: 0.16 }, // TUNE(elijah)
-  complete: { sfx: '/audio/sfx_score.mp3', volume: 1.0, shake: 0.2 }, // TUNE(elijah)
+  carnival: { shake: 0.05 }, // TUNE(elijah)
+  obstacle: { shake: 0.12, rumbleMs: 120 }, // TUNE(elijah)
+  bossEncounter: { shake: 0.18, rumbleMs: 200 }, // TUNE(elijah)
+  strike: { shake: 0.1 }, // TUNE(elijah)
+  bossDamage: { shake: 0.14, rumbleMs: 140 }, // TUNE(elijah)
+  retreat: { shake: 0.22, rumbleMs: 260 }, // TUNE(elijah)
+  bossDefeated: { shake: 0.16 }, // TUNE(elijah)
+  complete: { shake: 0.2 }, // TUNE(elijah)
 };

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { flashFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash too
 import { gkGuess, resolvePenalty, zoneToSide, gkLean, type Side } from '@/lib/feel/rally-outcome';
 
 // Penalty shootout: 5 rounds each, then sudden death. Shooter: lock aim, lock power. Keeper: pick a dive zone.
@@ -141,11 +142,11 @@ export default function SoccerGame({ grade, prq, onEnd, gamepad }: GameProps) {
             st.shotsP++;
             if (b.wild) { say('OFF TARGET!', '#FF3366'); rec.recordMiss(); }
             else if (b.saved) { say('SAVED BY KEEPER!', '#FF3366'); rec.recordMiss(); }
-            else { st.pGoals++; rec.recordHit(true); say('GOOOAL!', '#00FF9D'); st.flash = 0.15; for (let i = 0; i < 16; i++) st.particles.push({ x: b.tx, y: b.ty, vx: (Math.random() - 0.5) * 420, vy: -Math.random() * 320, life: 0.8, color: '#00FF9D' }); }
+            else { st.pGoals++; rec.recordHit(true); say('GOOOAL!', '#00FF9D'); st.flash = flashFor(0.15); for (let i = 0; i < 16; i++) st.particles.push({ x: b.tx, y: b.ty, vx: (Math.random() - 0.5) * 420, vy: -Math.random() * 320, life: 0.8, color: '#00FF9D' }); }
           } else {
             st.shotsAI++;
             const guessed = st.pDive !== null && Math.abs((st.pDive ?? 99) - st.aiShotZone) <= 1;
-            if (guessed) { rec.recordDodge(); say('WHAT A SAVE!', '#00E5FF'); st.flash = 0.15; for (let i = 0; i < 16; i++) st.particles.push({ x: b.tx, y: b.ty, vx: (Math.random() - 0.5) * 420, vy: -Math.random() * 320, life: 0.8, color: '#00E5FF' }); }
+            if (guessed) { rec.recordDodge(); say('WHAT A SAVE!', '#00E5FF'); st.flash = flashFor(0.15); for (let i = 0; i < 16; i++) st.particles.push({ x: b.tx, y: b.ty, vx: (Math.random() - 0.5) * 420, vy: -Math.random() * 320, life: 0.8, color: '#00E5FF' }); }
             else { st.aiGoals++; rec.recordMiss(); say('RIVAL SCORES', '#FF3366'); }
           }
           st.phase = 'between'; st.betweenT = 1.4;

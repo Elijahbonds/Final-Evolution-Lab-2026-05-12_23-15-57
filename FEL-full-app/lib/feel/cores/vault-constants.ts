@@ -53,12 +53,16 @@ export const VAULT_TRICK: AirTrickOpts = {
   stickWindowMs: 180, // TUNE(elijah)
 };
 
-/** SFX/shake presets per air-session event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per air-session event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. Sound belongs to the host that renders the mode (the Babylon modes play synthesized SoundKit
+ * cues); no live host builds this core today. See lib/feel/sensory-bus.ts.
+ */
 export const VAULT_SENSORY: Partial<Record<AirSessionSensoryEvent, SensoryEvent>> = {
-  launch: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.7, shake: 0.1 }, // TUNE(elijah) — the board punch
-  trickTap: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.35 }, // TUNE(elijah)
-  landClean: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.6, shake: 0.12, hitStopMs: 45 }, // TUNE(elijah)
-  landStuck: { sfx: '/audio/sfx_crowd_cheer.mp3', volume: 1.0, shake: 0.22, hitStopMs: 100, rumbleMs: 180, rumbleStrength: 0.75 }, // TUNE(elijah)
-  landSketchy: { sfx: '/audio/sfx_punch_impact.mp3', volume: 0.45, shake: 0.1 }, // TUNE(elijah)
-  landCrash: { sfx: '/audio/sfx_punch_impact.mp3', volume: 1.0, shake: 0.28, hitStopMs: 110, rumbleMs: 300, rumbleStrength: 0.9 }, // TUNE(elijah)
+  launch: { shake: 0.1 }, // TUNE(elijah) — the board punch
+  landClean: { shake: 0.12, hitStopMs: 45 }, // TUNE(elijah)
+  landStuck: { shake: 0.22, hitStopMs: 100, rumbleMs: 180, rumbleStrength: 0.75 }, // TUNE(elijah)
+  landSketchy: { shake: 0.1 }, // TUNE(elijah)
+  landCrash: { shake: 0.28, hitStopMs: 110, rumbleMs: 300, rumbleStrength: 0.9 }, // TUNE(elijah)
 };

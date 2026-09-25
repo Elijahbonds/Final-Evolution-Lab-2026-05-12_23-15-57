@@ -6,6 +6,7 @@ import { Matrix, Vector3 } from '@babylonjs/core';
 import type { Scene, TargetCamera } from '@babylonjs/core';
 import { vibrate } from './Haptics';
 import { captions } from '../core/captions';
+import { motionPolicy, type JuicePolicy } from '../../a11y/reducedMotion';
 
 /** How long the same callout stays "already said" for the caption bus. On screen it may repeat as often as it likes. */
 const CALLOUT_REPEAT_MS = 4000;
@@ -16,6 +17,9 @@ export const FLASH_EDGE = 0.46;
 export const FLASH_CORE = 0.09;
 /** The clear middle runs out to this fraction of the radius before the edge ramp starts. */
 export const FLASH_CORE_STOP = 0.3;
+
+/** The scene's animation clock while a hit-stop holds: the bodies stand still. */
+export const FREEZE_SCALE = 0.001;
 
 /** '#rrggbb' (or '#rgb') → 'rgba(r,g,b,a)'. Anything else is passed through with the alpha dropped. */
 export function rgba(hex: string, alpha: number): string {
@@ -42,9 +46,37 @@ export function flashBackground(color: string, strength = 1): string {
 export class JuiceKit {
   private overlay: HTMLDivElement;
   private shakeT = 0; private shakeAmp = 0; private shakeDir = 1;
-  private baseTimeScale = 1;
+  /**
+   * THE ANIMATION CLOCK — hit-stops and slow-mos are COUNTED, not captured (HOTFIX 2026-09-24).
+   *
+   * Each effect used to read `scene.animationTimeScale` when it started and write that value back when it ended, so two
+   * that overlapped handed each other's values back. A hit-stop that began inside another one captured the FROZEN 0.001;
+   * if it ended last it put 0.001 back and every body stood like a statue until the next slowMo, which many modes never
+   * call. Reduced motion made that the rule rather than the exception: it caps every hit-stop at 30 ms, so a pair started
+   * in the same frame (the Hundred's wall kick and a connect) always ends in call order. A slow-mo called inside a freeze
+   * (`impact(…, { slow: true })`) was cut off when the freeze ended, and a slow-mo inside a slow-mo was cut off when the
+   * first one ended.
+   *
+   * Now the effects in force decide: any freeze → frozen; else the NEWEST slow-mo still running → its scale; none → the
+   * ORIGINAL scale, the one in force before the first of them started (1, or a mode's own — the Hundred's Matrix latch).
+   * If somebody else writes the clock while ours are in force (that latch starting or ending), their value becomes the
+   * original, so a stale value of ours never overwrites it.
+   */
+  private freezes = 0;
+  private slows: { scale: number }[] = [];
+  private original = 1;
+  /** What we last wrote to the clock; null = none of ours is in force and the clock is somebody else's. */
+  private wrote: number | null = null;
+  private disposed = false;
 
-  constructor(private scene: Scene, private camera: TargetCamera, mount: HTMLElement) {
+  /**
+   * HOTFIX (2026-09-24): every effect below asks `motion()` at the moment it fires — none of them read
+   * prefers-reduced-motion before. Reduced (the OS setting, or the app's override): no flash, no shake, pops fade in
+   * place, hit-stop and slow-mo cut to a minimal cue. Presentation only: these move the scene's ANIMATION clock and
+   * the camera, never the dt a mode is timed on. The default reads the live setting; a test can hand in its own.
+   */
+  constructor(private scene: Scene, private camera: TargetCamera, mount: HTMLElement,
+    private motion: () => JuicePolicy = motionPolicy) {
     this.overlay = document.createElement('div');
     this.overlay.style.cssText =
       'position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:30;';
@@ -52,16 +84,37 @@ export class JuiceKit {
     scene.onBeforeRenderObservable.add(() => this.tick());
   }
 
-  /** 40–90ms freeze on significant contact. Never on ordinary movement. */
-  hitStop(ms = 70): void {
-    const anim = this.scene.animationTimeScale ?? 1;
-    this.scene.animationTimeScale = 0.001;
-    vibrate([12, 20, 12]);
-    setTimeout(() => { this.scene.animationTimeScale = anim; }, Math.min(ms, 90));
+  /** Point the scene's animation clock at whatever the effects in force say (see the fields above). */
+  private applyClock(): void {
+    if (this.disposed) return;   // a timer that outlived the kit never touches the clock again
+    const now = this.scene.animationTimeScale ?? 1;
+    if (this.wrote === null || now !== this.wrote) this.original = now;   // first effect, or somebody else wrote it since
+    if (this.freezes === 0 && this.slows.length === 0) {
+      if (this.wrote !== null) { this.scene.animationTimeScale = this.original; this.wrote = null; }
+      return;
+    }
+    const v = this.freezes > 0 ? FREEZE_SCALE : this.slows[this.slows.length - 1].scale;
+    this.scene.animationTimeScale = v;
+    this.wrote = v;
   }
 
-  /** Directional, dampened shake. amp in world units (0.05–0.2). */
+  /**
+   * 40–90ms freeze on significant contact. Never on ordinary movement. Reduced motion: a ~2-frame beat (30 ms) — unless
+   * `gameplay` says it is paired with an equal freeze of the mode's own clock (the dunk's contact punch), which keeps its
+   * length so the bodies and the root unfreeze together. Overlapping freezes JOIN: the clock comes back when the last
+   * one ends, to whatever is in force then.
+   */
+  hitStop(ms = 70, opts?: { gameplay?: boolean }): void {
+    const hold = this.motion().hitStopMs(ms, opts?.gameplay === true);
+    this.freezes++;
+    this.applyClock();
+    vibrate([12, 20, 12]);
+    setTimeout(() => { this.freezes = Math.max(0, this.freezes - 1); this.applyClock(); }, hold);
+  }
+
+  /** Directional, dampened shake. amp in world units (0.05–0.2). Reduced motion: none — the camera holds still. */
   shake(amp = 0.12, ms = 130): void {
+    if (!this.motion().shake) return;
     this.shakeAmp = amp;
     this.shakeT = ms / 1000;
   }
@@ -86,10 +139,27 @@ export class JuiceKit {
     requestAnimationFrame(() => { f.style.opacity = String(edge); });
   }
 
-  /** 0.3–0.5× for 300–500ms — SIGNATURE moments only. */
-  slowMo(scale = 0.4, ms = 400): void {
-    this.scene.animationTimeScale = scale;
-    setTimeout(() => { this.scene.animationTimeScale = this.baseTimeScale; }, Math.min(ms, 500));
+  /**
+   * 0.3–0.5× for 300–500ms — SIGNATURE moments only.
+   *
+   * Reduced motion cuts it to a dip (≤ 120 ms) — unless `gameplay` says the mode's own clock rides this slow-mo (the
+   * dunk's hang: the slam window is counted in the scene's animation time; skate's spectacle beat: the mode slows its
+   * own dt for the same span). Those keep their full length under every setting, so the window the player aims at never
+   * moves; the screen around them is still spared the flash and the shake.
+   *
+   * A freeze in force wins over it (impact's hit-stop, then its slow-mo); two slow-mos: the newer one sets the speed and
+   * the older one resumes if it is still running when the newer ends.
+   */
+  slowMo(scale = 0.4, ms = 400, opts?: { gameplay?: boolean }): void {
+    const hold = this.motion().slowMoMs(ms, opts?.gameplay === true);
+    const mine = { scale };   // a fresh object per call, so the timer removes THIS one and no other
+    this.slows.push(mine);
+    this.applyClock();
+    setTimeout(() => {
+      const i = this.slows.indexOf(mine);
+      if (i >= 0) this.slows.splice(i, 1);
+      this.applyClock();
+    }, hold);
   }
 
   /**
@@ -105,6 +175,7 @@ export class JuiceKit {
    * lets you see what you just did. `strength` (default 1) is for the rare moment that really is bigger than a make.
    */
   flash(color = '#fff6dd', ms = 140, strength = 1): void {
+    if (!this.motion().flash) return;   // HOTFIX (2026-09-24): reduced motion — no screen flash at all, not a dimmer one
     const f = document.createElement('div');
     f.style.cssText =
       `position:absolute;inset:0;background:${flashBackground(color, strength)};opacity:1;` +
@@ -137,6 +208,7 @@ export class JuiceKit {
     const scaleX = canvas && bufferW ? canvas.clientWidth / bufferW : 1;
     const scaleY = canvas && bufferH ? canvas.clientHeight / bufferH : 1;
     const px = p.x * scaleX, py = p.y * scaleY;
+    const travel = this.motion().travel;   // reduced motion: the number fades where it landed instead of flying up
     const el = document.createElement('div');
     el.textContent = text;
     el.style.cssText =
@@ -146,7 +218,7 @@ export class JuiceKit {
       `transition:transform .8s cubic-bezier(.16,.8,.3,1),opacity .8s ease-out;will-change:transform;`;
     this.overlay.appendChild(el);
     requestAnimationFrame(() => {
-      el.style.transform = 'translate(-50%,-150%) scale(1.25)';
+      if (travel) el.style.transform = 'translate(-50%,-150%) scale(1.25)';
       el.style.opacity = '0';
     });
     setTimeout(() => el.remove(), 850);
@@ -159,10 +231,11 @@ export class JuiceKit {
     // both ends. Cueing from the shared juice channel rather than from N modes means a mode cannot forget — the
     // same reason the QA trace wraps these methods instead of asking each mode to report itself.
     captions.cue(text, 'feedback');
+    const travel = this.motion().travel;   // reduced motion: the banner fades in at size, no pop-and-overshoot
     const el = document.createElement('div');
     el.textContent = text;
     el.style.cssText =
-      'position:absolute;left:50%;top:32%;transform:translate(-50%,-50%) scale(.7);' +
+      `position:absolute;left:50%;top:32%;transform:translate(-50%,-50%) scale(${travel ? '.7' : '1'});` +
       `font:900 clamp(28px,6vw,52px) var(--fel-font-display,ui-monospace);color:${accent};` +
       `letter-spacing:.06em;text-shadow:0 4px 24px rgba(0,0,0,.7),0 0 34px ${accent}66;` +
       'transition:transform .18s cubic-bezier(.2,1.4,.4,1),opacity .25s ease-out;opacity:0;';
@@ -227,7 +300,13 @@ export class JuiceKit {
     ));
   }
 
-  dispose(): void { this.overlay.remove(); }
+  /** HOTFIX (2026-09-24): a kit torn down mid-freeze hands the clock back NOW, and its pending timers stay silent. */
+  dispose(): void {
+    this.freezes = 0; this.slows.length = 0;
+    this.applyClock();
+    this.disposed = true;
+    this.overlay.remove();
+  }
 }
 
 // WIRING (one line per moment):

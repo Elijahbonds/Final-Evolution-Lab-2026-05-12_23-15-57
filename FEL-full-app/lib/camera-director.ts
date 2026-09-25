@@ -12,6 +12,8 @@
  * All timings/magnitudes // TUNE(elijah).
  */
 
+import { motionPolicy } from './a11y/reducedMotion';
+
 /* ── ApexFollow (2D canvas) ─────────────────────────── */
 
 export interface ApexFollowState {
@@ -165,10 +167,13 @@ export interface DragonMomentState {
   flashAlpha: number;
   /** Camera zoom factor (1 = normal, >1 = push-in). */
   zoomFactor: number;
+  /** HOTFIX (2026-09-24): reduced motion was on when it fired — no crimson flash (the push-in and the slow-mo, which is
+   *  the mode's clock, are unchanged). */
+  calm?: boolean;
 }
 
 export function createDragonMoment(): DragonMomentState {
-  return { active: false, t: 0, duration: 0, timeScale: 1, flashAlpha: 0, zoomFactor: 1 };
+  return { active: false, t: 0, duration: 0, timeScale: 1, flashAlpha: 0, zoomFactor: 1, calm: false };
 }
 
 // TUNE(elijah)
@@ -184,7 +189,8 @@ export function triggerDragonMoment(state: DragonMomentState): void {
   state.active = true;
   state.t = 0;
   state.duration = DRAGON_TOTAL_DUR;
-  state.flashAlpha = 1;
+  state.calm = !motionPolicy().flash;
+  state.flashAlpha = state.calm ? 0 : 1;
   state.zoomFactor = 1;
   state.timeScale = DRAGON_SLOWMO_SCALE;
 }
@@ -204,7 +210,7 @@ export function updateDragonMoment(state: DragonMomentState, realDt: number): Dr
   state.t += realDt;
 
   // Crimson flash: fade out over DRAGON_FLASH_DUR
-  state.flashAlpha = Math.max(0, 1 - state.t / DRAGON_FLASH_DUR);
+  state.flashAlpha = state.calm ? 0 : Math.max(0, 1 - state.t / DRAGON_FLASH_DUR);
 
   // Zoom: ramp in, hold, pull back
   if (state.t < DRAGON_ZOOM_RAMP) {

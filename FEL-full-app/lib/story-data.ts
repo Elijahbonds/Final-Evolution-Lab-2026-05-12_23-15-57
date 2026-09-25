@@ -58,10 +58,17 @@ export interface StoryNode {
   title: string;
   /** One sentence challenge framing. */
   description: string;
-  /** Game mode id — must match the app's `app/play/<mode>` route segment. */
+  /** Game mode id — must match the app's `app/play/<mode>` route segment. NOT the GameSession's `mode` (the
+   *  GameShell prop differs for half the roster: onevone posts hoops1v1) — see storySessionMode in lib/progression. */
   mode: string;
-  /** Score the linked GameSession must meet or beat. */
+  /** Score the linked GameSession must meet or beat, on the MODE's own scale (lib/story-yardstick.ts says what
+   *  that scale is and holds this number under it). 0 on a `mustWin` node. */
   targetScore: number;
+  /** The session must be a WIN by the mode's own rules (GameSession.won) — a boss that is "win the game". */
+  mustWin?: boolean;
+  /** A `mustWin` boss ALSO completes on a session at or over this score, won or lost — set where no recorded run has
+   *  beaten the mode's AI yet (STORY_YARDSTICKS winEvidence null), so AI balance cannot dead-end the campaign. */
+  orScore?: number;
   /** Lab Credits awarded exactly once on completion (server-authoritative). */
   rewardLC: number;
   /** Boss nodes only. */
@@ -115,6 +122,10 @@ interface BossSpec {
   title: string;
   description: string;
   targetScore: number;
+  /** The boss is the mode's own win (targetScore 0) — see ZoneSpec comments below. */
+  win?: true;
+  /** With `win`: the score on the mode's line that completes the boss without the win (StoryNode.orScore). */
+  orScore?: number;
   badgeName: string;
   badgeDescription: string;
 }
@@ -157,6 +168,8 @@ function defineZone(spec: ZoneSpec): StoryZone {
     description: spec.boss.description,
     mode: spec.mode,
     targetScore: spec.boss.targetScore,
+    ...(spec.boss.win ? { mustWin: true } : {}),
+    ...(spec.boss.win && spec.boss.orScore !== undefined ? { orScore: spec.boss.orScore } : {}),
     rewardLC: BOSS_REWARD,
     badge: {
       id: `badge.${spec.id}`,
@@ -187,39 +200,68 @@ function defineZone(spec: ZoneSpec): StoryZone {
 // signs you into the Nexus Initiative — thirteen trial grounds that rebuild
 // an athlete from the asphalt up. At the Lab you face the Benchmark: the
 // data-ghost of who you used to be.
+//
+// HOTFIX (2026-09-24): the routes are real. Four zones named modes that never had a route (`basketball`,
+// `skate`, `fitness`, `skilllab`), so 16 of the 52 nodes opened a 404 — the very first node among them.
+// basketball → onevone, skate → skateboard and fitness → training are the owner's defaults. The Lab's default was
+// `calibrate` and is NOT used: /play/calibrate is the audio-delay tapper, which mounts no GameShell and posts no
+// session, so no Lab node could ever complete and the Benchmark could never be beaten. The Lab is Free Run: a
+// scored parkour run graded on your time and your trick line, and the Lab's targets sit inside that score. Swap the
+// one line if the owner wants otherwise (lib/story-data.test.ts will refuse any route that posts no session).
+//
+// HOTFIX (2026-09-24): every target is on its MODE's scale. The numbers were authored as one 400–1,650 ladder
+// for all thirteen grounds, but each mode posts its own kind of score: Ones posts points to 11, tennis posts
+// games to 4, the shootout posts 20 a goal. So the remapped Blacktop still dead-ended at its first node — a
+// 1v1 won 11–7 posts 11 against a target of 400 — and the Sand Pit, the Golf Green, the Pitch and the Tennis
+// Court asked for more than their modes can ever post. The rule now, held for every node by
+// lib/story-yardstick.test.ts: no node asks for more than its mode's own evidence says a player posts (the
+// win line, a par, or a measured run — STORY_YARDSTICKS names which). Where a zone asked more, its ladder is
+// scaled onto that line in the authored proportions; where the mode can be won, the boss IS the win. The
+// Dojo, the Skate Bowl, the Snow Slope and the Lab were already inside their lines and are unchanged.
+//
+// HOTFIX (2026-09-24): a win against an AI nobody has beaten on record is the same dead end one step later. The
+// Blacktop, the Sand Pit and the Pitch bosses ask for the win OR a score on their mode's line (`orScore`, shown on
+// the node card): no recorded run has beaten the Ones rival, the pit's duo or the shootout's keeper under the
+// current code (STORY_YARDSTICKS.winEvidence is null for all three). The Golf Green, the Diamond (both solo, won
+// against the course and the wall) and the Tennis Court (a recorded match win) stay bare wins. The test refuses a
+// bare win boss on a mode with no win evidence — so drop an `orScore` only once a win is on record.
 
 const ZONES: readonly StoryZone[] = [
   defineZone({
     id: 'blacktop',
     title: 'The Blacktop',
-    mode: 'basketball',
+    mode: 'onevone',
     act: 1,
     narrative:
       'Cracked asphalt, chain nets, and the court where it all started — before the draft boards, before the injury, before the verdict. Mara Vane leans on the fence with a tablet full of your old numbers and one question: do you want them back? The Initiative starts where you did.',
     unlock: { requiresZone: null },
     position: { x: 12, y: 88 },
     accent: '#22d3ee',
+    // HOTFIX (2026-09-24): was 400/560/720/1000. Ones posts your points in a first-to-11 game of 2s and 3s: 4 / 6 / 8
+    // points, then win it — or put up 10 in it, the most a loss can post (no recorded run has won a Ones game yet).
     rail: [
       {
         title: 'First Touch',
         description: 'Shake the rust off. Put up a clean scoring run on the old court.',
-        targetScore: 400,
+        targetScore: 4,
       },
       {
         title: 'Chain Net Music',
         description: 'String buckets together — Mara is charting your rhythm, not your total.',
-        targetScore: 560,
+        targetScore: 6,
       },
       {
         title: 'Streetlight Session',
         description: 'Last light, tired legs. Hold your form when the easy energy is gone.',
-        targetScore: 720,
+        targetScore: 8,
       },
     ],
     boss: {
       title: 'Run It Back',
       description: 'One full game at your old standard. Prove the foundation still holds.',
-      targetScore: 1000,
+      targetScore: 0,
+      win: true,
+      orScore: 10,
       badgeName: 'Asphalt Proof',
       badgeDescription: 'Cleared the Blacktop — the foundation holds.',
     },
@@ -271,27 +313,31 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'dojo' },
     position: { x: 42, y: 82 },
     accent: '#fbbf24',
+    // HOTFIX (2026-09-24): was 480/670/860/1200. Beach Rally posts your points in a set to 25: 10 / 14 / 18 points,
+    // then win the set — or take 22 points off the duo (no recorded run has beaten them yet).
     rail: [
       {
         title: 'Sink or Step',
         description: 'Rally in deep sand. Keep the ball alive while your base rebuilds.',
-        targetScore: 480,
+        targetScore: 10,
       },
       {
         title: 'Double Cost',
         description: 'Attack from the sand — every takeoff pays twice, so make each one count.',
-        targetScore: 670,
+        targetScore: 14,
       },
       {
         title: 'Wind Reads',
         description: 'Crosswind session. Adjust mid-point or lose the point.',
-        targetScore: 860,
+        targetScore: 18,
       },
     ],
     boss: {
       title: 'King of the Pit',
       description: 'Beat the pit’s resident duo at their own tempo, on their own sand.',
-      targetScore: 1200,
+      targetScore: 0,
+      win: true,
+      orScore: 22,
       badgeName: 'Unstable Ground',
       badgeDescription: 'Explosiveness certified on sand.',
     },
@@ -300,7 +346,7 @@ const ZONES: readonly StoryZone[] = [
   defineZone({
     id: 'skateBowl',
     title: 'The Skate Bowl',
-    mode: 'skate',
+    mode: 'skateboard',
     act: 1,
     narrative:
       'The bowl teaches the one thing no coach can say out loud: commitment is binary. Half-sent tricks end in concrete, and the Initiative wants your relationship with fear on record. Falling is the curriculum — getting up on tempo is the grade.',
@@ -343,27 +389,28 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'skateBowl' },
     position: { x: 74, y: 80 },
     accent: '#34d399',
+    // HOTFIX (2026-09-24): was 520/730/940/1300. The Break is won on a barrel or 800: the ladder scaled onto 800.
     rail: [
       {
         title: 'Read the Set',
         description: 'Pick the right waves and ride them clean. Patience is scored.',
-        targetScore: 520,
+        targetScore: 320,
       },
       {
         title: 'Down the Line',
         description: 'Hold speed through sections — flow, not force.',
-        targetScore: 730,
+        targetScore: 450,
       },
       {
         title: 'Heavy Water',
         description: 'Overhead session. Stay composed when the ocean raises the stakes.',
-        targetScore: 940,
+        targetScore: 580,
       },
     ],
     boss: {
       title: 'The Long Set',
       description: 'A full heat in shifting conditions. Adapt or get graded by the whitewater.',
-      targetScore: 1300,
+      targetScore: 800,
       badgeName: 'Force Reader',
       badgeDescription: 'Graded composed in heavy water.',
     },
@@ -415,27 +462,30 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'snowSlope' },
     position: { x: 76, y: 44 },
     accent: '#4ade80',
+    // HOTFIX (2026-09-24): was 560/780/1000/1380. The Loop pays 420 for a par card (par 3-4-3, the last hole x1.5):
+    // the rails scaled onto it, then card par or better.
     rail: [
       {
         title: 'Tempo Work',
         description: 'Range session — same swing, every time, on camera.',
-        targetScore: 560,
+        targetScore: 170,
       },
       {
         title: 'Short Game',
         description: 'Chips and putts. Precision when there’s nothing to muscle through.',
-        targetScore: 780,
+        targetScore: 240,
       },
       {
         title: 'Pressure Putts',
         description: 'Every putt streak-scored. Miss one and the meter resets.',
-        targetScore: 1000,
+        targetScore: 300,
       },
     ],
     boss: {
       title: 'The Lie Detector',
       description: 'A full scored round with Mara walking every hole beside you.',
-      targetScore: 1380,
+      targetScore: 0,
+      win: true,
       badgeName: 'Still Hands',
       badgeDescription: 'Passed the lie detector at full stillness.',
     },
@@ -451,27 +501,30 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'golfGreen' },
     position: { x: 60, y: 32 },
     accent: '#fb923c',
+    // HOTFIX (2026-09-24): was 580/800/1020/1420. Moonshot Derby: three pure, square homers post 321 and three homers
+    // win it: the rails scaled onto 321, then win the derby.
     rail: [
       {
         title: 'Cage Work',
         description: 'Batting cage ladder — rising speeds, shrinking windows.',
-        targetScore: 580,
+        targetScore: 130,
       },
       {
         title: 'Reading Spin',
         description: 'Mixed pitches. Decide late, swing on time.',
-        targetScore: 800,
+        targetScore: 180,
       },
       {
         title: 'Two-Strike Life',
         description: 'Every at-bat starts 0-2. Survive the disadvantage.',
-        targetScore: 1020,
+        targetScore: 230,
       },
     ],
     boss: {
       title: 'The Frame Test',
       description: 'Face the rig at full velocity. Reflex or exposure — the film decides.',
-      targetScore: 1420,
+      targetScore: 0,
+      win: true,
       badgeName: 'Millisecond Window',
       badgeDescription: 'Timed to the frame and cleared.',
     },
@@ -487,27 +540,30 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'diamond', prqGate: 60 },
     position: { x: 44, y: 40 },
     accent: '#e879f9',
+    // HOTFIX (2026-09-24): was 600/830/1060/1450. Breakaway: three drives, a touchdown pays 100 + 10 per evade so far.
+    // The ladder is scaled onto 300, the least three touchdowns can post — a floor the rules guarantee, NOT three
+    // touchdowns required: evades, trucks, coins, ramps and rails all add, so one long drive can clear the boss alone.
     rail: [
       {
         title: 'Route Tree',
         description: 'Run the full tree — crisp cuts, exact depths, catchable separation.',
-        targetScore: 600,
+        targetScore: 125,
       },
       {
         title: 'Traffic Reads',
         description: 'Make the catch in coverage. Eyes through the chaos.',
-        targetScore: 830,
+        targetScore: 170,
       },
       {
         title: 'Fourth and Inches',
         description: 'Short-yardage gauntlet. Win the collision math.',
-        targetScore: 1060,
+        targetScore: 220,
       },
     ],
     boss: {
       title: 'Two-Minute Drill',
       description: 'Down late with no timeouts. Execute the whole rebuild at once, under the clock.',
-      targetScore: 1450,
+      targetScore: 300,
       badgeName: 'Pressure Reads',
       badgeDescription: 'Drove the field with the clock dying.',
     },
@@ -523,27 +579,32 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'gridiron' },
     position: { x: 28, y: 30 },
     accent: '#2dd4bf',
+    // HOTFIX (2026-09-24): was 620/850/1080/1480. Twelve Yards pays 20 a goal (+ style) and always gives you three
+    // kicks: the rails scaled onto 60, then win the shootout — or post 60, three goals' worth (no recorded run has
+    // beaten the keeper since he learned to read the shot).
     rail: [
       {
         title: 'First Touch, Again',
         description: 'Possession work — receive, turn, release, repeat under pressure.',
-        targetScore: 620,
+        targetScore: 25,
       },
       {
         title: 'Final Third',
         description: 'Create and finish. Chances are scored on quality, not volume.',
-        targetScore: 850,
+        targetScore: 35,
       },
       {
         title: 'Full Ninety',
         description: 'Hold your standard for the whole match. The last ten minutes are the exam.',
-        targetScore: 1080,
+        targetScore: 45,
       },
     ],
     boss: {
       title: 'The Decider',
       description: 'Knockout match. One game, one result, everything you’ve rebuilt on the line.',
-      targetScore: 1480,
+      targetScore: 0,
+      win: true,
+      orScore: 60,
       badgeName: 'Ninety-Minute Engine',
       badgeDescription: 'Held the standard for the full ninety.',
     },
@@ -559,27 +620,30 @@ const ZONES: readonly StoryZone[] = [
     unlock: { requiresZone: 'pitch' },
     position: { x: 16, y: 44 },
     accent: '#facc15',
+    // HOTFIX (2026-09-24): was 640/870/1100/1500. Match Point posts the games you take in a first-to-4 match: 1 / 2 /
+    // 3 games, then win the match.
     rail: [
       {
         title: 'Serve Ritual',
         description: 'Hold serve behind a repeatable ritual. Same toss, same breath, same result.',
-        targetScore: 640,
+        targetScore: 1,
       },
       {
         title: 'Grind Rally',
         description: 'Win the long points. Outlast, then strike.',
-        targetScore: 870,
+        targetScore: 2,
       },
       {
         title: 'Break Point Nerve',
         description: 'Every scored point is a break point. Play the big moments only.',
-        targetScore: 1100,
+        targetScore: 3,
       },
     ],
     boss: {
       title: 'The Fifth Set',
       description: 'Deep in the decider against the Initiative’s best. Between points is the match.',
-      targetScore: 1500,
+      targetScore: 0,
+      win: true,
       badgeName: 'Solitary Duel',
       badgeDescription: 'Won the conversation between points.',
     },
@@ -588,34 +652,36 @@ const ZONES: readonly StoryZone[] = [
   defineZone({
     id: 'gymDome',
     title: 'The Gym Dome',
-    mode: 'fitness',
+    mode: 'training',
     act: 3,
     narrative:
       'The engine room. Before the Lab will take you, the Dome audits everything — output, recovery, mechanics, and whether you actually did the classroom work or just the sweating. Twelve grounds built the athlete; the Dome certifies one.',
     unlock: { requiresZone: 'tennis', prqGate: 70, lessonGate: 6 },
     position: { x: 30, y: 58 },
     accent: '#f472b6',
+    // HOTFIX (2026-09-24): was 660/890/1120/1550. Iron Paradise is won at 1,000 in its 60 s round: the ladder scaled
+    // onto 1,000.
     rail: [
       {
         title: 'Output Audit',
         description: 'Max-effort circuit. The sensors log everything; leave nothing unlogged.',
-        targetScore: 660,
+        targetScore: 425,
       },
       {
         title: 'Recovery Protocol',
         description: 'Repeat efforts on short rest — the Dome scores the second effort, not the first.',
-        targetScore: 890,
+        targetScore: 575,
       },
       {
         title: 'Mechanics Under Fatigue',
         description: 'Technique holds or it doesn’t. Prove it on tired legs.',
-        targetScore: 1120,
+        targetScore: 725,
       },
     ],
     boss: {
       title: 'Certification Day',
       description: 'The full battery, back to back, one session. Pass and the Lab doors open.',
-      targetScore: 1550,
+      targetScore: 1000,
       badgeName: 'Certified Engine',
       badgeDescription: 'Full-battery certification, one session.',
     },
@@ -624,7 +690,7 @@ const ZONES: readonly StoryZone[] = [
   defineZone({
     id: 'labHub',
     title: 'The Lab',
-    mode: 'skilllab',
+    mode: 'freerun',   // not /play/calibrate — see the HOTFIX note above ZONES
     act: 3,
     narrative:
       'The Nexus trials, and the reason Mara found you on that blacktop. Inside the Lab waits the Benchmark — a data-ghost built from your own peak numbers, every stat from before the fall, running your old game back at you. You don’t beat your past by matching it. You beat it by being someone it never met.',

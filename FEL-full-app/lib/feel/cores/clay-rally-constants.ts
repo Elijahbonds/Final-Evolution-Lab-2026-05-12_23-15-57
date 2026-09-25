@@ -38,14 +38,19 @@ export const CLAY_RALLY_TUNING: RallyTuning = {
   winContacts: 5, // TUNE(elijah) — five clean contacts wins the 40-15 game
 };
 
-/** SFX/shake presets per rally event. // TUNE(elijah). */
+/**
+ * Shake / hit-stop / rumble presets per rally event. // TUNE(elijah).
+ * HOTFIX (2026-09-24): no `sfx` here. Every entry named an /audio/sfx_*.mp3 that was never under public/, so the
+ * bus played silence. Sound belongs to the host that renders the mode (the Babylon modes play synthesized SoundKit
+ * cues); no live host builds this core today. See lib/feel/sensory-bus.ts.
+ */
 export const CLAY_RALLY_SENSORY: RallySensory = {
-  windowOpen: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.35, shake: 0.02 }, // TUNE(elijah)
-  perfect: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.7, shake: 0.09 }, // TUNE(elijah)
-  good: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.5, shake: 0.05 }, // TUNE(elijah)
-  weak: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.3, shake: 0.03 }, // TUNE(elijah)
-  miss: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.25, shake: 0.04 }, // TUNE(elijah)
-  win: { sfx: '/audio/sfx_basketball_swoosh.mp3', volume: 0.8, shake: 0.12 }, // TUNE(elijah)
+  windowOpen: { shake: 0.02 }, // TUNE(elijah)
+  perfect: { shake: 0.09 }, // TUNE(elijah)
+  good: { shake: 0.05 }, // TUNE(elijah)
+  weak: { shake: 0.03 }, // TUNE(elijah)
+  miss: { shake: 0.04 }, // TUNE(elijah)
+  win: { shake: 0.12 }, // TUNE(elijah)
 };
 
 // Keep an explicit typed handle so unused-import checks stay quiet if the

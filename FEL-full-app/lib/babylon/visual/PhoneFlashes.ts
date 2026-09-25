@@ -6,6 +6,7 @@
 // per flash.
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, Observer, Scene } from '@babylonjs/core';
+import { motionPolicy } from '../../a11y/reducedMotion';
 
 const POOL = 24, LIFE_S = 0.09;
 
@@ -23,8 +24,10 @@ export class PhoneFlashes {
       this.quads.push(q); this.life.push(0);
     }
   }
-  /** `n` flashes spread over `overSec`. */
+  /** `n` flashes spread over `overSec`. HOTFIX (2026-09-24): reduced motion — none. Up to 22 white pops in 2.4 s is a
+   *  strobe, whatever size each one is; the crowd's roar carries the moment instead. */
   burst(n: number, overSec = 1.6): void {
+    if (!motionPolicy().flash) return;
     for (let i = 0; i < n; i++) this.queue.push(Math.random() * overSec);
     if (!this.obs) this.obs = this.scene.onBeforeRenderObservable.add(() => this.tick(this.scene.getEngine().getDeltaTime() / 1000));
   }

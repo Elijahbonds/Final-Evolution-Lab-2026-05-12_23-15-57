@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import {
   createShake, triggerShake, updateShake, applyShake,
-  createPopups, addPopup, updatePopups, drawPopups,
+  createPopups, addPopup, updatePopups, drawPopups, flashFor,
 } from '@/lib/canvas-juice';
 import { SessionRecorder } from '@/lib/game-systems';
 
@@ -85,7 +85,7 @@ export default function GlitchBossGame({ grade, prq, onEnd, gamepad }: GameProps
       st.hp -= dmg;
       triggerShake(st.shake, 8, 200);
       addPopup(st.popups, `-${dmg} HP`, st.px, st.py - 30, '#FF3366');
-      st.flash = 0.1;
+      st.flash = flashFor(0.1);   // HOTFIX (2026-09-24): the full-canvas red flash on every hit — none under reduced motion
       st.rec.recordMiss();
     };
 

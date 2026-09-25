@@ -393,7 +393,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   function spectacle(ctx: ModeContext, why: string): void {
     if (slowT > 0 || slowCool > 0) return;
     slowT = SLOW_SEC; slowCool = SLOW_COOLDOWN; slowCount++;
-    ctx.juice.slowMo(SLOW_SCALE, SLOW_SEC * 1000);
+    ctx.juice.slowMo(SLOW_SCALE, SLOW_SEC * 1000, { gameplay: true });   // HOTFIX (2026-09-24): the mode's dt is slowed for SLOW_SEC too — reduced motion keeps the bodies with it
     console.info(`[SKATE-SLOWMO] ${why} (${slowCount})`);
   }
   /**

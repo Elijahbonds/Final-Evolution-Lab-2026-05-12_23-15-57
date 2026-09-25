@@ -63,3 +63,37 @@ export class EarlyPress {
   get waiting(): boolean { return this.at !== null; }
   clear(): void { this.at = null; }
 }
+
+/**
+ * One attempt, one press: the FIRST press decides (HOTFIX 2026-09-24, BASELINE.md:244 — DunkMode's SlamLatch in core/slamPress, for a
+ * mode that judges with judgePress).
+ *
+ * EarlyPress keeps a masher out of the early BUFFER, but a mode that also judges each press as it lands still gave the next
+ * press a fresh verdict: a too-early press missed, and a later one thrown at the window hit. The owner's two-foot duel dunk
+ * "hit" on its third A. Now the first press is the verdict (clean, early but counted, or a miss) and every press after it is
+ * spent. A press before the window and outside the grace is still held, and judged from when it was pressed once the window
+ * opens: that is when the mode can say TOO EARLY.
+ */
+export class FirstPress {
+  private readonly early = new EarlyPress();
+  private at: number | null = null;
+  /** The attempt's press: its verdict when it can be judged now, 'held' for one before the window, 'spent' for any press after the first. */
+  press(at: number, w: TimingWindow, grace = PRESS_GRACE): PressVerdict | 'held' | 'spent' {
+    if (this.at !== null) return 'spent';
+    this.at = at;
+    const v = judgePress(at, w, grace);
+    if (v.hit || at > w.centre) return v;   // inside the window, in the grace, or after it
+    this.early.press(at);
+    return 'held';
+  }
+  /** The window has opened: the held press, judged from when it was pressed (null when none is waiting). */
+  open(w: TimingWindow, grace = PRESS_GRACE): PressVerdict | null {
+    const at = this.early.take();
+    return at === null ? null : judgePress(at, w, grace);
+  }
+  /** When the attempt's press was made (null before it). */
+  get pressedAt(): number | null { return this.at; }
+  get spent(): boolean { return this.at !== null; }
+  /** A new attempt. */
+  clear(): void { this.at = null; this.early.clear(); }
+}

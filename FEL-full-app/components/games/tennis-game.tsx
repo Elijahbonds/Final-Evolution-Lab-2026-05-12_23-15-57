@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
 import { SessionRecorder } from '@/lib/game-systems';
+import { flashFor } from '@/lib/canvas-juice';   // HOTFIX (2026-09-24): reduced motion reaches this game's own flash too
 import {
   classifyContact, resolveShot,
   ghostVisible, ghostOpacity, predictLandingX,
@@ -67,7 +68,7 @@ export default function TennisGame({ grade, prq, onEnd, gamepad }: GameProps) {
       st.bvy = bvy;
       st.bvx = (st.bx - st.px) * 5.2; // TUNE(elijah)
       st.rally++;
-      if (o.fistPump) { st.flash = 0.18; st.fist = 0.8; } // TUNE(elijah)
+      if (o.fistPump) { st.flash = flashFor(0.18); st.fist = 0.8; } // TUNE(elijah)
     };
 
     // A timed swing: measure error vs the moment the ball crosses the contact
@@ -110,7 +111,7 @@ export default function TennisGame({ grade, prq, onEnd, gamepad }: GameProps) {
       if (who === 'player') { st.pScore++; st.rec.recordHit(); st.rec.recordChain(st.rally); } else { st.oScore++; st.rec.recordMiss(); }
       st.server = who;
       st.msg = who === 'player' ? 'POINT — YOU!' : 'POINT — RIVAL';
-      st.msgT = 1.4; st.flash = 0.15;
+      st.msgT = 1.4; st.flash = flashFor(0.15);
       // DDA: AI adapts to score gap
       const gap = st.pScore - st.oScore;
       st.aiSkill = Math.max(0.35, Math.min(0.85, 0.55 + gap * 0.08));

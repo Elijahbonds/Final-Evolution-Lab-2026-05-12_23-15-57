@@ -24,6 +24,8 @@
 //
 // ALL feel magnitudes are marked // TUNE(elijah) — Elijah owns the numbers.
 
+import { motionPolicy } from './a11y/reducedMotion';
+
 // ----------------------------------------------------------------------------
 // HIT-STOP
 // ----------------------------------------------------------------------------
@@ -88,6 +90,7 @@ export function triggerFlash(
   intensity = 0.6,   // TUNE(elijah)
   decay = 3,         // TUNE(elijah)
 ): void {
+  if (!motionPolicy().flash) return;   // HOTFIX (2026-09-24): reduced motion — no full-screen bloom (the KO flash, the 3-D crowd pops)
   s.color = color;
   s.alpha = Math.max(s.alpha, intensity);
   s.decay = decay;

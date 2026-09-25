@@ -28,6 +28,8 @@ import {
   type StoryZone,
   type ZoneId,
 } from './story-data';
+import { sessionModeFor } from './mp/match-core';
+import { storyGoalLabel, storyModeLabel } from './story-yardstick';
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -62,6 +64,10 @@ export interface NodeStatus {
   description: string;
   mode: string;
   targetScore: number;
+  /** The session must be a win by the mode's own rules (the boss of a winnable mode). */
+  mustWin: boolean;
+  /** What the node asks, on its mode's own scale: "Score 8 points", "Take 2 games", "Win the set". */
+  goal: string;
   rewardLC: number;
   badge?: StoryNode['badge'];
   completed: boolean;
@@ -73,6 +79,8 @@ export interface ZoneStatus {
   id: ZoneId;
   title: string;
   mode: string;
+  /** The mode's player-facing name ("Ones"), for the zone panel — `mode` is a route id. */
+  modeLabel: string;
   act: StoryZone['act'];
   narrative: string;
   position: StoryZone['position'];
@@ -188,6 +196,8 @@ function evaluateNode(
     description: node.description,
     mode: node.mode,
     targetScore: node.targetScore,
+    mustWin: node.mustWin === true,
+    goal: storyGoalLabel(storySessionMode(node), node),
     rewardLC: node.rewardLC,
     ...(node.badge ? { badge: node.badge } : {}),
     completed,
@@ -213,6 +223,7 @@ export function evaluateCampaign(input: ProgressionInput): CampaignStatus {
       id: zone.id,
       title: zone.title,
       mode: zone.mode,
+      modeLabel: storyModeLabel(storySessionMode(zone)),
       act: zone.act,
       narrative: zone.narrative,
       position: zone.position,
@@ -289,6 +300,60 @@ export function isNodePlayable(
     return { playable: false, reason: 'locked' };
   }
   return { playable: true, reason: null };
+}
+
+/**
+ * The `mode` a GameSession launched from this node is stored under. `node.mode` is the ROUTE segment
+ * (/play/<mode>); the session carries the GameShell prop, and for half the campaign the two differ
+ * (onevone → hoops1v1, karate → karateEndless, skateboard → skateboarding, surf → surfing). lib/mp/match-core
+ * owns that map, measured against what the hosts actually post under; lib/story-data.test.ts reads each
+ * node's loader and holds this to it.
+ */
+export function storySessionMode(node: Pick<StoryNode, 'mode'>): string {
+  return sessionModeFor(node.mode);
+}
+
+export type StorySessionVerdict =
+  | { ok: true }
+  | { ok: false; error: 'Session mode does not match node'; required: string; achieved: string | null }
+  | { ok: false; error: 'Not a win'; required: 'win'; achieved: 'loss' }
+  | { ok: false; error: 'Not a win'; required: 'win'; achieved: 'loss'; orScore: number; score: number }
+  | { ok: false; error: 'Score below target'; required: number; achieved: number };
+
+/**
+ * Does this GameSession complete this node?
+ *
+ * HOTFIX (2026-09-24): the completion route checked the score and nothing else, so any session that cleared the
+ * number completed any node — a karate run counts in the thousands (scoreScale.ts: a mediocre one is 1,250) and
+ * would clear a golf node it never touched. The session must have been played in the node's own mode. No session
+ * at all is a mismatch too: a node is completed by playing it, never by asking.
+ *
+ * HOTFIX (2026-09-24): a boss of a winnable mode asks for the WIN, read off `won` — the verdict the mode itself
+ * posts (first to 11, the set, the match, a par card, the derby, the shootout). Its targetScore is 0, so the score
+ * check below never refuses a real win: a tennis match won by breaking the rival's racket posts fewer than 4 games.
+ *
+ * HOTFIX (2026-09-24): a win boss with an `orScore` also completes on a session at or over that score, won or lost —
+ * the Blacktop, the Sand Pit and the Pitch, whose rivals no recorded run has beaten (lib/story-data.ts). A loss under
+ * it is refused with both lines, so the player sees the way through.
+ */
+export function judgeStorySession(
+  node: Pick<StoryNode, 'mode' | 'targetScore' | 'mustWin' | 'orScore'>,
+  session: { mode: string; score: number; won: boolean } | null,
+): StorySessionVerdict {
+  const required = storySessionMode(node);
+  if (!session || session.mode !== required) {
+    return { ok: false, error: 'Session mode does not match node', required, achieved: session?.mode ?? null };
+  }
+  if (node.mustWin && session.won !== true) {
+    if (node.orScore === undefined) return { ok: false, error: 'Not a win', required: 'win', achieved: 'loss' };
+    if (session.score < node.orScore) {
+      return { ok: false, error: 'Not a win', required: 'win', achieved: 'loss', orScore: node.orScore, score: session.score };
+    }
+  }
+  if (session.score < node.targetScore) {
+    return { ok: false, error: 'Score below target', required: node.targetScore, achieved: session.score };
+  }
+  return { ok: true };
 }
 
 /**

@@ -12,6 +12,7 @@
 import type { Scene, TargetCamera } from '@babylonjs/core';
 import { Vector3 } from '@babylonjs/core';
 import { SoundKit } from '../audio/SoundKit';   // M43: impact() now plays a synthesized hit
+import { motionPolicy } from '../../a11y/reducedMotion';
 
 // ── Input buffer ───────────────────────────────────────────────────────────
 export class InputBuffer {
@@ -67,8 +68,12 @@ export class Shaker {
       this.amp *= 0.86;                                  // fast decay — no nausea
     });
   }
-  /** strength 0..1 → small worldspace amplitude (capped) */
-  kick(strength: number): void { this.amp = Math.min(0.22, Math.max(this.amp, strength * 0.22)); }
+  /** strength 0..1 → small worldspace amplitude (capped). HOTFIX (2026-09-24): reduced motion — the camera holds
+   *  still. Only the shake: the hit-stop above is the mode's gameplay clock and fires the same under every setting. */
+  kick(strength: number): void {
+    if (!motionPolicy().shake) return;
+    this.amp = Math.min(0.22, Math.max(this.amp, strength * 0.22));
+  }
   dispose(): void { if (this.obs) this.scene.onBeforeRenderObservable.remove(this.obs); }
 }
 

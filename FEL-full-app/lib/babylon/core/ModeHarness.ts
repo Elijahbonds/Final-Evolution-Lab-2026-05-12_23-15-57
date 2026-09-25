@@ -17,6 +17,7 @@ import { InputBus, type FelInput } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
 import { buildResult, defaultResultSink, type ResultSink, type SessionResult } from './sessionResult';
 import { JuiceKit } from '../premium/JuiceKit';
+import { motionPolicy } from '../../a11y/reducedMotion';   // HOTFIX (2026-09-24): the impact frame asks too
 import { RenderWatchdog } from './RenderWatchdog';
 import { GroundLock } from '../anim/importSanitizer';
 import { Shaker, InputBuffer, impact as feelImpact, timeScale } from './gameFeel';
@@ -270,7 +271,10 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     const j = juice as unknown as Record<string, (...a: unknown[]) => unknown>;
     for (const m of ['hitStop', 'shake', 'slowMo', 'flash', 'scorePop', 'banner', 'callout', 'impact']) {
       const orig = j[m]?.bind(juice);
-      if (orig) j[m] = (...a: unknown[]) => { qa.juice(m); return orig(...a); };
+      // HOTFIX (2026-09-24): a flash or a shake that reduced motion suppressed is not something the player perceived —
+      // the trace must not count it as the answer to a press
+      const unseen = () => (m === 'flash' && !motionPolicy().flash) || (m === 'shake' && !motionPolicy().shake);
+      if (orig) j[m] = (...a: unknown[]) => { if (!unseen()) qa.juice(m); return orig(...a); };
     }
     const sk = SoundKit as unknown as { play: (n: string, o?: unknown) => void };
     const origPlay = sk.play;
@@ -323,7 +327,9 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   let framePainted = false;
   const feel: ModeFeel = {
     shaker, buffer,
-    impact: (s: number) => { qa?.impact(); feelImpact(shaker, s); frame = kickImpactFrame(frame, s); },
+    // HOTFIX (2026-09-24): under reduced motion the frame does not pulse (a whole-frame exposure dip is a flash too); the
+    // hit-stop, the sound and the pad buzz inside feelImpact are unchanged, and the Shaker holds still on its own.
+    impact: (s: number) => { qa?.impact(); feelImpact(shaker, s); if (motionPolicy().flash) frame = kickImpactFrame(frame, s); },
   };
   // MOMENTUM IS HEARD, NOT DISPLAYED. `momentum:` in setHud only draws in hosts that happen to render it,
   // and there are twenty-one separate host components. The crowd bed and the tier sting need no host at

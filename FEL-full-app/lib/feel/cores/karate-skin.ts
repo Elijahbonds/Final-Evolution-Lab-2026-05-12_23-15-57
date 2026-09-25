@@ -32,7 +32,6 @@ import {
   LOW_HP_THRESHOLD,
   PRQ_DELTAS,
   KARATE_SENSORY,
-  KARATE_SFX,
   KARATE_ARENA,
   type StrikeType,
 } from './karate-constants';
@@ -154,7 +153,7 @@ export class KarateBout {
     this.feel = opts.feel ?? feelConfig;
     this.a = new KarateFighter(0, this.feel, opts.spawnA ?? { x: -2, z: 0 });
     this.b = new KarateFighter(1, this.feel, opts.spawnB ?? { x: 2, z: 0 });
-    this.bus = opts.sensory ?? new SensoryBus({ sfx: KARATE_SFX });
+    this.bus = opts.sensory ?? new SensoryBus();   // HOTFIX (2026-09-24): no sfx map; its two MP3s never existed
     this.onSensory = opts.onSensory;
   }
 

@@ -25,23 +25,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@/public/_prisma/client';
 import { toLook, toBuild, fromStorage, validateForSave, type Values, type BuildPayload, type LookPayload } from '@/lib/creator/schema/saveBuild';
 import { filterEquipped, refusedItems } from '@/lib/closet/ownership';
 import { defaultFace, defaultEquipped, getWearable } from '@/lib/closet/wearable-catalog';
-import type { PrqAxisId } from '@/lib/creator/schema/types';
 import { isMissingTable, isUnreachable } from '@/lib/db/errors';
-
-type Axes = Partial<Record<PrqAxisId, number>> | null;
-
-/** The eight measured axes off the player's profile row, or null when they have never been scanned. */
-async function axesFor(userId: string): Promise<Axes> {
-  const p = await prisma.playerProfile.findUnique({ where: { userId } });
-  if (!p) return null;
-  return {
-    strength: p.strength, speed: p.speed, endurance: p.endurance, agility: p.agility,
-    power: p.power, flexibility: p.flexibility, recovery: p.recovery, mental: p.mental,
-  };
-}
+// HOTFIX (2026-09-24): the page reads the same axes for the editor's ceilings, so the one function lives in lib (a
+// route file may only export its handlers) — and it reads measured axes, not the dice-seeded profile row.
+import { axesFor } from '@/lib/creator/athleteAxes-server';
 
 /**
  * `AthleteBuild` is new and the migration is the owner's to run, so the one error a fresh checkout will
@@ -91,7 +82,9 @@ export async function GET() {
     return NextResponse.json({
       values: fromStorage((row?.build as unknown as BuildPayload | null) ?? null, lookPayload),
       plate: lookPayload.jersey?.name ?? '',
-      prq: (row?.prq as unknown as Axes) ?? (await axesFor(userId)),
+      // HOTFIX (2026-09-24): the measured axes NOW, never the stored snapshot. Finalizes before this hotfix stored the
+      // dice-seeded profile axes in AthleteBuild.prq, and `row.prq ?? axesFor` kept serving them as the athlete's PRQ.
+      prq: await axesFor(userId),
       finalizedAt: row?.finalizedAt ?? null,
       owned: (await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId),
     });
@@ -135,8 +128,10 @@ export async function POST(req: NextRequest) {
       }),
       prisma.athleteBuild.upsert({
         where: { userId },
-        update: { build: toBuild(values) as object, prq: (prq ?? undefined) as object | undefined, finalizedAt: new Date() },
-        create: { userId, build: toBuild(values) as object, prq: (prq ?? undefined) as object | undefined, finalizedAt: new Date() },
+        // HOTFIX (2026-09-24): no measurement CLEARS the column (Prisma.DbNull), where `undefined` left it alone — so a
+        // dice-seeded snapshot an earlier Finalize stored is wiped on the next one instead of living on as "measured".
+        update: { build: toBuild(values) as object, prq: prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
+        create: { userId, build: toBuild(values) as object, prq: prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
       }),
     ]);
     return NextResponse.json({
