@@ -11,10 +11,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { faceFromLandmarks, type Landmark } from '@/lib/facescan/faceFromLandmarks';
 import { slidersFromLandmarks } from '@/lib/facescan/slidersFromLandmarks';
 import type { FaceConfig } from '@/lib/closet/wearable-catalog';
+import { visionAssets } from '@/lib/pose/assets';
 
 type Status = 'idle' | 'loading-model' | 'camera' | 'analyzing' | 'error';
 
-const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
+// The tasks-vision wasm is served from our own /pose/wasm copy (the same 0.10.35 build the pose adapter loads, CDN
+// only if ours is missing). The face model itself still comes from Google's storage: it is not self-hosted yet.
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
@@ -67,7 +69,7 @@ export function FaceScanCapture({
     if (landmarkerRef.current) return landmarkerRef.current;
     setStatus('loading-model');
     const vision = await import('@mediapipe/tasks-vision');
-    const fileset = await vision.FilesetResolver.forVisionTasks(WASM_CDN);
+    const fileset = await vision.FilesetResolver.forVisionTasks(await visionAssets.wasmBase());
     const lm = await vision.FaceLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: MODEL_URL },
       runningMode: 'IMAGE',

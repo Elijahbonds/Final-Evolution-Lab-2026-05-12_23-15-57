@@ -5,40 +5,43 @@
 // It lives in GameShell rather than in a mode, because body control is an input DEVICE: poseControl maps a body
 // to the same four FelInput shapes a gamepad produces, and emitToLive posts them to whichever mode is running.
 // Nothing in any mode file knows this exists.
+//
+// GameShell mounts it twice (the header, and a compact copy in full-bleed). Both drive and show ONE shared source and
+// one camera (poseSource's sharedPoseSource, on PoseService); the camera stops when the last of them unmounts.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { PersonStanding, X } from 'lucide-react';
-import { PoseSource, type PoseSourceState } from '@/lib/input/poseSource';
+import { holdSharedPoseSource, sharedPoseSource, type PoseSourceSnapshot } from '@/lib/input/poseSource';
 import { GESTURE_BUTTON, GESTURE_LABEL, type Gesture } from '@/lib/input/poseControl';
 import { emitToLive, type FelInput } from '@/lib/babylon/core/InputBus';
 
-/** A bus-shaped object that posts to whatever mode is running, so PoseSource needs no reference to one. */
-const LIVE_BUS = { emit: (e: FelInput) => emitToLive(e) } as unknown as ConstructorParameters<typeof PoseSource>[0];
+/** A bus-shaped object that posts to whatever mode is running, so the source needs no reference to one. */
+const LIVE_BUS = { emit: (e: FelInput) => emitToLive(e) };
 
 const ORDER: Gesture[] = ['jump', 'raiseR', 'raiseL', 'raiseBoth', 'reachR', 'reachL'];
 
+/** Before the page is live (server render, hydration) every Body button reads off. */
+const OFF: PoseSourceSnapshot = { state: 'idle', detail: '', body: false };
+const noSubscribe = () => () => {};
+
 export function BodyControl({ compact = false }: { compact?: boolean }) {
-  const srcRef = useRef<PoseSource | null>(null);
-  const [state, setState] = useState<PoseSourceState>('idle');
-  const [detail, setDetail] = useState('');
-  const [body, setBody] = useState(false);
+  // Client only: the server never builds a camera source.
+  const src = typeof window === 'undefined' ? null : sharedPoseSource(LIVE_BUS);
+  const { state, detail, body } = useSyncExternalStore(
+    src ? src.listen : noSubscribe, () => src?.snapshot ?? OFF, () => OFF,
+  );
   const [showCard, setShowCard] = useState(false);
 
-  useEffect(() => () => { srcRef.current?.stop(); srcRef.current = null; }, []);
-
-  const toggle = useCallback(async () => {
-    if (srcRef.current) { srcRef.current.stop(); srcRef.current = null; setShowCard(false); return; }
-    const src = new PoseSource(LIVE_BUS, {
-      onState: (s, d) => { setState(s); setDetail(d ?? ''); },
-      onBody: setBody,
-    });
-    srcRef.current = src;
-    setShowCard(true);
-    const ok = await src.start();
-    if (!ok) { srcRef.current = null; }
-  }, []);
+  useEffect(() => holdSharedPoseSource(), []);
 
   const on = state !== 'idle' && state !== 'error';
+
+  const toggle = useCallback(async () => {
+    if (!src) return;
+    if (on) { src.stop(); setShowCard(false); return; }
+    setShowCard(true);
+    await src.start();
+  }, [src, on]);
 
   return (
     <>
@@ -108,7 +111,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
               </ul>
               <button
                 type="button"
-                onClick={() => srcRef.current?.recalibrate()}
+                onClick={() => src?.recalibrate()}
                 className="mt-3 w-full rounded-lg border border-white/12 py-2 font-mono text-[10px] font-bold
                            uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
               >

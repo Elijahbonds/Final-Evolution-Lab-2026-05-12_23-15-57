@@ -6,7 +6,7 @@
 // What it keeps is LANDMARK NUMBERS ONLY. The camera picture is drawn in this page and nowhere else: never saved,
 // never sent. Takes live in this tab's memory until the owner downloads them as one .json file, which the browser
 // saves on the Mac. There is no fetch and no POST here. The only network use is the pose model's one-time download
-// (the same CDN files every camera feature in the app loads).
+// (from our own /pose copy, like every camera feature in the app; the MediaPipe CDN only if ours is missing).
 //
 // The owner stands about 3 m from the screen, so everything they need mid-take (the prompt, the 3-2-1, GO) is drawn
 // big on the video, with a beep on each count, and "Record all remaining" runs the takes back to back.
@@ -203,7 +203,7 @@ export default function PoseRecorder() {
       adapter.dispose();
       if (!aliveRef.current || streamRef.current !== stream) return;
       stopCamera();
-      setErr('The pose model did not load. It downloads once from the MediaPipe CDN, so check the network.');
+      setErr('The pose model did not load (from /pose, or the MediaPipe CDN when ours is missing), so check the network.');
       setCam('error');
       return;
     }

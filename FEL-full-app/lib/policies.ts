@@ -5,7 +5,12 @@
  * DRAFT — NOT LEGAL TEXT markers are present on every page.
  */
 
-export const CURRENT_POLICY_VERSION = '2026-07-15-draft';
+// CONTEXT (2026-09-24): bumped from '2026-07-15-draft' with the camera section (Privacy §6). The version is what a
+// signup records as the text it accepted (auth-form → /api/signup → User.policyVersion), so a text change that keeps
+// the old string leaves that record unable to say which text anyone saw. Nothing compares a stored version with this
+// one, so a bump re-prompts no one: it re-labels /privacy and /terms and changes what new signups store. The Terms
+// share it and re-label too, although their text did not change. policies.test.ts fails on a text change without one.
+export const CURRENT_POLICY_VERSION = '2026-09-24-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -92,16 +97,24 @@ PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics.
 We do not collect medical data. These values are stored with their source
 and measurement date for full traceability.
 
-## 6. Third Parties
+## 6. Camera and Body Tracking
+
+Some features use your camera: playing with your body as the controller, the Mirror, Prove It and face scan. The camera picture is processed on your device, in your browser. It never leaves your browser and is never stored. Face scan can also read a photo you choose; that photo is handled the same way.
+
+When you play, only numbers worked out from the camera (for example jump height, rep counts or form reads) may be saved to your history. Face scan keeps only the face settings it picks, never the picture.
+
+The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers. Face scan's model file comes from Google's servers (storage.googleapis.com), and if our copy of the body-tracking files is ever missing they come from jsDelivr and Google instead. These downloads never include your picture.
+
+## 7. Third Parties
 
 We do not sell personal data. Payment processing (when enabled) uses
 Stripe, governed by Stripe’s privacy policy.
 
-## 7. Your Rights
+## 8. Your Rights
 
 You may request data export (JSON) or deletion via your Profile settings.
 
-## 8. Changes
+## 9. Changes
 
 We may update this Policy. Material changes will be communicated in-app.
 `;
