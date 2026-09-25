@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { MODES, ENABLED_BABYLON_MODES } from './registry';
 import { stripComments } from '@/lib/testing/sourceScan';
+import { BODY_PROFILES } from '@/lib/input/bodyProfiles';
 
 const ROOT = path.resolve(__dirname, '../../..');
 
@@ -129,5 +130,32 @@ describe('EVERY ENABLED MODE HAS A DOOR', () => {
       return !literal && !viaFactory;
     });
     expect(undoored).toEqual([]);
+  });
+});
+
+// MOVEMENT PLAY P3 (2026-09-24): the body profiles are one more table keyed by a name that has to line up — by modeId
+// (what the harness knows), carrying the registry key (what MODE_VERBS and the routes know). A mode missing its row
+// silently plays session-only; a row naming a mode that is gone is a card for nothing.
+describe('every mode has its body profile', () => {
+  it('every ENABLED key has a row whose key is that key and whose modeId is the mode\'s own — the four aliases included', () => {
+    const rows = Object.values(BODY_PROFILES);
+    const bad: string[] = [];
+    for (const key of ENABLED_BABYLON_MODES) {
+      const def = MODES[key];
+      const row = rows.find((p) => p.key === key);
+      if (!row) { bad.push(`${key}: no row`); continue; }
+      if (row.modeId !== def.modeId) bad.push(`${key}: row modeId "${row.modeId}" vs the mode's "${def.modeId}"`);
+      if (BODY_PROFILES[def.modeId] !== row) bad.push(`${key}: BODY_PROFILES["${def.modeId}"] is not its row`);
+    }
+    expect(bad).toEqual([]);
+    const aliases = Object.entries(MODES).filter(([key, def]) => def.modeId !== key).map(([key, def]) => `${key}→${BODY_PROFILES[def.modeId]?.key}`);
+    expect(aliases.sort()).toEqual(['derby→derby', 'karate_vs→karate_vs', 'penalty→penalty', 'snowboard_slalom→snowboard_slalom']);
+  });
+
+  it('no orphan rows: every row names a registered, enabled mode, once', () => {
+    const rows = Object.values(BODY_PROFILES);
+    expect(rows.filter((p) => !(p.key in MODES) || !ENABLED_BABYLON_MODES.has(p.key)).map((p) => p.key)).toEqual([]);
+    expect(rows.length).toBe(Object.keys(MODES).length);
+    expect(new Set(rows.map((p) => p.key)).size).toBe(rows.length);
   });
 });

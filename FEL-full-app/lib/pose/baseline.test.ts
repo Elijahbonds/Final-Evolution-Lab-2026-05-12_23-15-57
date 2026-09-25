@@ -1,9 +1,13 @@
-// THE BASELINE, pinned (movement play, phase 1, 2026-09-24). These are KNOWN-BAD facts about TODAY's body mapper
-// (lib/input/poseControl.ts) replayed on the synthetic streams — the two misfires that matter most, confirmed in numbers
-// by scripts/body/baseline.mts (report: ~/Claude/outbox/finish-release/movementplay/p1-baseline/BASELINE.md).
+// THE BASELINE, pinned (movement play, phase 1, 2026-09-24), BEFORE and AFTER.
 //
-// They pass today BECAUSE the mapper is wrong. Phase 3 (per-mode body profiles) is expected to break both: when it
-// does, flip each `it` to the fixed behaviour written in its comment rather than deleting it.
+// BEFORE: KNOWN-BAD facts about the P1 body mapper (lib/input/poseControl.ts) replayed on the synthetic streams — the
+// two misfires that matter most, confirmed in numbers by scripts/body/baseline.mts (report:
+// ~/Claude/outbox/finish-release/movementplay/p1-baseline/BASELINE.md). They still pass, because that mapper is FROZEN
+// as the P1 baseline (it is no longer what the game hears): they pin the "before" the seam is measured against.
+//
+// AFTER (movement play P3, 2026-09-24): the same reads through the P3 seam (lib/pose/seamReplay.ts: the body reader,
+// the per-mode profile's floor, the session and the arbiter — scripts/body/seam.mts prints them beside BASELINE.md as
+// SEAM.md). The dunk binds nothing until P5, so the misfire is gone because nothing is pressed; P5 makes the dunks.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,15 +16,19 @@ import type { PoseFixture } from './synth';
 import type { FelInput } from '../babylon/core/InputBus';
 import { KEY_SPACE_DOWN } from '../babylon/core/StartWake';
 import { EASTBAY_TIMING } from '../babylon/anim/authored/timing';
+import { bodyPackets, seamReplay } from './seamReplay';
+import { standFrame, STAND_SEC } from './grade';
+import { holdStill } from './streamKit';
+import { BODY_PROFILES } from '../input/bodyProfiles';
 
 const load = (name: string) => JSON.parse(readFileSync(join(__dirname, '__fixtures__', `${name}.json`), 'utf8')) as PoseFixture;
 const still = load('stand_still');
 /** The owner's own stand (same body, same camera): his takes that never stand still calibrate on it, as the report does. */
 const ownerStand: ReplayOptions = { calibration: 'stand', stand: still.frames[uprightFrame(still)] };
 
-describe('BASELINE — today\'s poseControl on the streams (KNOWN-BAD: phase 3 flips these)', () => {
-  it('KNOWN-BAD: every body dunk launches on the rise out of the dip, and the jump itself is its A — dropped or refused, never made', () => {
-    // Phase 3: the launch waits for the real take-off, the slam is the arm's strike against the apex, and these are made.
+describe('BEFORE (legacy mapper, frozen) — the P1 poseControl on the streams', () => {
+  it('BEFORE (legacy mapper, frozen): every body dunk launches on the rise out of the dip, and the jump itself is its A — dropped or refused, never made', () => {
+    // AFTER (below): the P3 seam presses nothing in the dunk; P5 launches at the real take-off and grades the strike against the apex.
     // HOTFIX (2026-09-24): both dunk modes now drop an A inside TAKEOFF_ECHO_MS of the launch as the take-off's own (the
     // keyboard's Space release and a pad's A on the run are one press, not a slam). The body's jump A is the same kind of echo
     // — its R2 → 0 and its A are one jump — so when it lands inside that window it is dropped, and the body has no slam left
@@ -61,8 +69,8 @@ describe('BASELINE — today\'s poseControl on the streams (KNOWN-BAD: phase 3 f
     }
   });
 
-  it('KNOWN-BAD: standing still reads as the L stick held full back (y = +1), and forward (y < 0) is unreachable', () => {
-    // Phase 3: the resting stick is (0, 0), and a real forward lean or a run in place can push y below 0.
+  it('BEFORE (legacy mapper, frozen): standing still reads as the L stick held full back (y = +1), and forward (y < 0) is unreachable', () => {
+    // AFTER (below): the resting stick is (0, 0) — nothing is sent at all — and only Free Run's run in place pushes y below 0.
     // (the mapper writes a centred x as −0: `-Math.sign(0) * 0`)
     const atRest = (r: ReturnType<typeof replay>) => { const s = restStick(r)!; return { x: Math.abs(s.x), y: s.y }; };
     const rest = replay(still, { calibration: 'stand' });
@@ -169,5 +177,44 @@ describe('the dunk reads mirror the fixed modes', () => {
     expect(d.presses[1].kind).toBe('held');                  // the first real A: the verdict, far too early
     expect(d.presses.slice(2).every((p) => p.kind === 'spent')).toBe(true);
     expect(d.hit).toBe(false);
+  });
+});
+
+/** A take through the P3 seam with the stand held before it (grade.standFrame + holdStill, as the P3 gate does). */
+function seam(name: string, key: string) {
+  const fx = load(name);
+  const lead = holdStill(standFrame(fx, fx.source.kind === 'deepmotion' ? still.frames[70] : undefined).frame,
+    { sec: STAND_SEC, fps: fx.settings.synth.fps, beforeT: fx.frames[0].t });
+  const p = Object.values(BODY_PROFILES).find((x) => x.key === key)!;
+  return seamReplay(bodyPackets([...lead, ...fx.frames], { lead: lead.length }), { profile: p, phase: 'machine', start: 'playing', name });
+}
+
+describe('AFTER (P3 seam) — the same reads through the per-mode profiles', () => {
+  it('AFTER (P3 seam): the dunk profile on the four dunk takes presses nothing — no run, no launch, no slam, no menu change', () => {
+    for (const name of ['jump_two_foot_high', 'jump_one_foot_runup', 'jumpshot', 'dunk_elijah_two_foot']) {
+      const r = seam(name, 'dunk');
+      const d = dunkRead(r.events);
+      expect([d.run, d.launch, d.slam, d.notes], name).toEqual([null, null, null, []]);
+      expect(d.verdict, name).toBe('no launch');
+      expect(r.floor, name).toEqual([]);
+      expect(r.phases.map((x) => x.phase), name).toEqual(['playing']);   // and never paused: the body does not drive the dunk yet
+    }
+  });
+  it.todo('P5: the real take-off launches and the apex-graded strike makes these');
+
+  it('AFTER (P3 seam): rest sends no stick in any profile (restStick is null), and y is never pushed on a jog, a shuffle or a jump — save Free Run\'s run', () => {
+    for (const p of Object.values(BODY_PROFILES)) {
+      const rest = seam('stand_still', p.key);
+      expect(rest.events.filter((x) => x.e.t === 'stick'), p.key).toEqual([]);
+      expect(restStick(rest), p.key).toBeNull();
+      expect(stickYStats(rest, 0.01).shareAtLevel, p.key).toBe(0);
+      for (const name of ['run_in_place', 'shuffle_lateral', 'jump_two_foot_high']) {
+        const ys = seam(name, p.key).events.flatMap((x) => (x.e.t === 'stick' ? [x.e.y] : []));
+        if (p.key === 'freerun') expect(ys.every((y) => y <= 0), `${p.key} on ${name}: forward only`).toBe(true);
+        else expect(ys.filter((y) => y !== 0), `${p.key} on ${name}`).toEqual([]);
+      }
+    }
+    // and the run in place does push Free Run forward (the cadence), where P1 never could
+    expect(Math.min(...seam('run_in_place', 'freerun').events.flatMap((x) => (x.e.t === 'stick' ? [x.e.y] : [])))).toBeLessThanOrEqual(-0.5);
   });
 });
