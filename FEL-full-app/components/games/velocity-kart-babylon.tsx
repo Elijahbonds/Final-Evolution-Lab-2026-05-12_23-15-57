@@ -122,11 +122,6 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart} onRetry={tapStart}
       />
-      {phase === 'paused' && (
-        <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
-          <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
-        </button>
-      )}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="velocitykart" visible />
       )}

@@ -7,6 +7,7 @@ import type { GameProps, GameResult } from './game-shell';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
+import { PausedLayer, BodyReadyLine } from './paused-layer';
 
 type Hud = Record<string, HudValue>;
 const OPTS: { key: 'optA' | 'optB' | 'optX' | 'optY'; btn: 'A' | 'B' | 'X' | 'Y'; face: string; dpad: string; color: string }[] = [
@@ -155,8 +156,13 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
           <span className="fel-heading text-3xl font-black text-white">WHO SCENE IT</span>
           <span className="mt-2 font-mono text-xs text-white/70">name the place · A B C D answer · faster pays more · ◀ ▶ on the first screen adds a second player (arrows)</span>
           <span className="mt-6 rounded-xl bg-[var(--fel-cyan)] px-6 py-3 font-bold text-black">TAP TO START</span>
+          {/* MOVEMENT PLAY P3 (2026-09-24, the step-4a review): the hands-up START works here too — say so, as BootSplash does */}
+          <BodyReadyLine className="mt-3" />
         </button>
       )}
+      {/* MOVEMENT PLAY P3 (2026-09-24, step 4a): this host has no BootSplash, so it draws the shared pause itself. It had no
+          pause screen at all: a pad's START froze the quiz with no word, and nothing said both hands up bring it back. */}
+      {phase === 'paused' && <PausedLayer onResume={tapStart} />}
       {phase === 'countdown' && countdown != null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="fel-heading text-7xl font-black text-white drop-shadow">{countdown}</span></div>}
       {phase === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-6 text-center font-mono text-sm text-[var(--fel-red)]">{loadError}</div>}
     </div>

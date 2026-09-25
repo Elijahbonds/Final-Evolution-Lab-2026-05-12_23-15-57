@@ -180,12 +180,6 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         onRetry={tapStart}
       />
 
-      {phase === 'paused' && (
-        <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
-          <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
-        </button>
-      )}
-
       {busRef.current && <PadChips bus={busRef.current} className="left-4 bottom-4" />}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="carnival" visible />

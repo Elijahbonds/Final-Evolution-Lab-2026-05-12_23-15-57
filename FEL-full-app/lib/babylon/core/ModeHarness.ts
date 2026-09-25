@@ -732,8 +732,12 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // MOVEMENT PLAY P3 (2026-09-24): the body's clock between camera frames, in every phase — the lost deadline, the
     // stalled-camera watchdog, a release when the game leaves 'playing', and body presses whose release is due when the
     // next frame is late. Before update(), so a pause lands before the mode runs another frame.
+    // The tick's presence is written too (the step-4a review): a stalled camera sends no frame to say the body is gone,
+    // so only the tick can turn its last 'present' into 'absent' — the pause line and the Body card read it.
     const bodyNow = performance.now();
-    applyBody(session.tick(phase, bodyNow, input.lastBodyAt()));
+    const bodyTick = session.tick(phase, bodyNow, input.lastBodyAt());
+    applyBody(bodyTick);
+    store.setBody(bodyTick.presence, bodyTick.handsUp01);
     for (const e of floor.tick(bodyNow)) input.emitBody(e);
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
     if (phase === 'playing') {

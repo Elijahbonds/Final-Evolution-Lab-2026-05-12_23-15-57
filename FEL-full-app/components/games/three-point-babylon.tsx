@@ -164,6 +164,15 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
+      {turnLine && (
+        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-1.5">
+          <span className="fel-heading text-sm font-bold tracking-[0.2em] text-[#00E5FF]">{turnLine}</span>
+        </div>
+      )}
+      {/* MOVEMENT PLAY P3 (2026-09-24, the step-4a review): BootSplash draws the pause now, so it sits where this host's
+          own pause sat — after the turn banner, so the pause's dim covers the banner as it did (plan R11). Every other
+          phase of the splash is z-40 or nothing, so the order changes only the pause. */}
       <BootSplash
         modeId="threepoint"
         title="DOWNTOWN"
@@ -172,18 +181,6 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         onStart={tapStart}
         onRetry={tapStart}
       />
-      {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
-      {turnLine && (
-        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-1.5">
-          <span className="fel-heading text-sm font-bold tracking-[0.2em] text-[#00E5FF]">{turnLine}</span>
-        </div>
-      )}
-
-      {phase === 'paused' && (
-        <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
-          <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
-        </button>
-      )}
 
       {/* Lobby is expanded until the whistle, then collapses to a status badge
           so it never sits on top of live play. */}

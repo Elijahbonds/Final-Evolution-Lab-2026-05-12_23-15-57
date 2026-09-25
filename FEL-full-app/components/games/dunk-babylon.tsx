@@ -383,7 +383,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </div>
       )}
 
-      {/* BootSplash: cartridge boot / venue art / progress / READY / 3-2-1 / error+retry */}
+      {/* BootSplash: cartridge boot / venue art / progress / READY / 3-2-1 / error+retry / PAUSED */}
       <BootSplash
         modeId="dunk"
         title="FLIGHT NIGHT"
@@ -392,13 +392,6 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         onStart={tapStart}
         onRetry={tapStart}
       />
-
-      {/* pause */}
-      {phase === 'paused' && (
-        <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
-          <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
-        </button>
-      )}
 
       {/* CONTROLLER-UNIVERSAL-MULTI: phones join as pads (lazy — no room until the badge is tapped), TV MODE lives in its
           panel, and every local controller gets a named chip (bottom-left: a connected pad hides the touch deck that lives there). */}

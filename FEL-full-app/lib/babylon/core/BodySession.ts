@@ -32,10 +32,20 @@
 // `now` are set from arrivals (a probe's pushed frame keeps its fixture t, so a capture time set against the page
 // clock would read as seconds late), and the START hold is judged against the capture clock it is measured on.
 // Pure: no DOM.
+//
+// MOVEMENT PLAY P3 (2026-09-24, the step-4a review): why presence has a hold, and goes stale. It is only ever SHOWN
+// (the READY and PAUSED lines, the Body card); nothing it decides is a pause or a press (the lost pause runs on
+// read.tracking). A presence copied from each frame flickered on a single missed detection, in the middle of the
+// hands-up hold the ring was showing — the pause line swapped to "Step back into frame" and back, the READY card
+// jumped — while the hold itself (channels.handsUpMs) kept counting through the gap. So a body is 'present' until
+// PRESENT_HOLD_MS after its last tracked frame, the same gap the hold forgives: the line and the ring now agree. And
+// a camera that stops sending (no packet for STALL_MS, counted in render ticks like the watchdog) sees nobody, in
+// every phase: tick() turns its last 'present' into 'absent', so no screen says "raise both hands" to a frozen feed.
 import type { ModePhase } from './ModeHarness';
 import type { BodyPacket } from './InputBus';
 import type { BodyPresence } from './sessionStore';
 import { MAX_FLIGHT_MS } from '@/lib/pose/BodyReader';
+import { OVERHEAD_GAP_MS } from '@/lib/pose/bodyChannels';
 
 export type BodyIntent = 'wake' | 'resume' | 'pause-lost' | 'pause-stall';
 export interface SessionStep { release: boolean; intents: BodyIntent[]; latched: boolean; presence: BodyPresence; handsUp01: number }
@@ -57,6 +67,9 @@ export const STALL_RENDER_MS = 333;
 /** A render tick this long (ms) after the one before means rendering was suspended (a hidden tab): the watchdog's
  *  count starts over. */
 export const TICK_GAP_MS = 250;
+/** A body stays 'present' this long (capture ms) after its last tracked frame: a missed detection is not a body gone.
+ *  The hands-up hold's own gap (bodyChannels), so the line under a hold never says "step back" while its ring fills. */
+export const PRESENT_HOLD_MS = OVERHEAD_GAP_MS;
 
 const NONE: readonly BodyIntent[] = [];
 
@@ -65,6 +78,8 @@ export class BodySession {
   /** Reserved for owner call 3(b) (a long hold that pauses where overhead arms are not a move); unread in P3. */
   readonly overheadIsPlay: boolean;
   private presence: BodyPresence = 'off';
+  /** The last tracked frame's capture time: presence holds PRESENT_HOLD_MS past it. */
+  private trackT = -Infinity;
   private driver: 'body' | 'external' = 'external';
   /** A tracked frame since the last begin(): the lost pause is armed only for a body this run has seen. */
   private seen = false;
@@ -100,14 +115,18 @@ export class BodySession {
     if (p.final) {
       // the source stopped on purpose: let go, forget the body, never pause. The latch goes too: a source that
       // starts again calibrates again, on a still stand, before the floor presses anything.
-      this.presence = 'off';
+      this.presence = 'off'; this.trackT = -Infinity;
       this.lostSince = null; this.lastTrackAt = -Infinity; this.lastTracking = false;
       this.held = false; this.latched = false; this.handsUp01 = 0;
       return { release: true, intents: [], latched: false, presence: 'off', handsUp01: 0 };
     }
     const r = p.read, ch = p.channels;
     if (this.phaseReadT === null) this.phaseReadT = r.t;
-    this.presence = !r.calibrated ? 'calibrating' : r.tracking ? 'present' : 'absent';
+    // a missed detection inside PRESENT_HOLD_MS is still the body in frame (the header, the step-4a review); a capture
+    // clock that went back (a probe feed played again from its start) holds nothing
+    if (r.tracking) this.trackT = r.t;
+    const sinceTrack = r.t - this.trackT;
+    this.presence = !r.calibrated ? 'calibrating' : sinceTrack >= 0 && sinceTrack <= PRESENT_HOLD_MS ? 'present' : 'absent';
     this.lastTracking = r.tracking;
     const intents: BodyIntent[] = [];
     let release = left;
@@ -144,10 +163,13 @@ export class BodySession {
     this.lastTickAt = now;
     if (this.ticks === 0) this.tickFrom = now;
     this.ticks++;
+    // no packet for STALL_MS over a continuous run of rendering: the camera stopped sending
+    const silent = now - lastPacketAt > STALL_MS && this.ticks >= STALL_TICKS && now - this.tickFrom >= STALL_RENDER_MS;
+    // …and in any phase its last frame's 'present' is nobody anyone can see now, nor a hold anyone is making (the header)
+    if (silent && this.presence === 'present') { this.presence = 'absent'; this.handsUp01 = 0; }
     let intents: BodyIntent[] = NONE as BodyIntent[];
     if (this.lostDue(phase, now)) { release = true; intents = ['pause-lost']; this.lostSince = null; }
-    else if (phase === 'playing' && this.lastTracking && !this.stalled
-      && now - lastPacketAt > STALL_MS && this.ticks >= STALL_TICKS && now - this.tickFrom >= STALL_RENDER_MS) {
+    else if (phase === 'playing' && this.lastTracking && !this.stalled && silent) {
       this.stalled = true;
       release = true;
       if (this.armed(phase)) intents = ['pause-stall'];

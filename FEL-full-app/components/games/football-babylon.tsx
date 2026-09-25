@@ -197,12 +197,6 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         onRetry={tapStart}
       />
 
-      {phase === 'paused' && (
-        <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60">
-          <span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span>
-        </button>
-      )}
-
       {/* M35: THE single touch control surface — one overlay per mode, ever. */}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="football" visible />

@@ -8,12 +8,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   BodySession, START_HOLD_MS, HANDS_DOWN_MS, LOST_PAUSE_MS, AIR_LOST_PAUSE_MS, STALL_MS, STALL_TICKS, STALL_RENDER_MS, TICK_GAP_MS,
+  PRESENT_HOLD_MS,
   type SessionStep,
 } from './BodySession';
 import type { BodyPacket } from './InputBus';
 import type { ModePhase } from './ModeHarness';
 import { MAX_FLIGHT_MS, type BodyEvent, type BodyRead, type WristRead } from '@/lib/pose/BodyReader';
-import { ChannelReader, JUMP_GUARD_MS, type BodyChannels } from '@/lib/pose/bodyChannels';
+import { ChannelReader, JUMP_GUARD_MS, OVERHEAD_GAP_MS, type BodyChannels } from '@/lib/pose/bodyChannels';
 
 interface Rd { cal?: boolean; track?: boolean; present?: boolean; air?: boolean }
 function read(t: number, o: Rd = {}): BodyRead {
@@ -56,14 +57,40 @@ function holdFires(s: BodySession, phase: ModePhase, t0: number, t1: number, fro
 }
 
 describe('presence', () => {
-  it('none or final = off; uncalibrated = calibrating; tracked = present; otherwise absent', () => {
+  it(`none or final = off; uncalibrated = calibrating; tracked (or within ${PRESENT_HOLD_MS} ms of it) = present; otherwise absent`, () => {
     const s = bound();
     expect(s.tick('ready', 0, -Infinity).presence).toBe('off');
     expect(s.step('ready', pk(0, { cal: false }), 0).presence).toBe('calibrating');
     expect(s.step('ready', gone(33), 33).presence).toBe('absent');
     expect(s.step('ready', pk(66), 66).presence).toBe('present');
-    expect(s.step('ready', pk(99, { track: false }), 99).presence).toBe('absent');
-    expect(s.step('ready', final(133), 133)).toEqual({ release: true, intents: [], latched: false, presence: 'off', handsUp01: 0 });
+    expect(s.step('ready', pk(99, { track: false }), 99).presence).toBe('present');                        // a missed frame
+    expect(s.step('ready', gone(66 + PRESENT_HOLD_MS), 66 + PRESENT_HOLD_MS).presence).toBe('present');
+    expect(s.step('ready', gone(66 + PRESENT_HOLD_MS + 1), 66 + PRESENT_HOLD_MS + 1).presence).toBe('absent');   // gone
+    expect(s.step('ready', final(400), 400)).toEqual({ release: true, intents: [], latched: false, presence: 'off', handsUp01: 0 });
+    // the hold is forgotten with the source: a new source's first untracked frame is nobody
+    expect(s.step('ready', gone(410), 410).presence).toBe('absent');
+    // and a capture clock that went back (a probe feed played again from its start) holds nothing
+    s.step('ready', pk(5000), 5000);
+    expect(s.step('ready', gone(33), 33).presence).toBe('absent');
+  });
+
+  it(`a camera that stops sending sees nobody: after ${STALL_MS} ms of rendering without a packet, 'present' is 'absent' in every phase, and back with the frames`, () => {
+    for (const phase of ['ready', 'paused', 'playing'] as const) {
+      const s = bound();
+      s.step(phase, pk(0), 0);
+      expect(s.step(phase, upSince(0)(400), 400)).toMatchObject({ presence: 'present' });
+      // rendering on, no frames: the last frame's presence (and its ring) stand until the camera is silent…
+      let t = 416;
+      for (; t - 400 <= STALL_MS; t += 16) expect(s.tick(phase, t, 400).presence, `${phase} ${t}`).toBe('present');
+      // …then nobody, and no hold (the pause line reads "Step back into frame", the Body card says absent)
+      expect(s.tick(phase, t, 400)).toMatchObject({ presence: 'absent', handsUp01: 0 });
+      // the frames come back: the body is seen again at once (the pause line gets its ring back, plan §4.2)
+      expect(s.step(phase, pk(t + 16), t + 16).presence).toBe('present');
+    }
+    // a hidden tab is not a silent camera: too few ticks since the packet keeps the presence
+    const h = bound();
+    h.step('paused', pk(0), 0);
+    for (let k = 0; k < STALL_TICKS - 1; k++) expect(h.tick('paused', 5000 + k * 16, 0).presence).toBe('present');
   });
 });
 
@@ -160,6 +187,24 @@ describe('the START hold on the real channels (the jump guard)', () => {
     }
     expect(wokeAt).toBeGreaterThanOrEqual(told + JUMP_GUARD_MS + START_HOLD_MS);
     expect(wokeAt).toBeLessThan(told + JUMP_GUARD_MS + START_HOLD_MS + 67);
+  });
+  it('the step-4a review: one missed detection inside a hands-up hold is not a body gone — the line and the ring agree', () => {
+    // ChannelReader keeps the hold through a gap of up to OVERHEAD_GAP_MS; the presence must too, or the pause line
+    // swaps to "Step back into frame" and back (and READY's card jumps) while the ring keeps filling
+    expect(PRESENT_HOLD_MS).toBe(OVERHEAD_GAP_MS);
+    const s = bound(), c = new ChannelReader();
+    const frame = (t: number, seen = true): BodyPacket => {
+      const r = seen ? armsUp(t) : read(t, { present: false });
+      return { read: r, events: [], channels: c.step(r, []), arrivedAt: t };
+    };
+    s.step('paused', frame(0), 0);
+    const steps: SessionStep[] = [];
+    for (let k = 1; k <= 20; k++) steps.push(s.step('paused', frame(k * 33, k !== 10), k * 33));   // frame 10 missed
+    expect(steps[9].handsUp01).toBeGreaterThan(0);                                                 // the hold counts through it…
+    expect(steps.map((x) => x.presence)).toEqual(Array(20).fill('present'));                     // …and so does the presence
+    // a real absence (longer than the hold forgives) drops both together
+    const lost = 20 * 33 + OVERHEAD_GAP_MS + 1;
+    expect(s.step('paused', frame(lost, false), lost)).toMatchObject({ presence: 'absent', handsUp01: 0 });
   });
   it('the latest counted input decides who is playing: the body, then a hand, then the body again', () => {
     const s = bound();

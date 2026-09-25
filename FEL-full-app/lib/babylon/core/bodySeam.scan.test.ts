@@ -72,9 +72,10 @@ describe('the harness reads the body (plan §4.4)', () => {
     // the raw events go to QA's bodyLog; a claimed kind goes to the mode's onBody and counts as play
     expect(on).toMatch(/qa\?\.body\(ev\.kind, now - ev\.t\);\s*if \(def\.onBody && claimed\.has\(ev\.kind\)\) \{\s*qa\?\.press\(`body:\$\{ev\.kind\}`\); store\.count\('body'\); session\.noteInput\('body', now\);\s*def\.onBody\(ctx, ev, viewOf\(p\)\);/);
     expect(on).toMatch(/store\.setBody\(s\.presence, s\.handsUp01\);\s*\}\);/);
-    // the render loop ticks the session and the floor's pulses in every phase, before the mode's update
+    // the render loop ticks the session and the floor's pulses in every phase, before the mode's update — and writes the
+    // tick's presence (the step-4a review: a stalled camera's last 'present' stayed on the pause line and the Body card)
     const loop = harness.slice(harness.indexOf('engine.runRenderLoop('));
-    expect(loop).toMatch(/applyBody\(session\.tick\(phase, bodyNow, input\.lastBodyAt\(\)\)\);\s*for \(const e of floor\.tick\(bodyNow\)\) input\.emitBody\(e\);[\s\S]*?if \(phase === 'playing'\) \{\s*if \(qa\) qaSampleAnim\(\);\s*def\.update/);
+    expect(loop).toMatch(/const bodyTick = session\.tick\(phase, bodyNow, input\.lastBodyAt\(\)\);\s*applyBody\(bodyTick\);\s*store\.setBody\(bodyTick\.presence, bodyTick\.handsUp01\);\s*for \(const e of floor\.tick\(bodyNow\)\) input\.emitBody\(e\);[\s\S]*?if \(phase === 'playing'\) \{\s*if \(qa\) qaSampleAnim\(\);\s*def\.update/);
     // teardown: no more frames, the card goes, then the input as before
     expect(harness).toMatch(/unBody\(\);\s*store\.unmount\(\);\s*unsub\?\.\(\);\s*input\.stop\(\);/);
     // ctx.body() is the latest packet as a view, or null

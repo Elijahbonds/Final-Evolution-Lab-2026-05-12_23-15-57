@@ -1,12 +1,14 @@
 // BootSplash — the console ritual (Shell 03 §1.2): cartridge insert → venue art
 // boot with progress → READY gate → 3-2-1 → GO. Doubles as the loading cover
-// (no raw spinner anywhere) and renders the error/retry state from the harness.
+// (no raw spinner anywhere) and renders the error/retry state from the harness —
+// and, since movement play P3 (2026-09-24), the pause: PausedLayer, one for every host.
 
 import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
+import { PausedLayer, BodyReadyLine } from './paused-layer';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -247,7 +249,14 @@ export function BootSplash(props: {
   }, [v.venue]);
   const artOk = !!art;
 
-  if (props.phase === 'playing' || props.phase === 'paused' || props.phase === 'ended') return null;
+  // MOVEMENT PLAY P3 (2026-09-24, step 4a): the pause is drawn HERE, once, for every host — each used to draw its own
+  // copy straight after this splash (BACKLOG B16). PausedLayer keeps that copy's classes, so it stacks where they did.
+  // Brain Brawl keeps its own copy until step 5 (the Brain Brawl session owns that file), so it gets nothing here until
+  // then: the two layers stacked were no harmless double dim (the step-4a review) — 84% black, and with the Body on the
+  // shared headline sat 15 px above Brain Brawl's, doubled under its dim. Step 5 deletes this check with that copy
+  // (pausedLayer.scan.test holds the two together).
+  if (props.phase === 'paused') return props.modeId === 'brainbrawl' ? null : <PausedLayer onResume={props.onStart} />;
+  if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
     <div className="absolute inset-0 z-40 overflow-hidden"
@@ -299,6 +308,10 @@ export function BootSplash(props: {
             TAP TO START
           </button>
         )}
+        {/* MOVEMENT PLAY P3 (2026-09-24): the hands-up START, said once the camera sees you (it wakes a calibrated body,
+            BodySession). The line reads the session itself, so the splash does not re-render with the ring, and holds
+            its room while the camera is on, so the card does not jump when a detection is missed (the step-4a review). */}
+        {props.phase === 'ready' && <BodyReadyLine />}
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
