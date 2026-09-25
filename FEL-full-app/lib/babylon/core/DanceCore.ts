@@ -14,10 +14,21 @@
 //
 // Babylon-free and animator-free on purpose — same reasoning as RallyCore.
 // The mode owns the rig; this owns the clock.
+//
+// MOVEMENT PLAY (phase 9, 2026-09-24): steps can be BODY TARGETS (a move kind, a limb, a zone; bodyTargets.ts), judged
+// by hitBody() on the body's own clock. Only the matching move and limb scores such a step (a press, or a jump on a
+// punch target, scores nothing); the camera's latency is a parameter; and no body window is narrower than a pose
+// frame can resolve. A step with no move is a press step and judges exactly as before.
+
+import {
+  type BodyHit, type CueZone, type Limb, type MoveKind, MAX_WINDOW_SCALE, SELF_VIEW_ASPECT, inZone, limbSatisfies,
+} from './bodyTargets';
 
 export type Judgement = 'PERFECT' | 'GREAT' | 'GOOD' | 'MISS';
 
-export const JUDGE_WINDOWS: { label: Judgement; maxDelta: number; points: number }[] = [
+export interface JudgeWindow { label: Judgement; maxDelta: number; points: number }
+
+export const JUDGE_WINDOWS: JudgeWindow[] = [
   { label: 'PERFECT', maxDelta: 0.04, points: 300 },
   { label: 'GREAT', maxDelta: 0.09, points: 200 },
   { label: 'GOOD', maxDelta: 0.20, points: 100 },
@@ -36,6 +47,20 @@ export interface DanceStep {
   beat: number;
   holdBeats: number;
   mirrored: boolean;
+  /** A body target: only this move scores the step. Absent (or 'tap') = a press step, which any press scores. */
+  move?: MoveKind;
+  /** The limb the move must be made with (bodyTargets.limbSatisfies). */
+  limb?: Limb;
+  /** Where on the self-view the limb must be (touch and punch targets). Its limb is the step's limb. */
+  zone?: CueZone;
+  /** Widens this step's body windows (bodyTargets.MOVE_WINDOW_SCALE: a squat's bottom is a smear, not an instant). */
+  windowScale?: number;
+  /** How long past its window the step waits for a back-dated body event (bodyTargets.MOVE_LATE_GRACE_SEC). */
+  lateGraceSec?: number;
+  /** What the lane calls a body target (a dance step's name comes from its clip). */
+  label?: string;
+  /** A body target the player must stay in after hitting it (s): a stuck landing, a squat's pause. */
+  holdSec?: number;
 }
 
 export interface DanceClip {
@@ -124,12 +149,85 @@ export function generateRoutine(o: RoutineOptions): DanceStep[] {
 
 // ── judging ───────────────────────────────────────────────────────────────
 
-export function judgeDelta(delta: number): { label: Judgement; points: number } {
+export function judgeDelta(delta: number, windows: readonly JudgeWindow[] = JUDGE_WINDOWS): { label: Judgement; points: number } {
   const a = Math.abs(delta);
-  for (const w of JUDGE_WINDOWS) {
+  for (const w of windows) {
     if (a <= w.maxDelta) return { label: w.label, points: w.points };
   }
   return { label: 'MISS', points: 0 };
+}
+
+// ── body windows ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The pose rate the windows assume when nobody says: the fixtures' and the plan's 30 Hz camera. */
+export const BODY_POSE_HZ = 30;
+/**
+ * A body event's time is only as fine as the frame that saw it: at 30 Hz a frame is 33 ms, so a true instant reads
+ * anywhere inside ±17 ms of quantisation plus a frame of detector jitter. PERFECT at ±40 ms would be a coin toss.
+ * No body window is narrower than 1.5 frames, and never under ±50 ms (1.5 × 33 ms at 30 Hz); at the space check's
+ * 24 Hz floor that is ±63 ms.
+ */
+export const BODY_WINDOW_FRAMES = 1.5;
+export const BODY_WINDOW_FLOOR_SEC = 0.05;
+
+export function bodyWindowFloor(poseHz: number = BODY_POSE_HZ): number {
+  return Math.max(BODY_WINDOW_FLOOR_SEC, BODY_WINDOW_FRAMES / Math.max(1, poseHz));
+}
+
+/** The press windows scaled for the move and floored for the pose rate; missAfter = the widest. */
+export function bodyWindows(scale = 1, poseHz: number = BODY_POSE_HZ): { windows: JudgeWindow[]; missAfter: number } {
+  const floor = bodyWindowFloor(poseHz);
+  let prev = 0;
+  const windows = JUDGE_WINDOWS.map((w) => {
+    prev = Math.max(prev, w.maxDelta * scale, floor);     // stays ordered when the floor lifts PERFECT past GREAT
+    return { ...w, maxDelta: prev };
+  });
+  return { windows, missAfter: Math.max(MISS_AFTER * scale, prev) };
+}
+
+/** No body window reaches further than this (s) at a sane pose rate: how far ahead hitBody looks among unfired steps
+ *  (a slow pose rate's floor can lift it; hitBody takes the larger). */
+export const MAX_BODY_WINDOW_SEC = MISS_AFTER * MAX_WINDOW_SCALE;
+
+/**
+ * The largest camera latency (s) taken as a measurement: 3× the map's worst capture → game estimate (~100–150 ms,
+ * map:pose-pipeline §3). Past it the number is a broken measurement, not a slow camera, and judging by it would shift
+ * every target by a second.
+ */
+export const MAX_BODY_LATENCY_SEC = 0.5;
+
+/** A body judge's timing: the camera latency (s), the pose rate (Hz), the camera frame's width / height. */
+export interface BodyTiming { latencySec?: number; poseHz?: number; aspect?: number }
+
+/** Only the values that can be true: a finite latency in [0, MAX_BODY_LATENCY_SEC], a finite rate and aspect above 0. */
+export function validBodyTiming(o: BodyTiming): BodyTiming {
+  const ok = (v: number | undefined, lo: number, hi: number): v is number =>
+    v !== undefined && Number.isFinite(v) && v >= lo && v <= hi;
+  const out: BodyTiming = {};
+  if (ok(o.latencySec, 0, MAX_BODY_LATENCY_SEC)) out.latencySec = o.latencySec;
+  if (ok(o.poseHz, Number.MIN_VALUE, Number.MAX_VALUE)) out.poseHz = o.poseHz;
+  if (ok(o.aspect, Number.MIN_VALUE, Number.MAX_VALUE)) out.aspect = o.aspect;
+  return out;
+}
+
+/** A body target (a move other than a press). */
+export const isBodyStep = (s: DanceStep): boolean => s.move !== undefined && s.move !== 'tap';
+
+/** The step's limb: its own, or its zone's. */
+export const stepLimb = (s: DanceStep): Limb | undefined => s.limb ?? s.zone?.limb;
+
+/**
+ * Does this input answer this step? A press step takes any input (the dance chart, unchanged). A body step takes only
+ * a body hit of its move, with its limb, inside its zone when it has one (a hit with no position cannot prove the zone).
+ * `hit` null = a press. `aspect` is the camera frame's width / height, which makes a zone round (a portrait phone is
+ * 0.75, not the 4:3 default).
+ */
+export function stepAccepts(s: DanceStep, hit: BodyHit | null, aspect: number = SELF_VIEW_ASPECT): boolean {
+  if (!isBodyStep(s)) return true;
+  if (!hit || hit.move !== s.move) return false;
+  if (!limbSatisfies(stepLimb(s), hit.limb)) return false;
+  if (s.zone) return hit.x !== undefined && hit.y !== undefined && inZone(s.zone, hit.x, hit.y, aspect);
+  return true;
 }
 
 export interface DanceResult {
@@ -154,7 +252,23 @@ export class DancePerformance {
   private pending: { step: DanceStep; time: number }[] = [];
   private nextIdx = 0;
   private started = 0;
+  /** start() was called. Not `started !== 0`: a chart on its own clock (the drills) starts at 0. */
+  private begun = false;
   private bpm: number;
+  /** Steps a hit took before they fired, out of chart order (the next one is taken by nextIdx++): body steps (hitBody),
+   *  and a press step behind an unfired body step (hit). */
+  private consumedEarly = new Set<DanceStep>();
+  /**
+   * The camera's latency (s), subtracted from every body hit's time before it is judged. Body events are stamped on
+   * the CAPTURE clock (the instant the camera saw the move); the chart is drawn on the DISPLAY clock, and a player who
+   * moves as the cue reaches the line moves this much after the chart's time (display lag, plus any bias between the
+   * two clocks). 0 until it is measured: a guessed default would move every player's timing the same wrong way.
+   */
+  bodyLatencySec = 0;
+  /** The pose rate the body windows are floored for (bodyWindows). */
+  poseHz = BODY_POSE_HZ;
+  /** The camera frame's width / height, for zone distances (bodyTargets.inZone). */
+  aspect = SELF_VIEW_ASPECT;
 
   score = 0;
   combo = 0;
@@ -176,13 +290,39 @@ export class DancePerformance {
     this.steps = [...steps].sort((a, b) => a.beat - b.beat);
   }
 
+  /**
+   * Body timing: the camera latency (s), the pose rate (Hz) and the camera frame's aspect. Any may be left out. An
+   * impossible value (not finite, a negative or over-long latency, a rate or aspect at or under 0) is refused and the
+   * current one kept: NaN would silently fail every window, and a negative latency would judge events later than the
+   * steps' expiry allows for.
+   */
+  setBody(o: BodyTiming): void {
+    const v = validBodyTiming(o);
+    if (v.latencySec !== undefined) this.bodyLatencySec = v.latencySec;
+    if (v.poseHz !== undefined) this.poseHz = v.poseHz;
+    if (v.aspect !== undefined) this.aspect = v.aspect;
+  }
+
+  /** A body step's windows at this performance's pose rate. */
+  private bodyWin(s: DanceStep): { windows: JudgeWindow[]; missAfter: number } {
+    return bodyWindows(s.windowScale ?? 1, this.poseHz);
+  }
+
+  /** How long after its time a pending step waits before it is a miss (s, on the clock update() is driven with). */
+  private expiryOf(s: DanceStep): number {
+    if (!isBodyStep(s)) return MISS_AFTER;
+    return this.bodyWin(s).missAfter + (s.lateGraceSec ?? 0) + Math.max(0, this.bodyLatencySec);
+  }
+
   start(now: number): void {
     this.started = now;
+    this.begun = true;
     this.nextIdx = 0;
     this.pending = [];
     this.score = 0; this.combo = 0; this.maxCombo = 0;
     this.counts = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
     this.lastWildAt = -Infinity;
+    this.consumedEarly.clear();
     this.running = true;
   }
 
@@ -203,14 +343,20 @@ export class DancePerformance {
 
     while (this.nextIdx < this.steps.length && elapsed >= this.steps[this.nextIdx].beat * bd) {
       const s = this.steps[this.nextIdx];
+      this.nextIdx++;
+      if (this.consumedEarly.delete(s)) continue;      // already judged early, out of order (and already fired)
       this.pending.push({ step: s, time: this.started + s.beat * bd });
       this.onStepFired?.(s);
-      this.nextIdx++;
     }
 
-    while (this.pending.length && this.pending[0].time < now - MISS_AFTER) {
-      const expired = this.pending.shift()!;
-      this.registerMiss(expired.step);
+    // Each step expires on its own clock: a body step waits out its wider window and its back-dated event. Press steps
+    // all share MISS_AFTER, so for the dance chart this is the old head-of-queue expiry, in the same order.
+    for (let i = 0; i < this.pending.length;) {
+      const expired = this.pending[i];
+      if (expired.time < now - this.expiryOf(expired.step)) {
+        this.pending.splice(i, 1);
+        this.registerMiss(expired.step);
+      } else i++;
     }
   }
 
@@ -229,8 +375,10 @@ export class DancePerformance {
    *  the cue is what makes the judging fair. */
   peekNext(now: number): { time: number; step: DanceStep } | null {
     if (this.pending.length) return this.pending[0];
-    if (!this.started) return null;
-    const s = this.steps[this.nextIdx];
+    if (!this.begun) return null;
+    let i = this.nextIdx;
+    while (i < this.steps.length && this.consumedEarly.has(this.steps[i])) i++;
+    const s = this.steps[i];
     if (!s) return null;
     return { step: s, time: this.started + s.beat * beatDuration(this.bpm) };
   }
@@ -242,19 +390,21 @@ export class DancePerformance {
     void now;
     const out: { time: number; step: DanceStep }[] = [];
     for (const p of this.pending) { if (out.length >= n) break; out.push(p); }
-    if (!this.started) return out;
+    if (!this.begun) return out;
     const bd = beatDuration(this.bpm);
     for (let i = this.nextIdx; i < this.steps.length && out.length < n; i++) {
       const s = this.steps[i];
+      if (this.consumedEarly.has(s)) continue;
       out.push({ step: s, time: this.started + s.beat * bd });
     }
     return out;
   }
 
-  /** Player input on the audio clock. */
+  /** A press on the audio clock. It scores press steps only: a body target is not a button. */
   hit(now: number): Judgement {
     let bestIdx = -1, best = Infinity, bestSigned = 0;
     for (let i = 0; i < this.pending.length; i++) {
+      if (!stepAccepts(this.pending[i].step, null)) continue;
       const signed = now - this.pending[i].time;   // + = late, − = early
       const d = Math.abs(signed);
       if (d < best) { best = d; bestIdx = i; bestSigned = signed; }
@@ -264,12 +414,16 @@ export class DancePerformance {
       // hits the UPCOMING step. Without this, taps before the step fires are
       // "wild" misses — a tap 100ms early on purpose is a play, not an error
       // (measured: every slightly-early tap scored a wild MISS).
-      if (this.nextIdx < this.steps.length) {
-        const s = this.steps[this.nextIdx];
+      // The upcoming step is the next unfired PRESS step (nextPressIdx): on a press-only chart that is steps[nextIdx],
+      // judged exactly as before; behind an unfired body step it is taken out of chart order, as hitBody does.
+      const i = this.nextPressIdx(now);
+      if (i !== -1) {
+        const s = this.steps[i];
         const t = this.started + s.beat * beatDuration(this.bpm);
         const earlyBy = t - now;                        // + = the step is ahead
         if (earlyBy > 0 && earlyBy <= MISS_AFTER) {
-          this.nextIdx++;                               // consumed early — never fires
+          if (i === this.nextIdx) this.nextIdx++;       // consumed early — never fires
+          else this.consumedEarly.add(s);               // behind an unfired body step: update() passes over it
           const { label, points } = this.capAfterSpam(judgeDelta(earlyBy), now);
           this.combo++;
           if (this.combo > this.maxCombo) this.maxCombo = this.combo;
@@ -293,6 +447,72 @@ export class DancePerformance {
     return label;
   }
 
+  /**
+   * The index of the next unfired step a press can take, or -1. Body steps (no press answers them) and steps a hit
+   * already took are passed over; the first press step is the answer whatever its time, so a press never reaches past
+   * it. The scan stops at the first step more than MISS_AFTER ahead: the steps are sorted, so no press reaches any later.
+   */
+  private nextPressIdx(now: number): number {
+    const bd = beatDuration(this.bpm);
+    for (let i = this.nextIdx; i < this.steps.length; i++) {
+      const s = this.steps[i];
+      if (this.started + s.beat * bd - now > MISS_AFTER) return -1;
+      if (!this.consumedEarly.has(s) && stepAccepts(s, null)) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * A body event, at `now` on the capture clock mapped onto this performance's clock. It scores the nearest step that
+   * wants exactly this move, limb and zone, inside that step's body windows, after the camera latency is taken off
+   * (`latencyCorrected` = the time is already on the display clock, e.g. a hold the runner saw was already in place).
+   *
+   * An event that answers no step returns null and costs nothing. That is deliberate and unlike a wild tap: a thumb
+   * can choose not to press, but a body shifting its weight reads as steps and a hand passing its hip reads as a
+   * swing. Charging for those would grade the reader's noise. Flailing is held in check by kind, limb and zone.
+   */
+  hitBody(now: number, hit: BodyHit, opts: { latencyCorrected?: boolean } = {}): Judgement | null {
+    const t = opts.latencyCorrected ? now : now - this.bodyLatencySec;
+    let best: { at: 'pending' | 'unfired'; i: number; signed: number; step: DanceStep } | null = null;
+    for (let i = 0; i < this.pending.length; i++) {
+      const p = this.pending[i];
+      if (!isBodyStep(p.step) || !stepAccepts(p.step, hit, this.aspect)) continue;
+      const signed = t - p.time;
+      if (Math.abs(signed) > this.bodyWin(p.step).missAfter) continue;
+      if (!best || Math.abs(signed) < Math.abs(best.signed)) best = { at: 'pending', i, signed, step: p.step };
+    }
+    if (this.running) {
+      // symmetric judging: an early hit takes an upcoming step, as hit() does for the next press step
+      const bd = beatDuration(this.bpm);
+      const reach = Math.max(MAX_BODY_WINDOW_SEC, bodyWindowFloor(this.poseHz));
+      for (let i = this.nextIdx; i < this.steps.length; i++) {
+        const s = this.steps[i];
+        const time = this.started + s.beat * bd;
+        if (time - t > reach) break;
+        if (this.consumedEarly.has(s) || !isBodyStep(s) || !stepAccepts(s, hit, this.aspect)) continue;
+        const signed = t - time;
+        if (Math.abs(signed) > this.bodyWin(s).missAfter) continue;
+        if (!best || Math.abs(signed) < Math.abs(best.signed)) best = { at: 'unfired', i, signed, step: s };
+      }
+    }
+    if (!best) return null;
+
+    if (best.at === 'pending') this.pending.splice(best.i, 1);
+    else {
+      if (best.i === this.nextIdx) this.nextIdx++;
+      else this.consumedEarly.add(best.step);
+      this.onStepFired?.(best.step);
+    }
+    // no spam cap: it is for a thumb mashing a button, and a body's move cannot be mashed
+    const { label, points } = judgeDelta(best.signed, this.bodyWin(best.step).windows);
+    this.combo++;
+    if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    this.score += points + this.combo * 5;
+    this.counts[label]++;
+    this.onJudged?.(label, points, this.combo, best.step, best.signed * 1000);
+    return label;
+  }
+
   private capAfterSpam(j: { label: Judgement; points: number }, now: number): { label: Judgement; points: number } {
     if (now - this.lastWildAt > SPAM_LOCK_SEC || j.label === 'GOOD') return j;
     const good = JUDGE_WINDOWS.find((w) => w.label === 'GOOD');
@@ -305,13 +525,21 @@ export class DancePerformance {
   }
 
   result(): DanceResult {
-    const judged = this.counts.PERFECT + this.counts.GREAT + this.counts.GOOD + this.counts.MISS;
-    const weighted = this.counts.PERFECT * 1 + this.counts.GREAT * 0.75 + this.counts.GOOD * 0.4;
-    const accuracy = judged === 0 ? 0 : weighted / judged;
-    // Stars are on accuracy, NOT raw score: score scales with routine length,
-    // so a long easy chart would out-star a short hard one.
-    const stars = accuracy >= 0.95 ? 5 : accuracy >= 0.85 ? 4 : accuracy >= 0.7 ? 3
-      : accuracy >= 0.5 ? 2 : accuracy > 0 ? 1 : 0;
-    return { score: this.score, maxCombo: this.maxCombo, counts: { ...this.counts }, stars, accuracy };
+    const accuracy = accuracyOf(this.counts);
+    return { score: this.score, maxCombo: this.maxCombo, counts: { ...this.counts }, stars: starsFor(accuracy), accuracy };
   }
+}
+
+/** Weighted accuracy over judged steps (0 when none were judged). Shared with the drills so the two never disagree. */
+export function accuracyOf(counts: Record<Judgement, number>): number {
+  const judged = counts.PERFECT + counts.GREAT + counts.GOOD + counts.MISS;
+  const weighted = counts.PERFECT * 1 + counts.GREAT * 0.75 + counts.GOOD * 0.4;
+  return judged === 0 ? 0 : weighted / judged;
+}
+
+/** Stars are on accuracy, NOT raw score: score scales with routine length, so a long easy chart would out-star a
+ *  short hard one. */
+export function starsFor(accuracy: number): number {
+  return accuracy >= 0.95 ? 5 : accuracy >= 0.85 ? 4 : accuracy >= 0.7 ? 3
+    : accuracy >= 0.5 ? 2 : accuracy > 0 ? 1 : 0;
 }
