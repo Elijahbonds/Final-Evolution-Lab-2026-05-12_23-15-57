@@ -65,6 +65,9 @@ export const REASON = {
   SPEND_CATALOG_ITEM: 'SPEND_CATALOG_ITEM',
   ADMIN_ADJUST: 'ADMIN_ADJUST',
   PURCHASE_REFUND: 'PURCHASE_REFUND',
+  // Owner decision 2026-09-24: a purchase that took a balance and delivered nothing is paid back, in its own currency,
+  // the next time the wallet is read (lib/wallet/dead-buys.ts). Not an earn: it never counts against a daily cap.
+  DEAD_BUY_REFUND: 'DEAD_BUY_REFUND',
 } as const;
 
 export type ReasonCode = (typeof REASON)[keyof typeof REASON];

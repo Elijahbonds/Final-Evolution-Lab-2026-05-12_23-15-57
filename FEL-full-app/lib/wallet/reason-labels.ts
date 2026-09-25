@@ -43,6 +43,8 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   SPEND_CATALOG_ITEM: { label: 'Store purchase', kind: 'spend' },
   ADMIN_ADJUST: { label: 'Admin adjustment', kind: 'admin' },
   PURCHASE_REFUND: { label: 'Refund', kind: 'refund' },
+  // The row's metadata.note says what was refunded and why; the history shows it under this label.
+  DEAD_BUY_REFUND: { label: 'Refund: it delivered nothing', kind: 'refund' },
 };
 
 export function reasonLabel(code: string): ReasonLabel {

@@ -12,7 +12,11 @@ separate from the legacy LC economy (`lib/economy.ts`, `lib/ledger.ts`,
 2. **Every balance change is a ledger row.** Balance is reconstructable from
    `WalletLedgerEntry.delta` alone (see `derivedBalances`).
 3. **Every mutating request is idempotent** via a unique `idempotencyKey`. A
-   replay returns the ORIGINAL result — never a double grant/spend.
+   replay returns the ORIGINAL result — never a double grant/spend. Only to the
+   wallet whose row it is: another wallet's row is never replayed or described,
+   a write reusing its key is refused (`REPLAYED_KEY`), and a spend key answers
+   only a retry of the same purchase (same SKU, not refunded), since the routes
+   that deliver do so after it.
 4. **Balances never go negative.** Spend is a conditional atomic decrement
    (`updateMany WHERE balance >= price`); insufficient funds is a clean 409.
    A DB CHECK constraint (`prisma/wallet-constraints.sql`) is the backstop.
@@ -29,14 +33,18 @@ separate from the legacy LC economy (`lib/economy.ts`, `lib/ledger.ts`,
 | `validation.ts` | trick vocab, `validateChain`, `validateDunkAttempt`, `payloadHash` (PURE) |
 | `catalog.ts` | spend SKUs + coin packs (server-owned prices; no shard pack) |
 | `wallet-service.ts` | `earn` / `spend` / `grantCoinPurchase` / `refundCoins` / reads |
+| `dead-buys.ts` | the purchases that took a balance and delivered nothing, and how each is told apart (PURE) |
+| `dead-buy-refunds.ts` | pays those back on the next `readWallet`, once per row (`refund:<rowId>`), with a note |
 | `client.ts` | browser best-effort `reportEarn` (fire-and-forget, never blocks play) |
 
 ## Endpoints (`app/api/v1/wallet/`)
 
-- `GET  /api/v1/wallet` — caller balance (`{coins,shards,version,updated_at}`)
+- `GET  /api/v1/wallet` — caller balance (`{coins,shards,lc,version,updated_at,refund_notes}`); `refund_notes` says why a
+  dead-buy refund (reason `DEAD_BUY_REFUND`, owner decision 2026-09-24) raised it
 - `POST /api/v1/wallet/earn` — `{idempotency_key,event_type,payload}` → grant
 - `POST /api/v1/wallet/spend` — `{idempotency_key,sku_id,quantity?}` → 409 on funds; 403 `not_sold_here` for a SKU
-  outside `SPEND_ROUTE_SKUS` (it grants only an entitlement row, so a SKU another route delivers is sold there)
+  outside `SPEND_ROUTE_SKUS` (it grants only an entitlement row, so a SKU another route delivers is sold there); 400
+  `replayed_key` for a key that is not a retry of this purchase
 - `GET  /api/v1/wallet/ledger?limit&cursor` — read-only audit trail
 - `POST /api/v1/wallet/stripe-webhook` — coins-only mint, idempotent on event id
 

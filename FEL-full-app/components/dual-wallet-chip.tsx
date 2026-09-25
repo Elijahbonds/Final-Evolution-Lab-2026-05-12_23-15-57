@@ -23,8 +23,37 @@ import { cn } from '@/lib/utils';
 import { WALLET_EARN_EVENT, WALLET_SYNC_EVENT, reportEarn, type WalletEarnDetail, type WalletSyncDetail } from '@/lib/wallet/client';
 import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
+import { refundToastTexts, unseenRefundNotes, type RefundNote } from '@/lib/wallet/dead-buys';
 
 type FetchState = 'loading' | 'ready' | 'error';
+
+// DEAD-BUY REFUNDS (owner decision 2026-09-24): the wallet read that paid back a purchase which delivered nothing sends
+// the reason with the balance (refund_notes). Each note pops once: its ledger id is remembered on this device, and in
+// memory too, so a blocked localStorage still shows it once per page load rather than on every refocus. The wallet
+// history keeps the same words for good.
+const REFUND_SEEN_KEY = 'fel:refund_notes_seen';
+const refundSeenThisLoad = new Set<string>();
+
+function storedRefundSeen(): string[] {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(REFUND_SEEN_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : [];
+  } catch { return []; /* storage unavailable: memory only */ }
+}
+
+function markRefundNotesSeen(ids: string[]): void {
+  for (const id of ids) refundSeenThisLoad.add(id);
+  // newest last, so the cap drops the oldest ids
+  try { window.localStorage.setItem(REFUND_SEEN_KEY, JSON.stringify([...new Set([...storedRefundSeen(), ...ids])].slice(-50))); } catch { /* memory only */ }
+}
+
+function showRefundNotes(notes: unknown): void {
+  if (typeof window === 'undefined' || !Array.isArray(notes) || notes.length === 0) return;
+  const fresh = unseenRefundNotes(notes as RefundNote[], new Set([...storedRefundSeen(), ...refundSeenThisLoad]));
+  if (!fresh.length) return;
+  markRefundNotesSeen(fresh.map((n) => n.id));
+  for (const text of refundToastTexts(fresh)) toast.info(text, { duration: 9000 });
+}
 
 interface DualWalletChipProps {
   className?: string;
@@ -80,7 +109,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
     try {
       const res = await fetch('/api/v1/wallet', { cache: 'no-store' });
       if (!res.ok) throw new Error(`wallet ${res.status}`);
-      const data: { coins: number; shards: number; lc?: number } = await res.json();
+      const data: { coins: number; shards: number; lc?: number; refund_notes?: unknown } = await res.json();
       if (mine !== seq.current) return; // a newer fetch already won
       lastRef.current = { coins: data.coins, shards: data.shards, lc: data.lc ?? 0 };
       if (!firedRef.current) { firedRef.current = true; void fireDailyFirstSession(); }
@@ -88,6 +117,7 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
       shards.set(Number.isFinite(data.shards) ? data.shards : 0);
       lc.set(Number.isFinite(data.lc ?? NaN) ? (data.lc as number) : 0);
       setState('ready');
+      showRefundNotes(data.refund_notes);
     } catch {
       if (mine === seq.current) setState('error');
     }

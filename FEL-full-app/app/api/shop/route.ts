@@ -13,7 +13,10 @@ export async function GET() {
     const userId = (session?.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const profile = await getOrCreateProfile(userId);
+    await getOrCreateProfile(userId);
+    // The wallet is read FIRST: that read refunds a /shop card that unlocked nothing and takes it off the shelf
+    // (lib/wallet/dead-buy-refunds.ts), so the cards and the ledger below already show the refund.
+    const wallet = await readWallet(prisma, userId);   // pass 5 phase 1: the wallet is the balance
     const owned = await prisma.cardOwnership.findMany({ where: { userId } });
     const ledger = await prisma.creditLedger.findMany({
       where: { userId },
@@ -21,7 +24,7 @@ export async function GET() {
       take: 10,
     });
     return NextResponse.json({
-      labCredits: (await readWallet(prisma, userId)).lc,   // pass 5 phase 1: the wallet is the balance
+      labCredits: wallet.lc,
       owned: owned?.map((o: any) => o?.cardKey) ?? [],
       ledger: ledger ?? [],
     });

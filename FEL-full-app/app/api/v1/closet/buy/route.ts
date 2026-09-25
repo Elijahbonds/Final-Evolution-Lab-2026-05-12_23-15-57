@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       const bal = await readWallet(prisma, userId);
       return NextResponse.json({ error: 'insufficient_funds', balances: { coins: bal.coins, shards: bal.shards } }, { status: 409 });
     }
+    // The key is another purchase's (spend() says which it is not): nothing was charged, so nothing is handed over.
+    if (e instanceof WalletError && e.code === 'REPLAYED_KEY') return NextResponse.json({ error: 'replayed_key' }, { status: 409 });
     throw e;
   }
 }

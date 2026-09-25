@@ -45,7 +45,11 @@ export async function DELETE() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  await prisma.workoutPlan.deleteMany({ where: { userId } });
-  await prisma.workoutScan.deleteMany({ where: { userId } });
+  // One transaction: a reader sees both gone or neither. The dead-buy refund reads plans and scans together
+  // (lib/wallet/dead-buys.ts, workout_plan) and would pay back a delivered plan if it saw the plans gone and an old scan left.
+  await prisma.$transaction([
+    prisma.workoutPlan.deleteMany({ where: { userId } }),
+    prisma.workoutScan.deleteMany({ where: { userId } }),
+  ]);
   return NextResponse.json({ ok: true });
 }

@@ -5,6 +5,9 @@
  *   - Balance is reconstructable from WalletLedgerEntry.delta alone.
  *   - Every mutating op is idempotent via a unique idempotencyKey. A replay
  *     returns the ORIGINAL result and never double-grants / double-spends.
+ *     Only the wallet whose row it is gets that result: another wallet's row
+ *     is never replayed (isOwnEntry) and a write reusing its key is refused
+ *     (REPLAYED_KEY), and so is a spend key of another purchase (spendReplay).
  *   - Balances can never go negative: spend is a CONDITIONAL atomic decrement
  *     (updateMany WHERE balance >= price). Insufficient funds is a clean 409.
  *   - The client never sends an amount; the server computes it from RewardRule.
@@ -20,7 +23,7 @@
  * the original entry.
  */
 
-import { Prisma, type PrismaClient } from '@/public/_prisma/client';
+import { Prisma, type PrismaClient, type WalletLedgerEntry } from '@/public/_prisma/client';
 import {
   DEFAULT_REWARD_RULES,
   EVENT_REASON,
@@ -33,6 +36,8 @@ import {
 import { getSku, NOT_ON_SALE } from './catalog';
 import { postLc } from '../ledger';
 import { payloadHash, validateDunkAttempt } from './validation';
+import { refundDeadBuysOnRead, type DeadBuyCredit } from './dead-buy-refunds';
+import { DEAD_BUY_GRACE_MS, deadBuyOf, refundKey } from './dead-buys';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -59,6 +64,18 @@ export interface SpendResult {
 
 const n = (b: bigint | number): number => (typeof b === 'bigint' ? Number(b) : b);
 
+/**
+ * Is this ledger row in the player's own wallet? An idempotency key is unique across the WHOLE ledger, and a route that
+ * takes its key from the client can be handed anybody's: a /shop key is shop:<userId>:<cardKey>, and a user id is on
+ * every public card. A replay answers only with the caller's own row. Another wallet's row is never replayed: nothing
+ * about it (its id, amount or currency) leaves this file, and the write that would reuse its key is refused
+ * (REPLAYED_KEY).
+ */
+async function isOwnEntry(db: Db, playerId: string, entry: { walletId: string }): Promise<boolean> {
+  const w = await (db as any).wallet.findUnique({ where: { playerId }, select: { id: true } });
+  return !!w && w.id === entry.walletId;
+}
+
 // ---------------------------------------------------------------------------
 // Wallet read / create
 // ---------------------------------------------------------------------------
@@ -76,8 +93,66 @@ export async function getOrCreateWallet(db: Db, playerId: string) {
 }
 
 export async function readWallet(db: Db, playerId: string): Promise<WalletView> {
-  const w = await getOrCreateWallet(db, playerId);
+  let w = await getOrCreateWallet(db, playerId);
+  // DEAD-BUY REFUNDS (owner decision 2026-09-24): before the balance is shown, anything this player bought that
+  // delivered nothing is paid back (lib/wallet/dead-buy-refunds.ts). One query on a player's first read in a server
+  // instance, none after; it never throws. When it wrote a credit, the balance is read again so the refund shows.
+  if (await refundDeadBuysOnRead(db, playerId, w?.id, creditDeadBuyRefund)) w = await getOrCreateWallet(db, playerId);
   return { coins: n(w.coins), shards: n(w.shards), lc: n(w.lc ?? 0), version: n(w.version), updated_at: w.updatedAt.toISOString() };
+}
+
+/**
+ * The credit a dead-buy refund writes: `amount` back in `currency`, reason DEAD_BUY_REFUND, source refund, under the
+ * caller's idempotency key (refund:<rowId>). Coins and shards go through applyDelta, the same transaction every credit
+ * uses (balance and ledger row together; a unique-key race rolls ours back and returns the winner's row). Lab Credits
+ * go through applyLc, the one LC mover, in a transaction that also removes the /shop card the refund undoes.
+ *
+ * A row already under that key counts as "already refunded" only when it IS this refund (see isRefundOf). Anything
+ * else throws, so the sweep writes no note, is not marked done, and tries again on a later read.
+ */
+export async function creditDeadBuyRefund(prisma: PrismaClient, a: DeadBuyCredit): Promise<{ entryId: string; replayed: boolean }> {
+  if (!Number.isSafeInteger(a.amount) || a.amount <= 0) throw new WalletError('INVALID_AMOUNT', `refund must be a positive integer, got ${a.amount}`);
+  let r: { entryId: string; replayed: boolean };
+  if (a.currency !== 'lc') {
+    const applied = await applyDelta(prisma, {
+      playerId: a.playerId, currency: a.currency, delta: a.amount, reasonCode: REASON.DEAD_BUY_REFUND, source: 'refund',
+      idempotencyKey: a.idempotencyKey, metadata: a.metadata,
+    });
+    r = { entryId: applied.entryId, replayed: applied.replayed };
+  } else {
+    try {
+      r = await prisma.$transaction(async (tx) => {
+        const lc = await applyLc(tx, {
+          playerId: a.playerId, delta: a.amount, reasonCode: REASON.DEAD_BUY_REFUND, source: 'refund',
+          idempotencyKey: a.idempotencyKey, metadata: a.metadata,
+        });
+        // The card unlocked nothing and its price is back, so the sale is undone: it leaves the player's /shop shelf.
+        if (!lc.replayed && a.shopCardKey) await (tx as any).cardOwnership.deleteMany({ where: { userId: a.playerId, cardKey: a.shopCardKey } });
+        return { entryId: lc.entryId, replayed: lc.replayed };
+      });
+    } catch (e) {
+      // Lost a race on the key: Postgres aborted our transaction (LC and ownership row with it). The winner's row stands.
+      const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
+      if (!original) throw e;
+      r = { entryId: original.id, replayed: true };
+    }
+  }
+  if (r.replayed && !(await isRefundOf(prisma, a))) {
+    throw new WalletError('REPLAYED_KEY', `${a.idempotencyKey} is taken by a row that is not this refund`);
+  }
+  return r;
+}
+
+/**
+ * Is the row under the refund's key this very refund: in this player's wallet, a DEAD_BUY_REFUND, of the same row? The
+ * key refund:<rowId> can be worked out, so another route's client key could have taken it first. That row is not a
+ * refund, and reading it as one would mark the dead buy paid back, and show the player a note, when nothing came back.
+ */
+async function isRefundOf(prisma: PrismaClient, a: DeadBuyCredit): Promise<boolean> {
+  const row = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
+  if (!row || row.reasonCode !== REASON.DEAD_BUY_REFUND) return false;
+  if ((row.metadata as { refundOf?: unknown } | null)?.refundOf !== a.metadata.refundOf) return false;
+  return isOwnEntry(prisma, a.playerId, row);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,8 +186,10 @@ export async function earn(
   //    reuses the key and must return the ORIGINAL grant exactly once, never a
   //    'replay_detected' rejection. A DIFFERENT key with the same payload is a
   //    resubmission attempt and is caught by step 4.
+  //    Only this player's own row is a retry (isOwnEntry). Another wallet's row under the key is not looked at: the
+  //    event goes through the checks a fresh key gets, and step 10 refuses the grant on the key.
   const priorByKey = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
-  if (priorByKey) {
+  if (priorByKey && (await isOwnEntry(prisma, playerId, priorByKey))) {
     const bal = await readWallet(prisma, playerId);
     const amt = n(priorByKey.delta);
     return {
@@ -192,7 +269,8 @@ export async function earn(
   // 8. Rolling-24h currency cap.
   if (grant > 0 && rule.perDayCurrencyCap > 0) {
     const agg = await prisma.walletLedgerEntry.aggregate({
-      where: { wallet: { playerId }, currency: rule.currency, delta: { gt: 0 }, createdAt: { gte: new Date(Date.now() - 86_400_000) } },
+      // a dead-buy refund gives back what was spent; it is not an earn, so it must not eat today's cap
+      where: { wallet: { playerId }, currency: rule.currency, delta: { gt: 0 }, reasonCode: { not: REASON.DEAD_BUY_REFUND }, createdAt: { gte: new Date(Date.now() - 86_400_000) } },
       _sum: { delta: true },
     });
     const earnedToday = n((agg._sum.delta as bigint | null) ?? BigInt(0));
@@ -210,10 +288,16 @@ export async function earn(
 
   // 10. Apply grant idempotently.
   const source = SHARD_REASONS.has(reasonCode) ? 'milestone' : 'gameplay';
-  const applied = await applyDelta(prisma, {
-    playerId, currency: rule.currency, delta: grant, reasonCode, source: source as any,
-    idempotencyKey, metadata: { eventType, perfEventId: evt.id, payloadHash: hash },
-  });
+  let applied: Awaited<ReturnType<typeof applyDelta>>;
+  try {
+    applied = await applyDelta(prisma, {
+      playerId, currency: rule.currency, delta: grant, reasonCode, source: source as any,
+      idempotencyKey, metadata: { eventType, perfEventId: evt.id, payloadHash: hash },
+    });
+  } catch (e) {
+    if (e instanceof WalletError && e.code === 'REPLAYED_KEY') return reject('replayed_key');   // another wallet's key
+    throw e;
+  }
   await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { resolvedEntryId: applied.entryId } });
 
   const grantedCoins = rule.currency === 'coins' ? (applied.replayed ? applied.delta : grant) : 0;
@@ -237,12 +321,11 @@ export async function spend(
   if (!sku) throw new WalletError('UNKNOWN_SKU');
   const price = sku.unitPrice * quantity; // SERVER-owned price; client price ignored.
 
-  // Idempotency short-circuit: replayed spend returns the original result.
+  // Idempotency short-circuit: a retry of this same purchase returns the original result (spendReplay says what is one).
+  // Another wallet's row under the key is not looked at (isOwnEntry): the purchase is answered as a fresh key would be,
+  // so a held SKU is still NOT_ON_SALE, and anything else fails on the key at the insert below and is refused.
   const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
-  if (prior) {
-    const bal = await readWallet(prisma, playerId);
-    return { spent: { currency: prior.currency as WalletCurrency, amount: n(prior.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: prior.id };
-  }
+  if (prior && (await isOwnEntry(prisma, playerId, prior))) return spendReplay(prisma, playerId, skuId, prior);
   // HOTFIX (2026-09-24): a SKU that delivers nothing yet is refused before any write (see NOT_ON_SALE). The check sits
   // after the idempotency lookup on purpose: a retry of a purchase made before the SKU was held gets its original
   // receipt back, not a refusal of a purchase that already happened.
@@ -278,11 +361,37 @@ export async function spend(
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
-      const bal = await readWallet(prisma, playerId);
-      if (original) return { spent: { currency: original.currency as WalletCurrency, amount: n(original.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: original.id };
+      if (original && (await isOwnEntry(prisma, playerId, original))) return spendReplay(prisma, playerId, skuId, original);
+      if (original) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
     }
     throw e;
   }
+}
+
+/**
+ * A spend whose idempotency key is already on one of the caller's own ledger rows. It is a retry of THIS purchase only
+ * when that row is a charge for this same SKU and its money never went back; then the original receipt comes back and
+ * nothing moves. Anything else is refused with REPLAYED_KEY. The Closet, Sessions and Workout hand the item over once
+ * spend() returns, so a receipt for any other row is that item for free: a refund row (refund:<rowId>, whose row id the
+ * player's own ledger history shows), another SKU's charge, or a charge a dead-buy refund paid back.
+ *
+ * A charge the dead-buy sweep may still pay back (deadBuyOf: a browser-made key for an item /store sold dead) is a
+ * receipt only while it is younger than the sweep's grace. A real retry comes seconds after its click; later, a
+ * receipt could be handed out while another read of the same wallet writes the refund, and the player keeps both.
+ */
+async function spendReplay(
+  prisma: PrismaClient, playerId: string, skuId: string,
+  prior: Pick<WalletLedgerEntry, 'id' | 'walletId' | 'currency' | 'delta' | 'reasonCode' | 'idempotencyKey' | 'metadata' | 'createdAt'>,
+): Promise<SpendResult> {
+  const refundable = deadBuyOf({ ...prior, currency: String(prior.currency), delta: n(prior.delta) }, playerId) !== null
+    && Date.now() - prior.createdAt.getTime() >= DEAD_BUY_GRACE_MS;
+  const sameBuy = !refundable
+    && prior.reasonCode === REASON.SPEND_CATALOG_ITEM
+    && (prior.metadata as { skuId?: unknown } | null)?.skuId === skuId
+    && !(await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: refundKey(prior.id) }, select: { id: true } }));
+  if (!sameBuy) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another purchase');
+  const bal = await readWallet(prisma, playerId);
+  return { spent: { currency: prior.currency as WalletCurrency, amount: n(prior.delta) * -1 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: prior.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -386,9 +495,10 @@ interface ApplyArgs {
 async function applyDelta(
   prisma: PrismaClient, a: ApplyArgs
 ): Promise<{ entryId: string; delta: number; balances: { coins: number; shards: number; lc: number }; replayed: boolean }> {
-  // Fast idempotency short-circuit.
+  // Fast idempotency short-circuit: this wallet's own row only (isOwnEntry).
   const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
   if (prior) {
+    if (!(await isOwnEntry(prisma, a.playerId, prior))) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
     const bal = await readWallet(prisma, a.playerId);
     return { entryId: prior.id, delta: n(prior.delta), balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, replayed: true };
   }
@@ -418,6 +528,7 @@ async function applyDelta(
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
+      if (original && !(await isOwnEntry(prisma, a.playerId, original))) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
       const bal = await readWallet(prisma, a.playerId);
       if (original) return { entryId: original.id, delta: n(original.delta), balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, replayed: true };
     }
@@ -466,6 +577,7 @@ export async function applyLc(db: Db, a: ApplyLcArgs): Promise<ApplyLcResult> {
   const prior = await (db as any).walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
   if (prior) {
     if (a.rejectReplay) throw new WalletError('REPLAYED_KEY', `lc movement already recorded: ${a.idempotencyKey}`);
+    if (!(await isOwnEntry(db, a.playerId, prior))) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
     return { entryId: prior.id, delta: n(prior.delta), balanceAfter: n(prior.balanceAfter), replayed: true };
   }
   const wallet = await getOrCreateWallet(db, a.playerId);
@@ -490,6 +602,7 @@ export async function applyLc(db: Db, a: ApplyLcArgs): Promise<ApplyLcResult> {
       // lost a race on the key: the other writer's row is the truth — undo our balance move is not possible outside a tx,
       // so callers that need strict atomicity pass a transaction client.
       const original = await (db as any).walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
+      if (original && original.walletId !== wallet.id) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
       if (original) return { entryId: original.id, delta: n(original.delta), balanceAfter: n(original.balanceAfter), replayed: true };
     }
     throw e;

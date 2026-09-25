@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
 import { SHOP_CARDS, shopCardOnSale } from '@/lib/game-data';
+import { refundKey, shopPurchaseKey } from '@/lib/wallet/dead-buys';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,8 +36,13 @@ export async function POST(req: Request) {
       // purchases both reading the same stale balance and both passing the
       // funds check.
       // LC lives in the wallet (2026-09-04): applyLc rejects INSUFFICIENT_FUNDS atomically and writes ledger + mirror.
+      // A card whose first sale a dead-buy refund paid back is sold again under a new key, or applyLc would answer the
+      // old one with the refunded sale and the card would come free (shopPurchaseKey).
+      const sold = await tx.walletLedgerEntry.findUnique({ where: { idempotencyKey: shopPurchaseKey(userId, cardKey) }, select: { id: true } });
+      const refunded = sold ? await tx.walletLedgerEntry.findUnique({ where: { idempotencyKey: refundKey(sold.id) }, select: { id: true } }) : null;
+      const idempotencyKey = shopPurchaseKey(userId, cardKey, refunded ? sold!.id : null);
       let r;
-      try { r = await applyLc(tx, { playerId: userId, delta: -card.price, reasonCode: 'SHOP_PURCHASE', source: 'spend', idempotencyKey: `shop:${userId}:${cardKey}`, metadata: { cardKey, name: card.name } }); }
+      try { r = await applyLc(tx, { playerId: userId, delta: -card.price, reasonCode: 'SHOP_PURCHASE', source: 'spend', idempotencyKey, metadata: { cardKey, name: card.name } }); }
       catch (e) { if (e instanceof WalletError && e.code === 'INSUFFICIENT_FUNDS') throw new Error('INSUFFICIENT_FUNDS'); throw e; }
       await tx.cardOwnership.create({ data: { userId, cardKey } });
       return r.balanceAfter;

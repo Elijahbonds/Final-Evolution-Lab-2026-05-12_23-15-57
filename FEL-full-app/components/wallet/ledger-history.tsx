@@ -9,17 +9,24 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Coins, Gem, ArrowDownRight, ArrowUpRight, Loader2, History } from 'lucide-react';
+import { Coins, Gem, Landmark, ArrowDownRight, ArrowUpRight, Loader2, History } from 'lucide-react';
 import { reasonLabel } from '@/lib/wallet/reason-labels';
 
 interface Entry {
   id: string;
-  currency: 'coins' | 'shards';
+  currency: 'coins' | 'shards' | 'lc';
   delta: number;
   balance_after: number;
   reason_code: string;
   source: string;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
+}
+
+/** The plain-words note a row carries, if any (a dead-buy refund says what it paid back and why). */
+export function entryNote(e: Pick<Entry, 'metadata'>): string | null {
+  const note = e.metadata?.note;
+  return typeof note === 'string' && note.trim() ? note : null;
 }
 
 function fmtDate(iso: string): string {
@@ -74,8 +81,8 @@ export function LedgerHistory() {
       <ul className="space-y-2">
         {entries.map((e) => {
           const meta = reasonLabel(e.reason_code);
+          const note = entryNote(e);
           const positive = e.delta >= 0;
-          const isShard = e.currency === 'shards';
           return (
             <li key={e.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5">
               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${positive ? 'bg-[#00FF9D]/10 text-[#00FF9D]' : 'bg-[#FF3366]/10 text-[#FF3366]'}`}>
@@ -83,11 +90,14 @@ export function LedgerHistory() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-white">{meta.label}</div>
+                {note && <div className="text-xs text-white/65">{note}</div>}
                 <div className="text-[11px] text-white/40">{fmtDate(e.created_at)}</div>
               </div>
               <div className={`flex items-center gap-1 font-mono text-sm font-semibold ${positive ? 'text-[#00FF9D]' : 'text-[#FF3366]'}`}>
                 {positive ? '+' : ''}{e.delta.toLocaleString('en-US')}
-                {isShard ? <Gem className="h-3.5 w-3.5 text-[#C79BFF]" /> : <Coins className="h-3.5 w-3.5 text-[#FFD700]" />}
+                {e.currency === 'shards' ? <Gem className="h-3.5 w-3.5 text-[#C79BFF]" aria-label="shards" />
+                  : e.currency === 'lc' ? <Landmark className="h-3.5 w-3.5 text-[#7FEFFF]" aria-label="Lab Credits" />
+                  : <Coins className="h-3.5 w-3.5 text-[#FFD700]" aria-label="coins" />}
               </div>
               <div className="w-16 shrink-0 text-right font-mono text-[11px] text-white/40">{e.balance_after.toLocaleString('en-US')}</div>
             </li>

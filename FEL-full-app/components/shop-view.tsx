@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Coins, Check, Dumbbell, UserCircle2, BookOpen, Loader2 } from 'lucide-react';
 import { SHOP_CARDS, shopCardOnSale } from '@/lib/game-data';
+import { REASON_LABELS } from '@/lib/wallet/reason-labels';
 
 const TYPE_META: Record<string, { icon: any; label: string }> = {
   DRILL: { icon: Dumbbell, label: 'Drill Card' },
@@ -14,10 +15,19 @@ const TYPE_META: Record<string, { icon: any; label: string }> = {
 };
 
 // HOTFIX (2026-09-24): the /shop cards a player bought before the shop stopped selling them. They unlock nothing yet,
-// and the page says so on the card and above the grid instead of showing a plain green OWNED. No refund is made here.
-// TODO(owner): refunding the LC paid for these cards (SHOP_PURCHASE rows, key shop:<user>:<cardKey>) is the owner's decision.
+// and the page says so on the card and above the grid instead of showing a plain green OWNED.
+// Owner decision 2026-09-24: refund automatically. The first wallet read after the deploy pays back the LC of each such
+// buy (its SHOP_PURCHASE row, key shop:<user>:<cardKey>) and takes the card off the shelf in the same transaction
+// (lib/wallet/dead-buy-refunds.ts). GET /api/shop reads the wallet before the cards, so a refunded card is already gone
+// here; one still owned is a refund the next load finishes.
 export function hollowOwnedShopCards(owned: readonly string[]): string[] {
   return SHOP_CARDS.filter((c) => owned.includes(c.key) && !shopCardOnSale(c.key)).map((c) => c.key);
+}
+
+/** A ledger row's reason in plain words: newer rows carry a reason code, older ones a sentence of their own. */
+export function shopLedgerReason(reason: unknown): string {
+  const r = typeof reason === 'string' ? reason : '';
+  return REASON_LABELS[r]?.label ?? r;
 }
 
 export function ShopView({
@@ -100,7 +110,7 @@ export function ShopView({
           {hollowOwned.length === 1
             ? 'You own a card from before this shop stopped selling them. It unlocks nothing yet.'
             : `You own ${hollowOwned.length} cards from before this shop stopped selling them. They unlock nothing yet.`}{' '}
-          Your payment is on record: the Lab Credits you paid stay logged against the card, and nothing more will be charged.
+          The Lab Credits you paid are refunded automatically, and each refund shows in the ledger below.
         </p>
       )}
 
@@ -171,7 +181,7 @@ export function ShopView({
           <div className="fel-panel mt-3 divide-y divide-white/5 rounded-xl">
             {ledger.map((row: any) => (
               <div key={row?.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <span className="text-white/70">{row?.reason}</span>
+                <span className="text-white/70">{shopLedgerReason(row?.reason)}</span>
                 <span className={`font-mono font-bold ${(row?.amount ?? 0) >= 0 ? 'text-[#00FF9D]' : 'text-[#FF3366]'}`}>
                   {(row?.amount ?? 0) >= 0 ? '+' : ''}
                   {row?.amount} LC

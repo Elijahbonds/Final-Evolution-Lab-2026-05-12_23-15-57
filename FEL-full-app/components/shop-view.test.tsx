@@ -3,25 +3,41 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CARD_CATALOG, getCardById } from '@/lib/card-catalog';
 import { SHOP_CARDS, SHOP_CARDS_ON_SALE, shopCardOnSale } from '@/lib/game-data';
-import { ShopView, hollowOwnedShopCards } from './shop-view';
+import { ShopView, hollowOwnedShopCards, shopLedgerReason } from './shop-view';
 
 // /shop sold eight Lab-Credit cards whose keys are not catalog card ids. lib/entitlements.ts reads only catalog ids, so
-// every purchase took LC and unlocked nothing. Owner decision 2026-09-24: refuse the sale, no redesign, no automatic
-// refund. The route below runs for real; only its session, database and wallet are stand-ins that record what it did.
+// every purchase took LC and unlocked nothing. Owner decision 2026-09-24: refuse the sale, no redesign; then, the same
+// day, refund what was paid automatically (lib/wallet/dead-buy-refunds.ts runs it on the wallet read). The routes below
+// run for real; only their session, database and wallet are stand-ins that record what they did.
 const m = vi.hoisted(() => ({
   session: { user: { id: 'u1' } } as unknown,
   findUnique: vi.fn(async () => null),
   create: vi.fn(async () => ({})),
-  transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ cardOwnership: { create: vi.fn(async () => ({})) } })),
+  // no earlier sale of the card on file, so the purchase is keyed shop:<userId>:<cardKey> (dead-buy-refunds.test.ts has the re-buy)
+  transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ cardOwnership: { create: vi.fn(async () => ({})) }, walletLedgerEntry: { findUnique: vi.fn(async () => null) } })),
   applyLc: vi.fn(async () => ({ entryId: 'e1', delta: -80, balanceAfter: 20, replayed: false })),
   getOrCreateProfile: vi.fn(async () => ({})),
   onSale: null as null | ((key: string) => boolean),
+  calls: [] as string[],
 }));
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => m.session) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
-vi.mock('@/lib/db', () => ({ prisma: { cardOwnership: { findUnique: m.findUnique, create: m.create }, $transaction: m.transaction } }));
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    cardOwnership: {
+      findUnique: m.findUnique, create: m.create,
+      findMany: vi.fn(async () => { m.calls.push('cards'); return [{ cardKey: 'some-catalog-card' }]; }),
+    },
+    creditLedger: { findMany: vi.fn(async () => { m.calls.push('ledger'); return [{ id: 'c1', reason: 'DEAD_BUY_REFUND', amount: 80 }]; }) },
+    $transaction: m.transaction,
+  },
+}));
 vi.mock('@/lib/profile-service', () => ({ getOrCreateProfile: m.getOrCreateProfile }));
-vi.mock('@/lib/wallet/wallet-service', () => ({ applyLc: m.applyLc, WalletError: class WalletError extends Error {} }));
+vi.mock('@/lib/wallet/wallet-service', () => ({
+  applyLc: m.applyLc,
+  WalletError: class WalletError extends Error {},
+  readWallet: vi.fn(async () => { m.calls.push('wallet'); return { coins: 0, shards: 0, lc: 100, version: 1, updated_at: '' }; }),
+}));
 // The route's gate, with a switch a test can flip to prove the refusal comes from the gate and nothing else.
 vi.mock('@/lib/game-data', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/lib/game-data')>();
@@ -29,6 +45,17 @@ vi.mock('@/lib/game-data', async (importOriginal) => {
 });
 
 import { POST } from '@/app/api/shop/purchase/route';
+import { GET as getShop } from '@/app/api/shop/route';
+
+describe('GET /api/shop, after the refund', () => {
+  beforeEach(() => { m.calls.length = 0; m.session = { user: { id: 'u1' } }; });
+
+  it('reads the wallet (which refunds a hollow card and takes it off the shelf) before it reads the cards and the ledger', async () => {
+    const res = await getShop();
+    expect(m.calls).toEqual(['wallet', 'cards', 'ledger']);
+    expect(await res.json()).toMatchObject({ labCredits: 100, owned: ['some-catalog-card'], ledger: [{ reason: 'DEAD_BUY_REFUND', amount: 80 }] });
+  });
+});
 
 const post = (cardKey: string) => POST(new Request('http://fel.test/api/shop/purchase', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardKey }),
@@ -53,7 +80,7 @@ describe('/api/shop/purchase, the cards that unlock nothing', () => {
     m.onSale = () => true;
     const res = await post('drill-jab-flow');
     expect(res.status).toBe(200);
-    expect(m.applyLc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ delta: -80, reasonCode: 'SHOP_PURCHASE' }));
+    expect(m.applyLc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ delta: -80, reasonCode: 'SHOP_PURCHASE', idempotencyKey: 'shop:u1:drill-jab-flow' }));
   });
 
   it('still answers an unknown card with 400', async () => {
@@ -108,15 +135,22 @@ describe('/shop, the page', () => {
     expect(html).not.toMatch(/\d+<!-- --> LC<\/button>/);
   });
 
-  it('an owner of a hollow card sees it unlocks nothing yet and that the payment is on record, and is not refunded', () => {
+  it('an owner of a hollow card the refund has not reached yet sees it unlocks nothing and that the LC comes back', () => {
     const html = renderToStaticMarkup(createElement(ShopView, { initialCredits: 20, initialOwned: ['drill-jab-flow'] }));
     expect(html).toContain('OWNED · UNLOCKS NOTHING YET');
     expect(html.match(/OWNED · UNLOCKS NOTHING YET/g)).toHaveLength(1);
     expect(html).toContain('You own a card from before this shop stopped selling them. It unlocks nothing yet.');
-    expect(html).toMatch(/Your payment is on record/);
-    expect(html).not.toMatch(/refund|safe/i); // no refund promised, and no "safe" to read as one
+    expect(html).toContain('The Lab Credits you paid are refunded automatically, and each refund shows in the ledger below.');
+    expect(html).not.toMatch(/on record|safe/i); // the old "payment is on record" line is gone
 
     expect(html.match(/NOT ON SALE YET<\/button>/g)).toHaveLength(SHOP_CARDS.length - 1);
+  });
+
+  it('shows ledger reasons in plain words: a code by its label, an older sentence as written', () => {
+    expect(shopLedgerReason('DEAD_BUY_REFUND')).toBe('Refund: it delivered nothing');
+    expect(shopLedgerReason('SHOP_PURCHASE')).toBe('Shop purchase');
+    expect(shopLedgerReason('Purchase: Jab Flow Drill')).toBe('Purchase: Jab Flow Drill');
+    expect(shopLedgerReason(undefined)).toBe('');
   });
 
   it('counts several hollow cards, and ignores keys that are not /shop cards', () => {
