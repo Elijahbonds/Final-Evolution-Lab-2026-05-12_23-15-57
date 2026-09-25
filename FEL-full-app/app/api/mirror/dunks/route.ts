@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { readProgress, type DunkAttempt } from '@/lib/irl/dunkProgress';
 import { MAX_VERTICAL_CM, type DunkFamily } from '@/lib/irl/dunkTracker';
+import { DUNK_ATTEMPTS_RETURNED, MIRROR_FAMILIES, loadDunkHistory } from '@/lib/irl/dunkHistory';
 
 /**
  * A measured dunk, and the history it joins.
@@ -19,10 +20,6 @@ import { MAX_VERTICAL_CM, type DunkFamily } from '@/lib/irl/dunkTracker';
  * anything writing one.
  */
 
-const FAMILIES = new Set<DunkFamily>([
-  'BETWEEN-THE-LEGS', 'WINDMILL', '360', 'TOMAHAWK', 'ONE-HAND JAM', 'TWO-HAND JAM', 'ATTEMPT',
-]);
-
 /** A measurement the camera could not really have produced is not a measurement. MAX_VERTICAL_CM (130: the world
  *  record standing reach-to-rim differential, with room to spare) lives in the tracker, which refuses the same
  *  attempts first and says why; two copies let the tracker judge a 150 cm jump that this route then dropped. */
@@ -33,28 +30,10 @@ export async function GET() {
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const rows = await prisma.workoutScan.findMany({
-    where: { userId, kind: 'dunk' },
-    orderBy: { createdAt: 'asc' },
-    select: { metrics: true, createdAt: true },
-    take: 500,
-  }).catch(() => []);
-
-  const attempts: DunkAttempt[] = rows.map((r) => {
-    const m = (r.metrics ?? {}) as Partial<DunkAttempt>;
-    return {
-      at: r.createdAt.toISOString(),
-      verticalCm: Number(m.verticalCm) || 0,
-      flightTimeMs: Number(m.flightTimeMs) || 0,
-      family: (FAMILIES.has(m.family as DunkFamily) ? m.family : 'ATTEMPT') as DunkFamily,
-      ...(typeof m.difficulty === 'number' ? { difficulty: m.difficulty } : {}),
-      ...(typeof m.execution === 'number' ? { execution: m.execution } : {}),
-      ...(typeof m.style === 'number' ? { style: m.style } : {}),
-      ...(typeof m.made === 'boolean' ? { made: m.made } : {}),
-    };
-  });
-
-  return NextResponse.json({ attempts, progress: readProgress(attempts) });
+  // REVIEW (2026-09-24, D4): the NEWEST rows, one helper for GET and POST (lib/irl/dunkHistory.ts has why). Progress
+  // reads the whole window; the list handed back is its recent end.
+  const attempts = await loadDunkHistory(prisma, userId);
+  return NextResponse.json({ attempts: attempts.slice(-DUNK_ATTEMPTS_RETURNED), progress: readProgress(attempts) });
 }
 
 export async function POST(req: NextRequest) {
@@ -76,7 +55,7 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(flightTimeMs) || flightTimeMs <= 0 || flightTimeMs > MAX_FLIGHT_MS) {
     return NextResponse.json({ error: 'implausible_flight' }, { status: 400 });
   }
-  const family = (FAMILIES.has(b?.family as DunkFamily) ? b!.family : 'ATTEMPT') as DunkFamily;
+  const family = (MIRROR_FAMILIES.has(b?.family as DunkFamily) ? b!.family : 'ATTEMPT') as DunkFamily;
 
   const metrics = {
     verticalCm: Math.round(verticalCm * 10) / 10,
@@ -90,20 +69,7 @@ export async function POST(req: NextRequest) {
 
   await prisma.workoutScan.create({ data: { userId, kind: 'dunk', metrics } }).catch(() => null);
 
-  const rows = await prisma.workoutScan.findMany({
-    where: { userId, kind: 'dunk' }, orderBy: { createdAt: 'asc' },
-    select: { metrics: true, createdAt: true }, take: 500,
-  }).catch(() => []);
-  const attempts: DunkAttempt[] = rows.map((r) => {
-    const m = (r.metrics ?? {}) as Partial<DunkAttempt>;
-    return {
-      at: r.createdAt.toISOString(),
-      verticalCm: Number(m.verticalCm) || 0,
-      flightTimeMs: Number(m.flightTimeMs) || 0,
-      family: (FAMILIES.has(m.family as DunkFamily) ? m.family : 'ATTEMPT') as DunkFamily,
-      ...(typeof m.made === 'boolean' ? { made: m.made } : {}),
-    };
-  });
-
+  // the same read as GET, so the dunk just stored is in it and the spoken line is against the real best
+  const attempts = await loadDunkHistory(prisma, userId);
   return NextResponse.json({ progress: readProgress(attempts) });
 }

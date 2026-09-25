@@ -11,6 +11,23 @@ export const PRQ_ATTRS = [
 
 export type PrqAttr = (typeof PRQ_ATTRS)[number];
 
+/**
+ * PrqEntry.source for a reading the body camera ESTIMATED (movement play, 2026-09-24): the jump a player makes in front
+ * of the camera, timed off the pose stream. It lives here, in the pure leaf, because the shield readers
+ * (scanToSnapshot, camp deltas) must not import the Prisma-bound lib/prq-entries to ask about it.
+ */
+export const PRQ_CAMERA_SOURCE = 'camera';
+
+/**
+ * Sources that are estimates. They feed the PRQ vector (the owner: "the measured jump height feeds PRQ power as a
+ * camera estimate"), and nothing that grants the verified shield may stand on them ("never the verified shield").
+ */
+export const PRQ_ESTIMATE_SOURCES: readonly string[] = [PRQ_CAMERA_SOURCE];
+
+export function isPrqEstimate(source: string | null | undefined): boolean {
+  return typeof source === 'string' && PRQ_ESTIMATE_SOURCES.includes(source);
+}
+
 export interface PrqGrade {
   key: 'ELITE' | 'PRIMED' | 'READY' | 'RECOVERING';
   label: string;

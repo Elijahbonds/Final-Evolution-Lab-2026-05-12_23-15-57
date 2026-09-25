@@ -13,8 +13,11 @@ import {
   MEASUREMENTS, measurementFor, axisValue, snapshotFrom, missingAxes, suggestNextMeasurements,
   DEFAULT_MAX_SCAN_AGE_DAYS,
 } from './scanToSnapshot';
-import { prqScore, PRQ_ATTRS } from '../prq';
-import type { ScanRecord } from './sharedProfile';
+import { prqScore, PRQ_ATTRS, PRQ_CAMERA_SOURCE, isPrqEstimate } from '../prq';
+import { emptyProfile, prqTrend, roundTrip, type ScanRecord } from './sharedProfile';
+import { snapshotSeries } from './profileServer';
+import { projectCard, isVerified } from '../creator/cardProgression';
+import { boundFormSummary, heightCmForFlight, planFormWrite } from '../move/formSummary';
 
 const NOW = Date.parse('2026-09-13T12:00:00.000Z');
 const ago = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
@@ -196,5 +199,119 @@ describe('the table is auditable', () => {
         expect(m.note.toLowerCase(), `${m.key}/${bad}`).not.toContain(bad);
       }
     }
+  });
+});
+
+// A CAMERA ESTIMATE IS NOT A SCAN (movement play, 2026-09-24).
+//
+// The body camera's measured jump is written as PRQ power with source 'camera' (lib/prq.ts PRQ_CAMERA_SOURCE), and
+// the owner ruled it "feeds PRQ power as a camera estimate, never the verified shield". A snapshot carries
+// `sourceScanAt`, and that is what the card's shield stands on (cardProgression.measuredSnapshot), so a camera row
+// must never make, raise, lower, re-date or rescue one — while every verified source still does.
+describe('A CAMERA ESTIMATE IS NOT A SCAN', () => {
+  const cam = (attribute: string, value: number, days = 0): ScanRecord =>
+    ({ ...scan(attribute, value, days), source: PRQ_CAMERA_SOURCE });
+  const as = (source: string, attribute: string, value: number, days = 1): ScanRecord => ({ ...scan(attribute, value, days), source });
+
+  it('the exclusion is the estimate only: manual, device and drillResult readings all still make a snapshot', () => {
+    for (const source of ['manual', 'device', 'drillResult']) {
+      expect(isPrqEstimate(source), source).toBe(false);
+      const s = snapshotFrom([as(source, 'verticalJump', 26, 2)], { now: NOW });
+      expect(s, source).not.toBeNull();
+      expect(s!.axes.power, source).toBe(50);
+      expect(s!.sourceScanAt, source).toBe(ago(2));
+    }
+  });
+
+  it('a camera reading NEWER than the verified one neither raises nor lowers the axis, nor re-dates the snapshot', () => {
+    const verified = [scan('verticalJump', 30, 5)];
+    const alone = snapshotFrom(verified, { now: NOW })!;
+    const higher = snapshotFrom([...verified, cam('verticalJump', 40, 0)], { now: NOW })!;
+    const lower = snapshotFrom([...verified, cam('verticalJump', 12, 1)], { now: NOW })!;
+    expect(higher).toEqual(alone);
+    expect(lower).toEqual(alone);
+    expect(higher.sourceScanAt).toBe(ago(5));
+    expect(higher.at).toBe(ago(5));
+  });
+
+  it('a camera reading on an axis nothing verified covers leaves that axis ABSENT: not 0, and not the estimate', () => {
+    const s = snapshotFrom([scan('plankHold', 120, 2), cam('verticalJump', 36, 0), cam('broadJump', 110, 0)], { now: NOW })!;
+    expect(Object.keys(s.axes)).toEqual(['endurance']);
+    expect(s.axes.power).toBeUndefined();
+    expect(missingAxes(s)).toContain('power');
+    // the athlete is still asked to MEASURE power: an estimate does not fill the gap
+    expect(suggestNextMeasurements(s, 8).map((m) => m.axis)).toContain('power');
+    expect(s.sourceScanAt).toBe(ago(2));
+  });
+
+  it('camera readings alone make NO snapshot, whatever they measure', () => {
+    const all = MEASUREMENTS.map((m) => cam(m.key, m.ceiling, 0));
+    expect(snapshotFrom(all, { now: NOW })).toBeNull();
+  });
+
+  it('a fresh camera reading does not rescue a scan window that has run out', () => {
+    const stale = scan('verticalJump', 30, DEFAULT_MAX_SCAN_AGE_DAYS + 1);
+    expect(snapshotFrom([stale, cam('verticalJump', 30, 0)], { now: NOW })).toBeNull();
+  });
+
+  it('the PRQ row a dunk session writes (power, unit score, source camera) never makes a snapshot, alone or beside scans', () => {
+    const { form } = boundFormSummary({ attempts: [
+      { kind: 'jump', label: 'WINDMILL', reads: { heightCm: heightCmForFlight(720), flightMs: 720 } },
+    ] }, { mode: 'dunkContest' });
+    const plan = planFormWrite(form!, { userId: 'u', sessionId: 's', measuredAt: new Date(NOW) });
+    const p = plan.power!;
+    expect(p.source).toBe(PRQ_CAMERA_SOURCE);
+    // mapped the way lib/profile/profileServer.ts loadSharedProfile maps a PrqEntry row onto a ScanRecord
+    const row: ScanRecord = { attribute: p.attribute, value: p.value, unit: p.unit, source: p.source, measuredAt: p.measuredAt.toISOString(), sessionId: 's' };
+    expect(snapshotFrom([row], { now: NOW })).toBeNull();
+    const verified = [scan('verticalJump', 22, 4), scan('sprint10m', 2.0, 3)];
+    expect(snapshotFrom([...verified, row], { now: NOW })).toEqual(snapshotFrom(verified, { now: NOW }));
+  });
+
+  it('a camera scan keeps its source through a profile export, so it is still left out after the round trip', () => {
+    const p = emptyProfile('cl_cam', 'Ama');
+    p.scans = [cam('verticalJump', 40, 0), scan('verticalJump', 20, 3)];
+    const back = roundTrip(p)!;
+    expect(back.scans.map((s) => s.source)).toEqual([PRQ_CAMERA_SOURCE, 'device']);
+    expect(snapshotFrom(back.scans, { now: NOW })).toEqual(snapshotFrom([scan('verticalJump', 20, 3)], { now: NOW }));
+  });
+
+  describe('the card shield, end to end (snapshotSeries → projectCard)', () => {
+    const profileOf = (scans: ScanRecord[]) => {
+      const p = emptyProfile('cl_cam', 'Ama');
+      p.scans = scans.slice().reverse();
+      p.prq = snapshotSeries(scans);
+      return p;
+    };
+
+    it('camera readings only: no standing, no shield', () => {
+      const card = projectCard(profileOf([cam('verticalJump', 40, 1), cam('verticalJump', 38, 0)]), { now: NOW })!;
+      expect(card.standing).toBeNull();
+      expect(isVerified(card)).toBe(false);
+    });
+
+    it('an old verified scan stays stale beside a fresh camera jump: the estimate never re-dates the shield', () => {
+      const card = projectCard(profileOf([scan('verticalJump', 26, 45), cam('verticalJump', 40, 0)]), { now: NOW })!;
+      expect(card.standing).not.toBeNull();
+      expect(card.standing!.measuredAt).toBe(ago(45));
+      expect(card.standing!.freshness).toBe('stale');
+      expect(isVerified(card)).toBe(false);
+    });
+
+    it('a fresh verified scan wears the shield on its OWN number, not the camera\'s', () => {
+      const verifiedOnly = projectCard(profileOf([scan('verticalJump', 26, 2)]), { now: NOW })!;
+      const card = projectCard(profileOf([scan('verticalJump', 26, 2), cam('verticalJump', 40, 0)]), { now: NOW })!;
+      expect(isVerified(card)).toBe(true);
+      expect(card.standing!.composite).toBe(verifiedOnly.standing!.composite);
+      expect(card.standing!.measuredAt).toBe(ago(2));
+    });
+
+    it('a camera-only day adds no point to the trajectory, so one verified scan is still "cannot tell" (null), not "no change" (0)', () => {
+      // snapshotSeries: "One snapshot per day that had a measurement"; prqTrend: "null rather than zero, because 'no
+      // change' and 'we cannot tell' are different answers". A camera day is not a day something was measured.
+      const p = profileOf([scan('verticalJump', 26, 3), cam('verticalJump', 40, 0)]);
+      expect(p.prq).toHaveLength(1);
+      expect(prqTrend(p, ago(14))).toBeNull();
+    });
   });
 });

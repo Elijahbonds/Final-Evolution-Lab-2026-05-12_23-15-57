@@ -27,7 +27,7 @@
 // Pure: no Prisma, no DOM.
 
 import type { ScanRecord, PRQSnapshot } from './sharedProfile';
-import { PRQ_ATTRS, prqScore, type PrqAttr } from '../prq';
+import { PRQ_ATTRS, isPrqEstimate, prqScore, type PrqAttr } from '../prq';
 
 /** How one measured thing maps onto an axis. */
 export interface Measurement {
@@ -148,11 +148,13 @@ export function snapshotFrom(scans: readonly ScanRecord[], opts: SnapshotOptions
   const now = opts.now ?? Date.now();
   const maxAge = (opts.maxAgeDays ?? DEFAULT_MAX_SCAN_AGE_DAYS) * 86_400_000;
 
-  // newest first, so the freshest reading of each measurement wins
+  // newest first, so the freshest reading of each measurement wins. A camera ESTIMATE is not a scan: a snapshot
+  // carries sourceScanAt, and that is what the card's verified shield stands on (cardProgression.measuredSnapshot),
+  // which the owner ruled a camera estimate never earns (movement play, 2026-09-24).
   const usable = scans
     .filter((s) => {
       const t = Date.parse(s.measuredAt);
-      return Number.isFinite(t) && now - t <= maxAge && BY_KEY.has(s.attribute);
+      return Number.isFinite(t) && now - t <= maxAge && BY_KEY.has(s.attribute) && !isPrqEstimate(s.source);
     })
     .sort((a, b) => b.measuredAt.localeCompare(a.measuredAt));
 

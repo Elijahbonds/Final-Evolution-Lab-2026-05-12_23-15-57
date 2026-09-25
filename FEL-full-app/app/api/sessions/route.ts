@@ -4,13 +4,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
-import { computePrqDelta, MODE_ATTRS, prqScore, prqGrade } from '@/lib/prq';
+import { computePrqDelta, MODE_ATTRS, PRQ_CAMERA_SOURCE, prqScore, prqGrade } from '@/lib/prq';
 import { sanitizeTallies } from '@/lib/game-systems';
 import { createPrqEntry } from '@/lib/prq-entries';
 import { addSeasonXp } from '@/lib/season/season-service';
 import { recordMastery } from '@/lib/mastery/mastery-service';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { sessionHasPlay } from '@/lib/session-evidence';
+import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POWER_ATTR } from '@/lib/move/formSummary';
+import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +36,11 @@ export async function POST(req: Request) {
 
     if (!mode) return NextResponse.json({ error: 'mode required' }, { status: 400 });
 
+    // Movement play (phase 10): the body's form read, optional. Bounded here — finite, inside what a body produces,
+    // a height that agrees with its flight (g·t²/8), capped attempts — and a broken one is dropped, never the session.
+    const { form, issues: formIssues } = boundFormSummary(body?.form, { mode });
+    if (formIssues.length) console.warn('form read bounded:', formIssues.slice(0, 5).join('; '));
+
     const profile = await getOrCreateProfile(userId);
     const before = prqScore(profile as any);
 
@@ -41,7 +48,9 @@ export async function POST(req: Request) {
     // no input) is a mode left idle until its own clock ended it. It records no session and grants nothing — no XP, no
     // profile shards, no streak credits, no PRQ, no season XP, no mastery sample — and returns sessionId null so the shell's
     // "Session completed" coin earn has nothing to key on (lib/session-evidence.ts has the measured drift).
-    if (!sessionHasPlay({ score, won, hits, misses, dodges, combos, maxCombo, played: body?.played === true })) {
+    // a form read with anything read in it is the body having played (phase 3: body input counts as play), so a body
+    // run that scored 0 still keeps its reads ("every form read is saved to history")
+    if (!sessionHasPlay({ score, won, hits, misses, dodges, combos, maxCombo, played: body?.played === true || formHasReads(form) })) {
       await recordServerEvent({ name: 'session_noplay', userId, props: { mode, duration } });
       return NextResponse.json({
         ok: true, noPlay: true, sessionId: null,
@@ -76,7 +85,8 @@ export async function POST(req: Request) {
       attrData[a] = Math.min(100, Math.round((cur + prqDelta) * 100) / 100);
     }
 
-    const { updated, createdSession } = await prisma.$transaction(async (tx) => {
+    const at = new Date();
+    const { updated, createdSession, formWrite } = await prisma.$transaction(async (tx) => {
       // labCredits/xp/shards are pure counters — atomic increments so two
       // concurrent session submissions can't both read the same stale value
       // and drop one grant (the lost-update race a literal computed write allows).
@@ -100,11 +110,26 @@ export async function POST(req: Request) {
         const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: `session-lc:${(createdSession as any).id}`, metadata: { mode, won, streakDays, streakBonus: !!streakBonus } });
         newBalance = r.balanceAfter;
       }
+      // The form read is planned FIRST (pure: planFormWrite), stamped at the session's one moment `at`.
+      // REVIEW (2026-09-24, D2): ONE POWER READING. The game's power counter and a camera jump are on different scales
+      // and every latest-wins reader takes the newest row, so a measured jump replaces the session's drillResult power
+      // row rather than sitting 1 ms after it, and once a camera reading is on file no game session writes drillResult
+      // power again (formSummary.gameRowAttrs has the numbers).
+      const sid = (createdSession as any)?.id;
+      const formPlan = form && sid ? planFormWrite(form, { userId, sessionId: sid, measuredAt: at }) : null;
+
       // Task 3: emit drillResult PrqEntries for mode-relevant attributes.
       // prqDelta is the per-attribute gain; source = drillResult, linked to this session.
       if (prqDelta > 0) {
-        const sessionId = (createdSession as any)?.id;
-        for (const attr of attrs) {
+        const measuredNow = !!formPlan?.power;
+        // asked only when it decides something: the mode trains power and this session measured no jump
+        const onFile = !measuredNow && (attrs as readonly string[]).includes(CAMERA_POWER_ATTR)
+          ? (await tx.prqEntry.findFirst({
+              where: { userId, attribute: CAMERA_POWER_ATTR, source: PRQ_CAMERA_SOURCE },
+              select: { id: true },
+            })) !== null
+          : false;
+        for (const attr of gameRowAttrs(attrs, { measuredNow, onFile })) {
           const newVal = Number((updated as any)?.[attr] ?? 0);
           await createPrqEntry(tx, {
             userId,
@@ -112,15 +137,20 @@ export async function POST(req: Request) {
             value: Math.round(newVal * 100) / 100,
             unit: 'score',
             source: 'drillResult',
-            measuredAt: new Date(),
-            sessionId: sessionId ?? null,
+            measuredAt: at,
+            sessionId: sid ?? null,
           }).catch((err: any) => {
             console.warn('PrqEntry drillResult write skipped:', err?.message);
           });
         }
       }
 
-      return { updated, createdSession };
+      // The form read: every attempt to history, and the best measured jump to PRQ power as a camera estimate, at
+      // the same moment as the rows above (one session, one snapshot).
+      let formWrite: FormWriteResult | null = null;
+      if (formPlan) formWrite = await writeFormPlan(tx, formPlan);
+
+      return { updated, createdSession, formWrite };
     });
 
     const after = prqScore(updated as any);
@@ -176,6 +206,8 @@ export async function POST(req: Request) {
       mastery: mastery
         ? { mode: mastery.mode, tier: mastery.tier, tierIndex: mastery.tierIndex, ups: mastery.events }
         : null,
+      // null when no form was sent; `power` is the camera ESTIMATE (the end card says so), null when no jump was measured
+      form: form ? { attempts: form.attempts.length, stored: formWrite?.stored ?? 0, power: formWrite?.power ?? null, dropped: formIssues.length } : null,
     });
   } catch (e) {
     console.error('session error', e);

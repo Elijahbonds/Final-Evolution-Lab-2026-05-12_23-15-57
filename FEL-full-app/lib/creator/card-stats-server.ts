@@ -6,18 +6,19 @@ import { ageDaysOf, freshnessNote, freshnessOf } from './claimClock';
 import { bestSample, candidateHighlights, masteryLabel, maskStats, normalizeVisibility, recordsByMode, type HighlightCandidate, type PublicStats, type Visibility } from './card-stats';
 
 export async function computePublicStats(userId: string): Promise<PublicStats> {
-  const [profile, mastery, ladder, sessions, newest] = await Promise.all([
+  const [profile, mastery, ladder, sessions] = await Promise.all([
     composeProfile(userId),
     prisma.modeMastery.findMany({ where: { userId }, orderBy: { tier: 'desc' } }),
     prisma.ladderEntry.findMany({ where: { userId }, orderBy: { bestScore: 'desc' }, take: 1, include: { season: { select: { mode: true, weekStart: true } } } }),
     prisma.gameSession.findMany({ where: { userId }, select: { mode: true, score: true, won: true }, take: 500, orderBy: { createdAt: 'desc' } }),
-    // the card stored a snapshot and a snapshot has no clock — this is the timestamp the shield needs
-    prisma.prqEntry.findFirst({ where: { userId }, orderBy: { measuredAt: 'desc' }, select: { measuredAt: true } }),
   ]);
-  const measured = !!(profile.prq.measured && Object.keys(profile.prq.measured).length);
-  const prq = measured ? profile.prq.measured : profile.prq.card;
+  // The VOUCHED vector: camera estimates left out, so no shield ever sits on (or is dated by) a body-camera jump
+  // (movement play, 2026-09-24: the owner's "never the verified shield"). The coach's roster still sees them.
+  const measured = !!(profile.prq.vouched && Object.keys(profile.prq.vouched).length);
+  const prq = measured ? profile.prq.vouched : profile.prq.card;
 
-  const measuredAt = measured && newest ? newest.measuredAt.toISOString() : null;
+  // the card stored a snapshot and a snapshot has no clock — this is the timestamp the shield needs
+  const measuredAt = measured && profile.prq.vouchedAt ? profile.prq.vouchedAt.toISOString() : null;
   const ageDays = ageDaysOf(measuredAt, Date.now());
   const freshness = ageDays === null ? null : freshnessOf(ageDays);
   // an expired reading is withheld rather than shown with a caveat: a caveat is the thing that does not

@@ -229,7 +229,7 @@ function PrqDataRights() {
       const res = await fetch('/api/prq/delete', { method: 'POST' });
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast.success(`Deleted ${j.deleted ?? 0} PRQ entries`);
+        toast.success(`Deleted ${j.deleted ?? 0} PRQ entries and ${j.history ?? 0} movement history rows`);
         setShowConfirm(false);
         // Reload the page to refresh PRQ vector
         window.location.reload();
@@ -246,8 +246,10 @@ function PrqDataRights() {
   return (
     <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-5">
       <h3 className="fel-heading text-lg font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
+      {/* REVIEW (2026-09-24, D5): both buttons cover the movement history too (lib/prq-data-rights.ts), the numbers
+          worked out from the camera that the privacy policy sends people here to export or delete */}
       <p className="text-xs text-white/40 mb-4">
-        Export or delete your PRQ measurement data at any time.
+        Export or delete your PRQ measurements and your movement history (jumps, dunks, form reads and screens worked out from the camera) at any time.
       </p>
       <div className="flex flex-wrap gap-3">
         <button
@@ -262,11 +264,11 @@ function PrqDataRights() {
             onClick={() => setShowConfirm(true)}
             className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
           >
-            <Trash2 className="h-3.5 w-3.5" /> DELETE ALL PRQ DATA
+            <Trash2 className="h-3.5 w-3.5" /> DELETE PRQ + MOVEMENT HISTORY
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Are you sure? This is permanent.</span>
+            <span className="text-xs text-[#FF3366]">Deletes every PRQ entry and all movement history (Mirror dunks, screens, form reads). Bought plans stay. This is permanent.</span>
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -378,7 +380,8 @@ function PrqFoundation() {
           const color = val === null
             ? '#555'
             : val >= 80 ? '#A855F7' : val >= 60 ? '#00E5FF' : val >= 40 ? '#00FF9D' : '#FFD700';
-          const sourceLabel = m?.source === 'drillResult' ? 'Drill' : m?.source === 'device' ? 'Device' : m?.source === 'manual' ? 'Manual' : null;
+          // 'camera' = a body-camera jump, an estimate: the label says so (lib/prq.ts PRQ_CAMERA_SOURCE)
+          const sourceLabel = m?.source === 'drillResult' ? 'Drill' : m?.source === 'device' ? 'Device' : m?.source === 'manual' ? 'Manual' : m?.source === 'camera' ? 'Camera est.' : null;
           return (
             <motion.div
               key={attr.key}

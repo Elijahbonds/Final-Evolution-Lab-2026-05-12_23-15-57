@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { collectPrqExport } from '@/lib/prq-data-rights';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,32 +13,9 @@ export async function GET() {
   }
   const userId = session.user.id;
 
-  const [entries, sessions] = await Promise.all([
-    prisma.prqEntry.findMany({
-      where: { userId },
-      orderBy: { measuredAt: 'desc' },
-    }),
-    prisma.gameSession.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        mode: true,
-        score: true,
-        duration: true,
-        hits: true,
-        misses: true,
-        createdAt: true,
-      },
-    }),
-  ]);
-
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    userId,
-    prqEntries: entries,
-    gameSessions: sessions,
-  };
+  // REVIEW (2026-09-24, D5): the export carries the movement history too (every WorkoutScan row: the Mirror's dunks
+  // and screens, the movement screen, each session's form reads), which the privacy policy points here for.
+  const payload = await collectPrqExport(prisma, userId);
 
   return new NextResponse(JSON.stringify(payload, null, 2), {
     status: 200,

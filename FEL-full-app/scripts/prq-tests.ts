@@ -6,8 +6,10 @@
  * Coverage:
  *   PURE:
  *     - PRQ_SOURCES + PRQ_ATTRS are defined and disjoint
+ *       (manual | device | drillResult | camera — 'camera' is the body-camera ESTIMATE, movement play 2026-09-24)
  *     - ATTR_UNITS covers every PRQ attribute
  *     - DeviceSource seam interface exists and validator works
+ *     - camera requires sessionId, like drillResult (checked before any row is written, so no database)
  *   DB INTEGRATION (throwaway user, cleaned up):
  *     - Manual entry creates a traceable PrqEntry
  *     - No value without source+timestamp (enforced by createPrqEntry)
@@ -22,7 +24,7 @@ import 'dotenv/config';
 import assert from 'node:assert';
 import { PrismaClient } from '@/public/_prisma/client';
 
-import { PRQ_ATTRS } from '../lib/prq';
+import { PRQ_ATTRS, PRQ_CAMERA_SOURCE } from '../lib/prq';
 import {
   PRQ_SOURCES,
   ATTR_UNITS,
@@ -49,11 +51,14 @@ async function checkAsync(name: string, fn: () => Promise<void>) {
   console.log(`  \u2713 ${name}`);
 }
 
-function pureTests() {
+async function pureTests() {
   console.log('\nPURE LOGIC');
 
+  // MOVEMENT PLAY (2026-09-24): 'camera' joined the enum — the session's best measured jump, written as PRQ power by
+  // /api/sessions as an estimate (lib/prq.ts isPrqEstimate: it counts in the vector, never on the verified shield).
   check('PRQ_SOURCES is a valid enum set', () => {
-    assert.deepStrictEqual([...PRQ_SOURCES], ['manual', 'device', 'drillResult']);
+    assert.deepStrictEqual([...PRQ_SOURCES], ['manual', 'device', 'drillResult', PRQ_CAMERA_SOURCE]);
+    assert.equal(PRQ_CAMERA_SOURCE, 'camera');
   });
 
   check('ATTR_UNITS covers every PRQ attribute', () => {
@@ -72,6 +77,19 @@ function pureTests() {
     assert.equal(isDeviceSourceValid({ provider: 'apple_health', deviceId: 'x', syncedAt: new Date() }), true);
     assert.equal(isDeviceSourceValid({ provider: '', deviceId: 'x', syncedAt: new Date() }), false);
     assert.equal(isDeviceSourceValid({ provider: 'garmin', deviceId: '', syncedAt: new Date() }), false);
+  });
+
+  // createPrqEntry validates before it writes, so a client that throws on ANY touch proves the refusal needs no
+  // database (and that nothing was written): a camera estimate is traceable to the session that measured it.
+  const untouchable = new Proxy({}, { get: (_t, key) => { throw new Error(`database touched: ${String(key)}`); } });
+  await checkAsync('camera entry without sessionId rejected (before the database)', async () => {
+    await assert.rejects(
+      () => createPrqEntry(untouchable as any, {
+        userId: 'u', attribute: 'power', value: 42, unit: 'score',
+        source: PRQ_CAMERA_SOURCE, measuredAt: new Date(),
+      }),
+      /camera entries require a sessionId/
+    );
   });
 }
 
@@ -199,7 +217,7 @@ async function dbTests() {
 
 async function main() {
   console.log('PRQ / Digital-Twin Foundation — integrity tests');
-  pureTests();
+  await pureTests();
   await dbTests();
   console.log(`\nALL ${passed} CHECKS PASSED`);
 }

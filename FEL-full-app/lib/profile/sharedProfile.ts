@@ -36,7 +36,8 @@ export interface ScanRecord {
   attribute: string;
   value: number;
   unit: string;
-  /** manual | device | drillResult — how it was captured, which decides how much it is trusted. */
+  /** manual | device | drillResult | camera — how it was captured, which decides how much it is trusted (a camera
+   *  estimate never makes a snapshot: lib/prq.ts isPrqEstimate). */
   source: string;
   /** ISO 8601. Stored as a string on purpose: a Date does not survive JSON.parse. */
   measuredAt: string;

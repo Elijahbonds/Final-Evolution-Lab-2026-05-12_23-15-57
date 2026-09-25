@@ -29,6 +29,7 @@
 import 'server-only';
 import type { PrismaClient } from '@/public/_prisma/client';
 import { snapshotFrom } from './scanToSnapshot';
+import { isPrqEstimate } from '../prq';
 import {
   emptyProfile, type SharedProfile, type ScanRecord, type PRQSnapshot, type AcademyProgress,
   type PerformanceEntry,
@@ -51,9 +52,13 @@ function dayKey(iso: string): string {
  *
  * One snapshot per day that had a measurement, each built only from readings that existed on that day, so a
  * point on the line is never informed by the future. Oldest first.
+ *
+ * MOVEMENT PLAY (2026-09-24): a day with only camera ESTIMATES on it is not a day something was measured. snapshotFrom
+ * already leaves the estimate out, so that day would repeat the last verified snapshot as a second point, and one
+ * verified scan would read as "no change" (0) instead of "we cannot tell" (null).
  */
 export function snapshotSeries(scans: readonly ScanRecord[]): PRQSnapshot[] {
-  const days = [...new Set(scans.map((s) => dayKey(s.measuredAt)))].sort();
+  const days = [...new Set(scans.filter((s) => !isPrqEstimate(s.source)).map((s) => dayKey(s.measuredAt)))].sort();
   const out: PRQSnapshot[] = [];
   for (const day of days) {
     // end of that day, so a reading taken at 18:00 counts toward its own day

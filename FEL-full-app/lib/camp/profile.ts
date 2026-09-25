@@ -10,8 +10,8 @@ import { certificationStatusFor } from './certification';
 export const PRQ_ATTRS = ['strength', 'speed', 'endurance', 'agility', 'power', 'flexibility', 'recovery', 'mental'] as const;
 
 // the pure helpers live in ./deltas so they can be unit-tested without Prisma
-export { latestPerAttribute, prqDelta, numericDelta, toOutcomes } from './deltas';
-import { latestPerAttribute, prqDelta, numericDelta, toOutcomes } from './deltas';
+export { latestPerAttribute, prqDelta, numericDelta, toOutcomes, vouchedPrq } from './deltas';
+import { latestPerAttribute, prqDelta, numericDelta, toOutcomes, vouchedPrq } from './deltas';
 
 function safeAnalyze(metrics: unknown): unknown {
   try { return analyzeMovement(metrics as never); } catch { return null; }
@@ -27,6 +27,7 @@ export async function composeProfile(userId: string, since: Date | null = null) 
     prisma.facilitatorProfile.findUnique({ where: { userId } }),
   ]);
   const prqNow = latestPerAttribute(entries, null);
+  const vouched = vouchedPrq(entries);
   const prqThen = since ? latestPerAttribute(entries, since) : {};
   const latestScan = scans[0] ? safeAnalyze(scans[0].metrics) : null;
   const prevScan = scans[1] ? safeAnalyze(scans[1].metrics) : null;
@@ -34,6 +35,9 @@ export async function composeProfile(userId: string, since: Date | null = null) 
     prq: {
       card: profile ? Object.fromEntries(PRQ_ATTRS.map((k) => [k, (profile as unknown as Record<string, number>)[k]])) : null,
       measured: prqNow,
+      // what a verified shield may stand on: `measured` without the camera estimates, and the newest of those
+      vouched: vouched.values,
+      vouchedAt: vouched.newestAt,
       delta: since ? prqDelta(prqThen, prqNow) : null,
       entries: entries.length,
     },

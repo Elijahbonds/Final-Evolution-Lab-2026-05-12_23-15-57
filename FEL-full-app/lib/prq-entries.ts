@@ -2,8 +2,10 @@
  * lib/prq-entries.ts — PRQ / Digital-Twin Foundation.
  *
  * HONEST data model: every PRQ value has { source, measuredAt, unit }.
- * source enum: manual | device | drillResult.
+ * source enum: manual | device | drillResult | camera.
  * ‘device’ is a typed SEAM (interface only) — no integration in v1.
+ * ‘camera’ is a body-camera ESTIMATE (movement play, 2026-09-24): the session's best measured jump as power, written
+ * by /api/sessions only. It counts in the vector; no verified shield stands on it (lib/prq.ts isPrqEstimate).
  *
  * Integrity rules enforced in code:
  *   - No value without source + timestamp.
@@ -13,14 +15,16 @@
  */
 
 import { Prisma, type PrismaClient } from '@/public/_prisma/client';
-import { PRQ_ATTRS, type PrqAttr } from '@/lib/prq';
+import { PRQ_ATTRS, PRQ_CAMERA_SOURCE, type PrqAttr } from '@/lib/prq';
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;
 
 // ---------------------------------------------------------------------------
 // Source enum
 // ---------------------------------------------------------------------------
-export const PRQ_SOURCES = ['manual', 'device', 'drillResult'] as const;
+// 'camera' is its own value rather than 'device': 'device' is the seam for synced wearables (DeviceSource below:
+// provider + deviceId), and a camera estimate has neither.
+export const PRQ_SOURCES = ['manual', 'device', 'drillResult', PRQ_CAMERA_SOURCE] as const;
 export type PrqSource = (typeof PRQ_SOURCES)[number];
 
 // ---------------------------------------------------------------------------
@@ -99,6 +103,10 @@ export async function createPrqEntry(
   }
   if (input.source === 'drillResult' && !input.sessionId) {
     throw new Error('drillResult entries require a sessionId');
+  }
+  // a camera estimate is traceable to the session that measured it, like a drill result
+  if (input.source === PRQ_CAMERA_SOURCE && !input.sessionId) {
+    throw new Error('camera entries require a sessionId');
   }
 
   const row = await (db as any).prqEntry.create({
