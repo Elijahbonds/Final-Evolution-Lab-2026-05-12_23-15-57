@@ -15,7 +15,7 @@ import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AnimationGroup, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { boneNode } from './boneLookup';
 import { buildQuatClip, eulerQ, type QuatKeys } from './restPose';
-import { armChain, reachArm, anatomicalElbowPole, elbowBackDir } from './HandIK';
+import { armChain, reachArm, anatomicalElbowPole, elbowBackDir, type ArmChain } from './HandIK';
 import { frameAbove } from './TwoBoneIK';
 import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
@@ -41,6 +41,12 @@ export interface PoseKey {
   poles?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Ankle targets, body-local metres. */
   feet?: { Left?: [number, number, number]; Right?: [number, number, number] };
+  /**
+   * Knee pole directions for `feet` (body-local); default: the body's front. HOTFIX (2026-09-24): a knee toward the front is right
+   * for a stance and a lunge, but a bent leg reaching BEHIND a low pelvis then points its knee at the floor and through it — the
+   * Spider-Man's back leg has to turn its knee out to the side while it is bent and only face the court once it is nearly straight.
+   */
+  kneePoles?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Hips vertical offset (metres) — the only translation a clip carries. */
   hipsY?: number;
   /** A smooth clip eases to a stop on this key (zero velocity in and out): the top of a wind-up, a held accent. */
@@ -70,6 +76,30 @@ export const REF_LEG_LEN = 0.82;
 
 const ARM_BONES = ['LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm'];
 const LEG_BONES = ['LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg'];
+
+/** How far an elbow may close on the way between two keys beyond the more-closed of them before it counts as a fold (degrees). */
+export const ELBOW_FOLD_DIP_DEG = 10;
+/** The elbow's interior angle (180 = straight) for a forearm local rotation `fore`: the upper arm's line against the forearm's. */
+function elbowInterior(arm: ArmChain, fore: Quaternion): number {
+  const up = arm.elbow.position.scale(-1).normalize(), fo = arm.hand.position.applyRotationQuaternion(fore).normalize();
+  return (Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(up, fo)))) * 180) / Math.PI;
+}
+/**
+ * Whether playing from forearm rotation `from` to the arm's current one closes the elbow more than ELBOW_FOLD_DIP_DEG past both
+ * ends. Babylon's slerp and smoothKeys both take the short way round, and the short way between two deep bends about far-apart axes
+ * runs through a forearm lying inside the upper arm.
+ */
+export function elbowFoldsBetween(arm: ArmChain, from: Quaternion): boolean {
+  const to = arm.elbow.rotationQuaternion; if (!to) return false;
+  let mid = 180;
+  for (let u = 0.05; u < 1; u += 0.05) mid = Math.min(mid, elbowInterior(arm, Quaternion.Slerp(from, to, u)));
+  return Math.min(elbowInterior(arm, from), elbowInterior(arm, to)) - mid > ELBOW_FOLD_DIP_DEG;
+}
+/** Which side of the shoulder→hand line the elbow is on (world axes: a pole). */
+function elbowSide(arm: ArmChain): Vector3 {
+  const s = arm.shoulder.getAbsolutePosition(), e = arm.elbow.getAbsolutePosition().subtract(s), u = arm.hand.getAbsolutePosition().subtract(s).normalize();
+  return e.subtract(u.scale(Vector3.Dot(e, u))).normalize();
+}
 
 export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration: number, keys: PoseKey[], opts: PoseClipOpts = {}): AnimationGroup | null {
   // snapshot bind so every key is solved from the same start and the rig is left untouched
@@ -157,6 +187,8 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   /** DUNK MOTION phase 9: the dunk family's elbows are held to the arm's anatomy (opt out with `anatomicalPoles: false`). */
   const anatomical = opts.anatomicalPoles ?? (/^dunk_/.test(name) && !/^dunk_gather_/.test(name));   // (push 1-2's arms are low and authored true: the rule only re-rolled them — 84 forearm pops, p9f)
   const push = (bone: string, t: number, q: Quaternion) => { (out[bone] ??= []).push([t, q.clone()]); };
+  /** Each arm's last solved key: the forearm's local rotation, and the side of the shoulder→hand line its elbow was on. */
+  const lastArm: Partial<Record<'Left' | 'Right', { fore: Quaternion; side: Vector3 }>> = {};
   for (const key of keys) {
     restore();
     // 1) torso and any explicit bone keys
@@ -181,14 +213,42 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
         if (!key.poles?.[side]) { const nat = elbowBackDir(sh, world, bodyFrame.up, bodyFrame.front); if (nat.sagittal >= 0.35) poleW = nat.dir.add(bodyFrame.right.scale(side === 'Left' ? -0.6 : 0.6)).normalize(); }
         poleW = anatomicalElbowPole(poleW, sh, world, bodyFrame.up, bodyFrame.front);
       }
+      const upper0 = arm.shoulder.rotationQuaternion?.clone(), fore0 = arm.elbow.rotationQuaternion?.clone();
       reachArm(arm, world, poleW, 1);   // the pole is a body-frame direction too
       refresh();
+      // HOTFIX (2026-09-24): THE ELBOW DOES NOT PASS THROUGH THE UPPER ARM BETWEEN TWO KEYS. The rule above picks each key's side on
+      // its own, and it can jump: the ball hand whipping from the waist to the face (dunk_mocap 0.08 → 0.16, back → down) and the off
+      // arm lifting beside a torso leaning back (dunk_360_eastbay 1.0 → 1.25, back → front). Each key was a legal arm, but the forearm's
+      // bend is keyed as a local rotation, and between two bends past 90° about far-apart axes the shortest rotation goes through the
+      // fold: the elbow closed to 5° and 3° mid-segment on the sweep rig (rig-joint-tests, red in CI since phase 9). So a key whose arm
+      // would fold on the way in is re-solved with the elbow on the side nearest the one it was on at the key before, among the sides the
+      // rule allows and that do not fold. Measured: it fires on those two keys of the procedural body (224 clips) and nowhere else, and
+      // never on the 45 GLB bodies (the forge hero, the scan, both kits, the 41 athletes; 214 clips each) — which are only two distinct
+      // skeletons: 44 share the forge hero's joint heights, and the female kit differs from them in its hips and head alone.
+      const last = lastArm[side];
+      if (anatomical && last && upper0 && fore0 && elbowFoldsBetween(arm, last.fore)) {
+        const sh = arm.shoulder.getAbsolutePosition().clone(), u = world.subtract(sh).normalize();
+        const b1 = Vector3.Cross(u, Math.abs(u.x) < 0.9 ? Vector3.Right() : Vector3.Up()).normalize(), b2 = Vector3.Cross(u, b1);
+        let best = { upper: arm.shoulder.rotationQuaternion!.clone(), fore: arm.elbow.rotationQuaternion!.clone(), near: -Infinity };
+        for (let k = 0; k < 24; k++) {   // every 15° round the arm's line
+          const p = b1.scale(Math.cos((k * Math.PI) / 12)).addInPlace(b2.scale(Math.sin((k * Math.PI) / 12)));
+          if (!anatomicalElbowPole(p, sh, world, bodyFrame.up, bodyFrame.front).equalsWithEpsilon(p, 1e-6)) continue;   // the forbidden half
+          arm.shoulder.rotationQuaternion = upper0.clone(); arm.elbow.rotationQuaternion = fore0.clone(); refresh();
+          reachArm(arm, world, p, 1);
+          refresh();
+          const near = Vector3.Dot(elbowSide(arm), last.side);
+          if (near > best.near && !elbowFoldsBetween(arm, last.fore)) best = { upper: arm.shoulder.rotationQuaternion!.clone(), fore: arm.elbow.rotationQuaternion!.clone(), near };
+        }
+        arm.shoulder.rotationQuaternion = best.upper; arm.elbow.rotationQuaternion = best.fore; refresh();
+      }
+      if (arm.elbow.rotationQuaternion) lastArm[side] = { fore: arm.elbow.rotationQuaternion.clone(), side: elbowSide(arm) };
     }
     // 3) feet
     for (const side of ['Left', 'Right'] as const) {
       const tgt = key.feet?.[side]; if (!tgt) continue;
       const [h, k, a] = legs[side].map((b) => nodes.get(b)); if (!h || !k || !a) continue;
-      plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), bodyFrame.front);   // the knee toward the body's front
+      const kp = key.kneePoles?.[side];
+      plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), kp ? inBody(kp).normalize() : bodyFrame.front);   // the knee toward the body's front
       refresh();
     }
     // 4) read back local rotations for every bone the key touched

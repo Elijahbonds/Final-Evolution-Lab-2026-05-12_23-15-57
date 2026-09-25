@@ -342,5 +342,7 @@ export function mirrorKey(k: PoseKey): PoseKey {
     ...k,
     bones: Object.fromEntries(Object.entries(k.bones ?? {}).map(([bn, v]) => [bn, [v[0], -v[1], -v[2]] as V3])),
     hands: sw(k.hands), feet: sw(k.feet), poles: sw(k.poles),
+    // HOTFIX (2026-09-24): PoseKey.kneePoles is new; the spread above would carry it over on the wrong side with x un-negated.
+    ...(k.kneePoles ? { kneePoles: sw(k.kneePoles) } : {}),
   } as PoseKey;
 }

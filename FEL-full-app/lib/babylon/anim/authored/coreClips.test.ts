@@ -17,14 +17,16 @@ import { MOCAP_STYLE_CLIPS } from './mocapStyles';
 import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
-import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall, CELEB_SPIDERMAN_SEC } from './dunkCelebrations';
+import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall, CELEB_SPIDERMAN_SEC, CELEB_SPIDERMAN_KEYS } from './dunkCelebrations';
+import { buildPoseClip } from '../poseClip';
+import { mirrorPoseKeys } from '../poseMirror';
 import { buildEastbay } from './eastbay';
 import { EASTBAY_TIMING } from './timing';
 import { CRADLE_BACK, SCORPION_SEC, HIDE_SEEK_SEC, LOST_FOUND_SEC, SPIN_SEC, BEHIND_BACK_SEC, BEHIND_BACK_SWAP, FAKE_BACK_SEC, DOUBLE_EASTBAY_SEC, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, BEHIND_BACK_SEC as _BB, WINDMILL_360_SEC, FAKE_EASTBAY_SEC, TAP_SEC, TAP_STRIKE, buildWindmill360, buildFakeEastbay, buildTap, buildBehindBack, buildFakeBack, buildDoubleEastbay, buildSelfLob, buildBounceThrow, BOUNCE_THROW_CONTACT, buildKickUp, buildBackHandspring, buildBackflip, BACKFLIP_SEC, buildDoubleUp, buildScorpion, buildScorpionFlush, SCORPION_FLUSH_SEC, buildCartwheel, CARTWHEEL_SEC, CARTWHEEL_BOUNCE, buildSpin720, SPIN_720_SEC, KICK_UP_SEC, buildLostFound, buildHideSeek, buildSpin360, buildBetweenLegs, buildCradle, buildDoubleClutch, CRADLE_ROUND, CRADLE_SEC, CLUTCH_SEC, SELF_LOB_CONTACT, KICK_UP_CONTACT, LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BETWEEN_LEGS_SEC, FRONT_SWAP_SEC } from './dunkTricks';
 import { DUNK_TRICKS } from '../../core/DunkSystem';
 import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun } from './football';
 import { buildBaseClips } from './baseClips';
-import { buildStackBase, buildStackRider, STACK_SEC, STACK_DUCK_T } from './stackProp';
+import { buildStackBase, buildStackRider, buildDubbleKneel, STACK_SEC, STACK_DUCK_T } from './stackProp';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>();
@@ -100,6 +102,33 @@ describe('the tetris stack', () => {
       at(g, 0); const start = pos('Head').clone();
       at(g, STACK_SEC);
       expect(Vector3.Distance(pos('Head'), start)).toBeLessThan(0.05);
+    }
+  });
+});
+
+// HOTFIX (2026-09-24): THE DUBBLE UP's kneeler was drawn with straight legs and both ankles 0.25 m under the court — its hand and
+// foot targets were floor heights, and the Hips track lowered them another 0.42 (rig-floor-tests, red in CI since phase 10a). Its
+// hands never reached the floor either: the shoulders sat higher than a straight arm is long, and the wrists hung at 0.20 m.
+describe('the dubble kneel', () => {
+  const angle = (a: string, b: string, c: string) => {
+    const u = pos(a).subtract(pos(b)).normalize(), v = pos(c).subtract(pos(b)).normalize();
+    return (Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(u, v)))) * 180) / Math.PI;
+  };
+  it('is on all fours: knees on the floor under the hips, shins flat behind, hands on the floor under the shoulders', () => {
+    const g = fresh(() => buildDubbleKneel(scene, sk)!);
+    for (const t of [0, STACK_SEC / 2, STACK_SEC]) {
+      at(g, t);
+      for (const s of ['Left', 'Right']) {
+        expect(pos(`${s}Leg`).y, `${s} knee down`).toBeLessThan(0.18);
+        expect(pos(`${s}Foot`).y, `${s} ankle on the floor, not under it`).toBeGreaterThan(0.02);
+        expect(pos(`${s}Foot`).y, `${s} shin flat`).toBeLessThan(0.2);
+        expect(pos(`${s}Foot`).z, `${s} shin behind the knee`).toBeLessThan(pos(`${s}Leg`).z - 0.25);
+        // measured on the forge hero: wrists 0.05–0.06 m, elbows 168–178° (117–121° on the female kit), hands 0.09 m ahead of the shoulders
+        expect(pos(`${s}Hand`).y, `${s} wrist down at the floor`).toBeLessThan(0.09);
+        expect(pos(`${s}Hand`).y, `${s} wrist not through it`).toBeGreaterThan(0.02);
+        expect(angle(`${s}Arm`, `${s}ForeArm`, `${s}Hand`), `${s} arm bearing weight, not folded`).toBeGreaterThan(100);
+        expect(Math.abs(pos(`${s}Hand`).z - pos(`${s}Arm`).z), `${s} hand under the shoulder`).toBeLessThan(0.15);
+      }
     }
   });
 });
@@ -877,6 +906,50 @@ describe('the celebrations', () => {
     at(g, CELEB_SPIDERMAN_SEC);
     expect(pos('Hips').y, 'the splits: the hips near the floor').toBeLessThan(0.35);
     expect(Math.abs(pos('LeftFoot').z - pos('RightFoot').z), 'one leg ahead, one behind').toBeGreaterThan(1.2);
+    // HOTFIX (2026-09-24): …and the arms up to the building. The hand targets were floor heights, so the Hips track took them down
+    // with the body and the "arms up" ended at 0.22 m, by the knees.
+    expect(Math.min(pos('LeftHand').y, pos('RightHand').y), 'the arms up').toBeGreaterThan(pos('RightArm').y + 0.2);
+  });
+  // HOTFIX (2026-09-24): the slide went through the court (ankles to −0.33 m); the first fix kept it on the floor by lifting the hips
+  // 17 cm out of the crouch and dropping them again (0.36 → 0.53 → 0.24 m) — a hop. A slide only ever goes down.
+  it('the Spider-Man slides into the splits: the hips only go down, the feet run apart along the floor, nothing through it', () => {
+    const g = fresh(() => buildCelebSpidermanSplits(scene, sk)!);
+    let lowAnkle = 9, lowKnee = 9, highAnkle = -9, rise = 0, prevHips = 9;
+    for (let f = 0; f <= CELEB_SPIDERMAN_SEC * 30; f++) {
+      const t = f / 30;
+      at(g, t);
+      lowAnkle = Math.min(lowAnkle, pos('LeftFoot').y, pos('RightFoot').y);
+      if (t > 1.0) lowKnee = Math.min(lowKnee, pos('LeftLeg').y, pos('RightLeg').y);
+      if (t > 1.0 && t < 1.7) highAnkle = Math.max(highAnkle, pos('LeftFoot').y, pos('RightFoot').y);
+      if (t >= 0.95 && t <= 1.8) { rise = Math.max(rise, pos('Hips').y - prevHips); prevHips = pos('Hips').y; }
+    }
+    // measured on the forge hero: ankles −0.015 (the crouch) and 0.016–0.11 m in the slide, knees ≥ 0.054 m, the hips 0.36 → 0.12 m
+    expect(rise, 'the hips never rise between the crouch and the splits').toBeLessThan(1e-3);
+    expect(lowAnkle, 'no ankle under the court').toBeGreaterThan(-0.05);
+    expect(lowKnee, 'the back knee slides ON the floor').toBeGreaterThan(0.03);
+    expect(highAnkle, 'the feet slide along the floor, not kicked up').toBeLessThan(0.16);
+    at(g, 1.15);
+    expect(pos('RightFoot').z, 'mid-slide: the back foot already behind the hips').toBeLessThan(pos('Hips').z - 0.2);
+    expect(pos('LeftFoot').z, '…and the front foot out ahead of it').toBeGreaterThan(pos('RightFoot').z + 0.35);
+  });
+  // HOTFIX (2026-09-24): PoseKey.kneePoles is new, and mirrorPoseKeys built each key field by field: a left-leg-back Spider-Man made
+  // with it (the way dunkFlush makes its left-hand flush) lost the back knee's pole, and that knee went 0.13 m through the court.
+  it('mirrored (the left leg back), the Spider-Man still slides on the floor: the knee poles mirror with the feet', () => {
+    const g = fresh(() => buildPoseClip(scene, sk, 'dunk_celeb_spiderman_splits_mirrored', CELEB_SPIDERMAN_SEC, mirrorPoseKeys(CELEB_SPIDERMAN_KEYS))!);
+    let lowAnkle = 9, lowKnee = 9;
+    for (let f = 0; f <= CELEB_SPIDERMAN_SEC * 30; f++) {
+      const t = f / 30;
+      if (t <= 1.0) continue;
+      at(g, t);
+      lowAnkle = Math.min(lowAnkle, pos('LeftFoot').y, pos('RightFoot').y);
+      lowKnee = Math.min(lowKnee, pos('LeftLeg').y, pos('RightLeg').y);
+    }
+    // measured on the forge hero: knees ≥ 0.054 m, the same as the authored side (−0.126 m with the pole dropped)
+    expect(lowKnee, 'the back (left) knee slides ON the floor').toBeGreaterThan(0.03);
+    expect(lowAnkle, 'no ankle under the court').toBeGreaterThan(-0.05);
+    at(g, 1.15);
+    expect(pos('LeftFoot').z, 'mid-slide: the LEFT foot behind the hips').toBeLessThan(pos('Hips').z - 0.2);
+    expect(pos('RightFoot').z, '…and the right foot out ahead of it').toBeGreaterThan(pos('LeftFoot').z + 0.35);
   });
   it('Carter: "it\'s over" — the arms wide, then crossed in front, palms down', () => {
     const g = fresh(() => buildCelebItsOver(scene, sk)!);

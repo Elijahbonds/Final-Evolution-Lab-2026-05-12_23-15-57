@@ -198,18 +198,32 @@ export function buildDubbleHold(scene: Scene, sk: Skeleton): AnimationGroup | nu
 }
 
 /**
- * DUNK MOTION phase 10: THE DUBBLE UP's line — kneeling on all fours, head tucked, a low table (~0.75 m) nose to tail, the way a line of
+ * DUNK MOTION phase 10: THE DUBBLE UP's line — kneeling on all fours, head tucked, a low table (~0.65 m) nose to tail, the way a line of
  * people makes itself small for a dunker to go over (a line of bent-over people at hands-on-knees height was 1 m, and the first back
  * sits half a metre after the take-off: the feet cannot rise over it that fast).
  */
 export function buildDubbleKneel(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const key = (t: number, breathe: number) => ({
-    t,
-    bones: { Hips: [58, 0, 0] as Deg3, Spine: [18, 0, 0] as Deg3, Neck: [26, 0, 0] as Deg3 },
-    // knees on the floor under the hips, shins flat behind; hands flat on the floor under the shoulders
-    feet: { Left: [-0.14, 0.12, -0.42] as V3, Right: [0.14, 0.12, -0.42] as V3 },
-    hands: { Left: [-0.2, 0.06 + breathe, 0.55] as V3, Right: [0.2, 0.06 + breathe, 0.55] as V3 },
-    poles: { Left: [-0.4, 0.2, -0.9] as V3, Right: [0.4, 0.2, -0.9] as V3 }, hipsY: -0.42 + breathe,
-  });
+  // HOTFIX (2026-09-24): a hand or foot target is its height ABOVE THE FLOOR less the key's hipsY (dunkTakeoff's `foot`): the limbs
+  // are solved on an unlowered body and the Hips track then lowers them with it. Written as floor heights, this pose put both legs
+  // dead straight and both ankles 0.25 m under the court (rig-floor-tests, red in CI since phase 10a) — the kneel it describes was
+  // never drawn. And the hands could not reach the floor at all: with the back pitched 76° the shoulders sat 0.68–0.72 m up, higher
+  // than a straight arm is long, so the wrists hung at 0.20 m. The back is pitched past level now (Hips 70 + Spine 28, head tucked,
+  // shoulders a touch below the hips), and the hand target is the floor itself (the arm solver pulls a target toward the shoulder by the
+  // body's arm length, so the wrist lands a few centimetres up). Measured: wrists 0.05–0.06 m with the arms near straight (168–178°) on
+  // the forge hero (the male kit and the athletes share its joint heights), 0.05 m with soft elbows (117–121°) on the female kit,
+  // 0.09–0.10 m straight on the procedural sweep body; knees 0.07–0.13 m, ankles 0.11–0.12 m; hips and shoulder joints 0.53–0.55 m up
+  // on the forge hero, so the table is ~0.65 m, not the ~0.75 m first written (that height is what left the hands in the air).
+  // (Registered but unplayed today: the Dubble Up's line has stood tall since the owner's 2026-09-24 call.)
+  const key = (t: number, breathe: number) => {
+    const hipsY = -0.42 + breathe, floor = (y: number) => y - hipsY;
+    return {
+      t,
+      bones: { Hips: [70, 0, 0] as Deg3, Spine: [28, 0, 0] as Deg3, Neck: [26, 0, 0] as Deg3 },
+      // knees on the floor under the hips, shins flat behind; hands on the floor under the shoulders
+      feet: { Left: [-0.14, floor(0.12), -0.42] as V3, Right: [0.14, floor(0.12), -0.42] as V3 },
+      hands: { Left: [-0.2, floor(0), 0.55] as V3, Right: [0.2, floor(0), 0.55] as V3 },
+      poles: { Left: [-0.4, 0.2, -0.9] as V3, Right: [0.4, 0.2, -0.9] as V3 }, hipsY,
+    };
+  };
   return buildPoseClip(scene, sk, 'prop_dubble_kneel', STACK_SEC, [key(0, 0), key(STACK_SEC / 2, 0.01), key(STACK_SEC, 0)]);
 }

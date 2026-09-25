@@ -34,8 +34,22 @@ jobs:
           cache: npm
           cache-dependency-path: FEL-full-app/package-lock.json
       - run: npm ci
+      # HOTFIX (2026-09-24): the generated client under public/_prisma/client is committed and ships AS COMMITTED (nothing
+      # regenerates it in the cloud). npm ci's postinstall has just regenerated it from the committed schema copy, so the third
+      # check in lib/db/prismaSchemaSync.test.ts only ever saw a fresh client and could not fail. If regenerating changed the
+      # committed client's schema, the commit is missing the regenerated client. Only schema.prisma is compared: index.js and
+      # edge.js embed the absolute output path, which differs per machine; schema.prisma is Prisma's formatted copy of the
+      # schema and regenerates byte-identically (measured locally on 6.7.0).
+      - name: generated Prisma client is committed in sync
+        run: git diff --exit-code -- public/_prisma/client/schema.prisma
       - name: sync deploy Prisma schema
         run: node scripts/copy-prisma-schema.mjs
+      # HOTFIX (2026-09-24): the hosting packager ships public/_prisma/schema.prisma AS COMMITTED, so a schema change
+      # whose copy was not committed deploys a client that has never heard of the new tables. lib/db/prismaSchemaSync.test.ts
+      # guards that, but here it ran after the step above had already rewritten the copy, so it could never fail in CI.
+      # The copy is regenerated from the source: if that changed a committed file, the commit is missing it.
+      - name: deploy Prisma schema is committed in sync
+        run: git diff --exit-code -- public/_prisma/schema.prisma
       - run: npx prisma generate
       - name: type-check
         run: npx tsc --noEmit

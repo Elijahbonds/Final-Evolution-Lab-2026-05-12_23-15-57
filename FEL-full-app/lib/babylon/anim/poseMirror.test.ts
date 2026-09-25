@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { mirrorPoseKeys } from './poseMirror';
 import { boneNode } from './boneLookup';
 import { FLUSH_ONE, buildFlushOne, buildFlushLeft, buildFlushTwo, buildCarryUpOne, buildCarryUpLeft, buildCarryUpTwo } from './authored/dunkFlush';
+import { CELEB_SPIDERMAN_KEYS } from './authored/dunkCelebrations';
 
 describe('poseMirror — the same movement, other side of the body', () => {
   it('swaps the sides, reflects x, keeps pitch and flips yaw / roll', () => {
@@ -16,8 +17,16 @@ describe('poseMirror — the same movement, other side of the body', () => {
     expect(m.bones).toEqual({ Spine: [10, -20, -5], RightUpLeg: [-30, -0, -8] });
     expect(m.hipsY).toBe(-0.1); expect(m.hold).toBe(true); expect(m.t).toBe(0.2);
   });
+  // HOTFIX (2026-09-24): PoseKey.kneePoles (the Spider-Man's back leg) was dropped here — the mirrored knee pointed at the front again.
+  it('mirrors the knee poles like the elbow poles: sides swapped, x negated', () => {
+    const [m] = mirrorPoseKeys([{ t: 1.15, feet: { Right: [0.18, 0.77, -0.32] }, kneePoles: { Right: [1, -0.4, -0.5] } }]);
+    expect(m.feet).toEqual({ Left: [-0.18, 0.77, -0.32] });
+    expect(m.kneePoles).toEqual({ Left: [-1, -0.4, -0.5] });
+    expect(mirrorPoseKeys([{ t: 0 }])[0]).not.toHaveProperty('kneePoles');
+  });
   it('mirroring twice is the identity', () => {
     expect(mirrorPoseKeys(mirrorPoseKeys(FLUSH_ONE))).toEqual(JSON.parse(JSON.stringify(FLUSH_ONE)).map((k: Record<string, unknown>) => k));
+    expect(mirrorPoseKeys(mirrorPoseKeys(CELEB_SPIDERMAN_KEYS)), 'the Spider-Man, knee poles and all').toEqual(JSON.parse(JSON.stringify(CELEB_SPIDERMAN_KEYS)));
   });
 });
 

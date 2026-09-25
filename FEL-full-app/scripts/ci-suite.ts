@@ -3,8 +3,8 @@
  * scripts/ci-suite.ts — full CI regression runner.
  *
  * Where `standing-suite.ts` runs a hand-maintained list, this runner DISCOVERS
- * every `scripts/*-tests.ts` plus `scripts/ledger-invariants.ts`. Nothing can be
- * added to the tree and silently skipped.
+ * every `scripts/*-tests.ts` plus the EXTRA_SUITES below (`ledger-invariants.ts`,
+ * `smokeTest.ts`). Nothing can be added to the tree and silently skipped.
  *
  * INTEGRATION NOTE (2026-09-16). This was written on 2026-09-10 and never merged;
  * it sat on claude/outstanding-tasks-deployment-helayq while the dev line moved
@@ -54,8 +54,14 @@ const DB_SUITES = new Set([
   'wallet-tests.ts',
 ]);
 
-/** Non-`*-tests.ts` files that are nonetheless real regression suites. */
-const EXTRA_SUITES = ['ledger-invariants.ts'];
+/**
+ * Non-`*-tests.ts` files that are nonetheless real regression suites.
+ *
+ * smokeTest.ts (HOTFIX, 2026-09-24): the M31 zero-black-screen gate — every /play route ships a page, every active mode
+ * mounts a world, the harness arms and disarms the RenderWatchdog — matched no pattern here, so nothing had run it since
+ * it was imported. It is static and green (10 checks).
+ */
+const EXTRA_SUITES = ['ledger-invariants.ts', 'smokeTest.ts'];
 
 type Status = 'pass' | 'fail' | 'skip';
 interface Result {

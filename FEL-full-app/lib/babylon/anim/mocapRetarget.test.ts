@@ -85,6 +85,9 @@ describe('mocapRetarget — any capture becomes body-local pose keys in the rig\
     const r = retargetToPoseKeys(stream(hold(body({ rightHand: [60, 140, 30] }))), { from: 0, to: 0.6, smoothSec: 0 });
     const m = mirrorKey(r.keys[0]);
     expect(m.hands!.Left![0]).toBeCloseTo(-r.keys[0].hands!.Right![0], 5);
+    // HOTFIX (2026-09-24): PoseKey.kneePoles rode the spread on the wrong side, x un-negated
+    expect(mirrorKey({ ...r.keys[0], kneePoles: { Right: [1, -0.4, -0.5] } }).kneePoles).toEqual({ Left: [-1, -0.4, -0.5], Right: undefined });
+    expect(m).not.toHaveProperty('kneePoles');
     const keys = r.keys.map((k, i) => ({ ...k, hipsY: i * -0.01 }));
     const looped = closeLoop(keys);
     expect(looped[looped.length - 1].hipsY).toBeCloseTo(looped[0].hipsY!, 5);

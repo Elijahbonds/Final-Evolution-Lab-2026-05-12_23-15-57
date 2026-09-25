@@ -27,10 +27,14 @@ export function mirrorPoseKeys(keys: PoseKey[]): PoseKey[] {
     const m: PoseKey = { t: k.t };
     if (k.bones) m.bones = Object.fromEntries(Object.entries(k.bones).map(([b, d]) => [swapBone(b), flipDeg(d)]));
     const hands = sides(k.hands, flipX), handsRel = sides(k.handsRel, flipX), poles = sides(k.poles, flipX), feet = sides(k.feet, flipX);
+    // HOTFIX (2026-09-24): the knee poles too (PoseKey.kneePoles, new for the Spider-Man's back leg). Built field by field, this
+    // mirror dropped them, and a mirrored bent leg behind a low pelvis would point its knee at the front again — through the court.
+    const kneePoles = sides(k.kneePoles, flipX);
     if (hands) m.hands = hands;
     if (handsRel) m.handsRel = handsRel;
     if (poles) m.poles = poles;
     if (feet) m.feet = feet;
+    if (kneePoles) m.kneePoles = kneePoles;
     if (k.hipsY != null) m.hipsY = k.hipsY;
     if (k.hold) m.hold = true;
     return m;
