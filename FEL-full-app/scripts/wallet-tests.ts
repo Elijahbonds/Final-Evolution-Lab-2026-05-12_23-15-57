@@ -24,7 +24,7 @@ import {
 import {
   validateChain, chainScoreCeiling, validateDunkAttempt, payloadHash,
 } from '../lib/wallet/validation';
-import { CATALOG, COIN_PACKS, coinPackForPrice, getSku, COIN_STORE_PACKS, getCoinStorePack, coinStorePackTotal } from '../lib/wallet/catalog';
+import { CATALOG, COIN_PACKS, coinPackForPrice, getSku, skuOnSale, COIN_STORE_PACKS, getCoinStorePack, coinStorePackTotal } from '../lib/wallet/catalog';
 import {
   earn, spend, grantCoinPurchase, grantShardPurchase, refundCoins, readWallet, derivedBalances, resolveRule, WalletError, applyLc,
 } from '../lib/wallet/wallet-service';
@@ -351,16 +351,20 @@ async function dbTests() {
 
     // CASE 2 — concurrent spend can never go negative.
     await checkAsync('concurrent spend cannot drive balance negative', async () => {
-      // Dedicated user so the starting balance is DETERMINISTIC (100 coins),
-      // independent of coins accumulated by earlier cases on the main user.
+      // Dedicated user so the starting balance is DETERMINISTIC (exactly two units' worth),
+      // independent of shards accumulated by earlier cases on the main user.
+      // HOTFIX (2026-09-24): this used the 50-coin retry token, which is deleted from the catalog. No coin SKU left is
+      // consumable (the wearables are one-off), so it buys the 4-week plan instead: consumable, on sale, and bought
+      // through spend() by /api/v1/workout/plan. The wallet is funded with shards to match.
       const cu = await prisma.user.create({
         data: { email: `__walletcc_${stamp}@fel.test`, name: 'Wallet CC', password: 'x' },
         select: { id: true },
       });
       try {
-        await grantCoinPurchase(prisma, { playerId: cu.id, coins: 100, idempotencyKey: `fund_${stamp}` });
-        const sku = getSku('dunk_retry_token')!; // 50 coins each
-        const n = 3; // 3 * 50 = 150 > 100 → exactly 2 can succeed
+        const sku = getSku('workout_plan_4w')!; // 60 shards each
+        assert.ok(sku && sku.consumable && skuOnSale(sku.skuId), 'the SKU bought here must exist, be on sale and be consumable');
+        await grantShardPurchase(prisma, { playerId: cu.id, shards: 2 * sku.unitPrice, idempotencyKey: `fund_${stamp}` });
+        const n = 3; // 3 * 60 = 180 > 120 → exactly 2 can succeed
         const results = await Promise.allSettled(
           Array.from({ length: n }, (_, i) =>
             spend(prisma, { playerId: cu.id, idempotencyKey: `spend_${stamp}_${i}`, skuId: sku.skuId, quantity: 1 })),
@@ -373,8 +377,8 @@ async function dbTests() {
           if (r.status === 'rejected') assert.ok(r.reason instanceof WalletError && r.reason.code === 'INSUFFICIENT_FUNDS');
         }
         const bal = await readWallet(prisma, cu.id);
-        assert.ok(bal.coins >= 0, 'balance never negative');
-        assert.equal(bal.coins, 0, 'balance is exactly zero after two 50-coin spends');
+        assert.ok(bal.shards >= 0, 'balance never negative');
+        assert.equal(bal.shards, 0, 'balance is exactly zero after two spends of the whole funding');
       } finally {
         await prisma.user.delete({ where: { id: cu.id } }).catch(() => {});
       }

@@ -34,7 +34,7 @@ describe('/store, Spend Your Balance', () => {
     }
   });
 
-  it('no coin pack promises a retry token, which is sold nowhere', () => {
+  it('no coin pack promises a retry token, which no longer exists', () => {
     expect(html).not.toMatch(/retry token/i);
     for (const p of COIN_STORE_PACKS) expect(p.blurb, p.id).not.toMatch(/retry token/i);
   });

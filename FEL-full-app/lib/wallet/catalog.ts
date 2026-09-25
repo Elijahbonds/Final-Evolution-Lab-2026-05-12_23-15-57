@@ -18,15 +18,14 @@ export interface CatalogSku {
   consumable: boolean;
 }
 
+// HOTFIX (2026-09-24): three SKUs nothing ever read (a dunk retry token, a dunk style slot and a paid scan) are deleted,
+// by the owner's call. The generic spend route had already stopped selling them; now spend() refuses any purchase of
+// them as UNKNOWN_SKU. The ledger rows and entitlements of old purchases still carry their ids.
 export const CATALOG: Record<string, CatalogSku> = {
-  dunk_retry_token: { skuId: 'dunk_retry_token', currency: 'coins', unitPrice: 50, consumable: true },
-
   // ── M28 extra creative-card slot (SHARD sink) ──
   creative_card_slot: { skuId: 'creative_card_slot', currency: 'shards', unitPrice: 200, consumable: false }, // TUNE(elijah)
-  dunk_style_slot: { skuId: 'dunk_style_slot', currency: 'shards', unitPrice: 5, consumable: false },
 
   // ── M17 personalized workouts (SHARD sinks — premium, creates shard demand) ──
-  scan_personalized:   { skuId: 'scan_personalized',   currency: 'shards', unitPrice: 25,  consumable: true },
   workout_plan_4w:     { skuId: 'workout_plan_4w',     currency: 'shards', unitPrice: 60,  consumable: true },
   workout_program_12w: { skuId: 'workout_program_12w', currency: 'shards', unitPrice: 200, consumable: true },
 
@@ -90,7 +89,7 @@ export function skuOnSale(skuId: string): boolean {
 //   - the creative card slot is counted by the card creator, not read from the entitlement;
 //   - the Music Room keeps its kits on the device and charges under its own key, so a kit was paid twice, and it
 //     charges each Cell foundation as it is used, so a bought one sat unused;
-//   - dunk_retry_token, dunk_style_slot and scan_personalized have no reader anywhere, so they are sold nowhere;
+//   - three SKUs had no reader anywhere, so they were sold nowhere, and are now deleted (see CATALOG);
 //   - the boost cards do read the entitlement, but they have their own route (app/api/cards/boosts), which refuses a
 //     card already owned. The Profile's boost shelf sells them there.
 // Each of those is still sold where it is delivered, by a route that calls spend() directly. The generic route keeps
@@ -130,7 +129,7 @@ export interface CoinStorePack {
 
 // TUNE(elijah) — pack sizing / pricing ladder.
 export const COIN_STORE_PACKS: CoinStorePack[] = [
-  { id: 'coins_starter', coins: 500,  bonus: 0,    priceUsdCents: 199,  label: 'Starter Stack', blurb: 'A quick top-up for the Closet.' }, // HOTFIX (2026-09-24): a retry token is sold nowhere (see SPEND_ROUTE_SKUS)
+  { id: 'coins_starter', coins: 500,  bonus: 0,    priceUsdCents: 199,  label: 'Starter Stack', blurb: 'A quick top-up for the Closet.' }, // HOTFIX (2026-09-24): the blurb promised a retry token; that SKU delivered nothing and is deleted
   { id: 'coins_pro',     coins: 1500, bonus: 150,  priceUsdCents: 499,  label: 'Pro Pouch',     blurb: '+150 bonus coins.', tag: 'Popular' },
   { id: 'coins_elite',   coins: 3500, bonus: 500,  priceUsdCents: 999,  label: 'Elite Vault',   blurb: '+500 bonus coins.', tag: 'Best value' },
   { id: 'coins_legend',  coins: 8000, bonus: 2000, priceUsdCents: 1999, label: 'Legend Hoard',  blurb: '+2000 bonus coins for the grind.' },

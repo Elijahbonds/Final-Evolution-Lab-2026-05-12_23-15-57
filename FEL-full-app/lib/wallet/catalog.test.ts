@@ -36,14 +36,44 @@ describe('what the generic spend route may sell', () => {
     for (const id of SPEND_ROUTE_SKUS) expect(NOT_ON_SALE.has(id), id).toBe(true);
   });
 
-  it('leaves every SKU that another route delivers, and every SKU nothing reads, off it', () => {
+  it('leaves every SKU that another route delivers off it', () => {
     for (const id of [
-      'dunk_retry_token', 'dunk_style_slot', 'scan_personalized', // nothing reads these anywhere
       'workout_plan_4w', 'workout_program_12w', 'session_group_workout', 'seminar_seat', 'private_1on1',
       'creative_card_slot', 'music_cell_assist', 'boost_card_neural-max', 'top_lab',
     ]) {
       expect(CATALOG[id], id).toBeDefined();
       expect(SPEND_ROUTE_SKUS.has(id), id).toBe(false);
+    }
+  });
+});
+
+// Owner decision 2026-09-24: the three SKUs nothing ever read are deleted from the catalog, not just kept off sale.
+// Old ledger rows and entitlements still carry these ids; nothing in the catalog does.
+const DELETED = ['dunk_retry_token', 'dunk_style_slot', 'scan_personalized'];
+
+describe('the SKUs nothing read', () => {
+  it('are gone from the catalog: unknown, not on sale, not held, not on the spend route', () => {
+    for (const id of DELETED) {
+      expect(CATALOG[id], id).toBeUndefined();
+      expect(getSku(id), id).toBeNull();
+      expect(skuOnSale(id), id).toBe(false);
+      expect(NOT_ON_SALE.has(id), id).toBe(false);
+      expect(SPEND_ROUTE_SKUS.has(id), id).toBe(false);
+    }
+  });
+
+  it('spend() refuses each as an unknown SKU before it reads anything, even a retried key', async () => {
+    const db = new Proxy({}, {
+      get: (_t, prop) => {
+        if (prop === 'then') return undefined; // not a thenable
+        throw new Error(`spend touched prisma.${String(prop)}`);
+      },
+    }) as never;
+    for (const skuId of DELETED) {
+      const err = await spend(db, { playerId: 'p1', idempotencyKey: `k_${skuId}`, skuId, quantity: 1 })
+        .then(() => null, (e: unknown) => e);
+      expect(err, skuId).toBeInstanceOf(WalletError);
+      expect((err as WalletError).code, skuId).toBe('UNKNOWN_SKU');
     }
   });
 });
@@ -75,10 +105,14 @@ describe('spend() and a held SKU', () => {
   });
 
   it('a retried key of a pass bought before the hold gets its original receipt back, not a refusal', async () => {
-    const prior = { id: 'entry_1', currency: 'shards', delta: BigInt(-40) };
-    const wallet = { coins: BigInt(5), shards: BigInt(60), lc: BigInt(0), version: BigInt(3), updatedAt: new Date(0) };
+    // the player's own charge of this same SKU, and no refund of it: a retry, not another purchase's key
+    const prior = {
+      id: 'entry_1', walletId: 'w1', currency: 'shards', delta: BigInt(-40), reasonCode: 'SPEND_CATALOG_ITEM', idempotencyKey: 'k_old',
+      metadata: { skuId: 'class_pass_single', quantity: 1, unitPrice: 40 }, createdAt: new Date(0),
+    };
+    const wallet = { id: 'w1', coins: BigInt(5), shards: BigInt(60), lc: BigInt(0), version: BigInt(3), updatedAt: new Date(0) };
     const db = {
-      walletLedgerEntry: { findUnique: vi.fn(async () => prior) },
+      walletLedgerEntry: { findUnique: vi.fn(async ({ where }: { where: { idempotencyKey: string } }) => (where.idempotencyKey === 'k_old' ? prior : null)) },
       wallet: { findUnique: vi.fn(async () => wallet), create: vi.fn(), updateMany: vi.fn() },
       $transaction: vi.fn(async () => { throw new Error('a replay must not open a transaction'); }),
     };

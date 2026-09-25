@@ -34,8 +34,6 @@ import {
   isLoopClip,
   resolveConcreteClip,
   CLIP_ALIASES,
-  MOCAP_DESCRIPTORS,
-  descriptorsForMode,
 } from '../lib/anim/clip-registry';
 import { AvatarDriver, type DriveTarget } from '../lib/anim/avatar-driver';
 import {
@@ -214,7 +212,7 @@ t('FSM: one-shot mode phase (victory) latches as a sequence', () => {
   assert.ok(isValidDecision(d));
 });
 
-/* ─────────────────── clip-registry resolution + descriptors ────────────── */
+/* ─────────────────────── clip-registry resolution ─────────────────────── */
 console.log('Clip registry:');
 
 t('resolveConcreteClip(): never null when the avatar has any clips', () => {
@@ -230,24 +228,6 @@ t('resolveConcreteClip(): unknown logical name still falls back, never null', ()
   const available = ['karate_idle_stance', 'run_forward'];
   const c = resolveConcreteClip('totally_made_up_clip', available);
   assert.ok(c && available.includes(c), 'must fall back to an available clip');
-});
-
-t('MOCAP_DESCRIPTORS: all 10 batch-5 descriptors present with routing metadata', () => {
-  const keys = Object.keys(MOCAP_DESCRIPTORS);
-  assert.equal(keys.length, 10, `expected 10 descriptors, got ${keys.length}`);
-  for (const k of keys) {
-    const d = MOCAP_DESCRIPTORS[k];
-    assert.ok(d.clip && d.clip.length > 0);
-    assert.ok(Array.isArray(d.modes));
-  }
-});
-
-t('descriptorsForMode(): known mode returns at least one descriptor', () => {
-  const anyMode = MOCAP_DESCRIPTORS[Object.keys(MOCAP_DESCRIPTORS)[0]].modes[0];
-  if (anyMode) {
-    const list = descriptorsForMode(anyMode);
-    assert.ok(Array.isArray(list));
-  }
 });
 
 /* ─────────────────────────── avatar driver ────────────────────────────── */

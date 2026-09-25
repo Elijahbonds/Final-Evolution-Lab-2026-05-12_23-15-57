@@ -4,9 +4,12 @@
  * M7a — canonical animation clip registry.
  *
  * Ports the donor `nexus::gameplay::clips` namespace
- * (gameplay__character_anim_state.h) into a typed TS const map, and folds in
- * the 10 mocap descriptor JSONs shipped in batch 5
- * (public/mocap/descriptors/anim_*.json) as registry metadata.
+ * (gameplay__character_anim_state.h) into a typed TS const map.
+ *
+ * HOTFIX (2026-09-24): the 10 batch-5 mocap descriptors (MOCAP_DESCRIPTORS,
+ * public/mocap/descriptors/) are gone. Nothing read them, and the SEELE pack
+ * they named is licensed to the owner and "not redistributable outside this
+ * project".
  *
  * This is the SINGLE source of truth for logical clip names. The animation
  * state machine (state-machine.ts) resolves game state into one of these
@@ -156,96 +159,6 @@ const LOOPING = new Set<string>([
 
 export function isLoopClip(name: string): boolean {
   return LOOPING.has(name);
-}
-
-/* ────────────────────────────────────────────────────────────────────────
- * Mocap descriptors (batch 5) — folded-in metadata.
- * Each descriptor routes a logical clip into its ABP / blend-space / modes.
- * Descriptor JSON lives at public/mocap/descriptors/<id>.json (FBX urls).
- * ──────────────────────────────────────────────────────────────────────── */
-export interface MocapDescriptor {
-  id: string;
-  clip: string; // logical clip name it feeds
-  abp: string | null; // animation blueprint bucket
-  blendSpace: string | null; // blend-space membership (locomotion)
-  loop: boolean;
-  modes: string[]; // game modes that consume this clip
-  descriptorPath: string; // public path to the JSON descriptor
-}
-
-export const MOCAP_DESCRIPTORS: Record<string, MocapDescriptor> = {
-  standing_idle: {
-    id: 'anim_standing_idle', clip: CLIPS.idle, abp: 'ABP_Shared',
-    blendSpace: 'BS_Shared_Locomotion', loop: true,
-    modes: ['basketball_h2h', 'basketball_dunk', 'basketball_3v3', 'karate_h2h',
-      'karate_endless', 'baseball', 'football', 'soccer', 'golf', 'tennis',
-      'volleyball', 'surfing', 'gymnastics', 'brain_brawl'],
-    descriptorPath: '/mocap/descriptors/anim_standing_idle.json',
-  },
-  sprint_run_loop: {
-    id: 'anim_sprint_run_loop', clip: CLIPS.sprint, abp: 'ABP_Shared',
-    blendSpace: 'BS_Shared_Locomotion', loop: true,
-    modes: ['football', 'soccer', 'basketball_3v3', 'karate_endless'],
-    descriptorPath: '/mocap/descriptors/anim_sprint_run_loop.json',
-  },
-  basketball_dribble_run: {
-    id: 'anim_basketball_dribble_run', clip: CLIPS.bballDribble, abp: 'ABP_Basketball',
-    blendSpace: 'BS_Basketball_Locomotion', loop: true,
-    modes: ['basketball_h2h', 'basketball_3v3', 'basketball_dunk'],
-    descriptorPath: '/mocap/descriptors/anim_basketball_dribble_run.json',
-  },
-  basketball_defensive_idle: {
-    id: 'anim_basketball_defensive_idle', clip: CLIPS.bballDefend, abp: 'ABP_Basketball',
-    blendSpace: null, loop: true,
-    modes: ['basketball_h2h', 'basketball_3v3'],
-    descriptorPath: '/mocap/descriptors/anim_basketball_defensive_idle.json',
-  },
-  basketball_jump_shot: {
-    id: 'anim_basketball_jump_shot', clip: CLIPS.bballShoot, abp: 'ABP_Basketball',
-    blendSpace: null, loop: false,
-    modes: ['basketball_h2h', 'basketball_3v3', 'threePoint'],
-    descriptorPath: '/mocap/descriptors/anim_basketball_jump_shot.json',
-  },
-  basketball_dunk: {
-    id: 'anim_basketball_dunk', clip: CLIPS.dunkLaunch, abp: 'ABP_Basketball',
-    blendSpace: null, loop: false,
-    modes: ['basketball_dunk'],
-    descriptorPath: '/mocap/descriptors/anim_basketball_dunk.json',
-  },
-  karate_idle_stance: {
-    id: 'anim_karate_idle_stance', clip: CLIPS.karateIdle, abp: 'ABP_Karate',
-    blendSpace: null, loop: true,
-    modes: ['karate_h2h', 'karate_endless'],
-    descriptorPath: '/mocap/descriptors/anim_karate_idle_stance.json',
-  },
-  karate_punch_kick_combo: {
-    id: 'anim_karate_punch_kick_combo', clip: CLIPS.karateKick, abp: 'ABP_Karate',
-    blendSpace: null, loop: false,
-    modes: ['karate_h2h', 'karate_endless'],
-    descriptorPath: '/mocap/descriptors/anim_karate_punch_kick_combo.json',
-  },
-  golf_swing: {
-    id: 'anim_golf_swing', clip: 'golf_swing_full', abp: null,
-    blendSpace: null, loop: false,
-    modes: ['golf'],
-    descriptorPath: '/mocap/descriptors/anim_golf_swing.json',
-  },
-  defeat_knockdown: {
-    id: 'anim_defeat_knockdown', clip: CLIPS.karateDown, abp: 'ABP_Shared',
-    blendSpace: null, loop: false,
-    modes: ['karate_h2h', 'karate_endless', 'basketball_h2h'],
-    descriptorPath: '/mocap/descriptors/anim_defeat_knockdown.json',
-  },
-};
-
-/** All descriptors that belong to a given mode (used to preload a mode's set). */
-export function descriptorsForMode(modeId: string): MocapDescriptor[] {
-  return Object.values(MOCAP_DESCRIPTORS).filter((d) => d.modes.includes(modeId));
-}
-
-/** Look up the descriptor feeding a given logical clip name, if any. */
-export function descriptorForClip(clipName: string): MocapDescriptor | null {
-  return Object.values(MOCAP_DESCRIPTORS).find((d) => d.clip === clipName) ?? null;
 }
 
 /* ────────────────────────────────────────────────────────────────────────

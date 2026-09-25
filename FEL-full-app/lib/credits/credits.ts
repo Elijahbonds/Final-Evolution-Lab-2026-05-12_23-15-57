@@ -86,14 +86,15 @@ export const FIRST_PARTY_LICENCES: readonly string[] = [
 
 const CMU_TERMS = 'CMU Graphics Lab terms: free to include in commercially sold products; the data itself may not be resold, even converted';
 const MESHY_TERMS = "Made on the owner's Meshy subscription; Meshy's terms give a subscriber's output to the subscriber";
-const SEELE_TERMS = 'Licensed to the owner for this project (SEELE asset pack); only the clip metadata ships';
 const OPENAI_TERMS = "Owner's own output: OpenAI's terms assign image output to the user";
+
+// HOTFIX (2026-09-24): the SEELE descriptors are gone. Nothing read them, and the pack they came from is licensed to the
+// owner and "not redistributable outside this project", so they are no longer shipped or credited.
 
 /** A source's own terms, read and pinned by entry id. A 'terms' entry ships only if its licence is the one pinned here. */
 export const REVIEWED_TERMS: Record<string, string> = {
   cmu: CMU_TERMS,
   meshy: MESHY_TERMS,
-  'seele-descriptors': SEELE_TERMS,
   'openai-image': OPENAI_TERMS,
 };
 
@@ -101,8 +102,11 @@ export const REVIEWED_TERMS: Record<string, string> = {
  * HOTFIX (2026-09-24): the licences no record settles yet, each an entry id whose `missing` line is the owner's
  * question. The test accepts exactly this list and prints it on every run. Add to it only with the owner's say-so;
  * take an id off it in the same change that records its licence.
+ *
+ * Empty since the owner answered all three (2026-09-24): the Venice court and the story hub are Meshy exports made on
+ * the owner's paid subscription (now under the Meshy entry), and the venue card images are the owner's own AI art.
  */
-export const PENDING_OWNER: readonly string[] = ['venice-court-scan', 'venue-cards', 'story-hub'];
+export const PENDING_OWNER: readonly string[] = [];
 
 export const CREDITS: Credit[] = [
   // ── motion ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -155,23 +159,6 @@ export const CREDITS: Credit[] = [
     covers: ['models/clips/', 'mocap/dunk.json'],
     manifestLicences: ["owner's own DeepMotion capture"],
   },
-  {
-    id: 'seele-descriptors',
-    section: 'motion',
-    title: 'Animation descriptors',
-    by: 'SEELE AI (seeles.ai)',
-    used: 'Ten metadata files naming animation clips from a SEELE asset pack. The clips they point at are not shipped.',
-    licence: SEELE_TERMS,
-    status: 'terms',
-    link: 'https://www.seeles.ai/',
-    recordedIn: ['public/mocap/descriptors/', 'lib/anim/clip-registry.ts'],
-    evidence: [
-      'rork-final-evolution-lab 0271102 (nexus/assets-qa) infra/ASSET_ATTRIBUTION.md: "Seeles asset pack (FinalEvolutionLab57/Content/FEL/External/Seeles): licensed to owner; not redistributable outside this project."',
-      'rork-final-evolution-lab ae3bae6 infra/asset_sources.json: the pack\'s anim_* clips are "Owner-licensed Seeles pack"; the descriptors use the same anim_* ids and name the FEL Unreal project (fel_abp, local_bundle_path)',
-    ],
-    covers: ['mocap/descriptors/'],
-    manifestLicences: [],
-  },
 
   // ── models and art ──────────────────────────────────────────────────────────────────────────────────────────────
   {
@@ -179,13 +166,14 @@ export const CREDITS: Credit[] = [
     section: 'models',
     title: 'Meshy',
     by: 'The owner’s Meshy exports (meshy.ai)',
-    used: 'Rival and crowd bodies, the owner’s own body model, some rival run, walk and strike clips, balls, hoops, boards, helmets, the planes and karts, the kit packs, the venue maps and the backdrop art.',
+    used: 'Rival and crowd bodies, the owner’s own body model, some rival run, walk and strike clips, balls, hoops, boards, helmets, the planes and karts, the kit packs, the venue maps (the Venice court among them), the story mode’s hub map and the backdrop art.',
     licence: MESHY_TERMS,
     status: 'terms',
     link: 'https://www.meshy.ai/',
     recordedIn: [
       'scripts/map/pipeline.mts', 'scripts/backdrop/pipeline.mts', 'docs/history/MESHY-ASSETS-2026-09-05.md',
       'docs/CAST-MESHY-2026-09-22.md', 'public/models/athletes/*.json', 'public/models/crowd/*.json', 'scripts/mocap/sources.mts',
+      'docs/SPEC-COURT-LOCATIONS.md',
     ],
     evidence: [
       'rork-final-evolution-lab 0271102 (nexus/assets-qa) infra/ASSET_ATTRIBUTION.md: "Meshy outputs (venues, props, character rigs, preset animations): generated under the repository owner\'s Meshy subscription; licensed to subscriber per Meshy ToS."',
@@ -195,6 +183,8 @@ export const CREDITS: Credit[] = [
       // named "Armature|running|baselayer", "Armature|walking_man|baselayer" and "Armature|Boxing_Guard_…|baselayer",
       // exactly as Meshy names the clips in the owner's 2026-09-22 drop (Meshy_AI_Animation_Running_withSkin.glb).
       'public/models/clips/npc_*.glb: "…|baselayer" animation names, Meshy\'s own export naming',
+      // HOTFIX (2026-09-24): the owner settled the two maps our records disagreed on or had no record of.
+      'The owner, 2026-09-24: models/maps/venice-blue-court.glb (and its baked copy) and models/story-hub.glb are Meshy exports made on the owner\'s paid Meshy subscription. Older notes call the court "the Luma scan"; the commit that put its current bytes in (e25e9797) calls it the "luma-inspo locked Meshy court"',
     ],
     covers: [
       'models/athletes/', 'models/crowd/', 'models/meshy/', 'models/props/meshy', 'models/vehicles/', 'models/kits/', 'models/maps/',
@@ -202,23 +192,10 @@ export const CREDITS: Credit[] = [
       'models/elijah.glb', 'models/elijah-hero.glb', 'models/elijah-hero.json', 'models/elijah-meshy.glb', 'models/elijah-meshy.mobile.glb',
       'models/clips/npc_ericnash_combo.glb', 'models/clips/npc_ericnash_run.glb', 'models/clips/npc_ericnash_walk.glb',
       'models/clips/npc_tall_run.glb', 'models/clips/npc_tall_walk.glb',
+      'models/story-hub.glb',
       'backdrops/',
     ],
     manifestLicences: ["owner's Meshy animation exports (~/Downloads/FEL_hero_upload/Elijah*.glb)"],
-  },
-  {
-    id: 'venice-court-scan',
-    section: 'models',
-    title: 'Venice court model',
-    // HOTFIX (2026-09-24): our records disagree on who made it, so the page says so instead of picking one.
-    by: 'Source disputed in our records: a Luma AI capture or a Meshy export',
-    used: 'The Venice court the hoops modes play on.',
-    licence: LICENCE_PENDING,
-    status: 'pending',
-    recordedIn: ['scripts/map/cut-scan-stands.py', 'docs/history/SHIP-PASS-6-LOOK.md', 'docs/SPEC-COURT-LOCATIONS.md'],
-    covers: ['models/maps/venice-blue-court.glb', 'models/maps/baked/venice-blue-court.glb'],
-    manifestLicences: [],
-    missing: 'Who made the Venice court model, and on what terms. The commit that put the current bytes in (e25e9797) calls it the "luma-inspo locked Meshy court", and docs/SPEC-COURT-LOCATIONS.md calls it a Meshy court; scripts/map/cut-scan-stands.py and docs/history/SHIP-PASS-6-LOOK.md call it the Luma scan. If it is a Meshy export, it moves under the Meshy entry. If it is your own Luma capture, which Luma plan made it.',
   },
   {
     id: 'kenney',
@@ -269,27 +246,17 @@ export const CREDITS: Credit[] = [
     id: 'venue-cards',
     section: 'models',
     title: 'Venue card images',
-    by: 'Not yet confirmed',
+    // HOTFIX (2026-09-24): the owner made all sixteen. The files carry no metadata naming the tool, so none is named here.
+    by: 'The owner, made with a paid AI image tool',
     used: 'The pictures on the venue cards.',
-    licence: LICENCE_PENDING,
-    status: 'pending',
+    licence: "Owner's own artwork",
+    status: 'first-party',
     recordedIn: ['lib/game-data.ts'],
+    evidence: [
+      'The owner, 2026-09-24: the sixteen public/venues/*.jpg images are the owner\'s own AI-generated art, made on a paid plan of an AI image tool. They arrived with the imported web baseline (8721ec28, 2026-08-09) and carry no metadata of their own',
+    ],
     covers: ['venues/'],
     manifestLicences: [],
-    missing: 'Where the sixteen venue card images came from and on what terms. They arrived with the imported web baseline (8721ec28, 2026-08-09) and carry no metadata at all; two have AI-generator sizes (karate-bg 1536×1024, courtcarnival 1376×768), and an earlier session called venicebeach.jpg a photo. If you generated them, with which tool and plan; if any is a stock or found photo, its licence.',
-  },
-  {
-    id: 'story-hub',
-    section: 'models',
-    title: 'Story hub model',
-    by: 'Not yet confirmed',
-    used: 'The story mode’s hub map.',
-    licence: LICENCE_PENDING,
-    status: 'pending',
-    recordedIn: ['lib/story-data.ts'],
-    covers: ['models/story-hub.glb'],
-    manifestLicences: [],
-    missing: 'Who made story-hub.glb. It arrived with the imported web baseline (8721ec28) with no record. Its insides match the Meshy venue maps (one Mesh_0, a Material.001 with base, emissive and normal maps, the same glTF-Transform 4.4.1 pass), so it is probably a Meshy export; confirm and it moves under the Meshy entry.',
   },
 
   // ── voices and sound ────────────────────────────────────────────────────────────────────────────────────────────

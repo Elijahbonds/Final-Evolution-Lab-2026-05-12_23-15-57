@@ -41,7 +41,11 @@ describe('the credits page', () => {
   });
 
   it('renders a pending entry as being confirmed even if a licence string slipped into it', () => {
-    const slipped: Credit = { ...CREDITS.find((c) => c.status === 'pending')!, licence: 'CC0 1.0' };
+    // HOTFIX (2026-09-24): nothing on the real list is pending now (the owner answered all three), so make one up.
+    const slipped: Credit = {
+      id: 'new-thing', section: 'models', title: 'New thing', by: 'Not yet confirmed', used: 'Something on a screen.',
+      licence: 'CC0 1.0', status: 'pending', recordedIn: [], covers: [], manifestLicences: [], missing: 'Who made it.',
+    };
     const m = renderToStaticMarkup(createElement(CreditsList, { credits: [slipped] }));
     expect(m).toContain(LICENCE_PENDING);
     expect(m).not.toContain('CC0 1.0');

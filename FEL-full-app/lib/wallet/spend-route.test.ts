@@ -36,9 +36,9 @@ describe('POST /api/v1/wallet/spend, the SKUs it may sell', () => {
     m.touched.length = 0;
   });
 
-  it('refuses every SKU that is delivered by another route, or by nothing, with 403 and without touching the wallet', async () => {
+  it('refuses every SKU that is delivered by another route with 403, without touching the wallet', async () => {
     const refused = Object.keys(CATALOG).filter((id) => !SPEND_ROUTE_SKUS.has(id));
-    expect(refused.length).toBeGreaterThan(20); // wearables, boosts, kits, plans, sessions, the slot, the orphans
+    expect(refused.length).toBeGreaterThan(20); // wearables, boosts, kits, plans, sessions, the slot
     for (const id of refused) {
       const res = await post(id);
       expect(res.status, id).toBe(403);
@@ -48,8 +48,16 @@ describe('POST /api/v1/wallet/spend, the SKUs it may sell', () => {
     expect(m.touched).toEqual([]);
   });
 
-  it('includes the three SKUs nothing reads: bought here they were the only way to buy them, and delivered nothing', async () => {
-    for (const id of ['dunk_retry_token', 'dunk_style_slot', 'scan_personalized']) expect((await post(id)).status, id).toBe(403);
+  // Owner decision 2026-09-24: the three SKUs nothing read were deleted from the catalog, so they are unknown here now.
+  it('answers the three deleted SKUs as unknown, 404, without touching the wallet', async () => {
+    for (const id of ['dunk_retry_token', 'dunk_style_slot', 'scan_personalized']) {
+      expect(CATALOG[id], id).toBeUndefined();
+      const res = await post(id);
+      expect(res.status, id).toBe(404);
+      expect(await res.json(), id).toEqual({ error: 'unknown_sku' });
+    }
+    expect(m.findUnique).not.toHaveBeenCalled();
+    expect(m.touched).toEqual([]);
   });
 
   it('passes a held class pass through to spend(), which refuses it after the idempotency lookup and before any write', async () => {

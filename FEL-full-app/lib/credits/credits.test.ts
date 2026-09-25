@@ -242,10 +242,13 @@ describe('the ban on NC, ND, SA, personal-use and unlabeled licences', () => {
 
   it('holds on the real list: nothing banned, nothing unlabeled beyond the owner’s pending list, which it prints', () => {
     expect(licenceProblems(), 'BANNED OR UNLABELED LICENCE SHIPPING').toEqual([]);
+    // HOTFIX (2026-09-24): the owner answered all three (the Venice court, the story hub, the venue cards), so nothing
+    // is pending. A new id goes on this list, and on this line, only with the owner's say-so.
+    expect(PENDING_OWNER).toEqual([]);
     const pending = CREDITS.filter((c) => PENDING_OWNER.includes(c.id));
     expect(pending.length).toBe(PENDING_OWNER.length);
     // eslint-disable-next-line no-console
-    console.warn([
+    if (pending.length) console.warn([
       `PENDING_OWNER: ${pending.length} licence(s) being confirmed by the owner (lib/credits/credits.ts):`,
       ...pending.map((c) => `  - ${c.id} (${c.title}): ${c.missing}`),
     ].join('\n'));
@@ -253,7 +256,15 @@ describe('the ban on NC, ND, SA, personal-use and unlabeled licences', () => {
 
   it('fails a NEW unlabeled entry, a banned one even on the pending list, and a pending list gone stale', () => {
     const base = CREDITS;
-    const extra = (c: Partial<Credit>): Credit[] => [...base, { ...byId('venue-cards'), id: 'new-thing', ...c }];
+    // A made-up entry the owner has been asked about, since the real pending list is empty.
+    const asked: Credit = {
+      id: 'new-thing', section: 'models', title: 'New thing', by: 'Not yet confirmed', used: 'Something on a screen.',
+      licence: LICENCE_PENDING, status: 'pending', recordedIn: ['lib/game-data.ts'], covers: [], manifestLicences: [],
+      missing: 'Who made the new thing, and on what terms.',
+    };
+    const extra = (c: Partial<Credit>): Credit[] => [...base, { ...asked, ...c }];
+    // On the pending list, with its question, it passes.
+    expect(licenceProblems(extra({}), ['new-thing'])).toEqual([]);
     // A new entry nobody has a licence for.
     expect(licenceProblems(extra({}))).toEqual([expect.stringMatching(/^new-thing: UNLABELED/)]);
     // A new source whose own terms were never read and pinned.
@@ -262,14 +273,16 @@ describe('the ban on NC, ND, SA, personal-use and unlabeled licences', () => {
     expect(licenceProblems(extra({ status: 'pending', licence: 'CC BY-NC 4.0' }), [...PENDING_OWNER, 'new-thing'])).toEqual([expect.stringMatching(/^new-thing: BANNED NC/)]);
     // A banned string in a manifest an entry claims.
     expect(licenceProblems(extra({ status: 'open', licence: 'CC0 1.0', manifestLicences: ['Attribution-ShareAlike 4.0'] }))).toEqual([expect.stringMatching(/^new-thing: BANNED SA manifest/)]);
-    // A pending entry whose licence has been recorded must leave the list.
-    const recorded = base.map((c) => c.id === 'story-hub' ? { ...c, status: 'terms' as const, licence: REVIEWED_TERMS.meshy, id: 'meshy-2' } : c);
-    expect(licenceProblems(recorded)).toContain('story-hub: on PENDING_OWNER but no entry has this id.');
-    const cleared = base.map((c) => c.id === 'story-hub' ? { ...c, status: 'open' as const, licence: 'CC0 1.0' } : c);
-    expect(licenceProblems(cleared)).toEqual(['story-hub: its licence is recorded now; take it off PENDING_OWNER.']);
+    // A pending entry whose licence has been recorded must leave the list: moved under another entry (as the Venice
+    // court and the story hub moved under Meshy), or given its licence in place (as the venue cards were).
+    expect(licenceProblems(base, ['new-thing'])).toEqual(['new-thing: on PENDING_OWNER but no entry has this id.']);
+    expect(licenceProblems(extra({ status: 'first-party', licence: "Owner's own artwork" }), ['new-thing']))
+      .toEqual(['new-thing: its licence is recorded now; take it off PENDING_OWNER.']);
+    // Every answered id on the old list fails the same way, so it cannot be put back by mistake.
+    for (const id of ['venice-court-scan', 'story-hub']) expect(licenceProblems(base, [id])).toEqual([`${id}: on PENDING_OWNER but no entry has this id.`]);
+    expect(licenceProblems(base, ['venue-cards'])).toEqual(['venue-cards: its licence is recorded now; take it off PENDING_OWNER.']);
     // A pending entry must say it is pending and ask the owner something.
-    const mute = base.map((c) => c.id === 'story-hub' ? { ...c, missing: undefined } : c);
-    expect(licenceProblems(mute)).toEqual([expect.stringMatching(/^story-hub: on PENDING_OWNER, so it must/)]);
+    expect(licenceProblems(extra({ missing: undefined }), ['new-thing'])).toEqual([expect.stringMatching(/^new-thing: on PENDING_OWNER, so it must/)]);
   });
 });
 
@@ -285,12 +298,12 @@ describe('creditForPublicPath', () => {
     expect(creditForPublicPath('models/clips/npc_tall_walk.glb')?.id).toBe('meshy');
     expect(creditForPublicPath('backdrops/baked/beach.jpg')?.id).toBe('fel');
     expect(creditForPublicPath('backdrops/baked/city.jpg')?.id).toBe('meshy');
-    expect(creditForPublicPath('models/maps/baked/venice-blue-court.glb')?.id).toBe('venice-court-scan');
+    expect(creditForPublicPath('models/maps/baked/venice-blue-court.glb')?.id).toBe('meshy');
     expect(creditForPublicPath('models/maps/venice-golden-hour.png')?.id).toBe('openai-image');
     expect(creditForPublicPath('models/maps/dojo.glb')?.id).toBe('meshy');
     expect(creditForPublicPath('og-image.png')?.id).toBe('fel');
     expect(creditForPublicPath('venues/venicebeach.jpg')?.id).toBe('venue-cards');
-    expect(creditForPublicPath('models/story-hub.glb')?.id).toBe('story-hub');
+    expect(creditForPublicPath('models/story-hub.glb')?.id).toBe('meshy');
   });
 
   it('accepts a URL path or a public/ path, and a file cover never swallows a sibling', () => {
@@ -299,6 +312,41 @@ describe('creditForPublicPath', () => {
     expect(creditForPublicPath('models/fel-hero.glbx')).toBeNull();
     expect(creditForPublicPath('models/clips/npc_tall_walk.glb.bak')?.id).toBe('owner-captures');
     expect(creditForPublicPath('somewhere/new.png')).toBeNull();
+  });
+});
+
+// HOTFIX (2026-09-24): the owner's answers to the three pending licences, and the SEELE descriptors deleted.
+describe('the owner’s answers and the SEELE descriptors', () => {
+  it('the Venice court, its baked copy and the story hub are credited to Meshy, under Meshy’s terms', () => {
+    for (const f of ['models/maps/venice-blue-court.glb', 'models/maps/baked/venice-blue-court.glb', 'models/story-hub.glb']) {
+      expect(FILES, f).toContain(f);
+      expect(creditForPublicPath(f)?.id, f).toBe('meshy');
+    }
+    expect(byId('meshy').licence).toBe(REVIEWED_TERMS.meshy);
+    expect(byId('meshy').evidence?.some((e) => /venice-blue-court\.glb.*story-hub\.glb.*paid Meshy subscription/.test(e))).toBe(true);
+    // The court is no longer shown as disputed, or as anybody's Luma capture.
+    for (const c of CREDITS) expect(`${c.by} ${c.used}`, c.id).not.toMatch(/luma|disputed/i);
+  });
+
+  it('the sixteen venue card images are the owner’s own art, and the page names no tool it cannot back up', () => {
+    const cards = FILES.filter((f) => creditForPublicPath(f)?.id === 'venue-cards');
+    expect(cards).toHaveLength(16);
+    for (const f of cards) expect(f, f).toMatch(/^venues\/[^/]+\.jpg$/);
+    const c = byId('venue-cards');
+    expect(c.status).toBe('first-party');
+    expect(c.licence).toBe("Owner's own artwork");
+    expect(c.by).toBe('The owner, made with a paid AI image tool');
+    expect(c.missing).toBeUndefined();
+  });
+
+  it('the SEELE descriptors are gone from public/ and from the list, and nothing else credits SEELE', () => {
+    expect(FILES.filter((f) => f.startsWith('mocap/descriptors/'))).toEqual([]);
+    expect(existsSync(join(PUBLIC, 'mocap', 'descriptors'))).toBe(false);
+    expect(creditForPublicPath('mocap/descriptors/anim_golf_swing.json')).toBeNull();
+    expect(JSON.stringify(CREDITS)).not.toMatch(/seele/i);
+    expect(Object.keys(REVIEWED_TERMS).sort()).toEqual(['cmu', 'meshy', 'openai-image']);
+    // mocap/dunk.json stays: the owner's own capture.
+    expect(creditForPublicPath('mocap/dunk.json')?.id).toBe('owner-captures');
   });
 });
 

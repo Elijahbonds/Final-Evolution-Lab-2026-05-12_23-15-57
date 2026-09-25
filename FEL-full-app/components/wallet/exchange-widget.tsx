@@ -8,7 +8,7 @@
  * HOTFIX (2026-09-24): class passes left this list (and the copy below) when they
  * went NOT_ON_SALE in lib/wallet/catalog.ts: nothing can be watched on /live yet.
  * Scans left it too: the movement scan is free (app/api/v1/workout/scan), and the
- * shard scan SKU (scan_personalized) is sold nowhere.
+ * paid scan SKU is deleted from the catalog.
  */
 
 import { useEffect, useState } from 'react';
