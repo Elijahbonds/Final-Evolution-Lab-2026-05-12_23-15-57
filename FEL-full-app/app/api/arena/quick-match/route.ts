@@ -18,6 +18,7 @@ import {
 import { ensureHouseRivals, pickHouseRival } from '@/lib/arena-rivals';
 import { MODE_INFO } from '@/lib/game-data';
 import { recordServerEvent } from '@/lib/analytics-server';
+import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 /**
  * POST /api/arena/quick-match
@@ -46,6 +47,13 @@ export async function POST(req: NextRequest) {
 
   if (!isArenaMode(mode)) {
     return NextResponse.json({ error: 'invalid_mode', detail: 'That mode is not available in the Arena.' }, { status: 400 });
+  }
+  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a Quick Match on a paused mode (music,
+  // dance) is refused here, before the house roster or the transaction — no row, no event, neither seat's Lab Credits
+  // locked. lib/stakingPause.ts holds the list; a quick match opened before the pause is ACTIVE and still settles through
+  // /api/arena/submit-score, which has no pause check.
+  if (isStakingPaused(mode)) {
+    return NextResponse.json({ error: STAKING_PAUSED_CODE, detail: stakingPausedDetail(mode) }, { status: STAKING_PAUSED_STATUS });
   }
   const feeCheck = validateArenaFee(feeLc);
   if (!feeCheck.ok) return NextResponse.json({ error: feeCheck.reason, detail: feeCheck.detail }, { status: 400 });

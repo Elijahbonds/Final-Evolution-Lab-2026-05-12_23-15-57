@@ -15,7 +15,7 @@
 import { useEffect, useState } from 'react';
 import { Swords, Copy, Check, Loader2, Users, Radio, Trophy, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { MP_MODES, mpModeLabel } from '@/lib/mp/match-core';
+import { MP_CHALLENGE_MODES, MP_PAUSED_MODES, mpModeLabel } from '@/lib/mp/match-core';
 import { syncWalletBalances } from '@/lib/wallet/client';
 
 interface MatchRow {
@@ -101,22 +101,34 @@ function TabBtn({ active, onClick, icon, label }: { active: boolean; onClick: ()
   );
 }
 
+// MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a NEW challenge — online or pass-and-play —
+// is offered only on a mode whose staking is not paused (lib/stakingPause.ts via MP_CHALLENGE_MODES); the server refuses
+// the rest anyway (/api/v1/mp/create, /api/v1/mp/local). The paused ones are named under the picker, and a challenge
+// posted before the pause is still accepted by code in the JOIN tab.
 function ModeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white"
-    >
-      {MP_MODES.map((m) => (
-        <option key={m.key} value={m.key} className="bg-[#0a0a0a]">{m.label}</option>
-      ))}
-    </select>
+    <>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-white"
+      >
+        {MP_CHALLENGE_MODES.map((m) => (
+          <option key={m.key} value={m.key} className="bg-[#0a0a0a]">{m.label}</option>
+        ))}
+      </select>
+      {MP_PAUSED_MODES.length > 0 && (
+        <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-white/35">
+          Challenges paused: {MP_PAUSED_MODES.map((m) => m.label).join(', ')} &mdash; while their duels are made fair.
+          Free play is open, and a challenge code you already have can still be accepted.
+        </p>
+      )}
+    </>
   );
 }
 
 function OnlinePanel({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState(MP_MODES[0].key);
+  const [mode, setMode] = useState(MP_CHALLENGE_MODES[0].key);
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [hostScore, setHostScore] = useState<number | null>(null);
@@ -131,7 +143,7 @@ function OnlinePanel({ onDone }: { onDone: () => void }) {
         body: JSON.stringify({ mode }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error(d?.error === 'invalid_mode' ? 'Pick a valid mode' : 'Could not create challenge'); return; }
+      if (!res.ok) { toast.error(d?.error === 'invalid_mode' ? 'Pick a valid mode' : d?.error === 'STAKING_PAUSED' && d?.detail ? d.detail : 'Could not create challenge'); return; }
       setCode(d.code); setHostScore(d.hostScore);
       onDone();
       if (!d.hostScore) toast.message('Heads up: your best score for this mode is 0 — play it first for a real challenge.');
@@ -240,7 +252,7 @@ function JoinPanel({ onDone, initialCode = '' }: { onDone: () => void; initialCo
 }
 
 function LocalPanel({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState(MP_MODES[0].key);
+  const [mode, setMode] = useState(MP_CHALLENGE_MODES[0].key);
   const [p1, setP1] = useState('');
   const [p2, setP2] = useState('');
   const [p2name, setP2name] = useState('Player 2');
@@ -260,7 +272,7 @@ function LocalPanel({ onDone }: { onDone: () => void }) {
         body: JSON.stringify({ mode, hostScore, guestScore, guestName: p2name }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error('Could not record match'); return; }
+      if (!res.ok) { toast.error(d?.error === 'STAKING_PAUSED' && d?.detail ? d.detail : 'Could not record match'); return; }
       setResult(d);
       onDone();
       if (d.balances) syncWalletBalances(d.balances);

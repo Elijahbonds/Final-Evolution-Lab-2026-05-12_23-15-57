@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { arenaLockEntry, appendMatchEvent, ArenaError, arenaModeKey } from '@/lib/arena';
 import { recordServerEvent } from '@/lib/analytics-server';
+import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 /**
  * POST /api/arena/join
@@ -29,6 +30,12 @@ export async function POST(req: NextRequest) {
       if (match.status !== 'WAITING') throw new ArenaError('NOT_OPEN', 'This duel is no longer open to join.', 409);
       if (match.player1Id === userId) throw new ArenaError('OWN_MATCH', 'You cannot join your own duel.', 409);
       if (match.player2Id) throw new ArenaError('FULL', 'This duel is already full.', 409);
+      // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): accepting a duel puts a NEW stake up,
+      // so a duel on a paused mode (music, dance — a stored 'musicAcademy' too) that was posted before the pause can no
+      // longer be joined. Refused before the lock: nothing is written and the joiner's Lab Credits never move. The
+      // creator's stake is not stranded — /api/arena/cancel refunds a WAITING duel with no mode check, and the lobby
+      // tells them so (components/arena-view.tsx).
+      if (isStakingPaused(match.mode)) throw new ArenaError(STAKING_PAUSED_CODE, stakingPausedDetail(match.mode), STAKING_PAUSED_STATUS);
 
       const feeLc = match.entryFeeCents;
       await arenaLockEntry(tx, { userId, matchId: match.id, feeLc });

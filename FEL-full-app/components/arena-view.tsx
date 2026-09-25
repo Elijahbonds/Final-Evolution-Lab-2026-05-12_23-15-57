@@ -34,6 +34,8 @@ interface ArenaConfig {
   rakePercent: number;
   feeTiers: number[];
   modes: ArenaMode[];
+  /** MUSIC-SUITE P1 (2026-09-25): modes whose staking is paused (lib/stakingPause.ts) — named, never offered. */
+  pausedModes?: { key: string; name: string; detail: string }[];
   balance: number;
   authenticated: boolean;
 }
@@ -73,6 +75,8 @@ interface MyDuel {
   iWon: boolean | null;
   seed: string | null;
   updatedAt: string;
+  /** MUSIC-SUITE P1 (2026-09-25): the duel's mode is paused for NEW stakes. ACTIVE still plays; WAITING can only be cancelled. */
+  stakingPaused?: boolean;
 }
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -336,6 +340,14 @@ export function ArenaView() {
               </button>
             ))}
           </div>
+          {/* MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): the paused modes are named here so a
+              player looking for them reads why they are missing. Free play is open; a duel already running still plays. */}
+          {(config?.pausedModes?.length ?? 0) > 0 && (
+            <p className="mt-2 font-mono text-[10px] leading-relaxed text-white/35">
+              Staking paused: {config!.pausedModes!.map((p) => p.name).join(', ')} &mdash; while their duels are made
+              fair. Free play is open, and a duel you already have still plays and settles.
+            </p>
+          )}
         </div>
 
         <div className="mt-5">
@@ -521,6 +533,13 @@ export function ArenaView() {
                           <span className="text-white">{d.myScore ?? '—'}</span> &middot; Opponent{' '}
                           {/* HOTFIX (2026-09-24): their score is held back until you post yours — say that they posted */}
                           <span className="text-white">{d.oppScore ?? (d.oppSubmitted ? 'posted — shown once you post' : '—')}</span>
+                        </div>
+                      )}
+                      {/* MUSIC-SUITE P1 (2026-09-25): nobody can accept a posted duel on a paused mode, so its creator is
+                          told the way out — CANCEL refunds the stake in full (/api/arena/cancel has no mode check). */}
+                      {d.stakingPaused && d.status === 'WAITING' && d.role === 'p1' && (
+                        <div className="mt-1 font-mono text-[11px] text-[#FFD700]/80">
+                          Staking on {d.name} is paused, so nobody can accept this duel. Cancel it to get your {d.feeLc} LC back.
                         </div>
                       )}
                       {/* WHAT THEY THREW, not just what it added up to. Only rendered when a card exists —

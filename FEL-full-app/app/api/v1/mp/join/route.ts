@@ -6,6 +6,7 @@ import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
 import { joinAndSettle } from '@/lib/mp/service';
 import { readWallet } from '@/lib/wallet/wallet-service';
 import { isValidMatchCode, resolveOutcome } from '@/lib/mp/match-core';
+import { stakingPausedDetail } from '@/lib/stakingPause';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,9 @@ export async function POST(req: Request) {
   const result = await joinAndSettle(prisma, { code, guestId: userId, guestName });
   if ('error' in result) {
     const status = result.error === 'not_found' ? 404 : result.error === 'cannot_join_own' ? 400 : 409;
-    return NextResponse.json({ error: result.error }, { status });
+    // MUSIC-SUITE P1: a paused mode's open challenge answers with the same player-facing line the Arena uses
+    const detail = result.error === 'staking_paused' ? stakingPausedDetail(result.mode) : undefined;
+    return NextResponse.json({ error: result.error, ...(detail ? { detail } : {}) }, { status });
   }
   const m = result.match;
   const outcome = resolveOutcome(m.hostScore ?? 0, m.guestScore ?? 0);

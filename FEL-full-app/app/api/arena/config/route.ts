@@ -5,7 +5,8 @@ import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { ARENA_RAKE_PERCENT, ARENA_FEE_TIERS, ARENA_MODES } from '@/lib/arena';
+import { ARENA_RAKE_PERCENT, ARENA_FEE_TIERS, arenaStakeableModes } from '@/lib/arena';
+import { pausedStakeModes } from '@/lib/stakingPause';
 import { MODE_INFO } from '@/lib/game-data';
 
 /**
@@ -27,7 +28,10 @@ export async function GET() {
     balance = (await readWallet(prisma, userId)).lc ?? (profile?.labCredits ?? 0);
   }
 
-  const modes = ARENA_MODES.map((key) => ({
+  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): the lobby's mode picker offers only modes
+  // a NEW stake can be opened on. The paused ones (lib/stakingPause.ts) are named beside it rather than silently
+  // dropped, so a player looking for music or dance reads why; their open duels keep their links in /api/arena/list.
+  const modes = arenaStakeableModes().map((key) => ({
     key,
     name: MODE_INFO[key]?.name ?? key,
     venue: MODE_INFO[key]?.venue ?? '',
@@ -38,6 +42,7 @@ export async function GET() {
     rakePercent: ARENA_RAKE_PERCENT,
     feeTiers: ARENA_FEE_TIERS,
     modes,
+    pausedModes: pausedStakeModes(),
     balance,
     authenticated: Boolean(userId),
   });

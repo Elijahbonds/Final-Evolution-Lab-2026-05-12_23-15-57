@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { createLocalMatch } from '@/lib/mp/service';
 import { readWallet } from '@/lib/wallet/wallet-service';
-import { isValidMpMode, resolveOutcome } from '@/lib/mp/match-core';
+import { isValidMpMode, isMpChallengeOpen, sessionModeFor, resolveOutcome } from '@/lib/mp/match-core';
+import { stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,12 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const mode = String(body?.mode ?? '');
   if (!isValidMpMode(mode)) return NextResponse.json({ error: 'invalid_mode' }, { status: 400 });
+  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now" — music and dance out of friend challenges):
+  // a NEW pass-and-play match on a paused mode is refused before anything is written (no match row, no coins, no shards).
+  // lib/stakingPause.ts holds the list; a dance challenge posted before the pause still settles through /api/v1/mp/join.
+  if (!isMpChallengeOpen(mode)) {
+    return NextResponse.json({ error: STAKING_PAUSED_CODE, detail: stakingPausedDetail(sessionModeFor(mode)) }, { status: STAKING_PAUSED_STATUS });
+  }
   const hostScore = Number(body?.hostScore);
   const guestScore = Number(body?.guestScore);
   if (!Number.isFinite(hostScore) || !Number.isFinite(guestScore) || hostScore < 0 || guestScore < 0) {

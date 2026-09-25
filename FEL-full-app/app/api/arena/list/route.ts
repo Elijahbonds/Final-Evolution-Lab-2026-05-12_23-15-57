@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { MODE_INFO } from '@/lib/game-data';
 import { arenaModeKey } from '@/lib/arena';
 import { parseCard } from '@/lib/mp/dunkCard';
+import { isStakingPaused, STAKING_PAUSED } from '@/lib/stakingPause';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
   if (!userId) return null;
@@ -24,7 +25,12 @@ export async function GET() {
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const [openRaw, mineRaw] = await Promise.all([
+  // MUSIC-SUITE P1 (2026-09-25): a posted duel on a paused mode can no longer be joined, so its creator's CANCEL is the
+  // only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels. A WAITING duel's
+  // updatedAt is its creation time, so after 25 newer duels it would drop off the list with its CANCEL. The creator's
+  // paused WAITING duels are fetched on their own and always listed.
+  const pausedKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), 'musicAcademy']));
+  const [openRaw, mineRecent, mineStranded] = await Promise.all([
     prisma.competitionMatch.findMany({
       where: { currency: 'LC', status: 'WAITING', player1Id: { not: userId } },
       orderBy: { createdAt: 'desc' },
@@ -35,7 +41,13 @@ export async function GET() {
       orderBy: { updatedAt: 'desc' },
       take: 25,
     }),
+    prisma.competitionMatch.findMany({
+      where: { currency: 'LC', status: 'WAITING', player1Id: userId, mode: { in: pausedKeys } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
   ]);
+  const mineRaw = [...mineRecent, ...mineStranded.filter((s) => !mineRecent.some((m) => m.id === s.id))];
 
   // Resolve display names in one query.
   const ids = new Set<string>();
@@ -58,7 +70,10 @@ export async function GET() {
     return { mode: key, name: MODE_INFO[key]?.name ?? key, href: MODE_INFO[key]?.href ?? '#' };
   };
 
-  const open = openRaw.map((m) => ({
+  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a WAITING duel on a paused mode can no
+  // longer be accepted (/api/arena/join refuses it), so it is not advertised as an OPEN CHALLENGE. Its creator still
+  // sees it under MY DUELS, flagged stakingPaused, with the CANCEL that refunds it.
+  const open = openRaw.filter((m) => !isStakingPaused(m.mode)).map((m) => ({
     id: m.id,
     ...modeMeta(m.mode),
     feeLc: m.entryFeeCents,
@@ -123,6 +138,9 @@ export async function GET() {
       iWon: m.winnerId ? m.winnerId === userId : null,
       seed: m.seed,
       updatedAt: m.updatedAt,
+      // MUSIC-SUITE P1: a duel on a paused mode. An ACTIVE one still plays and settles; a WAITING one can only be
+      // cancelled (and refunded), because nobody can join it — the lobby says so on the row.
+      stakingPaused: isStakingPaused(m.mode),
     };
   });
 

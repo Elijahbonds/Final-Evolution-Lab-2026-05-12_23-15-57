@@ -14,7 +14,9 @@ import fs from 'node:fs';
 const RC: any = await import('../../lib/babylon/anim/recognisable'); const wrongMoves = (RC.wrongMoves ?? RC.default.wrongMoves) as typeof import('../../lib/babylon/anim/recognisable').wrongMoves;
 import { SCORE_ROUTES } from './_scorecard-routes.mts';
 
-const H = `${process.env.HOME}/Claude/outbox/finish-release`;
+// FR_OUTBOX (MUSIC-SUITE P1): score a lane's dry-run evidence tree (same layout: scorecard/<TAG>/, mechanics/, phone/)
+// without writing into the release outbox
+const H = process.env.FR_OUTBOX ?? `${process.env.HOME}/Claude/outbox/finish-release`;
 const TAG = process.env.TAG ?? 'run';
 const read = (p: string): any => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } };
 const bySlug = (rows: any[] | null) => new Map<string, any>((rows ?? []).map((r) => [r.slug, r]));
@@ -88,8 +90,10 @@ export function scoreGame(slug: string) {
       const best = Math.max(m.deliberate?.score ?? 0, m.intent?.score ?? 0);
       const mash = m.masher?.score ?? 0;
       const ratio = best > 0 ? mash / best : mash > 0 ? 99 : 0;
-      if (ratio > 1.2) { const pen = Math.min(4, (ratio - 1.2) * 1.5); s -= pen; why.push(`mash ${mash} vs best ${best} = ${ratio === 99 ? '∞' : r1(ratio)}× (−${r1(pen)})`); }
-      else why.push(`mash ${mash} vs best ${best}`);
+      // which masher and which intent player (MUSIC-SUITE P1: a mode's own verb masher, a PERFORM intent variant)
+      const who = `${m.masher?.masher === 'verb' ? ' (verb masher)' : ''}${m.intent?.driverStats?.variant ? ` (intent: ${m.intent.driverStats.variant})` : ''}`;
+      if (ratio > 1.2) { const pen = Math.min(4, (ratio - 1.2) * 1.5); s -= pen; why.push(`mash ${mash} vs best ${best} = ${ratio === 99 ? '∞' : r1(ratio)}× (−${r1(pen)})${who}`); }
+      else why.push(`mash ${mash} vs best ${best}${who}`);
       const unexp = Math.min(3, (m.deliberate?.unexplainedScores ?? 0) + (m.masher?.unexplainedScores ?? 0));
       if (unexp) { s -= unexp; why.push(`${unexp} unexplained score changes (−${unexp})`); }
     } else why.push('no mechanics row');
@@ -99,7 +103,10 @@ export function scoreGame(slug: string) {
 
   // 3 BODY
   const b = cap?.body;
-  if (!b || !b.n) out.body = na('no body samples');
+  // MUSIC-SUITE P1 (2026-09-25): a DOM room (the Groove Academy, _dom-room.mts) draws no rig, so the capture takes no
+  // body samples. N/A for that reason, not the "no body samples" that reads as a missing measurement (and blocks a pass)
+  if (cap?.domRoom) out.body = na('a DOM room (React page): no rig on screen');
+  else if (!b || !b.n) out.body = na('no body samples');
   else if (b.noHero / b.n > 0.8) out.body = na(`no hero body in ${Math.round((100 * b.noHero) / b.n)}% of samples (quiz / vehicle)`);
   else {
     const n = b.n - b.noHero; const why: string[] = []; let s = 10;

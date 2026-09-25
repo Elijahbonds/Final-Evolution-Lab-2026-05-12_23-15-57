@@ -24,6 +24,8 @@ const db = {
 const matchesWhere = (where: Row): Row[] => db.matches.filter((m) => {
   if (where.status && m.status !== where.status) return false;
   if (where.player1Id?.not && m.player1Id === where.player1Id.not) return false;
+  if (typeof where.player1Id === 'string' && m.player1Id !== where.player1Id) return false;   // MUSIC-SUITE P1: the stranded-duel query
+  if (where.mode?.in && !where.mode.in.includes(m.mode)) return false;
   if (where.OR) return where.OR.some((c: Row) => Object.entries(c).every(([k, v]) => m[k] === v));
   return true;
 });
@@ -92,6 +94,16 @@ vi.mock('@/lib/arena', async (importOriginal) => ({
   appendMatchEvent: vi.fn(async (_db: unknown, _id: string, type: string, _u: unknown, payload: Row = {}) => { db.events.push({ type, payload }); }),
 }));
 
+// MUSIC-SUITE P1 (2026-09-25): music's staking is paused (lib/stakingPause.ts, owner decision #9: "pause staking both
+// now"). The tests below that OPEN or JOIN a music duel describe the alias path as it runs once the pause lifts (phase 6),
+// so they lift it for themselves with pause.lifted; each has a twin proving what the paused route does today. The pause
+// itself is covered in lib/stakingPause.test.ts. The real isStakingPaused decides whenever the pause is not lifted.
+const pause = vi.hoisted(() => ({ lifted: false }));
+vi.mock('@/lib/stakingPause', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./stakingPause')>();
+  return { ...real, isStakingPaused: (m: string | null | undefined) => !pause.lifted && real.isStakingPaused(m) };
+});
+
 import { GET as listGET } from '../app/api/arena/list/route';
 import { GET as matchGET } from '../app/api/arena/[matchId]/route';
 import { POST as submitPOST } from '../app/api/arena/submit-score/route';
@@ -113,10 +125,12 @@ const legacyMatch = (over: Row = {}): Row => ({
 beforeEach(() => {
   db.matches = []; db.sessions = []; db.created = []; db.sessionQueries = []; db.duelQueries = []; db.events = [];
   vi.mocked(recordServerEvent).mockClear();
+  pause.lifted = false;
 });
 
 describe('an arena duel stored as "musicAcademy"', () => {
-  it('lists as a music duel with a working PLAY link, in the open lobby and in my duels', async () => {
+  it('lists as a music duel with a working PLAY link, in the open lobby and in my duels (once the pause lifts)', async () => {
+    pause.lifted = true;
     db.matches = [legacyMatch(), legacyMatch({ id: 'legacy-2', player1Id: USER, player2Id: HOUSE, status: 'ACTIVE' })];
     const body = await (await listGET()).json();
     expect(body.open).toHaveLength(1);
@@ -126,6 +140,16 @@ describe('an arena duel stored as "musicAcademy"', () => {
       expect(row.name).toBe('Groove Academy');
       expect(row.href).toBe('/play/music');
     }
+  });
+
+  // MUSIC-SUITE P1: while music is paused nobody can accept a posted music duel, so the open lobby does not advertise it;
+  // the one I am already in keeps its name, its PLAY link and a flag the lobby reads.
+  it('while music is paused: hidden from OPEN CHALLENGES, still in MY DUELS as music with its PLAY link', async () => {
+    db.matches = [legacyMatch(), legacyMatch({ id: 'legacy-2', player1Id: USER, player2Id: HOUSE, status: 'ACTIVE' })];
+    const body = await (await listGET()).json();
+    expect(body.open).toEqual([]);
+    expect(body.mine).toHaveLength(1);
+    expect(body.mine[0]).toMatchObject({ mode: 'music', name: 'Groove Academy', href: '/play/music', status: 'ACTIVE', stakingPaused: true });
   });
 
   it('opens as a music duel on its own page', async () => {
@@ -198,7 +222,16 @@ describe('a staked music rival and endless free play', () => {
 });
 
 describe('a new duel', () => {
-  it('is stored under the session key even when an old client posts "musicAcademy"', async () => {
+  it('while music is paused, an old client posting "musicAcademy" is refused as PAUSED (the alias is read), and nothing is stored', async () => {
+    const res = await createPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('STAKING_PAUSED');
+    expect(db.created).toHaveLength(0);
+    expect(db.events).toHaveLength(0);
+  });
+
+  it('is stored under the session key even when an old client posts "musicAcademy" (once the pause lifts)', async () => {
+    pause.lifted = true;
     const res = await createPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
     expect(res.status).toBe(200);
     expect(db.created).toHaveLength(1);
@@ -207,6 +240,7 @@ describe('a new duel', () => {
   });
 
   it('is stored as posted when the client posts the current key, and an unknown key is still refused', async () => {
+    pause.lifted = true;
     await createPOST(post({ mode: 'music', feeLc: 50 }));
     expect(db.created[0].mode).toBe('music');
     const bad = await createPOST(post({ mode: 'notAMode', feeLc: 50 }));
@@ -218,7 +252,16 @@ describe('a new duel', () => {
 // HOTFIX (2026-09-24): quick-match got the same normalisation as create, and it is the path that makes GHOST_DUEL rows,
 // the rows the ghost draw reads. Join was the one arena route still answering with the raw stored key.
 describe('a quick match', () => {
-  it('is stored, logged and answered under the session key when an old client posts "musicAcademy"', async () => {
+  it('while music is paused, an old client posting "musicAcademy" is refused as PAUSED, with no row and no event', async () => {
+    const res = await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('STAKING_PAUSED');
+    expect(db.created).toHaveLength(0);
+    expect(db.events).toHaveLength(0);
+  });
+
+  it('is stored, logged and answered under the session key when an old client posts "musicAcademy" (once the pause lifts)', async () => {
+    pause.lifted = true;
     const res = await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
     expect(res.status).toBe(200);
     expect(db.created).toHaveLength(1);
@@ -229,7 +272,9 @@ describe('a quick match', () => {
   });
 
   it("then settles against a rival drawn from the player's past Arena music scores", async () => {
+    pause.lifted = true;
     await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
+    pause.lifted = false;   // MUSIC-SUITE P1: a quick match opened before the pause still settles while it is on
     db.matches = db.created.map((m) => ({ ...m, player1Score: null, player2Score: null, createdAt: new Date('2026-09-20T00:00:00Z') }));
     db.matches.push(legacyMatch({ id: 'past-1', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 4800, player2Score: 4700, createdAt: new Date('2026-09-19T00:00:00Z') }));
     db.sessions = [{ userId: USER, mode: 'music', score: 14_800, createdAt: new Date('2026-09-19T00:00:00Z') }];
@@ -247,7 +292,17 @@ describe('a quick match', () => {
 });
 
 describe('joining a duel stored as "musicAcademy"', () => {
-  it('answers and logs it as a music duel', async () => {
+  it('while music is paused, is refused as PAUSED: no stake locked, the row untouched (its creator cancels for a refund)', async () => {
+    db.matches = [legacyMatch()];
+    const res = await joinPOST(post({ matchId: 'legacy-1' }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('STAKING_PAUSED');
+    expect(db.matches[0]).toMatchObject({ status: 'WAITING', player2Id: null });
+    expect(db.events).toHaveLength(0);
+  });
+
+  it('answers and logs it as a music duel (once the pause lifts)', async () => {
+    pause.lifted = true;
     db.matches = [legacyMatch()];
     const res = await joinPOST(post({ matchId: 'legacy-1' }));
     expect(res.status).toBe(200);

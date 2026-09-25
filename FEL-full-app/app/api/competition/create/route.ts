@@ -15,6 +15,7 @@ import {
 } from '@/lib/competition';
 import { ledgerEscrowLock } from '@/lib/stripe-helpers';
 import { scoreCeilingFor } from '@/lib/arena-score-integrity';
+import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 /**
  * POST /api/competition/create
@@ -42,6 +43,12 @@ export async function POST(req: NextRequest) {
   // above the mode's ceiling, and a mode with no ceiling could never settle.
   if (!scoreCeilingFor(mode)) {
     return NextResponse.json({ error: 'NO_SCORE_CEILING', detail: `"${mode}" has no score ceiling, so it cannot be staked.` }, { status: 400 });
+  }
+  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): this engine is dark (REAL_MONEY_COMPETITION),
+  // but it takes any mode with a ceiling, and music and dance have one — so it would lock money on exactly the duels the
+  // owner paused. Same list as the Arena (lib/stakingPause.ts), refused before anything is written.
+  if (isStakingPaused(mode)) {
+    return NextResponse.json({ error: STAKING_PAUSED_CODE, detail: stakingPausedDetail(mode) }, { status: STAKING_PAUSED_STATUS });
   }
   if (!['H2H', 'SCORE_DUEL', 'GHOST_DUEL'].includes(matchType)) {
     return NextResponse.json({ error: 'Invalid matchType' }, { status: 400 });

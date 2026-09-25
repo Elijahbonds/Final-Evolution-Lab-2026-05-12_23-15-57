@@ -14,6 +14,7 @@
  */
 import 'server-only';
 import { sessionModeFor } from './match-core';
+import { isStakingPaused } from '@/lib/stakingPause';
 import type { PrismaClient } from '@/public/_prisma/client';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
@@ -66,6 +67,12 @@ export async function joinAndSettle(
   if (match.status === 'settled') return { error: 'already_settled' as const, match };
   if (match.hostId === args.guestId) return { error: 'cannot_join_own' as const };
   if (match.guestId && match.guestId !== args.guestId) return { error: 'already_taken' as const };
+  // MUSIC-SUITE P1 (2026-09-25, owner decision #9 "pause staking both now" — friend challenges too). An open challenge
+  // posted before the pause settled on the guest's ALL-TIME best (bestScoreFor has no date bound), so a guest could
+  // play own-song dance free play after the pause, reach the 79,680 ceiling against the host's frozen pre-pause best
+  // and then accept — the exact song-decides duel the pause stops. Accepting is refused like /api/arena/join refuses a
+  // paused duel. Nothing is locked on a friend challenge, so nothing is stranded: the host's challenge simply stays open.
+  if (isStakingPaused(sessionModeFor(match.mode))) return { error: 'staking_paused' as const, mode: sessionModeFor(match.mode) };
 
   const guestScore = await bestScoreFor(prisma, args.guestId, match.mode);
   const updated = await prisma.mpMatch.update({

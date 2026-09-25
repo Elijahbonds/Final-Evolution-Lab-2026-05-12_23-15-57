@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { isRealMoneyCompetitionEnabled, FEATURE_DISABLED } from '@/lib/flags';
 import { checkCompetitionEligibility, appendMatchEvent } from '@/lib/competition';
 import { ledgerEscrowLock } from '@/lib/stripe-helpers';
+import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 /**
  * POST /api/competition/join
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest) {
       if (match.status !== 'WAITING') throw Object.assign(new Error('Match is not open for joining'), { httpStatus: 409 });
       if (match.player1Id === userId) throw Object.assign(new Error('Cannot join your own match'), { httpStatus: 409 });
       if (match.player2Id) throw Object.assign(new Error('Match is already full'), { httpStatus: 409 });
+      // MUSIC-SUITE P1 (2026-09-25, owner decision #9): joining locks a NEW stake, so a paused mode is refused here too,
+      // before the escrow lock (lib/stakingPause.ts). Dark engine; a creator's escrow is refunded by /api/competition/void.
+      if (isStakingPaused(match.mode)) throw Object.assign(new Error(stakingPausedDetail(match.mode)), { httpStatus: STAKING_PAUSED_STATUS });
 
       // Lock player 2's entry fee
       await ledgerEscrowLock(tx, {

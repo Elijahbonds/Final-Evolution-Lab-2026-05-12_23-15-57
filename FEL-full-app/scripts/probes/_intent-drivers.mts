@@ -374,6 +374,51 @@ export const INTENT_DRIVERS: Record<string, string> = {
       else if (Math.abs(err) < 0.1 && now - lastBoost > 3000) { btn(R1, 400); lastBoost = now; }
     }, 33);
   `),
+  // DANCE (MUSIC-SUITE P1, 2026-09-25) — a dancer who reads the cue lane. The scorecard had no Logic for the cypher
+  // (SCORECARD-rc25: "no gauntlet or mechanics evidence") because nothing played it on purpose: the generic deliberate
+  // driver taps once a second off the beat. The mode publishes its lane every playing frame (DanceMode.ts:440, HUD
+  // `cues`: each upcoming step's `in` = step time − audio now, on the SAME audio clock perf.hit() judges with,
+  // DanceMode.ts:386), so a player who watches it knows exactly when each step lands. This one:
+  //   · on the pick screen (HUD nextStep '◀ ▶ TRACK · A START', DanceMode.ts:249) presses A once a second until the
+  //     count-in takes it (a press during the harness's own 3-2-1 is not delivered, so it retries);
+  //   · polls rawHud every 4 ms and treats a NEW `cues` array as "a frame just ran update()", so a cue's `in` is as of
+  //     now (± 4 ms), not as of whenever the poll happened to land;
+  //   · plans one A per step (a step is one tap: DancePerformance.hit, DanceCore.ts:255).
+  // THE PRESS MUST LAND IN THE FRAME BEFORE THE STEP (measured 2026-09-25, _mechanics-probe dance-dry1: aimed AT the step,
+  // 6 hits in 30 rounds, and the misses were WILD — "MISS" with no EARLY/LATE). The pad is read on the InputBus's rAF
+  // chain (InputBus.ts:569) and onInput runs perf.hit(now) BEFORE that frame's update() has moved a due step into
+  // `pending` (DanceCore.ts:198-207). A tap delivered in the first frame after the step's time therefore finds no pending
+  // step, and the early-hit rescue (DanceCore.ts:268-281) wants the step still AHEAD (earlyBy > 0): it is judged a wild
+  // MISS and costs WILD_TAP_COST. A player tapping dead on the beat meets this on any tap the frame delivers late (a
+  // held-file bug for P2: DanceCore.ts is movement play's). So this driver aims one frame EARLY — LEAD = the p90 frame
+  // interval + 4 ms, capped at 38 (inside PERFECT's 40 ms) — and the step is taken by the early path as PERFECT.
+  // window.__DANCE_LEAD pins LEAD (ms; 8 = aim at the step, the dance-dry1 driver); window.__DANCE_OFF_MS shifts every
+  // tap (a late / early dancer). window.__DANCE_LOG keeps [plannedAt, in, name] for a probe.
+  dance: loop(`
+    const PIN = window.__DANCE_LEAD, OFF = Number(window.__DANCE_OFF_MS ?? 0);
+    let lastPick = 0, lastRef = null; const planned = []; const frames = []; let lastF = 0;
+    window.__DANCE_PLANNED = 0; window.__DANCE_LOG = [];
+    const onFrame = (t) => { if (lastF) { frames.push(t - lastF); if (frames.length > 60) frames.shift(); } lastF = t; requestAnimationFrame(onFrame); };
+    requestAnimationFrame(onFrame);
+    const lead = () => { if (PIN != null) return Number(PIN); if (!frames.length) return 24; const s = frames.slice().sort((a, b) => a - b); return Math.min(38, s[Math.floor(s.length * 0.9)] + 4); };
+    setInterval(() => {
+      const h = Q.rawHud ? Q.rawHud() : {}; const now = performance.now();
+      if (typeof h.nextStep === 'string' && /TRACK/.test(h.nextStep)) { if (now - lastPick > 1000) { lastPick = now; btn(A, 70); } return; }
+      const cues = h.cues;
+      if (!Array.isArray(cues) || cues === lastRef) return;
+      lastRef = cues;
+      for (const c of cues) {
+        if (typeof c.in !== 'number' || c.in < -0.12 || c.in > 0.6) continue;
+        const at = now + c.in * 1000 + OFF;
+        if (planned.some((t) => Math.abs(t - at) < 120)) continue;   // steps are ≥ half a beat apart (268 ms at 112 BPM)
+        planned.push(at); if (planned.length > 64) planned.shift();
+        window.__DANCE_PLANNED++; window.__DANCE_LOG.push([Math.round(at), c.in, c.name]);
+        const L = lead();
+        setTimeout(() => btn(A, 45), Math.max(0, at - now - L));
+      }
+    }, 4);
+  `),
+
   // SPRINT — hands off until the HUD says Go (a tap before it is a false start), then alternate the d-pad on a 115 ms
   // cadence (the carnival A+ recipe: 115 ms wins in ~11.5 s, 200 ms wins faster on the rhythm reward, 420 ms never finishes).
   sprint: loop(`
@@ -387,4 +432,85 @@ export const INTENT_DRIVERS: Record<string, string> = {
       btn(side ? RIGHT : LEFT, 50); side ^= 1;
     }, 8);
   `),
+
+  // MUSIC — the Groove Academy's PERFORM (MUSIC-SUITE P1, 2026-09-25). A DOM room: no pad, no scene. TAP is a React
+  // onClick (StudioMode.tsx:510) judged against the engine's audio clock (performTap → PerformSet.tap(ctx.currentTime),
+  // StudioMode.tsx:266-274), so this driver CLICKS the button (window.__DOM_CLICK, the _dom-room shim) at chosen times.
+  // What is a note today: EVERY sequencer step of free play, sounding or not (PerformSet.note is called for each
+  // step, StudioMode.tsx:208-216) — and a note is only tappable once AudioEngine.drainPlayhead has OFFERED it, up to a
+  // 25 ms timer tick after its time (AudioEngine.ts:154-161). Four players, picked by window.__PERFORM_TAP:
+  //   'onbeat'  (default when the room exposes its schedule) — a perfectly calibrated musician: every note tapped AT its
+  //             scheduled time on the audio clock. Needs /dev/music's window.__FEL_STUDIO__.steps (app/dev/music/
+  //             loader.tsx: each scheduled step and its time) and the page's AudioContext (_dom-room AUDIO_CLOCK_INIT).
+  //   'heard'   — the same musician uncalibrated: taps when the note comes out of the speaker (+ base + output latency).
+  //   'hits'    — a musician playing the MUSIC: lays kick on 1-2-3-4 and snare on 2 and 4, then taps only where the beat
+  //             sounds (what a player hears as "the notes"); the judge still offers the other twelve steps a bar.
+  //   'offered' — the best the judge allows: taps the moment the playhead moves (the drain offered the note), read off the
+  //             grid's playhead outline (StudioMode.tsx:470). The fallback on /play/music, which has no schedule readout.
+  // window.__INTENT_VARIANT says which one ran (a production run can only be 'offered').
+  music: `(() => {
+    const S = window.__FEL_STUDIO__;
+    const clock = () => (window.__ACS || []).filter((c) => c.state === 'running').slice(-1)[0] || null;
+    const tap = () => window.__DOM_CLICK && window.__DOM_CLICK('TAP');
+    let want = window.__PERFORM_TAP || (S && clock() ? 'onbeat' : 'offered');
+    if (want !== 'offered' && !(S && clock())) want = 'offered';
+    window.__INTENT_VARIANT = want; window.__MUSIC_TAPS = 0;
+    const HITS = new Set();
+    if (want === 'hits') {
+      // lay the beat on the STUDIO grid (the grid stays on screen in PERFORM): label cell, then 16 step cells per row
+      const lay = (row, steps) => {
+        const lab = Array.from(document.querySelectorAll('div')).find((d) => (d.textContent || '').trim() === row && d.nextElementSibling);
+        if (!lab) return; let c = lab.nextElementSibling, i = 0;
+        while (c && i < 16) { if (steps.includes(i)) c.click(); c = c.nextElementSibling; i++; }
+      };
+      lay('Kick', [0, 4, 8, 12]); lay('Snare', [4, 12]);
+      for (const i of [0, 4, 8, 12]) HITS.add(i);
+    }
+    if (want === 'offered') {
+      const col = () => { const el = document.querySelector('div[style*="outline"]'); if (!el || !el.parentElement) return -1; return Array.prototype.indexOf.call(el.parentElement.children, el); };
+      let last = col();
+      new MutationObserver(() => { const c = col(); if (c !== last) { last = c; if (c >= 0) { tap(); window.__MUSIC_TAPS++; } } })
+        .observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style'] });
+      return;
+    }
+    const done = new Set();
+    setInterval(() => {
+      const c = clock(); if (!c || !S) return;
+      const nowA = c.currentTime;
+      const lag = want === 'heard' ? (c.baseLatency || 0) + (c.outputLatency || 0) : 0;
+      for (const s of S.steps) {
+        const key = s.time.toFixed(4);
+        if (done.has(key) || s.time + lag < nowA) continue;
+        if (want === 'hits' && !HITS.has(s.step)) continue;
+        const ms = (s.time + lag - nowA) * 1000;
+        if (ms > 300) continue;
+        done.add(key);
+        setTimeout(() => { tap(); window.__MUSIC_TAPS++; }, Math.max(0, ms));
+      }
+    }, 5);
+  })()`,
+};
+
+/**
+ * MASHERS THAT MASH THE VERB (MUSIC-SUITE P1, 2026-09-25). The mechanics probe's generic masher presses one of twelve
+ * pad buttons at random, ~8 a second. In a mode with ONE verb that is a weak masher — dance reads only A, B and RT
+ * (DanceMode.ts:383), so seven presses in twelve are rests — and in a DOM room it presses nothing at all (TAP is a
+ * click, not a pad button). These press the mode's own verbs at the same ~8 a second with random gaps: the masher a
+ * rhythm game actually has to beat. _mechanics-probe runs one of these when it exists (GENERIC_MASH=1 forces the old one).
+ */
+export const MASHER_DRIVERS: Record<string, string> = {
+  // A / B / RT (all three are TAP in the cypher), 40 ms down, 50–120 ms up: ~8 presses a second. No stick: the cypher
+  // reads none while dancing, and on the pick screen a random stick changes the SONG (dance-dry1's masher landed on
+  // BATTLE, 112 BPM, while the intent driver danced THE CYPHER) — so the masher's first A locks the same default song.
+  dance: loop(`
+    const V = [A, B, RT]; window.__MASH_PRESSES = 0;
+    const go = () => { btn(V[Math.floor(Math.random() * V.length)], 40); window.__MASH_PRESSES++; setTimeout(go, 90 + Math.random() * 70); };
+    go();
+  `),
+  // TAP clicked at random, 60–190 ms apart: ~8 a second.
+  music: `(() => {
+    window.__MASH_PRESSES = 0;
+    const go = () => { if (window.__DOM_CLICK && window.__DOM_CLICK('TAP')) window.__MASH_PRESSES++; setTimeout(go, 60 + Math.random() * 130); };
+    go();
+  })()`,
 };

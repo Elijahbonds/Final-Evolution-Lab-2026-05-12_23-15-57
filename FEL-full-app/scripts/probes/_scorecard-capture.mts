@@ -21,12 +21,20 @@ const { MODE_VERBS, BOOST_MODES } = (MV.MODE_VERBS ? MV : MV.default) as { MODE_
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3096';
 const SEC = Number(process.env.SEC ?? 40);
 const TAG = process.env.TAG ?? 'run';
-const OUT = `${process.env.HOME}/Claude/outbox/finish-release/scorecard/${TAG}`;
+// OUT (MUSIC-SUITE P1): a lane's dry run writes beside its own notes instead of into the release scorecard folder
+const OUT = process.env.OUT ?? `${process.env.HOME}/Claude/outbox/finish-release/scorecard/${TAG}`;
 fs.mkdirSync(OUT, { recursive: true });
 
-import { SCORE_ROUTES } from './_scorecard-routes.mts';
+import { SCORE_ROUTES, devPath, withQuery } from './_scorecard-routes.mts';
+import { isDomRoom, startDomRoom, domPress, AUDIO_CLOCK_INIT, DOM_ROOMS } from './_dom-room.mts';
 const pick = (process.env.MODES ?? 'all').split(',');
-const MODES = pick[0] === 'all' ? SCORE_ROUTES : SCORE_ROUTES.filter(([s]) => pick.includes(s));
+// DEV=1 (MUSIC-SUITE P1, 2026-09-25): a lane's `next dev` (database offline, every /play route bounces to /login) —
+// capture each game on its auth-free twin (_scorecard-routes devPath) and skip the login. HEADLESS=1: headless, with
+// the angle/metal GL the Babylon modes need on this Mac. Neither is set for a release capture, which is unchanged.
+const DEV = process.env.DEV === '1';
+const HEADLESS = process.env.HEADLESS === '1';
+const MODES0 = pick[0] === 'all' ? SCORE_ROUTES : SCORE_ROUTES.filter(([s]) => pick.includes(s));
+const MODES: [string, string][] = DEV ? MODES0.map(([s]) => [s, devPath(s)]) : MODES0;
 const verbKey = (slug: string) => (slug === 'try' ? 'dunk' : slug);
 
 const IDX: Record<string, number> = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, LT: 6, RT: 7, DPAD_LEFT: 14, DPAD_RIGHT: 15 };
@@ -43,7 +51,7 @@ function verbsFor(slug: string): { label: string; idx: number; holdMs: number }[
   return out;
 }
 
-const browser = await chromium.launch({ executablePath: chromiumExe(), headless: false, args: ['--window-size=1280,860', '--autoplay-policy=no-user-gesture-required', '--use-angle=metal', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+const browser = await chromium.launch({ executablePath: chromiumExe(), headless: HEADLESS, args: ['--window-size=1280,860', '--autoplay-policy=no-user-gesture-required', ...(HEADLESS ? ['--use-gl=angle', '--enable-webgl'] : []), '--use-angle=metal', '--ignore-gpu-blocklist', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['camera'] });   // PROVE IT (/play/dunkduel) is a CAMERA contest: a fake device lets the headless session reach its flow
 await ctx.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });
 // THE PROBE DECLARES ITSELF. `?agent=1` is remembered in sessionStorage, which is per TAB — and every route here opens
@@ -55,7 +63,7 @@ await ctx.addInitScript(`(() => {
   window.__PAD = pad; navigator.getGamepads = () => [pad, null, null, null];
   let n = 0, t = performance.now(); window.__FPS = []; const f = (now) => { n++; if (now - t >= 500) { window.__FPS.push(Math.round(n * 1000 / (now - t))); n = 0; t = now; } requestAnimationFrame(f); }; requestAnimationFrame(f);
 })()`);
-{
+if (!DEV || process.env.LOGIN === '1') {
   const p = await ctx.newPage();
   await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 }); await p.waitForTimeout(800);
   if (/\/login/.test(p.url())) { await p.fill('input[type="email"]', 'playtest@fel.local'); await p.fill('input[type="password"]', 'playtest-local-only'); await p.click('button[type="submit"]'); const t = Date.now(); while (Date.now() - t < 30000 && /\/login/.test(p.url())) await p.waitForTimeout(300); }
@@ -72,25 +80,39 @@ for (const [slug, path] of MODES) {
   p.on('pageerror', (e) => errors.push('pageerror ' + e.message.slice(0, 200)));
   const row: Record<string, unknown> = { slug, path, tag: TAG };
   const t0 = Date.now();
+  // MUSIC-SUITE P1 (2026-09-25): a DOM room (the Groove Academy) has no #fel-ready, no rig and no __FEL_QA__ — it is
+  // started by its own ritual (_dom-room startDomRoom: READY, then PLAY), measured through the __FEL_QA__ shim that
+  // installs, pressed by clicking its verbs, and has NO body sampler (the scorer marks Body N/A for it, with the reason).
+  // Frames, fps, errors and load time are the same code as every other game.
+  const dom = isDomRoom(slug);
   try {
-    await p.goto(`${BASE}${path}?agent=1`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await p.waitForTimeout(1200);
-    const lobby = p.getByRole('button', { name: /START THE NIGHT/i }); if (await lobby.count()) await lobby.first().click().catch(() => {});
-    let st = '';
-    while (Date.now() - t0 < 150000) { st = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (st === 'loaded' || st === 'failed') break; await p.waitForTimeout(300); }
-    row.loadMs = Date.now() - t0;
-    if (st !== 'loaded') { row.note = `not ready (${st})`; throw new Error('not ready'); }
-    await p.waitForTimeout(700);
-    const start = p.getByRole('button', { name: /^(TAP TO START|START|PLAY)$/i });
-    if (await start.count()) await start.first().click().catch(() => {}); else await p.keyboard.press('Space');
-    await p.waitForTimeout(800);
-    // who scene it: its own PLAY
-    const play = p.getByRole('button', { name: /^PLAY$/ }); if (await play.count()) await play.first().click().catch(() => {});
+    if (dom) await p.addInitScript({ content: AUDIO_CLOCK_INIT });
+    await p.goto(`${BASE}${withQuery(path, 'agent=1')}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    if (dom) {
+      row.domRoom = true;
+      const r = await startDomRoom(p, slug, 150000);
+      row.loadMs = r.loadMs;
+      if (!r.ok) { row.note = `not ready (${r.note})`; throw new Error('not ready'); }
+      await p.waitForTimeout(800);
+    } else {
+      await p.waitForTimeout(1200);
+      const lobby = p.getByRole('button', { name: /START THE NIGHT/i }); if (await lobby.count()) await lobby.first().click().catch(() => {});
+      let st = '';
+      while (Date.now() - t0 < 150000) { st = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => ''); if (st === 'loaded' || st === 'failed') break; await p.waitForTimeout(300); }
+      row.loadMs = Date.now() - t0;
+      if (st !== 'loaded') { row.note = `not ready (${st})`; throw new Error('not ready'); }
+      await p.waitForTimeout(700);
+      const start = p.getByRole('button', { name: /^(TAP TO START|START|PLAY)$/i });
+      if (await start.count()) await start.first().click().catch(() => {}); else await p.keyboard.press('Space');
+      await p.waitForTimeout(800);
+      // who scene it: its own PLAY
+      const play = p.getByRole('button', { name: /^PLAY$/ }); if (await play.count()) await play.first().click().catch(() => {});
+    }
     const from = await p.evaluate(() => (window as any).__FEL_QA__?.now() ?? 0);
     // 10 Hz body sampler in the page
     // WHICH CLIP (2026-09-15): the tallies alone say "1.5% T-arms" and leave the next hour to guessing. Every fault
     // frame now also names the clip that was on top of the blend, so a deduction points at a file.
-    await p.evaluate(`(() => { window.__BODY = { n: 0, noClip: 0, tee: 0, awkward: 0, noHero: 0, clipChanges: 0, last: '', teeBy: {}, awkBy: {}, churnBy: {} };
+    if (!dom) await p.evaluate(`(() => { window.__BODY = { n: 0, noClip: 0, tee: 0, awkward: 0, noHero: 0, clipChanges: 0, last: '', teeBy: {}, awkBy: {}, churnBy: {} };
       window.__BODYI = setInterval(() => { const d = window.__FEL_DEV__; const r = d && d.anim ? d.anim() : null; const B = window.__BODY; B.n++;
         const h = r && r.hero; if (!h) { B.noHero++; return; }
         if (!h.playing.length) B.noClip++;
@@ -100,6 +122,7 @@ for (const [slug, path] of MODES) {
         if (h.arms && !h.arms.ok && !h.arms.tee) { B.awkward++; bump(B.awkBy, top || '(no clip)'); }
         if (top !== B.last) { B.clipChanges++; bump(B.churnBy, (B.last || '(none)') + '→' + (top || '(none)')); B.last = top; } }, 100); })()`);
     const verbs = verbsFor(slug);
+    const domVerbs = dom ? DOM_ROOMS[slug].verbs : [];
     const tPlay = Date.now(); let k = 0;
     while ((Date.now() - tPlay) / 1000 < SEC) {
       const state = await p.evaluate(() => document.getElementById('fel-ready')?.dataset.state ?? '').catch(() => '');
@@ -108,6 +131,7 @@ for (const [slug, path] of MODES) {
       if (k === 2) await p.screenshot({ path: `${OUT}/${slug}-1-open.png` });
       if (Math.abs(el - SEC * 0.5) < 0.6 && !fs.existsSync(`${OUT}/${slug}-2-mid.png`)) await p.screenshot({ path: `${OUT}/${slug}-2-mid.png` });
       if (Math.abs(el - SEC * 0.85) < 0.6 && !fs.existsSync(`${OUT}/${slug}-3-late.png`)) await p.screenshot({ path: `${OUT}/${slug}-3-late.png` });
+      if (dom) { await domPress(p, domVerbs[k++ % domVerbs.length]); await p.waitForTimeout(990); continue; }
       await pad(p, `p.axes[0] = ${(0.45 * Math.sin(k * 0.7)).toFixed(2)}; p.axes[1] = -0.75`);
       const v = verbs[k++ % Math.max(1, verbs.length)];
       if (v) await press(p, v.idx, v.holdMs);
@@ -115,10 +139,12 @@ for (const [slug, path] of MODES) {
     }
     row.playSec = Math.round((Date.now() - tPlay) / 1000);
     if (!fs.existsSync(`${OUT}/${slug}-3-late.png`)) await p.screenshot({ path: `${OUT}/${slug}-3-late.png` });
-    const body = await p.evaluate(() => { clearInterval((window as any).__BODYI); return (window as any).__BODY; });
-    row.body = body;
-    // RECOGNISABLE: every request another clip answered this session ("requested→played"), scored by anim/recognisable
-    row.stoodIn = await p.evaluate(() => { const d = (window as any).__FEL_DEV__; const r = d && d.anim ? d.anim() : null; return r?.stoodIn ?? null; }).catch(() => null);
+    if (!dom) {
+      const body = await p.evaluate(() => { clearInterval((window as any).__BODYI); return (window as any).__BODY; });
+      row.body = body;
+      // RECOGNISABLE: every request another clip answered this session ("requested→played"), scored by anim/recognisable
+      row.stoodIn = await p.evaluate(() => { const d = (window as any).__FEL_DEV__; const r = d && d.anim ? d.anim() : null; return r?.stoodIn ?? null; }).catch(() => null);
+    }
     const fps = (await p.evaluate(() => (window as any).__FPS)) as number[];
     const sorted = [...fps.slice(2)].sort((a, b) => a - b);
     row.fpsP50 = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null; row.fpsP10 = sorted.length ? sorted[Math.floor(sorted.length * 0.1)] : null;

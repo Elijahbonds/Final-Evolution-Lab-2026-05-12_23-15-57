@@ -5,6 +5,7 @@
  * this same module (never fork a core). Covers challenge-code generation and
  * winner resolution from two final scores.
  */
+import { isStakingPaused } from '../stakingPause';
 
 // Unambiguous alphabet (no 0/O/1/I) so codes read cleanly aloud / over text.
 export const MP_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -109,3 +110,22 @@ export function isValidMpMode(mode: string): boolean {
 export function mpModeLabel(mode: string): string {
   return MP_MODES.find((m) => m.key === mode)?.label ?? mode;
 }
+
+/**
+ * MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now" — music AND dance out of friend challenges).
+ * MP_MODES stays the list of modes a challenge key can NAME: the creator card editor, /api/v1/card and every existing
+ * challenge's label read it, and a dance challenge posted before the pause still has to show as The Cypher and settle
+ * (/api/v1/mp/join has no pause check; it locks no stake). Whether a NEW challenge may be CREATED — online
+ * (/api/v1/mp/create) or pass-and-play (/api/v1/mp/local), both of which pay coins and the winner's shards — is this
+ * question, answered by lib/stakingPause.ts through the key the challenge settles under (sessionModeFor). Music has
+ * no challenge key today; if one is added while music is paused, it is refused here the same way.
+ */
+export function isMpChallengeOpen(mode: string): boolean {
+  return isValidMpMode(mode) && !isStakingPaused(sessionModeFor(mode));
+}
+
+/** The modes the multiplayer lobby offers for a NEW challenge (MP_MODES minus the paused ones), in roster order. */
+export const MP_CHALLENGE_MODES: { key: string; label: string }[] = MP_MODES.filter((m) => isMpChallengeOpen(m.key));
+
+/** The challenge modes whose staking is paused — the lobby names them instead of dropping them silently. */
+export const MP_PAUSED_MODES: { key: string; label: string }[] = MP_MODES.filter((m) => !isMpChallengeOpen(m.key));
