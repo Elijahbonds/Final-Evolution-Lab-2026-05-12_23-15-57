@@ -746,4 +746,23 @@ describe('what the body does press', () => {
     expect((rt[rt.length - 1].e as { value: number }).value).toBe(0);
     expect(rt[rt.length - 1].e.src).toBeUndefined();                // the pad's own 0 again
   });
+
+  it('a pad\'s START in the middle of a crouch: the mode sees the body let go of RT, down to the pad\'s value, BEFORE it pauses', () => {
+    // the step-3 review: "releases FIRST, still playing" did not hold for a trigger with a pad seated — the let-go
+    // waited for the next pad frame, which reached a paused game and was dropped, so the mode held the crouch through
+    // the pause (and SkateRun read its end, on the first frame after the resume, as a charged pop)
+    const duck = stream('duck 30 cm s17');
+    const rtOf = (r: SeamReplay) => r.events.filter((x) => x.e.t === 'trigger' && x.e.side === 'R');
+    const val = (x: SeamEmitted) => (x.e as { value: number }).value;
+    const free = machine(SKATE, duck, { padSeated: true });
+    const top = rtOf(free).reduce((a, b) => (val(b) > val(a) ? b : a));
+    expect(val(top)).toBeGreaterThanOrEqual(0.6);
+    const q = machine(SKATE, duck, { padSeated: true, inputs: [{ at: top.at + 1, e: { t: 'button', btn: 'START', pressed: true } }] });
+    const paused = q.phases.find((p) => p.phase === 'paused')!;
+    expect(paused.why).toBe('input');
+    const before = rtOf(q).filter((x) => x.seq < paused.seq);
+    expect(val(before[before.length - 2])).toBeGreaterThanOrEqual(0.6);   // crouching up to the press…
+    expect(before[before.length - 1].e).toStrictEqual({ t: 'trigger', side: 'R', value: 0, src: 'body' });   // …let go first
+    expect(rtOf(q).filter((x) => x.seq > paused.seq)).toEqual([]);        // nothing reaches a paused game
+  });
 });

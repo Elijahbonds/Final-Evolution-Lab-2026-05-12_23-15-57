@@ -20,12 +20,11 @@ import { ChannelReader } from './bodyChannels';
 import type { PoseFrame } from './landmarks';
 import type { Emitted, Replay } from './baseline';
 import { BodySession, type BodyIntent, type SessionStep } from '../babylon/core/BodySession';
-import { EvidenceCounter } from '../babylon/core/sessionStore';
+import { bodySeamFor } from '../babylon/core/bodySeam';
 import { isWakeInput, WakeLatch } from '../babylon/core/StartWake';
 import type { BodyOut, BodyPacket, FelInput } from '../babylon/core/InputBus';
 import type { ModePhase } from '../babylon/core/ModeHarness';
 import { BodyArbiter, type HoldKey } from '../input/arbiter';
-import { BodyFloor } from '../input/bodyFloor';
 import type { BodyProfile } from '../input/bodyProfiles';
 
 /** One camera frame's packet, and which stream frame it came from (< 0 = the stand lead, as baseline's Emitted.frame). */
@@ -95,17 +94,19 @@ const holdKey = (e: Extract<FelInput, { t: 'button' | 'dpad' }>): HoldKey => (e.
 
 export function seamReplay(packets: readonly StreamPacket[], opt: SeamOptions): SeamReplay {
   const profile = opt.profile;
-  const drives = opt.drives ?? profile.bindings.length > 0;
   const machine = (opt.phase ?? 'machine') === 'machine';
   let phase: ModePhase = machine ? (opt.start ?? 'ready') : (opt.phase as ModePhase);
   const padSeated = !!opt.padSeated;
   const rafMs = 1000 / (opt.rafHz ?? 60);
 
-  const session = new BodySession({ drives, overheadIsPlay: opt.overheadIsPlay ?? profile.overheadIsPlay });
-  const floor = new BodyFloor(profile);
+  // MOVEMENT PLAY P3 (2026-09-24, the step-3 review): built the way the harness builds it (bodySeamFor), so the gate
+  // replays the harness's own construction — `drives` and the session with it — not a copy of it
+  const seam = bodySeamFor({ modeId: profile.modeId, body: { profile, overheadIsPlay: opt.overheadIsPlay } });
+  const drives = opt.drives ?? seam.drives;
+  const session = drives === seam.drives ? seam.session : new BodySession({ drives, overheadIsPlay: seam.overheadIsPlay });
+  const { floor, evidence } = seam;
   const held = new Set<HoldKey>();                   // the pad's / keys' own held buttons (the bus's `held`)
   const arbiter = new BodyArbiter((k) => held.has(k));
-  const evidence = new EvidenceCounter();
   const latch = new WakeLatch();
   const padT = { L: 0, R: 0 };
 

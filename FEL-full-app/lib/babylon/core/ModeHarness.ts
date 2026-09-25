@@ -13,9 +13,9 @@ import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
 import { detectQualityTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
 import type { VenueMood } from '../scene/moods';
-import { InputBus, type FelInput } from './InputBus';
+import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
-import { buildResult, defaultResultSink, type ResultSink, type SessionResult } from './sessionResult';
+import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
 import { JuiceKit } from '../premium/JuiceKit';
 import { motionPolicy } from '../../a11y/reducedMotion';   // HOTFIX (2026-09-24): the impact frame asks too
 import { RenderWatchdog } from './RenderWatchdog';
@@ -48,6 +48,16 @@ import type { PrqGrade } from '../../prq';
 type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
 import { isWakeInput, WakeLatch } from './StartWake';   // SHARED-START-UNSTICK: any press/push/pull → playing
+// MOVEMENT PLAY P3 (2026-09-24): the body seam — the mode's profile, the floor that presses it, the session that starts and
+// pauses the game on the body (all built by bodySeamFor), and the one store the UI reads (plan §4.4).
+import type { BodyRead, BodyEvent } from '@/lib/pose/BodyReader';
+import type { BodyChannels } from '@/lib/pose/bodyChannels';
+import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
+import type { SessionStep } from './BodySession';
+import { bodySeamFor, type BodySeam } from './bodySeam';
+import { sessionStore, type SessionWriter } from './sessionStore';
+// declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
+export type { BodyClaim, BodyChannelName, ModeBodySpec } from '@/lib/input/bodyProfiles';
 
 /** M37 mutable slot a mode fills right after spawn (hero root / live objective). */
 export interface MutableRef<T> { current: T | null; }
@@ -74,6 +84,13 @@ export type { HudCue } from './danceTracks';
 /** DUNK MOTION phase 12: a made dunk's poster — the frozen contact frame (a data URL) and what it says. */
 export interface HudPoster { src: string; title: string; by: string; total: number; night: number }
 export type HudValue = string | number | boolean | null | HudScoreCard[] | HudCue[] | HudPoster;
+
+/**
+ * MOVEMENT PLAY P3 (2026-09-24): the body as a mode sees it — one camera frame's read, the facts that need history
+ * (in a jump, the stride, the hands-up hold), when the page had it, and how late that was (arrivedAt − read.t). The
+ * read and every event are on the CAPTURE clock, which is the clock a mode that grades timing must use (P5+).
+ */
+export interface BodyView { read: BodyRead; channels: BodyChannels; arrivedAt: number; lagMs: number }
 
 export interface ModeContext {
   scene: Scene;
@@ -130,6 +147,10 @@ export interface ModeContext {
   /** PLAYER RING (all modes, 2026-09-17): the ring's arc — a mode with a tank (boost / turbo) reports it 0..1; without a
    *  report the ring stays full. Optional so a mode (or a test's fake context) need not know about the ring. */
   stamina?(v01: number): void;
+  /** MOVEMENT PLAY P3 (2026-09-24): the latest body frame, or null = no body source (none switched on, or it stopped).
+   *  An absent read (present: false) = the source is live and nobody is in frame. Optional like stamina?, so a fake
+   *  context in a test need not know about the body. */
+  body?(): BodyView | null;
 }
 
 export interface ModeDefinition {
@@ -160,6 +181,12 @@ export interface ModeDefinition {
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
   dispose?(): void;
+  /** MOVEMENT PLAY P3 (2026-09-24): the mode's own say in its body play (none in P3: every mode runs its table row in
+   *  lib/input/bodyProfiles). `claims` takes a move off the floor and hands it to onBody instead (P5+). */
+  body?: ModeBodySpec;
+  /** The CLAIMED event kinds only, in 'playing' only, on the capture clock (ev.t / ev.seen). Never re-entered by
+   *  DunkMode's aiFeed. */
+  onBody?(ctx: ModeContext, ev: BodyEvent, view: BodyView): void;
 }
 
 export interface HarnessOpts {
@@ -169,7 +196,9 @@ export interface HarnessOpts {
   onHud?: (hud: Record<string, HudValue>) => void;
   /** Dev only (ship pass 3 rollout flag): every spawn of the default hero uses this GLB instead. */
   heroOverride?: string;
-  resultSink?: ResultSink;
+  /** Where ctx.end() lands. REQUIRED (MOVEMENT PLAY P3, 2026-09-24): the old default posted to /api/sessions/result, a
+   *  route that does not exist, and every host already passes its own. */
+  resultSink: ResultSink;
   /** TRY-ONBOARD (G1): run this mode as a CONTINUOUS night — see ModeContext.continuous. */
   continuous?: boolean;
   /** Where ctx.card() lands: a scoreboard the host may show without ending the run. */
@@ -193,7 +222,34 @@ const LOAD_WATCHDOG_MS = 20_000;
  *  harness closure (heap snapshot: `getScene → context: scene → Scene`), and would retain the scene it exists to release. */
 const NO_SCENE = (): undefined => undefined;
 
+/** MOVEMENT PLAY P3: a body packet as a mode sees it (ctx.body(), onBody). */
+function viewOf(p: BodyPacket): BodyView {
+  return { read: p.read, channels: p.channels, arrivedAt: p.arrivedAt, lagMs: p.arrivedAt - p.read.t };
+}
+
 export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<() => void> {
+  // MOVEMENT PLAY P3 (2026-09-24): THE BODY SEAM (plan §4.4), built by bodySeamFor — the one place a mode's row, whether
+  // the body drives it (the only thing that lets losing the body pause it), its floor and its session are decided, and
+  // the place bodySeam.test holds to the table. The evidence counter keeps the run's "input the game received" (owner
+  // call 4).
+  // The store's card is mounted FIRST, before any await, so mounts land in the order runMode was called: a harness torn
+  // down while it loaded (StrictMode's double effect, a quick remount) holds a stale writer and cannot blank the card of
+  // the one that replaced it (sessionStore, the step-2 review). And it comes down again if the mount never finishes
+  // (the step-3 review): a throw anywhere before the disposer is handed back — the engine, the scene, a rig — would
+  // otherwise leave a dead mode's card up until the next mount.
+  const seam = bodySeamFor(def);
+  const store = sessionStore.mount(seam.card);
+  try {
+    return await mountMode(def, opts, seam, store);
+  } catch (e) {
+    store.unmount();
+    throw e;
+  }
+}
+
+/** runMode's mount itself: everything from the engine to the disposer, with the body seam and the card already up. */
+async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam, store: SessionWriter): Promise<() => void> {
+  const { claimed, floor, session, evidence } = seam;
   const engine = await createEngine(opts.canvas);
   // M95 (Pass 2): a phone reports devicePixelRatio 3, so the backing buffer is
   // 9 pixels per CSS pixel — fill rate is the dominant cost on mobile GPUs and
@@ -294,6 +350,8 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       now: () => performance.now(),
       summary: (windowMs?: number, from?: number) => qa.summary(windowMs, from),
       events: (n = 400) => qa.events.slice(-n),
+      /** MOVEMENT PLAY P3: the body's raw events and how late each reached the page — never graded (summary). */
+      bodyLog: (n = 400) => qa.bodyLog.slice(-n),
       hud: () => qa.snapshot(),
       /** Every HUD key's latest value, the continuous ones too (a meter, a phase) — what an INTENT driver plays from. */
       rawHud: () => ({ ...qaRawHud }),
@@ -364,7 +422,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       // same record the session went to, and nowhere else.
       emitCreator({ kind: 'completion', discipline: def.modeId });
       emitCreator({ kind: 'time', discipline: def.modeId, seconds: Math.round((performance.now() - startedAt) / 1000) });
-      (opts.resultSink ?? defaultResultSink)(result);
+      opts.resultSink(result);
     },
     continuous: opts.continuous === true,
     card(outcome, score, stats, detail) {
@@ -382,6 +440,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       opts.onHud?.(update);
     },
     stamina(v01) { ring?.set(v01); },
+    body() { const p = input.body(); return p ? viewOf(p) : null; },
   };
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
@@ -495,9 +554,12 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   input.start();
   const wakeLatch = new WakeLatch();
   const qaTrig = { L: 0, R: 0 };
-  unsub = input.on((e) => {
-    // M43: browsers block audio until a user gesture — unlock on the very first
-    // input event of the session (safe to call repeatedly; no-ops after unlock).
+  // M43: browsers block audio until a user gesture — unlock on the very first input of the session (safe to call
+  // repeatedly; no-ops after unlock), and start the mood's ambient bed once.
+  // MOVEMENT PLAY P3 (2026-09-24): its own function, because the body's hands-up START is a first input too. It presses
+  // nothing, so no event would ever reach the handler below to start the bed: the Body toggle's click unlocks the
+  // audio (the user gesture), and the body's wake calls this.
+  function firstInput(): void {
     SoundKit.unlock();
     if (!ambientStarted) {
       ambientStarted = true;
@@ -505,20 +567,46 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
       SoundKit.startAmbient(bed);
     }
-    // Error phase: any press retries the load (the UI shows a RETRY button too)
-    if (phase === 'error' && e.t === 'button' && e.pressed) { void attemptLoad(); return; }
+  }
+  /** MOVEMENT PLAY P3: whatever the body holds on this mode, let go — sent while the phase is still 'playing', so the
+   *  mode sees its axes at 0 and every body press released before it pauses. */
+  function releaseBody(): void { for (const e of floor.release()) input.emitBody(e); }
+  /** MOVEMENT PLAY P3: the session's verdict on a body frame or a render tick (BodySession): releases FIRST, then START,
+   *  resume or the body-lost / stalled pause. */
+  function applyBody(s: SessionStep): void {
+    if (s.release) releaseBody();
+    for (const it of s.intents) {
+      if (it === 'wake' && phase === 'ready') { firstInput(); wake('body'); }
+      if (it === 'resume' && phase === 'paused') resume(null);
+      if ((it === 'pause-lost' || it === 'pause-stall') && phase === 'playing') {
+        releaseBody(); setPhase('paused'); store.setPause(it === 'pause-lost' ? 'body-lost' : 'stall');
+      }
+    }
+  }
+  unsub = input.on((e) => {
+    firstInput();
+    // Error phase: any press retries the load (the UI shows a RETRY button too). A real press: the body never retries (P3 Z4)
+    if (phase === 'error' && e.t === 'button' && e.pressed && e.src !== 'body') { void attemptLoad(); return; }
     // READY gate (SHARED-START-UNSTICK): the first press, stick push, d-pad press or trigger pull starts play NOW.
     // A waking button is not a gameplay press (dropped, and so is its release — see StartWake); a waking stick or
     // trigger is state, so it falls through and the hero is already moving on the first playing frame.
+    // (A body event is never a wake input: the body starts the game only by its hands-up hold, applyBody above.)
     if (phase === 'ready' && isWakeInput(e)) {
       wake();
       if (!wakeLatch.wake(e, performance.now())) return;
     }
-    if (phase === 'playing' && e.t === 'button' && e.btn === 'START' && e.pressed) { setPhase('paused'); return; }
-    if (phase === 'paused' && e.t === 'button' && e.pressed) { setPhase('playing'); return; }
+    if (phase === 'playing' && e.t === 'button' && e.btn === 'START' && e.pressed) { releaseBody(); setPhase('paused'); store.setPause('input'); return; }
+    // any real press or tap resumes (owner call 2); a body press never does — a paused body's way back is the hands-up hold
+    if (phase === 'paused' && e.t === 'button' && e.pressed && e.src !== 'body') { resume(e); return; }
     if (phase === 'playing' && e.t === 'button' && e.btn === 'SELECT' && e.pressed) { camDirector.toggle(); return; }
     if (phase === 'playing') {
-      if (!wakeLatch.pass(e, performance.now())) return;
+      const now = performance.now();
+      if (!wakeLatch.pass(e, now)) return;
+      // MOVEMENT PLAY P3 (2026-09-24): "input the game received" (owner call 4), from every source — a press, a d-pad
+      // press, a stick or trigger crossing (EvidenceCounter). It is the run's play record, and the latest one says who
+      // is driving: only a body that is playing may pause the game by walking off (Z5).
+      const c = evidence.count(e, now);
+      if (c) { store.count(c); session.noteInput(c, now); }
       if (e.t === 'button' && e.pressed) buffer.press(e.btn);   // M37 input-buffer
       if (qa) {
         if (e.t === 'button' && e.pressed) qa.press(e.btn);
@@ -534,11 +622,33 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
       def.onInput(ctx, e);
     }
   });
+  // MOVEMENT PLAY P3 (2026-09-24): one camera frame of body (lib/input/poseSource → publishBodyToLive). The session
+  // judges it in every phase (START in READY, resume in PAUSED, the lost pause while playing); only while playing does
+  // the floor turn it into this mode's FelInput — through the arbiter and back into the handler above, where the wake
+  // latch, the input buffer, QA and the evidence see it like any other input — and a mode that claims a move gets the
+  // event itself. The raw events go to QA's bodyLog, never its graded timeline (Z9).
+  const unBody = input.onBody((p) => {
+    const now = performance.now();
+    const s = session.step(phase, p, now);
+    applyBody(s);
+    if (p.final) releaseBody();
+    if (phase === 'playing') {
+      for (const e of floor.step(p, now, s.latched)) input.emitBody(e);
+      for (const ev of p.events) {
+        qa?.body(ev.kind, now - ev.t);
+        if (def.onBody && claimed.has(ev.kind)) {
+          qa?.press(`body:${ev.kind}`); store.count('body'); session.noteInput('body', now);
+          def.onBody(ctx, ev, viewOf(p));
+        }
+      }
+    }
+    store.setBody(s.presence, s.handsUp01);
+  });
 
   // SHARED-START-UNSTICK (2026-09-14): READY → 'playing' in the same event. This was a 3-2-1 on an 800 ms interval —
   // 2.4 s from the press to the first update(), the hero standing still throughout, and a stick or d-pad never
   // started it at all. The 'countdown' phase stays in ModePhase (hosts still type against it) but nothing enters it.
-  function wake(): void {
+  function wake(by: 'body' | 'external' = 'external'): void {
     if (phase !== 'ready') return;
     startedAt = performance.now();
     setPhase('playing');
@@ -547,6 +657,20 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     // profile") enforced by there being exactly one call site. A discipline id is the mode id — nothing
     // finer, because a richer stream would be more useful to us and worse for the person it is about.
     emitCreator({ kind: 'session', discipline: def.modeId });
+    // MOVEMENT PLAY P3 (2026-09-24): a new run, a new play record — and the body begins it clean whoever woke it (a tap,
+    // a key, a pad, the agent bridge or the body's own START): the floor re-sends what the body is doing on the first
+    // playing frame, and the session knows who is driving. Here and in resume(), not at the call sites, so no way into
+    // 'playing' can skip it and leave a stale START hold or lost deadline behind (the step-2 review; the seam scan).
+    store.beginRun(def.modeId);
+    evidence.reset();
+    floor.begin(); session.begin(performance.now(), by);
+  }
+  /** PAUSED → 'playing': a real press or tap (e), or the body's hands-up hold (null). */
+  function resume(e: FelInput | null): void {
+    if (phase !== 'paused') return;
+    setPhase('playing');
+    store.setPause(null);
+    floor.begin(); session.begin(performance.now(), e ? 'external' : 'body');
   }
 
   const qaSteps = qaSpeedParam();
@@ -605,6 +729,12 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     ringFollow();
+    // MOVEMENT PLAY P3 (2026-09-24): the body's clock between camera frames, in every phase — the lost deadline, the
+    // stalled-camera watchdog, a release when the game leaves 'playing', and body presses whose release is due when the
+    // next frame is late. Before update(), so a pause lands before the mode runs another frame.
+    const bodyNow = performance.now();
+    applyBody(session.tick(phase, bodyNow, input.lastBodyAt()));
+    for (const e of floor.tick(bodyNow)) input.emitBody(e);
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
     if (phase === 'playing') {
       if (qa) qaSampleAnim();
@@ -636,6 +766,8 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
     agentBridge()?.detach();   // M69
     renderWatchdog?.disarm();
     frameGuard?.stop();
+    unBody();            // MOVEMENT PLAY P3: no more body frames for this mode…
+    store.unmount();     // …and its card goes (a stale writer — a later mount took over — does nothing)
     unsub?.();
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown

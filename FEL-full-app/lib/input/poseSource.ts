@@ -1,23 +1,29 @@
 'use client';
 
-// poseSource — the camera half of body control: it reads PoseService's frames and pumps the mapper's events into
-// InputBus. Nothing here decides what a gesture means; that is poseControl, which is pure and tested.
+// poseSource — the camera half of body play: PoseService's frames, read into the body channel every running mode hears.
 //
-// Movement play, phase 2 (2026-09-24): the camera, the model and their lifetimes moved into PoseService
-// (lib/pose/PoseService.ts): one camera per page, the landmarker freed on stop, and a stop during the permission
-// prompt no longer leaves the camera on. What poseControl is fed, and when, is deliberately UNCHANGED until phase 3
-// replaces the mapping: a requestAnimationFrame loop reads the newest frame to have arrived, CALIBRATION_FRAMES good
-// ticks take the neutral from the last of them, and read() runs on every tick. That is exactly what lib/pose/baseline.ts
-// replays, so the baseline still measures what ships. Two things did change, both only ever releasing input: a
-// re-centre, and a switch to the dev feed, now let go of whatever the old neutral was holding down. The picture's
-// shape is kept too: a desktop is now asked for 16:9, and the mapper is handed it as the 4:3 it was tuned on
-// (MAPPER_ASPECT).
+// MOVEMENT PLAY P3 (2026-09-24): THE SWITCH-OVER. Until now this pumped the P1 mapper (poseControl) into InputBus on a
+// requestAnimationFrame loop, the same buttons for every game — a hip rise was A everywhere, and standing still held the
+// stick at full back (BASELINE.md). It only READS now. Each camera frame goes through BodyReader (the jumps, steps and
+// strikes, the lean and the crouch, on the capture clock) and ChannelReader (the facts that need history: in a jump, the
+// stride, both hands held up), and is published whole, one BodyPacket per frame, to every running bus
+// (publishBodyToLive). What a body PRESSES is each mode's business: the harness runs the mode's row in
+// lib/input/bodyProfiles through the floor, starts and pauses the game on the body (BodySession), and a mode that owns
+// its body play later reads the packet itself (ctx.body, onBody).
+//
+// Driven by the frames themselves (PoseService.onFrame), not a render loop: a packet per camera frame, stamped with the
+// frame's arrival. The reader calibrates itself on a still stand; the Body card says "Stand still, whole body in frame"
+// until it has. Whenever the source stops being this body — switched off, re-centred, the camera refused or gone — a
+// FINAL packet goes out: every running mode lets go of whatever the body held, and nothing pauses.
 //
 // It stays code-split where it matters: PoseService imports the adapter, and the adapter imports the MediaPipe package
 // (and the wasm and model download) only when a camera actually starts.
 
-import type { FelInput } from '../babylon/core/InputBus';
-import { PoseController, calibrateFrom, type PoseInput } from './poseControl';
+import { publishBodyToLive, type BodyPacket } from '../babylon/core/InputBus';
+import { agentEnabled } from '../babylon/core/AgentBridge';
+import { BodyReader, type BodyRead } from '../pose/BodyReader';
+import { ChannelReader, type BodyChannels } from '../pose/bodyChannels';
+import { feedHookAllowed } from '../pose/feed';
 import { poseService, type PoseService, type PoseStatus } from '../pose/PoseService';
 import type { PoseFrame } from '../pose/landmarks';
 
@@ -32,48 +38,42 @@ export interface PoseSourceEvents {
 /** What a Body button shows. A new object on every change, so it works as a React external store. */
 export interface PoseSourceSnapshot { state: PoseSourceState; detail: string; body: boolean }
 
-/**
- * Good rAF ticks of a standing pose before calibration is taken, so a blurred first frame cannot set the neutral.
- * Unchanged (about 6 camera frames at 60 Hz): lib/pose/baseline.ts replays this number.
- */
-const CALIBRATION_FRAMES = 12;
+/** The part of PoseService this uses; tests pass a stand-in. */
+export type PoseServiceLike = Pick<PoseService, 'start' | 'stop' | 'onStatus' | 'onFrame' | 'status'>;
+/** Where the packets go: every running bus (publishBodyToLive), or a test's sink. */
+export type BodyPublish = (p: BodyPacket) => void;
 
-/**
- * The picture shape poseControl was tuned and baselined on: the 640×480 the camera used to be asked for (and the phase 1
- * fixtures' virtual webcam). Its squat, jump and hand-raise read a height (image y) in shoulder widths (image x), so the
- * shape sits inside each of them: on the 1280×720 PoseService now asks a desktop for, the same jump reads
- * (16/9)/(4/3) = 1.33× higher and fires on three quarters of the movement. Until phase 3 replaces the mapper, a picture
- * wider than this is handed over as the 4:3 centre crop the old request got (Chrome's crop-and-scale cut a wide
- * webcam's sides to fit 640×480): x stretched about the middle, y untouched. Portrait and 4:3 pictures, which phones
- * gave before and give now, and the feed (no camera) pass through as they are.
- */
-const MAPPER_ASPECT = 640 / 480;
+/** The channels of a body that is not there: the final packet's (nothing held, no jump, no stride). */
+const NO_CHANNELS: BodyChannels = Object.freeze({ inJump: false, stride: null, handsUpMs: 0, handsDownMs: 0 });
 
-/** How far to stretch x so a wider-than-4:3 picture reads as its 4:3 centre crop; 1 = as it is. */
-export function mapperStretch(camera: PoseStatus['camera']): number {
-  if (!camera || !(camera.width > 0) || !(camera.height > 0)) return 1;
-  return Math.max(1, camera.width / camera.height / MAPPER_ASPECT);
+/** A read with nobody in it (present: false, every field null), as the final packet carries. */
+function absentRead(t: number): BodyRead {
+  return {
+    t, present: false, conf: null, calibrated: false, tracking: false, rulers: null, hip: null, feet: null,
+    airborne: null, knee: null, wrist: null, elbowDeg: null, lean: null, squat: null, yaw: null,
+  };
 }
 
-/** The part of PoseService this uses; tests pass a stand-in. */
-export type PoseServiceLike = Pick<PoseService, 'start' | 'stop' | 'onStatus' | 'status' | 'latest'>;
-export interface PoseBus { emit(e: FelInput): void }
-
 export class PoseSource {
-  private controller: PoseController | null = null;
-  private raf = 0;
   private active = false;
-  private goodFrames = 0;
-  private hadBody = false;
-  private lastFrame: PoseFrame | null = null;
-  private lastInput: PoseInput | null = null;
+  private readonly reader = new BodyReader();
+  private readonly channels = new ChannelReader();
+  /** A packet has gone out since the last final one: a stop or a re-centre must tell the running mode to let go. */
+  private published = false;
+  /** The capture time of the last frame read (the final packet's read carries it). */
+  private lastT = -Infinity;
   private offStatus: (() => void) | null = null;
+  private offFrame: (() => void) | null = null;
   private source: PoseStatus['source'] = null;
   private snap: PoseSourceSnapshot = { state: 'idle', detail: '', body: false };
   private readonly listeners = new Set<(s: PoseSourceSnapshot) => void>();
   private readonly service: PoseServiceLike;
 
-  constructor(private readonly bus: PoseBus, private readonly events: PoseSourceEvents = {}, service?: PoseServiceLike) {
+  constructor(
+    private readonly events: PoseSourceEvents = {},
+    service?: PoseServiceLike,
+    private readonly publish: BodyPublish = publishBodyToLive,
+  ) {
     this.service = service ?? poseService();
   }
 
@@ -86,12 +86,12 @@ export class PoseSource {
     return () => { this.listeners.delete(fn); };
   };
 
-  /** Start the camera (PoseService), take a calibration, then feed the bus. */
+  /** Start the camera (PoseService) and read every frame it gives into the body channel. */
   async start(): Promise<boolean> {
     if (this.active) return true;
     this.active = true;
     this.offStatus = this.service.onStatus(this.onStatus);
-    this.loop();
+    this.offFrame = this.service.onFrame(this.onFrame);
     const ok = await this.service.start();
     if (!this.active) return false;   // switched off while it was starting
     // The feed can take over a start still in flight; that start says false, but frames are coming.
@@ -99,14 +99,15 @@ export class PoseSource {
     return ok || this.service.status.state === 'live';
   }
 
-  /** Retake the neutral pose — people move, and they move the phone. */
+  /** Retake the stand — people move, and they move the phone. The running mode lets go first (a final packet). */
   recalibrate(): void {
-    this.release();
-    this.goodFrames = 0;
+    this.reader.recalibrate();
+    this.channels.reset();
+    this.final();
     if (this.active && this.service.status.state === 'live') this.update({ state: 'calibrating' });
   }
 
-  /** Hands off, camera off, nothing left held down. */
+  /** Camera off, and every running mode told the body is gone (it lets go; nothing pauses). */
   stop(): void {
     const was = this.active;
     this.detach();
@@ -117,7 +118,7 @@ export class PoseSource {
 
   private onStatus = (s: PoseStatus): void => {
     if (!this.active) return;
-    // The dev feed took the camera's place (or the other way round): a different body, so a new neutral.
+    // The dev feed took the camera's place (or the other way round): a different body, so a new stand.
     if (this.source && s.source && s.source !== this.source) this.recalibrate();
     this.source = s.source ?? this.source;
     switch (s.state) {
@@ -126,7 +127,7 @@ export class PoseSource {
         this.update({ state: s.state, detail: '' });
         break;
       case 'live':
-        this.update({ state: this.controller ? 'live' : 'calibrating', detail: '' });
+        this.update({ state: this.reader.calibration ? 'live' : 'calibrating', detail: '' });
         break;
       case 'error':
         // A refused camera is an ordinary answer, not a crash: the player keeps their controller and is told why.
@@ -141,61 +142,47 @@ export class PoseSource {
     }
   };
 
-  private loop = (): void => {
+  /** One camera frame: read it, and hand the running mode the packet. */
+  private onFrame = (f: PoseFrame): void => {
     if (!this.active) return;
-    this.raf = requestAnimationFrame(this.loop);
-
-    const frame = this.service.latest;
-    if (!frame) return;
-    const input = this.toInput(frame);
-    const present = frame.present && input.landmarks.length > 0;
-    if (present !== this.hadBody) { this.hadBody = present; this.update({ body: present }); }
-
-    if (!this.controller) {
-      // Calibrating: wait for a run of good frames so a blur or a half-detected body cannot become the neutral.
-      const cal = present ? calibrateFrom(input) : null;
-      if (!cal) { this.goodFrames = 0; return; }
-      if (++this.goodFrames < CALIBRATION_FRAMES) return;
-      this.controller = new PoseController(cal);
-      this.update({ state: 'live' });
-      return;
+    const { read, events } = this.reader.read(f);
+    const channels = this.channels.step(read, events);
+    this.lastT = read.t;
+    this.published = true;
+    try {
+      this.publish({ read, events, channels, arrivedAt: f.arrive ?? performance.now() });
+    } finally {
+      // the Body button shows this frame whatever a listener did with it (the step-3 review: the bus reports a
+      // throwing listener itself, and a publisher that throws anyway must not freeze the button on the last frame)
+      const live = this.service.status.state === 'live';
+      this.update(live ? { body: read.tracking, state: read.calibrated ? 'live' : 'calibrating' } : { body: read.tracking });
     }
-
-    for (const e of this.controller.read(input)) this.bus.emit(e);
   };
 
-  /** The mapper's view of a frame: image landmarks as {x, y, visibility} in the 4:3 it was tuned on, built once per frame. */
-  private toInput(f: PoseFrame): PoseInput {
-    if (f !== this.lastFrame || !this.lastInput) {
-      const k = mapperStretch(this.service.status.camera);
-      this.lastFrame = f;
-      this.lastInput = {
-        present: f.present,
-        landmarks: f.image.map((l) => ({ x: k === 1 ? l.x : 0.5 + (l.x - 0.5) * k, y: l.y, visibility: l.v })),
-      };
+  /** The body is gone on purpose (off, re-centred, the camera gone): one final packet, if any went out since the last. */
+  private final(): void {
+    if (!this.published) return;
+    this.published = false;
+    const now = performance.now();
+    // reported, not thrown (the step-3 review): this runs inside stop() and recalibrate(), and a publisher's throw must
+    // not leave the camera on, or the reader holding the old body, behind a Body button that says off
+    try {
+      this.publish({ read: absentRead(Number.isFinite(this.lastT) ? this.lastT : now), events: [], channels: NO_CHANNELS, arrivedAt: now, final: true });
+    } catch (err) {
+      console.error('[FEL-BODY] the final packet\'s publisher threw:', err);
     }
-    return this.lastInput;
   }
 
-  private release(): void {
-    // THE RELEASE MATTERS MOST HERE. Switching body control off while leaning must not leave the stick pushed.
-    if (this.controller) { for (const e of this.controller.release()) this.bus.emit(e); }
-    this.controller = null;
-  }
-
-  /** Stop reading (loop, listener, held input) without touching the service or the state shown. */
+  /** Stop reading (listeners, the reader's history) and let go, without touching the service or the state shown. */
   private detach(): void {
     this.active = false;
-    if (this.raf) cancelAnimationFrame(this.raf);
-    this.raf = 0;
-    this.release();
-    this.offStatus?.();
-    this.offStatus = null;
+    this.offStatus?.(); this.offStatus = null;
+    this.offFrame?.(); this.offFrame = null;
+    this.final();
+    this.reader.reset();
+    this.channels.reset();
+    this.lastT = -Infinity;
     this.source = null;
-    this.hadBody = false;
-    this.goodFrames = 0;
-    this.lastFrame = null;
-    this.lastInput = null;
   }
 
   private update(p: Partial<PoseSourceSnapshot>): void {
@@ -217,12 +204,18 @@ let shared: PoseSource | null = null;
 let holds = 0;
 
 /**
- * The page's one body-control source. GameShell mounts BodyControl twice (the header, and the compact button in
- * full-bleed, with the header only hidden by CSS), and before this each mount had its own camera and model: switching
- * on in both ran two cameras and doubled every event. Both now drive, and show, this one.
+ * The page's one body source. GameShell mounts BodyControl twice (the header, and the compact button in full-bleed,
+ * with the header only hidden by CSS), and before this each mount had its own camera and model: switching on in both
+ * ran two cameras and doubled every frame. Both now drive, and show, this one. It needs no bus: it publishes to
+ * whichever modes are running.
  */
-export function sharedPoseSource(bus: PoseBus, service?: PoseServiceLike): PoseSource {
-  return (shared ??= new PoseSource(bus, {}, service));
+export function sharedPoseSource(service?: PoseServiceLike): PoseSource {
+  return (shared ??= new PoseSource({}, service));
+}
+
+/** The page's source if one has been made, without making one. */
+export function peekSharedPoseSource(): PoseSource | null {
+  return shared;
 }
 
 /** A mounted Body button holds the shared source. When the last one lets go (the shell unmounts), it is stopped. */
@@ -233,5 +226,30 @@ export function holdSharedPoseSource(): () => void {
     if (!held) return;
     held = false;
     if (--holds === 0) shared?.stop();
+  };
+}
+
+// ── the probe's Body button ─────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * window.__FEL_BODY__: the Body button without a click, for a probe that drives a mode with __FEL_POSE_FEED__ frames
+ * (scripts/probes/_body-seam-live.mts). The same gate as the feed (lib/pose/feed.ts): development, or a production
+ * build on this machine with ?agent=1 — never the deployed site, where scripted frames would make body play nobody did.
+ */
+export interface BodyHook {
+  start(): Promise<boolean>;
+  stop(): void;
+  snapshot(): PoseSourceSnapshot;
+}
+
+declare global {
+  interface Window { __FEL_BODY__?: BodyHook }
+}
+
+if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
+  window.__FEL_BODY__ = {
+    start: () => sharedPoseSource().start(),
+    stop: () => sharedPoseSource().stop(),
+    snapshot: () => sharedPoseSource().snapshot,
   };
 }

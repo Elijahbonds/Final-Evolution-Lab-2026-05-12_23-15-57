@@ -120,7 +120,8 @@ describe('BodyArbiter — triggers', () => {
     expect(a.body(btn('A', true), true)).toStrictEqual([   // …unless a press comes first
       { t: 'trigger', side: 'R', value: 0.8, src: 'body' }, btn('A', true),
     ]);
-    expect(a.body(bodyR(0), true)).toEqual([]);          // the drop after the A rides the next pad frame
+    // the drop after the A is a let-go: it goes out at once (the pad's next frame repeats it)
+    expect(a.body(bodyR(0), true)).toStrictEqual([{ t: 'trigger', side: 'R', value: 0, src: 'body' }]);
     expect(a.foldTrigger('R', 0)).toStrictEqual({ t: 'trigger', side: 'R', value: 0 });
     // nothing pending: a press goes out alone; the release flushes a change still waiting, then goes
     expect(a.body(btn('B', true), true)).toStrictEqual([btn('B', true)]);
@@ -130,6 +131,28 @@ describe('BodyArbiter — triggers', () => {
     const { a: b } = arb();
     b.body(bodyR(0.8), false);
     expect(b.body(btn('A', true), false)).toStrictEqual([btn('A', true)]);
+  });
+  it('pad seated: a let-go goes out at once — down to the pad\'s own value, never below it; a deeper pull still waits', () => {
+    // the step-3 review: the harness lets go of the body and pauses in one call (START, a stalled camera); the pad frame
+    // that carried the drop reached a PAUSED game, so the mode held the crouch through the pause and saw it end on the
+    // first frame after the resume — a charged pop for SkateRun (pumpReleased)
+    const { a } = arb();
+    a.foldTrigger('R', 0);                               // a pad at rest
+    expect(a.body(bodyR(0.8), true)).toEqual([]);        // the pull waits…
+    expect(a.foldTrigger('R', 0).value).toBe(0.8);       // …for the pad frame
+    expect(a.body(bodyR(0.5), true)).toStrictEqual([{ t: 'trigger', side: 'R', value: 0.5, src: 'body' }]);   // shallower: now
+    expect(a.body(bodyR(0), true)).toStrictEqual([{ t: 'trigger', side: 'R', value: 0, src: 'body' }]);       // let go: now
+    expect(a.body(bodyR(0), true)).toEqual([]);          // nothing more to let go of
+    expect(a.foldTrigger('R', 0)).toStrictEqual({ t: 'trigger', side: 'R', value: 0 });   // the pad repeats it, its own
+    // a pad holding 0.3 under a 0.8 crouch: the let-go lands on the pad's 0.3, not 0
+    a.foldTrigger('R', 0.3);
+    a.body(bodyR(0.8), true);
+    expect(a.foldTrigger('R', 0.3).value).toBe(0.8);
+    expect(a.body(bodyR(0), true)).toStrictEqual([{ t: 'trigger', side: 'R', value: 0.3, src: 'body' }]);
+    // a pad pulling deeper than the body: the body letting go changes nothing the mode sees, so nothing goes out
+    a.body(bodyR(0.4), true);
+    expect(a.foldTrigger('R', 0.9).value).toBe(0.9);
+    expect(a.body(bodyR(0), true)).toEqual([]);
   });
 });
 

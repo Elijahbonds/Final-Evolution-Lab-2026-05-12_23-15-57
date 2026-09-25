@@ -5,8 +5,8 @@
 // the four modeId aliases) is registry.drift.test.ts; what the floor does with a row is bodyFloor / bodyGate.
 import { describe, it, expect } from 'vitest';
 import {
-  BODY_PROFILES, FREE_VERBS, MOVE_LABEL, SESSION_LINES, cardLines, resolveBodyProfile, sessionOnly,
-  type BodyBinding, type BodyProfile,
+  BODY_PROFILES, FREE_VERBS, MOVE_LABEL, PAUSE_NOTE, SESSION_LINES, SESSION_ONLY_COPY, cardLines, resolveBodyProfile,
+  sessionOnly, type BodyBinding, type BodyProfile,
 } from './bodyProfiles';
 import { MODE_VERBS } from '@/lib/babylon/ui/modeVerbs';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
@@ -145,5 +145,14 @@ describe('the card', () => {
     expect(cardLines(BODY_PROFILES.dunk)).toEqual([]);
     for (const from of Object.keys(MOVE_LABEL)) expect(MOVE_LABEL[from as BodyBinding['from']]).not.toMatch(/^[A-Z]+$/);
     expect(SESSION_LINES.map((l) => l.verb)).toEqual(['Start / Resume', 'Pause']);
+  });
+  it('promises only what the session does (the step-3 review): a session-only card never promises a pause', () => {
+    // BodySession arms the lost pause only where the body drives the mode, and both hands up while playing do nothing
+    // (owner call 3): in a session-only game the camera starts it and brings it back from a pause, and that is all
+    expect(SESSION_ONLY_COPY).toMatch(/raise both hands/i);
+    expect(SESSION_ONLY_COPY).not.toMatch(/start and pause|\bpauses? (it|the game)\b/i);
+    // a bound card's pause line holds only while the body is the one playing (Z5): the note says so
+    expect(PAUSE_NOTE).toMatch(/only while your body is playing/);
+    expect(PAUSE_NOTE).toMatch(/controller/);
   });
 });

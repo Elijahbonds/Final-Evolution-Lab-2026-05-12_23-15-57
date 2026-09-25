@@ -24,8 +24,18 @@ const CONTINUOUS = /^(hint|time|timeLeft|timer|clock|speed|height|spin|charge|po
 const DISCRETE_NUM = /^(score|combo|chain|kos|makes|misses|points|pts|strokes|wave|lap|gates?|coins|rivalScore|pot|banked|goals?|runs|outs|strikes|balls|kills|rings|place|position|round|attempt|streak|multiplier|mult|tricks?)$/i;
 const SCORE_KEYS = /^(score|points|pts|banked)$/i;
 
+/** One raw body event as the harness had it: its kind, and how late it reached the page (arrival − capture, ms). */
+export interface QaBodyEvent { t: number; kind: string; lagMs: number }
+
 export class QaTrace {
   readonly events: QaEvent[] = [];
+  /**
+   * MOVEMENT PLAY P3 (2026-09-24): the body's RAW events (a take-off, a step, a dip, a punch …), with their lag, for the
+   * probes. Kept OUT of `events` on purpose: summary() grades presses the mode received, and a move the floor turned into
+   * a press is already one of those (and a mode's claimed verb is logged as `body:<kind>` there). A raw step in a mode
+   * that binds nothing is not a press, and must never read as a silent one.
+   */
+  readonly bodyLog: QaBodyEvent[] = [];
   private last = new Map<string, string>();
   constructor(private now: () => number = () => performance.now(), private cap = 20000) {}
 
@@ -39,6 +49,11 @@ export class QaTrace {
   sfx(name: string): void { this.push('sfx', name); }
   impact(): void { this.push('impact', 'impact'); }
   anim(clip: string): void { this.push('anim', clip); }
+  /** A raw body event, told `lagMs` after its capture: to bodyLog only (see above). */
+  body(kind: string, lagMs: number): void {
+    if (this.bodyLog.length >= this.cap) this.bodyLog.splice(0, 2000);
+    this.bodyLog.push({ t: this.now(), kind, lagMs });
+  }
 
   /** A setHud update: records only the keys a player reads as news. */
   hud(update: Record<string, unknown>): void {
@@ -57,7 +72,7 @@ export class QaTrace {
     }
   }
 
-  reset(): void { this.events.length = 0; this.last.clear(); }
+  reset(): void { this.events.length = 0; this.bodyLog.length = 0; this.last.clear(); }
 
   /** The last value of every news-bearing HUD key (score, banner, combo…) — what a probe reads an outcome from. */
   snapshot(): Record<string, string> { return Object.fromEntries(this.last); }

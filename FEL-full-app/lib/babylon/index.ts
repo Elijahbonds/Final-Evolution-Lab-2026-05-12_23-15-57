@@ -20,14 +20,21 @@ export { DunkReplayRecorder } from './scene/DunkReplayCam';
 
 // ── framework cores (M26) ──
 export { CharacterLibrary, type SpawnedCharacter, type SpawnOpts } from './core/CharacterLibrary';
-export { runMode, type ModeDefinition, type ModeContext, type ModePhase, type HudValue, type HudScoreCard } from './core/ModeHarness';
+export {
+  runMode, type ModeDefinition, type ModeContext, type ModePhase, type HudValue, type HudScoreCard,
+  type BodyView, type ModeBodySpec, type BodyClaim,   // MOVEMENT PLAY P3: the body seam a mode meets
+} from './core/ModeHarness';
 export { CameraDirector, FOLLOW_PRESETS } from './core/CameraDirector';
-export { InputBus, type FelInput } from './core/InputBus';
+export { InputBus, publishBodyToLive, type FelInput, type BodyPacket } from './core/InputBus';
+// MOVEMENT PLAY P3 (2026-09-24): what the body channel carries, and a mode's row in the body profiles
+export type { BodyRead, BodyEvent } from '../pose/BodyReader';
+export type { BodyChannels } from '../pose/bodyChannels';
+export type { BodyProfile } from '../input/bodyProfiles';
 export { BallSim, arcVelocity } from './core/BallPhysics';
 export { CoinField, COIN_RUN_CAP } from './core/Pickups';
 export { Mob, MobPool, STEERING_PRESETS, type SteeringConfig } from './core/MobSteering';
 export { Rider, type GrindLine } from './core/GroundRide';
-export { buildResult, defaultResultSink, type SessionResult } from './core/sessionResult';
+export { buildResult, type SessionResult } from './core/sessionResult';
 
 // ── premium feel (M29) ──
 export { JuiceKit } from './premium/JuiceKit';

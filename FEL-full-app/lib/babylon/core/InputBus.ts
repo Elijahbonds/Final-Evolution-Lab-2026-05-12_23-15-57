@@ -157,6 +157,18 @@ export function publishBodyToLive(p: BodyPacket): void {
 /** How many lags per event kind bodyStats keeps (the newest): a probe's median, not a history. */
 const BODY_STATS_KEEP = 256;
 
+/**
+ * MOVEMENT PLAY P3 (2026-09-24, the step-3 review): every body delivery is made to each listener on its own, and a
+ * listener that throws is reported, not propagated. A body frame is a BATCH the rest of the seam has already committed
+ * to — the floor marked its RT drop after the POP as sent, the session cleared its lost deadline — so a mode's onInput
+ * throwing on the A used to abort the frame's remaining outputs and strand the crouch on RT in every pad frame after
+ * it (and, from the render loop's floor tick, stop Babylon's loop for good). The camera's own path (PoseService) only
+ * ever warned about it; now nothing downstream of the one failing listener is lost with it.
+ */
+function bodyFault(what: string, err: unknown): void {
+  console.error(`[FEL-BODY] ${what}:`, err);
+}
+
 export class InputBus {
   private listeners = new Set<Listener>();
   private slotListeners = new Set<SlotListener>();
@@ -246,7 +258,7 @@ export class InputBus {
     // MOVEMENT PLAY P3: a body event is the floor's, already arbitrated (emitBody) — and nobody pressed anything: no
     // buzz. It must never go through external() either: that records it as a hand's value, and a lean or a crouch
     // that went back to 0 would stay composed into every event after it.
-    if (e.src === 'body') { this.deliver(e); return; }
+    if (e.src === 'body') { this.deliverBody(e); return; }
     if (e.t === 'button' && e.pressed) HAPTIC.tap();  // 10ms button-down buzz (throttled in Haptics) //TUNE(elijah)
     // MOVEMENT PLAY P3: the same event, untouched, while the body holds nothing (Z1); composed with it otherwise —
     // and tagged `src: 'body'` where the value it now carries is the body's (arbiter.ts, WHOSE EVENT IT IS)
@@ -255,6 +267,10 @@ export class InputBus {
   /** Straight to the listeners: for an event already arbitrated (a body output, a folded pad trigger, a resync). */
   private deliver(e: FelInput): void {
     this.listeners.forEach((fn) => fn(e));
+  }
+  /** A floor output to the listeners, each on its own (bodyFault): one that throws takes nothing else with it. */
+  private deliverBody(e: FelInput): void {
+    this.listeners.forEach((fn) => { try { fn(e); } catch (err) { bodyFault(`a listener threw on a body ${e.t}`, err); } });
   }
 
   // ── the body channel (MOVEMENT PLAY P3, 2026-09-24) ──
@@ -269,7 +285,9 @@ export class InputBus {
       l.push(p.arrivedAt - ev.t);
       if (l.length > BODY_STATS_KEEP) l.shift();
     }
-    this.bodyListeners.forEach((fn) => fn(p));
+    // each on its own (bodyFault): a harness that throws on this frame must not cost another bus, or the source's own
+    // snapshot, the frame
+    this.bodyListeners.forEach((fn) => { try { fn(p); } catch (err) { bodyFault('a body listener threw', err); } });
   }
   onBody(fn: (p: BodyPacket) => void): () => void {
     this.bodyListeners.add(fn);

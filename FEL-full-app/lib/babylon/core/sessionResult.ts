@@ -19,16 +19,13 @@ export interface SessionResult {
   detail?: unknown;
 }
 
+/**
+ * Where a finished run goes. Every host passes its own (HarnessOpts.resultSink is required).
+ *
+ * MOVEMENT PLAY P3 (2026-09-24): there is no default any more. The one this file had posted to /api/sessions/result,
+ * a route that does not exist, so a host that forgot its sink lost every result to a 404 without a word.
+ */
 export type ResultSink = (result: SessionResult) => Promise<void>;
-
-/** Default sink posts to the app's existing session endpoint. */
-export const defaultResultSink: ResultSink = async (result) => {
-  await fetch('/api/sessions/result', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(result),
-  }).catch((e) => console.error('[FEL-RESULT] post failed', e));
-};
 
 export function buildResult(
   modeId: string, outcome: string, score: number,

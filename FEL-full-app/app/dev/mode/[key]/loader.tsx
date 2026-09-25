@@ -10,6 +10,9 @@ import { useEffect, useRef, useState } from 'react';
 import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+// MOVEMENT PLAY P3 (2026-09-24): no Body button here, so the body source is loaded for its probe hook alone —
+// window.__FEL_BODY__ (dev / agent only), which a probe switches on before it feeds frames (scripts/probes/_body-seam-live.mts)
+import '@/lib/input/poseSource';
 
 export function DevModeRunner({ modeKey }: { modeKey: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

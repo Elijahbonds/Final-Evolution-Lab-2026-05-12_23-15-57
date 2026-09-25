@@ -6,8 +6,9 @@
 // MODE, keyed by the def.modeId the harness knows (the registry key rides along for MODE_VERBS and the drift test):
 //
 //   bindings   the moves the floor (lib/input/bodyFloor.ts) turns into ordinary FelInput for that mode — nine modes in
-//              P3, each with a reason in the plan's table. [] = SESSION-ONLY: the camera starts and pauses the game
-//              (both hands up = START, stepping out = pause) and presses nothing. A binding exists only where the
+//              P3, each with a reason in the plan's table. [] = SESSION-ONLY: both hands up start the game and bring it
+//              back from a pause, and the body presses nothing — so it never pauses it either (stepping out pauses
+//              only a game the body is playing: BodySession, P3 Z5). A binding exists only where the
 //              move means the verb in that mode AND the mode reads that button that way in every phase the floor
 //              can reach (the dunk's A is the slam at the apex, so the dunk binds nothing until P5 grades it there).
 //   verb       what the card says the move does: the MODE_VERBS label of the slot that emits that button or trigger
@@ -121,6 +122,11 @@ const ROWS: readonly BodyProfile[] = [
   //    (FreeRunMode :613-619) and ◀ ▶ change it — the row binds no d-pad, so the body cannot pick a tier, and a hop
   //    there starts the run on the current one (as the pick's own 6 s timeout would). Mixed Combat's loadout has the
   //    same shape (R14). The step-3 live probe covers it before the cut line is decided.
+  //    CUT LINE, decided (the step-3 live probe, scripts/probes/_body-seam-live.mts on /dev/mode, 2026-09-24): Free Run
+  //    and Mixed Combat both KEEP their rows — no misfire on a still stand, a take of four hops or a 20 cm dip (Free Run
+  //    pressed JUMP once per hop, plus once for the take-off the reader tells at the stand → take splice, which the
+  //    gate excludes as well; Mixed pressed nothing), the lost pause ~1.22 s after the last tracked frame, and both
+  //    hands up resumed.
   row({ key: 'sprint', modeId: 'sprint', family: 'racing', later: 'P8', overheadIsPlay: false, bindings: [
     { from: 'step', to: 'dpadByFoot', verb: 'STRIDE' },
   ] }),
@@ -169,12 +175,19 @@ export function cardLines(p: BodyProfile): CardLine[] {
 }
 
 /**
- * The rest of the card (plan §2.2), for BodyControl to read: a bound mode shows its lines and then the two session
- * lines; a session-only mode, the one sentence; no mode, the other.
+ * The rest of the card (plan §2.2), for BodyControl to read: a bound mode shows its lines, the two session lines and
+ * the pause's one condition; a session-only mode, the one sentence; no mode, the other.
+ *
+ * MOVEMENT PLAY P3 (2026-09-24, the step-3 review): the plan's §2.2 copy promised what its own §4.2 never does. A
+ * session-only mode is never paused by the body (the lost pause is armed only where the body drives the mode, and
+ * hands up while playing does nothing, owner call 3), so its card said "the camera can start and pause it" to a
+ * player whose clock then kept running out of frame. And in a bound mode stepping out pauses only while the body is
+ * the one playing: a controller player walking off camera is never paused (Z5).
  */
 export const SESSION_LINES: readonly CardLine[] = [
   { move: 'Raise both hands and hold', verb: 'Start / Resume' },
   { move: 'Step out of frame', verb: 'Pause' },
 ];
-export const SESSION_ONLY_COPY = "This game doesn't read your moves yet. The camera can start and pause it; play with your controller or touch.";
+export const PAUSE_NOTE = 'Stepping out pauses only while your body is playing, never while you play with a controller.';
+export const SESSION_ONLY_COPY = "This game doesn't read your moves yet. Raise both hands to start it or bring it back from a pause; play with your controller or touch.";
 export const NO_MODE_COPY = 'Open a game to see its moves.';

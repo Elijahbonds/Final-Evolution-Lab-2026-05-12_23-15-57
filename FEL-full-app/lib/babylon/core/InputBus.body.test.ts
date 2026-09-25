@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { InputBus, liveInputBuses, publishBodyToLive, type BodyPacket, type FelInput } from './InputBus';
+import { InputBus, liveInputBuses, publishBodyToLive, type BodyOut, type BodyPacket, type FelInput } from './InputBus';
 import { isWakeInput } from './StartWake';
 import { HAPTIC } from '../premium/Haptics';
 import type { BodyEvent, BodyRead } from '@/lib/pose/BodyReader';
@@ -237,10 +237,25 @@ describe('the trigger fold (P3 bug 3): a seated pad carries the body instead of 
     expect(on(r.log)).toStrictEqual([
       { t: 'trigger', side: 'R', value: 0.8, src: 'body' },
       { t: 'button', btn: 'A', pressed: true, src: 'body' },
+      { t: 'trigger', side: 'R', value: 0, src: 'body' },   // the drop after the A: a let-go goes out at once
     ]);
     r.log.length = 0;
     r.tick();
     expect(on(r.log).filter((e) => e.t === 'trigger' && e.side === 'R')).toStrictEqual([{ t: 'trigger', side: 'R', value: 0 }]);
+  });
+  it('pad seated: the body\'s let-go reaches the listeners at once — a release sent just before a pause lands before it', () => {
+    // the step-3 review: the harness sends the body's release and pauses in one call (a START press, a stalled camera).
+    // The let-go used to wait for the next pad frame, which reached a PAUSED game and was dropped: the mode held the
+    // crouch through the pause and saw it end on the first frame after the resume (a charged pop for SkateRun).
+    const r = withPad();
+    r.bus.emitBody({ t: 'trigger', side: 'R', value: 0.8, src: 'body' });
+    r.tick();
+    expect(trig(r.log, 'R')).toEqual([0.8]);
+    r.log.length = 0;
+    r.bus.emitBody({ t: 'trigger', side: 'R', value: 0, src: 'body' });   // releaseBody(), then setPhase('paused')
+    expect(on(r.log)).toStrictEqual([{ t: 'trigger', side: 'R', value: 0, src: 'body' }]);   // no pad frame in between
+    r.tick();
+    expect(trig(r.log, 'R')).toEqual([0, 0]);            // the pad's own frame repeats it: harmless
   });
 });
 
@@ -357,6 +372,45 @@ describe('body events never pass through external(): a body that lets go is let 
   });
 });
 
+describe('one failing listener strands nothing (the step-3 review)', () => {
+  it('a mode that throws on the POP still gets the RT drop after it, and so does every other listener', () => {
+    // the harness sends a frame's floor outputs in a loop; a throw on the A used to end the loop there, leaving the
+    // floor's RT 0 unsent — the arbiter kept the crouch, and every pad frame after it carried the crouch on RT
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const r = withPad();
+    const other: FelInput[] = [];
+    r.bus.on((e) => { if (e.t === 'button' && e.pressed) throw new Error('onInput blew up on the A'); });
+    r.bus.on((e) => other.push(e));
+    const frame: BodyOut[] = [
+      { t: 'trigger', side: 'R', value: 0.8, src: 'body' },
+      { t: 'button', btn: 'A', pressed: true, src: 'body' },
+      { t: 'trigger', side: 'R', value: 0, src: 'body' },
+    ];
+    try { for (const e of frame) r.bus.emitBody(e); } catch { /* the harness's frame would have ended here */ }
+    expect(other).toStrictEqual([
+      { t: 'trigger', side: 'R', value: 0.8, src: 'body' },
+      { t: 'button', btn: 'A', pressed: true, src: 'body' },
+      { t: 'trigger', side: 'R', value: 0, src: 'body' },
+    ]);
+    r.log.length = 0;
+    r.tick();
+    expect(trig(r.log, 'R')).toEqual([0]);               // the pad's own 0: no crouch stuck on RT
+    expect(err).toHaveBeenCalled();                      // reported, not swallowed silently
+  });
+  it('a body listener that throws costs no other listener, and no other bus, the frame', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const a = new InputBus(), b = new InputBus();
+    a.start(); b.start();
+    const heard: string[] = [];
+    a.onBody(() => { throw new Error('a harness blew up on this frame'); });
+    a.onBody(() => heard.push('a2'));
+    b.onBody(() => heard.push('b'));
+    expect(() => publishBodyToLive(packet(2000))).not.toThrow();
+    expect(heard).toEqual(['a2', 'b']);
+    expect(a.body()).not.toBeNull();
+    expect(err).toHaveBeenCalledTimes(1);
+  });
+});
 describe('Z7: a blur never releases the body; stop() clears it', () => {
   it('a blur lets go of the keys and leaves the body as it was: its lean shows through the released stick', () => {
     const r = rig();

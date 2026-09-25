@@ -9,8 +9,9 @@
 //             y and a body leaning x both work.
 //   R stick   the body never writes it.
 //   triggers  pad seated: pollPads delivers foldTrigger's event every frame — the pad's exact value while the body
-//             pulls no deeper, so the pad stream is byte-for-byte what it was. A body change rides the next pad frame
-//             (≤ 16 ms), unless a body press comes first (it flushes the change ahead of itself, see flush()).
+//             pulls no deeper, so the pad stream is byte-for-byte what it was. A deeper body pull rides the next pad
+//             frame (≤ 16 ms), unless a body press comes first (it flushes the change ahead of itself, see flush()); a
+//             let-go goes out at once, so a release sent just before a pause reaches the mode still playing.
 //             No pad: a Space ramp / touch hold / Controller Link charge is rewritten to max(it, body) while the body
 //             pulls; a body change goes out as max(the last external value, body), tagged, on change.
 //   buttons,  body presses are PULSES (the floor presses then releases ~60 ms later). A pulse is skipped when the bus
@@ -89,7 +90,7 @@ export class BodyArbiter {
     return e;
   }
 
-  /** A floor output → what to deliver now ([] = skipped, or folded into the next pad frame). */
+  /** A floor output → what to deliver now ([] = skipped, or a deeper trigger pull folded into the next pad frame). */
   body(e: BodyOut, padSeated: boolean): FelInput[] {
     switch (e.t) {
       case 'stick': {
@@ -103,8 +104,14 @@ export class BodyArbiter {
       case 'trigger': {
         const s = e.side;
         this.bodyT[s] = e.value;
-        if (padSeated) return [];        // the next pad frame carries it (foldTrigger)
         const v = this.bodyT[s] > 0 ? Math.max(this.extT[s], this.bodyT[s]) : this.extT[s];
+        // pad seated: a deeper pull waits for the next pad frame (foldTrigger carries it) — but a LET-GO goes out now.
+        // MOVEMENT PLAY P3 (2026-09-24, the step-3 review): the harness lets go of the body and pauses in the same call
+        // (a START press, a stalled camera), and the pad frame that would have carried the drop reached a paused game
+        // and was dropped. The mode held the crouch through the pause and saw it end on the first frame after the
+        // resume, where SkateRun takes a let-go for a charged pop (pumpReleased, 250 ms). The pad's next frame repeats
+        // the same value; max is idempotent, so that is harmless.
+        if (padSeated && !(v < (this.outT[s] ?? 0))) return [];
         if (this.outT[s] === v) return [];
         this.outT[s] = v;
         return [{ t: 'trigger', side: s, value: v, src: 'body' }];
@@ -139,7 +146,7 @@ export class BodyArbiter {
   }
 
   /**
-   * Pad seated, a body trigger change waits for the next pad frame — but a body PRESS goes out at once, so a crouch's
+   * Pad seated, a deeper body pull waits for the next pad frame — but a body PRESS goes out at once, so a crouch's
    * peak and the hop's POP told in one camera step reached the mode as [A, RT 0]: the A before the peak, and the peak
    * never (the drop after the A overwrote it before the frame came). Measured on the bus. So a body edge first
    * delivers whatever trigger change it would otherwise overtake: the floor's order survives a seated pad.

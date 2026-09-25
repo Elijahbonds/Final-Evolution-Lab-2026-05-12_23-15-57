@@ -3,8 +3,9 @@
 // A dev and QA hook: `window.__FEL_POSE_FEED__` (PoseService installs it, only when NODE_ENV is development, or on a
 // production build served from this machine with ?agent=1; never on the deployed site) lets a probe push frames, such
 // as a lib/pose/__fixtures__ take, into PoseService,
-// so a live mode is driven by body frames without a camera. Everything downstream (PoseSource today, BodyReader and
-// the per-mode profiles later) reads them exactly as it reads the camera's.
+// so a live mode is driven by body frames without a camera. Everything downstream reads them exactly as it reads the
+// camera's: PoseSource's BodyReader and ChannelReader, the body channel every running bus hears, and the harness that
+// runs each mode's profile on it (movement play P3; scripts/probes/_body-seam-live.mts drives it this way).
 //
 //   const fx = await (await fetch('…/jump_two_foot_low.json')).json();   // or inline the frames
 //   __FEL_POSE_FEED__.begin();          // the feed takes the camera's place; start() now opens no camera

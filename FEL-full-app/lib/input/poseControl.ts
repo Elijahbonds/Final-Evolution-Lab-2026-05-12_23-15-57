@@ -1,5 +1,11 @@
 // poseControl — your body as the controller, for every mode at once.
 //
+// MOVEMENT PLAY P3 (2026-09-24): FROZEN — the P1 baseline mapper. Nothing plays through this any more: body play is the
+// seam (lib/pose/BodyReader → lib/input/bodyFloor, one profile per mode, run by the harness). It is kept unchanged as
+// the BEFORE the seam is measured against, and it is imported only by lib/pose/baseline.ts, scripts/body/baseline.mts
+// and its own tests (lib/babylon/core/bodySeam.scan.test.ts pins that list). Do not tune it; do not wire it back in.
+// Everything below describes it as it shipped.
+//
 // THE REASON THIS IS ONE FILE AND NOT THIRTY-THREE. Modes do not read a camera; they read InputBus, whose whole
 // contract is four event shapes (stick / dpad / button / trigger) and whose emit() is already called directly by
 // the touch overlay. So body control is not a feature added to each game — it is another input device. Nothing in
