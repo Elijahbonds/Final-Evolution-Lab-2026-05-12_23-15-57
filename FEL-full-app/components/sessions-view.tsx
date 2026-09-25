@@ -5,16 +5,27 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { CalendarDays, Loader2, Users, Lock, Check, Sparkles, Dumbbell } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
+import { BookingRow, HostingPanel, type BookingWithLink, type HostingSlot } from '@/components/sessions/join-links';
 
 type GroupSlot = { sessionKey: string; host: string; startsAtIso: string; label: string; shards: number; capacity: number };
 type PrivSlot = { sessionKey: string; startsAtIso: string; label: string; shards: number };
-type Booking = { id: string; kind: string; sessionKey: string; startsAt: string; shardsPaid: number };
+type Booking = BookingWithLink;
+
+/** What the page says once a booking goes through: where the way in will be, not just "see you there". */
+export const BOOKED_TOAST = 'Booked. Your join link will appear under Your upcoming sessions.';
+
+/** What the page says when the server refuses a booking (409). The list reloads, so a taken slot drops off it. */
+export const BOOKING_REFUSED: Record<string, string> = {
+  session_full: 'That session is full.',
+  slot_taken: 'Someone just booked that private slot. Pick another time.',
+};
 
 export function SessionsView() {
   const [group, setGroup] = useState<GroupSlot[]>([]);
   const [priv, setPriv] = useState<PrivSlot[]>([]);
   const [privateOpen, setPrivateOpen] = useState(false);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
+  const [hosting, setHosting] = useState<HostingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<string | null>(null);
 
@@ -27,6 +38,7 @@ export function SessionsView() {
         setPriv(j.private ?? []);
         setPrivateOpen(!!j.privateOpen);
         setMyBookings(j.myBookings ?? []);
+        setHosting(j.hosting ?? []);
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -45,9 +57,9 @@ export function SessionsView() {
       const j = await res.json();
       if (res.status === 403 && j?.error === 'minors_cannot_book_private') { toast.error('Private 1-on-1 sessions are for members 18+.'); return; }
       if (res.status === 409 && j?.needShards) { toast.error('Not enough shards. Earn by playing or exchange coins in the Wallet.'); return; }
-      if (res.status === 409) { toast.error(j?.error === 'session_full' ? 'That session is full.' : 'Session unavailable.'); return; }
+      if (res.status === 409) { toast.error(BOOKING_REFUSED[j?.error] ?? 'Session unavailable.'); await load(); return; }
       if (!res.ok) throw new Error(j?.error || 'booking failed');
-      toast.success('Booked! See you there.');
+      toast.success(BOOKED_TOAST);
       await load();
     } catch (e: any) { toast.error(e?.message || 'Booking failed'); }
     finally { setBooking(null); }
@@ -61,7 +73,7 @@ export function SessionsView() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-5">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-white"><CalendarDays className="h-6 w-6 text-cyan-400" /> Sessions</h1>
-        <p className="text-sm text-white/50">Live group workouts with Elijah Bonds, seminars, and private 1-on-1 coaching.</p>
+        <p className="text-sm text-white/50">Live group workouts and private 1-on-1 coaching with Elijah Bonds.</p>
       </div>
 
       {/* My bookings */}
@@ -69,15 +81,13 @@ export function SessionsView() {
         <section className="mb-6">
           <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-green-400">Your upcoming sessions</h2>
           <div className="space-y-2">
-            {myBookings.map((b) => (
-              <div key={b.id} className="flex items-center justify-between rounded-xl border border-green-400/20 bg-green-400/[0.05] px-4 py-3">
-                <div className="flex items-center gap-2 text-sm text-white"><Check className="h-4 w-4 text-green-400" /> {b.kind === 'private_1on1' ? 'Private 1-on-1' : 'Group Workout'}</div>
-                <div className="text-xs text-white/50">{new Date(b.startsAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT</div>
-              </div>
-            ))}
+            {myBookings.map((b) => <BookingRow key={b.id} b={b} nowMs={Date.now()} />)}
           </div>
         </section>
       )}
+
+      {/* Join links, for the slot's coach and admins only (the server sends null to everyone else) */}
+      <HostingPanel rows={hosting} onChanged={load} />
 
       {/* Group workouts */}
       <section className="mb-8">
@@ -117,7 +127,7 @@ export function SessionsView() {
             })}
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">Private 1-on-1 booking opens automatically when no seminar is scheduled within 14 days. A seminar is currently on the calendar — grab a seat above.</div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">Private 1-on-1 booking is closed for now. It opens again here automatically.</div>
         )}
       </section>
     </div>

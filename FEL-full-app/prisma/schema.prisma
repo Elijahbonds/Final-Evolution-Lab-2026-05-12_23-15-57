@@ -1279,6 +1279,18 @@ model SessionBooking {
   @@index([sessionKey])
 }
 
+/// How a booked player actually attends (owner decision 2026-09-24): the Zoom/Meet/etc. link an admin or the slot's
+/// coach pastes for one slot. One row per slot, keyed exactly like SessionBooking.sessionKey. Readable only by a player
+/// holding a CONFIRMED booking for that key, the coach and admins (lib/sessions/joinLinkServer.ts). Purely additive:
+/// no relation, so User and SessionBooking are untouched, and the readers treat a missing table as "not posted yet".
+model SessionJoinLink {
+  sessionKey  String   @id // schedule slot id, e.g. gw_2026-09-25 or pv_2026-09-28_16
+  url         String   // normalised https URL, at most 500 characters (lib/sessions/joinLink.ts normaliseJoinUrl)
+  setById     String   // the admin or coach who posted it
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // ===========================================================================
 // CRM — Contacts, Companies, Deals, Activities, Notes
 // ===========================================================================

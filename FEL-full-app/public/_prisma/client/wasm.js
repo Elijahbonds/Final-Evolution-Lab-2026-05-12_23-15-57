@@ -851,6 +851,14 @@ exports.Prisma.SessionBookingScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.SessionJoinLinkScalarFieldEnum = {
+  sessionKey: 'sessionKey',
+  url: 'url',
+  setById: 'setById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.CrmCompanyScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -1374,6 +1382,7 @@ exports.Prisma.ModelName = {
   AvatarLook: 'AvatarLook',
   OwnedWearable: 'OwnedWearable',
   SessionBooking: 'SessionBooking',
+  SessionJoinLink: 'SessionJoinLink',
   CrmCompany: 'CrmCompany',
   CrmContact: 'CrmContact',
   CrmDeal: 'CrmDeal',

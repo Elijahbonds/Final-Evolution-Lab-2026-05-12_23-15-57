@@ -322,6 +322,14 @@ export type OwnedWearable = $Result.DefaultSelection<Prisma.$OwnedWearablePayloa
  */
 export type SessionBooking = $Result.DefaultSelection<Prisma.$SessionBookingPayload>
 /**
+ * Model SessionJoinLink
+ * How a booked player actually attends (owner decision 2026-09-24): the Zoom/Meet/etc. link an admin or the slot's
+ * coach pastes for one slot. One row per slot, keyed exactly like SessionBooking.sessionKey. Readable only by a player
+ * holding a CONFIRMED booking for that key, the coach and admins (lib/sessions/joinLinkServer.ts). Purely additive:
+ * no relation, so User and SessionBooking are untouched, and the readers treat a missing table as "not posted yet".
+ */
+export type SessionJoinLink = $Result.DefaultSelection<Prisma.$SessionJoinLinkPayload>
+/**
  * Model CrmCompany
  * 
  */
@@ -1446,6 +1454,16 @@ export class PrismaClient<
   get sessionBooking(): Prisma.SessionBookingDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.sessionJoinLink`: Exposes CRUD operations for the **SessionJoinLink** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SessionJoinLinks
+    * const sessionJoinLinks = await prisma.sessionJoinLink.findMany()
+    * ```
+    */
+  get sessionJoinLink(): Prisma.SessionJoinLinkDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.crmCompany`: Exposes CRUD operations for the **CrmCompany** model.
     * Example usage:
     * ```ts
@@ -2174,6 +2192,7 @@ export namespace Prisma {
     AvatarLook: 'AvatarLook',
     OwnedWearable: 'OwnedWearable',
     SessionBooking: 'SessionBooking',
+    SessionJoinLink: 'SessionJoinLink',
     CrmCompany: 'CrmCompany',
     CrmContact: 'CrmContact',
     CrmDeal: 'CrmDeal',
@@ -2215,7 +2234,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -6659,6 +6678,80 @@ export namespace Prisma {
           }
         }
       }
+      SessionJoinLink: {
+        payload: Prisma.$SessionJoinLinkPayload<ExtArgs>
+        fields: Prisma.SessionJoinLinkFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SessionJoinLinkFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SessionJoinLinkFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>
+          }
+          findFirst: {
+            args: Prisma.SessionJoinLinkFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SessionJoinLinkFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>
+          }
+          findMany: {
+            args: Prisma.SessionJoinLinkFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>[]
+          }
+          create: {
+            args: Prisma.SessionJoinLinkCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>
+          }
+          createMany: {
+            args: Prisma.SessionJoinLinkCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SessionJoinLinkCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>[]
+          }
+          delete: {
+            args: Prisma.SessionJoinLinkDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>
+          }
+          update: {
+            args: Prisma.SessionJoinLinkUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>
+          }
+          deleteMany: {
+            args: Prisma.SessionJoinLinkDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SessionJoinLinkUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SessionJoinLinkUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>[]
+          }
+          upsert: {
+            args: Prisma.SessionJoinLinkUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionJoinLinkPayload>
+          }
+          aggregate: {
+            args: Prisma.SessionJoinLinkAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSessionJoinLink>
+          }
+          groupBy: {
+            args: Prisma.SessionJoinLinkGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SessionJoinLinkGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SessionJoinLinkCountArgs<ExtArgs>
+            result: $Utils.Optional<SessionJoinLinkCountAggregateOutputType> | number
+          }
+        }
+      }
       CrmCompany: {
         payload: Prisma.$CrmCompanyPayload<ExtArgs>
         fields: Prisma.CrmCompanyFieldRefs
@@ -8505,6 +8598,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookOmit
     ownedWearable?: OwnedWearableOmit
     sessionBooking?: SessionBookingOmit
+    sessionJoinLink?: SessionJoinLinkOmit
     crmCompany?: CrmCompanyOmit
     crmContact?: CrmContactOmit
     crmDeal?: CrmDealOmit
@@ -79699,6 +79793,1001 @@ export namespace Prisma {
 
 
   /**
+   * Model SessionJoinLink
+   */
+
+  export type AggregateSessionJoinLink = {
+    _count: SessionJoinLinkCountAggregateOutputType | null
+    _min: SessionJoinLinkMinAggregateOutputType | null
+    _max: SessionJoinLinkMaxAggregateOutputType | null
+  }
+
+  export type SessionJoinLinkMinAggregateOutputType = {
+    sessionKey: string | null
+    url: string | null
+    setById: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SessionJoinLinkMaxAggregateOutputType = {
+    sessionKey: string | null
+    url: string | null
+    setById: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SessionJoinLinkCountAggregateOutputType = {
+    sessionKey: number
+    url: number
+    setById: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SessionJoinLinkMinAggregateInputType = {
+    sessionKey?: true
+    url?: true
+    setById?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SessionJoinLinkMaxAggregateInputType = {
+    sessionKey?: true
+    url?: true
+    setById?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SessionJoinLinkCountAggregateInputType = {
+    sessionKey?: true
+    url?: true
+    setById?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SessionJoinLinkAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SessionJoinLink to aggregate.
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionJoinLinks to fetch.
+     */
+    orderBy?: SessionJoinLinkOrderByWithRelationInput | SessionJoinLinkOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SessionJoinLinkWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionJoinLinks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionJoinLinks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SessionJoinLinks
+    **/
+    _count?: true | SessionJoinLinkCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SessionJoinLinkMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SessionJoinLinkMaxAggregateInputType
+  }
+
+  export type GetSessionJoinLinkAggregateType<T extends SessionJoinLinkAggregateArgs> = {
+        [P in keyof T & keyof AggregateSessionJoinLink]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSessionJoinLink[P]>
+      : GetScalarType<T[P], AggregateSessionJoinLink[P]>
+  }
+
+
+
+
+  export type SessionJoinLinkGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionJoinLinkWhereInput
+    orderBy?: SessionJoinLinkOrderByWithAggregationInput | SessionJoinLinkOrderByWithAggregationInput[]
+    by: SessionJoinLinkScalarFieldEnum[] | SessionJoinLinkScalarFieldEnum
+    having?: SessionJoinLinkScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SessionJoinLinkCountAggregateInputType | true
+    _min?: SessionJoinLinkMinAggregateInputType
+    _max?: SessionJoinLinkMaxAggregateInputType
+  }
+
+  export type SessionJoinLinkGroupByOutputType = {
+    sessionKey: string
+    url: string
+    setById: string
+    createdAt: Date
+    updatedAt: Date
+    _count: SessionJoinLinkCountAggregateOutputType | null
+    _min: SessionJoinLinkMinAggregateOutputType | null
+    _max: SessionJoinLinkMaxAggregateOutputType | null
+  }
+
+  type GetSessionJoinLinkGroupByPayload<T extends SessionJoinLinkGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SessionJoinLinkGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SessionJoinLinkGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SessionJoinLinkGroupByOutputType[P]>
+            : GetScalarType<T[P], SessionJoinLinkGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SessionJoinLinkSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    sessionKey?: boolean
+    url?: boolean
+    setById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["sessionJoinLink"]>
+
+  export type SessionJoinLinkSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    sessionKey?: boolean
+    url?: boolean
+    setById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["sessionJoinLink"]>
+
+  export type SessionJoinLinkSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    sessionKey?: boolean
+    url?: boolean
+    setById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["sessionJoinLink"]>
+
+  export type SessionJoinLinkSelectScalar = {
+    sessionKey?: boolean
+    url?: boolean
+    setById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type SessionJoinLinkOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"sessionKey" | "url" | "setById" | "createdAt" | "updatedAt", ExtArgs["result"]["sessionJoinLink"]>
+
+  export type $SessionJoinLinkPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SessionJoinLink"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      sessionKey: string
+      url: string
+      setById: string
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["sessionJoinLink"]>
+    composites: {}
+  }
+
+  type SessionJoinLinkGetPayload<S extends boolean | null | undefined | SessionJoinLinkDefaultArgs> = $Result.GetResult<Prisma.$SessionJoinLinkPayload, S>
+
+  type SessionJoinLinkCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SessionJoinLinkFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SessionJoinLinkCountAggregateInputType | true
+    }
+
+  export interface SessionJoinLinkDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SessionJoinLink'], meta: { name: 'SessionJoinLink' } }
+    /**
+     * Find zero or one SessionJoinLink that matches the filter.
+     * @param {SessionJoinLinkFindUniqueArgs} args - Arguments to find a SessionJoinLink
+     * @example
+     * // Get one SessionJoinLink
+     * const sessionJoinLink = await prisma.sessionJoinLink.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SessionJoinLinkFindUniqueArgs>(args: SelectSubset<T, SessionJoinLinkFindUniqueArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SessionJoinLink that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SessionJoinLinkFindUniqueOrThrowArgs} args - Arguments to find a SessionJoinLink
+     * @example
+     * // Get one SessionJoinLink
+     * const sessionJoinLink = await prisma.sessionJoinLink.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SessionJoinLinkFindUniqueOrThrowArgs>(args: SelectSubset<T, SessionJoinLinkFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SessionJoinLink that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkFindFirstArgs} args - Arguments to find a SessionJoinLink
+     * @example
+     * // Get one SessionJoinLink
+     * const sessionJoinLink = await prisma.sessionJoinLink.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SessionJoinLinkFindFirstArgs>(args?: SelectSubset<T, SessionJoinLinkFindFirstArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SessionJoinLink that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkFindFirstOrThrowArgs} args - Arguments to find a SessionJoinLink
+     * @example
+     * // Get one SessionJoinLink
+     * const sessionJoinLink = await prisma.sessionJoinLink.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SessionJoinLinkFindFirstOrThrowArgs>(args?: SelectSubset<T, SessionJoinLinkFindFirstOrThrowArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SessionJoinLinks that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SessionJoinLinks
+     * const sessionJoinLinks = await prisma.sessionJoinLink.findMany()
+     * 
+     * // Get first 10 SessionJoinLinks
+     * const sessionJoinLinks = await prisma.sessionJoinLink.findMany({ take: 10 })
+     * 
+     * // Only select the `sessionKey`
+     * const sessionJoinLinkWithSessionKeyOnly = await prisma.sessionJoinLink.findMany({ select: { sessionKey: true } })
+     * 
+     */
+    findMany<T extends SessionJoinLinkFindManyArgs>(args?: SelectSubset<T, SessionJoinLinkFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SessionJoinLink.
+     * @param {SessionJoinLinkCreateArgs} args - Arguments to create a SessionJoinLink.
+     * @example
+     * // Create one SessionJoinLink
+     * const SessionJoinLink = await prisma.sessionJoinLink.create({
+     *   data: {
+     *     // ... data to create a SessionJoinLink
+     *   }
+     * })
+     * 
+     */
+    create<T extends SessionJoinLinkCreateArgs>(args: SelectSubset<T, SessionJoinLinkCreateArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SessionJoinLinks.
+     * @param {SessionJoinLinkCreateManyArgs} args - Arguments to create many SessionJoinLinks.
+     * @example
+     * // Create many SessionJoinLinks
+     * const sessionJoinLink = await prisma.sessionJoinLink.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SessionJoinLinkCreateManyArgs>(args?: SelectSubset<T, SessionJoinLinkCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SessionJoinLinks and returns the data saved in the database.
+     * @param {SessionJoinLinkCreateManyAndReturnArgs} args - Arguments to create many SessionJoinLinks.
+     * @example
+     * // Create many SessionJoinLinks
+     * const sessionJoinLink = await prisma.sessionJoinLink.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SessionJoinLinks and only return the `sessionKey`
+     * const sessionJoinLinkWithSessionKeyOnly = await prisma.sessionJoinLink.createManyAndReturn({
+     *   select: { sessionKey: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SessionJoinLinkCreateManyAndReturnArgs>(args?: SelectSubset<T, SessionJoinLinkCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SessionJoinLink.
+     * @param {SessionJoinLinkDeleteArgs} args - Arguments to delete one SessionJoinLink.
+     * @example
+     * // Delete one SessionJoinLink
+     * const SessionJoinLink = await prisma.sessionJoinLink.delete({
+     *   where: {
+     *     // ... filter to delete one SessionJoinLink
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SessionJoinLinkDeleteArgs>(args: SelectSubset<T, SessionJoinLinkDeleteArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SessionJoinLink.
+     * @param {SessionJoinLinkUpdateArgs} args - Arguments to update one SessionJoinLink.
+     * @example
+     * // Update one SessionJoinLink
+     * const sessionJoinLink = await prisma.sessionJoinLink.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SessionJoinLinkUpdateArgs>(args: SelectSubset<T, SessionJoinLinkUpdateArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SessionJoinLinks.
+     * @param {SessionJoinLinkDeleteManyArgs} args - Arguments to filter SessionJoinLinks to delete.
+     * @example
+     * // Delete a few SessionJoinLinks
+     * const { count } = await prisma.sessionJoinLink.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SessionJoinLinkDeleteManyArgs>(args?: SelectSubset<T, SessionJoinLinkDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SessionJoinLinks.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SessionJoinLinks
+     * const sessionJoinLink = await prisma.sessionJoinLink.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SessionJoinLinkUpdateManyArgs>(args: SelectSubset<T, SessionJoinLinkUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SessionJoinLinks and returns the data updated in the database.
+     * @param {SessionJoinLinkUpdateManyAndReturnArgs} args - Arguments to update many SessionJoinLinks.
+     * @example
+     * // Update many SessionJoinLinks
+     * const sessionJoinLink = await prisma.sessionJoinLink.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SessionJoinLinks and only return the `sessionKey`
+     * const sessionJoinLinkWithSessionKeyOnly = await prisma.sessionJoinLink.updateManyAndReturn({
+     *   select: { sessionKey: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SessionJoinLinkUpdateManyAndReturnArgs>(args: SelectSubset<T, SessionJoinLinkUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SessionJoinLink.
+     * @param {SessionJoinLinkUpsertArgs} args - Arguments to update or create a SessionJoinLink.
+     * @example
+     * // Update or create a SessionJoinLink
+     * const sessionJoinLink = await prisma.sessionJoinLink.upsert({
+     *   create: {
+     *     // ... data to create a SessionJoinLink
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SessionJoinLink we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SessionJoinLinkUpsertArgs>(args: SelectSubset<T, SessionJoinLinkUpsertArgs<ExtArgs>>): Prisma__SessionJoinLinkClient<$Result.GetResult<Prisma.$SessionJoinLinkPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SessionJoinLinks.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkCountArgs} args - Arguments to filter SessionJoinLinks to count.
+     * @example
+     * // Count the number of SessionJoinLinks
+     * const count = await prisma.sessionJoinLink.count({
+     *   where: {
+     *     // ... the filter for the SessionJoinLinks we want to count
+     *   }
+     * })
+    **/
+    count<T extends SessionJoinLinkCountArgs>(
+      args?: Subset<T, SessionJoinLinkCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SessionJoinLinkCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SessionJoinLink.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SessionJoinLinkAggregateArgs>(args: Subset<T, SessionJoinLinkAggregateArgs>): Prisma.PrismaPromise<GetSessionJoinLinkAggregateType<T>>
+
+    /**
+     * Group by SessionJoinLink.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionJoinLinkGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SessionJoinLinkGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SessionJoinLinkGroupByArgs['orderBy'] }
+        : { orderBy?: SessionJoinLinkGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SessionJoinLinkGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSessionJoinLinkGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SessionJoinLink model
+   */
+  readonly fields: SessionJoinLinkFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SessionJoinLink.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SessionJoinLinkClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SessionJoinLink model
+   */
+  interface SessionJoinLinkFieldRefs {
+    readonly sessionKey: FieldRef<"SessionJoinLink", 'String'>
+    readonly url: FieldRef<"SessionJoinLink", 'String'>
+    readonly setById: FieldRef<"SessionJoinLink", 'String'>
+    readonly createdAt: FieldRef<"SessionJoinLink", 'DateTime'>
+    readonly updatedAt: FieldRef<"SessionJoinLink", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SessionJoinLink findUnique
+   */
+  export type SessionJoinLinkFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * Filter, which SessionJoinLink to fetch.
+     */
+    where: SessionJoinLinkWhereUniqueInput
+  }
+
+  /**
+   * SessionJoinLink findUniqueOrThrow
+   */
+  export type SessionJoinLinkFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * Filter, which SessionJoinLink to fetch.
+     */
+    where: SessionJoinLinkWhereUniqueInput
+  }
+
+  /**
+   * SessionJoinLink findFirst
+   */
+  export type SessionJoinLinkFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * Filter, which SessionJoinLink to fetch.
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionJoinLinks to fetch.
+     */
+    orderBy?: SessionJoinLinkOrderByWithRelationInput | SessionJoinLinkOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SessionJoinLinks.
+     */
+    cursor?: SessionJoinLinkWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionJoinLinks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionJoinLinks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SessionJoinLinks.
+     */
+    distinct?: SessionJoinLinkScalarFieldEnum | SessionJoinLinkScalarFieldEnum[]
+  }
+
+  /**
+   * SessionJoinLink findFirstOrThrow
+   */
+  export type SessionJoinLinkFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * Filter, which SessionJoinLink to fetch.
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionJoinLinks to fetch.
+     */
+    orderBy?: SessionJoinLinkOrderByWithRelationInput | SessionJoinLinkOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SessionJoinLinks.
+     */
+    cursor?: SessionJoinLinkWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionJoinLinks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionJoinLinks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SessionJoinLinks.
+     */
+    distinct?: SessionJoinLinkScalarFieldEnum | SessionJoinLinkScalarFieldEnum[]
+  }
+
+  /**
+   * SessionJoinLink findMany
+   */
+  export type SessionJoinLinkFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * Filter, which SessionJoinLinks to fetch.
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionJoinLinks to fetch.
+     */
+    orderBy?: SessionJoinLinkOrderByWithRelationInput | SessionJoinLinkOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SessionJoinLinks.
+     */
+    cursor?: SessionJoinLinkWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionJoinLinks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionJoinLinks.
+     */
+    skip?: number
+    distinct?: SessionJoinLinkScalarFieldEnum | SessionJoinLinkScalarFieldEnum[]
+  }
+
+  /**
+   * SessionJoinLink create
+   */
+  export type SessionJoinLinkCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * The data needed to create a SessionJoinLink.
+     */
+    data: XOR<SessionJoinLinkCreateInput, SessionJoinLinkUncheckedCreateInput>
+  }
+
+  /**
+   * SessionJoinLink createMany
+   */
+  export type SessionJoinLinkCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SessionJoinLinks.
+     */
+    data: SessionJoinLinkCreateManyInput | SessionJoinLinkCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SessionJoinLink createManyAndReturn
+   */
+  export type SessionJoinLinkCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * The data used to create many SessionJoinLinks.
+     */
+    data: SessionJoinLinkCreateManyInput | SessionJoinLinkCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SessionJoinLink update
+   */
+  export type SessionJoinLinkUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * The data needed to update a SessionJoinLink.
+     */
+    data: XOR<SessionJoinLinkUpdateInput, SessionJoinLinkUncheckedUpdateInput>
+    /**
+     * Choose, which SessionJoinLink to update.
+     */
+    where: SessionJoinLinkWhereUniqueInput
+  }
+
+  /**
+   * SessionJoinLink updateMany
+   */
+  export type SessionJoinLinkUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SessionJoinLinks.
+     */
+    data: XOR<SessionJoinLinkUpdateManyMutationInput, SessionJoinLinkUncheckedUpdateManyInput>
+    /**
+     * Filter which SessionJoinLinks to update
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * Limit how many SessionJoinLinks to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionJoinLink updateManyAndReturn
+   */
+  export type SessionJoinLinkUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * The data used to update SessionJoinLinks.
+     */
+    data: XOR<SessionJoinLinkUpdateManyMutationInput, SessionJoinLinkUncheckedUpdateManyInput>
+    /**
+     * Filter which SessionJoinLinks to update
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * Limit how many SessionJoinLinks to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionJoinLink upsert
+   */
+  export type SessionJoinLinkUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * The filter to search for the SessionJoinLink to update in case it exists.
+     */
+    where: SessionJoinLinkWhereUniqueInput
+    /**
+     * In case the SessionJoinLink found by the `where` argument doesn't exist, create a new SessionJoinLink with this data.
+     */
+    create: XOR<SessionJoinLinkCreateInput, SessionJoinLinkUncheckedCreateInput>
+    /**
+     * In case the SessionJoinLink was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SessionJoinLinkUpdateInput, SessionJoinLinkUncheckedUpdateInput>
+  }
+
+  /**
+   * SessionJoinLink delete
+   */
+  export type SessionJoinLinkDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+    /**
+     * Filter which SessionJoinLink to delete.
+     */
+    where: SessionJoinLinkWhereUniqueInput
+  }
+
+  /**
+   * SessionJoinLink deleteMany
+   */
+  export type SessionJoinLinkDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SessionJoinLinks to delete
+     */
+    where?: SessionJoinLinkWhereInput
+    /**
+     * Limit how many SessionJoinLinks to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionJoinLink without action
+   */
+  export type SessionJoinLinkDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionJoinLink
+     */
+    select?: SessionJoinLinkSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionJoinLink
+     */
+    omit?: SessionJoinLinkOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Model CrmCompany
    */
 
@@ -107822,6 +108911,17 @@ export namespace Prisma {
   export type SessionBookingScalarFieldEnum = (typeof SessionBookingScalarFieldEnum)[keyof typeof SessionBookingScalarFieldEnum]
 
 
+  export const SessionJoinLinkScalarFieldEnum: {
+    sessionKey: 'sessionKey',
+    url: 'url',
+    setById: 'setById',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SessionJoinLinkScalarFieldEnum = (typeof SessionJoinLinkScalarFieldEnum)[keyof typeof SessionJoinLinkScalarFieldEnum]
+
+
   export const CrmCompanyScalarFieldEnum: {
     id: 'id',
     name: 'name',
@@ -113436,6 +114536,58 @@ export namespace Prisma {
     shardsPaid?: IntWithAggregatesFilter<"SessionBooking"> | number
     startsAt?: DateTimeWithAggregatesFilter<"SessionBooking"> | Date | string
     createdAt?: DateTimeWithAggregatesFilter<"SessionBooking"> | Date | string
+  }
+
+  export type SessionJoinLinkWhereInput = {
+    AND?: SessionJoinLinkWhereInput | SessionJoinLinkWhereInput[]
+    OR?: SessionJoinLinkWhereInput[]
+    NOT?: SessionJoinLinkWhereInput | SessionJoinLinkWhereInput[]
+    sessionKey?: StringFilter<"SessionJoinLink"> | string
+    url?: StringFilter<"SessionJoinLink"> | string
+    setById?: StringFilter<"SessionJoinLink"> | string
+    createdAt?: DateTimeFilter<"SessionJoinLink"> | Date | string
+    updatedAt?: DateTimeFilter<"SessionJoinLink"> | Date | string
+  }
+
+  export type SessionJoinLinkOrderByWithRelationInput = {
+    sessionKey?: SortOrder
+    url?: SortOrder
+    setById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SessionJoinLinkWhereUniqueInput = Prisma.AtLeast<{
+    sessionKey?: string
+    AND?: SessionJoinLinkWhereInput | SessionJoinLinkWhereInput[]
+    OR?: SessionJoinLinkWhereInput[]
+    NOT?: SessionJoinLinkWhereInput | SessionJoinLinkWhereInput[]
+    url?: StringFilter<"SessionJoinLink"> | string
+    setById?: StringFilter<"SessionJoinLink"> | string
+    createdAt?: DateTimeFilter<"SessionJoinLink"> | Date | string
+    updatedAt?: DateTimeFilter<"SessionJoinLink"> | Date | string
+  }, "sessionKey">
+
+  export type SessionJoinLinkOrderByWithAggregationInput = {
+    sessionKey?: SortOrder
+    url?: SortOrder
+    setById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SessionJoinLinkCountOrderByAggregateInput
+    _max?: SessionJoinLinkMaxOrderByAggregateInput
+    _min?: SessionJoinLinkMinOrderByAggregateInput
+  }
+
+  export type SessionJoinLinkScalarWhereWithAggregatesInput = {
+    AND?: SessionJoinLinkScalarWhereWithAggregatesInput | SessionJoinLinkScalarWhereWithAggregatesInput[]
+    OR?: SessionJoinLinkScalarWhereWithAggregatesInput[]
+    NOT?: SessionJoinLinkScalarWhereWithAggregatesInput | SessionJoinLinkScalarWhereWithAggregatesInput[]
+    sessionKey?: StringWithAggregatesFilter<"SessionJoinLink"> | string
+    url?: StringWithAggregatesFilter<"SessionJoinLink"> | string
+    setById?: StringWithAggregatesFilter<"SessionJoinLink"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"SessionJoinLink"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"SessionJoinLink"> | Date | string
   }
 
   export type CrmCompanyWhereInput = {
@@ -120772,6 +121924,62 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type SessionJoinLinkCreateInput = {
+    sessionKey: string
+    url: string
+    setById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SessionJoinLinkUncheckedCreateInput = {
+    sessionKey: string
+    url: string
+    setById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SessionJoinLinkUpdateInput = {
+    sessionKey?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    setById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionJoinLinkUncheckedUpdateInput = {
+    sessionKey?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    setById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionJoinLinkCreateManyInput = {
+    sessionKey: string
+    url: string
+    setById: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SessionJoinLinkUpdateManyMutationInput = {
+    sessionKey?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    setById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionJoinLinkUncheckedUpdateManyInput = {
+    sessionKey?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    setById?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CrmCompanyCreateInput = {
     id?: string
     name: string
@@ -126773,6 +127981,30 @@ export namespace Prisma {
 
   export type SessionBookingSumOrderByAggregateInput = {
     shardsPaid?: SortOrder
+  }
+
+  export type SessionJoinLinkCountOrderByAggregateInput = {
+    sessionKey?: SortOrder
+    url?: SortOrder
+    setById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SessionJoinLinkMaxOrderByAggregateInput = {
+    sessionKey?: SortOrder
+    url?: SortOrder
+    setById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SessionJoinLinkMinOrderByAggregateInput = {
+    sessionKey?: SortOrder
+    url?: SortOrder
+    setById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type CrmCompanyCountOrderByAggregateInput = {
