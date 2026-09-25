@@ -316,9 +316,14 @@ export class AirSessionCore {
     s.vy = 0;
     const judge = this.airTrick.land();
     s.spinTurns = 0;
-    const tricked = !t.pointsNeedTrick || Math.abs(judge.rotations) >= 0.5;
+    // HOTFIX (2026-09-24): judge.rotations is SIGNED by the spin direction (backside = −1 on the d-pad), and the points
+    // took it as is — a backside spin paid less than a straight air and a stuck backside 360 paid (100 − 140) × 2 = −80,
+    // so the session score went down for landing it. Points pay the size of the spin; the attempts log, lastRotations
+    // and onLanding keep the signed value so the direction is still readable.
+    const turns = Math.abs(judge.rotations);
+    const tricked = !t.pointsNeedTrick || turns >= 0.5;
     const pts = tricked ? Math.round(
-      (t.basePoints + judge.rotations * t.pointsPerRotation) * t.gradePoints[judge.grade],
+      (t.basePoints + turns * t.pointsPerRotation) * t.gradePoints[judge.grade],
     ) : 0;
     s.score += pts;
     s.lastGrade = judge.grade;

@@ -4239,6 +4239,11 @@ export const DunkMode: ModeDefinition = (() => {
     // the night number, and nothing else a contest scored
     const led: NightState = nextNight({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain });
     ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = led);
+    // HOTFIX (2026-09-24): the card is the night too. The ledger put playerTotal back to 0 but the card kept last
+    // night's attempts (addAttempt holds the last twelve), so night 2's report read "YOUR NIGHT: <both nights>" with
+    // night 1's dunks on it, and the card no longer added up to the score ctx.card sends out beside it. A card that
+    // disagrees with its own score is exactly what an integrity check refuses. load() already opened a fresh one.
+    card = emptyCard();
     hype = 0; chain = 0;
     ended = false; finishing = false;
     usedCombos.clear(); momentum.reset(); flight.reset();
