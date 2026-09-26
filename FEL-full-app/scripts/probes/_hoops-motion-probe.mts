@@ -36,6 +36,7 @@
 //   REPS=N — attempts kept per action (1 = the canonical instance; ≥ 5 = the plan's gate; per-action caps in MAXA)
 //   TAKES=canon|all — which takes run (default: canon for REPS=1, all for REPS>1; canon = phase 1's take list exactly)
 //   SEED=7  VDT=16.6667  COLS=12  HOG=<ms>  FROM_REC=<dir> — re-measure recordings already on disk (sheets need SCRUB=1 + a server)
+//   EXTRA_QS=&nomotion=1 — extra query parameters on every page (PHASE 3c: the A/Bs)
 //   WEIGHTS=1 — write the per-frame weights log for every recording (default: the 3PT shots only, plus weights-summary.txt)
 //   HUNT=<take>:<from>-<to> + ACTIONS=<action> + AOFF=<action>:<n> — a supplemental hunt for a rare action, merged after the n on disk
 //   Determinism: run the same TAG twice idle and once with HOG=60, then DET=1 _hoops-motion-compare.mts <tagA> <tagB>
@@ -61,6 +62,9 @@ const COLS = Number(process.env.COLS ?? 12);
 const FROM_REC = process.env.FROM_REC ?? '';
 const TAKE_WALL_MS = Number(process.env.TAKE_WALL_MS ?? 240000);
 const WEIGHTS_ALL = process.env.WEIGHTS === '1';
+/** EXTRA_QS=&nomotion=1 (PHASE 3c): extra query parameters on every session's page — the A/Bs (?nomotion=1 the motion layers off,
+ *  ?heroMocap=0 the authored clips for the captures, ?capPrefilter=0|1 the hoops captures' prefilter). */
+const EXTRA_QS = process.env.EXTRA_QS ?? '';
 /** HOG=<ms>: the load self-test — burn up to that much wall time inside every frame (see the clock). Numbers must not move. */
 const HOG = Number(process.env.HOG ?? 0);
 const VCLOCK_JS = fs.readFileSync(path.join(HERE, '_vclock-page.js'), 'utf8');
@@ -611,6 +615,13 @@ export interface Metrics {
     /** the subject had the ball (held or dribbled) on at least one frame of the window */
     withBall: boolean;
   };
+  /** PHASE 3c (2026-09-26) — the elbows on the overhead clips: frames whose top clip is an overhead family (OVERHEAD_CLIP), the wrong-way
+   *  elbow count on them (elbowBad's test, both arms, high + low), per clip. */
+  h3c?: { overheadFrames: number; elbowOverhead: number; byClip: Record<string, { frames: number; bad: number; straight?: number; locked?: number }>;
+    /** PHASE 3c review (2026-09-26): elbowBad skips an arm straighter than 160° (an arm without a bend has no side to point), so an arm
+     *  that only STRAIGHTENED reads as a fixed elbow. The arms (both, per frame) on the overhead frames over 160° (straight: the frames the
+     *  test could not judge) and over 172° (locked, the lockedElbow threshold), in total and per clip. */
+    straightOverhead?: number; lockedOverhead?: number };
   /** PHASE 3b (2026-09-25) — the "Feet" gate lines. */
   h3b: {
     /** the foot slide on LOCOMOTION / DRIBBLE LOOP frames only (the subject's top clip a loop: the dribbles, the drive, the run, the
@@ -651,6 +662,10 @@ export interface Metrics {
   };
 }
 /** PHASE 3b: which clips are locomotion / dribble loops (the feet lines are read on their frames). */
+/** PHASE 3c: the OVERHEAD families (plan §3 "Anatomical elbow poles"): the floater, the hook, the reverse, the finger roll, the Mikan, the
+ *  up-and-under, the spin and hang layups, the fadeaway, the block reach, the hand up and the late follow-through (with their _left
+ *  versions), and the captured layup (its extend pole). */
+export const OVERHEAD_CLIP = /^(bball_(floater|hook|layup_reverse|finger_roll|mikan|up_and_under|layup_spin|layup_hang)(_left)?|bball_(fadeaway|block_reach|hand_up|follow_through_late)|bball_mc_layup_gather(_left)?)$/;
 export const LOOP_CLIP = /^(bball_mc_(dribble_(idle|walk|jog|run)|drive|run|defend_(slide_left|slide_right|slide_hard_left|slide_hard_right|stance|backpedal))|bball_(dribble_(idle|walk|jog|run)|defend_(slide_left|slide_right|slide_hard_left|slide_hard_right|stance|backpedal)|closeout|idle_stand)|run_forward|run|walk|jog|strafe_(left|right)|idle_stand|football_mc_run)$/;
 /** the forward loops (cadence by gait) and the lateral ones (the slide band) */
 const FORWARD_LOOP = /^(bball_mc_(dribble_(walk|jog|run)|drive|run)|bball_dribble_(walk|jog|run)|run_forward|run|walk|jog|football_mc_run)$/;
@@ -738,12 +753,15 @@ export function measure(rec: Rec): Metrics {
     joints[k] = { bent: bent.length, off: errs.filter((e) => e > 35 && e <= 120).length, inverted: errs.filter((e) => e > 120).length, errP90: errs.length ? errs[Math.floor(errs.length * 0.9)] : 0, rollMax: Math.round(Math.max(0, ...rolls)), rollFast: rolls.filter((r) => r > 1500).length };
   }
   const elbowBad: Metrics['elbowBad'] = {};
+  const elbowBadAt: number[] = bw.map(() => 0);   // PHASE 3c: the wrong-way elbows per frame (both arms, high + low), for the overhead-clip line
+  const straightAt: number[] = bw.map(() => 0), lockedAt: number[] = bw.map(() => 0);   // (3c review) the arms the test skips (> 160°), and > 172°
   for (const sd of ['Left', 'Right']) {
     let high = 0, low = 0;
-    for (const b of bw) {
+    for (const [bi, b] of bw.entries()) {
       const Sh = b.j[J[sd + 'Arm']], E = b.j[J[sd + 'ForeArm']], H = b.j[J[sd + 'Hand']]; if (!Sh || !E || !H) continue;
       const ax = sub(H, Sh), al = len(ax); if (al < 1e-3) continue;
-      if (angleAt(Sh, E, H) > 160) continue;
+      const elbowDeg = angleAt(Sh, E, H);
+      if (elbowDeg > 160) { straightAt[bi]++; if (elbowDeg > 172) lockedAt[bi]++; continue; }
       const axn = ax.map((v) => v / al) as V3, e = sub(E, Sh), pe = sub(e, axn.map((v) => v * dot(e, axn)) as V3), pl = len(pe); if (pl < 1e-3) continue;
       // AUDIT 2026-09-25: the dunk probe's forward, exactly — the hip line's normal oriented by the LEFT foot (was: the mean of both
       // feet's heel→toe, which a turned-out foot drags)
@@ -751,8 +769,8 @@ export function measure(rec: Rec): Metrics {
       const across = sub(ru, lu); across[1] = 0; const acl = len(across) || 1; const ac = across.map((v) => v / acl);
       let fwd: V3 = [ac[2], 0, -ac[0]]; if (dot(fwd, sub(lt, lf)) < 0) fwd = [-fwd[0], 0, -fwd[2]];
       const pf = dot(p, fwd), pu = p[1], handUp = H[1] - Sh[1];
-      if (handUp > 0.15 && pf < -0.5 && pu < 0.3) high++;
-      if (handUp < -0.1 && pf > 0.6) low++;
+      if (handUp > 0.15 && pf < -0.5 && pu < 0.3) { high++; elbowBadAt[bi]++; }
+      if (handUp < -0.1 && pf > 0.6) { low++; elbowBadAt[bi]++; }
     }
     elbowBad[sd] = { high, low };
   }
@@ -1127,13 +1145,22 @@ export function measure(rec: Rec): Metrics {
       prevF = f;
     }
   }
+  // ── PHASE 3c: the wrong-way elbows ON THE OVERHEAD CLIPS (the gate line: ≤ 1 per window) — the frames whose top clip (≥ 0.5) is one of the
+  // overhead families (OVERHEAD_CLIP), the elbowBad test on each (both arms, high + low, as the family tables sum it) ──────────────
+  const h3c: Metrics['h3c'] = { overheadFrames: 0, elbowOverhead: 0, byClip: {}, straightOverhead: 0, lockedOverhead: 0 };
+  for (const [bi, b] of bw.entries()) {
+    const c = b.c.slice().sort((x, y) => y[1] - x[1])[0]; const tc = c && c[1] >= 0.5 ? clipName(c[0]) : '';
+    if (!OVERHEAD_CLIP.test(tc)) continue;
+    h3c.overheadFrames++; h3c.elbowOverhead += elbowBadAt[bi]; h3c.straightOverhead! += straightAt[bi]; h3c.lockedOverhead! += lockedAt[bi];
+    const e = (h3c.byClip[tc] ??= { frames: 0, bad: 0, straight: 0, locked: 0 }); e.frames++; e.bad += elbowBadAt[bi]; e.straight! += straightAt[bi]; e.locked! += lockedAt[bi];
+  }
   return {
     id: rec.action, label: rec.label, who: rec.who, kind: rec.kind, family: rec.family, session: rec.session, take: rec.take, subject: S, anchorClip: rec.anchorClip, attempt: rec.attempt ?? 1,
     frames: win.length, fps: +fs.toFixed(1), windowMs: [rec.pre, rec.post], clips, shotTypes,
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
     pops, popsN: pops.length, severe: pops.filter((p) => p.degPerSec >= 3000).length, whips,
     heldFrac: held, wristStill: r2(((held.LeftHand ?? 0) + (held.RightHand ?? 0)) / 2), thoracicStill: held.Spine2 ?? 0,
-    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2, h3, h3b,
+    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2, h3, h3b, h3c,
     audit: (() => { const cl = bw.map((b) => Math.min(b.j[J.LeftFoot]?.[1] ?? 9, b.j[J.RightFoot]?.[1] ?? 9) - floorY); let fi = -1, ft = -1e9; win.forEach((f, i) => { if (f.t >= A0 - 100 && cl[i] > ft) { ft = cl[i]; fi = i; } });
       return { windowMs: [Math.round(Math.max(wS, win[0]?.t ?? wS) - A0), Math.round(Math.min(wE, win[win.length - 1]?.t ?? wE) - A0)] as [number, number], frames: win.length, resetsMs: resetsT.map((t) => Math.round(t - A0)), anchorAtReset, snaps, preMs, frozen, flight: { feetUpM: r2(ft), feetApexMs: fi >= 0 ? Math.round(win[fi].t - A0) : null, rootUpM: r2(Math.max(0, ...bw.map((b) => b.rp[1]))) } }; })(),
   };
@@ -1215,7 +1242,7 @@ async function boot(b: Browser, s: Session): Promise<Seg> {
   const errors: string[] = [];
   p.on('console', (m) => { const t = m.text(); if (m.type() === 'error' && !/status of 401|favicon|gamepad|Unauthorized/.test(t)) errors.push(t.slice(0, 200)); });
   p.on('pageerror', (e) => errors.push('pageerror ' + e.message.slice(0, 200)));
-  const url = `${BASE}/dev/mode/${s.mode}?agent=1${s.qs}`;
+  const url = `${BASE}/dev/mode/${s.mode}?agent=1${s.qs}${EXTRA_QS}`;
   const w0 = Date.now();
   await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 300000 });
   let st = '';

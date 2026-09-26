@@ -47,6 +47,10 @@ const BALL_HAND: V3 = [0.25, 0.95, 0.30];       // the live dribble, waist heigh
 const OFF_HAND: V3 = [-0.25, 1.00, 0.12];       // relaxed, slightly forward
 const UP_R: V3 = [0.9, 0.1, -0.3], UP_L: V3 = [-0.9, 0.1, -0.3];
 const mirror = (v: V3): V3 => [-v[0], v[1], v[2]];
+/** HOOPS MOTION phase 3c (plan §3 "Smoothing": `hold: true` on the accents). Every bball_* clip is a joint-space cubic now (smoothKeys);
+ *  these keys ease to a stop — zero velocity in and out — because the move lives there: a shot's or a finish's RELEASE (the ball leaves
+ *  a hand that has arrived), the top of a FAKE (the sell), the hesi's CHECK, the block's reach at its HEIGHT. mirrorKey carries it. */
+function accent<K extends PoseKey>(keys: K[], ...at: number[]): K[] { return keys.map((k) => (at.some((t) => Math.abs(t - k.t) < 1e-6) ? { ...k, hold: true } : k)); }
 
 /** Ball-hand pump on a bent-knee stance. Loops. */
 export function buildDribbleIdle(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -86,12 +90,12 @@ export function buildCrossover(scene: Scene, sk: Skeleton, dir: 'left' | 'right'
 
 /** Hesitation: a stutter — the body checks, the ball hand holds, the knees load. */
 export function buildHesi(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildPoseClip(scene, sk, 'bball_hesi', 0.55, [
+  return buildPoseClip(scene, sk, 'bball_hesi', 0.55, accent([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [0, 0, 0],  ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
     { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-8, 0, 0], LeftUpLeg: [-10, 0, 8], RightUpLeg: [-10, 0, -8], LeftLeg: [16, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.26, 0.98, 0.31], Left: OFF_HAND }, hipsY: -0.02 },
     { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  Neck: [-4, 0, 0], LeftUpLeg: [-14, 0, 8], RightUpLeg: [-14, 0, -8], LeftLeg: [22, 0, 0], RightLeg: [22, 0, 0] }, hands: { Right: [0.26, 0.96, 0.31], Left: OFF_HAND }, hipsY: -0.04 },
     { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [0, 0, 0],  LeftUpLeg: [-28, 0, 8], RightUpLeg: [-28, 0, -8], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.08 },
-  ]);
+  ], 0.2));
 }
 
 /** Mirror a pose key across the body's midline: hands / poles / feet x negated and the sides swapped, the left and right
@@ -120,13 +124,13 @@ export function mirrorKey(k: PoseKey): PoseKey {
  *  glass with the off arm shielding, then the feet come down the FRONT to a soft stance (HOOPS-MOVE-KIT-A M3: the finish
  *  used to be the dunk launch clip — a two-arm sweep through a T). The release is the 0.3 s key; the modes pace the clip so
  *  it lands on the meter's green and ride the hop to the 0.7 s landing key. */
-const LAYUP_KEYS = [
+const LAYUP_KEYS = accent([
   { t: 0,   bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] } as Record<string, Deg3>, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
   { t: 0.3, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], LeftUpLeg: [4, 0, 4],   RightUpLeg: [-82, 0, -4], LeftLeg: [6, 0, 0],  RightLeg: [78, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.20, 1.95, 0.15] as V3, Left: [-0.30, 1.25, 0.20] as V3 }, poles: { Right: UP_R }, hipsY: 0.02 },
   { t: 0.5, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], LeftUpLeg: [8, 0, 4],   RightUpLeg: [-70, 0, -4], LeftLeg: [4, 0, 0],  RightLeg: [60, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.18, 1.98, 0.10] as V3, Left: [-0.30, 1.20, 0.20] as V3 }, poles: { Right: UP_R }, hipsY: 0.05 },
   // feet-down: the legs under the body, the ball arm comes down the front, the off hand to the hip
   { t: 0.7, bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  LeftUpLeg: [-16, 0, 6], RightUpLeg: [-16, 0, -6], LeftLeg: [24, 0, 0], RightLeg: [24, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.24, 1.12, 0.30] as V3, Left: [-0.24, 1.08, 0.28] as V3 }, hipsY: -0.04 },
-];
+], 0.3);
 export function buildLayupGather(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_gather', 0.7, LAYUP_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_gather_left', 0.7, LAYUP_KEYS.map(mirrorKey));
@@ -169,13 +173,13 @@ export function buildStepbackGather(scene: Scene, sk: Skeleton): AnimationGroup 
 // THE RUNNER, either hand (2026-09-16). The shape was always right; what it did not have was a LEFT, and
 // FINISH_CLIP.floater pointed both sides at this one clip — so a floater taken going left pushed the ball up with
 // the right hand, across the body, in front of the help it was supposed to be getting over.
-const FLOATER_KEYS: PoseKey[] = [
+const FLOATER_KEYS: PoseKey[] = accent([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [0, 0, 0],  LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.05 },
     { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-6, 0, 4],  RightUpLeg: [-50, 0, -4], LeftLeg: [10, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.12, 1.32, 0.30], Left: [-0.14, 1.28, 0.30] }, hipsY: 0 },   // the gather off the stride, the ball to the chest
     { t: 0.35, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0], LeftUpLeg: [-2, 0, 4],  RightUpLeg: [-72, 0, -4], LeftLeg: [6, 0, 0],  RightLeg: [70, 0, 0] }, hands: { Right: [0.12, 2.05, 0.30], Left: [-0.25, 1.35, 0.20] }, poles: { Right: UP_R }, hipsY: 0.04 },   // the push: the ball arm high and in front, the runner's knee up (measured: −56° lifted the knee 0.21 m, −82° 0.42)
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-12, 0, 4], RightUpLeg: [-30, 0, -4], LeftLeg: [16, 0, 0], RightLeg: [36, 0, 0] }, hands: { Right: [0.16, 1.90, 0.35], Left: [-0.24, 1.30, 0.22] }, poles: { Right: UP_R }, hipsY: 0.02 },   // the follow: the arm stays up, the knee comes down
     { t: 0.7,  bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],  Neck: [-4, 0, 0], LeftUpLeg: [-16, 0, 6], RightUpLeg: [-16, 0, -6], LeftLeg: [24, 0, 0], RightLeg: [24, 0, 0] }, hands: { Right: [0.24, 1.12, 0.30], Left: [-0.24, 1.08, 0.28] }, hipsY: -0.04 },   // feet-down, the arm down the front
-];
+], 0.35);
 export function buildFloater(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_floater', 0.7, FLOATER_KEYS);
   return buildPoseClip(scene, sk, 'bball_floater_left', 0.7, FLOATER_KEYS.map(mirrorKey));
@@ -351,11 +355,11 @@ export function buildBlockReach(scene: Scene, sk: Skeleton): AnimationGroup | nu
   const LOAD: Record<string, Deg3> = { LeftUpLeg: [-26, 0, 5], LeftLeg: [42, 0, 0], RightUpLeg: [-26, 0, -5], RightLeg: [42, 0, 0] };
   /** In the air: long and trailing, toes down. Not mirror-perfect — nobody leaves the floor square. */
   const LONG: Record<string, Deg3> = { LeftUpLeg: [-9, 0, 4], LeftLeg: [11, 0, 0], RightUpLeg: [-3, 0, -4], RightLeg: [16, 0, 0] };
-  return buildPoseClip(scene, sk, 'bball_block_reach', 0.5, [
+  return buildPoseClip(scene, sk, 'bball_block_reach', 0.5, accent([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [8, 0, 0], ...LOAD },  hands: { Right: [0.25, 1.00, 0.25], Left: mirror([0.25, 1.00, 0.25]) } },
     { t: 0.25, bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], ...LONG }, hands: up, poles: { Right: UP_R, Left: UP_L } },
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], ...LONG }, hands: { Right: [0.22, 1.98, 0.08], Left: [-0.22, 1.98, 0.08] }, poles: { Right: UP_R, Left: UP_L } },
-  ]);
+  ], 0.25));
 }
 
 /** The shot's FOLLOW-THROUGH (BIOMECH-HOOPS-WAVE1, G5 end pose): played from the jumpshot's release frame (both arms
@@ -464,7 +468,7 @@ export function buildPostUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
  *  plays), the ball released high and slightly back over the head, the guide hand at the chest; then the fall and a
  *  balanced landing with the arms down the front. The release is the 0.38 s key, feet-down the 0.8 s key. */
 export function buildFadeaway(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  return buildPoseClip(scene, sk, 'bball_fadeaway', 0.8, [
+  return buildPoseClip(scene, sk, 'bball_fadeaway', 0.8, accent([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-32, 0, 8], RightUpLeg: [-32, 0, -8], LeftLeg: [46, 0, 0], RightLeg: [46, 0, 0] }, hands: { Right: [0.16, 1.16, 0.22], Left: [-0.12, 1.14, 0.24] }, hipsY: -0.11 },   // the gather: the ball into both hands, the knees loaded
     { t: 0.2,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-14, 0, 6], RightUpLeg: [-14, 0, -6], LeftLeg: [22, 0, 0], RightLeg: [22, 0, 0] }, hands: { Right: [0.18, 1.62, 0.16], Left: [-0.16, 1.56, 0.20] }, hipsY: 0.02 },   // the push-off: the legs drive, the ball starts up
     // THE LEAN — the shoulders open back over the hips, the thighs come FORWARD (the knees in front of the body): the
@@ -472,14 +476,14 @@ export function buildFadeaway(scene: Scene, sk: Skeleton): AnimationGroup | null
     { t: 0.38, bones: { Hips: [0, 0, 0], Spine: [-20, 0, 0], Neck: [10, 0, 0], LeftUpLeg: [-44, 0, 6], RightUpLeg: [-44, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [50, 0, 0] }, hands: { Right: [0.16, 2.06, 0.10], Left: [-0.20, 1.78, 0.18] }, poles: { Right: UP_R, Left: UP_L }, hipsY: 0.10 },
     { t: 0.55, bones: { Hips: [0, 0, 0], Spine: [-16, 0, 0], Neck: [8, 0, 0],  LeftUpLeg: [-30, 0, 6], RightUpLeg: [-30, 0, -6], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.20, 1.94, 0.30], Left: [-0.24, 1.50, 0.24] }, poles: { Right: UP_R }, hipsY: 0.05 },   // the follow-through, still falling
     { t: 0.8,  bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [-4, 0, 0], LeftUpLeg: [-26, 0, 8], RightUpLeg: [-26, 0, -8], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.26, 1.16, 0.30], Left: [-0.26, 1.10, 0.28] }, hipsY: -0.09 },   // the landing: absorbed, square, the arms down the front
-  ]);
+  ], 0.38));
 }
 
 /** The JUMP HOOK (M5), right-handed: off the seal the opposite knee drives up as the body turns shoulder-on, the ball
  *  sweeps OUT to the side on a straight arm and goes over the top at full extension — the release is the 0.34 s key — while
  *  the off arm is the SHIELD, out across the body at shoulder height between the ball and the defender. Feet-down at 0.72.
  *  The whole point is where the ball is: high and OUT to the side, not on the midline like a jumper. */
-const HOOK_KEYS = [
+const HOOK_KEYS = accent([
   // 2K20 HOOK (owner, 2026-09-17: "hook shots like 2k20"). What the 2K20 hooks have that the first cut did not: the body turns
   // SHOULDER-ON to the rim (the hips ~30° away, the eyes over the shoulder), the ball starts low and BEHIND the far hip and
   // sweeps a WIDE arc out to the side and up to a sky-hook release well above the head, the shield arm across the chest the
@@ -492,7 +496,7 @@ const HOOK_KEYS = [
   { t: 0.34, bones: { Hips: [0, -30, 0], Spine: [-4, -12, 5], Neck: [-2, 26, 0], LeftUpLeg: [-74, 0, 8], RightUpLeg: [-8, 0, -6], LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.44, 2.22, 0.00] as V3, Left: [-0.56, 1.46, 0.10] as V3 }, poles: { Right: [0.95, -0.1, -0.2] as V3, Left: [-0.8, 0.2, 0.6] as V3 }, hipsY: 0.06 },
   { t: 0.5,  bones: { Hips: [0, -16, 0], Spine: [2, -6, 0], Neck: [-4, 14, 0], LeftUpLeg: [-40, 0, 10], RightUpLeg: [-18, 0, -8], LeftLeg: [44, 0, 0], RightLeg: [24, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.06, 2.04, 0.38] as V3, Left: [-0.40, 1.30, 0.20] as V3 }, poles: { Right: UP_R }, hipsY: 0.03 },   // the follow-through: the wrist carries toward the rim
   { t: 0.72, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [26, 0, 0], RightLeg: [26, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.26, 1.14, 0.30] as V3, Left: [-0.26, 1.10, 0.28] as V3 }, hipsY: -0.05 },   // feet-down, the arms down the front
-];
+], 0.34);
 export function buildHook(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_hook', 0.72, HOOK_KEYS);
   return buildPoseClip(scene, sk, 'bball_hook_left', 0.72, HOOK_KEYS.map(mirrorKey));
@@ -520,12 +524,12 @@ export function buildSpin(scene: Scene, sk: Skeleton): AnimationGroup | null {
  *  floor, the knees still loaded (that is the whole tell: no rise) — then it comes back down to the chest. */
 export function buildPumpFake(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const load: Record<string, Deg3> = { LeftUpLeg: [-30, 0, 8], RightUpLeg: [-30, 0, -8], LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] };
-  return buildPoseClip(scene, sk, 'bball_pump_fake', 0.5, [
+  return buildPoseClip(scene, sk, 'bball_pump_fake', 0.5, accent([
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0], ...load }, hands: { Right: [0.16, 1.18, 0.24], Left: [-0.12, 1.16, 0.26] }, hipsY: -0.10 },
     { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  Neck: [-8, 0, 0], ...load }, hands: { Right: [0.18, 1.86, 0.18], Left: [-0.16, 1.78, 0.22] }, poles: { Right: UP_R, Left: UP_L }, hipsY: -0.09 },   // the ball up to the release — and the FEET STAY DOWN
     { t: 0.28, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  Neck: [-8, 0, 0], ...load }, hands: { Right: [0.18, 1.88, 0.20], Left: [-0.16, 1.80, 0.24] }, poles: { Right: UP_R, Left: UP_L }, hipsY: -0.09 },   // held there: the sell
     { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0], ...load }, hands: { Right: [0.16, 1.18, 0.24], Left: [-0.12, 1.16, 0.26] }, hipsY: -0.11 },   // back to the chest, still loaded
-  ]);
+  ], 0.16, 0.28));
 }
 
 /** The STEP-THROUGH (M8): the long step past his shoulder — the lead leg reaches across and forward, the torso turns
@@ -551,13 +555,13 @@ export function buildPivot(scene: Scene, sk: Skeleton): AnimationGroup | null {
 /** The REVERSE layup (M11), right-handed: carried under the rim, the body turns its BACK to the baseline and the ball is
  *  laid back OVER the head to the far side of the glass — the release is the 0.34 s key, feet-down at 0.74. The tell is
  *  the hand: behind and above the head, not out in front. */
-const REVERSE_KEYS = [
+const REVERSE_KEYS = accent([
   { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] } as Record<string, Deg3>, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
   { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  Neck: [-8, 0, 0], LeftUpLeg: [-8, 0, 4],  RightUpLeg: [-70, 0, -4], LeftLeg: [10, 0, 0], RightLeg: [72, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.24, 1.60, 0.02] as V3, Left: [-0.26, 1.36, 0.14] as V3 }, hipsY: 0.02 },   // the knee up, the ball rising behind the ear
   { t: 0.34, bones: { Hips: [0, 0, 0], Spine: [-10, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-4, 0, 4], RightUpLeg: [-78, 0, -4], LeftLeg: [6, 0, 0],  RightLeg: [70, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 2.06, -0.16] as V3, Left: [-0.28, 1.42, 0.10] as V3 }, poles: { Right: [0.85, 0.1, -0.5] as V3 }, hipsY: 0.07 },   // laid BACK: the hand above and BEHIND the head
   { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-10, 0, 4], RightUpLeg: [-50, 0, -4], LeftLeg: [12, 0, 0], RightLeg: [50, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.24, 1.94, -0.06] as V3, Left: [-0.26, 1.34, 0.14] as V3 }, poles: { Right: UP_R }, hipsY: 0.04 },
   { t: 0.74, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0], LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [26, 0, 0], RightLeg: [26, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.24, 1.12, 0.28] as V3, Left: [-0.24, 1.08, 0.26] as V3 }, hipsY: -0.05 },
-];
+], 0.34);
 export function buildReverseLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_reverse', 0.74, REVERSE_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_reverse_left', 0.74, REVERSE_KEYS.map(mirrorKey));
@@ -574,13 +578,13 @@ export function buildReverseLayup(scene: Scene, sk: Skeleton, side: 'left' | 'ri
  * Release at 0.38 s, feet down at 0.78 — a touch longer than a layup, which is the price of the reach. It is the
  * highest-percentage finish in the game after the Mikan, and it only ever appears when nobody is home.
  */
-const FINGER_ROLL_KEYS: PoseKey[] = [
+const FINGER_ROLL_KEYS: PoseKey[] = accent([
   { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-24, 0, 6], RightUpLeg: [-24, 0, -6], LeftLeg: [36, 0, 0], RightLeg: [36, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.07 },
   { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],  Neck: [-8, 0, 0],  LeftUpLeg: [-66, 0, 8], RightUpLeg: [-14, 0, -6], LeftLeg: [62, 0, 0], RightLeg: [20, 0, 0] }, hands: { Right: [0.26, 1.48, 0.40], Left: [-0.18, 1.30, 0.26] }, hipsY: 0.04 },   // the gather off the stride, the knee driving, the ball going OUT not up
   { t: 0.38, bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0], Neck: [-10, 0, 0], LeftUpLeg: [-78, 0, 8], RightUpLeg: [-8, 0, -6],  LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.28, 2.12, 0.62], Left: [-0.22, 1.36, 0.22] }, poles: { Right: UP_R }, hipsY: 0.10 },   // RELEASE: the arm STRAIGHT and the ball out IN FRONT — rolled, not laid
   { t: 0.54, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-50, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [52, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.28, 2.00, 0.58], Left: [-0.22, 1.32, 0.24] }, poles: { Right: UP_R }, hipsY: 0.05 },   // the hand hangs there after it — the follow IS the shot
   { t: 0.78, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [30, 0, 0], RightLeg: [30, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
-];
+], 0.38);
 export function buildFingerRoll(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_finger_roll', 0.78, FINGER_ROLL_KEYS);
   return buildPoseClip(scene, sk, 'bball_finger_roll_left', 0.78, FINGER_ROLL_KEYS.map(mirrorKey));
@@ -596,13 +600,13 @@ export function buildFingerRoll(scene: Scene, sk: Skeleton, side: 'left' | 'righ
  * Release at 0.22 s, feet down at 0.5 — the quickest finish in the game, because under the ring the only thing that
  * beats you is time.
  */
-const MIKAN_KEYS = [
+const MIKAN_KEYS = accent([
   { t: 0,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-20, 0, 6], RightUpLeg: [-20, 0, -6], LeftLeg: [32, 0, 0], RightLeg: [32, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.18, 1.10, 0.18] as V3, Left: [-0.18, 1.10, 0.18] as V3 }, hipsY: -0.05 },
   { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-14, 0, 0], LeftUpLeg: [-74, 0, 8], RightUpLeg: [-10, 0, -6], LeftLeg: [70, 0, 0], RightLeg: [14, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.20, 1.56, 0.10] as V3, Left: [-0.14, 1.44, 0.14] as V3 }, hipsY: 0.03 },   // the knee drives, the ball up the middle
   { t: 0.22, bones: { Hips: [0, 0, 0], Spine: [0, 0, 0],  Neck: [-18, 0, 0], LeftUpLeg: [-80, 0, 8], RightUpLeg: [-6, 0, -6],  LeftLeg: [74, 0, 0], RightLeg: [10, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 2.02, 0.06] as V3, Left: [-0.12, 1.50, 0.12] as V3 }, poles: { Right: UP_R }, hipsY: 0.07 },   // RELEASE: high and CLOSE, off the square
   { t: 0.34, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0],  Neck: [-12, 0, 0], LeftUpLeg: [-52, 0, 8], RightUpLeg: [-14, 0, -6], LeftLeg: [56, 0, 0], RightLeg: [18, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 1.86, 0.08] as V3, Left: [-0.14, 1.40, 0.14] as V3 }, poles: { Right: UP_R }, hipsY: 0.04 },   // the hand stays up — you are going again
   { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.18, 1.14, 0.18] as V3, Left: [-0.18, 1.12, 0.18] as V3 }, hipsY: -0.05 },
-];
+], 0.22);
 export function buildMikan(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_mikan', 0.5, MIKAN_KEYS);
   return buildPoseClip(scene, sk, 'bball_mikan_left', 0.5, MIKAN_KEYS.map(mirrorKey));
@@ -618,7 +622,7 @@ export function buildMikan(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 
  * the release key is 0.46 and the feet come down at 0.85. That length IS the risk — a defender who does not bite
  * has all of it to recover.
  */
-const UP_UNDER_KEYS = [
+const UP_UNDER_KEYS = accent([
   { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [-4, 0, 0],  LeftUpLeg: [-26, 0, 8], RightUpLeg: [-26, 0, -8], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] } as Record<string, Deg3>, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.08 },
   { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0],  Neck: [-16, 0, 0], LeftUpLeg: [-12, 0, 6], RightUpLeg: [-12, 0, -6], LeftLeg: [16, 0, 0], RightLeg: [16, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 1.80, 0.16] as V3, Left: [-0.18, 1.74, 0.18] as V3 }, poles: { Right: UP_R, Left: UP_L }, hipsY: 0.01 },   // THE SELL: ball and shoulders up, chin up, heels light
   { t: 0.30, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0],  Neck: [-16, 0, 0], LeftUpLeg: [-14, 0, 6], RightUpLeg: [-14, 0, -6], LeftLeg: [18, 0, 0], RightLeg: [18, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.22, 1.84, 0.16] as V3, Left: [-0.18, 1.78, 0.18] as V3 }, poles: { Right: UP_R, Left: UP_L }, hipsY: 0.02 },   // held — he is in the air now
@@ -626,7 +630,7 @@ const UP_UNDER_KEYS = [
   { t: 0.46, bones: { Hips: [0, 22, 0], Spine: [8, -14, 0], Neck: [-8, 10, 0], LeftUpLeg: [-72, 0, 12], RightUpLeg: [-10, 0, -8], LeftLeg: [46, 0, 0], RightLeg: [16, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.40, 1.92, 0.26] as V3, Left: [-0.04, 1.30, 0.28] as V3 }, poles: { Right: UP_R }, hipsY: 0.01 },   // RELEASE: extended on the FAR side, under him
   { t: 0.62, bones: { Hips: [0, 20, 0], Spine: [10, -12, 0], Neck: [-6, 8, 0], LeftUpLeg: [-48, 0, 12], RightUpLeg: [-14, 0, -8], LeftLeg: [40, 0, 0], RightLeg: [22, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.38, 1.78, 0.28] as V3, Left: [-0.08, 1.26, 0.28] as V3 }, poles: { Right: UP_R }, hipsY: -0.02 },
   { t: 0.85, bones: { Hips: [0, 10, 0], Spine: [12, -6, 0], Neck: [-4, 4, 0], LeftUpLeg: [-22, 0, 8], RightUpLeg: [-22, 0, -8], LeftLeg: [32, 0, 0], RightLeg: [32, 0, 0] } as Record<string, Deg3>, hands: { Right: [0.26, 1.12, 0.28] as V3, Left: [-0.22, 1.08, 0.26] as V3 }, hipsY: -0.07 },
-];
+], 0.16, 0.30, 0.46);
 export function buildUpAndUnder(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_up_and_under', 0.85, UP_UNDER_KEYS);
   return buildPoseClip(scene, sk, 'bball_up_and_under_left', 0.85, UP_UNDER_KEYS.map(mirrorKey));
@@ -722,13 +726,13 @@ export function buildContactReact(scene: Scene, sk: Skeleton): AnimationGroup | 
 // The release key lands on the meter's green through planFinish (FINISH_RELEASE_KEY_SEC); the modes hop the root
 // (FINISH_HOP_APEX) and ride the clip to the landing key.
 const SCOOP_POLE: V3 = [0.8, -0.55, -0.1];   // the underhand elbow: out and DOWN, never up over the ball
-const SCOOP_KEYS: PoseKey[] = [
+const SCOOP_KEYS: PoseKey[] = accent([
   { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
   { t: 0.16, bones: { Hips: [0, 0, 0], Spine: [2, 0, 0],  Neck: [-8, 0, 0],  LeftUpLeg: [-62, 0, 8], RightUpLeg: [-6, 0, -6], LeftLeg: [62, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.22, 0.96, 0.50], Left: [-0.26, 1.30, 0.22] }, poles: { Right: SCOOP_POLE }, hipsY: 0.02 },   // the scoop starts LOW and forward
   { t: 0.32, bones: { Hips: [0, 0, 0], Spine: [-12, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-80, 0, 8], RightUpLeg: [6, 0, -6],  LeftLeg: [74, 0, 0], RightLeg: [8, 0, 0] },  hands: { Right: [0.20, 1.98, 0.52], Left: [-0.28, 1.36, 0.20] }, poles: { Right: SCOOP_POLE }, hipsY: 0.05 },   // the release: palm up, arm from below, leaning back
   { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-52, 0, 8], RightUpLeg: [-10, 0, -6], LeftLeg: [54, 0, 0], RightLeg: [14, 0, 0] }, hands: { Right: [0.22, 1.90, 0.38], Left: [-0.26, 1.32, 0.22] }, poles: { Right: SCOOP_POLE }, hipsY: 0.02 },
   { t: 0.72, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
-];
+], 0.32);
 export function buildScoopLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_scoop', 0.72, SCOOP_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_scoop_left', 0.72, SCOOP_KEYS.map(mirrorKey));
@@ -751,14 +755,14 @@ export function buildScoopLayup(scene: Scene, sk: Skeleton, side: 'left' | 'righ
  * RIGHT hand at the release keeps an absolute target, because reaching for the rim is a reach at
  * a fixed thing in the world and is supposed to stay where the rim is.
  */
-const SPIN_LAYUP_KEYS: PoseKey[] = [
+const SPIN_LAYUP_KEYS: PoseKey[] = accent([
   { t: 0,    bones: { Hips: [0, 0, 0],   Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
   { t: 0.12, bones: { Hips: [0, 120, 0], Spine: [6, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-52, 0, 8], RightUpLeg: [-48, 0, -8], LeftLeg: [68, 0, 0], RightLeg: [64, 0, 0] }, handsRel: { Right: [0.09, -0.08, 0.41], Left: [-0.09, -0.08, 0.41] }, hipsY: 0.02 },   // tucked, both hands on the ball — rel, so the tuck rides the turn; x pulls each wrist toward the MIDLINE (it pushed them apart, and a tuck is two hands on one ball)
   { t: 0.24, bones: { Hips: [0, 240, 0], Spine: [2, 0, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-56, 0, 8], RightUpLeg: [-44, 0, -8], LeftLeg: [70, 0, 0], RightLeg: [60, 0, 0] }, handsRel: { Right: [0.09, 0.02, 0.41], Left: [-0.09, 0.02, 0.41] }, hipsY: 0.04 },
   { t: 0.34, bones: { Hips: [0, 360, 0], Spine: [-8, 0, 0], Neck: [-10, 0, 0], LeftUpLeg: [-76, 0, 8], RightUpLeg: [-8, 0, -6],  LeftLeg: [70, 0, 0], RightLeg: [12, 0, 0] }, hands: { Right: [0.20, 2.02, 0.18] }, handsRel: { Left: [0.14, -0.06, 0.40] }, poles: { Right: UP_R }, hipsY: 0.05 },   // out of the turn: the release — the rim hand is a world reach, the off hand rides the body
   { t: 0.54, bones: { Hips: [0, 360, 0], Spine: [-2, 0, 0], Neck: [-6, 0, 0],  LeftUpLeg: [-48, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.22, 1.90, 0.14] }, handsRel: { Left: [0.14, -0.10, 0.40] }, poles: { Right: UP_R }, hipsY: 0.02 },
   { t: 0.76, bones: { Hips: [0, 360, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
-];
+], 0.34);
 export function buildSpinLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_spin', 0.76, SPIN_LAYUP_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_spin_left', 0.76, SPIN_LAYUP_KEYS.map(mirrorKey));
@@ -766,14 +770,14 @@ export function buildSpinLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right
 
 /** The hang / double clutch: up, DOWN to the chest while the blocker's hand passes, back up late. The longest finish
  *  after the up-and-under (release 0.5, feet down 0.9) — the hang is what it is buying. */
-const HANG_LAYUP_KEYS: PoseKey[] = [
+const HANG_LAYUP_KEYS: PoseKey[] = accent([
   { t: 0,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-22, 0, 6], RightUpLeg: [-22, 0, -6], LeftLeg: [34, 0, 0], RightLeg: [34, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
   { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-72, 0, 8], RightUpLeg: [-6, 0, -6], LeftLeg: [68, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.22, 1.90, 0.20], Left: [-0.28, 1.34, 0.20] }, poles: { Right: UP_R }, hipsY: 0.03 },   // up, as if to finish
   { t: 0.32, bones: { Hips: [0, 0, 0], Spine: [-14, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-78, 0, 8], RightUpLeg: [0, 0, -6],  LeftLeg: [72, 0, 0], RightLeg: [8, 0, 0] },  hands: { Right: [0.18, 1.30, 0.28], Left: [-0.10, 1.28, 0.30] }, hipsY: 0.05 },   // THE CLUTCH: pulled down to the chest, both hands, arched back
   { t: 0.5,  bones: { Hips: [0, 0, 0], Spine: [-8, 0, 0], Neck: [-12, 0, 0], LeftUpLeg: [-70, 0, 8], RightUpLeg: [4, 0, -6],  LeftLeg: [66, 0, 0], RightLeg: [10, 0, 0] }, hands: { Right: [0.24, 2.06, 0.18], Left: [-0.28, 1.40, 0.16] }, poles: { Right: UP_R }, hipsY: 0.04 },   // back up, late: the release
   { t: 0.66, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], Neck: [-8, 0, 0],  LeftUpLeg: [-46, 0, 8], RightUpLeg: [-12, 0, -6], LeftLeg: [50, 0, 0], RightLeg: [16, 0, 0] }, hands: { Right: [0.24, 1.90, 0.14], Left: [-0.26, 1.34, 0.22] }, poles: { Right: UP_R }, hipsY: 0.01 },
   { t: 0.9,  bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-4, 0, 0],  LeftUpLeg: [-18, 0, 6], RightUpLeg: [-18, 0, -6], LeftLeg: [28, 0, 0], RightLeg: [28, 0, 0] }, hands: { Right: [0.26, 1.14, 0.30], Left: [-0.24, 1.08, 0.26] }, hipsY: -0.05 },
-];
+], 0.18, 0.5);
 export function buildHangLayup(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_layup_hang', 0.9, HANG_LAYUP_KEYS);
   return buildPoseClip(scene, sk, 'bball_layup_hang_left', 0.9, HANG_LAYUP_KEYS.map(mirrorKey));

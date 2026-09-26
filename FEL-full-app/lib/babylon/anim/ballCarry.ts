@@ -30,6 +30,7 @@ import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type
 import { findBone } from './boneLookup';
 import { WristLayer, flexAxisLocal, handFlexAxisFromPoints, handPointsFromMeshes, PALM_LOCAL } from './WristLayer';
 import { rigHandOnSide, sideOfRigHand, type AthleteSide, type RigHand } from './athleteSide';
+import { animDt } from './motionLayers';
 
 export interface BallCarryOpts {
   scene: Scene;
@@ -43,6 +44,8 @@ export interface BallCarryOpts {
   armIntensity?: number;
   /** HOOPS MOTION phase 3: the hoops carry (see the header). Off = the carry exactly as the dunk runway was tuned on. */
   hoops?: boolean;
+  /** Hold the reach through a held move until the ball leaves the hand (the 3c review's alternative; default `?heldReach=1`, dev). */
+  heldReach?: boolean;
 }
 /** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Default: the centre line, in front. */
 export interface CrossPoint { x?: number; z?: number }
@@ -77,6 +80,12 @@ export interface BallCarry {
 const SWITCH_FADE_SEC = 0.12;
 /** The reach's let-go when the carry deactivates (a shot, a pass, a pick-up). */
 const RELEASE_FADE_SEC = 0.14;
+/** Dev A/B (HOOPS MOTION phase 3c review): `?heldReach=1` holds the reach through a held move until the ball has LEFT the hand (the
+ *  review's alternative: runs rG / rH) instead of handing the move's arms to its clip. See applyHoops. */
+export function heldReachOverride(search: string | null | undefined, dev: boolean): boolean {
+  return dev && !!search && /[?&]heldReach=1\b/.test(search);
+}
+const HELD_REACH = heldReachOverride(typeof location !== 'undefined' ? location.search : null, process.env.NODE_ENV === 'development');
 /** How far the elbow's twist may leave the clip's side at full weight (the dunk's REACH_POLE_CAP). */
 const REACH_POLE_CAP = Math.PI / 2;
 /** The fastest the carrying arm's elbow may swing round the shoulder→hand line between two drawn frames (deg per second). */
@@ -179,6 +188,7 @@ function lowestHandY(chain: ArmChain | null, root: TransformNode): number {
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const armW = opts.armIntensity ?? 1;
   const hoops = !!opts.hoops;
+  const heldReach = opts.heldReach ?? HELD_REACH;   // (3c review) the alternative A/B; default: a held move's arms are its clip's
   // HOOPS MOTION phase 3: the hoops carry's ball hand is the one DRAWN on the athlete's right, read off the rig
   const strongSide = (): 'Left' | 'Right' => (rigHandOnSide(opts.skeleton, opts.root, 'right') === 'LeftHand' ? 'Left' : 'Right');
   let side: 'Left' | 'Right' = opts.side ?? (hoops ? strongSide() : 'Right');
@@ -556,18 +566,42 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       heldPrevBall = (heldPrevBall ?? new Vector3()).copyFrom(drawnBall);
     } else drawnLocalsHand = null;
   };
+  /** The drawn frame's animation dt (s) for a pass the mode recorded nothing for; 1/60 when the engine has no frame time yet. */
+  const drawnDt = (): number => { const d = animDt(opts.scene.getEngine().getDeltaTime() / 1000, opts.scene.animationTimeScale); return d > 0 ? d : 1 / 60; };
   const applyHoops = () => {
     stamp++;
-    const dt = pendingDt > 0 ? pendingDt : 1 / 60; pendingDt = 0; passDt = dt;
+    // the dt the mode recorded since the last pass — or, on a frame it did not update() the carry (a defender's, a held move's), the drawn
+    // frame's own animation clock (the engine's delta, clamped, × animationTimeScale: motionLayers.animDt), never an assumed 60 fps
+    // (3c review: at 30 fps the let-go fade ran at half speed, and the elbow's swing limit got half the frame's dt)
+    const dt = pendingDt > 0 ? pendingDt : drawnDt(); pendingDt = 0; passDt = dt;
     clock += dt;
     const sx = sideSign(side);
     strideTick(dt, sx);
     holdK += (holdTarget - holdK) * Math.min(1, dt / 0.2);
     if (!active) {
       if (releaseLeft > 0) {
-        const k = releaseLeft / releaseTotal; releaseLeft = Math.max(0, releaseLeft - releaseDt);
-        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachShaped(arm, handT, pole, k * armW, releaseDt, stamp); }
-        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, k * offW, releaseDt, stamp); }
+        // HOOPS MOTION phase 3c: THE LET-GO FADE RUNS ON THE DRAWN FRAME'S CLOCK. It ran on the dt of the mode's last update() — and a
+        // possession change deactivates the carry with update(0, 0, false) and then stops calling it (a defender's carry gets no updates),
+        // so the fade's clock was 0, releaseLeft never fell, and the ball arm was held at FULL weight on its last dribble target for the
+        // whole defensive possession: the hand_up's raised arm drawn folded at the hip (the in-game arm 93–132° off the clip on every
+        // contest frame, measured on rD's hero_1v1_def_contest; base2's 412 wrong-way elbow frames on bball_hand_up, 396 of them this arm)
+        // (3c review) A HELD MOVE'S ARMS ARE ITS CLIP'S. A held move parks the carry the same way with the ball still in the hand (the
+        // jumper's meter, the finishes, the dunk, the fade and shimmy, the spin), so this fade hands them over too. That was the cause of
+        // 3c's held-right drop (1v1 95.2 → 92.1%, rD → rE): the captures under the spin, the step-through and the dunk hang carried the
+        // ball in their own other hand. 3d removed it at the source: N4 re-keys those captures' hands in their turning frame, and the drop
+        // step no longer turns against the root. The review's alternative, holding the reach until the ball leaves (`heldReach`), was
+        // measured on 3d's tree (1v1, the same takes, held → handed over): held-right 99.8 → 98.9% without the deliberate off-hand clips,
+        // but it pinned every overhead finish to its last dribble target. The post hook's hand never rose over the head (0.02 m against
+        // 0.37), the up-and-under took 37 wrong-way elbow frames in a window, and wrong-way frames went 5.71 → 3.44 per action (0.21 on the
+        // overhead clips against 1.74). The hook still carries the ball across the body (the post hook's held-right is 92.4%); that is
+        // phase 6's clip to re-author.
+        const rdt = releaseDt > 0 ? releaseDt : heldReach && ballHandNow() ? 0 : dt;   // the fade's clock
+        const k = releaseLeft / releaseTotal; releaseLeft = Math.max(0, releaseLeft - rdt);
+        // …and the elbow's swing limit runs on the drawn frame's clock even while a held reach's fade is paused: handed a 0 dt it did not
+        // run at all, so a held arm's elbow flipped free as the clip under it moved (rF, the fade's off arm: 5900–6700°/s at the hand-overs)
+        const ldt = rdt > 0 ? rdt : dt;
+        if (arm && armW > 0) { toWorld(handLocal.x, handLocal.y, handLocal.z, handT); reachShaped(arm, handT, pole, k * armW, ldt, stamp); }
+        if (offArm && offW > 0) { toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, k * offW, ldt, stamp); }
       }
       if (holdK > 1e-3 && ballHandNow()) applyHold(dt);
       applyWrists(dt);

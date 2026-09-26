@@ -46,6 +46,7 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';            /
 /** HOOPS MOTION phase 3b (review): the shooter's idle between shots has its own knees (idle_stand keys no leg: 76 / 41° take to take). */
 const WATCH_IDLE = 'bball_idle_stand';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
+import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on the shooter
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01 } from '../core/BallHandling';
@@ -295,6 +296,7 @@ let posture: { layer: PostureLayer; dispose(): void } | null = null;
 /** HOOPS MOTION phase 3: the shooter's carry — the shared hoops carry (ballCarry), so its fixes reach the shootout: the jog's two-hand
  *  chest hold (setHold, 3PT's own carryApply until now), the wrists, the right hand. The shooter never dribbles. */
 let carry: BallCarry | null = null;
+let layers: MotionMount | null = null;   // HOOPS MOTION phase 3c
 const bio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE, role: 'offense', hasBall: true };
 let shotWin: ShotWindow = 'none', shotSec = 0;
 let releaseIn = -1;                        // seconds until the ball leaves the hand (the jumpshot's release frame); −1 = none pending
@@ -867,8 +869,12 @@ export const ThreePointMode: ModeDefinition = {
     player.secondary?.setLookTarget(() => null);   // the layer owns the eyes
     posture?.dispose();
     posture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => { const { window, pose, legs } = hoopsPose(bio); return { pose, legs, aim: RIM, eyes: RIM, window }; }, '3PT-PP');
+    // HOOPS MOTION phase 3c: THE MOTION LAYERS — the drag insert-first, the side lean after the posture layer (before the carry's hold),
+    // and the hinge after the carry: the arms' last writer
+    layers?.dispose(); layers = mountMotionLayers({ scene: ctx.scene, skeleton: player.skeleton, root: player.root, ball, hinge: false });
     carry?.dispose();
     carry = mountBallCarry({ scene: ctx.scene, ball, root: player.root, skeleton: player.skeleton, hoops: true });   // after the posture layer: the hold solves off the posed chest
+    layers.mountHinge();
     shotWin = 'none'; releaseIn = -1;
     if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopsPosture?: unknown } }).__FEL_DEV__; if (dev) dev.hoopsPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ me: { ...bio } }) }; }
     // The objective is the RIM, not the ball. The 'hoops' preset frames hero and
@@ -1113,6 +1119,7 @@ export const ThreePointMode: ModeDefinition = {
     meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
     carry?.dispose(); carry = null;   // HOOPS MOTION phase 3
+    layers?.dispose(); layers = null;   // HOOPS MOTION phase 3c
     ring?.dispose(); ring = null;
     player?.dispose(); player = null;
     for (const b of rivalBodies) b.dispose(); rivalBodies = [];

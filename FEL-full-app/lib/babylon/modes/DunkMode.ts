@@ -28,7 +28,7 @@ import { Color3, Color4, MeshBuilder, Space, Tools, Vector3, type Mesh } from '@
 import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
-import { mirrorGroupsInPlace, mirrorSide, bindFrontInFrame } from '../anim/groupMirror';   // DUNK MOTION phase 8: the right-handed dunker
+import { mirrorGroupsInPlace, mirrorSide } from '../anim/groupMirror';   // DUNK MOTION phase 8: the right-handed dunker
 import { planGather, fitGather, gatherProgress, gatherSpeedAt, gatherDistAt, GATHER_CLIP_SEC, GATHER_BRAKE_FROM } from '../core/DunkGatherRun';   // …and push 1-2 at speed
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -49,9 +49,10 @@ import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { TAKE_OFF_ONE_CATCH } from '../anim/authored/dunkTakeoff';   // DUNK MOTION phase 7
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
 import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
-import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, anatomicalElbowPole, makeHingeArm, hingeArmApply, type ArmChain, type HingeArm } from '../anim/HandIK';
-import { LimbDrag } from '../anim/LimbDrag';           // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
-import { WristLayer, wristFor, handFlexAxisFromPoints, handPointsFromMeshes, flexAxisLocal, PALM_LOCAL, pronateToward } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
+import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, anatomicalElbowPole, type ArmChain } from '../anim/HandIK';
+import type { LimbDrag } from '../anim/LimbDrag';      // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
+import { MotionLayers } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the drag, the wrists and the hinged arm are built there (lifted from here, unchanged)
+import { WristLayer, wristFor, pronateToward } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
 import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '../core/CourtMovement';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
@@ -673,7 +674,7 @@ export const DunkMode: ModeDefinition = (() => {
   const arms: { Left: ArmChain | null; Right: ArmChain | null } = { Left: null, Right: null };   // H1: built once at spawn
   let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
   let handIkObs: Observer<Scene> | null = null, ikScene: Scene | null = null;
-  let hingeObs: Observer<Scene> | null = null; const hinges: HingeArm[] = [];   // DUNK MOTION phase 9: the arms' last writer (HandIK.hingeArmApply)
+  let hingeObs: Observer<Scene> | null = null; let motion: MotionLayers | null = null;   // DUNK MOTION phase 9: the arms' last writer (HandIK.hingeArmApply, through MotionLayers)
   const handIkTarget = new Vector3(), handIkPole = new Vector3();
   let clipToken = 0;                          // H5: a superseded clip's onEnd chain is dead (Babylon fires it on stop() too)
   // ── DUNK-HANDS-RIM (2026-09-08): the hands and the rim ──
@@ -1018,13 +1019,11 @@ export const DunkMode: ModeDefinition = (() => {
     if (hipsNode) { const b = hipsBf.bind.get(hipsNode)?.q ?? Quaternion.Identity(); hipsBindInv.copyFrom(b).invertInPlace(); } else console.warn('[FEL-DUNK] no Hips node on this rig — the 360 turn is off');
     if (!feet.L || !feet.R) console.warn('[FEL-DUNK] no foot bones on this rig — the obstacle clear reads the root');
     setupPosture();   // DUNK-POSTURE: the thoracic chain, the clavicles and the head, and the frame's yaw sense
-    limbDrag = LimbDrag.forRig((n) => boneNode(player.skeleton, n));
-    wristLayer = new WristLayer();
-    { const bodyMeshes = player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0);
-      for (const side of ['Left', 'Right'] as const) { const h = boneNode(player.skeleton, `${side}Hand`); const b = h ? hipsBf.bind.get(h) : null; if (!h || !b) continue;
-        // the axis off the body's own hand mesh (the palm's normal, signed to the ball's side); the bones' guess only as a fallback
-        const axis = handFlexAxisFromPoints(handPointsFromMeshes(bodyMeshes, h, `${side}Hand`), side) ?? flexAxisLocal(b.p, b.q, PALM_LOCAL[side]);
-        wristLayer.add(side, h, axis); } }
+    // HOOPS MOTION phase 3c: the limb followers, the wrists (their axis off the body's own hand mesh) and the hinged arms are built by
+    // MotionLayers.forBody — this construction, lifted so every hoops body can mount the same layers; the contest calls them from the
+    // same places as before (applyLimbDrag / applyWrists / the hinge observer below)
+    motion = MotionLayers.forBody(player.skeleton, { bind: hipsBf, arms, meshes: player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0) as never, wrists: true });
+    limbDrag = motion.drag; wristLayer = motion.wrists;
     if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
     ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
     dribble?.dispose();
@@ -1032,13 +1031,8 @@ export const DunkMode: ModeDefinition = (() => {
     // DUNK MOTION phase 9 (owner: "fix the orientation of the joints" · "fix the off arm on all the dunks"): THE HINGED ARM, after every
     // writer of the arms (registered after the dribble's own IK): the elbow bends about its hinge, the forearm's twist turns no faster
     // than a forearm does — the one-frame twist flips (92° at the slam's press, 90° on the gather's off arm) become turns
-    hinges.length = 0;
-    { const front = bindFrontInFrame(player.skeleton), bf = hipsBf ?? bindFrame(player.skeleton);
-      for (const side of ['Left', 'Right'] as const) { const a = arms[side]; const bu = a ? bf.bind.get(a.shoulder) : null, bfo = a ? bf.bind.get(a.elbow) : null;
-        if (!a || !bu || !bfo || !front) continue;
-        const H = makeHingeArm(a, (bf.parentRot.get(a.shoulder) ?? Quaternion.Identity()).multiply(bu.q), bfo.q, front); if (H) hinges.push(H); } }
     if (hingeObs) ctx.scene.onAfterAnimationsObservable.remove(hingeObs);
-    hingeObs = ctx.scene.onAfterAnimationsObservable.add(() => { if (MOTION_OFF || !player) return; const dt = motionDt(); for (const H of hinges) hingeArmApply(H, dt, ikFrame, ARM_TWIST_RATE_DEG); });
+    hingeObs = ctx.scene.onAfterAnimationsObservable.add(() => { if (MOTION_OFF || !player) return; const dt = motionDt(); motion?.applyHinges(dt, ikFrame, ARM_TWIST_RATE_DEG); });
     // DUNK-BALL-ARMS-RIM: the replay puts the ball back in what it rode — the hand it was in, the body while it dribbled
     replay?.dispose(); replay = new DunkReplayRecorder(ctx.scene, player.root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : dribble?.active ? player.root : null));
     // DUNK MOTION phase 12: the recorder keeps the body's pose as DRAWN (the hips first — they carry the clips' height)

@@ -169,8 +169,9 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
 ${out.join('\n')}
 ];
 
+// HOOPS MOTION phase 3c: a LOOP is smoothed as one (poseClip \`periodic\`: the end slopes read across the seam closeLoop made)
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {
-  return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys);
+  return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys, { periodic: clip.loop });
 }
 `);
 console.log(`wrote ${OUT} (${out.length} clips)`);

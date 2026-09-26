@@ -107,6 +107,119 @@ describe('the pushed bounce (Dribble.dribbleAtPushed)', () => {
 });
 
 describe('the hoops carry', () => {
+  // HOOPS MOTION phase 3c: a possession change deactivates the carry with update(0, 0, false) and a defender's carry gets no updates after
+  // it: the let-go fade ran on that 0 dt, so the ball arm stayed at FULL weight on its last dribble target for the whole defence (rD:
+  // the hero's contest arm 93–132° off its clip on every frame)
+  it('the let-go fade runs on the drawn frame\'s clock: deactivated with update(0, 0, false) and never updated again, the arm is its clip\'s within the fade', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const sh = r.nodes.LeftArm, el = r.nodes.LeftForeArm;
+    const clipSh = sh.rotationQuaternion!.clone(), clipEl = el.rotationQuaternion!.clone();
+    const clip = () => { sh.rotationQuaternion!.copyFrom(clipSh); el.rotationQuaternion!.copyFrom(clipEl); };   // the clip's arm, every frame
+    for (let i = 0; i < 60; i++) { clip(); d.frame(1 / 60, 0.3, true); }
+    releaseBall(r.ball); (r.ball.metadata ??= {}).felReleased = true;   // the ball goes (a shot, a turnover) …
+    carry.update(0, 0, false);                                           // … the possession change parks the carry, dt 0
+    const off = (): number => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(sh.rotationQuaternion!, clipSh)))) * 180 / Math.PI;
+    let first = 0;
+    for (let i = 0; i < 30; i++) {   // no more update() calls: the defender's carry
+      clip();
+      scene.onAfterAnimationsObservable.notifyObservers(scene);
+      if (i === 0) first = off();
+    }
+    expect(off()).toBeLessThan(0.01);   // the fade (0.14 s) ran out on its own: the arm is the clip's again (it stayed on the dribble target)
+    void first;
+    carry.dispose();
+  });
+  // (3c review) the held moves park the carry the same way — update(0, 0, false), then no updates — with the ball STILL IN THE HAND (the
+  // jumper's meter, the finishes, the spin, the hook, the drop step). Their arms are their clips' (the fade runs on the drawn frames): held
+  // on the last dribble target instead (the review's alternative, `heldReach`), an overhead finish never rose (the post hook's hand 0.02 m
+  // over the head against 0.37) and its elbows folded (1v1: wrong-way frames 5.71 → 3.44 per action handed over, measured on 3d's tree)
+  const heldRig = (heldReach?: boolean) => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true, heldReach });
+    const d = driver(scene, carry, r.ball);
+    const sh = r.nodes.LeftArm, el = r.nodes.LeftForeArm;
+    const clipSh = sh.rotationQuaternion!.clone(), clipEl = el.rotationQuaternion!.clone();
+    const clip = () => { sh.rotationQuaternion!.copyFrom(clipSh); el.rotationQuaternion!.copyFrom(clipEl); };
+    const off = (): number => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(sh.rotationQuaternion!, clipSh)))) * 180 / Math.PI;
+    const pass = () => { clip(); scene.onAfterAnimationsObservable.notifyObservers(scene); };
+    for (let i = 0; i < 60; i++) { clip(); d.frame(1 / 60, 0.3, true); }
+    return { scene, r, carry, off, pass, clipSh, clipEl };
+  };
+  it('a held move\'s arms are its clip\'s: parked with update(0, 0, false) and the ball still in the hand, the let-go runs on the drawn frames', () => {
+    const { r, carry, off, pass } = heldRig();
+    carry.update(0, 0, false);   // a jumper's meter / a spin / a hook: the ball comes into the hand (the gather), no more updates
+    pass();
+    expect(off()).toBeGreaterThan(3);   // the let-go starts from the carry's reach …
+    for (let i = 0; i < 9; i++) pass();   // … and the 0.14 s fade runs on the drawn frames (60 fps: 8.4 of them, then the clip's)
+    expect(r.ball.parent?.name).toBe('LeftHand');   // the ball never left the hand
+    expect(off()).toBeLessThan(0.01);
+    carry.dispose();
+  });
+  it('heldReach (the review\'s alternative, `?heldReach=1` in dev): the reach holds until the ball leaves, then lets go', () => {
+    const { r, carry, off, pass } = heldRig(true);
+    carry.update(0, 0, false);
+    for (let i = 0; i < 40; i++) pass();
+    expect(r.ball.parent?.name).toBe('LeftHand');
+    expect(off()).toBeGreaterThan(3);   // 0.67 s later: still the carry's reach, not the clip's arm
+    releaseBall(r.ball); (r.ball.metadata ??= {}).felReleased = true;   // the release …
+    for (let i = 0; i < 10; i++) pass();   // … and the 0.14 s fade runs on the drawn frames
+    expect(off()).toBeLessThan(0.01);
+    carry.dispose();
+  });
+  it('a held reach keeps the elbow\'s swing limit: a chest that whips under the held arm cannot flip its elbow faster than 720°/s', () => {
+    const { scene, r, carry, clipSh, clipEl } = heldRig(true);
+    carry.update(0, 0, false);
+    const chest = r.nodes.Spine2, sh = r.nodes.LeftArm, el = r.nodes.LeftForeArm, hd = r.nodes.LeftHand;
+    /** the elbow's side of the shoulder→hand line and that line, in the chest's frame (where the limit reads them: the body's own turn is
+     *  not a swing) */
+    const arm = (): { ax: Vector3; side: Vector3 } => {
+      for (const n of [chest, sh, el, hd]) n.computeWorldMatrix(true);
+      const inv = chest.getWorldMatrix().clone().invert(), P = (n: TransformNode) => Vector3.TransformCoordinates(n.getAbsolutePosition(), inv);
+      const S = P(sh), E = P(el), H = P(hd), ax = H.subtract(S).normalize(), e = E.subtract(S);
+      return { ax, side: e.subtract(ax.scale(Vector3.Dot(e, ax))).normalize() };
+    };
+    /** the swing ROUND the line since the last frame (the last side projected across the new line — the limit's own measure) */
+    const swingDeg = (prevSide: Vector3, a: { ax: Vector3; side: Vector3 }): number => {
+      const p = prevSide.subtract(a.ax.scale(Vector3.Dot(prevSide, a.ax))).normalize();
+      return Math.abs(Math.atan2(Vector3.Dot(Vector3.Cross(p, a.side), a.ax), Vector3.Dot(p, a.side))) * 180 / Math.PI;
+    };
+    let prev: Vector3 | null = null, worst = 0;
+    for (let i = 0; i < 20; i++) {
+      // the clip whips the chest ±35° a frame under the held arm (a capture's turn); the reach's target stays in the root's frame
+      chest.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), ((i % 2 ? 35 : -35) * Math.PI) / 180);
+      sh.rotationQuaternion!.copyFrom(clipSh); el.rotationQuaternion!.copyFrom(clipEl);
+      scene.onAfterAnimationsObservable.notifyObservers(scene);
+      const a = arm();
+      if (prev) worst = Math.max(worst, swingDeg(prev, a));
+      prev = a.side;
+    }
+    expect(r.ball.parent?.name).toBe('LeftHand');
+    expect(worst).toBeLessThanOrEqual(720 / 60 + 0.5);   // 12° a 1/60 s frame (rF: no limit — the held fade's 0 dt switched it off)
+    carry.dispose();
+  });
+  it('the fade runs on the ENGINE\'s frame time, not an assumed 60 fps: at 30 fps the arm is its clip\'s after 6 drawn frames', () => {
+    const { scene, r, carry, off, pass } = heldRig();
+    (scene.getEngine() as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 30;
+    releaseBall(r.ball); (r.ball.metadata ??= {}).felReleased = true;
+    carry.update(0, 0, false);
+    for (let i = 0; i < 6; i++) pass();   // the fade's 5 frames (5 × 33 ms ≥ 0.14 s), then the clip's; at a fixed 1/60 it needs 10
+    expect(off()).toBeLessThan(0.01);
+    carry.dispose();
+  });
+  it('?heldReach=1 is a dev-only A/B switch', async () => {
+    const { heldReachOverride } = await import('./ballCarry');
+    expect(heldReachOverride('?heldReach=1', true)).toBe(true);
+    expect(heldReachOverride('?a=1&heldReach=1', true)).toBe(true);
+    expect(heldReachOverride('?heldReach=1', false)).toBe(false);
+    expect(heldReachOverride('?heldReach=0', true)).toBe(false);
+    expect(heldReachOverride(null, true)).toBe(false);
+  });
   it('starts in the hand drawn on the athlete\'s RIGHT (rig LeftHand on the mirrored rig), and the ball dribbles on his right', () => {
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
