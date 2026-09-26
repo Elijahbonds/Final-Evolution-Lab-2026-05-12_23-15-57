@@ -43,6 +43,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'health/route.ts': 'liveness probe, no data',
   'health/db/route.ts': 'database liveness probe, no rows returned',
   'stripe/webhook/route.ts': 'Stripe calls it; authenticated by signature, not session',
+  'books/webhook/route.ts': 'Stripe calls it for book purchases; authenticated by signature, not a user session',
   'v1/wallet/stripe-webhook/route.ts': 'the wallet\'s own Stripe endpoint; authenticated by signature, not session',
   'marketing/subscribe/route.ts': 'public mailing-list intake; there is no account yet to authenticate',
   'telemetry/crash/route.ts': 'crash reports arrive from clients that may be broken or signed out',

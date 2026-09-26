@@ -38,6 +38,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // Book sales (guest checkout has no userId, so they must be handled before the
+  // userId requirement below). A failure returns 500 so Stripe retries. The
+  // book tables dedupe on the event id.
+  const bookProduct = event.type === 'checkout.session.completed'
+    ? (event.data.object as Stripe.Checkout.Session).metadata?.product
+    : null;
+  if (bookProduct === 'BOOK') {
+    try {
+      const { recordBookCheckout } = await import('@/lib/books/bookFulfill');
+      const { prismaBookStore } = await import('@/lib/books/bookStore');
+      const result = await recordBookCheckout(event.id, event.data.object as Stripe.Checkout.Session, prismaBookStore());
+      return NextResponse.json({ received: true, ...result });
+    } catch (err) {
+      console.error('[stripe-webhook] book fulfillment failed', err instanceof Error ? err.message : err);
+      return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
+    }
+  }
+  if (event.type === 'charge.refunded') {
+    try {
+      const { revokeBookCharge } = await import('@/lib/books/bookFulfill');
+      const { prismaBookStore } = await import('@/lib/books/bookStore');
+      const result = await revokeBookCharge(event.id, event.data.object as Stripe.Charge, prismaBookStore());
+      if (!('ignored' in result && result.ignored)) {
+        return NextResponse.json({ received: true, ...result });
+      }
+    } catch (err) {
+      // The book tables are new. Until they are pushed, a refund for some other
+      // product must not start failing the shared webhook.
+      const code = typeof err === 'object' && err && 'code' in err ? (err as { code?: string }).code : '';
+      if (code === 'P2021') {
+        console.error('[stripe-webhook] book tables are not in the database yet');
+      } else {
+        console.error('[stripe-webhook] book refund failed', err instanceof Error ? err.message : err);
+        return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
+      }
+    }
+  }
+
   // Idempotency: check if we already processed this event
   const eventIdempotencyKey = `stripe-event:${event.id}`;
   const alreadyProcessed = await prisma.ledgerTransaction.findUnique({

@@ -1187,6 +1187,32 @@ exports.Prisma.CoachClientScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.BookFulfillmentEventScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  type: 'type',
+  paymentIntentId: 'paymentIntentId',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.BookEntitlementScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  userId: 'userId',
+  offerId: 'offerId',
+  format: 'format',
+  bookSlug: 'bookSlug',
+  stripeSessionId: 'stripeSessionId',
+  stripePaymentIntentId: 'stripePaymentIntentId',
+  stripeEventId: 'stripeEventId',
+  amountCents: 'amountCents',
+  currency: 'currency',
+  status: 'status',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1458,7 +1484,9 @@ exports.Prisma.ModelName = {
   MirrorSession: 'MirrorSession',
   ShareLink: 'ShareLink',
   CoachInvite: 'CoachInvite',
-  CoachClient: 'CoachClient'
+  CoachClient: 'CoachClient',
+  BookFulfillmentEvent: 'BookFulfillmentEvent',
+  BookEntitlement: 'BookEntitlement'
 };
 
 /**
