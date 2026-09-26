@@ -190,8 +190,15 @@ const strideRate = (mps: number): number => Math.max(0.7, Math.min(1.6, mps / HO
 /** HOOPS-DEPTH S8 (2026-09-23): the runway loop. The dunker runs up DRIBBLING, and the shared `run` (SPORT_CLIP.moveLoop) has the
  *  arms of a sprinter with nothing in the hands — straight at the elbow on 631 of 733 approach frames (body smoke). The hoops
  *  dribble run (its capture, 78_06, on the hero) is the one the 1v1 drives on (7 straight-armed frames in 732). Paced against the
- *  same run reference (HOOPS_STRIDE_CAPTURE.run = HOOPS_STRIDE.run, calibrated for these captures). */
+ *  authored run reference (HOOPS_STRIDE.run 3.6). */
 const RUNWAY_LOOP = 'bball_dribble_run';
+/** TEMP, until phase 8 re-cuts the runway (HOOPS MOTION 2b review, 2026-09-25). 2b plays the capture at its real 0.66 s cycle for
+ *  the hoops modes (it was squeezed into 0.6 s). On the dunk runway that moved the loop's phase at the gather hand-over, and the
+ *  contest measured it (dunkmotion/P13-VCLOCK-2B.md, the 21 dunks phase 1 shares, run twice on the final clock): severe pops 17 → 28
+ *  and 32, the new ones RightArm pops of 5–6k°/s on the runway → gather blend. So the runway keeps its pre-2b pace, like the seven
+ *  TEMP clip pins: the capture plays 0.66 / 0.6 faster here, which is a 0.6 s cycle at rate 1, and the pace against 3.6 is
+ *  unchanged. With the pin, twice: 11 and 12. Phase 8 measures its dunks against p13-vclock-2b-a/-b, taken with this pin. */
+const RUNWAY_PIN = 0.66 / 0.6;
 // Dunk play tip (2026-09-07): a full stick runs at APPROACH_SPEED (the hold-run ramps past it to HOLD_RUN_MAX); the
 // flight eases the facing onto the rim at FACE_RIM_RATE per second.
 const APPROACH_SPEED = 6, FACE_RIM_RATE = 6;
@@ -577,7 +584,7 @@ export const DunkMode: ModeDefinition = (() => {
     busRun = { t: 0, s: alongPane(pane, player.root.position.x, player.root.position.z), pane, speed: Math.max(BUS_RUN.speedMin, speed) };
     runUpPeak = Math.max(runUpPeak, busRun.speed);
     endRunwayBeat(true); runwayBeat = null;
-    playClip(runLoop(), { loop: true }); player.animator.setPlaybackScale(runLoop(), strideRate(busRun.speed)); setWin('run');
+    playClip(runLoop(), { loop: true }); player.animator.setPlaybackScale(runLoop(), strideRate(busRun.speed) * runwayPin(runLoop())); setWin('run');
     SoundKit.play('impact', { pitch: 1.2, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#a5f3fc', 50); ctx.camDirector.pulse(0.35, 0.3);
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(-pane.nx * 0.5, 1.0, -pane.nz * 0.5)), 'sparks');
     flash(ctx, `WALL RUN ON ${ride.name} — off the front of it`, 800); ctx.setHud({ hint: `RUNNING THE ${ride.short} — the jump is at its front end` });
@@ -1501,7 +1508,7 @@ export const DunkMode: ModeDefinition = (() => {
         // tricks fit before the slam window. Live 08's whole ramp, in one number.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 0.5;
-        if (!runwayBeat) { playClip(moving ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(runLoop(), strideRate(Math.hypot(vel.x, vel.z))); }   // a runway beat owns the body until it ends; the loop paces to the run
+        if (!runwayBeat) { playClip(moving ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(runLoop(), strideRate(Math.hypot(vel.x, vel.z)) * runwayPin(runLoop())); }   // a runway beat owns the body until it ends; the loop paces to the run
         if (player.root.position.z <= gatherLine() + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -1580,7 +1587,7 @@ export const DunkMode: ModeDefinition = (() => {
         runwayVel.x = steer; runwayVel.z = -runNow;
         runMotion.update(steer, -runNow, player.root.rotation.y, dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
-        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(runLoop(), strideRate(holdRunSpeed) * strideAdjust); }
+        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(runLoop(), strideRate(holdRunSpeed) * strideAdjust * runwayPin(runLoop())); }
         // THE RUNWAY TEACHES ITS MOVES (owner, 2026-09-16). Everything a player can throw on the run is a bare face
         // button under a held trigger — undiscoverable — and this pass added three more. The hold-run hint is the move
         // list now, and it turns into DOUBLE-UP the moment the double-up is actually on. Only pushed on CHANGE: a HUD
@@ -3134,12 +3141,16 @@ export const DunkMode: ModeDefinition = (() => {
     const owned = player.animator.clipNames;
     return owned.has(RUNWAY_LOOP) || owned.has('bball_mc_dribble_run') ? RUNWAY_LOOP : SPORT_CLIP.moveLoop;
   }
+  /** RUNWAY_PIN when `name` is the runway loop and the body plays its capture (the authored clip keeps its own pace). */
+  function runwayPin(name: string): number {
+    return name === RUNWAY_LOOP && player.animator.clipNames.has('bball_mc_dribble_run') ? RUNWAY_PIN : 1;
+  }
   function playClip(name: string, opts: PlayOpts = {}): AnimationGroup | null {
     // DUNK-HANDS-RIM H5: the idle / rest loop is refused while the body is in the air on a flight — the dunk clip (or its held
     // last frame) owns the body through CONTACT and the fall; feet-down is the only way to the land clip and the idle
     if (opts.loop && name === SPORT_CLIP.idle && (phase === 'cinematic' || phase === 'resolve') && player.root.position.y > 0.05) { console.warn(`[HANDS] idle refused in the air (${phase}, y ${player.root.position.y.toFixed(2)})`); return null; }
     const token = ++clipToken;
-    if (opts.loop) return player.animator.play(name, opts);
+    if (opts.loop) { const pin = runwayPin(name); return player.animator.play(name, pin === 1 ? opts : { ...opts, speedRatio: (opts.speedRatio ?? 1) * pin }); }
     return player.animator.play(name, { ...opts, onEnd: () => {
       if (token !== clipToken) return;
       if (opts.onEnd) opts.onEnd(); else player.animator.play(SPORT_CLIP.idle, { loop: true });

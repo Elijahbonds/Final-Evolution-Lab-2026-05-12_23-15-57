@@ -1,5 +1,5 @@
 {
- "_comment": "EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14). Each clip is a window of a real capture, retargeted by lib/babylon/anim/mocapRetarget.ts into lib/babylon/anim/authored/mocapOpponents.ts (npx tsx scripts/mocap/gen-opponent-clips.mts). `replaces` is the authored clip an OPPONENT plays this instead of (lib/babylon/anim/opponentMotion.ts). A beat keeps the duration of the clip it replaces so mode timing (the release, the settle) does not move; a loop keeps real time. Files are relative to ~/Downloads/fel-mocap-sources. Windows were read off scripts/mocap/stream-sheet.mts sheets and hand/foot signal tables.",
+ "_comment": "EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14). Each clip is a window of a real capture, retargeted by lib/babylon/anim/mocapRetarget.ts into lib/babylon/anim/authored/mocapOpponents.ts (npx tsx scripts/mocap/gen-opponent-clips.mts). `replaces` is the authored clip an OPPONENT plays this instead of (lib/babylon/anim/opponentMotion.ts). A beat keeps the duration of the clip it replaces so mode timing (the release, the settle) does not move; a loop keeps real time. Files are relative to ~/Downloads/fel-mocap-sources. Windows were read off scripts/mocap/stream-sheet.mts sheets and hand/foot signal tables. · TRUE FPS (hoops motion 2b, 2026-09-25): every cgspeed CMU header says 120 fps but subjects 75, 88, 141 and 143 were captured at 60 (scripts/mocap/sources.mts CMU_TRUE_FPS, measured by scripts/mocap/fps-check.mts); sources.mts now reads them at 60, so their windows here are TRUE seconds (a window chosen in header seconds was doubled so the same frames are cut). Subject 78 measured 120 (not 60 as the plan said), so the hoops windows are unchanged. HOOPS LOOPS KEEP REAL TIME: no `duration` on a hoops loop — it plays its cut span at rate 1 and StrideMatch paces it (HOOPS_STRIDE_CAPTURE is derived from these loops by scripts/mocap/clip-strides.mts). `pin` marks a non-hoops clip whose `duration` is held on purpose (TEMP) until its own motion pass; lib/babylon/anim/authored/mocapPins.test.ts pins those to the millisecond, and `smoothSec` 0.07 on a pinned 60-fps clip keeps the retarget's smoothing on the same frames, so its keys are unchanged.",
  "clips": [
   {
    "name": "bball_mc_dribble_idle",
@@ -173,13 +173,12 @@
    "file": "cmu/78/78_30.bvh",
    "from": 0.3,
    "to": 1.05,
-   "duration": 0.5,
    "loop": true,
    "refineLoop": [
     0.6,
     0.85
    ],
-   "note": "DefensiveMoveSideToSide: low wide stance, arms out, one push-and-gather step to the RIGHT (hips travel +2.6 torso)"
+   "note": "DefensiveMoveSideToSide: low wide stance, arms out, one push-and-gather step to the RIGHT (hips travel +2.6 torso) · REAL TIME (2b, 2026-09-25): was played in 0.5 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_defend_slide_left",
@@ -188,13 +187,12 @@
    "file": "cmu/78/78_30.bvh",
    "from": 1.6,
    "to": 2.3,
-   "duration": 0.5,
    "loop": true,
    "refineLoop": [
     0.6,
     0.85
    ],
-   "note": "the same drill back to the LEFT"
+   "note": "the same drill back to the LEFT · REAL TIME (2b, 2026-09-25): was played in 0.5 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_spin",
@@ -213,13 +211,12 @@
    "file": "cmu/78/78_12.bvh",
    "from": 0.08,
    "to": 0.7,
-   "duration": 0.6,
    "loop": true,
    "refineLoop": [
     0.55,
     0.72
    ],
-   "note": "RunningNoBall: one full stride cycle, arms free (a body without the ball)"
+   "note": "RunningNoBall: one full stride cycle, arms free (a body without the ball) · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_dribble_run",
@@ -228,13 +225,12 @@
    "file": "cmu/78/78_06.bvh",
    "from": 0.08,
    "to": 0.75,
-   "duration": 0.6,
    "loop": true,
    "refineLoop": [
     0.55,
     0.8
    ],
-   "note": "RunningStraight: a stride cycle dribbling on the run (the ball hand works low)"
+   "note": "RunningStraight: a stride cycle dribbling on the run (the ball hand works low) · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_drive",
@@ -243,13 +239,12 @@
    "file": "cmu/78/78_06.bvh",
    "from": 0.08,
    "to": 0.75,
-   "duration": 0.6,
    "loop": true,
    "refineLoop": [
     0.55,
     0.8
    ],
-   "note": "the drive (run_forward) is the same dribbling stride"
+   "note": "the drive (run_forward) is the same dribbling stride · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_defend_stance",
@@ -356,7 +351,8 @@
     0.55,
     0.72
    ],
-   "note": "a defender's pursuit stride: CMU 78 RunningNoBall (the same cycle as bball_mc_run, in the football scope)"
+   "note": "a defender's pursuit stride: CMU 78 RunningNoBall (the same cycle as bball_mc_run, in the football scope)",
+   "pin": "TEMP (hoops motion 2b, 2026-09-25): the football scope keeps the 0.6 s loop it was tuned on until the football pass (the same 78_12 frames as bball_mc_run, which now plays its real 0.66 s span; 78 is really 120 fps, so this pin holds only the duration)"
   },
   {
    "name": "bball_mc_pump_fake",
@@ -439,11 +435,13 @@
    "replaces": "uppercut",
    "source": "cmu",
    "file": "cmu/141/141_24.bvh",
-   "from": 0.61,
-   "to": 1.13,
-   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT fist rising 0.74 m to 1.64 m, 0.32 m in front — UPPERCUT / RISING DRAGON (was a 0.45 m rise that stayed at the chin)",
+   "from": 1.22,
+   "to": 2.26,
+   "note": "RECOGNISABLE ON SIGHT (2026-09-15, find-signature): the RIGHT fist rising 0.74 m to 1.64 m, 0.32 m in front — UPPERCUT / RISING DRAGON (was a 0.45 m rise that stayed at the chin) · TRUE FPS (2b): 141_24 is a 60-fps capture, so this window is 1.22–2.26 true seconds (it was written as 0.61–1.13 header seconds: the same frames)",
    "duration": 0.5,
-   "aim": "hand"
+   "aim": "hand",
+   "smoothSec": 0.07,
+   "pin": "TEMP (hoops motion 2b, 2026-09-25): the real span is 1.04 s and `duration` 0.5 holds the played length THE HUNDRED tuned (2.08× real), to the millisecond, until the combat motion pass re-cuts it; `smoothSec` 0.07 holds the retarget's smoothing on the same frames too (the default 35 ms was read at the header's 120: 4.2 frames, 70 ms of the true time), so the keys are unchanged"
   },
   {
    "name": "karate_mc_whirl",
@@ -536,13 +534,12 @@
    "file": "cmu/78/78_24.bvh",
    "from": 1,
    "to": 2,
-   "duration": 0.7,
    "loop": true,
    "refineLoop": [
     0.5,
     0.85
    ],
-   "note": "DefensiveStraightNoStop: the retreat — hips at -0.3, a fast drop back while the chest stays on the man (2026-09-17)"
+   "note": "DefensiveStraightNoStop: the retreat — hips at -0.3, a fast drop back while the chest stays on the man (2026-09-17) · REAL TIME (2b, 2026-09-25): was played in 0.7 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_defend_slide_hard_right",
@@ -551,13 +548,12 @@
    "file": "cmu/78/78_26.bvh",
    "from": 0.5,
    "to": 1.5,
-   "duration": 0.6,
    "loop": true,
    "refineLoop": [
     0.5,
     0.85
    ],
-   "note": "DefensiveRightStopToStop: the sat-down slide (hips -0.30..-0.43, four leg-lengths in a second) — intense D (2026-09-17)"
+   "note": "DefensiveRightStopToStop: the sat-down slide (hips -0.30..-0.43, four leg-lengths in a second) — intense D (2026-09-17) · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_defend_slide_hard_left",
@@ -566,14 +562,13 @@
    "file": "cmu/78/78_26.bvh",
    "from": 0.5,
    "to": 1.5,
-   "duration": 0.6,
    "loop": true,
    "refineLoop": [
     0.5,
     0.85
    ],
    "mirror": true,
-   "note": "the hard slide mirrored"
+   "note": "the hard slide mirrored · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_feint_right",
@@ -603,13 +598,12 @@
    "file": "cmu/06/06_01.bvh",
    "from": 2.7,
    "to": 3.9,
-   "duration": 1.2,
    "loop": true,
    "refineLoop": [
     0.9,
     1.3
    ],
-   "note": "DRIBBLE GEARS (2026-09-17): a walking dribble, ~1.2 leg/s — one bounce per stride (the right hand dips 2.7 → 3.9)"
+   "note": "DRIBBLE GEARS (2026-09-17): a walking dribble, ~1.2 leg/s — one bounce per stride (the right hand dips 2.7 → 3.9) · REAL TIME (2b, 2026-09-25): was played in 1.2 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "bball_mc_dribble_jog",
@@ -618,13 +612,12 @@
    "file": "cmu/78/78_10.bvh",
    "from": 0.3,
    "to": 1.1,
-   "duration": 0.8,
    "loop": true,
    "refineLoop": [
     0.6,
     0.9
    ],
-   "note": "DRIBBLE GEARS: a jogging dribble, ~4.5 leg/s, hands low — between the walk and the 78_06 sprint"
+   "note": "DRIBBLE GEARS: a jogging dribble, ~4.5 leg/s, hands low — between the walk and the 78_06 sprint · REAL TIME (2b, 2026-09-25): was played in 0.8 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
    "name": "dunk_mc_tomahawk",

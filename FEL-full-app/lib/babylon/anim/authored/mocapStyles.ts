@@ -4,7 +4,9 @@
 // Each clip is pose keys INSIDE the pelvis frame plus a ROOT TRACK (the pelvis orientation + hips height), because a
 // cartwheel, a flip or a windmill turns the whole body over (mocapRetarget.rootTrack). anim/styleMotion.ts builds a
 // vocabulary's clips onto a rig and swaps the base move names; anim/MoveRootLayer.ts plays the root tracks.
-// Source: CMU Graphics Lab Motion Capture Database — free in commercial products, the data may not be resold.
+// Source: CMU Graphics Lab Motion Capture Database — free in commercial products, the data may not be resold. Each
+// subject is read at its TRUE frame rate (scripts/mocap/sources.mts CMU_TRUE_FPS: 75 and 88 are 60 fps, stamped 120);
+// the windows in `source` are true seconds.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type PoseKey } from '../poseClip';
 import type { RootKey } from '../mocapRetarget';
@@ -247,7 +249,7 @@ export const MOCAP_STYLE_CLIPS: MocapStyleClip[] = [
   },
   {
     name: 'trick_jump_spin_kick', replaces: 'karate_backspin', duration: 0.8, loop: false, style: 'tricking', label: 'JUMP SPIN KICK',
-    source: 'cmu:88_06.bvh 0.15–1.35s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    source: 'cmu:88_06.bvh 0.30–2.70s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [1,-22,0]},hands: {Left: [-0.16,1.51,0.42],Right: [0.41,1.38,-0.38]},poles: {Left: [-0.98,-0.18,0.04],Right: [-0.49,-0.54,-0.69]},feet: {Left: [-0.24,0.27,-0.16],Right: [0.21,0.31,0.29]},hipsY: 0},
       {t: 0.05,bones: {Hips: [0,0,0],Spine: [5,-22,0]},hands: {Left: [-0.23,1.66,0.35],Right: [0.26,1.37,-0.47]},poles: {Left: [-0.97,-0.02,-0.24],Right: [-0.8,-0.37,-0.47]},feet: {Left: [-0.28,0.37,0.14],Right: [0.2,0.48,0.47]},hipsY: 0},
@@ -289,7 +291,7 @@ export const MOCAP_STYLE_CLIPS: MocapStyleClip[] = [
   },
   {
     name: 'trick_cartwheel', replaces: 'karate_rush', duration: 0.8, loop: false, style: 'tricking', label: 'CARTWHEEL',
-    source: 'cmu:88_07.bvh 0.00–1.20s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    source: 'cmu:88_07.bvh 0.00–2.40s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [-1,-3,0]},hands: {Left: [-0.04,1.67,0.08],Right: [0.43,1.34,0.07]},poles: {Left: [-0.95,0.31,0.08],Right: [0.27,-0.52,-0.81]},feet: {Left: [0.04,0.2,-0.01],Right: [0.22,0.27,0.17]},hipsY: 0},
       {t: 0.05,bones: {Hips: [0,0,0],Spine: [0,-3,0]},hands: {Left: [0.01,1.75,0.2],Right: [0.58,1.36,0.14]},poles: {Left: [-0.88,0.48,-0.01],Right: [0.4,-0.64,-0.66]},feet: {Left: [0.09,0.22,0.05],Right: [0.3,0.4,0.33]},hipsY: 0},
@@ -569,7 +571,7 @@ export const MOCAP_STYLE_CLIPS: MocapStyleClip[] = [
   },
   {
     name: 'cap_escape', replaces: 'karate_evade', duration: 0.85, loop: false, style: 'capoeira', label: 'ESQUIVA',
-    source: 'cmu:88_08.bvh 0.70–2.10s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    source: 'cmu:88_08.bvh 1.40–4.20s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [-1,-21,0]},hands: {Left: [0.02,1.17,0.34],Right: [0.42,1.1,-0.25]},poles: {Left: [-0.66,-0.73,-0.17],Right: [-0.46,-0.33,-0.83]},feet: {Left: [-0.15,0.32,0.25],Right: [0.15,0.32,0.21]},hipsY: 0},
       {t: 0.05,bones: {Hips: [0,0,0],Spine: [0,-21,0]},hands: {Left: [0.01,1.16,0.35],Right: [0.39,1.09,-0.25]},poles: {Left: [-0.66,-0.73,-0.19],Right: [-0.51,-0.33,-0.79]},feet: {Left: [-0.21,0.55,0.38],Right: [0.12,0.54,0.39]},hipsY: 0},
@@ -965,7 +967,7 @@ export const MOCAP_STYLE_CLIPS: MocapStyleClip[] = [
   },
   {
     name: 'pk_backflip', replaces: 'pk_backflip', duration: 0.85, loop: false, style: 'parkour', label: 'WALL FLIP',
-    source: 'cmu:88_01.bvh 0.05–1.15s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    source: 'cmu:88_01.bvh 0.10–2.30s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [-1,2,0]},hands: {Left: [-0.47,1.28,0.06],Right: [0.42,1.16,0.13]},poles: {Left: [-0.28,-0.35,-0.89],Right: [0.18,-0.59,-0.79]},feet: {Left: [-0.07,0.2,-0.02],Right: [0.08,0.18,-0.01]},hipsY: 0},
       {t: 0.05,bones: {Hips: [0,0,0],Spine: [2,2,0]},hands: {Left: [-0.55,1.4,-0.07],Right: [0.54,1.3,-0.02]},poles: {Left: [-0.06,-0.11,-0.99],Right: [0.04,-0.35,-0.94]},feet: {Left: [-0.1,0.23,0.11],Right: [0.08,0.21,0.13]},hipsY: 0},
@@ -1057,7 +1059,7 @@ export const MOCAP_STYLE_CLIPS: MocapStyleClip[] = [
   },
   {
     name: 'pk_360_jump', replaces: 'pk_360_jump', duration: 0.95, loop: false, style: 'parkour', label: '360 PRECISION',
-    source: 'cmu:75_09.bvh 0.05–1.80s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    source: 'cmu:75_09.bvh 0.10–3.60s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [-1,-7,0]},hands: {Left: [-0.26,1.06,0.13],Right: [0.27,1.02,0.08]},poles: {Left: [0.29,-0.57,-0.77],Right: [-0.42,-0.62,-0.66]},feet: {Left: [-0.18,0.19,-0.05],Right: [0.12,0.18,-0.06]},hipsY: 0},
       {t: 0.05,bones: {Hips: [0,0,0],Spine: [-1,-10,0]},hands: {Left: [-0.17,1.03,0.17],Right: [0.23,0.99,0.1]},poles: {Left: [0.18,-0.59,-0.79],Right: [-0.4,-0.62,-0.67]},feet: {Left: [-0.2,0.2,-0.04],Right: [0.11,0.19,-0.04]},hipsY: 0},
