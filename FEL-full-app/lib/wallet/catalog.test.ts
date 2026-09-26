@@ -18,8 +18,17 @@ describe('SKUs held off sale', () => {
     for (const id of NOT_ON_SALE) expect(CATALOG[id], id).toBeDefined();
   });
 
+  // MIRROR-COACH P1 (2026-09-25), owner decision #3: /workout's plans are pulled from sale until the relaunch.
+  it('holds both /workout plans, and they are still registered at their price', () => {
+    for (const id of ['workout_plan_4w', 'workout_program_12w']) {
+      expect(NOT_ON_SALE.has(id), id).toBe(true);
+      expect(getSku(id), id).not.toBeNull();
+      expect(skuOnSale(id), id).toBe(false);
+    }
+  });
+
   it('holds nothing else (spend() still sells through the routes that deliver), and an unknown SKU is not on sale', () => {
-    expect(skuOnSale('workout_plan_4w')).toBe(true); // sold by /api/v1/workout/plan, which writes the plan
+    expect([...NOT_ON_SALE].sort()).toEqual(['class_monthly', 'class_pass_single', 'workout_plan_4w', 'workout_program_12w']);
     expect(skuOnSale('private_1on1')).toBe(true); // sold by /api/v1/sessions/book, which writes the booking
     expect(skuOnSale('no_such_sku')).toBe(false);
   });

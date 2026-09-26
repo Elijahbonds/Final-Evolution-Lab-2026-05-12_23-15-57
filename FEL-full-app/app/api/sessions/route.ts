@@ -40,6 +40,10 @@ async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise
       select: { mode: true, status: true, currency: true, player1Id: true, player2Id: true, player1Score: true, player2Score: true },
     });
     if (!m || canonicalModeKey(m.mode) !== 'music' || m.currency !== 'LC' || !OPEN_MATCH_STATES.includes(m.status)) return false;
+    // only a duel /api/arena/submit-score will record this set's score in: it refuses a duel with no opponent yet (409
+    // WAITING_OPPONENT) before it writes anything, so a WAITING duel's score never went in and every set against it was
+    // uncapped, set after set (review of the shell's arenaMatchId, 2026-09-26)
+    if (!m.player2Id) return false;
     if (m.player1Id === userId) return m.player1Score == null;
     if (m.player2Id === userId) return m.player2Score == null;
     return false;

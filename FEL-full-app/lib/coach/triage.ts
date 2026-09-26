@@ -113,7 +113,9 @@ export function flagsFor(row: AthleteRow, now: number = Date.now()): TriageFlag[
     out.push({
       ...base, kind: 'stale-scan', positive: false,
       urgency: 55,
-      observed: snap === null ? 'No scan on file.' : `Last scan ${Math.floor(scanAge ?? 0)} days ago.`,
+      // "PRQ System Scan", not "scan" (MIRROR-COACH P1, 2026-09-25): this reads the PRQ snapshot only, so the day
+      // after a Mirror movement screen it said "No scan on file." about an athlete who had just been scanned.
+      observed: snap === null ? 'No PRQ System Scan on file.' : `Last PRQ System Scan ${Math.floor(scanAge ?? 0)} days ago.`,
       action: 'Ask for a System Scan — there is nothing current to program from.',
     });
   }

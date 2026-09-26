@@ -28,10 +28,11 @@ interface Balances { coins: number; shards: number }
 // because each is delivered by its own page and route (SPEND_ROUTE_SKUS in lib/wallet/catalog.ts has the list). The
 // owner's economy-honesty call: refuse dead-end buys. So /store sells coin packs and points at the pages whose buy is
 // the real one. Every href here is a page in app/ (components/wallet/storefronts.test.tsx checks it).
+// MIRROR-COACH P1 (2026-09-25): Workout ("Personalized training plans") left this list when its plans went NOT_ON_SALE
+// (owner decision #3, lib/workout/plan-sale.ts). It was never personal either: every buyer got the same plan.
 export const WHERE_TO_SPEND: { href: string; place: string; what: string; currency: 'coins' | 'shards' }[] = [
   { href: '/closet', place: 'Closet', what: 'Wearables for your athlete', currency: 'coins' },
   { href: '/profile', place: 'Profile', what: 'Creator boost cards', currency: 'shards' },
-  { href: '/workout', place: 'Workout', what: 'Personalized training plans', currency: 'shards' },
   { href: '/sessions', place: 'Sessions', what: 'Group workouts and private 1-on-1s', currency: 'shards' },
   { href: '/play/music', place: 'Music Room', what: 'Sound kits and the Cell foundation', currency: 'shards' },
 ];

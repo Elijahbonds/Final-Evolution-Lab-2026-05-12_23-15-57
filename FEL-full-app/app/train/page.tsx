@@ -29,8 +29,12 @@ export default async function TrainPage() {
 
   const cards = [
     {
+      // MIRROR-COACH P1 (2026-09-25): this said "Scored, with the corrective work written for you." Nothing grades the
+      // screen's stations yet (no app code calls ScreenRunner.record, so every screen came back unscored), and a camera
+      // number is an estimate, not a score. It now says what the Mirror does. Put "graded" back only for a station a
+      // grader actually scores (lib/workout/workout-copy.test.tsx holds the line).
       href: '/play/mirror', icon: ScanLine, accent: '#00FF9D', title: 'The Mirror',
-      line: 'A movement screen from your own camera. Scored, with the corrective work written for you.',
+      line: 'A squat coach and a movement screen on your own camera. It cues what it can see, and every number it shows is an estimate.',
       tag: 'Start a screen',
     },
     {
@@ -50,7 +54,10 @@ export default async function TrainPage() {
     },
     {
       href: '/kitchens', icon: UtensilsCrossed, accent: '#FF7A2F', title: 'Fuel',
-      line: 'Your meal prescription from your own movement screen, and the kitchens behind it.',
+      // MIRROR-COACH P1 review (2026-09-25): was "Your meal prescription from your own movement screen". The Kitchens
+      // input is sliders the athlete sets (sample numbers "until a Mirror scan lands": your-build-panel.tsx), not their
+      // screen, and "prescription" is a treatment word (lib/share/screen.ts). Said as what it is.
+      line: 'Meals keyed to the numbers you enter, and the kitchens behind it.',
       tag: 'Eat',
     },
     ...(coachesAnyone ? [{

@@ -55,4 +55,12 @@ describe('pose recorder file', () => {
     expect(new Set(TAKES.map((t) => t.id)).size).toBe(TAKES.length);
     for (const t of TAKES) expect(t.prompt.length).toBeGreaterThan(10);
   });
+
+  it('records the space check at the owner\'s play spot (movement play P4: the gate\'s real-camera row)', () => {
+    // scripts/body/space.mts TAKES=<file> finds it by this id: a stand, the reach held 2 s, the arms down, a stand
+    const space = TAKES.find((t) => t.id === 'space')!;
+    expect(space.prompt).toMatch(/play spot/);
+    expect(space.prompt).toMatch(/both arms overhead for 2 seconds/);
+    expect(space.seconds).toBeGreaterThanOrEqual(8);
+  });
 });

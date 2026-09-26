@@ -10,7 +10,9 @@
 // the old string leaves that record unable to say which text anyone saw. Nothing compares a stored version with this
 // one, so a bump re-prompts no one: it re-labels /privacy and /terms and changes what new signups store. The Terms
 // share it and re-label too, although their text did not change. policies.test.ts fails on a text change without one.
-export const CURRENT_POLICY_VERSION = '2026-09-24-draft';
+// MOVEMENT PLAY P4 (2026-09-25): bumped again with §6's space-check paragraph (the check, the brightness sample, the
+// remembered choice, the self-view). 2026-09-24-draft is live and signups recorded it for the text without it.
+export const CURRENT_POLICY_VERSION = '2026-09-25-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -102,6 +104,8 @@ and measurement date for full traceability.
 Some features use your camera: playing with your body as the controller, the Mirror, Prove It and face scan. The camera picture is processed on your device, in your browser. It never leaves your browser and is never stored. Face scan can also read a photo you choose; that photo is handled the same way.
 
 When you play, only numbers worked out from the camera (for example jump height, rep counts or form reads) may be saved to your history. Face scan keeps only the face settings it picks, never the picture.
+
+Before body play, a space check makes sure the camera can see all of you and the floor. It also checks how bright the picture is. Both happen on your device, and nothing from them is sent or saved. Your choice to play a game with your body is remembered on this device only. The small self-view of you is shown only on your screen.
 
 The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers. Face scan's model file comes from Google's servers (storage.googleapis.com), and if our copy of the body-tracking files is ever missing they come from jsDelivr and Google instead. These downloads never include your picture.
 

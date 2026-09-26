@@ -41,6 +41,7 @@
  *      stats, a session that arrives WITHOUT them is a client that predates the contract: its music `won` is the room's
  *      own (StudioMode applies performSetWon itself), and PRQ takes the old score path. ROOM_STATS_FORWARDED flips this
  *      the day the shell change lands (session-payout.test.ts reads game-shell.tsx and fails until it is flipped).
+ *      LANDED 2026-09-26: the shell sends `stats` and `arenaMatchId`, and ROOM_STATS_FORWARDED is true.
  *   B. `?arena=<anything>` LIFTED THE CEILING. An Arena set was believed from `stats.arena`, which the room sets from the
  *      bare query string (app/play/music/_components/loader.tsx:68), while music staking is paused (decision #9) — up to
  *      3,970,700 XP / 132,358 shards for a set nobody staked. An Arena set is now uncapped only when the route has
@@ -73,12 +74,14 @@ import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS } from '@/lib/arena-score
 import { performSetMax } from '@/lib/babylon/music/performSet';
 
 /**
- * Does the shell forward the room's `stats` to POST /api/sessions yet? NO (components/games/game-shell.tsx is held by
- * another lane; the request is in the phase report). While false, a session with no stats is an old-contract client:
- * its music win is its own claim (the room applies the rule itself) and dance/music PRQ uses the score. Flip to true in
- * the same commit that makes the shell send `stats` — session-payout.test.ts reads the shell and holds the two together.
+ * Does the shell forward the room's `stats` to POST /api/sessions yet? YES since 2026-09-26: GameShell's handleEnd sends
+ * `stats: res?.stats` (and the run's `arenaMatchId`), and fires the wallet's won earn on the server's `won`. While it was
+ * false, a session with no stats was an old-contract client: its music win was its own claim (the room applied the rule
+ * itself) and dance/music PRQ used the score. Now a music set that arrives without its counts wins nothing and a dance
+ * or music run without them trains nothing — the rules above, with no legacy door. session-payout.test.ts reads the
+ * shell and holds the two together.
  */
-export const ROOM_STATS_FORWARDED = false;
+export const ROOM_STATS_FORWARDED = true;
 
 /** Is this a mode the catalogue knows (after an old spelling is mapped)? Anything else is paid as endless and wins nothing. */
 export function isCatalogueMode(mode: string): boolean {

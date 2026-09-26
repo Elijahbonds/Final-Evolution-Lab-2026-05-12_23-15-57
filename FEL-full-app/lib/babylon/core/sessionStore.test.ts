@@ -5,7 +5,7 @@
 // (useSyncExternalStore re-renders on identity), and (the step-2 review) that the writers belong to one mount: a harness
 // torn down after the next one mounted blanks nothing.
 import { describe, it, expect, afterEach } from 'vitest';
-import { sessionStore, EvidenceCounter, EVIDENCE_TRIGGER_MS, type SessionWriter } from './sessionStore';
+import { sessionStore, EvidenceCounter, EVIDENCE_TRIGGER_MS, markRun, countedSince, type SessionWriter } from './sessionStore';
 import type { FelInput } from './InputBus';
 
 let w: SessionWriter | null = null;
@@ -82,14 +82,52 @@ describe('the run record', () => {
   });
 });
 
+describe('what came after a mark (GameShell\'s `played`, movement play P3 step 5)', () => {
+  it('a run begun after the mark counts in full; the run before it never does, however much it counted', () => {
+    w = sessionStore.mount(card('skateboard'));
+    w.beginRun('skateboard');
+    for (let i = 0; i < 9; i++) w.count('external');           // the last match: nine presses
+    const mark = markRun(sessionStore.record());                 // the shell mounts its next game
+    expect(countedSince(sessionStore.record(), mark)).toBe(0);   // not woken yet: the old record is still there
+    w.unmount();
+    w.count('external');                                         // a harness gone counts nothing
+    expect(countedSince(sessionStore.record(), mark)).toBe(0);
+    w = sessionStore.mount(card('sprint'));
+    w.beginRun('sprint');
+    w.count('external'); w.count('body');
+    expect(countedSince(sessionStore.record(), mark)).toBe(2);   // pad and body alike: input the game received
+    w.count('body');
+    expect(countedSince(sessionStore.record(), mark)).toBe(3);
+  });
+  it('the run the mark saw counts only what came after it (an in-place REPLAY keeps one harness run going)', () => {
+    w = sessionStore.mount(card('brainbrawl'));
+    w.beginRun('brainbrawl');
+    for (let i = 0; i < 7; i++) w.count('external');           // match one, and a press on its results card
+    const mark = markRun(sessionStore.record());                 // REPLAY: the rematch starts in the same run
+    expect(countedSince(sessionStore.record(), mark)).toBe(0);
+    w.count('external'); w.count('external');
+    expect(countedSince(sessionStore.record(), mark)).toBe(2);
+    w.count('external');
+    expect(countedSince(sessionStore.record(), mark)).toBe(3);
+  });
+  it('no record, or a mark on none: nothing counted before a run exists, everything of the first run after', () => {
+    expect(markRun(null)).toEqual({ runId: 0, counted: 0 });
+    expect(countedSince(null, markRun(null))).toBe(0);
+    expect(countedSince({ runId: 4, modeId: 'dunk', inputs: 2, bodyInputs: 1 }, markRun(null))).toBe(3);
+    // a mark newer than the record read (it cannot happen with one store; the reader stays at zero, never negative)
+    expect(countedSince({ runId: 4, modeId: 'dunk', inputs: 2, bodyInputs: 1 }, { runId: 5, counted: 0 })).toBe(0);
+    expect(countedSince({ runId: 4, modeId: 'dunk', inputs: 2, bodyInputs: 1 }, { runId: 4, counted: 9 })).toBe(0);
+  });
+});
+
 describe('the view', () => {
   it('mount writes the card and clears the body line and the pause; unmount empties it', () => {
     const a = sessionStore.mount({ modeId: 'skateboard', key: 'skateboard', lines: [{ move: 'Jump', verb: 'POP' }], drives: true, later: 'P8' });
     a.setBody('present', 0.5); a.setPause('body-lost');
     w = sessionStore.mount({ modeId: 'dunk', key: 'dunk', lines: [], drives: false, later: 'P5' });
-    expect(sessionStore.view()).toEqual({ modeId: 'dunk', key: 'dunk', lines: [], drives: false, later: 'P5', body: 'off', handsUp01: 0, pause: null });
+    expect(sessionStore.view()).toEqual({ modeId: 'dunk', key: 'dunk', lines: [], drives: false, later: 'P5', body: 'off', handsUp01: 0, pause: null, phase: null });
     w.unmount();
-    expect(sessionStore.view()).toEqual({ modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null });
+    expect(sessionStore.view()).toEqual({ modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null, phase: null });
   });
   it('a writer that changes nothing keeps the snapshot and tells nobody; one that does, replaces it and tells every subscriber', () => {
     let n = 0;
@@ -111,6 +149,33 @@ describe('the view', () => {
     un();
     w.setPause(null);
     expect(n).toBe(4);
+  });
+});
+
+describe('the phase (movement play P4)', () => {
+  it('the harness writes it: only a change is a new snapshot, and a mount starts it clear', () => {
+    let n = 0;
+    const un = sessionStore.subscribe(() => { n++; });
+    w = sessionStore.mount(card('skateboard'));
+    expect(sessionStore.view().phase).toBeNull();
+    w.setPhase('loading');
+    const v = sessionStore.view();
+    w.setPhase('loading');
+    expect(sessionStore.view()).toBe(v);
+    w.setPhase('ready');
+    w.setPhase('playing');
+    expect(sessionStore.view().phase).toBe('playing');
+    expect(n).toBe(4);
+    un();
+  });
+  it('a stale writer (a harness torn down after the next mounted) moves nobody\'s phase', () => {
+    const first = sessionStore.mount(card('skateboard'));
+    w = sessionStore.mount(card('sprint'));
+    w.setPhase('ready');
+    const v = sessionStore.view();
+    first.setPhase('playing');
+    expect(sessionStore.view()).toBe(v);
+    expect(sessionStore.view().phase).toBe('ready');
   });
 });
 

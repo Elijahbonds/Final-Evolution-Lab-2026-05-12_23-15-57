@@ -311,6 +311,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     else if (p === 'playing') setReady(def.modeId, 'playing');
     else if (p === 'ended') setReady(def.modeId, 'ended');
     else if (p === 'error') setReady(def.modeId, 'failed', typeof detail === 'string' ? detail : undefined);
+    store.setPhase(p);   // MOVEMENT PLAY P4: the body-play store and the shell's Body button read the phase here
     opts.onPhase?.(p, detail);
   };
 

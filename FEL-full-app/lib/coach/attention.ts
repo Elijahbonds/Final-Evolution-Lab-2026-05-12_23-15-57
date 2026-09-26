@@ -30,7 +30,10 @@ export interface ClientFacts {
   name: string;
   joinedAtMs: number | null;
   hasProgram: boolean;
-  /** GameSession.createdAt as epoch ms, any order. */
+  /**
+   * Every session as epoch ms, any order: GameSession.createdAt AND completed ClientSession.completedAt (coached work
+   * counts — MIRROR-COACH P1, 2026-09-25; the board used to read games only).
+   */
   sessionTimesMs: readonly number[];
   prq: readonly PrqFact[];
   /** The most recent activity of ANY kind, epoch ms — a session, a scan, a logged set. */

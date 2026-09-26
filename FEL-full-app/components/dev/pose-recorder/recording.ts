@@ -48,6 +48,9 @@ export const TAKES: TakeSpec[] = [
   { id: 'board-stance', label: 'Board stance', prompt: 'Stand sideways, three-quarters to the camera, knees soft. Lean to your toes, lean to your heels, crouch low, then a small hop.', seconds: 12 },
   { id: 'wings-tilt', label: 'Wings + tilt', prompt: 'Arms straight out like wings. Tilt left, back to level, tilt right, back to level.', seconds: 8 },
   { id: 'wheel-turn', label: 'Steering wheel', prompt: 'Hands on an invisible steering wheel. Turn left, back to centre, turn right, back to centre.', seconds: 8 },
+  // MOVEMENT PLAY P4 (2026-09-25): the space check in the owner's own room, from where he will really play: its gate
+  // replays this take (scripts/body/space.mts TAKES=<file>), and until one exists its real-camera row stays open.
+  { id: 'space', label: 'Space check', prompt: 'At your play spot: stand still, reach both arms overhead for 2 seconds, lower them, stand still.', seconds: 8 },
 ];
 
 /** Which clock the frame times came from (the adapter's onVideoFrames). 'capture' is the one to trust; 'mixed'

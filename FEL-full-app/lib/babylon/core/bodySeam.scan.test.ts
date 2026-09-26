@@ -92,6 +92,17 @@ describe('the harness reads the body (plan §4.4)', () => {
     expect(read('lib/babylon/core/StartWake.ts')).toMatch(/if \(e\.src === 'body'\) return false;/);
   });
 
+  it('every phase is written to the session store (movement play P4: the body-play store and the Body button read it)', () => {
+    const at = harness.indexOf('const setPhase = (p: ModePhase');
+    expect(at).toBeGreaterThan(0);
+    const body = harness.slice(at, harness.indexOf('\n  };', at));
+    expect(body).toMatch(/\n\s*store\.setPhase\(p\);/);
+    // before the host hears it (onPhase), so a host re-rendering on the phase reads the store already moved
+    expect(body.indexOf('store.setPhase(p)')).toBeLessThan(body.indexOf('opts.onPhase?.(p, detail)'));
+    // and nothing else writes the phase
+    expect([...harness.matchAll(/store\.setPhase\(/g)]).toHaveLength(1);
+  });
+
   it('releaseBody() comes before every setPhase(\'paused\'): the mode sees its axes at 0 while it is still playing', () => {
     const pauses = [...harness.matchAll(/setPhase\('paused'\)/g)];
     expect(pauses.length).toBe(2);                     // the START press, and the body-lost / stalled pause

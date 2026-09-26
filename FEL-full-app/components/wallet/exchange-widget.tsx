@@ -9,6 +9,8 @@
  * went NOT_ON_SALE in lib/wallet/catalog.ts: nothing can be watched on /live yet.
  * Scans left it too: the movement scan is free (app/api/v1/workout/scan), and the
  * paid scan SKU is deleted from the catalog.
+ * MIRROR-COACH P1 (2026-09-25): so did the workout plans ("Shards unlock personalized
+ * plans"), when /workout's plans went NOT_ON_SALE (owner decision #3).
  */
 
 import { useEffect, useState } from 'react';
@@ -61,7 +63,7 @@ export function ExchangeWidget() {
           <Gem className="h-5 w-5 text-[#C79BFF]" />
           <h2 className="fel-heading text-lg font-bold text-white">Get Shards</h2>
         </div>
-        <p className="mb-4 text-xs text-white/50">Shards unlock personalized plans and live sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
+        <p className="mb-4 text-xs text-white/50">Shards unlock group workouts and 1-on-1 sessions. Convert coins to shards at {rate} coins = 1 shard.</p>
 
         {bal && (
           <div className="mb-4 flex items-center gap-4 text-sm">

@@ -2,13 +2,19 @@
 // boot with progress → READY gate → 3-2-1 → GO. Doubles as the loading cover
 // (no raw spinner anywhere) and renders the error/retry state from the harness —
 // and, since movement play P3 (2026-09-24), the pause: PausedLayer, one for every host.
+//
+// MOVEMENT PLAY P4 (2026-09-25): BODY PLAY. The card (SplashCard) gains one READY line — the "Play with your body" choice,
+// or "coming", or nothing (BodyPlayReady, which runs the space check over the card once chosen) — and BootSplash is now
+// the card plus its sibling BodyPlayLayer (the check over a pause, the corner self-view in play). With body play off
+// the layer draws nothing, so every screen is the card's alone (pausedLayer.scan.test holds the two to that).
 
 import React, { useEffect, useState } from 'react';
 import type { ModePhase } from '@/lib/babylon';
 import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
-import { PausedLayer, BodyReadyLine } from './paused-layer';
+import { PausedLayer } from './paused-layer';
+import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -93,14 +99,27 @@ function Bars({ bars, tint }: { bars: { speed: number; hold: number; edge: numbe
   );
 }
 
-export function BootSplash(props: {
+export interface BootSplashProps {
   modeId: string;
   title: string;
   phase: ModePhase;
   detail?: number | string;         // countdown number or error message
   onStart: () => void;              // READY tap
   onRetry: () => void;              // error retry
-}) {
+}
+
+/** The splash: the card, and body play beside it (the check over a pause, the corner self-view in play). */
+export function BootSplash(props: BootSplashProps) {
+  return (
+    <>
+      <SplashCard {...props} />
+      <BodyPlayLayer phase={props.phase} onStart={props.onStart} />
+    </>
+  );
+}
+
+/** The card: boot, READY, the countdown, the error — and the pause (PausedLayer). */
+export function SplashCard(props: BootSplashProps) {
   // Court locations (docs/SPEC-COURT-LOCATIONS.md): basketball splashes take their art from the player's pick.
   const isCourt = BASKETBALL_MODE_IDS.has(props.modeId);
   const [loc, setLoc] = useState<CourtLocationId>('venice');
@@ -251,11 +270,9 @@ export function BootSplash(props: {
 
   // MOVEMENT PLAY P3 (2026-09-24, step 4a): the pause is drawn HERE, once, for every host — each used to draw its own
   // copy straight after this splash (BACKLOG B16). PausedLayer keeps that copy's classes, so it stacks where they did.
-  // Brain Brawl keeps its own copy until step 5 (the Brain Brawl session owns that file), so it gets nothing here until
-  // then: the two layers stacked were no harmless double dim (the step-4a review) — 84% black, and with the Body on the
-  // shared headline sat 15 px above Brain Brawl's, doubled under its dim. Step 5 deletes this check with that copy
-  // (pausedLayer.scan.test holds the two together).
-  if (props.phase === 'paused') return props.modeId === 'brainbrawl' ? null : <PausedLayer onResume={props.onStart} />;
+  // Step 5 (2026-09-26): Brain Brawl's own copy is gone, and with it the check that drew nothing here for it (the two
+  // stacked were 84% black with the headline doubled — the step-4a review); pausedLayer.scan.test holds the two together.
+  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} />;
   if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
@@ -310,8 +327,12 @@ export function BootSplash(props: {
         )}
         {/* MOVEMENT PLAY P3 (2026-09-24): the hands-up START, said once the camera sees you (it wakes a calibrated body,
             BodySession). The line reads the session itself, so the splash does not re-render with the ring, and holds
-            its room while the camera is on, so the card does not jump when a detection is missed (the step-4a review). */}
-        {props.phase === 'ready' && <BodyReadyLine />}
+            its room while the camera is on, so the card does not jump when a detection is missed (the step-4a review).
+            P4 (2026-09-25): while the space check runs, the check's few words in the same place (BodyPlayReadyLine). */}
+        {props.phase === 'ready' && <BodyPlayReadyLine />}
+        {/* MOVEMENT PLAY P4 (2026-09-25): "Play with your body" (the games the body drives), "coming", or nothing; once
+            chosen, the space check over this card. */}
+        {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
