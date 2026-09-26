@@ -1,0 +1,14 @@
+# THE GENERATED PRISMA CLIENT IS A DEPLOY ARTIFACT, AND IT IS COMMITTED ON PURPOSE.
+#
+# Do not gitignore public/_prisma/client. It carries libquery_engine-debian-openssl-3.0.x.so.node — the engine Cloud
+# Run loads — and the hosting packager snapshots public/ OUT OF THE SOURCE TREE before the build runs, so a client
+# that is not committed is a function with no query engine. That is the "ENGINE NOT FOUND" outage this repo spent
+# roughly ten deploys on (see prisma/schema.prisma's generator block, and lib/db/prismaSchemaSync.test.ts).
+# scripts/prisma-artifact-tests.ts asserts the tracking, so the mistake fails a suite now instead of a deploy.
+#
+# What these attributes buy: the artifact is ~43 MB of generated JS plus two engine binaries, and it goes DIRTY on any
+# machine whose `native` binaryTarget differs from the one it was generated on (the schema pins
+# ["native", "debian-openssl-3.0.x"], so a Mac bakes darwin-arm64 and absolute mac paths into it; a Linux container
+# regenerates both and every path). Marking it generated keeps that churn out of diffs and reviews. It stays tracked.
+public/_prisma/client/** -diff linguist-generated=true
+public/_prisma/client/*.node binary
