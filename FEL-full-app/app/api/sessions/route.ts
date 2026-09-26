@@ -15,13 +15,11 @@ import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POW
 import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
-  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED,
+  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt,
 } from '@/lib/session-payout';
 import { canonicalModeKey } from '@/lib/game-data';
 
 export const dynamic = 'force-dynamic';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Match states an Arena set can still be played for (app/api/arena: WAITING until joined, ACTIVE until it settles). */
 const OPEN_MATCH_STATES = ['WAITING', 'ACTIVE'];
@@ -75,6 +73,48 @@ export async function POST(req: Request) {
     // mastery, so no reader pays a win this route refused.
     const stats = roomStats(body);
     const rulesMode = canonicalModeKey(mode);
+
+    // MUSIC-SUITE P3 (2026-09-25): a CREATION session — a Studio save or render (mode music, score 0, metadata.kind
+    // 'creation'; lib/session-payout.ts isCreationSession). Before this, sessionHasPlay() below refused it as an idle run,
+    // so STUDIO time never reached the streak (PLAN.md: "STUDIO time counts toward the streak ... no XP"). It is decided
+    // HERE, before any of the play rules, and it touches exactly two profile fields: streakDays and lastStreakAt, and only
+    // when the streak day is due (streakStep). No XP, no profile shards, no Lab Credits (not even the streak's: the day's
+    // first PLAY pays those — streakStep's `owed`), never a win, no PRQ, no season XP, no mastery sample — and NO
+    // GameSession row: every score reader of that table would misread a score-0 row (the Arena's rival draw reads the
+    // player's last ten scores in the mode, app/api/arena/submit-score/route.ts:117-129; season XP's first-of-day bonus
+    // counts the day's rows in the mode, season-service.ts:84-93; card stats count sessions; and the wallet's "Session
+    // completed" coin earn pays for any row the player owns, wallet-service.ts:245-253).
+    // sessionId is null for the same reason. lastActiveAt is left alone on purpose (streakStep's debt reads it).
+    if (isCreationSession(rulesMode, score, body)) {
+      const profile = await getOrCreateProfile(userId);
+      const before = prqScore(profile as any);
+      const stamp = new Date();
+      const step = streakStep(profile as any, stamp.getTime(), 'creation');
+      let counted = false;
+      if (step.due) {
+        // conditional on the lastStreakAt this request read: a save and a render posted together count ONE streak day
+        // (the loser matches no row and is a no-op like any other repeat)
+        const seen = (profile as any)?.lastStreakAt;
+        const r = await prisma.playerProfile.updateMany({
+          where: { userId, ...(seen ? { lastStreakAt: seen } : {}) },
+          data: { streakDays: step.streakDays, lastStreakAt: stamp },
+        });
+        counted = r.count > 0;
+      }
+      if (counted) await recordServerEvent({ name: 'session_creation', userId, props: { mode, duration, streakDays: step.streakDays } });
+      const payout = sessionPayout({ score: 0, won: false, endless: true, durationSec: duration, kind: 'creation' });
+      // MUSIC-SUITE P3 FIX PASS (2026-09-25): a no-op says when the streak day opens, so the Academy asks again then
+      // (it used to take any 200 as "counted" and stop for the local day — lib/babylon/music/studioStore.ts CreationLog)
+      const nextDue = creationNextDueAt(profile as any, stamp.getTime(), { counted, due: step.due });
+      return NextResponse.json({
+        ok: true, creation: true, counted, noOp: !counted, nextDueAt: nextDue === null ? null : new Date(nextDue).toISOString(), sessionId: null,
+        won: false, capped: false, xp: payout.xp, shards: payout.shards, credits: payout.winCredits,
+        streakDays: counted ? step.streakDays : (profile as any)?.streakDays ?? 0, streakBonus: 0,
+        prqDelta: 0, prqBefore: before, prqAfter: before, grade: prqGrade(before),
+        labCredits: (profile as any)?.labCredits ?? 0, season: null, mastery: null,
+      });
+    }
+
     // MUSIC-SUITE P2 FIX PASS (2026-09-25): until the shell forwards `stats` (ROOM_STATS_FORWARDED, a held file), a
     // session without them is an old-contract client and keeps its own music win (the room applies the rule itself) —
     // this refused every honest win while the card said "set won". A mode the catalogue does not know wins nothing.
@@ -132,18 +172,15 @@ export async function POST(req: Request) {
     const { xp, shards } = payout;
     if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
 
-    // Credits: hero-mode win +15 LC, daily streak +5*day (cap day 7)
-    let credits = payout.winCredits;
-    let streakDays = profile?.streakDays ?? 0;
-    const lastStreak = new Date(profile?.lastStreakAt ?? 0).getTime();
-    const now = Date.now();
-    const daysSince = Math.floor((now - lastStreak) / DAY_MS);
-    let streakBonus = 0;
-    if (daysSince >= 1) {
-      streakDays = daysSince === 1 ? Math.min(streakDays + 1, 7) : 1;
-      streakBonus = 5 * streakDays;
-      credits += streakBonus;
-    }
+    // Credits: hero-mode win +15 LC, daily streak +5*day (cap day 7).
+    // MUSIC-SUITE P3 (2026-09-25): the streak rule moved to lib/session-payout.ts streakStep, unchanged — plus `owed`: the
+    // first play inside a streak day a creation session opened pays that day's streak LC (the creation paid none), so
+    // making music first never costs a player the day's streak Lab Credits. lastStreakAt and lastActiveAt are written
+    // from ONE stamp below — streakStep's debt test (lastActiveAt < lastStreakAt) relies on a play never leaving them apart.
+    const stamp = new Date();
+    const streak = streakStep(profile as any, stamp.getTime(), 'play');
+    const { streakDays, streakBonus } = streak;
+    const credits = payout.winCredits + streakBonus;
 
     // Distribute PRQ delta to mode-relevant attributes
     const attrs = MODE_ATTRS?.[rulesMode] ?? ['mental'];
@@ -165,8 +202,8 @@ export async function POST(req: Request) {
           xp: { increment: xp },
           shards: { increment: shards },
           streakDays,
-          lastStreakAt: daysSince >= 1 ? new Date() : profile?.lastStreakAt,
-          lastActiveAt: new Date(),
+          lastStreakAt: streak.due ? stamp : profile?.lastStreakAt,
+          lastActiveAt: stamp,
         },
       });
       const createdSession = await tx.gameSession.create({
@@ -175,7 +212,7 @@ export async function POST(req: Request) {
       // LC lives in the wallet (2026-09-04): the session's credits move through the one mover, keyed by the session row.
       let newBalance = Number(updated.labCredits ?? 0);
       if (credits > 0) {
-        const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: `session-lc:${(createdSession as any).id}`, metadata: { mode, won, streakDays, streakBonus: !!streakBonus } });
+        const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: `session-lc:${(createdSession as any).id}`, metadata: { mode, won, streakDays, streakBonus: !!streakBonus, ...(streak.owed ? { streakOwed: true } : {}) } });
         newBalance = r.balanceAfter;
       }
       // The form read is planned FIRST (pure: planFormWrite), stamped at the session's one moment `at`.

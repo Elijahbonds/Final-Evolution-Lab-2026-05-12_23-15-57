@@ -8,7 +8,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   roleOf, grooveOf, density, difficultyFor, routineFromGroove, exportSongToDance, exportedTrackId, seedFrom,
+  GRID_DANCE_BARS, danceSongAtTier, saveExportedTrack, readExportedTrack,
 } from './DanceExport';
+import { installFakeWebAudio } from './fakeWebAudio';
+import { shownRowIds } from './MusicTiers';
 import {
   TIERS, MUSIC_TIERS, NO_PROGRESS, tierFor, tierDef, unlocked, nextUnlock, isRealPattern, advance,
   CHAIN_AT_PATTERNS, STUDIO_AT_CHAIN, type MusicProgress,
@@ -242,5 +245,65 @@ describe('THE GRID TIER', () => {
     // each tier is a superset of the one below: a ladder, not a set of modes
     expect(TIERS.studio.tracks).toBeGreaterThan(TIERS.chain.tracks);
     expect(TIERS.chain.tracks).toBeGreaterThan(TIERS.grid.tracks);
+  });
+});
+
+// MUSIC-SUITE P3 (2026-09-25): the ladder opens the dance export AT THE GRID, but the button lived in the song panel (which
+// mounts at the CHAIN) and exported only a chain — so the grid tier never had it. danceSongAtTier decides the song per tier.
+describe('THE DANCE EXPORT AT THE TIER THE LADDER NAMES', () => {
+  const grid = [track('kick', [0, 8]), track('snare', [4, 12]), track('lead', [2, 6, 10, 14])];
+  const heard = (def: { tracks: number }) => { const ids = shownRowIds(def); return (t: TrackState) => ids.has(t.sampleId); };
+  const chainSong = { chain: [{ sectionId: 's1', bars: 2 }], sections: [{ id: 's1', name: 'verse', tracks: grid }] };
+
+  it('AT THE GRID (no arrangement, no chain) the grid itself goes to the dance floor, looped', () => {
+    const t = TIERS.grid;
+    const s = danceSongAtTier({ danceExport: t.danceExport, arrangement: t.arrangement, chain: [], sections: [], grid, heard: heard(t) })!;
+    expect(s.from).toBe('grid');
+    const out = exportSongToDance({ id: 'prj_1', name: 'Beat', bpm: 96, steps: STEPS, ...s })!;
+    expect(out).not.toBeNull();
+    expect(out.track.bars).toBe(GRID_DANCE_BARS);
+    expect(out.summary.hits).toBe(4 * GRID_DANCE_BARS);           // kick + snare only: lead is not drawn at the grid
+  });
+
+  it('with the arrangement open and a chain built, the chain goes — and a hidden row is still left out', () => {
+    const t = TIERS.chain;
+    const s = danceSongAtTier({ danceExport: t.danceExport, arrangement: t.arrangement, ...chainSong, grid: [], heard: heard(t) })!;
+    expect(s.from).toBe('chain');
+    expect(exportSongToDance({ id: 'prj_1', name: 'Beat', bpm: 96, steps: STEPS, ...s })!.summary).toMatchObject({ bars: 2, hits: 8 });
+    const studio = danceSongAtTier({ danceExport: true, arrangement: true, ...chainSong, grid: [], heard: heard(TIERS.studio) })!;
+    expect(exportSongToDance({ id: 'prj_1', name: 'Beat', bpm: 96, steps: STEPS, ...studio })!.summary.hits).toBe(16);   // lead joins at 8 rows
+  });
+
+  it('with the arrangement open but no chain yet, the grid still goes (the button is never a dead end)', () => {
+    const t = TIERS.chain;
+    expect(danceSongAtTier({ danceExport: true, arrangement: t.arrangement, chain: [], sections: [], grid, heard: heard(t) })!.from).toBe('grid');
+  });
+
+  it('a tier without the export gets nothing; the same project exports the same chart every time', () => {
+    expect(danceSongAtTier({ danceExport: false, arrangement: true, ...chainSong, grid, heard: () => true })).toBeNull();
+    const s = danceSongAtTier({ danceExport: true, arrangement: false, chain: [], sections: [], grid, heard: heard(TIERS.grid) })!;
+    const a = exportSongToDance({ id: 'prj_same', name: 'A', bpm: 96, steps: STEPS, ...s });
+    const b = exportSongToDance({ id: 'prj_same', name: 'A', bpm: 96, steps: STEPS, ...s });
+    expect(a).toEqual(b);
+  });
+});
+
+// MUSIC-SUITE P3 FIX PASS (2026-09-25): SEND TO THE DANCE FLOOR said "sent" when the write failed — saveExportedTrack
+// swallowed every setItem failure. It says whether the export was kept now, and the room says the failure.
+describe('the dance export says whether it was kept', () => {
+  const kick = (): TrackState[] => [{ sampleId: 'kick', pattern: Array.from({ length: STEPS }, (_, i) => i % 4 === 0), volume: 0.8, muted: false, pan: 0 }];
+  it('true when kept (and the Cypher reads it back); false when the storage refuses it — never a silent success', () => {
+    const out = exportSongToDance({ id: 'prj_d', name: 'Kept', bpm: 100, steps: STEPS, chain: [{ sectionId: 'a', bars: 2 }], sections: [{ id: 'a', name: 'a', tracks: kick() }] })!;
+    expect(out).toBeTruthy();
+    const roomy = installFakeWebAudio();
+    try {
+      expect(saveExportedTrack(out)).toBe(true);
+      expect(readExportedTrack()?.track.id).toBe(out.track.id);
+    } finally { roomy.uninstall(); }
+    const full = installFakeWebAudio({ quotaChars: 10 });
+    try {
+      expect(saveExportedTrack(out)).toBe(false);
+      expect(readExportedTrack()).toBeNull();
+    } finally { full.uninstall(); }
   });
 });

@@ -5,6 +5,10 @@
 // 'mental' off a score that saturates at 100. This drives the real handler with the session, the database and the
 // services mocked, so dropping the ceiling, the music win rule or the accuracy-scaled PRQ from the route fails here —
 // the pure rules in lib/session-payout.ts and lib/prq.ts have their own tests.
+//
+// MUSIC-SUITE P3 (2026-09-25): a CREATION session (a Studio save / render: music, score 0, metadata.kind 'creation') was
+// refused as idle (sessionHasPlay), so STUDIO time never reached the streak. The last two describes drive it: it counts
+// for the streak once a streak day and pays nothing, and every other session keeps today's rules.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
@@ -18,6 +22,10 @@ const h = vi.hoisted(() => ({
   events: [] as Array<Record<string, unknown>>,
   /** MUSIC-SUITE P2 FIX PASS: the duels the route can find (competitionMatch.findUnique), by id. */
   matches: {} as Record<string, Record<string, unknown>>,
+  /** MUSIC-SUITE P3: the creation branch's conditional streak writes (prisma.playerProfile.updateMany). */
+  creationWrites: [] as Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>,
+  /** MUSIC-SUITE P3: when set, the profile a request reads (a stale read racing another request); h.profile is the row. */
+  staleRead: null as Record<string, unknown> | null,
 }));
 
 vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { id: 'u1' } }) }));
@@ -27,6 +35,8 @@ vi.mock('@/lib/db', () => {
     playerProfile: {
       update: async ({ data }: { data: Record<string, unknown> }) => {
         h.updates.push(data);
+        // MUSIC-SUITE P3: the streak fields persist, so the next request reads what this one wrote
+        for (const k of ['streakDays', 'lastStreakAt', 'lastActiveAt'] as const) if (data[k] !== undefined) h.profile[k] = data[k];
         const plain = Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'number'));
         return { ...h.profile, ...plain, labCredits: 100 };
       },
@@ -38,13 +48,23 @@ vi.mock('@/lib/db', () => {
     prisma: {
       $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx),
       competitionMatch: { findUnique: async ({ where }: { where: { id: string } }) => h.matches[where.id] ?? null },
+      // MUSIC-SUITE P3: matches only while the row still has the lastStreakAt the request read (Postgres equality on a Date)
+      playerProfile: {
+        updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+          h.creationWrites.push({ where, data });
+          const seen = where.lastStreakAt;
+          if (seen !== undefined && new Date(seen as Date).getTime() !== new Date(h.profile.lastStreakAt as Date).getTime()) return { count: 0 };
+          Object.assign(h.profile, data);
+          return { count: 1 };
+        },
+      },
     },
   };
 });
 vi.mock('@/lib/wallet/wallet-service', () => ({
   applyLc: async (_tx: unknown, a: Record<string, unknown>) => { h.lc.push(a); return { balanceAfter: 100 + Number(a.delta) }; },
 }));
-vi.mock('@/lib/profile-service', () => ({ getOrCreateProfile: async () => h.profile }));
+vi.mock('@/lib/profile-service', () => ({ getOrCreateProfile: async () => ({ ...(h.staleRead ?? h.profile) }) }));
 vi.mock('@/lib/prq-entries', () => ({ createPrqEntry: async (_tx: unknown, row: Record<string, unknown>) => { h.prqRows.push(row); } }));
 vi.mock('@/lib/season/season-service', () => ({ addSeasonXp: async (a: Record<string, unknown>) => { h.season.push(a); return null; } }));
 vi.mock('@/lib/mastery/mastery-service', () => ({ recordMastery: async (_u: string, a: Record<string, unknown>) => { h.mastery.push(a); return null; } }));
@@ -76,8 +96,9 @@ function perfectScore(notes: number): number {
 beforeEach(() => {
   // streaked today already, so the only credits in play are the win's
   h.profile = { userId: 'u1', streakDays: 3, lastStreakAt: new Date(), labCredits: 100, strength: 50, speed: 50, endurance: 50, agility: 50, power: 50, flexibility: 50, recovery: 50, mental: 50 };
-  for (const k of ['updates', 'sessions', 'lc', 'prqRows', 'season', 'mastery', 'events'] as const) h[k] = [];
+  for (const k of ['updates', 'sessions', 'lc', 'prqRows', 'season', 'mastery', 'events', 'creationWrites'] as const) h[k] = [];
   h.matches = {};
+  h.staleRead = null;
 });
 
 /** An open LC music duel between u1 and u2 (the Arena's CompetitionMatch row). */
@@ -272,5 +293,158 @@ describe('what did not change', () => {
   it('a claimed win with nothing behind it is not play in the music room', async () => {
     const r = await post({ mode: 'music', score: 0, won: true, duration: 60 });
     expect(r.body).toMatchObject({ noPlay: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MUSIC-SUITE P3 (2026-09-25): the creation session
+// ---------------------------------------------------------------------------
+
+const HOUR = 60 * 60 * 1000;
+/** The player last streaked `hours` ago and has not been active since. */
+function streakedAgo(hours: number, streakDays = 3) {
+  const at = new Date(Date.now() - hours * HOUR);
+  Object.assign(h.profile, { streakDays, lastStreakAt: at, lastActiveAt: at });
+}
+/** A Studio save / render as the P3 client posts it. */
+function creation(o: Record<string, unknown> = {}) {
+  return { mode: 'music', score: 0, duration: 420, metadata: { kind: 'creation', projectId: 'p1', reason: 'save' }, ...o };
+}
+
+describe('MUSIC-SUITE P3: a creation session (a Studio save or render)', () => {
+  it('counts toward the daily streak and pays nothing: no XP, shards, LC, win, PRQ, season XP, mastery or session row', async () => {
+    streakedAgo(25);
+    const r = await post(creation({ won: true }));                  // a claimed win is not a win
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      ok: true, creation: true, counted: true, noOp: false, nextDueAt: null, sessionId: null,
+      won: false, capped: false, xp: 0, shards: 0, credits: 0, streakDays: 4, streakBonus: 0, prqDelta: 0,
+      season: null, mastery: null,
+    });
+    expect(r.body.prqAfter).toBe(r.body.prqBefore);
+    // exactly the two streak fields, conditional on the lastStreakAt the request read; lastActiveAt left alone
+    expect(h.creationWrites).toHaveLength(1);
+    expect(Object.keys(h.creationWrites[0].data).sort()).toEqual(['lastStreakAt', 'streakDays']);
+    expect(h.creationWrites[0].data.streakDays).toBe(4);
+    expect(h.creationWrites[0].where).toMatchObject({ userId: 'u1' });
+    expect(h.creationWrites[0].where.lastStreakAt).toBeInstanceOf(Date);
+    expect(h.updates).toEqual([]);                                  // no XP / shards / attribute write
+    expect(h.sessions).toEqual([]);                                 // no GameSession row for a score reader to misread
+    expect(h.lc).toEqual([]);
+    expect(h.prqRows).toEqual([]);
+    expect(h.season).toEqual([]);
+    expect(h.mastery).toEqual([]);
+    expect(h.events.map((e) => e.name)).toEqual(['session_creation']);
+    expect(h.profile.streakDays).toBe(4);
+  });
+
+  it('a second creation the same streak day is a 200 no-op — nothing written, nothing logged', async () => {
+    streakedAgo(25);
+    await post(creation());
+    for (const reason of ['save', 'render', 'save']) {
+      const again = await post(creation({ metadata: { kind: 'creation', reason } }));
+      expect(again.status).toBe(200);
+      expect(again.body).toMatchObject({ ok: true, creation: true, counted: false, noOp: true, xp: 0, shards: 0, credits: 0, streakDays: 4, sessionId: null });
+      // MUSIC-SUITE P3 FIX PASS: a no-op says when the streak day opens (the Academy asks again then, not tomorrow)
+      expect(Date.parse(again.body.nextDueAt)).toBe((h.profile.lastStreakAt as Date).getTime() + 24 * HOUR);
+    }
+    expect(h.creationWrites).toHaveLength(1);
+    expect(h.events).toHaveLength(1);
+    expect(h.profile.streakDays).toBe(4);
+  });
+
+  it('a creation on a day a set already counted is a no-op too (the day is already in the streak)', async () => {
+    // beforeEach: streaked today by play
+    const r = await post(creation());
+    expect(r.body).toMatchObject({ counted: false, noOp: true, streakDays: 3 });
+    expect(h.creationWrites).toEqual([]);
+    expect(h.events).toEqual([]);
+  });
+
+  it('a gap restarts the streak at day 1, exactly as a set would', async () => {
+    streakedAgo(24 * 3, 6);
+    const r = await post(creation());
+    expect(r.body).toMatchObject({ counted: true, streakDays: 1, credits: 0 });
+  });
+
+  it('a save and a render posted together count one streak day (the loser\'s conditional write matches nothing)', async () => {
+    streakedAgo(25);
+    h.staleRead = { ...h.profile };                                  // both requests read the row before either wrote
+    const [a, b] = await Promise.all([post(creation()), post(creation({ metadata: { kind: 'creation', reason: 'render' } }))]);
+    expect([a.body.counted, b.body.counted].sort()).toEqual([false, true]);
+    expect(h.events).toHaveLength(1);
+    expect(h.profile.streakDays).toBe(4);
+  });
+
+  it('the old catalogue key is the same room', async () => {
+    streakedAgo(25);
+    const r = await post(creation({ mode: 'musicAcademy' }));
+    expect(r.body).toMatchObject({ creation: true, counted: true, xp: 0 });
+  });
+
+  it('a creation-only day keeps the streak growing: the next day\'s set continues it', async () => {
+    streakedAgo(25);
+    await post(creation());                                          // day 4, by making music
+    const madeAt = h.profile.lastStreakAt as Date;
+    Object.assign(h.profile, { lastStreakAt: new Date(madeAt.getTime() - 25 * HOUR) });   // … and that was yesterday
+    const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+    expect(r.body).toMatchObject({ streakDays: 5, streakBonus: 25, credits: 15 + 25 });
+  });
+});
+
+describe('MUSIC-SUITE P3: making music first never changes what a set pays', () => {
+  it('the first set after a creation-opened day pays that day\'s streak LC (the creation paid none); the next set does not', async () => {
+    // what the set pays with no creation first (today's rules): day 4 opened by the set itself
+    streakedAgo(25);
+    const plain = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(plain.body).toMatchObject({ won: true, streakDays: 4, streakBonus: 20, credits: 35 });
+
+    // the same set after a Studio save opened the day
+    for (const k of ['updates', 'sessions', 'lc', 'events'] as const) h[k] = [];
+    streakedAgo(25);
+    await post(creation());
+    const first = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(first.body).toMatchObject({ won: true, streakDays: 4, streakBonus: 20, credits: 35 });
+    expect(h.sessions[0]).toMatchObject({ credits: 35 });
+    expect(h.lc[0]).toMatchObject({ delta: 35, metadata: { streakDays: 4, streakBonus: true, streakOwed: true } });
+    const second = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(second.body).toMatchObject({ streakDays: 4, streakBonus: 0, credits: 15 });
+  });
+
+  it('a set on a day a set opened (no creation) pays no second streak bonus — today\'s rule', async () => {
+    streakedAgo(25);
+    await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+    const again = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+    expect(again.body).toMatchObject({ streakBonus: 0, credits: 15 });
+    expect(h.lc[1].metadata).not.toHaveProperty('streakOwed');
+  });
+});
+
+describe('MUSIC-SUITE P3: anything that is not a creation session keeps today\'s rules', () => {
+  it('a music set with a score is a PERFORM set whatever its kind says: paid, won and recorded as before', async () => {
+    const r = await post({ mode: 'music', score: 9000, won: true, duration: 30, metadata: { ...musicSet({ bars: 8 }), kind: 'creation' } });
+    expect(r.body).not.toHaveProperty('creation');
+    expect(r.body).toMatchObject({ won: true, credits: 15, xp: Math.min(Math.round(9000 * 1.5) + 50, 14_150 * 30 / 60) });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.creationWrites).toEqual([]);
+  });
+
+  it('a score-0 music post of another kind is what it was: idle records nothing, a played miss-only set pays the floor', async () => {
+    const idle = await post({ mode: 'music', score: 0, duration: 60, metadata: { kind: 'perform' } });
+    expect(idle.body).toMatchObject({ noPlay: true, xp: 0 });
+    expect(idle.body).not.toHaveProperty('creation');
+    const missed = await post({ mode: 'music', score: 0, duration: 60, played: true, metadata: { kind: 'perform' } });
+    expect(missed.body).toMatchObject({ won: false, xp: 10, shards: 1, credits: 0 });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.creationWrites).toEqual([]);
+  });
+
+  it('another mode labelled a creation is that mode: idle at 0, paid as before with a score', async () => {
+    streakedAgo(25);
+    const idle = await post({ mode: 'dunkContest', score: 0, duration: 60, metadata: { kind: 'creation' } });
+    expect(idle.body).toMatchObject({ noPlay: true, streakDays: 3 });
+    const dunk = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120, metadata: { kind: 'creation' } });
+    expect(dunk.body).toMatchObject({ won: true, capped: false, xp: 410, shards: 15, streakDays: 4, streakBonus: 20, credits: 35 });
+    expect(h.creationWrites).toEqual([]);
   });
 });

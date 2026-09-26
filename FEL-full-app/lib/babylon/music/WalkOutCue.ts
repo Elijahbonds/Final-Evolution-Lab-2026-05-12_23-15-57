@@ -34,7 +34,16 @@ export interface WalkOutTrack {
   id: string;
   title: string;
   bpm: number;
-  /** data: URL of the rendered mixdown. Synthesised by SynthKit — nothing licensed, nothing to ship. */
+  /**
+   * data: URL of the rendered mixdown. Synthesised by SynthKit — nothing licensed, nothing to ship.
+   *
+   * MUSIC-SUITE P3 (2026-09-25): a SYNCHRONOUS source, and for the walk-out's song it always is one. Library audio
+   * moved into the device's file store (IndexedDB, async), but DunkMode resolves the cue at the top of its async
+   * load(), before any await (DunkMode.ts:1066-1067), and plays `new Audio(cue.src)` from it (DunkMode.ts:806) — an
+   * async lookup could never land in time. So StudioLibrary keeps the walk-out song's mixdown in its own localStorage
+   * keys and fills this field from them in `get(id)`; every other song reads '' here and plays through
+   * `StudioLibrary.audioSource(id)`. '' still means "nothing to walk out to" below, which is the honest answer.
+   */
   mixdownDataUrl: string;
 }
 

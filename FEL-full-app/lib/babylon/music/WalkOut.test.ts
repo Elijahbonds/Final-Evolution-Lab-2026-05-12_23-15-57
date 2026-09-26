@@ -7,8 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   makeWalkOut, parseWalkOut, countPlay, musicCredential, walkOutFromCard,
-  WalkOutRefused, WALKOUT_VERSION, MAX_TITLE, MIN_BARS, MAX_BARS,
+  WalkOutRefused, WALKOUT_VERSION, MAX_TITLE, MIN_BARS, MAX_BARS, saveWalkOut, readWalkOut,
 } from './WalkOut';
+import { installFakeWebAudio } from './fakeWebAudio';
 
 const NOW = Date.parse('2026-09-13T12:00:00.000Z');
 const draft = (over = {}) => ({ songId: 'song_1', title: 'Boardwalk', bpm: 96, bars: 16, now: NOW, ...over });
@@ -124,5 +125,20 @@ describe('a ghost duel plays THEIR track, and it came from their JSON', () => {
   it('and an oversized title from a stranger is still clamped', () => {
     const theirs = { ...makeWalkOut(draft()), title: 'z'.repeat(500) };
     expect(walkOutFromCard(theirs)!.title.length).toBeLessThanOrEqual(MAX_TITLE);
+  });
+});
+
+// MUSIC-SUITE P3 (2026-09-25): no save fails silently. saveWalkOut returned nothing and swallowed the error.
+describe('saveWalkOut says whether the record was kept', () => {
+  it('true when kept, false when the storage refuses, false with no window', () => {
+    expect(saveWalkOut(makeWalkOut(draft()))).toBe(false);            // node: no window, nothing kept
+    const fake = installFakeWebAudio({ quotaChars: 10_000 });
+    try {
+      expect(saveWalkOut(makeWalkOut(draft()))).toBe(true);
+      expect(readWalkOut()?.songId).toBe('song_1');
+      fake.storage.setItem('filler', 'x'.repeat(10_000 - fake.storage.usedChars - 'filler'.length));
+      expect(saveWalkOut({ ...makeWalkOut(draft()), title: 'a much longer title than before' })).toBe(false);
+      expect(readWalkOut()?.title).toBe('Boardwalk');                   // the old record is untouched
+    } finally { fake.uninstall(); }
   });
 });

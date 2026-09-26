@@ -40,6 +40,23 @@ async function setRange(p: Page, label: string, v: number): Promise<void> {
   }, [label, v]);
   await p.waitForTimeout(120);
 }
+
+/**
+ * MUSIC-SUITE P3 FIX PASS (2026-09-25): REPLAY no longer wipes the grid — P3 restores the whole project on the remount
+ * (useStudioProject), the built beat, its sections and its tempo included. The runs below were written for P2's "REPLAY
+ * remounts on an empty grid", so each replay now puts the room in that known state itself: CLEAR (asked, then yes) and
+ * the tempo / swing the tap timings assume. MY PROJECTS' NEW would also do it, but it is held during a PERFORM set.
+ */
+async function knownState(p: Page, bpm = 92, swingPct = 15): Promise<void> {
+  const clear = p.locator('[data-qa="clear"]');
+  if (await clear.isEnabled().catch(() => false)) {
+    await clear.click();
+    await p.locator('[data-qa="clear-yes"]').click();
+    await p.waitForTimeout(120);
+  }
+  await setRange(p, 'BPM', bpm);
+  await setRange(p, 'SWING', swingPct);
+}
 const status = (p: Page) => p.evaluate(() => document.querySelector('[data-qa="perform-status"]')?.textContent ?? null);
 const ended = (p: Page) => p.evaluate(() => (window as Any).__FEL_STUDIO__?.ended ?? null);
 
@@ -209,6 +226,7 @@ async function run(): Promise<void> {
   await p.getByRole('button', { name: 'TAP TO START' }).click();
   await p.waitForFunction(`(${GRID_EL}) != null`, undefined, { timeout: 60000 });
   await p.waitForTimeout(300);
+  await knownState(p);                        // MUSIC-SUITE P3 FIX PASS: the remount restores the project now
 
   // one tap, then END SET (P1: score 100, won)
   for (const s of [0, 4, 8, 12]) await clickCell(p, 0, s);
@@ -225,8 +243,9 @@ async function run(): Promise<void> {
   await p.getByRole('button', { name: 'TAP TO START' }).click();
   await p.waitForFunction(`(${GRID_EL}) != null`, undefined, { timeout: 60000 });
   await p.waitForTimeout(300);
+  await knownState(p);                        // MUSIC-SUITE P3 FIX PASS: the remount restores the project now
 
-  // an EMPTY grid (the remount clears it): no notes; a tap is EXTRA
+  // an EMPTY grid (CLEARed after the remount — P3 restores the project): no notes; a tap is EXTRA
   await btn(p, 'PLAY').click();
   await p.waitForTimeout(2500);
   await p.evaluate(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true, cancelable: true })));

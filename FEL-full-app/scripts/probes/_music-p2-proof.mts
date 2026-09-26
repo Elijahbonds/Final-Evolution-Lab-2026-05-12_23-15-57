@@ -92,7 +92,23 @@ async function freshRoom(p: Page): Promise<void> {
   await p.waitForTimeout(300);
   R.hook = await p.evaluate(HOOK);
 }
-const replay = async (p: Page) => { await p.locator('[data-dev="replay"]').click(); await p.waitForTimeout(300); await freshRoom(p); };
+/**
+ * MUSIC-SUITE P3 FIX PASS (2026-09-25): REPLAY no longer wipes the grid — P3 restores the whole project on the remount
+ * (useStudioProject), the built beat, its sections and its tempo included. The runs below were written for P2's "REPLAY
+ * remounts on an empty grid", so each replay now puts the room in that known state itself: CLEAR (asked, then yes) and
+ * the tempo / swing the tap timings assume. MY PROJECTS' NEW would also do it, but it is held during a PERFORM set.
+ */
+async function knownState(p: Page, bpm = 92, swingPct = 15): Promise<void> {
+  const clear = p.locator('[data-qa="clear"]');
+  if (await clear.isEnabled().catch(() => false)) {
+    await clear.click();
+    await p.locator('[data-qa="clear-yes"]').click();
+    await p.waitForTimeout(120);
+  }
+  await setRange(p, 'BPM', bpm);
+  await setRange(p, 'SWING', swingPct);
+}
+const replay = async (p: Page) => { await p.locator('[data-dev="replay"]').click(); await p.waitForTimeout(300); await freshRoom(p); await knownState(p); };
 
 /**
  * In-page: the live start()s of the last PLAY vs renderMixdown(bars) on the same engine. `live` = the starts on the
@@ -310,7 +326,7 @@ async function run(): Promise<void> {
   await btn(p, 'END SET').click();
   await p.waitForTimeout(400);
   R.empty = { litCells: litAll, playedSec: 5, statusAfterTap: emptyStatus, audibleHits: emptyAudible, result: await ended(p),
-    how: 'REPLAY remounts on an empty grid; PERFORM, PLAY 5 s, one keydown J, END SET; notes = the set\'s own count (stats.notes)' };
+    how: 'REPLAY, then CLEAR (P3 restores the project on a remount) at 92 BPM / 15 %; PERFORM, PLAY 5 s, one keydown J, END SET; notes = the set\'s own count (stats.notes)' };
   log('empty', JSON.stringify(R.empty));
 
   // ── 5. a shard spend asks first ──
