@@ -20,7 +20,10 @@ import {
   buildShimmy, buildDropStep,                        // 2026-09-18: the post game
   buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildSnatchBack,
   buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip,   // 2026-09-16: the handle, and the ankles
+  buildIdleStandHoops,   // HOOPS MOTION phase 3b (review): the ball-less watch with knees
 } from './basketball';
+import { basketballClipTable } from '../basketballTree';
+import { CLIP_ALIASES } from '../clipAliases';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>(); let root: TransformNode;
@@ -48,6 +51,27 @@ function pos(name: string): Vector3 {
 }
 
 describe('basketball packages on the forge rig', () => {
+  // HOOPS MOTION phase 3b (review): the tree's `watch` played idle_stand, which keys no leg — its knees were the previous clip's (21–95°
+  // across takes: the 1v1 hero 63.4 → 28.2° in a session). The hoops watch keys both legs on every key, so the knees are its own.
+  it('the ball-less watch (bball_idle_stand) keys its own knees: the same bend on every key, whatever clip came before', () => {
+    rest(); const watch = buildIdleStandHoops(scene, sk)!, slide = buildDefendSlide(scene, sk, 'left')!;
+    const knee = () => { const a = pos('LeftUpLeg'), k = pos('LeftLeg'), f = pos('LeftFoot'); const u = a.subtract(k).normalize(), v = f.subtract(k).normalize(); return 180 - Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(u, v)))) * 180 / Math.PI; };
+    const bends: number[] = [];
+    for (const t of [0, 1.5, 3]) { at(watch, t); bends.push(knee()); }
+    expect(Math.max(...bends) - Math.min(...bends)).toBeLessThan(1.5);
+    expect(bends[0]).toBeGreaterThan(15); expect(bends[0]).toBeLessThan(40);   // soft athletic knees, not locked, not a crouch
+    // after the deep slide stance (no reset to bind between them): the same knees
+    at(slide, 0.25); const deep = knee();
+    watch.start(true, 1, watch.from, watch.to, false); watch.goToFrame(0); scene.render();
+    for (const x of scene.animationGroups) if (x !== watch) x.stop();
+    scene.render();
+    expect(Math.abs(deep - bends[0])).toBeGreaterThan(5);                       // (the slide really is a different bend)
+    expect(Math.abs(knee() - bends[0])).toBeLessThan(1.5);
+    watch.stop();
+    // the tree's watch asks for it, and a rig that did not build it falls back to the base idle
+    expect(basketballClipTable().watch.clip).toBe('bball_idle_stand');
+    expect(CLIP_ALIASES.bball_idle_stand?.[0]).toBe('idle_stand');
+  });
   it('dribble idle keeps the ball hand low and in front', () => {
     at(buildDribbleIdle(scene, sk)!, 0.4);
     const h = pos('RightHand'), head = pos('Head');

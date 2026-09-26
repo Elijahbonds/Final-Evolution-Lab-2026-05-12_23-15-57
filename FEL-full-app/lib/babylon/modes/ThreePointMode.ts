@@ -43,6 +43,8 @@ import { attachBallToHand, gatherBallToHand, palmOffsetOf, releaseBall } from '.
 import { rightHandHoops, rightHandBall, hoopsHand } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
 import { rightHandDunks } from '../anim/dunkHand';                             // …the dunk family too (the make's celebration is a dunk_ clip)
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';            // HOOPS MOTION phase 3: the jog's hold is the shared carry's
+/** HOOPS MOTION phase 3b (review): the shooter's idle between shots has its own knees (idle_stand keys no leg: 76 / 41° take to take). */
+const WATCH_IDLE = 'bball_idle_stand';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
@@ -567,7 +569,7 @@ function contactMake(ctx: ModeContext): void {
   const big = landing.perfect || landing.money;
   ctx.juice.shake(big ? 0.10 : 0.06, 100);
   // hoops detail pass (2026-09-18): the shooter ANSWERS a perfect / money make with arms up (the sideline bodies did; he never did)
-  if (big && player) player.animator.play(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) });
+  if (big && player) player.animator.play(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12, onEnd: () => player?.animator.play(WATCH_IDLE, { loop: true, fadeSec: 0.2 }) });
   if (big) ctx.juice.flash(landing.money ? '#ffd75e' : '#fff6dd', 90);
   hoopJuice?.punch(true);   // RIM PLAY: escalates over a rattle's graze
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
@@ -972,7 +974,7 @@ export const ThreePointMode: ModeDefinition = {
           // A+ mission #4: the body on the sideline ANSWERS its number — a big round celebrates, a poor one flinches.
           // (Lock D4 rules out visible rival shooting; a reaction to the posted score is not a shot.)
           const body = rivalBodies[RIVAL_NAMES.indexOf(f.name)];
-          if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { onEnd: () => body.animator.play('idle_stand', { loop: true }) });
+          if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { onEnd: () => body.animator.play(WATCH_IDLE, { loop: true }) });
           pushHud(ctx);
           if (!S.revealQueue.length) { micPlaced(); if (S.finalistsPosting) mic?.expect({ moment: 'three.go' }); }   // THE MIC: the last number is up
         }
@@ -1008,7 +1010,7 @@ export const ThreePointMode: ModeDefinition = {
       // Ease so the jog into the rack reads as deliberate rather than a snap.
       const k = S.moveT * S.moveT * (3 - 2 * S.moveT);
       player.root.position = Vector3.Lerp(S.from, target, k);
-      player.animator.play(k < 1 ? 'run' : 'idle_stand', { loop: true });
+      player.animator.play(k < 1 ? 'run' : WATCH_IDLE, { loop: true });
       // BIOMECH-HOOPS-WAVE1 G1: the jog faces its travel (the body ran sideways / backwards to the next rack), slewed
       const travel = yawOfVel({ x: target.x - S.from.x, z: target.z - S.from.z }, 0.05);
       if (k < 1 && travel !== null) player.root.rotation.y = slewYaw(player.root.rotation.y, travel, FACE_RATE, dt);
@@ -1044,7 +1046,7 @@ export const ThreePointMode: ModeDefinition = {
           // HOOPS-DEPTH S6: outside the good band the body shows the miss before the rim does: short = the early short arm, long = the late push
           const ftClip = followThroughFor(Math.abs(shotErr) < goodBand() ? 'good' : shotErr < 0 ? 'early' : 'late');
           console.info(`[3PT-SHOT] follow-through ${ftClip} (err ${shotErr.toFixed(3)})`);
-          player.animator.play(ftClip, { fadeSec: 0.08, onEnd: () => player?.animator.play('bball_land_absorb', { fadeSec: 0.1, onEnd: () => player?.animator.play('idle_stand', { loop: true, fadeSec: 0.2 }) }) });   // from the release frame: arms overhead → the wrist snap → down the front
+          player.animator.play(ftClip, { fadeSec: 0.08, onEnd: () => player?.animator.play('bball_land_absorb', { fadeSec: 0.1, onEnd: () => player?.animator.play(WATCH_IDLE, { loop: true, fadeSec: 0.2 }) }) });   // from the release frame: arms overhead → the wrist snap → down the front
         }
       } else if (rimOut >= 0) {
         // the ball is live off the iron: let it bounce where the timing sent it, then the next ball is up

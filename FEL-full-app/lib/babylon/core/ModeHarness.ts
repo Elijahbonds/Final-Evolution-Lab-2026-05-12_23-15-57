@@ -776,6 +776,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     store.setBody(bodyTick.presence, bodyTick.handsUp01);
     for (const e of floor.tick(bodyNow)) input.emitBody(e);
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
+    (ctx.scene.metadata ??= {}).felTimeScale = timeScale();   // HOOPS MOTION phase 3b: the hit-stop's scale this frame, read by the motion probe (a frozen frame is not a body's acceleration)
     if (phase === 'playing') {
       if (qa) qaSampleAnim();
       def.update(ctx, dt * timeScale());

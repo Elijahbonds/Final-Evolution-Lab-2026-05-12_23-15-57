@@ -10,6 +10,7 @@
 // Yaw convention (measured 2026-09-03): +yaw turns the RIGHT shoulder FORWARD (+z).
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
+import { hangFor } from './locomotion';
 
 export const BASKETBALL_CLIPS = [
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
@@ -37,6 +38,7 @@ export const BASKETBALL_CLIPS = [
   'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin', 'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left',
   // THE POST GAME (2026-09-18): the shimmy before a fade, the drop step around the man
   'bball_shimmy', 'bball_drop_step', 'bball_drop_step_left',
+  'bball_idle_stand',   // HOOPS MOTION phase 3b (review): the ball-less watch with its own knees (idle_stand keys none)
 ] as const;
 type V3 = [number, number, number];
 
@@ -50,6 +52,24 @@ const mirror = (v: V3): V3 => [-v[0], v[1], v[2]];
 export function buildDribbleIdle(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const key = (t: number, spine: number, hand: V3, hipsY: number) => ({ t, bones: { Hips: [0, 0, 0] as Deg3, Spine: [spine, 0, 0] as Deg3, ...STANCE }, hands: { Right: hand, Left: OFF_HAND }, hipsY });
   return buildPoseClip(scene, sk, 'bball_dribble_idle', 0.8, [key(0, 14, BALL_HAND, -0.05), key(0.4, 17, [0.22, 0.82, 0.32], -0.07), key(0.8, 14, BALL_HAND, -0.05)]);
+}
+
+/** HOOPS MOTION phase 3b (review): THE BALL-LESS WATCH HAS KNEES. The tree's `watch` (a body with no ball that is not defending: the
+ *  shooter watching his arc, a mate spacing, the rival after his release) played `idle_stand`, which keys the hips, the spine, the neck
+ *  and the hands and NO LEG BONE — so its knees were whatever the clip before it left: 21–95° across takes (base2, 3b's rB/rC; the 1v1
+ *  hero 63.4 → 28.2° in one session, the 3PT shooter alternating 76 / 41°). This is idle_stand's own breath and hang on a soft athletic
+ *  stance keyed on every key (knees ≈ 26°, the hips down by the legs' shortening), so it reads the same on every take. */
+export const WATCH_LEGS: Record<string, Deg3> = { LeftUpLeg: [-14, 0, 5], RightUpLeg: [-14, 0, -5], LeftLeg: [26, 0, 0], RightLeg: [26, 0, 0] };
+export const WATCH_DROP = -0.021;
+export function buildIdleStandHoops(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const HANG = hangFor(sk);
+  const poles = { Left: [-0.2, -0.3, -0.9] as V3, Right: [0.2, -0.3, -0.9] as V3 };   // (idle_stand's: the elbows slightly back)
+  const key = (t: number, spine: number, neck: Deg3, lift: number, hipsY: number): PoseKey => ({
+    t, bones: { Hips: [0, 0, 0], Spine: [spine, 0, 0], Neck: neck, ...WATCH_LEGS },
+    hands: { Left: [HANG.Left[0] - lift * 0.3, HANG.Left[1] + lift + WATCH_DROP, HANG.Left[2]], Right: [HANG.Right[0] + lift * 0.3, HANG.Right[1] + lift + WATCH_DROP, HANG.Right[2]] },
+    poles, hipsY: hipsY + WATCH_DROP,
+  });
+  return buildPoseClip(scene, sk, 'bball_idle_stand', 3.0, [key(0, 4, [0, 0, 0], 0, 0), key(1.5, 6.5, [2, 3, 0], 0.02, -0.012), key(3, 4, [0, 0, 0], 0, 0)]);
 }
 
 /** Crossover: hips and shoulders snap to the new side, the ball hand sweeps across. */

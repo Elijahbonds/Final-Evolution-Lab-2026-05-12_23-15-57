@@ -181,7 +181,9 @@
   HM.hud = hudNow;
   const seam = () => (scene.metadata || {})[MODE] || null;
   HM.seam = seam;
-  const state = () => {
+  // PHASE 3b: the harness's hit-stop scale this frame (scene.metadata.felTimeScale; < 1 = game time frozen / easing back) rides every state
+  const state = () => { const o = state0(); const ts = (scene.metadata || {}).felTimeScale; if (o && typeof ts === 'number' && ts < 1) o.ts = Math.round(ts * 1000) / 1000; return o; };
+  const state0 = () => {
     try {
       const s = seam(); const h = hudNow();
       // PHASE 3a: hh = the athlete's hand each live dribble is on ('R' / 'L', per body id; the mode's carry says it); cf = the 3v3 foe

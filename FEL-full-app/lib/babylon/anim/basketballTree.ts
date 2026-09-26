@@ -94,7 +94,11 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   // hip, so the off arm swung like a sprinter's and the ball arm stuck out behind. The dribbling sprint capture (78_06)
   // already carries a ball: the off arm rides low and balanced, the ball arm's cadence matches the bounce.
   drive:           { clip: 'bball_dribble_run', loop: true, fadeSec: 0.12 },
-  run:             { clip: 'run_forward', loop: true, fadeSec: 0.1 },
+  // HOOPS MOTION phase 3b: A BALL-LESS RUNNER RUNS. `run_forward` resolves on a hoops rig to `bball_mc_drive` — the DRIBBLING sprint
+  // (78_06, the ball arm low and pumping the bounce) — so every mate and foe off the ball dribbled air (B:ai_3v3_offball 5/5). `run`
+  // resolves to the real run, `bball_mc_run` (78_12), which was built and never asked for. basketballRun.test holds it: no state a
+  // ball-less body can be in plays a dribbling clip.
+  run:             { clip: 'run', loop: true, fadeSec: 0.1 },
   gather:          { clip: 'dunk_charge_gather', loop: true, fadeSec: 0.08 },
   shot_release:    { clip: 'bball_shoot_jumper', loop: true, fadeSec: 0.06 },
   layup:           { clip: 'bball_layup_gather', loop: false, fadeSec: 0.08 },
@@ -120,7 +124,7 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   // BIOMECH-HOOPS-WAVE1 (2026-09-08): a body with no ball that is NOT defending (the shooter watching his arc, the rival
   // after his release) stands and watches — it used to drop into the defensive slide stance (G5: the follow-through's
   // silhouette died into a crouch the moment the hold released).
-  watch:           { clip: 'idle_stand', loop: true, fadeSec: 0.2 },
+  watch:           { clip: 'bball_idle_stand', loop: true, fadeSec: 0.2 },   // HOOPS MOTION phase 3b (review): idle_stand keys no leg — its knees were the last clip's (21–95°)
   floor:           { clip: 'karate_floor_hold', loop: true, fadeSec: 0.12 },
   celebrate:       { clip: 'bball_score_celebrate', loop: false, fadeSec: 0.26 },   // POLISH: the arms-up first key popped a wrist 0.7 m out of a stance at 0.15
   dejected:        { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
@@ -143,7 +147,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
           : i.intense ? (i.slideDir === 'right' ? 'defend_slide_hard_right' : 'defend_slide_hard')
           : (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide'))
         : 'defend_idle';
-  } else if (i.crossover) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';
+  } else if (i.crossover && i.hasBall) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';   // HOOPS MOTION phase 3b: a crossover is a ball move — a ball-less body never plays one
   // TRAVELLING OFF THE FACING: slide, do not run. Only above a real walking pace and never inside a drive, so a
   // size-up reads as a size-up and a drive still reads as a drive.
   else if (lateralState(i)) state = lateralState(i)!;

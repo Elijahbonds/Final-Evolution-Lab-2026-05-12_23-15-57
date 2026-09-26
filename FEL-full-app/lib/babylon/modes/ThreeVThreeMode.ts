@@ -52,7 +52,8 @@ import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } f
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
-import { BasketballAnimTree } from '../anim/basketballTree';
+import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
+import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
@@ -209,6 +210,9 @@ interface Body {
   /** DYNAMIC POSTURE: this body's own motion tracker. Per body, because an acceleration only means 'braking' or
    *  'turning' once it is resolved in the frame of the body that felt it — six bodies, six frames. */
   motion: BodyMotion;
+  /** HOOPS MOTION phase 3b: an AI body's movement (its brain's wish reached at the hero's accel 26 / decel 34; null for the hero, whose
+   *  dribble controller is his), and every body's plant-and-cut foot pin (FootPlant, as 1v1's hero had alone). */
+  mover: AiMover | null; plant: FootPlant | null; wasPlanting: boolean;
 }
 
 export const ThreeVThreeMode: ModeDefinition = (() => {
@@ -255,7 +259,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   }
   // the rival's drive is a CLOCKED path (his `vel` is zeroed every frame — see the foe loop), so his closing speed on me is
   // read off his position, the way the charge reads it
-  const driverPrev = new Vector3(), driverVelEst = new Vector3(); let driverPrevFor: Body | null = null;
+  const driverPrev = new Vector3(), driverVelEst = new Vector3(); let driverPrevFor: Body | null = null, driverEstFrame = -1;
   const kin = { drifts: 0, ankles: 0, parries: 0, driveBys: 0, slings: 0, slipSec: 0, ignitions: 0, shocks: 0 };
   let arc: ShotArc;
   let arcMade = false, arcPoints = 0, arcLabel = '', arcQuality: ShotQuality = 'good';
@@ -265,6 +269,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
   let carrierId: 'me' | 'mate0' | 'mate1' | 'foeTeam' = 'me';
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
+  /** HOOPS MOTION phase 3b: a MATE's shot is up (the one-shot-at-a-time guard). teammateShoots used to raise the hero's own `shooting`,
+   *  which nothing cleared when their ball followed his make (opponentPossession leaves it): the hero looped `bball_shoot_jumper` while
+   *  sliding on defence and was slewed toward the rim until the next possession of ours (V:3v3 C6). */
+  let mateShooting = false;
   let currentShot: ShotContext | null = null;
   /** Contest at shot start — so the release banner can say why. */
   let shotContest = 0;
@@ -421,6 +429,19 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   const JUMP_SEC = 0.75, JUMP_APEX = 0.46;
   const JUMPER_HOP_APEX = 0.30;   // DEFENSE-LOOK: a jump shot leaves the floor
   let riseHop: { t: number; dur: number } | null = null;
+  /** HOOPS MOTION phase 3b: the AI bodies' run tops (what they always moved at — now reached at the hero's accel / decel; a sprint is
+   *  AI_SPRINT_X of it). */
+  const MATE_RUN_MPS = 4.2, FOE_RUN_MPS = 3.8;
+  /** HOOPS MOTION phase 3b: a body's plant-and-cut pins a foot (the hero's FootPlant, on the rising edge of its plant), and the pin's
+   *  window runs down every frame. */
+  function plantBody(b: Body, planting: boolean, dt: number): void {
+    if (planting && !b.wasPlanting) b.plant?.plant();
+    b.wasPlanting = planting;
+    b.plant?.update(dt);
+  }
+  /** (3b review) A branch that skips the mover (a stun, a knockdown, the scripted drive) lets any pin go: FootPlant's window only runs down
+   *  inside plantBody, so a pin taken just before held that ankle at its plant spot for the whole stun or drive. */
+  function unplant(b: Body): void { b.plant?.release(); b.wasPlanting = false; }
   const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
   const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
   const AI_REACH_COOLDOWN_SEC = 1.2, AI_STEAL_CHANCE = 0.22, AI_STEAL_ON_BUMP = 0.6, AI_REACH_GATE = 0.5;   // measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions — a foul every other trip   // the AI defender's reach: its cadence and its odds (open / on the bump)
@@ -564,8 +585,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     possessionToken++;
     dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
-    // every body is about to be teleported; a reset is not an acceleration
-    for (const b of everyBody()) b.motion.reset();
+    // every body is about to be teleported; a reset is not an acceleration (nor a run: the movers stand, the pins let go)
+    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; }
     me.char.root.position.set(0, 0, 6);
     // MODE-STICK-FACE (2026-09-07): face the rim AND tell the dribble so. The movement layer's facing starts at 0 no
     // matter which way the model spawned, and a push AGAINST the facing is a back-pedal that keeps the chest where it
@@ -576,7 +597,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     mates[1].char.root.position.set(3.5, 0, 4);
     foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
     ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
-    shooting = false; currentShot = null;
+    shooting = false; mateShooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
     gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
@@ -652,7 +673,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // BIOMECH-HOOPS-WAVE1: one animation owner per rig, and the Posture Poses layer (mounted here, BEFORE the carries —
         // the dribble arm solves against the posed shoulders); the layer owns the eyes
         char.secondary?.setLookTarget(() => null);
-        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, vel: new Vector3(), jumpAge: Infinity, reachCooldown: 0, brain, screenHeld: false, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0, motion: new BodyMotion() };
+        const body: Body = { char, slot, drib: new DribbleController(), stunSec: 0, vel: new Vector3(), jumpAge: Infinity, reachCooldown: 0, brain, screenHeld: false, tree: new BasketballAnimTree(char.animator), posture: null, bio: { ...HOOPS_INPUT_IDLE }, floored: false, shotWin: 'none', shotSec: 0, landSec: 0, celebrateSec: 0, speed01: 0, motion: new BodyMotion(),
+          mover: ai ? new AiMover(aiKind === 'teammate' ? MATE_RUN_MPS : FOE_RUN_MPS) : null, plant: char.meshes[0] ? new FootPlant(char.skeleton, char.meshes[0] as never) : null, wasPlanting: false };
         body.posture = mountPostureLayer(ctx.scene, char.skeleton, char.root, () => feedFor(body), `3V3-PP-${ai ? aiKind : 'me'}`);
         return body;
       };
@@ -794,10 +816,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       synergy.tick(dt); driftCool = Math.max(0, driftCool - dt); meBurstLeft = Math.max(0, meBurstLeft - dt); mateBurst[0] = Math.max(0, mateBurst[0] - dt); mateBurst[1] = Math.max(0, mateBurst[1] - dt);
       if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.char.root.position.set(q.x, q.y, q.z); me.drib.vel.set(0, 0, 0); if (u >= 1) vault = null; }
       if (synergy.active) turbo.t01 = 1;
-      if (driver && dt > 1e-4) {
+      // (3b review) the scripted drive moves him ONCE a render, in the before-render pass: under ?qaSpeed=N the sub-updates 2..N of a
+      // render saw no travel and fed his tree 0 (the dribble run at RATE_MIN). Read once per frame id; the estimate holds in between.
+      if (driver && dt > 1e-4 && !(driverPrevFor === driver && driverEstFrame === ctx.scene.getFrameId())) {
         if (driverPrevFor === driver) { driverVelEst.copyFrom(driver.char.root.position).subtractInPlace(driverPrev).scaleInPlace(1 / dt); if (driverVelEst.length() > 12) driverVelEst.setAll(0); }   // a SNAP (the check spot, a reset) is not a run: 24 m/s read on one frame, measured
         else driverVelEst.setAll(0);
-        driverPrev.copyFrom(driver.char.root.position); driverPrevFor = driver;
+        driverPrev.copyFrom(driver.char.root.position); driverPrevFor = driver; driverEstFrame = ctx.scene.getFrameId();
       }
       else if (!driver) { driverPrevFor = null; driverVelEst.setAll(0); }
       { const sv = Math.round(synergy.value), od = Math.ceil(synergy.overdriveLeft); if (sv !== synHud || od !== odHud) { synHud = sv; odHud = od; ctx.setHud({ synergy: sv, overdrive: od }); } }
@@ -823,7 +847,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // flying ball to the dribble point (carrierId stays 'me' until the next possession)
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
       // HOOPS MOTION phase 3: an AI dribbler's pace is his own ground speed (a fixed 0.5 pushed a walking mate's ball out like a sprint)
-      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble) && !shooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin));
+      for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin));
 
       // poll every body; tick stagger timers
       net?.tick(me.slot.intent);   // no-op without ?net=
@@ -1157,6 +1181,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       const drib = me.drib.update(dt, wish.x, -wish.z, sprintOk);
       meSpeed01 = drib.speed01; me.speed01 = drib.speed01;
+      plantBody(me, drib.planting && !finish && !posting && !shooting && !dunking, dt);   // HOOPS MOTION phase 3b: the plant-and-cut pin (1v1's hero had it; 3v3 had none)
       meIntensity01 = drib.intensity01; if (drib.gear !== meGear) { console.info(`[3V3-PACE] gear ${meGear} → ${drib.gear} at ${me.drib.vel.length().toFixed(1)} m/s`); meGear = drib.gear; }
       if (drib.paceChange) { SoundKit.play('whoosh', { pitch: 1.25, volume: 0.4 }); ctx.camDirector.pulse(0.2, 0.3); console.info('[3V3-PACE] change of pace'); }
       // THE FLOOR ANSWERS A HARD STOP. Dust existed and ten modes used it — for knockdowns, tackles and
@@ -1431,7 +1456,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (!dunking) me.tree.update({   // the flight's held launch + the land crouch are mode-owned beats
         // STRIDE MATCHING: real ground speed, because speed01 is normalised and cannot pace a stride
         speedMps: Math.hypot(me.drib.vel.x, me.drib.vel.z),
-        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, crossoverDir: wish.x >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active,
+        speed01: drib.speed01, crossover: drib.crossover && iAmCarrier, crossoverDir: wish.x >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestFoeDist, hasBall: iAmCarrier && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased,   // HOOPS MOTION phase 3b: my released shot is not my ball (the tree settled me into a dribble idle under it for ~1 s, measured)
         shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
         retreat: retreatFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null), closeout: closeoutFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.speed01), intense: !!me.slot.intent.intense,   // DEFENSE-LOOK
@@ -1444,7 +1469,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const body = mates[i];
         const intent = body.slot.intent;
         const inMyWake = carrierId === 'me' && slipstreamRead(body.char.root.position, me.char.root.position, me.drib.vel);   // HOOPS KINETIC 3v3
-        const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(4.2 * (mateBurst[i] > 0 ? SLING.burstMult : 1) * synergy.mateMult * (inMyWake ? SLIPSTREAM.speedMult : 1));
+        // HOOPS MOTION phase 3b: the brain's intent reached at the hero's accel / decel (it was 0 or 4.2 m/s in one frame); the burst, the
+        // synergy and the slipstream scale his tops
+        const mv = body.mover!; mv.speedScale = (mateBurst[i] > 0 ? SLING.burstMult : 1) * synergy.mateMult * (inMyWake ? SLIPSTREAM.speedMult : 1);
+        mv.observe(body.char.root.position, dt);   // (held up by a body or a clamp last frame, he carries the speed he really had)
+        const mst = mv.stepIntent(dt, intent);
+        const vel = mst.vel.clone();
+        plantBody(body, mst.planting, dt);
         mateVel[i]?.copyFrom(vel); body.vel.copyFrom(vel);
         body.char.root.position.addInPlace(vel.scale(dt));
         if (!threeVenue?.constrain(body.char.root.position)) clampToHalfCourt(body.char.root.position, 8, 15);
@@ -1465,10 +1496,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // hard run (a cut / a crash), never while jogging a step: a spacer with its back to the ball is the wandering mannequin
         else if (jobAim && (setScreen || mb?.boxing || mb?.job === 'screen' || vel.length() < 2.5)) body.char.root.rotation.y = slewYaw(body.char.root.rotation.y, yawTo(body.char.root.position, jobAim), FACE_RATE, dt);
         else if (vel.lengthSquared() > 0.1) body.char.root.rotation.y = slewYaw(body.char.root.rotation.y, Math.atan2(vel.x, vel.z), FACE_RATE, dt);
-        body.speed01 = Math.min(1, vel.length() / 4.2);
+        body.speed01 = Math.min(1, vel.length() / MATE_RUN_MPS);
         body.tree.update({
           speedMps: Math.hypot(vel.x, vel.z),
-          speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active, shooting: false, dunking: false, driving: false,
+          speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: false,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball)
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
           retreat: retreatFor(body.char.root.position, vel, driver?.char.root.position ?? null),   // DEFENSE-LOOK
         });
@@ -1494,19 +1525,27 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       for (let fi = 0; fi < foes.length; fi++) {
         const f = foes[fi];
         if (f.floored && f.stunSec === 0) { f.floored = false; f.tree.beat('karate_get_up'); }   // BIOMECH-HOOPS-WAVE1: a posterized body gets up when the stun ends
-        if (f.stunSec > 0) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); f.speed01 = 0; f.vel.setAll(0); bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false); continue; }
+        if (f.stunSec > 0) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); f.speed01 = 0; f.vel.setAll(0); f.mover?.stop(); unplant(f); bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false); continue; }
         if (f === driver) {
+          unplant(f);   // (3b review) the scripted drive moves his root metres: a pin taken just before would hold one foot back for the whole drive
           f.vel.setAll(0);   // the rival driving on their possession: the scripted drive moves him, he faces the rim, his tree carries the ball
+          // HOOPS MOTION phase 3b: …but his feet read the speed he really covers. f.vel stays 0 (the contact rules read a scripted driver
+          // as a body they cannot shove); the tree was fed that 0, so the dribble run ran at RATE_MIN 0.55 while he covered 2–5.4 m/s
+          f.mover?.adopt(driverVelEst);
+          const driveMpsNow = Math.hypot(driverVelEst.x, driverVelEst.z);
           f.char.root.rotation.y = slewYaw(f.char.root.rotation.y, yawTo(f.char.root.position, RIM), FACE_RIM_RATE, dt);
           f.speed01 = driveK < 1 ? 0.9 : 0;
-          if (!foeDunkFlight) f.tree.update({ speedMps: Math.hypot(f.vel.x, f.vel.z), speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: driverHasBall(), shooting: false, dunking: false, driving: driveK < 1, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
+          if (!foeDunkFlight) f.tree.update({ speedMps: driveMpsNow, speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: driverHasBall(), shooting: false, dunking: false, driving: driveK < 1, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
           bioTick(f, dt, 'offense', driverHasBall(), Infinity, false);
           if (foeDunkFlight) f.bio.flight = foeDunkFlight;
           chokeClamp(f.char.root.position);   // CHOKEPOINT: the scripted drive skips the clamp line below — 2 of 546 samples inside a rail, measured
           continue;
         }
         const intent = f.slot.intent;
-        const vel = new Vector3(intent.moveX, 0, -intent.moveY).scale(3.8);
+        f.mover!.observe(f.char.root.position, dt);
+        const fst = f.mover!.stepIntent(dt, intent);   // HOOPS MOTION phase 3b: 3.8 m/s (sprint 1.2×) at the hero's accel / decel (it was 0 or 3.8 in one frame)
+        const vel = fst.vel.clone();
+        plantBody(f, fst.planting, dt);
         f.vel.copyFrom(vel);
         const cb = carrierBody();
         if (cb) {
@@ -1525,7 +1564,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         facePlay(f.char.root, vel, aim, db?.boxing ? 99 : DEFEND_FACE_RANGE, dt);
         if (db && db.fightingOver !== null && !f.screenHeld) { f.screenHeld = true; console.info(`[3V3-OFF] navigate ${db.fightingOver ? 'over' : 'under'} (foe${fi})`); }
         else if (db && db.fightingOver === null) f.screenHeld = false;
-        f.speed01 = Math.min(1, vel.length() / 3.8);
+        f.speed01 = Math.min(1, vel.length() / FOE_RUN_MPS);
           if (db && db.job !== lastFoeJobs.get(f)) { lastFoeJobs.set(f, db.job); if (db.job === 'closeout' || db.job === 'recover') console.info(`[3V3-DEF] ${f.char.root.name} job ${db.job}`); }   // DEFENSE-LOOK
         f.tree.update({
           speedMps: Math.hypot(vel.x, vel.z),
@@ -1749,7 +1788,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // body collision holds two players ~1.1m apart, so a 1.2m application
       // range flickered across the standoff (same trap as 1v1, measured there)
       const carrier = carrierBody();
-      if (carrier && carrierId !== 'foeTeam' && !shooting) {
+      if (carrier && carrierId !== 'foeTeam' && !shooting && !mateShooting) {
         for (const f of foes) {
           // HOOPS-MOVE-KIT-B: a SEALED post man cannot be poked from behind (the body is between him and the ball) — front
           // him and the poke is live again
@@ -1789,7 +1828,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       net?.dispose(); net = null;
       carries.forEach((c) => c.dispose()); carries.clear();
       meReach?.dispose(); meReach = null;
-      for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; }   // BIOMECH-HOOPS-WAVE1
+      for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; b?.plant?.dispose(); }   // BIOMECH-HOOPS-WAVE1 · HOOPS MOTION phase 3b: the foot pins
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
       shotTrail?.dispose(); shotTrail = null;
@@ -1802,8 +1841,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   };
 
   async function teammateShoots(ctx: ModeContext, body: Body, _i: number, finish: 'shot' | 'alleyoop' = 'shot'): Promise<void> {
-    if (shooting) return;
-    shooting = true;
+    if (shooting || mateShooting) return;
+    mateShooting = true;   // HOOPS MOTION phase 3b: his shot, not mine — my `shooting` is the hero's tree and slew
     const dist = Vector3.Distance(body.char.root.position, RIM);
     const points = finish === 'alleyoop' ? 2 : isThree(body.char.root.position, RIM) ? 3 : 2;
     // THE ONE SHOOTER ON THE FLOOR WHO WAS STILL ROLLING DICE.
@@ -3125,7 +3164,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         micMateAt = performance.now() + 15000;   // the mates let the welcome finish
       } else if (performance.now() - micLiveAt > 6000) micOpened = true;
     }
-    if (carrierId === 'me' && !shooting && !dunking && !passFlight.active && !board && performance.now() >= micMateAt) {
+    if (carrierId === 'me' && !shooting && !mateShooting && !dunking && !passFlight.active && !board && performance.now() >= micMateAt) {
       micMateAt = performance.now() + 5000 + Math.random() * 4000;
       const open = mates.findIndex((m) => Math.min(...foes.map((f) => distXZ(f.char.root.position, m.char.root.position))) > 3);
       if (open >= 0 && Math.random() < 0.4) mic.say({ who: `mate${open}`, moment: 'player.callball' });
@@ -3194,6 +3233,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     goaltendCalled = false; foeShotScored = false;   // …and again for theirs: the latch is per SHOT, not per game
     carrierId = 'foeTeam';
     myJumpAge = Infinity; foeShotBlocked = false;
+    mateShooting = false;   // HOOPS MOTION phase 3b: their ball ends my mate's shot (his make or a lost board brings us here)
     ctx.setHud({ hint: 'DEFEND — stay tight · time a jump (A) at the release to BLOCK' });
     // THE MIC: their ball. The booth sets the stop only when it has the air (priority 0: it never cuts or queues), a mate talks
     // the D, the stands chant for one — each now and then, because this happens every other possession
@@ -3254,12 +3294,26 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // 6 m in 1.1 s is a 5.5 m/s teleport nobody can drop back on, 2 m in 1.1 s a jog — so the defender's read was
     // decided by where the rival happened to catch it. A sprint drive is DRIVE_MPS, and the clock is the distance.
     driveSec = Math.min(1.6, Math.max(0.8, driveLen / DRIVE_MPS));
+    // (3b review) …FROM THE SPEED HE HAS. The profile started from a stand, so a defender who was backpedalling or chasing a board at
+    // 2.5–4.5 m/s when his team won it stopped dead (or reversed) in one frame. His velocity along the drive seeds the profile (a
+    // reversal brakes through zero at the AI's accel; the clock lengthens by what the brake takes), his velocity across it the bend
+    const v0Along = shooter.mover ? shooter.mover.vel.x * driveDir.x + shooter.mover.vel.z * driveDir.z : 0;
+    const v0Across = shooter.mover ? shooter.mover.vel.x * driveDir.z - shooter.mover.vel.z * driveDir.x : 0;
+    driveSec = driveSecFor(driveLen, driveSec, v0Along);
     driveMps = driveLen / driveSec;
     console.info(`[3V3-DEF] drive intent ${intent} (defender ${meSet || takingCharge ? 'set' : 'moving'}) ${driveLen.toFixed(1)} m in ${driveSec.toFixed(2)} s`);
+    // HOOPS MOTION phase 3b: the path's distance ramps at the AI's accel from his stand to a cruise that still arrives at driveSec (it
+    // was a lerp: 0 → 2–5.4 m/s in one frame), and the bend round the man in the way follows its target at a limited speed and
+    // acceleration (it stepped the moment he entered the corridor)
+    // The drive's clock runs on the FRAME's dt (the engine's, not scaled by a hit-stop — the drive never froze for one), as every other
+    // body's motion does: read off performance.now() inside the before-render pass it repeated a frame now and then and caught up on the
+    // next — a stop and a double step (measured on base2's drives and this step's; the dt-driven bodies beside him never stalled)
+    const bendFollow = new AccelFollower(); bendFollow.reset(0, v0Across); let driveT = Math.max(0, (performance.now() - t0) / 1000);
     await new Promise<void>((res) => {
       const obs = ctx.scene.onBeforeRenderObservable.add(() => {
         if (driveStolen || possessionToken !== tok) { ctx.scene.onBeforeRenderObservable.remove(obs); res(); return; }   // D2: the poke took it / the possession moved on
-        const k = Math.min(1, (performance.now() - t0) / (driveSec * 1000));
+        const fdt = Math.min(0.05, Math.max(0, ctx.scene.getEngine().getDeltaTime() / 1000)); driveT += fdt;
+        const k = Math.min(1, driveT / driveSec);
         driveK = k;
         if (!tellPlan && k >= 1 - GATHER_TELL_SEC / driveSec) {
           driverDribbling = false;   // HOOPS MOTION phase 3: the gather — his carry parks the ball into his hand for the finish
@@ -3271,10 +3325,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // drive AT the rim, not 5m short of it (was x*0.6, z to RIM.z+2.2 —
         // the same short drive 1v1 shipped; a drive that never arrives makes
         // your positioning irrelevant and the block dance unreachable)
-        const baseX = from.x + (driveEnd.x - from.x) * k;
-        const baseZ = from.z + (driveEnd.z - from.z) * k;
+        const u = driveFraction(k * driveSec, driveSec, driveLen, undefined, v0Along);   // HOOPS MOTION phase 3b: the clock is k, the distance ramps (from his own speed)
+        const baseX = from.x + (driveEnd.x - from.x) * u;
+        const baseZ = from.z + (driveEnd.z - from.z) * u;
         // …and BEND it around the man in the way (or do not, if he chose to go through him)
-        const bend = driveLateral({ at: { x: baseX, z: baseZ }, defender: me.char.root.position, dir: driveDir, k, intent });
+        const bend = bendFollow.step(driveLateral({ at: { x: baseX, z: baseZ }, defender: me.char.root.position, dir: driveDir, k, intent }), fdt);
         shooter.char.root.position.x = baseX + driveDir.z * bend;
         shooter.char.root.position.z = baseZ - driveDir.x * bend;
         if (takingCharge) drivePlanted = true;   // he got set before the bodies met

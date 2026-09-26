@@ -178,6 +178,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
 import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
 import { MomentumBus } from '../core/MomentumBus';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
+import { AiMover } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
@@ -304,6 +305,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let meDribbleSM: DribbleStateMachine;
   let meAnimTree: BasketballAnimTree, foeAnimTree: BasketballAnimTree;
   let meFootPlant: FootPlant;
+  let foeFootPlant: FootPlant | null = null; let foeWasPlanting = false;   // HOOPS MOTION phase 3b: the rival's plant-and-cut pins a foot too
   let meCarry: BallCarry | null = null, foeCarry: BallCarry | null = null;   // live dribble (ball off the palm)
   let meReach: RimReachHandle | null = null, foeReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   let wasPlanting = false;
@@ -496,6 +498,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   let finishFoul = false;                                                            // M2: fouled in the air on a dunk / a finish — and-one on a make, the ball back on a miss
   const foeVelLast = new Vector3();                                                  // the defender's velocity this frame (the contest reads set vs moving)
+  /** HOOPS MOTION phase 3b: the rival's movement — his slide at 3.6 m/s (sprint 1.2×) and his drive's own wish, on the hero's accel 26 /
+   *  decel 34 (it was unit steer × 3.6 in one frame: 216 m/s²). */
+  const foeMover = new AiMover(3.6);
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
   // ── the DEFENSE contest package (D1–D3) ──
   let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
@@ -555,6 +560,21 @@ export const OneVOneMode: ModeDefinition = (() => {
     const d = Math.atan2(vel.x, vel.z) - yaw;
     return ((d + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
   }
+  /** HOOPS MOTION phase 3b: the rival's plant-and-cut pins a foot (the hero's FootPlant, on the rising edge of his mover's plant), and
+   *  the pin's window runs down every frame. */
+  /** The rival's mover takes the velocity he really had (AiMover.observe). A PHYSICS body moves once a render, in the physics step, so
+   *  it is observed once per frame id: under ?qaSpeed=N the sub-updates 2..N read no travel and set him to 0 (3b review: 0.43 m/s at
+   *  qaSpeed=4). Without the contact system the root moves here, in every update. */
+  function observeFoe(ctx: ModeContext, dt: number): void {
+    foeMover.observe(foe.root.position, dt, contact?.isReady ? ctx.scene.getFrameId() : undefined);
+  }
+  function plantFoe(planting: boolean, dt: number): void {
+    if (planting && !foeWasPlanting) foeFootPlant?.plant();
+    foeWasPlanting = planting;
+    foeFootPlant?.update(dt);
+  }
+  /** (3b review) A branch that skips the mover lets the pin go (the play is over: nothing runs the window down). */
+  function unplantFoe(): void { foeFootPlant?.release(); foeWasPlanting = false; }
   /** Body-right for a yaw (measured, MODE-STICK-FACE): which way a slide goes in the body frame. */
   function slideDirFor(yaw: number, vel: Vector3): 'left' | 'right' {
     return vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw) > 0.3 ? 'right' : 'left';
@@ -646,7 +666,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
-    meMotion.reset(); foeMotion.reset();   // a check-up moves bodies metres in a frame; that is not acceleration
+    meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release();   // a check-up moves bodies metres in a frame; that is not acceleration
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -869,6 +889,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meAnimTree = new BasketballAnimTree(me.animator);
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
+      foeFootPlant = new FootPlant(foe.skeleton, foe.meshes[0] as never);   // HOOPS MOTION phase 3b: every body plants
       // BIOMECH-HOOPS-WAVE1: the Posture Poses layer on both bodies — mounted BEFORE the carries (observer order = add
       // order: the dribble arm must solve against the posed shoulders). The layer owns the eyes; the secondary head-look
       // is stood down (it looked at ball.position — a palm-LOCAL offset while carried, i.e. the world origin).
@@ -1329,7 +1350,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             // STRIDE MATCHING needs real ground speed: speed01 is normalised and cannot pace a stride
             speedMps: Math.hypot(meDribble.vel.x, meDribble.vel.z),
             speed01: drib.speed01, crossover: drib.crossover, crossoverDir: mx >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestDef,
-            hasBall: carrying, shooting, dunking,
+            hasBall: carrying && !loose, shooting, dunking,   // (3b review) make-it-take-it sets `carrying` while the ball is still in the net: 24 dribble frames on a make's exit
             driving: sprintOk && drib.speed01 > 0.6
               && Vector3.Dot(meDribble.vel, RIM.subtract(me.root.position)) > 0,
             defending: false, bracing: false, staggered: false,
@@ -1475,7 +1496,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         // DEV: `?dummy=1` — a defender who stands and does nothing, so a probe can frame an uncontested layup / jumper /
         // dunk for the animation eye (every layup play the lab drove became a contested pull-up)
         if (dummyFoe) { foeIntent.moveX = 0; foeIntent.moveY = 0; foeIntent.steal = false; foeIntent.contest = false; foeIntent.action = false; foeIntent.sprint = false; }
-        const foeVel = foeStunSec > 0 ? new Vector3(0, 0, 0) : new Vector3(foeIntent.moveX, 0, -foeIntent.moveY).scale(3.6);
+        // HOOPS MOTION phase 3b: the brain's intent is a wish; the mover gives the velocity the body has (a stagger stands him still, as before)
+        if (foeStunSec > 0) foeMover.stop(); else observeFoe(ctx, dt);   // (the physics step and the contacts moved him last frame: he carries the speed he really had)
+        const foeMove = foeMover.stepIntent(dt, foeStunSec > 0 ? { moveX: 0, moveY: 0 } : foeIntent);
+        const foeVel = foeMove.vel.clone();
+        plantFoe(foeMove.planting, dt);
         foeVelLast.copyFrom(foeVel);   // HOOPS-MOVE-KIT-A M2: the drive contest reads set vs moving
         // the posture trackers: each body's acceleration resolved in its OWN frame (a brake and a turn are the
         // same world-space number otherwise)
@@ -1841,11 +1866,15 @@ export const OneVOneMode: ModeDefinition = (() => {
           // the rival attacks — reading ME: contained → sidestep, open → drive, held → pull-up, a jump at nothing → blow-by
           const dec = attacker.decide(dt, foe.root.position, me.root.position, RIM_FLOOR, { defenderAirborne: myJumpAge !== Infinity && myJumpAge < 0.6 });
           if (defPhase === 'check' && dec.phase !== 'check') defPhase = 'drive';
-          const sp = dec.wish.length();
+          // HOOPS MOTION phase 3b: his wish, reached at the hero's accel / decel — the body, the tree and the carry read the velocity he has
+          observeFoe(ctx, dt);
+          const foeMoveO = foeMover.track(dt, dec.wish); const foeW = foeMoveO.vel;
+          plantFoe(foeMoveO.planting, dt);
+          const sp = foeW.length();
           foeSpeed01 = Math.min(1, sp / RIVAL_DRIVE_SPEED);
           if (dec.phase === 'gather' || dec.phase === 'stepback') { if (foeShotWin === 'none') foeShotWin = 'load'; }   // BIOMECH-HOOPS-WAVE1: the telegraph is the load
-          driveBody('foe', foe.root, dec.wish, dt);
-          foeVelLast.copyFrom(dec.wish);   // …on THEIR possession too: the charge and every set-vs-moving read below
+          driveBody('foe', foe.root, foeW, dt);
+          foeVelLast.copyFrom(foeW);   // …on THEIR possession too: the charge and every set-vs-moving read below
                                            // were looking at a vector only ever written while I had the ball, so a
                                            // driver measured 0.0 m/s all the way to the rim (probe: driver peak 0.0).
           // a driver faces the rim through a sidestep (a crossover, not a run sideways); a blow-by runs its line
@@ -1857,7 +1886,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             speed01: Math.min(1, sp / RIVAL_DRIVE_SPEED), crossover: false, nearestDefender: dist,
             hasBall: true, shooting: false, dunking: false, driving: dec.phase === 'blowby',
             defending: false, bracing: false, staggered: false,
-            travelOffRad: travelOff(foe.root.rotation.y, dec.wish),
+            travelOffRad: travelOff(foe.root.rotation.y, foeW),
           });
           if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_hesi', { fadeSec: 0.1 }); }   // the step-back reads as a check: the body loads
           if (dec.crossover) {
@@ -1935,16 +1964,20 @@ export const OneVOneMode: ModeDefinition = (() => {
             const toBall = ball.position.subtract(foe.root.position); toBall.y = 0;
             if (toBall.length() > 0.7) wish.copyFrom(toBall.normalize().scale(3.0));
           }
-          driveBody('foe', foe.root, wish, dt);
-          foeSpeed01 = Math.min(1, wish.length() / 3.6);
+          observeFoe(ctx, dt);
+          const foeCrashSt = foeMover.track(dt, wish); const foeCrash = foeCrashSt.vel;   // HOOPS MOTION phase 3b: the crash at the hero's accel / decel
+          plantFoe(foeCrashSt.planting, dt);   // (3b review) the pin's window runs down here too — a pin from his defence was held through the crash
+          driveBody('foe', foe.root, foeCrash, dt);
+          foeSpeed01 = Math.min(1, foeCrash.length() / 3.6);
           if (wish.lengthSquared() > 0.05) face(foe.root, slewYaw(foe.root.rotation.y, Math.atan2(wish.x, wish.z), FACE_RATE, dt));
           foeAnimTree.update({
-            speed01: Math.min(1, wish.length() / 3.6), crossover: false, nearestDefender: Infinity,
+            speedMps: foeCrash.length(),   // (the stride match had no speed here: the crash ran at the fixed cadence)
+            speed01: Math.min(1, foeCrash.length() / 3.6), crossover: false, nearestDefender: Infinity,
             hasBall: false, shooting: false, dunking: false, driving: false,
             defending: false, bracing: false, staggered: false,
-            travelOffRad: travelOff(foe.root.rotation.y, wish),
+            travelOffRad: travelOff(foe.root.rotation.y, foeCrash),
           });
-        }
+        } else if (defPhase === 'over') unplantFoe();   // (3b review) the play is over: nothing runs his pin's window down here
 
         if (!contact?.isReady) resolveBodyCollision(me.root.position, foe.root.position);
 
@@ -1999,7 +2032,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
 
     dispose() {
-      meFootPlant?.dispose();
+      meFootPlant?.dispose(); foeFootPlant?.dispose(); foeFootPlant = null;
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;   // BIOMECH-HOOPS-WAVE1
       meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
       meReach?.dispose(); foeReach?.dispose(); meReach = null; foeReach = null;
@@ -2046,7 +2079,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
-    meMotion.reset(); foeMotion.reset();   // a check-up moves bodies metres in a frame; that is not acceleration
+    meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release();   // a check-up moves bodies metres in a frame; that is not acceleration
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
