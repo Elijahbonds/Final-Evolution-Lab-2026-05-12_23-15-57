@@ -16,6 +16,8 @@ import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarnGrant } from '@/lib/wallet/client';
+import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
+import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
@@ -34,6 +36,9 @@ export interface GameResult {
   /** Pass 5 phase 3: the mode's own end-of-session stats and outcome, for the proof line (lib/proofLine.ts). */
   stats?: Record<string, number | string | boolean>;
   outcome?: string;
+  /** The mode's non-numeric detail (SessionResult.detail): the dunk card rides here to the Arena submit. Declared now that
+   *  the dunk host passes it on (the arena integrity hotfix, 2026-09-24). */
+  detail?: unknown;
 }
 
 export interface GameProps {
@@ -127,9 +132,11 @@ function GameShellInner({
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
+  /** The Story route refused this run (end-card-refusal): the card says why instead of saying nothing. */
+  const [storyRefused, setStoryRefused] = useState<Refusal | null>(null);
   const [mpResult, setMpResult] = useState<{ status: string; hostScore: number; guestScore: number; hostName?: string; iWon: boolean; tie: boolean } | null>(null);
   const [arenaResult, setArenaResult] = useState<
-    | { settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number; myScore?: number; oppScore?: number }
+    | { settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number; myScore?: number; oppScore?: number; refused?: Refusal }
     | null
   >(null);
   const [gameKey, setGameKey] = useState(0);
@@ -141,6 +148,13 @@ function GameShellInner({
   // "ready" overlay followed by nothing still reads as no play.
   const inputCount = useRef(0);
   const runLive = useRef(true);
+  // MOVEMENT PLAY P3 step 5 (2026-09-26): the shell's own count sees only keys, pointers and touches on the window — a pad,
+  // the body and Controller Link reach the game through its InputBus and never touched it, so a pad-only or phone-only run
+  // that scored 0 was NO PLAY. The harness writes "input the game received", from every source (sessionStore's run
+  // record, owner call 4); the shell marks the record when its game mounts and on REPLAY, and at handleEnd counts what
+  // came after the mark — never the run before (runId only grows). Read there once, not subscribed: a subscription would
+  // re-render the shell, and the game under it, on every counted press.
+  const runMark = useRef(markRun(null));
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -170,6 +184,7 @@ function GameShellInner({
   useEffect(() => { runLive.current = result === null; }, [result]);
   useEffect(() => {
     inputCount.current = 0;
+    runMark.current = markRun(sessionStore.record());
     const mark = () => { if (runLive.current) inputCount.current += 1; };
     window.addEventListener('keydown', mark);
     window.addEventListener('pointerdown', mark);
@@ -219,7 +234,12 @@ function GameShellInner({
           duration: res?.duration ?? 0,
           tallies: res?.tallies,
           maxCombo: res?.maxCombo,
-          played: inputCount.current >= 3,
+          // the room's own end-of-session stats (the music set's counts, the dance judge's): the server reads the set from
+          // them (lib/session-payout.ts, the SHARED CONTRACT; ROOM_STATS_FORWARDED) — and the duel this run was staked in,
+          // the only thing that makes a music set an Arena set there (route.ts verifiedMusicDuel)
+          stats: res?.stats,
+          ...(arenaMatchId ? { arenaMatchId } : {}),
+          played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,
         }),
       })
         .then((r) => (r?.ok ? r.json() : null))
@@ -248,7 +268,9 @@ function GameShellInner({
                 event_type: 'mode_session_completed',
                 payload: { mode, run_id: j.sessionId, score: res?.score ?? 0 },
               })];
-              if (res?.won) {
+              // the server's verdict, not the room's claim: a music set is won only by its counts (session-payout
+              // sessionWon), and a won earn the server refused was logged by the wallet as an anti-cheat refusal
+              if (j?.won) {
                 grants.push(reportEarnGrant({
                   idempotency_key: `sess:${j.sessionId}:won`,
                   event_type: 'mode_session_won',
@@ -271,7 +293,14 @@ function GameShellInner({
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ nodeId: storyNodeId, sessionId: j.sessionId }),
-                }).then((r2) => r2.ok ? r2.json() : null);
+                }).then(async (r2) => {
+                  if (r2.ok) return r2.json();
+                  // a refused run (422: the verdict — error, required, achieved; 409: the run already completed another
+                  // node) is said on the card, not swallowed (end-card-refusal)
+                  const refused = storyRefusal(r2.status, await r2.json().catch(() => null));
+                  if (refused && mine()) setStoryRefused(refused);
+                  return null;
+                });
                 if (sr?.ok && !sr?.alreadyCompleted) {
                   if (mine()) setStoryReward({ rewardLC: sr.rewardLC ?? 0, badge: sr.badge ?? null });
                 }
@@ -307,7 +336,16 @@ function GameShellInner({
                     matchId: arenaMatchId, score: arenaScore,
                     ...((res as { detail?: { card?: unknown } })?.detail?.card ? { card: (res as { detail?: { card?: unknown } }).detail!.card } : {}),
                   }),
-                }).then((r2) => (r2.ok ? r2.json() : null));
+                }).then(async (r2) => {
+                  if (r2.ok) return r2.json();
+                  // HOTFIX (2026-09-24, the arena integrity pass): the server refuses a score above its mode's limit or a
+                  // dunk card that does not add up (422, lib/arena-score-integrity.ts), and a duel that is closed or has no
+                  // opponent yet (409). The panel used to vanish on any refusal; now it says so, in the server's words. A 422
+                  // records nothing, so the duel stays open and the next run from the same link submits again.
+                  const refused = arenaRefusal(r2.status, await r2.json().catch(() => null));
+                  if (refused && mine()) setArenaResult({ settled: false, status: 'REFUSED', myScore: arenaScore, refused });
+                  return null;
+                });
                 if (ar?.ok) {
                   // ARENA-10PHASE P1/P2: keep both settled scores — the card reads the duel from them, not from the mode's own rival.
                   const p1 = typeof ar.p1Score === 'number' ? ar.p1Score : undefined, p2 = typeof ar.p2Score === 'number' ? ar.p2Score : undefined;
@@ -384,10 +422,13 @@ function GameShellInner({
     setStoryReward(null);
     runSeq.current += 1;
     setArenaResult(null);
+    setStoryRefused(null);
     setMpResult(null);
     setShareUrl(null);
     setShareState('idle');
-    // the next run's evidence of play starts from zero, as a remount would start it
+    // the next run's evidence of play starts from zero, as a remount would start it — the game's record too: marked before
+    // an in-place restart (it keeps the same harness run going, so only what comes after REPLAY is the rematch's)
+    runMark.current = markRun(sessionStore.record());
     if (inPlace.current?.()) { inputCount.current = 0; return; }
     setGameKey((k) => k + 1);
   };
@@ -431,19 +472,24 @@ function GameShellInner({
   // proof line that said "YOU LOST" (playtest d3d4a93, dunk 128–156 in-game vs a lower house draw; 3PT "Tie — refunded" vs
   // "LOST"). When the run was staked, the settlement is the verdict: headline, score line, proof line and the arena card all
   // read from it. A run whose submission never came back keeps the mode's own result (no arena card, no arena claim).
-  const arenaVerdict: ProofVerdict | null = arenaMatchId && arenaResult
+  const arenaVerdict: ProofVerdict | null = arenaMatchId && arenaResult && !arenaResult.refused
     ? (!arenaResult.settled ? 'PENDING' : arenaResult.result === 'tie' ? 'TIE' : arenaResult.iWon ? 'WON' : 'LOST')
     : null;
   const arenaOpp = arenaVerdict && arenaVerdict !== 'PENDING' ? arenaResult?.oppScore : undefined;
-  const proofLine = result ? proofLineFor(mode, {
+  // A staked run whose score the Arena REFUSED (422 over the mode's limit / a dunk card that doesn't add up, 409 closed or no
+  // opponent) has no verdict at all — and the mode's own W/L is against its in-game rival, not the Arena. So the card claims
+  // nothing: no trophy, no win headline, no proof line, nothing to share (review: gold trophy + 'BIG BRAIN' + 'You won' over
+  // 'Score not accepted').
+  const arenaRefused = Boolean(arenaMatchId && arenaResult?.refused);
+  const proofLine = result && !arenaRefused ? proofLineFor(mode, {
     score: result.score,
     opponentScore: arenaOpp ?? result.opponentScore,
     won: arenaVerdict ? arenaVerdict === 'WON' : result.won,
     outcome: result.outcome, stats: result.stats,
     verdict: arenaVerdict ?? undefined,
   }) : null;
-  const cardWon = arenaVerdict ? arenaVerdict === 'WON' : Boolean(result?.won);
-  const cardHeadline = !result ? '' : arenaVerdict === 'WON' ? 'DUEL WON' : arenaVerdict === 'LOST' ? 'DUEL LOST' : arenaVerdict === 'TIE' ? 'DUEL TIED' : arenaVerdict === 'PENDING' ? 'SCORE LOCKED IN' : (result.headline ?? (result.won ? 'VICTORY' : 'SESSION COMPLETE'));
+  const cardWon = arenaRefused ? false : arenaVerdict ? arenaVerdict === 'WON' : Boolean(result?.won);
+  const cardHeadline = !result ? '' : arenaRefused ? 'SCORE NOT ACCEPTED' : arenaVerdict === 'WON' ? 'DUEL WON' : arenaVerdict === 'LOST' ? 'DUEL LOST' : arenaVerdict === 'TIE' ? 'DUEL TIED' : arenaVerdict === 'PENDING' ? 'SCORE LOCKED IN' : (result.headline ?? (result.won ? 'VICTORY' : 'SESSION COMPLETE'));
   const shareProof = useCallback(() => { if (proofLine) void shareChallenge(`PROOF · ${proofLine}`); }, [proofLine, shareChallenge]);
 
   // A PHONE HELD SIDEWAYS GETS THE WHOLE SCREEN.
@@ -662,6 +708,7 @@ function GameShellInner({
                     )}
                   </div>
                   )}
+                  {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
                   {storyReward && (
                     <div className="mt-3 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 p-3 text-center">
                       <p className="text-xs font-bold text-[#A855F7]">STORY NODE COMPLETE</p>
@@ -692,7 +739,9 @@ function GameShellInner({
                       }`}
                     >
                       <p className="text-xs font-bold tracking-wide text-white/80">TRIUMPH ARENA</p>
-                      {!arenaResult.settled ? (
+                      {arenaResult.refused ? (
+                        <ArenaRefusedLine refusal={arenaResult.refused} />
+                      ) : !arenaResult.settled ? (
                         <p className="mt-1 text-sm text-white/70">Score locked in — waiting for your opponent to finish.</p>
                       ) : arenaResult.result === 'tie' ? (
                         <p className="mt-1 text-sm text-white/80">Tie — both entries refunded ({arenaResult.feeLc} LC each).</p>
@@ -746,8 +795,8 @@ function GameShellInner({
                     </div>
                   )}
 
-                  {/* M13.4 share challenge (K-factor loop) */}
-                  <button
+                  {/* M13.4 share challenge (K-factor loop) — not for a score the Arena refused */}
+                  {!arenaRefused && <button
                     onClick={() => void shareChallenge()}
                     disabled={shareState === 'minting'}
                     className="fel-heading mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#A855F7]/50 bg-[#A855F7]/10 py-2.5 text-sm font-bold text-[#A855F7] transition-colors hover:bg-[#A855F7]/20 disabled:opacity-60"
@@ -759,7 +808,7 @@ function GameShellInner({
                     ) : (
                       <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
                     )}
-                  </button>
+                  </button>}
                   {proofLine && (
                     <button
                       onClick={shareProof}

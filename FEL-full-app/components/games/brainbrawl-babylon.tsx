@@ -21,6 +21,9 @@
 //     the host's line in a bubble over him while he is in view and on the card's header while the card is up.
 //   · GO AGAIN IN PLACE: the mode runs `continuous` (its finish reports a card and keeps the stage), and the shell's REPLAY
 //     calls replayBrainBrawl through ReplayInPlaceContext — round one's spin, same players, no splash, no remount.
+//
+// MOVEMENT PLAY P3 step 5 (2026-09-26): the pause is BootSplash's shared PausedLayer, as in every other host (this one's
+// own copy is gone; it read the same and stacked under the shared one as a second dim).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -350,7 +353,6 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
       )}
 
       <BootSplash modeId="brainbrawl" title="BRAIN BRAWL" phase={phase} detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)} onStart={tapStart} onRetry={tapStart} />
-      {phase === 'paused' && <button onClick={tapStart} className="absolute inset-0 flex items-center justify-center bg-black/60"><span className="fel-heading text-3xl font-bold text-white">PAUSED — TAP TO RESUME</span></button>}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && <TouchOverlay bus={busRef.current} modeId="brainbrawl" visible />}
     </div>
   );

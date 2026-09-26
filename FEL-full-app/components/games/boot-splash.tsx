@@ -270,11 +270,9 @@ export function SplashCard(props: BootSplashProps) {
 
   // MOVEMENT PLAY P3 (2026-09-24, step 4a): the pause is drawn HERE, once, for every host — each used to draw its own
   // copy straight after this splash (BACKLOG B16). PausedLayer keeps that copy's classes, so it stacks where they did.
-  // Brain Brawl keeps its own copy until step 5 (the Brain Brawl session owns that file), so it gets nothing here until
-  // then: the two layers stacked were no harmless double dim (the step-4a review) — 84% black, and with the Body on the
-  // shared headline sat 15 px above Brain Brawl's, doubled under its dim. Step 5 deletes this check with that copy
-  // (pausedLayer.scan.test holds the two together).
-  if (props.phase === 'paused') return props.modeId === 'brainbrawl' ? null : <PausedLayer onResume={props.onStart} />;
+  // Step 5 (2026-09-26): Brain Brawl's own copy is gone, and with it the check that drew nothing here for it (the two
+  // stacked were 84% black with the headline doubled — the step-4a review); pausedLayer.scan.test holds the two together.
+  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} />;
   if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
