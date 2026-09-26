@@ -4,7 +4,7 @@ import { SHOP_CARDS, shopCardOnSale } from '@/lib/game-data';
 import { REASON } from './reward-rules';
 import {
   BOOKING_SKU, CLASS_PASS_REASON, DEAD_CATALOG_BUYS, HOLLOW_SHOP_CARDS, NO_LINK_REASON, PLAN_CLAIM_WINDOW_MS,
-  bookingCharges, bookingName, bookingRefundAmount, bookingRefundNote, deadBuyOf, endedBookings, firstChargeIds, isClientMadeKey,
+  backedEntitlements, bookingCharges, bookingName, bookingRefundAmount, bookingRefundNote, deadBuyOf, endedBookings, firstChargeIds, isClientMadeKey,
   linkedSlotsFor, refundKey, refundNote, refundToastTexts, refundableDeadBuys, refundedRowIds, shopPurchaseKey, unclaimed,
   unlinkedBookings, unseenRefundNotes,
   type BookingRow, type DeadBuyRow, type DeliveryEvidence,
@@ -235,6 +235,61 @@ describe('telling a dead buy from a delivered one', () => {
     const kit = buy(row({ sku: 'music_kit_dust', currency: 'shards', delta: -400 }));
     const card = buy(row({ reasonCode: 'SHOP_PURCHASE', currency: 'lc', delta: -250, idempotencyKey: 'shop:p1:avatar-neon-gi' }));
     expect(refundableDeadBuys([token, kit, card], NONE)).toEqual([token, kit, card]);
+  });
+});
+
+// MUSIC-SUITE P2 (2026-09-25): the kits were client_key because "nothing calls the entitlement read". GET
+// /api/music/unlock calls it now (the room's kits come from the account), and a /store charge wrote the very row it reads.
+// The kits stay client_key — every /store kit charge is still paid back — and the read counts a row only with a charge
+// these rules keep (backedEntitlements). The route itself is driven in dead-buy-refunds.test.ts.
+describe('the entitlement rows a charge still backs (the Music Room reads its kits)', () => {
+  const kit = (over: Partial<DeadBuyRow> & { sku?: string } = {}) =>
+    row({ sku: 'music_kit_neon', currency: 'shards', delta: -200, ...over });
+  const refundOf = (id: string) => row({ reasonCode: REASON.DEAD_BUY_REFUND, currency: 'shards', delta: 200, idempotencyKey: refundKey(id) });
+  const KITS = ['music_kit_neon', 'music_kit_dust'];
+
+  it('keeps both kits client_key: every browser-keyed kit charge is still paid back, and says why the read cannot deliver it', () => {
+    for (const sku of ['music_kit_neon', 'music_kit_dust']) {
+      expect(DEAD_CATALOG_BUYS[sku], sku).toMatchObject({ match: 'client_key', currency: 'shards' });
+      expect(DEAD_CATALOG_BUYS[sku].why, sku).toMatch(/backedEntitlements/);
+      expect(DEAD_CATALOG_BUYS[sku].why, sku).not.toMatch(/nothing calls the entitlement read/);
+    }
+    expect(refundableDeadBuys([buy(kit())], NONE)).toHaveLength(1);
+  });
+
+  it("the Room's own charge (music:<player>:<sku>) backs its row; a /store charge never does, refunded yet or not", () => {
+    const room = kit({ idempotencyKey: 'music:p1:music_kit_neon' });
+    const store = kit({ sku: 'music_kit_dust', delta: -400 });
+    expect([...backedEntitlements(KITS, [room, store], 'p1')]).toEqual(['music_kit_neon']);
+    // before the sweep reaches it (younger than the grace, or a failed sweep) a /store charge is still not a delivery
+    expect(backedEntitlements(KITS, [store], 'p1').size).toBe(0);
+    expect(backedEntitlements(KITS, [store, refundOf(store.id)], 'p1').size).toBe(0);
+  });
+
+  it('a kit whose only charge was paid back is not owned, though spend() left its row behind', () => {
+    const store = kit();
+    expect(backedEntitlements(KITS, [store, refundOf(store.id)], 'p1').size).toBe(0);
+    // bought again in the Room afterwards: owned, by that charge
+    const room = kit({ idempotencyKey: 'music:p1:music_kit_neon', createdAt: at(60) });
+    expect([...backedEntitlements(KITS, [store, refundOf(store.id), room], 'p1')]).toEqual(['music_kit_neon']);
+    // a /store charge AND a Room charge of one kit: the Room's backs it, the /store one is paid back — paid once, owned once
+    expect([...backedEntitlements(KITS, [store, room], 'p1')]).toEqual(['music_kit_neon']);
+    expect(refundableDeadBuys([buy(store)], NONE).map((b) => b.row)).toEqual([store]);
+  });
+
+  it("reads only what it was asked about, only charges, and never another reason's rows", () => {
+    const room = kit({ idempotencyKey: 'music:p1:music_kit_neon' });
+    expect(backedEntitlements(['music_kit_dust'], [room], 'p1').size).toBe(0);
+    expect(backedEntitlements(KITS, [kit({ idempotencyKey: 'music:p1:music_kit_neon', delta: 200 })], 'p1').size).toBe(0);
+    expect(backedEntitlements(KITS, [kit({ idempotencyKey: 'music:p1:music_kit_neon', reasonCode: 'ARENA_ENTRY' })], 'p1').size).toBe(0);
+    expect(backedEntitlements(KITS, [], 'p1').size).toBe(0);
+  });
+
+  it('mirrors first_charge for a SKU under that rule: the earliest charge backs its row, a later /store one does not', () => {
+    const mk = (min: number, key = UUID) => row({ sku: 'boost_card_neural-max', currency: 'shards', delta: -400, createdAt: at(min), idempotencyKey: key });
+    const first = mk(0), second = mk(10);
+    expect([...backedEntitlements(['boost_card_neural-max'], [first, second], 'p1')]).toEqual(['boost_card_neural-max']);
+    expect(backedEntitlements(['boost_card_neural-max'], [second, first, refundOf(first.id)], 'p1').size).toBe(0);
   });
 });
 

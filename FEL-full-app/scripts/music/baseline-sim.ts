@@ -35,8 +35,11 @@ import { AudioEngine, type TrackState } from '@/lib/babylon/music/AudioEngine';
 import { AudioEngine as LegacyAudioEngine } from '@/lib/modes/music/audio-engine';
 import {
   PerformSet, performSetMax, PERFORM_SET_BARS, PERFORM_SET_NOTES, PERFORM_STEPS_PER_BAR, PERFORM_EXPIRE_S,
-  PERFORM_PERFECT_S, type PerformJudgement,
+  PERFORM_PERFECT_S, performNoteAt, performResultStats, type PerformTapOutcome, type PerformResult,
 } from '@/lib/babylon/music/performSet';
+import {
+  sessionWon as serverSessionWon, sessionScoreCap, isEndlessSession, sessionPayout as serverSessionPayout,
+} from '@/lib/session-payout';
 import { StudioLibrary } from '@/lib/babylon/music/StudioLibrary';
 import { KIT_SLOTS } from '@/lib/babylon/music/SynthKit';
 import { ARENA_SCORE_BASELINES, RIVAL_BAND } from '@/lib/arena-rivals';
@@ -396,7 +399,7 @@ function emptyTracks(): TrackState[] {       // StudioMode.tsx:57-62
   return KIT_SLOTS.map((k) => ({ sampleId: k.id, pattern: new Array<boolean>(STEPS).fill(false), volume: 0.8, muted: false, pan: 0 }));
 }
 
-interface TapRecord { note: number; offsetMs: number; result: PerformJudgement; hitNote: number | null; hitDtMs: number | null }
+interface TapRecord { note: number; offsetMs: number; result: PerformTapOutcome; hitNote: number | null; hitDtMs: number | null }
 
 interface PerformRun {
   taps: TapRecord[];
@@ -408,6 +411,8 @@ interface PerformRun {
   overAtSec: number | null;
   lastNoteSec: number | null;
   releaseLatencyMs: number[];
+  /** MUSIC-SUITE P2: the set's own result at the end of the run (won = accuracy >= 0.5 over >= 8 bars). */
+  result: PerformResult;
 }
 
 /**
@@ -431,12 +436,39 @@ function runPerform(fake: FakeWebAudio, o: {
   let expiredMisses = 0, overAtSec: number | null = null, lastNoteSec: number | null = null;
   const releaseLatencyMs: number[] = [];
   const idxByTime = new Map<number, number>();
-  eng.onStepAudible = (s, t) => {
+  // MUSIC-SUITE P2 (2026-09-25): wired as StudioMode wires it now — a step is offered when SCHEDULED (onStepScheduled; a
+  // note while the grid sounds, performNoteAt, else a rest), and the playhead hook only expires windows and ends the set.
+  // `releaseLatencyMs` is still now − t at the moment a note becomes hittable: negative = known before it sounds.
+  // A tap that WAITS (P2: a nearer note may still be scheduled) settles in a later call; its record gets the verdict then
+  // (lastTap changes identity once per settle, oldest waiting tap first).
+  const waitingRecs: { rec: TapRecord; at: number }[] = [];
+  let lastSeen = set.lastTap;
+  const resolveWaiting = (): void => {
+    if (set.lastTap === lastSeen) return;
+    lastSeen = set.lastTap;
+    const w = waitingRecs.shift();
+    if (!w || !set.lastTap) return;
+    w.rec.result = set.lastTap.judgement;
+    if (set.lastTap.errorSec !== null) {
+      const noteT = w.at - set.lastTap.errorSec;
+      const key = [...idxByTime.keys()].find((x) => Math.abs(x - noteT) < 1e-6);
+      w.rec.hitNote = key === undefined ? null : idxByTime.get(key) ?? null;
+      w.rec.hitDtMs = ms(set.lastTap.errorSec);
+    }
+  };
+  eng.onStepScheduled = (s, t, sound) => {
     const now = ctx.currentTime;
-    releaseLatencyMs.push((now - t) * 1000);
-    const { missed, offered } = set.note(s, t, now);
+    const isNote = performNoteAt(sound);
+    if (isNote) releaseLatencyMs.push((now - t) * 1000);
+    const { missed, offered } = isNote ? set.note(s, t, now) : set.rest(s, t, now);
+    resolveWaiting();
     expiredMisses += missed;
     if (offered) lastNoteSec = t;
+  };
+  eng.onStepAudible = () => {
+    const now = ctx.currentTime;
+    expiredMisses += set.expire(now);
+    resolveWaiting();
     if (overAtSec === null && set.over(now)) overAtSec = now;
   };
   ctx.currentTime = 0;
@@ -453,15 +485,19 @@ function runPerform(fake: FakeWebAudio, o: {
       if (p.at < lastEventAt) throw new Error(`tap for note ${p.note} at ${p.at}s is before the last event (${lastEventAt}s)`);
       lastEventAt = p.at;
       ctx.currentTime = read(p.at);
+      set.expire(ctx.currentTime);   // P2: tap() sweeps expired notes first; sweep here so `gone` is the note the tap took
+      resolveWaiting();
       const before = expected().map((e) => e.time);
       const result = set.tap(ctx.currentTime);
       const after = new Set(expected().map((e) => e.time));
       const gone = before.find((t) => !after.has(t));
-      taps.push({
+      const rec: TapRecord = {
         note: p.note, offsetMs: ms(p.at - p.time), result,
         hitNote: gone === undefined ? null : idxByTime.get(gone) ?? null,
         hitDtMs: gone === undefined ? null : ms(ctx.currentTime - gone),
-      });
+      };
+      taps.push(rec);
+      if (result === 'WAIT') waitingRecs.push({ rec, at: ctx.currentTime }); else lastSeen = set.lastTap;
       continue;
     }
     if (nextTick > o.untilSec || overAtSec !== null) break;
@@ -479,7 +515,9 @@ function runPerform(fake: FakeWebAudio, o: {
   }
   const soundsScheduled = ctx.starts.length;
   eng.dispose();
-  return { taps, score: set.score, combo: set.combo, notesOffered: set.notes, expiredMisses, soundsScheduled, overAtSec, lastNoteSec, releaseLatencyMs };
+  const result = set.result(ctx.currentTime);   // decides any tap still waiting
+  resolveWaiting();
+  return { taps, score: set.score, combo: set.combo, notesOffered: set.notes, expiredMisses, soundsScheduled, overAtSec, lastNoteSec, releaseLatencyMs, result };
 }
 
 /** What /api/sessions and the shell's earn events pay for one session. */
@@ -501,8 +539,35 @@ function sessionPayout(score: number, won: boolean) {
   };
 }
 
+/**
+ * MUSIC-SUITE P2 (2026-09-25, live-proof pass): what POST /api/sessions pays NOW, through the REAL server rules
+ * (lib/session-payout.ts — pure, so importable here), wired as app/api/sessions/route.ts:81-131 wires them: sessionWon →
+ * sessionScoreCap → isEndlessSession → sessionPayout (not an Arena set, so arenaVerified false). `sessionPayout` above is
+ * P1's copy of the OLD formula, kept so the P1 columns read the same. Two rows: the SHARED CONTRACT (the shell forwards
+ * the room's stats) and TODAY's shell, which posts no `stats` (session-payout.ts ROOM_STATS_FORWARDED = false). The
+ * daily streak LC and the season/wallet earns are left out.
+ */
+function serverPayoutP2(score: number, result: PerformResult, durationSec: number) {
+  const stats = performResultStats(result);
+  const row = (st: Record<string, unknown> | null, forwarded: boolean) => {
+    const won = serverSessionWon('music', result.won, st, durationSec, { score, statsForwarded: forwarded });
+    const cap = sessionScoreCap('music', st, durationSec);
+    const paidScore = cap === null ? score : Math.min(score, cap);
+    const endless = isEndlessSession('music', st, durationSec);
+    const p = serverSessionPayout({ score: paidScore, won, endless, durationSec });
+    return { won, endless, paidScore, xp: p.xp, profileShards: p.shards, lc: p.winCredits, capped: p.capped };
+  };
+  return {
+    durationSec: r(durationSec, 2),
+    statsForwarded: row(stats, true),
+    todaysShellNoStats: row(null, false),
+    how: 'lib/session-payout.ts sessionWon / sessionScoreCap / isEndlessSession / sessionPayout, as app/api/sessions/route.ts:81-131 calls them (arenaVerified false); statsForwarded = the room\'s performResultStats(result) in the body; todaysShellNoStats = no stats (ROOM_STATS_FORWARDED false: the room\'s own won is kept when it scored)',
+  };
+}
+
 function tally(taps: TapRecord[]) {
-  const t = { PERFECT: 0, GOOD: 0, EARLY: 0, sameNote: 0, previousNote: 0, olderNote: 0, noNote: 0 };
+  // MUSIC-SUITE P2: a tap with no note in reach is EXTRA now (P1 called it EARLY whatever its timing)
+  const t = { PERFECT: 0, GOOD: 0, EXTRA: 0, WAIT: 0, sameNote: 0, previousNote: 0, olderNote: 0, noNote: 0 };
   for (const x of taps) {
     t[x.result]++;
     if (x.hitNote === null) t.noNote++;
@@ -567,7 +632,7 @@ function performSection(fake: FakeWebAudio) {
     bpm: ACADEMY_BPM, swing: ACADEMY_SWING, arena: false, grid: 'all', tickPhaseSec: 0.007, untilSec: bars4(ACADEMY_SWING),
     tapFor: (n, t) => (n === 16 ? t + 0.03 : null),
   });
-  const oneWon = one.score > 0;                  // StudioMode.tsx:367 won: score > 0
+  const oneWon = one.result.won;                 // MUSIC-SUITE P2: performSetWon (P1: StudioMode.tsx:367 won: score > 0)
   const oneTapEarly = runPerform(fake, {        // the same single tap, 30 ms EARLY
     bpm: ACADEMY_BPM, swing: ACADEMY_SWING, arena: false, grid: 'all', tickPhaseSec: 0.007, untilSec: bars4(ACADEMY_SWING),
     tapFor: (n, t) => (n === 16 ? t - 0.03 : null),
@@ -582,7 +647,9 @@ function performSection(fake: FakeWebAudio) {
     const perfect = run.taps.filter((x) => x.result === 'PERFECT').length;
     return {
       swing, notes: run.notesOffered, tapsPerfect: perfect, score: run.score, scoreIsPerformSetMax: run.score === performSetMax(perfect),
-      payout: sessionPayout(run.score, run.score > 0),
+      result: run.result,
+      payout: sessionPayout(run.score, run.result.won),
+      serverPayoutP2: serverPayoutP2(run.score, run.result, 300),   // MUSIC-SUITE P2: what the route pays now
     };
   });
 
@@ -591,10 +658,10 @@ function performSection(fake: FakeWebAudio) {
   const emptyMinute = runPerform(fake, { bpm: ACADEMY_BPM, swing: ACADEMY_SWING, arena: false, grid: 'empty', tickPhaseSec: 0.005, untilSec: LIVE_LEAD_S + 60 });
 
   return {
-    how: 'the real AudioEngine + PerformSet on fakeWebAudio, wired as StudioMode.tsx:208-216 (note on release) and :258-266 (tap); the scheduler interval fires at phase + 25 ms·k, phases 0–24 ms tried (the timer and the audio clock are not aligned in a browser); "true audible time" = the scheduled start() time on the context clock (output latency not added)',
+    how: 'the real AudioEngine + PerformSet on fakeWebAudio, wired as StudioMode wires them (P2: a note offered on onStepScheduled, a rest when the grid is silent; P1 was StudioMode.tsx:208-216, note on release) and a tap = set.tap(ctx.currentTime); the scheduler interval fires at phase + 25 ms·k, phases 0–24 ms tried (the timer and the audio clock are not aligned in a browser); "true audible time" = the scheduled start() time on the context clock (output latency not added)',
     rules: {
-      releaseRule: 'drainPlayhead releases a step only once its time <= ctx.currentTime, on the 25 ms interval (AudioEngine.ts:23, 105, 154-160); PerformSet.tap searches only released notes (performSet.ts:95-107)',
-      windows: { perfectBelowMs: PERFORM_PERFECT_S * 1000, hitWithinMs: PERFORM_EXPIRE_S * 1000, earlyWindowMs: 0 },
+      releaseRule: 'P2: a note is offered when the scheduler SCHEDULES it (AudioEngine.onStepScheduled, up to SCHEDULE_AHEAD_S = 100 ms before it sounds); PerformSet.tap takes the nearest open note by signed error. (P1: drainPlayhead released a step only once its time <= ctx.currentTime.)',
+      windows: { perfectBelowMs: PERFORM_PERFECT_S * 1000, hitWithinMs: PERFORM_EXPIRE_S * 1000, earlyWindowMs: 'as far ahead as the note is scheduled (see releaseLatencyMs, negative = before it sounds), at most 250' },
       releaseLatencyMs: { min: r(Math.min(...lat), 2), max: r(Math.max(...lat), 2), mean: r(lat.reduce((a, b) => a + b, 0) / lat.length, 2), samples: lat.length },
     },
     isolatedNote: { how: 'notes 0–15 hit PERFECT at +30 ms (nothing left open), then note 16 tapped at the offset; 25 timer phases', rows: isolated },
@@ -605,9 +672,10 @@ function performSection(fake: FakeWebAudio) {
       how: 'free play, one PERFECT tap (+30 ms on note 16), then END SET after 4 bars: StudioMode.tsx:360-372 endSet',
       score: one.score, won: oneWon, headline: one.combo > 0 ? `${one.score} · best combo x${one.combo}` : `${one.score}`,
       payout: sessionPayout(one.score, oneWon),
+      serverPayoutP2: serverPayoutP2(one.score, one.result, bars4(ACADEMY_SWING)),   // MUSIC-SUITE P2: what the route pays now
       sameTap30msEarly: {
         result: oneTapEarly.taps[0]?.result, hitNote: oneTapEarly.taps[0]?.hitNote, hitDtMs: oneTapEarly.taps[0]?.hitDtMs,
-        score: oneTapEarly.score, won: oneTapEarly.score > 0,
+        score: oneTapEarly.score, won: oneTapEarly.result.won,
       },
     },
     perfectFiveMinuteFreePlay: { how: 'steady +30 ms player, every note PERFECT, notes whose audible time is within 300 s of the first', bySwing: fiveMin },
@@ -761,21 +829,24 @@ function printSummary(res: any, out: string): void {
   for (const c of res.swing.legacyEngine.cases) {
     L(`  legacy s=${c.swing}: eff BPM ${c.liveEffectiveBpm}, max err vs stems ${c.maxAbsErrMs} ms`);
   }
-  L('\nPERFORM isolated note (25 timer phases): offset → PERFECT/GOOD/EARLY   [quantized clock]');
-  res.perform.isolatedNote.rows.forEach((x: { offsetMs: number; PERFECT: number; GOOD: number; EARLY: number }, i: number) => {
+  L('\nPERFORM isolated note (25 timer phases): offset → PERFECT/GOOD/EXTRA   [quantized clock]');
+  res.perform.isolatedNote.rows.forEach((x: { offsetMs: number; PERFECT: number; GOOD: number; EXTRA: number }, i: number) => {
     const q = res.perform.isolatedNoteQuantizedClock.rows[i];
-    L(`  ${String(x.offsetMs).padStart(4)} ms → ${x.PERFECT}/${x.GOOD}/${x.EARLY}   [${q.PERFECT}/${q.GOOD}/${q.EARLY}]`);
+    L(`  ${String(x.offsetMs).padStart(4)} ms → ${x.PERFECT}/${x.GOOD}/${x.EXTRA}   [${q.PERFECT}/${q.GOOD}/${q.EXTRA}]`);
   });
-  L('PERFORM lone tap on bar 2 downbeat: offset → PERFECT/GOOD/EARLY (same/prev note)');
-  for (const x of res.perform.loneTapInRunningMusic.rows) L(`  ${String(x.offsetMs).padStart(4)} ms → ${x.PERFECT}/${x.GOOD}/${x.EARLY} (${x.sameNote}/${x.previousNote})`);
+  L('PERFORM lone tap on bar 2 downbeat: offset → PERFECT/GOOD/EXTRA (same/prev note)');
+  for (const x of res.perform.loneTapInRunningMusic.rows) L(`  ${String(x.offsetMs).padStart(4)} ms → ${x.PERFECT}/${x.GOOD}/${x.EXTRA} (${x.sameNote}/${x.previousNote})`);
   for (const s of res.perform.steadyPlayer.bySwing) {
-    L(`PERFORM steady player, swing ${s.swing} (per row 25×64 taps): offset → PERFECT/GOOD/EARLY, same/prev, median score (perfect ${s.rows[0].perfectSetScore})`);
-    for (const x of s.rows) L(`  ${String(x.offsetMs).padStart(4)} ms → ${x.PERFECT}/${x.GOOD}/${x.EARLY}  ${x.sameNote}/${x.previousNote}  ${x.scoreMedian}`);
+    L(`PERFORM steady player, swing ${s.swing} (per row 25×64 taps): offset → PERFECT/GOOD/EXTRA, same/prev, median score (perfect ${s.rows[0].perfectSetScore})`);
+    for (const x of s.rows) L(`  ${String(x.offsetMs).padStart(4)} ms → ${x.PERFECT}/${x.GOOD}/${x.EXTRA}  ${x.sameNote}/${x.previousNote}  ${x.scoreMedian}`);
   }
   const o = res.perform.oneTapSet;
   L(`one-tap set: score ${o.score} won ${o.won} → XP ${o.payout.profileXp}, shards ${o.payout.totalShards}, LC ${o.payout.lc}, coins ${o.payout.walletCoins}, season XP ${o.payout.seasonXp}`);
+  const sv = (x: any) => `won ${x.won} endless ${x.endless} → XP ${x.xp}, profile shards ${x.profileShards}, LC ${x.lc}${x.capped ? ' (capped)' : ''}`;
+  L(`  P2 server (stats forwarded): ${sv(o.serverPayoutP2.statsForwarded)} | today's shell (no stats): ${sv(o.serverPayoutP2.todaysShellNoStats)}`);
   for (const f of res.perform.perfectFiveMinuteFreePlay.bySwing) {
     L(`5-min perfect free play s=${f.swing}: notes ${f.notes} score ${f.score} → XP ${f.payout.profileXp}, shards ${f.payout.totalShards}, LC ${f.payout.lc}`);
+    L(`  P2 server (stats forwarded): ${sv(f.serverPayoutP2.statsForwarded)} | today's shell (no stats): ${sv(f.serverPayoutP2.todaysShellNoStats)}`);
   }
   L(`empty grid: arena set ${res.perform.emptyGrid.arenaSetNotesOffered} notes / ${res.perform.emptyGrid.arenaSetSoundsScheduled} sounds; free play ${res.perform.emptyGrid.freePlayNotesPerMinute} notes/min`);
   L('\nPUBLISH');

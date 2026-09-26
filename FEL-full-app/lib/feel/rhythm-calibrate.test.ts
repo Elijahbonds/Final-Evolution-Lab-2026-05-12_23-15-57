@@ -22,19 +22,33 @@ function sources(dir: string, out: string[] = []): string[] {
 const readers = ['app', 'components', 'lib']
   .flatMap((d) => sources(join(ROOT, d)))
   .filter((p) => p !== MODULE && !p.startsWith(CALIBRATE))
-  // the loader, or the storage key read directly
-  .filter((p) => /\bloadAudioOffsetMs\b|\bCALIBRATION_STORAGE_KEY\b|fel\.audioOffsetMs/.test(readFileSync(p, 'utf8')))
+  // the loader, or the storage key read directly (MUSIC-SUITE P2 FIX PASS: or the rooms' shared reader)
+  .filter((p) => /\bloadAudioOffsetMs\b|\bloadRoomCalibration\b|\bloadSavedOffsetMs\b|\bCALIBRATION_STORAGE_KEY\b|fel\.audioOffsetMs/.test(readFileSync(p, 'utf8')))
   .map((p) => relative(ROOT, p));
 
 const screen = ['page.tsx', join('_components', 'calibrate-client.tsx')]
   .map((f) => readFileSync(join(CALIBRATE, f), 'utf8'))
   .join('\n');
 
+/** MUSIC-SUITE P2 (2026-09-25): the rooms the screen may name, and the file whose reading of the offset makes it true. */
+const ROOMS: Array<{ named: RegExp; file: string }> = [
+  { named: /\bCypher\b/, file: join('lib', 'babylon', 'modes', 'DanceMode.ts') },
+  { named: /\bPERFORM\b/, file: join('lib', 'babylon', 'music', 'StudioMode.tsx') },
+];
+
 describe('audio calibration, what the screen claims', () => {
   it('says the timing windows move only if something outside the screen reads the offset', () => {
     if (readers.length > 0) return;   // a mode reads it: the claim may be true now
     expect(screen).not.toMatch(/every rhythm mode/i);
     expect(screen).not.toMatch(/windows shift|shifts? (its|their) (timing )?windows/i);
+  });
+
+  it('names a room as using the offset only when that room reads it, and never claims every mode', () => {
+    const copy = readFileSync(join(CALIBRATE, 'page.tsx'), 'utf8').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');   // the copy, not its comments
+    for (const r of ROOMS) {
+      if (r.named.test(copy)) expect(readers, `${r.file} must read the offset for the screen to name it`).toContain(r.file);
+    }
+    expect(copy).not.toMatch(/every rhythm mode|all rhythm modes/i);
   });
 
   it('still says what it measures', () => {

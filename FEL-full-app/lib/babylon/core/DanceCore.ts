@@ -256,7 +256,8 @@ export class DancePerformance {
   private begun = false;
   private bpm: number;
   /** Steps a hit took before they fired, out of chart order (the next one is taken by nextIdx++): body steps (hitBody),
-   *  and a press step behind an unfired body step (hit). */
+   *  and a press step behind an unfired body step (hit) — or, MUSIC-SUITE P2, fired by a press behind a due body step
+   *  (fireDuePresses: pending already; update() passes over it the same way). */
   private consumedEarly = new Set<DanceStep>();
   /**
    * The camera's latency (s), subtracted from every body hit's time before it is judged. Body events are stamped on
@@ -360,6 +361,30 @@ export class DancePerformance {
     }
   }
 
+  /**
+   * MUSIC-SUITE P2 (2026-09-25): fire the PRESS steps whose time has come by `now`, as update() would — same test
+   * (elapsed >= beat × beat duration), same order, same callback — so a press judges them as pending. A due BODY step is
+   * left where it is: it is update()'s to fire and hitBody's to take, and a press never answers it. A press step behind
+   * such a body step fires out of chart order and is marked in consumedEarly, which update() already reads as "fired":
+   * it passes over it when it reaches it. On a press-only chart this is update()'s firing loop exactly.
+   */
+  private fireDuePresses(now: number): void {
+    const elapsed = now - this.started;
+    const bd = beatDuration(this.bpm);
+    for (let i = this.nextIdx; i < this.steps.length && elapsed >= this.steps[i].beat * bd; i++) {
+      const s = this.steps[i];
+      if (this.consumedEarly.has(s)) {
+        if (i === this.nextIdx) { this.consumedEarly.delete(s); this.nextIdx++; }   // what update() does with it
+        continue;
+      }
+      if (isBodyStep(s)) continue;
+      if (i === this.nextIdx) this.nextIdx++;
+      else this.consumedEarly.add(s);
+      this.pending.push({ step: s, time: this.started + s.beat * bd });
+      this.onStepFired?.(s);
+    }
+  }
+
   private lastWildAt = -Infinity;
   private registerMiss(step?: DanceStep, deltaMs?: number, now?: number): void {
     this.combo = 0;
@@ -402,6 +427,18 @@ export class DancePerformance {
 
   /** A press on the audio clock. It scores press steps only: a body target is not a button. */
   hit(now: number): Judgement {
+    // MUSIC-SUITE P2 (2026-09-25): A PRESS JUST AFTER THE BEAT IS NOT A WILD TAP. A press arrives on the input event,
+    // between frames; a step only joined `pending` when the NEXT frame's update() fired it. A tap 1–30 ms after a step's
+    // beat that beat the frame to it found the step in neither place — not pending (unfired), and not upcoming (the
+    // early path below takes a step still AHEAD of the press) — and was judged a wild MISS: −20, combo gone, the spam
+    // lock armed (a hit inside 0.25 s capped at GOOD), and the step it meant expired as a second MISS. P1 measured it (BASELINE.md §2a, then DanceCore.ts:262-284 at 7ee51e4e)
+    // and it survived phase 9's rework: re-checked on 02387a65, +1/+5/+15/+30 ms input-first all MISS, the same taps
+    // update-first all PERFECT; a bot aiming at the beat scored 1,170 (D), one frame early 5,395 (A). The press now fires
+    // the press steps due by its own time first, exactly as update() would (fireDuePresses), so the frame order no
+    // longer decides the judgement. Only firing: expiry stays update()'s (a press cannot match a step past its window
+    // either way). The frozen pre-P9 core keeps the old answer; DanceCore.equivalence.test.ts pins this as
+    // its difference 3.
+    if (this.running) this.fireDuePresses(now);
     let bestIdx = -1, best = Infinity, bestSigned = 0;
     for (let i = 0; i < this.pending.length; i++) {
       if (!stepAccepts(this.pending[i].step, null)) continue;

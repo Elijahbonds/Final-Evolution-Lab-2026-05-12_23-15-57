@@ -37,28 +37,41 @@ class SoundKitImpl {
   private crowdDuck: GainNode | null = null;
   private out: AudioNode | null = null;
   private voiceEnabled = readVoicePref();
+  // MUSIC-SUITE P2 (2026-09-25): THE MUSIC BUS. The Cypher built a second AudioContext for its band and 808 kit and
+  // played them straight into the speakers: past this master and limiter (the suite map found, by arithmetic, that the
+  // band's downbeat sum can pass 0 dBFS), on a clock 144–160 ms apart from this one (BASELINE.md §2a), and never
+  // unlocked by the harness's first gesture (SoundKit.unlock only resumes THIS context: the map's assumed iPhone
+  // count-in hang, a banner stuck on '4'). Music now plays on this
+  // context through this bus into the master. Its gain undoes the master's 0.55, so the band keeps the loudness it had
+  // on its own context (against the SFX it was mixed with) and only the limiter is new. Additive: nothing else routes here.
+  private musicBus: GainNode | null = null;
   /** The MC's voice is on (a player setting, kept across sessions; the captions carry the call either way). */
   get voiceOn(): boolean { return this.voiceEnabled && this.sfxEnabled; }
   setVoice(on: boolean): void { this.voiceEnabled = on; writeVoicePref(on); }
-  /** The graph the voice plays into; null before a context can exist (server, no Web Audio). */
-  graph(): { ctx: AudioContext; voice: GainNode; crowdDuck: GainNode; out: AudioNode } | null {
+  /** The graph the voice (and, MUSIC-SUITE P2, the music) plays into; null before a context can exist (server, no Web Audio). */
+  graph(): { ctx: AudioContext; voice: GainNode; crowdDuck: GainNode; out: AudioNode; music: GainNode } | null {
     const ctx = this.ensure();
-    return ctx && this.voiceBus && this.crowdDuck && this.out ? { ctx, voice: this.voiceBus, crowdDuck: this.crowdDuck, out: this.out } : null;
+    return ctx && this.voiceBus && this.crowdDuck && this.out && this.musicBus
+      ? { ctx, voice: this.voiceBus, crowdDuck: this.crowdDuck, out: this.out, music: this.musicBus } : null;
   }
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
+    // MUSIC-SUITE P2 FIX PASS (2026-09-25): no audio-session change here any more. P2 set 'playback' at this point, the
+    // first time ANY mode built this context, which (on iOS, assumed) stopped the player's own music and played through
+    // the silent switch in every game mode. The music rooms claim it themselves (lib/audio/session.ts).
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.55;
+    this.master.gain.value = MASTER_GAIN;
     const limiter = this.ctx.createDynamicsCompressor();
     limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.12;
     this.master.connect(limiter).connect(this.ctx.destination);
     this.out = limiter;   // everything the game sounds like, last node before the speakers (a dev probe can tap it)
     this.crowdDuck = this.ctx.createGain(); this.crowdDuck.connect(this.master);
     this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = 1.35; this.voiceBus.connect(this.master);
+    this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 1 / MASTER_GAIN; this.musicBus.connect(this.master);   // MUSIC-SUITE P2
     return this.ctx;
   }
 
@@ -351,6 +364,12 @@ class SoundKitImpl {
     this.crowdGain = null;
   }
 }
+
+const MASTER_GAIN = 0.55;
+
+// MUSIC-SUITE P2 FIX PASS (2026-09-25): playbackAudioSession() lived here and was called for every mode; it moved to
+// lib/audio/session.ts as a CLAIM the music rooms make (DanceMode, the Academy's AudioEngine, the legacy maker, the
+// calibration screen) and give back.
 
 const VOICE_PREF_KEY = 'fel-audio';
 function readVoicePref(): boolean {

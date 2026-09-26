@@ -5,8 +5,10 @@ import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
-import { CELL_ASSIST_SHARDS, CELL_ASSIST_SKU, kitSkuId } from '@/lib/babylon/music/purchases';
-import { KIT_META, type KitId } from '@/lib/babylon/music/SynthKit';
+import {
+  SPEND_REFUSED, SPEND_UNREACHABLE, newSpendNonce, ownedReadFromResponse, skuForSpend, spendResultFromStatus,
+  type ReadOwnedKits, type ShardSpend,
+} from '@/lib/babylon/music/purchases';
 
 const spinner = () => (
   <div className="flex h-[80vh] items-center justify-center bg-[#050505]">
@@ -23,26 +25,40 @@ export function MusicLoader() {
   // shipped. This is the prop.
   //
   // The cost argument is ignored on purpose: the server prices the SKU from the catalogue, and a cost arriving
-  // from the client is a suggestion, not a price. It is matched back to a SKU by the amount the room displays,
-  // which lib/babylon/music/purchases.ts keeps equal to KIT_META by test.
-  const spendShards = useCallback(async (cost: number, reason: string): Promise<boolean> => {
-    const kit = (Object.keys(KIT_META) as KitId[]).find((k) => reason === `unlock kit ${k}`);
-    const sku = kit ? kitSkuId(kit) : cost === CELL_ASSIST_SHARDS ? CELL_ASSIST_SKU : null;
-    if (!sku) return false; // an unrecognised spend is refused, never waved through
+  // from the client is a suggestion, not a price. The SKU comes from the reason alone (purchases.ts skuForSpend).
+  //
+  // MUSIC-SUITE P2 (2026-09-25): A TYPED ANSWER, NOT A BOOLEAN. This returned `res.ok`, and the room read every `false`
+  // as 'Not enough Shards' — an expired sign-in (401) and a server fault (500) included. Now the status is read
+  // (spendResultFromStatus): 401 signed out, 402/409 insufficient, 5xx or no answer at all unreachable ("nothing was
+  // charged": the route's 5xx comes from a rolled-back transaction), anything else refused. A consumable's nonce is the
+  // ROOM's now (one per confirm), so a second BUY after a lost answer is the same purchase to the server, not another.
+  const spendShards = useCallback<ShardSpend>(async (_cost, reason, opts) => {
+    const sku = skuForSpend(reason);
+    if (!sku) return SPEND_REFUSED; // an unrecognised spend is refused, never waved through
 
+    let res: Response;
     try {
-      const res = await fetch('/api/music/unlock', {
+      res = await fetch('/api/music/unlock', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          sku,
-          // A kit ignores this; an assist is consumable and each deliberate buy needs its own key.
-          nonce: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-        }),
+        // A kit ignores the nonce (its key is permanent); an assist is consumable and each deliberate buy needs its own.
+        body: JSON.stringify({ sku, nonce: opts?.nonce ?? newSpendNonce() }),
       });
-      return res.ok;
     } catch {
-      return false;
+      return SPEND_UNREACHABLE;
+    }
+    return spendResultFromStatus(res.status, await res.json().catch(() => null));
+  }, []);
+
+  // MUSIC-SUITE P2 (2026-09-25): OWNED KITS COME FROM THE ACCOUNT. GET /api/music/unlock had no caller; kits lived in
+  // this device's localStorage only, so a kit bought on a phone was on sale again on a laptop. The room reads this at
+  // mount and keeps localStorage as a cache: a failed read keeps the cache, a good one replaces it (a refunded kit goes).
+  const readOwnedKits = useCallback<ReadOwnedKits>(async () => {
+    try {
+      const res = await fetch('/api/music/unlock', { cache: 'no-store' });
+      return ownedReadFromResponse(res.status, await res.json().catch(() => null));
+    } catch {
+      return { ok: false, reason: 'unreachable' };
     }
   }, []);
 
@@ -62,7 +78,7 @@ export function MusicLoader() {
       venue="The Academy"
       Game={StudioMode}
       ownControls
-      gameProps={{ spendShards, arenaSet }}
+      gameProps={{ spendShards, readOwnedKits, arenaSet }}
     />
   );
 }

@@ -25,6 +25,13 @@
 //      startAt is the audio clock + a four-beat count-in). The new core shows them. Judging is identical either way.
 //   2. Re-entry: the old update() advanced nextIdx AFTER onStepFired, so upcoming() called from inside onStepFired
 //      listed the firing step twice. No consumer does that (DanceMode's playStep only plays a clip).
+//   3. MUSIC-SUITE P2 (2026-09-25): a press that lands after a step's beat but before the frame's update() has fired
+//      that step. The old core found the step neither pending nor ahead and called the press a wild MISS (−20, and the
+//      spam lock capped the next hit at GOOD): P1 measured +1…+30 ms taps all MISS (BASELINE.md §2a). The new hit()
+//      fires what is due by the press's own time first, exactly as update() would, and then judges. So the differential
+//      gives the OLD core that same catch-up before every press (oldCatchUp: its own update() firing loop, run from
+//      outside) and still requires identical answers; the tally counts the presses the catch-up fired a step for. Its
+//      test at the bottom shows the old answer next to the new one.
 
 import { describe, it, expect } from 'vitest';
 import * as NEW from './DanceCore';
@@ -257,11 +264,34 @@ interface Run { chart: Chart; model: string; clock: Clock; stamp: Stamp; life: L
 interface Tally {
   runs: number; frames: number; presses: number; judged: number; fired: number; bodyEvents: number;
   comparisons: number; differences: number; zeroStartFrames: number; zeroStartDiffers: number;
+  /** Presses that arrived after a step's beat and before the frame fired it (pinned difference 3). */
+  catchUps: number;
 }
 const newTally = (): Tally => ({
   runs: 0, frames: 0, presses: 0, judged: 0, fired: 0, bodyEvents: 0, comparisons: 0, differences: 0,
-  zeroStartFrames: 0, zeroStartDiffers: 0,
+  zeroStartFrames: 0, zeroStartDiffers: 0, catchUps: 0,
 });
+
+/** Pinned difference 3: the old core's own update() firing loop (DanceCore.base.ts:206-216), run before a press the
+ *  way the new hit() runs fireDue — firing only, no expiry. Returns how many steps it fired. */
+function oldCatchUp(o: OLD.DancePerformance, now: number): number {
+  const x = o as unknown as {
+    running: boolean; started: number; bpm: number; nextIdx: number;
+    steps: OLD.DanceStep[]; pending: { step: OLD.DanceStep; time: number }[];
+  };
+  if (!x.running) return 0;
+  const elapsed = now - x.started;
+  const bd = OLD.beatDuration(x.bpm);
+  let fired = 0;
+  while (x.nextIdx < x.steps.length && elapsed >= x.steps[x.nextIdx].beat * bd) {
+    const s = x.steps[x.nextIdx];
+    x.pending.push({ step: s, time: x.started + s.beat * bd });
+    o.onStepFired?.(s);
+    x.nextIdx++;
+    fired++;
+  }
+  return fired;
+}
 
 /** The old core's peekNext/upcoming with its `!this.started` gate stepped over at a start of exactly 0: `started`
  *  becomes an object that is truthy and adds as 0, so the OLD code computes its own started ≠ 0 branch. */
@@ -315,7 +345,9 @@ function simulate(r: Run, tally: Tally): string | null {
 
   const hit = (t: number): string | null => {
     op++; tally.presses++;
-    const jn = n.hit(t), jo = o.hit(t);
+    const jn = n.hit(t);
+    if (oldCatchUp(o, t) > 0) tally.catchUps++;                              // pinned difference 3
+    const jo = o.hit(t);
     return check('hit()', jn, jo) ?? afterCall();
   };
   const frame = (t: number): string | null => {
@@ -527,12 +559,14 @@ describe('DanceCore phase 9: button play is unchanged (differential against the 
     // the tally is filled by the chart tests above (vitest runs a file's tests in order)
     expect(TOTAL.runs).toBe(all.length);
     expect(TOTAL.differences).toBe(0);
+    expect(TOTAL.catchUps).toBeGreaterThan(0);                            // difference 3 is exercised, not just pinned
     console.info(
       `[dance-equivalence] ${CHARTS.length} charts (${CHARTS.filter((c) => c.shipped).length} shipped-track × difficulty) `
       + `× ${MODEL_NAMES.length} models: `
       + `${TOTAL.runs} runs, ${TOTAL.frames} frames, ${TOTAL.presses} presses, ${TOTAL.judged} judgements, ${TOTAL.fired} steps fired, `
       + `${TOTAL.bodyEvents} stray body events, ${TOTAL.comparisons} comparisons, ${TOTAL.differences} differences; `
-      + `start(0) frames ${TOTAL.zeroStartFrames} (old cue gate changed the answer on ${TOTAL.zeroStartDiffers})`,
+      + `start(0) frames ${TOTAL.zeroStartFrames} (old cue gate changed the answer on ${TOTAL.zeroStartDiffers}); `
+      + `presses between a step's beat and its frame ${TOTAL.catchUps} (difference 3)`,
     );
   });
 
@@ -579,13 +613,66 @@ describe('DanceCore phase 9: button play is unchanged (differential against the 
       seen.op.push(o.peekNext(now)?.time ?? null);
     };
     n.start(0.5); o.start(0.5);
-    const press = (t: number) => { now = t; expect(n.hit(t)).toBe(o.hit(t)); };
+    // pinned difference 3: a press fires the steps due by its time (4.6 takes the step at 4.5 as GOOD; the old core
+    // called it wild), so the old core gets the same catch-up — its own update() firing loop, hence `inUpdate`
+    const press = (t: number) => {
+      now = t;
+      const j = n.hit(t);
+      inUpdate = true; oldCatchUp(o, t); inUpdate = false;
+      expect(j).toBe(o.hit(t));
+    };
     const tick = (t: number) => { now = t; inUpdate = true; n.update(t); o.update(t); inUpdate = false; };
-    // early presses consume a step from hit() (1.42, 2.4); the rest fire from update(), several in one call at the end
+    // early presses consume a step from hit() (1.42, 2.4); 4.6 fires the 4.5 step from hit() (difference 3); the rest
+    // fire from update(), several in one call at the end
     tick(1.3); press(1.42); tick(1.8); press(2.4); tick(2.6); tick(3.6); press(4.6); tick(6); tick(9.5);
     expect(seen.n.length).toBe(steps.length);
     expect(seen.n).toEqual(seen.o);                                    // otherwise identical, the early-press path included
     expect(seen.np).toEqual(seen.op);                                  // peekNext was never affected
     expect(n.result()).toEqual(o.result());
+  });
+
+  it('pinned difference 3: a press after the beat but before the frame fired the step takes that step (the old core called it wild)', () => {
+    const steps = mk([1, 2, 3, 4]);
+    const fresh = () => {
+      const n = new NEW.DancePerformance(60), o = new OLD.DancePerformance(60), u = new OLD.DancePerformance(60);
+      n.setRoutine(steps.map((s) => ({ ...s }))); o.setRoutine(steps.map((s) => ({ ...s }))); u.setRoutine(steps.map((s) => ({ ...s })));
+      n.start(0.5); o.start(0.5); u.start(0.5);
+      return { n, o, u };
+    };
+    // P1's four taps (BASELINE.md §2a): +1, +5, +15, +30 ms after the step at 1.5 s, the last frame at 1.49 s. `o` gets
+    // the press first (the old answer), `u` gets the frame first (what the player earned), `n` gets the press first.
+    for (const late of [0.001, 0.005, 0.015, 0.03]) {
+      const { n, o, u } = fresh();
+      n.update(1.49); o.update(1.49); u.update(1.49);
+      u.update(1.5 + late);
+      expect(o.hit(1.5 + late)).toBe('MISS');                             // the bug: a wild tap, and it costs
+      expect(o.score).toBe(0);
+      expect(o.counts.MISS).toBe(1);
+      expect(u.hit(1.5 + late)).toBe('PERFECT');
+      expect(n.hit(1.5 + late)).toBe('PERFECT');                            // the fix: the frame order no longer decides
+      expect(n.score).toBe(u.score);
+      // and the old core then let the step it never matched expire: one tap on time cost two MISSes
+      for (const p of [n, o, u]) p.update(2.5);
+      expect([n.hit(2.51), o.hit(2.51), u.hit(2.51)]).toEqual(['PERFECT', 'PERFECT', 'PERFECT']);
+      expect(n.result()).toEqual(u.result());
+      expect(n.result().counts).toEqual({ PERFECT: 2, GREAT: 0, GOOD: 0, MISS: 0 });
+      expect(o.result().counts).toEqual({ PERFECT: 1, GREAT: 0, GOOD: 0, MISS: 2 });
+    }
+    // a pending step still inside its window (1.5 s, 150 ms before the press) and a due-but-unfired one (1.64 s at
+    // 1.65 s): update-first, the press takes the nearer; the old press-first took the pending one as GOOD and let the
+    // due step expire. The new core takes the nearer, like update-first.
+    const near = mk([1, 1.14, 3]);
+    const mkp = <T extends { setRoutine(s: never[]): void; start(t: number): void }>(p: T) => {
+      p.setRoutine(near.map((s) => ({ ...s })) as never[]); p.start(0.5); return p;
+    };
+    const n = mkp(new NEW.DancePerformance(60)), o = mkp(new OLD.DancePerformance(60)), u = mkp(new OLD.DancePerformance(60));
+    n.update(1.6); o.update(1.6); u.update(1.6); u.update(1.65);
+    expect(o.hit(1.65)).toBe('GOOD');                                      // the 1.5 s step, 150 ms late
+    expect(u.hit(1.65)).toBe('PERFECT');                                   // the 1.64 s step, 10 ms late
+    expect(n.hit(1.65)).toBe('PERFECT');
+    for (const p of [n, o, u]) p.update(3);
+    expect(n.result()).toEqual(u.result());
+    expect(o.result().counts).toEqual({ PERFECT: 0, GREAT: 0, GOOD: 1, MISS: 1 });
+    expect(n.result().counts).toEqual({ PERFECT: 1, GREAT: 0, GOOD: 0, MISS: 1 });
   });
 });

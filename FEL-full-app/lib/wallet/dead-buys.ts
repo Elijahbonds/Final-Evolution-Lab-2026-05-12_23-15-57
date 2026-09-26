@@ -43,6 +43,15 @@ import { REASON, type WalletCurrency } from './reward-rules';
  *   client_key    every row of the SKU whose key the browser made is dead. The one route that delivers it composes its
  *                 key on the server (music:<player>:<sku>, card_slot:<player>_<ms>), or no route delivers it at all
  *                 (the class passes: nothing has ever read one, so the refund also takes back the entitlement row).
+ *                 MUSIC-SUITE P2 (2026-09-25): the Music Room's two kits are client_key SKUs whose entitlement row IS
+ *                 now read back — GET /api/music/unlock hands the room the kits the account owns — and a /store
+ *                 charge wrote that same row. The read therefore counts a row only when a charge this file never pays
+ *                 back stands behind it (backedEntitlements): the room's own music:<player>:<sku> charge. A /store kit
+ *                 charge is still paid back and still unlocks nothing, and a kit whose only charge was already paid
+ *                 back (the sweep never deleted a kit's row: no `undo`) is not owned. Moving the kits to first_charge
+ *                 instead was rejected: a player who bought a kit on /store and again in the room would keep both
+ *                 charges (the room's key is never a candidate), and players swept before the change and after it
+ *                 would be treated differently for the same buy.
  *   wearable      the Closet's buy (app/api/v1/closet/buy) writes OwnedWearable just after its charge and refuses an item
  *                 already owned, and nothing deletes a store wearable's row (the season pass withdraws only its own ids).
  *                 The row made at or just before OwnedWearable.acquiredAt delivered; any other row of that item did not.
@@ -60,7 +69,9 @@ import { REASON, type WalletCurrency } from './reward-rules';
  *                 delivered; a later one whose key the browser made upserted the same row and delivered nothing.
  *
  * These rules lean on how the delivering routes behave today. If one of them ever deletes its record (a booking
- * cancelled by deletion, a wearable sold back) or starts writing it without a charge, its rule here must change.
+ * cancelled by deletion, a wearable sold back) or starts writing it without a charge, its rule here must change. And a
+ * new reader of the entitlement row of a client_key SKU must read it through backedEntitlements, or the rows those
+ * refunds leave behind start delivering for free.
  */
 export type DeadBuyMatch = 'client_key' | 'wearable' | 'session' | 'workout_plan' | 'first_charge';
 
@@ -92,8 +103,8 @@ export const DEAD_CATALOG_BUYS: Readonly<Record<string, DeadCatalogBuy>> = {
   dunk_style_slot: { currency: 'shards', name: 'Dunk Style Slot', match: 'client_key', why: 'no code ever read the entitlement, and only /store sold it' },
   scan_personalized: { currency: 'shards', name: 'Personalized Scan', match: 'client_key', why: 'no code ever read the entitlement, and only /store sold it' },
   creative_card_slot: { currency: 'shards', name: 'Extra Card Slot', match: 'client_key', why: 'the card creator counts CardSlot.extra, which only its own route writes (key card_slot:)' },
-  music_kit_neon: { currency: 'shards', name: 'NEON kit', match: 'client_key', why: 'the Music Room keeps kits on the device and charges under music:<player>:<sku>; nothing calls the entitlement read' },
-  music_kit_dust: { currency: 'shards', name: 'DUST kit', match: 'client_key', why: 'the Music Room keeps kits on the device and charges under music:<player>:<sku>; nothing calls the entitlement read' },
+  music_kit_neon: { currency: 'shards', name: 'NEON kit', match: 'client_key', why: 'the Music Room charges a kit under music:<player>:<sku>, and its entitlement read (GET /api/music/unlock) counts a row only with a charge this file keeps (backedEntitlements)' },
+  music_kit_dust: { currency: 'shards', name: 'DUST kit', match: 'client_key', why: 'the Music Room charges a kit under music:<player>:<sku>, and its entitlement read (GET /api/music/unlock) counts a row only with a charge this file keeps (backedEntitlements)' },
   music_cell_assist: { currency: 'shards', name: 'Cell foundation', match: 'client_key', why: 'the Music Room charges each foundation as it is used, under its own key; a bought one was never used' },
   workout_plan_4w: { currency: 'shards', name: '4-Week Workout Plan', match: 'workout_plan', deliveredAs: 'plan_4w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too)' },
   workout_program_12w: { currency: 'shards', name: '12-Week Workout Program', match: 'workout_plan', deliveredAs: 'program_12w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too)' },
@@ -289,6 +300,35 @@ export function firstChargeIds(rows: readonly DeadBuyRow[]): Map<string, string>
     if (sku && (!had || t < had.createdAt.getTime() || (t === had.createdAt.getTime() && r.id < had.id))) first.set(sku, r);
   }
   return new Map([...first].map(([sku, r]) => [sku, r.id]));
+}
+
+/**
+ * MUSIC-SUITE P2 (2026-09-25): the SKUs among `skus` whose entitlement row a charge still backs, for a reader of the
+ * rows of a client_key or first_charge SKU — today GET /api/music/unlock, the Music Room's kits. Before P2 nothing read
+ * a kit's row, which is why the kits could be client_key ("nothing calls the entitlement read"). Once something reads
+ * it, the row spend() wrote with a /store charge would unlock the kit while the sweep pays that same charge back — a
+ * free kit — and every kit already paid back still has its row, since a kit's refund takes nothing back.
+ *
+ * A SKU counts when the player has a charge of it (SPEND_CATALOG_ITEM, delta < 0, from their own ledger rows) that has
+ * no refund and that these rules never pay back: deadBuyOf takes no such charge (a server-composed key, e.g.
+ * music:<player>:<sku>), or its rule is first_charge and it is the earliest charge (firstChargeIds). A browser-keyed
+ * charge of a client_key SKU never backs a row, even before the sweep reaches it (younger than DEAD_BUY_GRACE_MS, or a
+ * failed sweep): it is going to be paid back, so it does not deliver meanwhile either. The caller intersects the result
+ * with the entitlement rows it read. Not for wearable/session/workout_plan SKUs: those deliver through other tables.
+ */
+export function backedEntitlements(skus: readonly string[], rows: readonly DeadBuyRow[], playerId: string): Set<string> {
+  const want = new Set(skus);
+  const refunded = refundedRowIds(rows);
+  const first = firstChargeIds(rows);
+  const out = new Set<string>();
+  for (const r of rows) {
+    if (r.reasonCode !== REASON.SPEND_CATALOG_ITEM || !(r.delta < 0) || refunded.has(r.id)) continue;
+    const sku = str(((r.metadata ?? {}) as Record<string, unknown>).skuId);
+    if (!want.has(sku) || out.has(sku)) continue;
+    const dead = deadBuyOf(r, playerId);
+    if (!dead || (dead.match === 'first_charge' && first.get(sku) === r.id)) out.add(sku);
+  }
+  return out;
 }
 
 /**

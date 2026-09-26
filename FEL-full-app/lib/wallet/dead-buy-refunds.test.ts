@@ -71,6 +71,8 @@ const { readWallet, earn, spend } = await import('./wallet-service');
 const { refundNotesFor } = await import('./dead-buy-refunds');
 const { refundKey } = await import('./dead-buys');
 const { NOT_ON_SALE } = await import('./catalog');
+const { GET: musicOwned, POST: musicBuy } = await import('@/app/api/music/unlock/route');
+const { spendResultFromStatus, ownedReadFromResponse, SPEND_FAILURE_TEXT } = await import('@/lib/babylon/music/purchases');
 
 const unique = (target: string) => new Prisma.PrismaClientKnownRequestError(`Unique constraint failed on the fields: (\`${target}\`)`, { code: 'P2002', clientVersion: 'test' });
 const missingTable = () => Object.assign(new Error('The table `public.SessionJoinLink` does not exist in the current database.'), { code: 'P2021' });
@@ -136,6 +138,11 @@ function client(store: Store) {
         },
       },
       playerEntitlement: {
+        // MUSIC-SUITE P2: GET /api/music/unlock reads the player's kit rows (playerId, skuId in [...])
+        findMany: async ({ where }: { where: Record<string, unknown> }) => {
+          guard();
+          return view.entitlements.filter((e) => matches(e as unknown as Record<string, unknown>, where)).map((e) => ({ skuId: e.skuId }));
+        },
         upsert: async ({ create }: { create: { playerId: string; skuId: string; quantity: number } }) => {
           guard();
           write((s) => { if (!s.entitlements.some((e) => e.playerId === create.playerId && e.skuId === create.skuId)) s.entitlements.push({ ...create }); });
@@ -888,6 +895,122 @@ describe('the keys a refund leaves behind buy nothing', () => {
     await readWallet(client(s) as never, 'p1');
     expect(s.entries.filter((e) => e.reasonCode === 'DEAD_BUY_REFUND').map((r) => (r.metadata as { refundOf: string }).refundOf)).toEqual(['store_program']);
     expect(s.wallets[0].shards).toBe(300n);
+  });
+});
+
+// MUSIC-SUITE P2 (2026-09-25): the Music Room reads its kits from the account (GET /api/music/unlock), which until today
+// had no caller — the reason the kits could be client_key ("nothing calls the entitlement read", dead-buys.ts). A /store
+// kit charge wrote the same PlayerEntitlement row that read looks at, and a kit's refund never took that row back. So the
+// read counts a row only with a charge the dead-buy rules keep (dead-buys.ts backedEntitlements), and here that is
+// proven on the real routes, the real sweep and the real spend(): refunds stay exactly what they were, and nobody ends
+// up with both the shards and the kit, or with two charges for one kit.
+describe('the Music Room\'s kits come from the account, and a refund still means the kit is not yours', () => {
+  let store: Store;
+  beforeEach(() => {
+    vi.setSystemTime(NOW);
+    ({ store } = seed());
+    // the rows spend() wrote with p1's two kit charges: /store's DUST (dead) and the Room's own NEON (delivered)
+    store.entitlements.push({ playerId: 'p1', skuId: 'music_kit_dust', quantity: 1 }, { playerId: 'p1', skuId: 'music_kit_neon', quantity: 1 });
+    h.client = client(store);
+    h.session = { user: { id: 'p1' } };
+  });
+  const entitled = (sku: string, playerId = 'p1') => store.entitlements.some((e) => e.playerId === playerId && e.skuId === sku);
+  const kitCharges = (sku: string, walletId = 'w1') => store.entries.filter((e) => e.walletId === walletId && e.reasonCode === 'SPEND_CATALOG_ITEM' && (e.metadata as { skuId?: string }).skuId === sku);
+
+  it('lists the Room-bought kit; the /store kit is paid back on this very read and is not listed, though its row stays', async () => {
+    const res = await musicOwned();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ owned: ['music_kit_neon'], shards: Number(P1_AFTER.shards) });
+    expect(refundsIn(store).map((r) => r.idempotencyKey)).toContain(refundKey('store_dust'));   // the rule is unchanged
+    expect(entitled('music_kit_dust')).toBe(true);   // a kit's refund takes nothing back, which is why the read must look past the row
+    expect(ownedReadFromResponse(res.status, body)).toEqual({ ok: true, owned: ['music_kit_neon'], shards: 3160 });
+  });
+
+  it('a kit bought on /store AND in the Room: the /store charge is paid back, the Room\'s backs it — paid once, owned once', async () => {
+    store.entries.push({
+      id: 'store_neon', walletId: 'w1', currency: 'shards', delta: -200n, balanceAfter: 0n, reasonCode: 'SPEND_CATALOG_ITEM', source: 'spend',
+      idempotencyKey: UUID(40), metadata: { skuId: 'music_kit_neon', quantity: 1, unitPrice: 200 }, createdAt: ago(4 * DAY),
+    });
+    const body = await (await musicOwned()).json();
+    expect(body.owned).toEqual(['music_kit_neon']);
+    expect(refundsIn(store).map((r) => r.idempotencyKey)).toEqual(expect.arrayContaining([refundKey('store_neon'), refundKey('store_dust')]));
+    expect(walletOf(store, 'p1').shards).toBe(P1_AFTER.shards + 200n);
+    const kept = kitCharges('music_kit_neon').filter((e) => !refundsIn(store).some((r) => r.idempotencyKey === refundKey(e.id)));
+    expect(kept.map((e) => e.id)).toEqual(['room_neon']);
+  });
+
+  it('a kit paid back before this read (its row left behind) is for sale in the Room: one charge, then owned; a second buy replays', async () => {
+    await GET();   // /api/v1/wallet: the sweep pays the /store DUST back, exactly as it did before P2
+    expect((await (await musicOwned()).json()).owned).toEqual(['music_kit_neon']);
+    const bought = await post(musicBuy, { sku: 'music_kit_dust' });
+    expect(bought.status).toBe(200);
+    expect(spendResultFromStatus(bought.status, await bought.json())).toEqual({ ok: true, shards: Number(P1_AFTER.shards) - 400 });
+    expect((await (await musicOwned()).json())).toEqual({ owned: ['music_kit_dust', 'music_kit_neon'], shards: Number(P1_AFTER.shards) - 400 });
+    const again = await post(musicBuy, { sku: 'music_kit_dust' });
+    expect(again.status).toBe(200);
+    expect(walletOf(store, 'p1').shards).toBe(P1_AFTER.shards - 400n);
+    expect(kitCharges('music_kit_dust').map((e) => e.idempotencyKey)).toEqual([UUID(4), 'music:p1:music_kit_dust']);
+    // and the sweep never touches the Room's charge
+    await readWallet(client(store) as never, 'p1');
+    expect(refundsIn(store).some((r) => r.idempotencyKey === refundKey(kitCharges('music_kit_dust')[1].id))).toBe(false);
+  });
+
+  it('a /store kit charge the sweep has not reached yet (inside the grace) is not a kit either, then or after its refund', async () => {
+    h.session = { user: { id: 'p2' } };
+    store.entries.push({
+      id: 'young_neon', walletId: 'w2', currency: 'shards', delta: -200n, balanceAfter: 0n, reasonCode: 'SPEND_CATALOG_ITEM', source: 'spend',
+      idempotencyKey: UUID(41), metadata: { skuId: 'music_kit_neon', quantity: 1, unitPrice: 200 }, createdAt: ago(1),
+    });
+    store.entitlements.push({ playerId: 'p2', skuId: 'music_kit_neon', quantity: 1 });
+    expect((await (await musicOwned()).json()).owned).toEqual([]);
+    expect(refundsIn(store).some((r) => r.idempotencyKey === refundKey('young_neon'))).toBe(false);
+    vi.setSystemTime(new Date(NOW.getTime() + 15 * 60_000));
+    expect((await (await musicOwned()).json()).owned).toEqual([]);
+    expect(refundsIn(store).some((r) => r.idempotencyKey === refundKey('young_neon'))).toBe(true);
+  });
+
+  it('never lists another player\'s kit', async () => {
+    h.session = { user: { id: 'p2' } };
+    expect((await (await musicOwned()).json()).owned).toEqual([]);
+  });
+
+  it('a failed read is a 503 the room keeps its cache on — never "you own nothing"', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    h.client = { ...client(store), playerEntitlement: { findMany: async () => { throw new Error('db down'); } } };
+    const res = await musicOwned();
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body).toEqual({ error: 'unavailable' });
+    expect(ownedReadFromResponse(res.status, body)).toEqual({ ok: false, reason: 'unreachable' });
+    err.mockRestore();
+  });
+
+  it('signed out: 401 from both, which the room says as "Sign in to unlock"', async () => {
+    h.session = null;
+    const read = await musicOwned();
+    const buy = await post(musicBuy, { sku: 'music_kit_dust' });
+    expect([read.status, buy.status]).toEqual([401, 401]);
+    const r = spendResultFromStatus(buy.status, await buy.json());
+    expect(r.ok ? '' : SPEND_FAILURE_TEXT[r.reason]).toBe('Sign in to unlock');
+  });
+
+  it('a buy the wallet cannot cover is a 409 the room reads as "Not enough Shards", and nothing moves', async () => {
+    walletOf(store, 'p1').shards = 100n;
+    h.session = { user: { id: 'p1' } };
+    await GET();   // settle the refunds first, so the balance below is only this buy's doing
+    walletOf(store, 'p1').shards = 100n;
+    const before = store.entries.length;
+    const res = await post(musicBuy, { sku: 'music_kit_dust' });
+    expect(res.status).toBe(409);
+    const r = spendResultFromStatus(res.status, await res.json());
+    expect(r.ok ? '' : SPEND_FAILURE_TEXT[r.reason]).toBe('Not enough Shards');
+    expect(store.entries.length).toBe(before);
+    expect(walletOf(store, 'p1').shards).toBe(100n);
+    // an item the room does not sell is refused, not "broke"
+    const unknown = await post(musicBuy, { sku: 'music_kit_gold' });
+    const u = spendResultFromStatus(unknown.status, await unknown.json());
+    expect([unknown.status, u]).toEqual([404, { ok: false, reason: 'refused' }]);
   });
 });
 

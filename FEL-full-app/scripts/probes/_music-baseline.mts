@@ -68,6 +68,15 @@ async function buildPattern(p: Page): Promise<void> {
   await p.waitForTimeout(150);
 }
 const btn = (p: Page, name: string) => p.getByRole('button', { name, exact: true }).first();
+/** MUSIC-SUITE P2 (2026-09-25): a spend opens the inline confirm; note it (and any spend before the yes), then BUY. */
+async function confirmThenYes(p: Page, spendsBefore: number): Promise<{ confirmShown: boolean; spentBeforeYes: number; text: string | null }> {
+  const conf = p.locator('[data-qa="shop-confirm"]');
+  const shown = (await conf.count()) > 0;
+  const spentBeforeYes = (await p.evaluate(() => (window as Any).__FEL_STUDIO__.spends.length)) - spendsBefore;
+  const text = shown ? await conf.textContent() : null;
+  if (shown) { await p.locator('[data-qa="shop-yes"]').click(); await p.waitForTimeout(500); }
+  return { confirmShown: shown, spentBeforeYes, text };
+}
 
 async function startRoom(p: Page): Promise<void> {
   const start = p.getByRole('button', { name: 'TAP TO START' });
@@ -240,13 +249,16 @@ async function run(browser: Browser): Promise<void> {
   const spendsBefore = await p.evaluate(() => (window as Any).__FEL_STUDIO__.spends.length);
   await p.getByRole('button', { name: /CELL: LAY A FOUNDATION/ }).click();
   await p.waitForTimeout(400);
+  // MUSIC-SUITE P2 (2026-09-25): every shard spend now asks first (the inline [data-qa=shop-confirm]); P1 had no confirm.
+  // Record whether it asked, and whether anything was spent BEFORE the yes, then say yes so the rest of the run is P1's.
+  const cellConfirm = await confirmThenYes(p, spendsBefore);
   const gCell = await grid(p);
   const playCell = await playBars(p, 2);
   const engCell = await engine(p);
   const spends = await p.evaluate(() => (window as Any).__FEL_STUDIO__.spends);
   R.hiddenAfterCellChainTier = { ...hiddenAudible(engCell, gCell, playCell.audible), litDrawnAfterCell: gCell.lit, audibleOver2Bars: playCell.audible,
-    spendsAsked: spends.slice(spendsBefore), confirmShown: false,
-    how: 'CELL: LAY A FOUNDATION at the chain tier (6 rows drawn); the spend went straight to spendShards with no confirm (the dev route logs every ask); then 2 bars of PLAY' };
+    spendsAsked: spends.slice(spendsBefore), confirmShown: cellConfirm.confirmShown, spentBeforeYes: cellConfirm.spentBeforeYes, confirmText: cellConfirm.text,
+    how: 'CELL: LAY A FOUNDATION at the chain tier (6 rows drawn); P1: the spend went straight to spendShards with no confirm (the dev route logs every ask). P2 re-run: the inline confirm is recorded, then its BUY pressed; then 2 bars of PLAY' };
   log('hidden after cell', JSON.stringify(R.hiddenAfterCellChainTier.audibleNotDrawn));
 
   // 5. PERFORM on the CELL pattern
@@ -354,8 +366,10 @@ async function run(browser: Browser): Promise<void> {
   await frame(pp, 'studio-phone');
   // CELL on the first-visit tier: how many rows sound that the player cannot see?
   const pBefore = await pp.evaluate(GRID) as Any;
+  const pSpends0 = await pp.evaluate(() => (window as Any).__FEL_STUDIO__.spends.length);
   await pp.getByRole('button', { name: /CELL: LAY A FOUNDATION/ }).tap();
   await pp.waitForTimeout(400);
+  const pConfirm = await confirmThenYes(pp, pSpends0);   // MUSIC-SUITE P2: the confirm, then BUY
   const pAfter = await pp.evaluate(GRID) as Any;
   await pp.evaluate(() => (window as Any).__FEL_STUDIO__.reset());
   await pp.getByRole('button', { name: 'PLAY', exact: true }).tap();
@@ -363,7 +377,7 @@ async function run(browser: Browser): Promise<void> {
   const pAud = await pp.evaluate(() => ({ ...(window as Any).__FEL_STUDIO__.audible }));
   const pEng = await pp.evaluate(() => (window as Any).__FEL_STUDIO__.engine());
   await pp.getByRole('button', { name: 'STOP', exact: true }).tap();
-  R.hiddenAfterCellPhone = { rowsBeforeCell: pBefore.rows, rowsAfterCell: pAfter.rows, ...hiddenAudible(pEng, pAfter, pAud), audibleOver2Bars: pAud,
+  R.hiddenAfterCellPhone = { rowsBeforeCell: pBefore.rows, rowsAfterCell: pAfter.rows, ...hiddenAudible(pEng, pAfter, pAud), audibleOver2Bars: pAud, cellConfirm: pConfirm,
     how: 'phone context: 4 kick taps (the pattern gate opens the chain tier), then CELL, 2 bars of PLAY; drawn rows vs engine tracks' };
   log('phone hidden after cell', JSON.stringify(R.hiddenAfterCellPhone.audibleNotDrawn));
   await pctx.close();

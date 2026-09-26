@@ -9,8 +9,14 @@
 // scripts/probes/_music-baseline.mts, is its first user).
 //
 // What is real: StudioMode itself, unchanged, with the props app/play/music/_components/loader.tsx passes (spendShards,
-// arenaSet) plus the shell's grade/prq/onEnd. What stands in:
-//   * spendShards always says yes (no wallet on this server) and logs what it was asked for, so a probe can count spends;
+// readOwnedKits, arenaSet) plus the shell's grade/prq/onEnd. What stands in:
+//   * spendShards says yes (no wallet on this server) and logs what it was asked for, so a probe can count spends.
+//     MUSIC-SUITE P2 (2026-09-25): it answers the typed result the real loader does, and ?shop=<status>|offline makes
+//     every spend answer that HTTP status (read through the real purchases.ts spendResultFromStatus) or no answer at all,
+//     so each failure's words can be seen in a browser: ?shop=401 'Sign in to unlock', ?shop=409 'Not enough Shards',
+//     ?shop=500 or ?shop=offline "Couldn't reach the shop — if it went through, you won't be charged twice" (P2 fix pass);
+//   * readOwnedKits stands in for GET /api/music/unlock: the kits named in ?owned=neon,dust plus every kit this page
+//     load approved (so a REPLAY remount keeps a kit bought before it). ?shop=offline fails the read too (the cache stands);
 //   * GameShell's end card is a small card with REPLAY that REMOUNTS the room — exactly what the shell's REPLAY does
 //     (game-shell.tsx bumps gameKey), so "does my beat survive a PERFORM card" can be driven here;
 //   * ?stage=studio|perform is read by StudioMode itself (musicStage.ts readMusicStage, `?stage=` wins over the saved
@@ -28,6 +34,10 @@ import { prqGrade } from '@/lib/prq';
 import type { GameResult } from '@/components/games/game-shell';
 import { AudioEngine, type SequencerState } from '@/lib/babylon/music/AudioEngine';
 import { isMusicStageId } from '@/lib/babylon/music/musicStage';
+import {
+  SPEND_REFUSED, SPEND_UNREACHABLE, isKitId, kitForSku, kitSkuId, skuForSpend, spendResultFromStatus,
+  type ReadOwnedKits, type ShardSpend,
+} from '@/lib/babylon/music/purchases';
 
 const StudioMode = dynamicImport(() => import('@/lib/babylon/music/StudioMode'), { ssr: false });
 
@@ -43,8 +53,10 @@ export interface StudioProbe {
   steps: { step: number; time: number }[];
   /** The engine's audio clock (seconds), to line a tap up with a scheduled note. */
   now(): number | null;
-  /** Every spend StudioMode asked this route to approve. */
-  spends: { cost: number; reason: string }[];
+  /** Every spend StudioMode asked this route to approve (MUSIC-SUITE P2: only a confirmed one reaches here). */
+  spends: { cost: number; reason: string; nonce?: string }[];
+  /** How many times the room read the account's kits (the stand-in for GET /api/music/unlock). */
+  ownedReads: number;
   /** The last result StudioMode reported to the (stand-in) shell. */
   ended: GameResult | null;
   reset(): void;
@@ -83,6 +95,7 @@ function installStudioProbe(): void {
     audible: {},
     steps: [],
     spends: [],
+    ownedReads: 0,
     ended: null,
     reset() { probe.audible = {}; probe.steps = []; },
   };
@@ -108,6 +121,9 @@ function installStudioProbe(): void {
 }
 installStudioProbe();
 
+/** The kit SKUs this page load approved: the dev account's purchases, so a remount (REPLAY) still owns them. */
+const DEV_BOUGHT = new Set<string>();
+
 export function DevMusicLoader() {
   const [ended, setEnded] = useState<GameResult | null>(null);
   const [remounts, setRemounts] = useState(0);
@@ -121,11 +137,25 @@ export function DevMusicLoader() {
     setArenaSet(Boolean(q.get('arena')));
   }, []);
 
-  // No wallet here: every spend is approved, and written down so a probe can count what the room tried to charge.
-  const spendShards = useCallback(async (cost: number, reason: string): Promise<boolean> => {
-    window.__FEL_STUDIO__?.spends.push({ cost, reason });
+  // No wallet here: every spend is approved (unless ?shop= says otherwise), and written down so a probe can count what
+  // the room tried to charge. The SKU is resolved the way the real loader resolves it, so an unknown spend is refused.
+  const spendShards = useCallback<ShardSpend>(async (cost, reason, opts) => {
+    window.__FEL_STUDIO__?.spends.push({ cost, reason, ...(opts?.nonce ? { nonce: opts.nonce } : {}) });
+    const shop = new URLSearchParams(window.location.search).get('shop');
+    if (shop === 'offline') return SPEND_UNREACHABLE;
+    if (shop && /^\d{3}$/.test(shop)) return spendResultFromStatus(Number(shop), null);
+    const sku = skuForSpend(reason);
+    if (!sku) return SPEND_REFUSED;
+    if (kitForSku(sku)) DEV_BOUGHT.add(sku);
     console.info(`[dev-music] spend approved (dev): ${reason} · ${cost}`);
-    return true;
+    return { ok: true };
+  }, []);
+  const readOwnedKits = useCallback<ReadOwnedKits>(async () => {
+    if (window.__FEL_STUDIO__) window.__FEL_STUDIO__.ownedReads += 1;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('shop') === 'offline') return { ok: false, reason: 'unreachable' };
+    const named = (q.get('owned') ?? '').split(',').filter(isKitId).map(kitSkuId);
+    return { ok: true, owned: [...new Set([...named, ...DEV_BOUGHT])] };
   }, []);
   const onEnd = useCallback((r: GameResult) => {
     console.log('[dev-music] ended', JSON.stringify(r));
@@ -140,12 +170,12 @@ export function DevMusicLoader() {
     // StudioMode's own — the best case for the real route, which can only add a shell around it.
     <div className="min-h-screen bg-[#07090d]">
       <p className="px-2 py-1 font-mono text-[10px] text-white/40">
-        DEV · real StudioMode (no GameShell) · ?stage= {asked || '…'}{arenaSet ? ' · ARENA SET' : ''} · shards approved
+        DEV · real StudioMode (no GameShell) · ?stage= {asked || '…'}{arenaSet ? ' · ARENA SET' : ''} · shards approved (?shop= to fail them)
       </p>
       <div className="relative min-h-[80vh]">
         {arenaSet
-          ? <StudioMode key={`a${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} arenaSet />
-          : <StudioMode key={`f${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} />}
+          ? <StudioMode key={`a${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} arenaSet />
+          : <StudioMode key={`f${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} />}
         {ended && (
           <div data-dev="end-card" className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 font-mono">
             <div className="rounded-xl border border-white/20 bg-[#0b0d14] px-6 py-4 text-center text-white">

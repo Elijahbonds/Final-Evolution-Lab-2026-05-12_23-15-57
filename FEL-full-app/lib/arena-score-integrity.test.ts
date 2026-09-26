@@ -862,7 +862,10 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(studio).toContain('set.note(s, t, now)');
     expect(studio).toContain('set.tap(eng.context.currentTime)');
     expect(studio).toContain('if (set.over(now)) endSetRef.current();');
-    expect(studio).toContain('const { score, combo } = setRef.current;');
+    // MUSIC-SUITE P2 (2026-09-25): the end card reads the set's own result (real best combo, the win rule, the shared
+    // stats contract) — it read `const { score, combo } = setRef.current;` and reported won = score > 0
+    expect(studio).toContain('const r = setRef.current.result(engineRef.current?.context.currentTime ?? 0);');
+    expect(studio).toContain('won: r.won,');
     expect(studio).toContain('setRef.current = new PerformSet({ arena: arenaSet });');   // an Arena set only on an Arena run
     expect(studio).not.toMatch(/new PerformSet\(\{ arena: true \}\)/);                  // never capped by default
     expect(studio).not.toMatch(/setScore\(\(s\) =>/);                            // no second tally beside the set's

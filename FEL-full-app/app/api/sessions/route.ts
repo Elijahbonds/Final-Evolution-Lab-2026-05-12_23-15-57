@@ -13,10 +13,42 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { sessionHasPlay } from '@/lib/session-evidence';
 import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POWER_ATTR } from '@/lib/move/formSummary';
 import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
+import {
+  roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
+  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED,
+} from '@/lib/session-payout';
+import { canonicalModeKey } from '@/lib/game-data';
 
 export const dynamic = 'force-dynamic';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Match states an Arena set can still be played for (app/api/arena: WAITING until joined, ACTIVE until it settles). */
+const OPEN_MATCH_STATES = ['WAITING', 'ACTIVE'];
+
+/**
+ * MUSIC-SUITE P2 FIX PASS (2026-09-25): is `arenaMatchId` a music duel this player is in, still open, that this player has
+ * not submitted a score to yet? The ONLY thing that makes a music set an Arena set to this route (lib/session-payout.ts
+ * isEndlessSession). `stats.arena` alone came from the bare ?arena= query (app/play/music/_components/loader.tsx:68) and
+ * lifted the endless ceiling for anyone — up to 3,970,700 XP a set while music staking is paused. The shell posts the
+ * session BEFORE it submits the Arena score (game-shell.tsx handleEnd), so an honest set is still unsubmitted here, and
+ * one match cannot uncap set after set once its score is in. A lookup failure is "not verified": free play.
+ */
+async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise<boolean> {
+  if (typeof arenaMatchId !== 'string' || !arenaMatchId || arenaMatchId.length > 64) return false;
+  try {
+    const m = await (prisma as any).competitionMatch.findUnique({
+      where: { id: arenaMatchId },
+      select: { mode: true, status: true, currency: true, player1Id: true, player2Id: true, player1Score: true, player2Score: true },
+    });
+    if (!m || canonicalModeKey(m.mode) !== 'music' || m.currency !== 'LC' || !OPEN_MATCH_STATES.includes(m.status)) return false;
+    if (m.player1Id === userId) return m.player1Score == null;
+    if (m.player2Id === userId) return m.player2Score == null;
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -28,13 +60,29 @@ export async function POST(req: Request) {
     const mode = String(body?.mode ?? '');
     const score = Math.max(0, Math.floor(Number(body?.score ?? 0)));
     const opponentScore = Math.max(0, Math.floor(Number(body?.opponentScore ?? 0)));
-    const won = Boolean(body?.won);
+    const claimedWon = Boolean(body?.won);
     const duration = Math.max(0, Math.floor(Number(body?.duration ?? 0)));
 
     // Optional standardized fun-loop tallies (M6). Absent for legacy clients — all default to 0.
     const { hits, misses, dodges, combos, maxCombo } = sanitizeTallies(body);
 
     if (!mode) return NextResponse.json({ error: 'mode required' }, { status: 400 });
+
+    // MUSIC-SUITE P2 (2026-09-25): the room's own end-of-session stats (GameResult.stats — the SHARED CONTRACT in
+    // lib/session-payout.ts). `won` is the server's verdict from here on: a music set is won only at accuracy >= 0.5 over
+    // >= 8 bars read from its counts (owner decision #13; it was `score > 0`, so one tap paid the +15 LC below), and every
+    // other mode keeps its claim. The same `won` reaches the row, the wallet's won earn (it reads the row), season XP and
+    // mastery, so no reader pays a win this route refused.
+    const stats = roomStats(body);
+    const rulesMode = canonicalModeKey(mode);
+    // MUSIC-SUITE P2 FIX PASS (2026-09-25): until the shell forwards `stats` (ROOM_STATS_FORWARDED, a held file), a
+    // session without them is an old-contract client and keeps its own music win (the room applies the rule itself) —
+    // this refused every honest win while the card said "set won". A mode the catalogue does not know wins nothing.
+    const won = sessionWon(rulesMode, claimedWon, stats, duration, { score });
+    if (claimedWon && !won) {
+      const read = readMusicSet(stats, duration);
+      console.info('session win refused:', mode, !isCatalogueMode(mode) ? 'not a catalogue mode' : read ? `accuracy ${read.accuracy.toFixed(3)} over ${read.bars} bars${read.issues.length ? ` (${read.issues.slice(0, 3).join('; ')})` : ''}` : 'no set counts');
+    }
 
     // Movement play (phase 10): the body's form read, optional. Bounded here — finite, inside what a body produces,
     // a height that agrees with its flight (g·t²/8), capped attempts — and a broken one is dropped, never the session.
@@ -60,12 +108,32 @@ export async function POST(req: Request) {
       });
     }
 
-    const prqDelta = computePrqDelta({ mode, score, won, duration });
-    const xp = Math.max(5, Math.round(score * 1.5) + (won ? 50 : 10));
-    const shards = Math.max(1, Math.floor(score / 20)) + (won ? 3 : 0);
+    // MUSIC-SUITE P2 FIX PASS: an Arena music set is one whose match this route has found (arenaMatchId), never the claim.
+    const arenaVerified = rulesMode === 'music' && !!readMusicSet(stats, duration)?.arena
+      ? await verifiedMusicDuel(userId, body?.arenaMatchId) : false;
+    // MUSIC-SUITE P2 FIX PASS: a score no honest run can reach is paid (and recorded) as the most one can — a music set by
+    // its own hits, a finite rules game by its derived maximum (arena-score-integrity). Real play is never above it.
+    const cap = sessionScoreCap(rulesMode, stats, duration, { arenaVerified });
+    const paidScore = cap === null ? score : Math.min(score, cap);
+    if (paidScore < score) console.info('session score bounded:', mode, `${score} → ${paidScore} (the most this run can score)`);
+
+    // MUSIC-SUITE P2: dance and music train by the run's ACCURACY (lib/prq.ts ACCURACY_PRQ_MODES), read from their counts
+    // (P2 FIX PASS: and by the old score path while the shell sends no counts at all — ROOM_STATS_FORWARDED).
+    const prqDelta = computePrqDelta({
+      mode: rulesMode, score: paidScore, won, duration, accuracy: sessionAccuracy(rulesMode, stats, duration),
+      whenNoAccuracy: !stats && !ROOM_STATS_FORWARDED ? 'score' : 'none',
+    });
+    // MUSIC-SUITE P2: XP = 1.5 × score and shards = score / 20 had no ceiling, and an endless run (music free play, The
+    // Hundred — lib/session-payout.ts ENDLESS_MODES) paid ~51M XP for a perfect 5-minute set. An endless run now pays at
+    // most what a flawless finite game does (ENDLESS_SESSION_CEILING); every game with an end of its own is paid as before.
+    // (P2 FIX PASS: prorated by the session's length, so back-to-back 5 s sets no longer pay ~12× the ceiling's minute.)
+    const endless = isEndlessSession(rulesMode, stats, duration, { arenaVerified });
+    const payout = sessionPayout({ score: paidScore, won, endless, durationSec: duration });
+    const { xp, shards } = payout;
+    if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
 
     // Credits: hero-mode win +15 LC, daily streak +5*day (cap day 7)
-    let credits = won ? 15 : 0;
+    let credits = payout.winCredits;
     let streakDays = profile?.streakDays ?? 0;
     const lastStreak = new Date(profile?.lastStreakAt ?? 0).getTime();
     const now = Date.now();
@@ -78,7 +146,7 @@ export async function POST(req: Request) {
     }
 
     // Distribute PRQ delta to mode-relevant attributes
-    const attrs = MODE_ATTRS?.[mode] ?? ['mental'];
+    const attrs = MODE_ATTRS?.[rulesMode] ?? ['mental'];
     const attrData: Record<string, any> = {};
     for (const a of attrs) {
       const cur = Number((profile as any)?.[a] ?? 0);
@@ -102,7 +170,7 @@ export async function POST(req: Request) {
         },
       });
       const createdSession = await tx.gameSession.create({
-        data: { userId, mode, score, opponentScore, won, xp, shards, prqDelta, credits, duration, hits, misses, dodges, combos, maxCombo },
+        data: { userId, mode, score: paidScore, opponentScore, won, xp, shards, prqDelta, credits, duration, hits, misses, dodges, combos, maxCombo },
       });
       // LC lives in the wallet (2026-09-04): the session's credits move through the one mover, keyed by the session row.
       let newBalance = Number(updated.labCredits ?? 0);
@@ -160,14 +228,14 @@ export async function POST(req: Request) {
     // transaction and swallow their own errors). Server owns all grants. ---
     let season: Awaited<ReturnType<typeof addSeasonXp>> = null;
     try {
-      season = await addSeasonXp({ userId, mode, score, won });
+      season = await addSeasonXp({ userId, mode, score: paidScore, won });
     } catch (err) {
       console.warn('season xp skipped:', (err as any)?.message);
     }
 
     let mastery: Awaited<ReturnType<typeof recordMastery>> | null = null;
     try {
-      mastery = await recordMastery(userId, { mode, score, won, hits, misses, maxCombo });
+      mastery = await recordMastery(userId, { mode, score: paidScore, won, hits, misses, maxCombo });
     } catch (err) {
       console.warn('mastery record skipped:', (err as any)?.message);
     }
@@ -176,12 +244,15 @@ export async function POST(req: Request) {
     await recordServerEvent({
       name: 'session_complete',
       userId,
-      props: { mode, score, won, duration },
+      props: { mode, score: paidScore, won, duration },
     });
 
     return NextResponse.json({
       ok: true,
       sessionId: (createdSession as any)?.id ?? null,
+      // MUSIC-SUITE P2: the server's verdict (a music set's win is decided here), and whether the endless ceiling applied
+      won,
+      capped: payout.capped,
       xp,
       shards,
       credits,

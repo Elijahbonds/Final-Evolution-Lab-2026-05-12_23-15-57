@@ -7,8 +7,22 @@
 // backing track when the audio pack lands" never landed), so every stem is
 // synthesized on the shared AudioContext — the mode's song clock — with a
 // 16th-note lookahead scheduler. All values // TUNE(elijah).
+//
+// MUSIC-SUITE P2 (2026-09-25): the grid runs on the SONG clock (SongClock: the audio clock with the pauses taken out),
+// mapped to audio time only when a note is handed to Web Audio (setClock). Three things were wrong with the old loop,
+// all measured in P1 (BASELINE.md §2a):
+//   * it walked every 16th between its cursor and now+0.25 s and scheduled each one, so after a hitch, a hidden tab or
+//     a pause every missed 16th was started IN THE PAST — Web Audio plays a past start at once, so they stacked into a
+//     burst (P1: 2 sounds 0.735 s behind the clock after a 5 s pause, at MIX 18%). plan16ths now passes over any 16th
+//     already behind the clock (KitPulse had this guard since 2026-09-06; the band never did);
+//   * nothing it had queued could be taken back, so the 0.25 s lookahead played on into a pause: cancelFrom() stops
+//     every queued note from a time on;
+//   * it could not go back: a resume counts back in over the bar before the pause point, so rewind() moves the cursor.
+// It now plays on SoundKit's context through SoundKit's music bus and limiter (DanceMode wires `out`), not a private
+// context straight into the speakers.
 
 import type { DanceClip } from '../core/DanceCore';
+import { plan16ths, gridIndexAt } from './SongClock';
 
 export type StemCategory = DanceClip['category'];
 
@@ -45,12 +59,21 @@ interface Stem {
   node: GainNode;
 }
 
+/** How far ahead (song seconds) the band queues its 16ths. */
+export const BAND_LOOKAHEAD_SEC = 0.25;
+
 export class StemBand {
   private stems = new Map<StemCategory, Stem>();
   private next16 = 0;         // next 16th-note index
-  private nextTime = 0;       // its audio-clock time
-  private startedAt = 0;
+  private startedAt = 0;      // song-clock time of 16th 0
+  private started = false;    // not `startedAt !== 0`: a song clock may start at 0
   private dead = false;
+  /** Song time → audio time (SongClock.audio). Identity until the mode sets it, as before the song clock existed. */
+  private toAudio: (songSec: number) => number = (s) => s;
+  /** Every source handed to Web Audio and when it starts (audio time), so a pause can take the queued ones back. */
+  private queued: { node: AudioScheduledSourceNode; at: number }[] = [];
+  /** 16ths passed over because they were already behind the clock (a dev probe reads it). */
+  skipped = 0;
 
   constructor(
     private ctx: AudioContext,
@@ -83,30 +106,62 @@ export class StemBand {
     return sum / this.stems.size;
   }
 
-  /** The count-in ended — start the grid from the mode's audio clock. */
+  /** Map the grid's song time to the context's audio time (SongClock.audio). Without it the two are one clock. */
+  setClock(toAudio: (songSec: number) => number): void { this.toAudio = toAudio; }
+
+  /** Start the grid: 16th 0 sounds at song time `nowSec` (it may be ahead — nothing is queued before its lookahead). */
   start(nowSec: number): void {
     this.startedAt = nowSec;
     this.next16 = 0;
-    this.nextTime = nowSec;
+    this.started = true;
   }
 
-  /** Drive from the mode's update with the AUDIO clock. Schedules 0.25s ahead. */
+  private get per16(): number { return 60 / Math.max(1, this.bpm) / 4; }
+
+  /** Drive from the mode's update with the SONG clock. Queues 0.25 s ahead; never in the past. */
   update(nowSec: number): void {
-    if (this.dead || !this.startedAt) return;
-    const sixteenth = this.bpm / 60 / 4;          // 16ths per second
-    while (this.nextTime < nowSec + 0.25) {
-      this.schedule16th(this.next16, this.nextTime);
-      this.next16++;
-      this.nextTime = this.startedAt + this.next16 / sixteenth;
-    }
+    if (this.dead || !this.started) return;
+    const audioNow = this.ctx.currentTime;
+    const plan = plan16ths({
+      startedAt: this.startedAt, next16: this.next16, per16: this.per16, songNow: nowSec,
+      lookahead: BAND_LOOKAHEAD_SEC, toAudio: this.toAudio, audioNow,
+    });
+    for (const { idx, at } of plan.slots) this.schedule16th(idx, at);
+    this.next16 = plan.next16;
+    this.skipped += plan.skipped;
+    if (this.queued.length > 64) this.queued = this.queued.filter((q) => q.at > audioNow - 2);   // long since played
+  }
+
+  /** Put the cursor back to song time `songSec` (a resume's count back in replays the bar before the pause point). */
+  rewind(songSec: number): void {
+    if (!this.started) return;
+    this.next16 = gridIndexAt(this.startedAt, this.per16, songSec);
+  }
+
+  /** Take back every note queued to start at or after audio time `audioSec` (a pause: the lookahead must not play into
+   *  it). What is already sounding rings out. Returns how many were taken back. */
+  cancelFrom(audioSec: number): number {
+    let n = 0;
+    this.queued = this.queued.filter((q) => {
+      if (q.at < audioSec - 1e-6) return true;
+      try { q.node.stop(0); } catch { /* never started, or already stopped */ }
+      try { q.node.disconnect(); } catch { /* already gone */ }
+      n++;
+      return false;
+    });
+    return n;
   }
 
   dispose(): void {
     this.dead = true;
+    this.cancelFrom(this.ctx.currentTime);
     for (const s of this.stems.values()) {
       try { s.node.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1); } catch { /* closing */ }
     }
   }
+
+  /** Remember a source handed to Web Audio (see cancelFrom). */
+  private queue(node: AudioScheduledSourceNode, at: number): void { this.queued.push({ node, at }); }
 
   // ── the arrangement ──────────────────────────────────────────────────────
   private schedule16th(idx: number, t: number): void {
@@ -156,7 +211,7 @@ export class StemBand {
     g.gain.setValueAtTime(0.9, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
     o.connect(g).connect(this.out(cat));
-    o.start(t); o.stop(t + 0.16);
+    o.start(t); o.stop(t + 0.16); this.queue(o, t);
   }
 
   private snare(t: number, cat: StemCategory): void {
@@ -168,7 +223,7 @@ export class StemBand {
     g.gain.setValueAtTime(0.5, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
     n.connect(bp).connect(g).connect(this.out(cat));
-    n.start(t); n.stop(t + 0.12);
+    n.start(t); n.stop(t + 0.12); this.queue(n, t);
   }
 
   private hat(t: number, cat: StemCategory, vel: number): void {
@@ -180,7 +235,7 @@ export class StemBand {
     g.gain.setValueAtTime(0.22 * vel, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
     n.connect(hp).connect(g).connect(this.out(cat));
-    n.start(t); n.stop(t + 0.04);
+    n.start(t); n.stop(t + 0.04); this.queue(n, t);
   }
 
   private tick(t: number, cat: StemCategory): void {
@@ -190,7 +245,7 @@ export class StemBand {
     g.gain.setValueAtTime(0.3, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
     o.connect(g).connect(this.out(cat));
-    o.start(t); o.stop(t + 0.06);
+    o.start(t); o.stop(t + 0.06); this.queue(o, t);
   }
 
   private pluck(t: number, freq: number, cat: StemCategory, dur: number, type: OscillatorType): void {
@@ -200,7 +255,7 @@ export class StemBand {
     g.gain.setValueAtTime(0.26, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(g).connect(this.out(cat));
-    o.start(t); o.stop(t + dur + 0.02);
+    o.start(t); o.stop(t + dur + 0.02); this.queue(o, t);
   }
 
   private keys(t: number, freq: number, cat: StemCategory): void {
@@ -211,7 +266,7 @@ export class StemBand {
       g.gain.setValueAtTime(0.1, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
       o.connect(g).connect(this.out(cat));
-      o.start(t); o.stop(t + 0.24);
+      o.start(t); o.stop(t + 0.24); this.queue(o, t);
     }
   }
 
@@ -224,7 +279,7 @@ export class StemBand {
     g.gain.setValueAtTime(0.12, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
     o.connect(lp).connect(g).connect(this.out(cat));
-    o.start(t); o.stop(t + 0.32);
+    o.start(t); o.stop(t + 0.32); this.queue(o, t);
   }
 
   private sweep(t: number, cat: StemCategory): void {
@@ -239,7 +294,7 @@ export class StemBand {
     g.gain.exponentialRampToValueAtTime(0.18, t + 0.3);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
     n.connect(bp).connect(g).connect(this.out(cat));
-    n.start(t); n.stop(t + 0.52);
+    n.start(t); n.stop(t + 0.52); this.queue(n, t);
   }
 
   private noiseCache = new Map<number, AudioBuffer>();

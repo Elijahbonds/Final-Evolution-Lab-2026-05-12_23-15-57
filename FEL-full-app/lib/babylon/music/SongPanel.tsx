@@ -5,20 +5,42 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { exportSongToDance, saveExportedTrack } from './DanceExport';
 import type { AudioEngine, TrackState } from './AudioEngine';
-import { SECTION_NAMES, expandChain, newSectionId, normalizeChain, renderLengthSec, sectionAtBar, snapshotTracks, songBars, type Section, type SongChain, type Take } from './Song';
+import { MAX_SONG_BARS, SECTION_NAMES, expandChain, newSectionId, normalizeChain, renderLengthSec, sectionAtBar, snapshotTracks, songBars, type Section, type SongChain, type Take } from './Song';
 
 declare global { interface Window { __FEL_SONG__?: { sections: number; chain: SongChain; bars: number; songMode: boolean; bar: number; section: string | null; takes: number; stems: number } } }
 
+/**
+ * MUSIC-SUITE P2 (2026-09-25): a section keeps the swing it was saved at. The song-mode swap (was :52) handed the engine
+ * `swing: 0.15` on EVERY bar line, whatever the player had set, so a straight section played swung and a hard-swung one
+ * lost its swing at the first swap; the song render used one swing for every bar. `swing` is optional so a section from
+ * before this change plays at the room's swing.
+ */
+export type SwungSection = Section & { swing?: number };
+
+/** The swing of each bar of the song, laid out exactly as Song.expandChain lays out its patterns (same skips, same cap). */
+export function expandChainSwing(chain: SongChain, sections: SwungSection[], fallback: number): number[] {
+  const byId = new Map(sections.map((s) => [s.id, s]));
+  const out: number[] = [];
+  for (const e of chain) {
+    const s = byId.get(e.sectionId); if (!s) continue;
+    for (let i = 0; i < Math.max(0, Math.floor(e.bars)) && out.length < MAX_SONG_BARS; i++) out.push(s.swing ?? fallback);
+  }
+  return out;
+}
+
 export interface SongPanelProps {
   engine: AudioEngine | null; tracks: TrackState[]; setTracks: (t: TrackState[]) => void; playing: boolean; bpm: number; steps: number; say: (m: string) => void;
+  /** MUSIC-SUITE P2: the room's swing (saved into each section) and its setter (song mode moves the slider to the section's). */
+  swing: number; setSwing?: (s: number) => void;
   S: Record<string, React.CSSProperties>;
   /** Told when a section is saved and when one is put in the chain — the two gates on the studio tier. */
   onSectionSaved?: () => void;
   onChained?: () => void;
 }
 
-export default function SongPanel({ engine, tracks, setTracks, playing, bpm, steps, say, S, onSectionSaved, onChained }: SongPanelProps) {
-  const [sections, setSections] = useState<Section[]>([]);
+export default function SongPanel({ engine, tracks, setTracks, playing, bpm, steps, say, S, onSectionSaved, onChained, swing, setSwing }: SongPanelProps) {
+  const [sections, setSections] = useState<SwungSection[]>([]);
+  const swingRef = useRef(swing); useEffect(() => { swingRef.current = swing; }, [swing]);
   /** Has this song been sent to the dance floor? Resets when the arrangement changes under it. */
   const [danced, setDanced] = useState(false);
   /** Stable per mount, so re-exporting the same song overwrites its slot instead of piling up. */
@@ -49,7 +71,11 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
         const at = sectionAtBar(chainRef.current, b);
         const sec = at ? sectionsRef.current.find((s) => s.id === at.sectionId) : null;
         setSectionNow(sec?.name ?? null);
-        if (sec) { engine.setState({ bpm, steps, tracks: snapshotTracks(sec.tracks), swing: 0.15 }); setTracks(snapshotTracks(sec.tracks)); }
+        if (sec) {
+          const sw = sec.swing ?? swingRef.current;   // MUSIC-SUITE P2: the section's own swing, never a forced 0.15
+          engine.setState({ bpm, steps, tracks: snapshotTracks(sec.tracks), swing: sw }); setTracks(snapshotTracks(sec.tracks));
+          if (sw !== swingRef.current) setSwing?.(sw);   // the slider follows, so the room's next setState keeps it
+        }
       }
       if (armedRef.current && !recRef.current) void beginTake(b);
     };
@@ -61,7 +87,7 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
   useEffect(() => { window.__FEL_SONG__ = { sections: sections.length, chain, bars: songBars(chain), songMode, bar, section: sectionNow, takes: takes.length, stems: stems.length }; }, [sections, chain, songMode, bar, sectionNow, takes, stems]);
 
   const saveSection = () => {
-    const s: Section = { id: newSectionId(name), name, tracks: snapshotTracks(tracks) };
+    const s: SwungSection = { id: newSectionId(name), name, tracks: snapshotTracks(tracks), swing };
     setSections((a) => [...a, s]); setChain((c) => normalizeChain([...c, { sectionId: s.id, bars: 2 }], [...sections, s]));
     // Saving a section also drops it into the chain, so this one action is both events.
     onSectionSaved?.(); onChained?.();
@@ -91,8 +117,9 @@ export default function SongPanel({ engine, tracks, setTracks, playing, bpm, ste
     try {
       const len = renderLengthSec(bars.length, bpm, steps, takes);
       const shots = takes.map((t) => ({ id: t.id, buffer: t.buffer, atBar: t.atBar, gain: t.gain }));
-      const mix = await engine.renderSong(bars, shots, len);
-      const st = await engine.renderSongStems(bars, shots, len);
+      const barSwing = expandChainSwing(chain, sections, swing);   // MUSIC-SUITE P2: each bar at its section's swing
+      const mix = await engine.renderSong(bars, shots, len, barSwing);
+      const st = await engine.renderSongStems(bars, shots, len, barSwing);
       if (mixUrl) URL.revokeObjectURL(mixUrl); for (const s of stems) URL.revokeObjectURL(s.url);
       setMixUrl(URL.createObjectURL(mix)); setStems(st.map((s) => ({ name: s.name, url: URL.createObjectURL(s.blob) })));
       say(`Rendered ${bars.length} bars · ${st.length} stems`);
