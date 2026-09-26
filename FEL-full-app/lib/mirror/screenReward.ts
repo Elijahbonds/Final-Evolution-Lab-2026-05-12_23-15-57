@@ -11,7 +11,14 @@
 // Idempotency is per ATHLETE per SCREEN, not per day: the key is the athlete's id and the screen's own id, so a
 // retry, a double-tap or a reconnect pays once, while a genuinely new screen tomorrow pays again — up to the
 // wallet's daily cap, which exists so that squatting at a camera is never a faucet.
+// MIRROR-COACH P1 (2026-09-25) — A SCREEN NOTHING GRADED IS NOT A BAD SHOT. No production code calls
+// ScreenRunner.record yet (the graders are phase 3), so every screen arrived with zero checks, the harness marked it
+// provisional, and the athlete was told "Not enough of that was in frame to grade … Step back and run it again": a
+// retry loop that could never succeed, blaming their framing for a grader that does not exist. Zero checks is now its
+// own answer, decided FIRST — no pay, no score, no retry prompt — and the framing message is kept for a screen the
+// camera genuinely could not see.
 import { REASON } from '@/lib/wallet/reward-rules';
+import { NOT_GRADED_LINE } from './screen';
 
 export interface ScreenRewardDecision {
   /** Whether to call the grant path at all. */
@@ -41,6 +48,9 @@ export function decideScreenReward(input: ScreenRewardInput): ScreenRewardDecisi
   // the second athlete would be handed the first one's ledger entry instead of a payout. `athleteId` was already
   // on this input and went unused, which is what that field was always for.
   const key = `screen:${input.athleteId}:${input.screenId}`;
+  if (input.checksTaken <= 0) {
+    return { pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key, message: NOT_GRADED_LINE };
+  }
   if (input.provisional) {
     return {
       pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key,

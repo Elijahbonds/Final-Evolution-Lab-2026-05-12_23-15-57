@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FramingGate, checkFraming, type FramingFrame, type FramingPoint } from './framing';
+import { FramingGate, SIDE_TURNED, SIDE_WIDTH_MAX, checkFraming, sideWidth, type FramingFrame, type FramingPoint } from './framing';
 
 /** A body standing in a good shot; each option nudges one thing out of place. */
 function shot(o: { headY?: number; ankleY?: number; centre?: number; shoulderSpan?: number; hipSpan?: number; vis?: number } = {}): FramingFrame {
@@ -81,5 +81,40 @@ describe('the shot before the rep', () => {
     expect(checkFraming(squareOn, 'front').ok).toBe(true);
     expect(checkFraming(sideOn, 'front').issues).toContain('turned');
     expect(checkFraming(sideOn, 'front').instruction).toMatch(/square-on/i);
+  });
+});
+
+// MIRROR-COACH P1 review (2026-09-25): a body EXACTLY side-on has its hips stacked as well as its shoulders. The old side
+// test (shoulderSpan / hipSpan > 0.6, falling back to 1 when the hips collapsed) read that body as "turned" — so both
+// screens stalled at the head-float station telling an athlete who was already side-on to turn side-on — and let the
+// same body pass the FRONT check. The shot above only ever narrowed the shoulders, so it never saw it.
+describe('side-on, read from the width against the torso', () => {
+  /** Shoulders AND hips stacked (a real side-on body), the far side a hair off by perspective. */
+  function sideOn(): FramingFrame {
+    const L: FramingPoint[] = [];
+    const put = (i: number, x: number, y: number, v = 0.95) => { L[i] = { x, y, visibility: v }; };
+    put(0, 0.47, 0.10); put(2, 0.472, 0.09); put(5, 0.473, 0.092);
+    put(11, 0.5, 0.20); put(12, 0.5, 0.21);                  // shoulders, one behind the other
+    put(23, 0.5, 0.52); put(24, 0.5, 0.519);                 // hips, likewise: hipSpan 0
+    put(25, 0.51, 0.70); put(26, 0.51, 0.70); put(27, 0.5, 0.90); put(28, 0.5, 0.90);
+    return { landmarks: L, present: true };
+  }
+
+  it('a body with its hips stacked too passes the side check, and fails the front and back checks', () => {
+    expect(checkFraming(sideOn(), 'side').ok).toBe(true);
+    expect(checkFraming(sideOn(), 'front').issues).toContain('turned');
+    expect(checkFraming(sideOn(), 'back').issues).toContain('turned');
+  });
+
+  it('the side line names no movement the station does not read (it said "I read a hinge from the side")', () => {
+    const c = checkFraming(shot(), 'side');
+    expect(c.instruction).toBe(SIDE_TURNED);
+    expect(c.instruction).not.toMatch(/hinge/i);
+  });
+
+  it('sideWidth: ~0 side-on, wide square-on, null with no torso to divide by', () => {
+    expect(sideWidth(sideOn())!).toBeLessThan(SIDE_WIDTH_MAX);
+    expect(sideWidth(shot())!).toBeGreaterThan(SIDE_WIDTH_MAX);
+    expect(sideWidth({ landmarks: [] })).toBeNull();
   });
 });

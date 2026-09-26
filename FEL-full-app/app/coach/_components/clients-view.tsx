@@ -72,7 +72,9 @@ export function ClientsView() {
         {roster.map((r) => (
           <div key={r.clientId} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] border border-white/6 px-3 py-2 text-xs">
             <div className="min-w-0">
-              <div className="text-white text-sm truncate">{r.name} <span className="text-white/40">· {r.sessions} sessions · {r.wins}W</span></div>
+              {/* "games", not "sessions" (MIRROR-COACH P1, 2026-09-25): the roster's count is GameSession
+                  (lib/camp/profile.ts history.sessions), so a client with six coached sessions read "0 sessions". */}
+              <div className="text-white text-sm truncate">{r.name} <span className="text-white/40">· {r.sessions} games · {r.wins}W</span></div>
               <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
             </div>
             {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]">card · {r.card.rarity}</a> : <span className="shrink-0 text-white/30">no public card</span>}

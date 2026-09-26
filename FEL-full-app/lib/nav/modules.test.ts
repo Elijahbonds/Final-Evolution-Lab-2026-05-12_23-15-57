@@ -49,8 +49,9 @@ const DYNAMIC_TREES = [
  */
 const KNOWN_ORPHANS: readonly string[] = [
   // The movement screen's own machinery. screenRunner and screenReward were wired into the Mirror on
-  // 2026-09-20 and came off this list, which is the ratchet doing its job. These two are still waiting.
-  'lib/mirror/lungeAudit.ts',
+  // 2026-09-20 and came off this list, which is the ratchet doing its job. lungeAudit.ts came off on 2026-09-25
+  // (MIRROR-COACH P1 baseline): lib/mirror/fixtures/measure.ts runs it on every landmark fixture, so it is MEASURED
+  // now — but it is still not mounted in the Mirror; that is phase 4. This one is still waiting.
   'lib/kitchens/fromScreen.ts',
   // The coach layer — written, tested, unreachable.
   'lib/coach-interfaces.ts',

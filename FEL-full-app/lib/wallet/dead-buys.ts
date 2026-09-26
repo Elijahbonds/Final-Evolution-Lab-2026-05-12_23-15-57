@@ -64,6 +64,10 @@ import { REASON, type WalletCurrency } from './reward-rules';
  *                 PLAN_CLAIM_WINDOW_MS. A row no plan claims is refunded. delete-my-data (DELETE /api/v1/workout/scan)
  *                 erases every plan, so a plan that was delivered and then erased is paid back too: the owner's call
  *                 (2026-09-25), over holding every unmatched charge back for want of proof.
+ *                 MIRROR-COACH P1 (2026-09-25): Workout sells no plan now (its route refuses, and both SKUs are in
+ *                 NOT_ON_SALE), so no new charge or plan of either SKU is written. The revision of a stored plan
+ *                 (lib/workout/plan-revision.ts) rewrites its weeks only, never its tier or createdAt, so every plan
+ *                 still claims the charge it claimed before.
  *   first_charge  the entitlement row IS the delivery, and spend() writes it with the first charge of the SKU; nothing
  *                 else writes it and nothing deletes it. The player's earliest charge of the SKU (whatever its key)
  *                 delivered; a later one whose key the browser made upserted the same row and delivered nothing.

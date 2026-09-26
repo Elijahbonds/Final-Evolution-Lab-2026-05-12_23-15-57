@@ -31,9 +31,10 @@ export const PROGRAMS: StreamProgram[] = [
 export interface AdSlot { id: string; placement: 'banner_live_tab' | 'preroll' | 'schedule_sponsor'; label: 'AD' | 'SPONSORED' | 'FEL'; weight: number; headline: string; cta: string; href: string }
 
 // House ads (label 'FEL') fill unsold inventory. First-party impressions only.
+// MIRROR-COACH P1 (2026-09-25): the house_workout ad ("Get a plan animated with YOUR avatar", → /workout) is gone. The
+// plans are off sale (owner decision #3), nothing ever animated one, and the avatar was drawn from sample numbers.
 export const AD_SLOTS: AdSlot[] = [
   { id: 'house_scan', placement: 'banner_live_tab', label: 'FEL', weight: 3, headline: 'Run your System Scan', cta: 'Scan now', href: '/try' },
-  { id: 'house_workout', placement: 'banner_live_tab', label: 'FEL', weight: 3, headline: 'Get a plan animated with YOUR avatar', cta: 'Start', href: '/workout' },
   { id: 'house_card', placement: 'banner_live_tab', label: 'FEL', weight: 2, headline: 'Build your Creator Card', cta: 'Create', href: '/cards' },
 ];
 

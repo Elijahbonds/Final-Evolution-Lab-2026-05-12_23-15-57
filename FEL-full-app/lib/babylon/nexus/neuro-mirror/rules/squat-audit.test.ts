@@ -1,0 +1,225 @@
+// SquatAudit's knee read on a squat the app's own virtual webcam films (MIRROR-COACH P1, 2026-09-25).
+//
+// The old knee check (`lk.x > la.x`, squat-audit.ts:133-134 before this pass) was tested on a hand-built frame that put
+// the subject's LEFT shoulder on the image's LEFT — a mirrored subject — so it passed while being backwards on the
+// stream the Mirror actually reads (not mirrored: lib/pose/landmarks.ts:9-10, mediapipe-adapter.ts:184-187). This
+// builds the squat in 3-D instead and films it through lib/pose/synth.ts, whose synthesize() REFUSES a mirrored source
+// (assertHandedness), so the fixture cannot quietly mirror the subject again. Knees go IN, then OUT, each leg alone
+// and both together, and the audit has to tell them apart.
+//
+// What this proves and what it does not: the SIGN of the read is right on the app's documented camera geometry, and
+// the read is mirror-invariant (so it stays right if MediaPipe's left/right convention turns out the other way round).
+// It does NOT prove the thresholds or that a real phone camera shows a caving knee this clearly — that needs a real
+// recording, which is why the COACH stays silent on it (VALGUS_CUE_VERIFIED in cue-engine.ts).
+import { describe, expect, it } from 'vitest';
+import { LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_KNEE, LEFT_ANKLE, RIGHT_KNEE, RIGHT_ANKLE } from '@/lib/pose/landmarks';
+import { MIN_HIP_HALF, SQUAT_THRESHOLDS, SquatAudit, frontalReadable, kneeInwardRatio, type SquatFrameResult } from './squat-audit';
+import type { PoseFrame } from '../pose/mediapipe-adapter';
+import { filmSquat, type SquatShape } from './__fixtures__/synthSquat';
+
+/** Film one squat (noise-free, nothing dropped: the geometry alone) and run the audit over it. */
+function film(shiftL: number, shiftR: number, opts: { mirror?: boolean; up?: Omit<SquatShape, 'shiftL' | 'shiftR'> } = {}): { frames: PoseFrame[]; reads: SquatFrameResult[] } {
+  const frames = filmSquat({ shiftL, shiftR, ...opts.up }, undefined, opts.mirror);
+  const audit = new SquatAudit();
+  return { frames, reads: frames.map((f) => audit.evaluate(f)) };
+}
+
+const flagged = (reads: SquatFrameResult[]) => reads.some((r) => r.faults.includes('kneeValgus'));
+const worst = (reads: SquatFrameResult[], side: 'left' | 'right') =>
+  Math.max(...reads.filter((r) => r.valgusBySide && r.phase !== 'standing').map((r) => r.valgusBySide![side]));
+const least = (reads: SquatFrameResult[], side: 'left' | 'right') =>
+  Math.min(...reads.filter((r) => r.valgusBySide && r.phase !== 'standing').map((r) => r.valgusBySide![side]));
+
+/** The rule this pass replaced, verbatim (squat-audit.ts:133-135 before 2026-09-25), kept here as the witness. */
+function legacyValgusRatio(f: PoseFrame): number {
+  const L = f.landmarks;
+  const hipHalf = Math.max(1e-3, Math.abs(L[23].x - L[24].x) / 2);
+  const leftIn = Math.max(0, L[LEFT_KNEE].x - L[LEFT_ANKLE].x);
+  const rightIn = Math.max(0, L[RIGHT_ANKLE].x - L[RIGHT_KNEE].x);
+  return Math.max(leftIn, rightIn) / hipHalf;
+}
+
+describe('the fixture is the stream the Mirror reads (not mirrored)', () => {
+  it('facing the camera, the subject\'s left shoulder lands on the image RIGHT', () => {
+    const { frames } = film(0, 0);
+    const f = frames[0];
+    expect(f.landmarks[LEFT_SHOULDER].x).toBeGreaterThan(f.landmarks[RIGHT_SHOULDER].x);
+  });
+});
+
+describe('knee valgus is read per side, against each knee\'s own hip–ankle line', () => {
+  it('both knees caving IN is flagged, and both sides read inward', () => {
+    const { reads } = film(-0.06, -0.06);
+    expect(flagged(reads)).toBe(true);
+    expect(worst(reads, 'left')).toBeGreaterThan(0.35);
+    expect(worst(reads, 'right')).toBeGreaterThan(0.35);
+  });
+
+  it('both knees pushed OUT is NOT flagged, and both sides read outward (negative)', () => {
+    const { reads } = film(0.05, 0.05);
+    expect(flagged(reads)).toBe(false);
+    expect(least(reads, 'left')).toBeLessThan(0);
+    expect(least(reads, 'right')).toBeLessThan(0);
+  });
+
+  it('the LEFT knee alone caving in is flagged on the left, and the right reads clean', () => {
+    const { reads } = film(-0.06, 0);
+    expect(flagged(reads)).toBe(true);
+    expect(worst(reads, 'left')).toBeGreaterThan(0.35);
+    expect(worst(reads, 'right')).toBeLessThan(0.35);
+  });
+
+  it('the RIGHT knee alone caving in is flagged on the right, and the left reads clean', () => {
+    const { reads } = film(0, -0.06);
+    expect(flagged(reads)).toBe(true);
+    expect(worst(reads, 'right')).toBeGreaterThan(0.35);
+    expect(worst(reads, 'left')).toBeLessThan(0.35);
+  });
+
+  it('a knee pushed out on one side and caving on the other flags only the caving one', () => {
+    const { reads } = film(0.05, -0.06);
+    expect(flagged(reads)).toBe(true);
+    expect(least(reads, 'left')).toBeLessThan(0);
+    expect(worst(reads, 'right')).toBeGreaterThan(0.35);
+  });
+
+  it('a knee tracking straight is clean', () => {
+    expect(flagged(film(0, 0).reads)).toBe(false);
+  });
+
+  it('never reads a standing frame as a fault', () => {
+    const { reads } = film(-0.06, -0.06);
+    expect(reads.filter((r) => r.phase === 'standing').every((r) => !r.faults.includes('kneeValgus'))).toBe(true);
+  });
+});
+
+describe('the sign does not lean on the left/right convention', () => {
+  it('a mirrored (selfie) stream gives the same verdicts, with the side labels swapped', () => {
+    const inward = film(-0.06, 0, { mirror: true }).reads;
+    expect(flagged(inward)).toBe(true);
+    // mirrored, the subject's left leg carries MediaPipe's RIGHT label
+    expect(worst(inward, 'right')).toBeGreaterThan(0.35);
+    expect(flagged(film(0.05, 0.05, { mirror: true }).reads)).toBe(false);
+  });
+
+  it('kneeInwardRatio: inward is toward the other hip, whichever side of the image the leg is on', () => {
+    // a leg on the image's right (midline at 0.5): a knee at smaller x is inward
+    expect(kneeInwardRatio({ x: 0.6, y: 0.5 }, { x: 0.55, y: 0.7 }, { x: 0.6, y: 0.9 }, 0.5, 0.1)).toBeCloseTo(0.5, 5);
+    // the same leg with the knee at larger x is outward
+    expect(kneeInwardRatio({ x: 0.6, y: 0.5 }, { x: 0.65, y: 0.7 }, { x: 0.6, y: 0.9 }, 0.5, 0.1)).toBeCloseTo(-0.5, 5);
+    // a leg on the image's left: larger x is inward
+    expect(kneeInwardRatio({ x: 0.4, y: 0.5 }, { x: 0.45, y: 0.7 }, { x: 0.4, y: 0.9 }, 0.5, 0.1)).toBeCloseTo(0.5, 5);
+    // hips on top of each other (side-on) or a leg with no height: no read, never a guess
+    expect(kneeInwardRatio({ x: 0.5, y: 0.5 }, { x: 0.45, y: 0.7 }, { x: 0.5, y: 0.9 }, 0.5, 0.1)).toBe(0);
+    expect(kneeInwardRatio({ x: 0.6, y: 0.5 }, { x: 0.55, y: 0.5 }, { x: 0.6, y: 0.5 }, 0.5, 0.1)).toBe(0);
+  });
+});
+
+describe('the witness: the replaced rule was backwards on this stream', () => {
+  // Kept so the reason for the change is re-measured on every run rather than asserted once in a comment.
+  it('the old rule read nothing with both knees 6 cm IN, and flagged both knees 5 cm OUT', () => {
+    const inFrames = film(-0.06, -0.06).frames.slice(30);
+    const outFrames = film(0.05, 0.05).frames.slice(30);
+    const warn = 0.35;
+    expect(Math.max(...inFrames.map(legacyValgusRatio))).toBeLessThan(warn);
+    expect(Math.max(...outFrames.map(legacyValgusRatio))).toBeGreaterThanOrEqual(warn);
+  });
+});
+
+describe('armFall is a sideways read (what a front camera can see)', () => {
+  // MIRROR-COACH P1 (2026-09-25): the copy called this "arms falling forward"; the audit compares the shoulder
+  // midpoint's x with its standing line. Film both, and let the audit say which one it sees.
+  const armFall = (reads: SquatFrameResult[]) => reads.some((r) => r.faults.includes('armFall'));
+
+  // deep enough that the audit's depth gate (depth01 > 0.3) is open, so a quiet result means "not seen", not "not asked"
+  const deep = 0.55;
+
+  it('the fixture is deep enough for the check to run', () => {
+    expect(Math.max(...film(0, 0, { up: { drop: deep } }).reads.map((r) => r.depth01))).toBeGreaterThan(0.3);
+  });
+
+  it('the upper body drifting sideways is read', () => {
+    expect(armFall(film(0, 0, { up: { drop: deep, sideways: 0.1 } }).reads)).toBe(true);
+  });
+
+  it('a big forward lean is not (it moves toward the lens, not across it)', () => {
+    expect(armFall(film(0, 0, { up: { drop: deep, lean: 0.25 } }).reads)).toBe(false);
+  });
+});
+
+// MIRROR-COACH P1 review (2026-09-25): the knee read on a squat that does not face the camera. kneeInwardRatio's doc
+// promised 0 for "hips stacked on top of each other, as in a side-on view", but its guard was `hipHalf < 1e-6` and the
+// caller floored hipHalf at 1e-3, so it never fired: a side-on squat read its knees' FORWARD travel as caving, flagged
+// on 31 of 120 frames, worst 58.5 hip half-widths.
+describe('a squat that does not face the camera is not read in the frontal plane', () => {
+  const reads = (shape: SquatShape) => { const a = new SquatAudit(); return filmSquat(shape).map((f) => a.evaluate(f)); };
+  const moving = (rs: SquatFrameResult[]) => rs.filter((r) => r.present && r.phase !== 'standing');
+
+  for (const turnDeg of [-90, 90]) {
+    it(`side-on (${turnDeg}°): no kneeValgus, no lateralShift, no armFall, and it says it is turned`, () => {
+      const rs = reads({ turnDeg });
+      expect(moving(rs).length).toBeGreaterThan(20);                          // the squat was seen…
+      for (const r of rs) {
+        expect(r.faults, `${turnDeg}°`).not.toContain('kneeValgus');
+        expect(r.faults, `${turnDeg}°`).not.toContain('lateralShift');
+        expect(r.faults, `${turnDeg}°`).not.toContain('armFall');
+      }
+      for (const r of moving(rs)) {
+        expect(r.frontal).toBe(false);                                         // …and not read as a frontal squat
+        expect(r.valgusBySide).toBeUndefined();
+        expect(r.valgusRatio).toBe(0);
+        expect(r.note).toMatch(/turned/i);
+      }
+    });
+  }
+
+  it('turned 45°: the same, even with the knees caving (a turned body cannot be judged either way)', () => {
+    for (const shape of [{ turnDeg: 45 }, { turnDeg: -45 }, { turnDeg: 45, shiftL: -0.06, shiftR: -0.06 }] as SquatShape[]) {
+      const rs = reads(shape);
+      for (const r of rs) expect(r.faults, JSON.stringify(shape)).not.toContain('kneeValgus');
+      expect(moving(rs).every((r) => r.frontal === false), JSON.stringify(shape)).toBe(true);
+    }
+  });
+
+  it('square-on is still frontal, and the caving knee is still caught', () => {
+    const rs = reads({ shiftL: -0.06, shiftR: -0.06 });
+    expect(moving(rs).every((r) => r.frontal === true)).toBe(true);
+    expect(rs.some((r) => r.faults.includes('kneeValgus'))).toBe(true);
+  });
+
+  it('frontalReadable: collapsed hips, or hips deep apart, are unreadable; a frame with no z reads as square', () => {
+    const lh = { x: 0.53, y: 0.55, z: 0 }, rh = { x: 0.47, y: 0.55, z: 0 };
+    expect(frontalReadable(lh, rh, 0.55, 0.9)).toBe(true);
+    expect(frontalReadable({ ...lh, x: 0.501 }, { ...rh, x: 0.499 }, 0.55, 0.9)).toBe(false);     // stacked
+    expect(frontalReadable({ ...lh, z: -0.03 }, { ...rh, z: 0.03 }, 0.55, 0.9)).toBe(false);      // turned ~45°
+    expect(frontalReadable({ x: 0.53, y: 0.55 }, { x: 0.47, y: 0.55 }, 0.55, 0.9)).toBe(true);    // no z
+  });
+
+  it('kneeInwardRatio: a half-width under MIN_HIP_HALF is no read (the guard the floor used to disable)', () => {
+    expect(kneeInwardRatio({ x: 0.5004, y: 0.5 }, { x: 0.45, y: 0.7 }, { x: 0.5, y: 0.9 }, 0.5, 0.0004)).toBe(0);
+    expect(kneeInwardRatio({ x: 0.6, y: 0.5 }, { x: 0.55, y: 0.7 }, { x: 0.6, y: 0.9 }, 0.5, MIN_HIP_HALF / 2)).toBe(0);
+  });
+});
+
+// One frame of jitter is not a knee (the persistence gate, same review). Under the synth's default noise a straight
+// squat tripped a single-frame kneeValgus in 26 of 50 squats; the fault now needs valgusPersistFrames frames running.
+describe('the knee fault needs the read to hold', () => {
+  const flaggedSquats = (shape: SquatShape, persist?: number) => {
+    let n = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const a = new SquatAudit(persist ? { ...SQUAT_THRESHOLDS, valgusPersistFrames: persist } : SQUAT_THRESHOLDS);
+      if (filmSquat(shape, { seed }).map((f) => a.evaluate(f)).some((r) => r.faults.includes('kneeValgus'))) n++;
+    }
+    return n;
+  };
+
+  it('a straight squat under jitter: flagged at one frame (the old behaviour), never at the gate', () => {
+    expect(flaggedSquats({}, 1)).toBeGreaterThan(0);
+    expect(flaggedSquats({})).toBe(0);
+  });
+
+  it('a caving squat under jitter is still caught on every take', () => {
+    expect(flaggedSquats({ shiftL: -0.06, shiftR: -0.06 })).toBe(20);
+    expect(flaggedSquats({ shiftL: -0.06 })).toBe(20);
+  });
+});

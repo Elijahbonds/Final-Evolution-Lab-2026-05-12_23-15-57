@@ -356,15 +356,18 @@ async function dbTests() {
       // HOTFIX (2026-09-24): this used the 50-coin retry token, which is deleted from the catalog. No coin SKU left is
       // consumable (the wearables are one-off), so it buys the 4-week plan instead: consumable, on sale, and bought
       // through spend() by /api/v1/workout/plan. The wallet is funded with shards to match.
+      // MIRROR-COACH P1 (2026-09-25): the 4-week plan is NOT_ON_SALE now (owner decision #3), so spend() would refuse all
+      // three and the case would test nothing. It buys a group-workout seat instead: consumable, on sale, and bought
+      // through spend() by /api/v1/sessions/book.
       const cu = await prisma.user.create({
         data: { email: `__walletcc_${stamp}@fel.test`, name: 'Wallet CC', password: 'x' },
         select: { id: true },
       });
       try {
-        const sku = getSku('workout_plan_4w')!; // 60 shards each
+        const sku = getSku('session_group_workout')!; // 150 shards each
         assert.ok(sku && sku.consumable && skuOnSale(sku.skuId), 'the SKU bought here must exist, be on sale and be consumable');
         await grantShardPurchase(prisma, { playerId: cu.id, shards: 2 * sku.unitPrice, idempotencyKey: `fund_${stamp}` });
-        const n = 3; // 3 * 60 = 180 > 120 → exactly 2 can succeed
+        const n = 3; // 3 * 150 = 450 > 300 → exactly 2 can succeed
         const results = await Promise.allSettled(
           Array.from({ length: n }, (_, i) =>
             spend(prisma, { playerId: cu.id, idempotencyKey: `spend_${stamp}_${i}`, skuId: sku.skuId, quantity: 1 })),

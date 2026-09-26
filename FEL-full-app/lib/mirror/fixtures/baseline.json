@@ -1,0 +1,1743 @@
+{
+  "format": "fel-mirror-baseline/1",
+  "fixtures": {
+    "squat_clean": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": 0,
+        "kneeInwardCmRight": 0,
+        "kneeCaves": false,
+        "kneeCavesLeft": false,
+        "kneeCavesRight": false,
+        "kneePushedOut": false,
+        "hipBelowKneeCm": 2,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": {
+          "left": -0.01,
+          "right": -0.01
+        },
+        "leastInward": {
+          "left": -0.08,
+          "right": -0.08
+        },
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.86,
+        "faultFrames": {
+          "kneeIn": 28
+        },
+        "firstFaultFrame": {
+          "kneeIn": 53
+        },
+        "maxKneeIn": 0.41,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "squat_knee_in_left": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": 6.7,
+        "kneeInwardCmRight": 0,
+        "kneeCaves": true,
+        "kneeCavesLeft": true,
+        "kneeCavesRight": false,
+        "kneePushedOut": false,
+        "hipBelowKneeCm": 1,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {
+          "kneeValgus": 38
+        },
+        "firstFaultFrame": {
+          "kneeValgus": 49
+        },
+        "worstInward": {
+          "left": 0.84,
+          "right": -0.01
+        },
+        "leastInward": {
+          "left": -0.02,
+          "right": -0.08
+        },
+        "maxValgusRatio": 0.84,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [
+          "kneeValgus"
+        ],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.86,
+        "faultFrames": {
+          "kneeIn": 28
+        },
+        "firstFaultFrame": {
+          "kneeIn": 53
+        },
+        "maxKneeIn": 0.41,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "squat_knee_in_right": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": 0,
+        "kneeInwardCmRight": 6.7,
+        "kneeCaves": true,
+        "kneeCavesLeft": false,
+        "kneeCavesRight": true,
+        "kneePushedOut": false,
+        "hipBelowKneeCm": 2,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {
+          "kneeValgus": 38
+        },
+        "firstFaultFrame": {
+          "kneeValgus": 49
+        },
+        "worstInward": {
+          "left": -0.01,
+          "right": 0.84
+        },
+        "leastInward": {
+          "left": -0.08,
+          "right": -0.02
+        },
+        "maxValgusRatio": 0.84,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [
+          "kneeValgus"
+        ],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.85,
+        "faultFrames": {
+          "kneeIn": 52
+        },
+        "firstFaultFrame": {
+          "kneeIn": 41
+        },
+        "maxKneeIn": 1.25,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "squat_knees_in_both": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": 6.7,
+        "kneeInwardCmRight": 6.7,
+        "kneeCaves": true,
+        "kneeCavesLeft": true,
+        "kneeCavesRight": true,
+        "kneePushedOut": false,
+        "hipBelowKneeCm": 1,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {
+          "kneeValgus": 38
+        },
+        "firstFaultFrame": {
+          "kneeValgus": 49
+        },
+        "worstInward": {
+          "left": 0.84,
+          "right": 0.84
+        },
+        "leastInward": {
+          "left": -0.02,
+          "right": -0.02
+        },
+        "maxValgusRatio": 0.84,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [
+          "kneeValgus"
+        ],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.85,
+        "faultFrames": {
+          "kneeIn": 52
+        },
+        "firstFaultFrame": {
+          "kneeIn": 41
+        },
+        "maxKneeIn": 1.25,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "squat_knee_out_left": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": -5.7,
+        "kneeInwardCmRight": 0,
+        "kneeCaves": false,
+        "kneeCavesLeft": false,
+        "kneeCavesRight": false,
+        "kneePushedOut": true,
+        "hipBelowKneeCm": 2.5,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": {
+          "left": -0.04,
+          "right": -0.01
+        },
+        "leastInward": {
+          "left": -0.74,
+          "right": -0.08
+        },
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.86,
+        "faultFrames": {
+          "kneeIn": 28
+        },
+        "firstFaultFrame": {
+          "kneeIn": 53
+        },
+        "maxKneeIn": 0.41,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "squat_knee_out_right": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": 0,
+        "kneeInwardCmRight": -5.7,
+        "kneeCaves": false,
+        "kneeCavesLeft": false,
+        "kneeCavesRight": false,
+        "kneePushedOut": true,
+        "hipBelowKneeCm": 2,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": {
+          "left": -0.01,
+          "right": -0.04
+        },
+        "leastInward": {
+          "left": -0.08,
+          "right": -0.74
+        },
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.87,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0.2,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "squat_knees_out_both": {
+      "pattern": "squat",
+      "view": "front",
+      "truth": {
+        "kneeInwardCmLeft": -5.7,
+        "kneeInwardCmRight": -5.7,
+        "kneeCaves": false,
+        "kneeCavesLeft": false,
+        "kneeCavesRight": false,
+        "kneePushedOut": true,
+        "hipBelowKneeCm": 2.5,
+        "kneeFlexionDegBottom": 127.2,
+        "kneeFlexionDegStanding": 10.8,
+        "trunkLeanDegBottom": 40,
+        "heelsLift": false,
+        "upperBodySidewaysCm": 0,
+        "hipsSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "reps": 1,
+        "maxDepth01": 0.48,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": {
+          "left": -0.04,
+          "right": -0.04
+        },
+        "leastInward": {
+          "left": -0.74,
+          "right": -0.74
+        },
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 53,
+          "descending": 21,
+          "bottom": 25,
+          "ascending": 21
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.87,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0.2,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 80,
+          "frames": 120,
+          "worst": {
+            "tooFar": 40
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.59
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.59
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.59
+        }
+      }
+    },
+    "lunge_left_front": {
+      "pattern": "lunge",
+      "view": "front",
+      "truth": {
+        "front": "left",
+        "frontKneeInwardCm": 0,
+        "frontKneeCaves": false,
+        "frontKneeFlexionDegBottom": 102.2,
+        "backKneeHeightCmBottom": 6.2,
+        "hipDropSideToSideCm": 0,
+        "torsoSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 61,
+          "descending": 14,
+          "bottom": 31,
+          "ascending": 14
+        },
+        "reps": 1,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": {
+          "left": -0.07,
+          "right": 0.24
+        },
+        "leastInward": {
+          "left": -0.09,
+          "right": 0.07
+        },
+        "maxValgusRatio": 0.24,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 61,
+          "descending": 14,
+          "bottom": 31,
+          "ascending": 14
+        },
+        "frontLeg": "left",
+        "maxDepth01": 0.82,
+        "faultFrames": {
+          "kneeIn": 34
+        },
+        "firstFaultFrame": {
+          "kneeIn": 50
+        },
+        "maxKneeIn": 0.37,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 120,
+          "frames": 120,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.6
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.6
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.6
+        }
+      }
+    },
+    "lunge_right_front_knee_in": {
+      "pattern": "lunge",
+      "view": "front",
+      "truth": {
+        "front": "right",
+        "frontKneeInwardCm": 6.5,
+        "frontKneeCaves": true,
+        "frontKneeFlexionDegBottom": 102.2,
+        "backKneeHeightCmBottom": 6.2,
+        "hipDropSideToSideCm": 0,
+        "torsoSidewaysCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 61,
+          "descending": 14,
+          "bottom": 31,
+          "ascending": 14
+        },
+        "reps": 1,
+        "maxDepth01": 0,
+        "faultFrames": {
+          "kneeValgus": 38
+        },
+        "firstFaultFrame": {
+          "kneeValgus": 49
+        },
+        "worstInward": {
+          "left": 0.24,
+          "right": 0.77
+        },
+        "leastInward": {
+          "left": 0.07,
+          "right": 0.01
+        },
+        "maxValgusRatio": 0.77,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [
+          "kneeValgus"
+        ],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 61,
+          "descending": 14,
+          "bottom": 31,
+          "ascending": 14
+        },
+        "frontLeg": "right",
+        "maxDepth01": 0.8,
+        "faultFrames": {
+          "kneeIn": 59
+        },
+        "firstFaultFrame": {
+          "kneeIn": 38
+        },
+        "maxKneeIn": 1.21,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 120,
+          "frames": 120,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.6
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.6
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.6
+        }
+      }
+    },
+    "hinge_side": {
+      "pattern": "hinge",
+      "view": "side",
+      "truth": {
+        "trunkFromVerticalDegBottom": 66.6,
+        "hipsBackCm": 17.7,
+        "kneeFlexionDegBottom": 35.4,
+        "spineNeutral": true,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 132,
+        "present": 132,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 132
+        },
+        "reps": 0,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 132,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 132
+        },
+        "frontLeg": null,
+        "maxDepth01": 0.11,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 20,
+        "maxHipDrop": 4.4,
+        "maxTorsoDrift": 16.03
+      },
+      "framing": {
+        "front": {
+          "ok": 0,
+          "frames": 132,
+          "worst": {
+            "turned": 132
+          },
+          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "bodyFill": 0.61
+        },
+        "side": {
+          "ok": 98,
+          "frames": 132,
+          "worst": {
+            "tooFar": 34
+          },
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.61
+        },
+        "back": {
+          "ok": 0,
+          "frames": 132,
+          "worst": {
+            "turned": 132
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.61
+        }
+      }
+    },
+    "pushup_side": {
+      "pattern": "pushup",
+      "view": "side",
+      "truth": {
+        "elbowDegTop": 151.3,
+        "elbowDegBottom": 60,
+        "shoulderHeightCmTop": 56,
+        "shoulderHeightCmBottom": 31,
+        "hipOffLineCm": 0,
+        "reps": 1
+      },
+      "squat": {
+        "frames": 120,
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 105,
+          "bottom": 15
+        },
+        "reps": 1,
+        "maxDepth01": 0.35,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 120,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 93,
+          "bottom": 27
+        },
+        "frontLeg": "left",
+        "maxDepth01": 0.64,
+        "faultFrames": {
+          "torsoDrift": 45,
+          "kneeIn": 27,
+          "hipDrop": 27
+        },
+        "firstFaultFrame": {
+          "torsoDrift": 42,
+          "kneeIn": 51,
+          "hipDrop": 51
+        },
+        "maxKneeIn": 95.92,
+        "maxHipDrop": 12.54,
+        "maxTorsoDrift": 1.36
+      },
+      "framing": {
+        "front": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "bodyFill": 0.18
+        },
+        "side": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "tooFar": 120
+          },
+          "say": "Come forward a little — you are far enough away that I am guessing.",
+          "bodyFill": 0.18
+        },
+        "back": {
+          "ok": 0,
+          "frames": 120,
+          "worst": {
+            "turned": 120
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.18
+        }
+      }
+    },
+    "stand_front": {
+      "pattern": "stand",
+      "view": "front",
+      "truth": {
+        "still": true,
+        "shouldersLevel": true,
+        "hipsLevel": true
+      },
+      "squat": {
+        "frames": 30,
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "reps": 0,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "frontLeg": null,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0.05,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 30,
+          "frames": 30,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.62
+        },
+        "side": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.62
+        },
+        "back": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.62
+        }
+      }
+    },
+    "stand_back": {
+      "pattern": "stand",
+      "view": "back",
+      "truth": {
+        "still": true
+      },
+      "squat": {
+        "frames": 30,
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "reps": 0,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0.01,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "frontLeg": null,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0.07,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "bodyFill": 0.61
+        },
+        "side": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.61
+        },
+        "back": {
+          "ok": 30,
+          "frames": 30,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.61
+        }
+      }
+    },
+    "stand_side": {
+      "pattern": "stand",
+      "view": "side",
+      "truth": {
+        "still": true,
+        "earOverShoulder": true
+      },
+      "squat": {
+        "frames": 30,
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "reps": 0,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "frontLeg": null,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 9,
+        "maxHipDrop": 3.4,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "bodyFill": 0.63
+        },
+        "side": {
+          "ok": 30,
+          "frames": 30,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.63
+        },
+        "back": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.63
+        }
+      }
+    },
+    "single_leg_left": {
+      "pattern": "singleLeg",
+      "view": "front",
+      "truth": {
+        "still": true,
+        "stance": "left",
+        "pelvisLevel": true
+      },
+      "squat": {
+        "frames": 30,
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "reps": 0,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "frontLeg": null,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 30,
+          "frames": 30,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.62
+        },
+        "side": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.62
+        },
+        "back": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.62
+        }
+      }
+    },
+    "single_leg_right": {
+      "pattern": "singleLeg",
+      "view": "front",
+      "truth": {
+        "still": true,
+        "stance": "right",
+        "pelvisLevel": true
+      },
+      "squat": {
+        "frames": 30,
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "reps": 0,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 30,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 30
+        },
+        "frontLeg": null,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0
+      },
+      "framing": {
+        "front": {
+          "ok": 30,
+          "frames": 30,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.62
+        },
+        "side": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.62
+        },
+        "back": {
+          "ok": 0,
+          "frames": 30,
+          "worst": {
+            "turned": 30
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.62
+        }
+      }
+    },
+    "seated_rotation_front": {
+      "pattern": "seated",
+      "view": "front",
+      "truth": {
+        "turnDegEachSide": 40
+      },
+      "squat": {
+        "frames": 195,
+        "present": 195,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 195
+        },
+        "reps": 0,
+        "maxDepth01": 0.03,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "worstInward": null,
+        "leastInward": null,
+        "maxValgusRatio": 0,
+        "maxLateralDrift": 0,
+        "shown": [],
+        "checkFindings": [],
+        "coach": []
+      },
+      "lunge": {
+        "present": 195,
+        "calibratedAtFrame": 20,
+        "phases": {
+          "standing": 195
+        },
+        "frontLeg": null,
+        "maxDepth01": 0,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0.34,
+        "maxHipDrop": 0,
+        "maxTorsoDrift": 0.04
+      },
+      "framing": {
+        "front": {
+          "ok": 195,
+          "frames": 195,
+          "worst": {},
+          "say": "Good shot — start when you are ready.",
+          "bodyFill": 0.49
+        },
+        "side": {
+          "ok": 0,
+          "frames": 195,
+          "worst": {
+            "turned": 195
+          },
+          "say": "Turn side-on to the camera.",
+          "bodyFill": 0.49
+        },
+        "back": {
+          "ok": 0,
+          "frames": 195,
+          "worst": {
+            "turned": 195
+          },
+          "say": "Turn all the way around — I read the heel line from behind.",
+          "bodyFill": 0.49
+        }
+      }
+    }
+  },
+  "screens": {
+    "modified": {
+      "screen": "modified",
+      "completed": true,
+      "stalledAt": null,
+      "poseClockSec": 104,
+      "stations": [
+        {
+          "id": "heels",
+          "view": "back",
+          "fixture": "stand_back",
+          "seconds": 12,
+          "positioningFrames": 0,
+          "holdingFrames": 360,
+          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width. Look straight ahead.",
+          "heldBy": null
+        },
+        {
+          "id": "frontStack",
+          "view": "front",
+          "fixture": "stand_front",
+          "seconds": 13.97,
+          "positioningFrames": 0,
+          "holdingFrames": 419,
+          "firstSay": "Turn and face the camera. Same stance — do not fix anything.",
+          "heldBy": null
+        },
+        {
+          "id": "breath",
+          "view": "front",
+          "fixture": "stand_front",
+          "seconds": 7.97,
+          "positioningFrames": 0,
+          "holdingFrames": 239,
+          "firstSay": "Stay facing me. Take one easy breath in and out.",
+          "heldBy": null
+        },
+        {
+          "id": "profile",
+          "view": "side",
+          "fixture": "stand_side",
+          "seconds": 9.97,
+          "positioningFrames": 0,
+          "holdingFrames": 299,
+          "firstSay": "Turn side-on — left shoulder to the camera. Look straight ahead.",
+          "heldBy": null
+        },
+        {
+          "id": "wobbleL",
+          "view": "front",
+          "fixture": "single_leg_left",
+          "seconds": 29.97,
+          "positioningFrames": 0,
+          "holdingFrames": 899,
+          "firstSay": "Face me. Stand on your LEFT leg, other knee up to hip height, arms by your sides.",
+          "heldBy": null
+        },
+        {
+          "id": "wobbleR",
+          "view": "front",
+          "fixture": "single_leg_right",
+          "seconds": 29.97,
+          "positioningFrames": 0,
+          "holdingFrames": 899,
+          "firstSay": "Now the RIGHT leg. Same thing — thirty seconds.",
+          "heldBy": null
+        }
+      ],
+      "resultsRecorded": 0,
+      "onComplete": {
+        "posted": true,
+        "summary": {
+          "screen": "modified",
+          "graded": false,
+          "movementFlags": 0,
+          "redFlags": 0,
+          "asymmetries": 0,
+          "score": null,
+          "triage": "notGraded",
+          "headline": "Not graded yet: the camera can't score this screen.",
+          "meaning": [],
+          "suggestions": [],
+          "programming": [],
+          "notMeasured": [
+            "Heel line and Achilles",
+            "Knee window",
+            "Hip points level",
+            "Shoulder height",
+            "Rib angle and breath",
+            "Head float",
+            "Single-leg stance, 30 seconds a side"
+          ],
+          "ranAll": false
+        },
+        "stored": {
+          "screenId": "fixture-modified",
+          "screen": "modified",
+          "graded": false,
+          "results": [],
+          "summary": {
+            "screen": "modified",
+            "graded": false,
+            "movementFlags": 0,
+            "redFlags": 0,
+            "asymmetries": 0,
+            "score": null,
+            "triage": "notGraded",
+            "headline": "Not graded yet: the camera can't score this screen.",
+            "meaning": [],
+            "suggestions": [],
+            "programming": [],
+            "notMeasured": [
+              "Heel line and Achilles",
+              "Knee window",
+              "Hip points level",
+              "Shoulder height",
+              "Rib angle and breath",
+              "Head float",
+              "Single-leg stance, 30 seconds a side"
+            ],
+            "ranAll": false
+          }
+        },
+        "reward": {
+          "pay": false,
+          "reasonCode": "MOVEMENT_SCREEN_COMPLETED",
+          "idempotencyKey": "screen:fixture-athlete:fixture-modified",
+          "message": "Not graded yet: the camera can't score this screen."
+        },
+        "prescribeReason": "ungraded_screen",
+        "athletePanel": "Not graded yet: the camera can't score this screen."
+      }
+    },
+    "full": {
+      "screen": "full",
+      "completed": true,
+      "stalledAt": null,
+      "poseClockSec": 136,
+      "stations": [
+        {
+          "id": "heels",
+          "view": "back",
+          "fixture": "stand_back",
+          "seconds": 12,
+          "positioningFrames": 0,
+          "holdingFrames": 360,
+          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width. Look straight ahead.",
+          "heldBy": null
+        },
+        {
+          "id": "frontStack",
+          "view": "front",
+          "fixture": "stand_front",
+          "seconds": 13.97,
+          "positioningFrames": 0,
+          "holdingFrames": 419,
+          "firstSay": "Turn and face the camera. Same stance — do not fix anything.",
+          "heldBy": null
+        },
+        {
+          "id": "breath",
+          "view": "front",
+          "fixture": "stand_front",
+          "seconds": 7.97,
+          "positioningFrames": 0,
+          "holdingFrames": 239,
+          "firstSay": "Stay facing me. Take one easy breath in and out.",
+          "heldBy": null
+        },
+        {
+          "id": "profile",
+          "view": "side",
+          "fixture": "stand_side",
+          "seconds": 9.97,
+          "positioningFrames": 0,
+          "holdingFrames": 299,
+          "firstSay": "Turn side-on — left shoulder to the camera. Look straight ahead.",
+          "heldBy": null
+        },
+        {
+          "id": "pelvis",
+          "view": "side",
+          "fixture": "stand_side",
+          "seconds": 11.97,
+          "positioningFrames": 0,
+          "holdingFrames": 359,
+          "firstSay": "Stay side-on. If a coach is with you, they can check the pelvis now.",
+          "heldBy": null
+        },
+        {
+          "id": "rotation",
+          "view": "front",
+          "fixture": "seated_rotation_front",
+          "seconds": 19.97,
+          "positioningFrames": 0,
+          "holdingFrames": 599,
+          "firstSay": "Sit tall and rotate to each side as far as is comfortable.",
+          "heldBy": null
+        },
+        {
+          "id": "wobbleL",
+          "view": "front",
+          "fixture": "single_leg_left",
+          "seconds": 29.97,
+          "positioningFrames": 0,
+          "holdingFrames": 899,
+          "firstSay": "Face me. Stand on your LEFT leg, other knee up to hip height, arms by your sides.",
+          "heldBy": null
+        },
+        {
+          "id": "wobbleR",
+          "view": "front",
+          "fixture": "single_leg_right",
+          "seconds": 29.97,
+          "positioningFrames": 0,
+          "holdingFrames": 899,
+          "firstSay": "Now the RIGHT leg. Same thing — thirty seconds.",
+          "heldBy": null
+        }
+      ],
+      "resultsRecorded": 0,
+      "onComplete": {
+        "posted": true,
+        "summary": {
+          "screen": "full",
+          "graded": false,
+          "movementFlags": 0,
+          "redFlags": 0,
+          "asymmetries": 0,
+          "score": null,
+          "triage": "notGraded",
+          "headline": "Not graded yet: the camera can't score this screen.",
+          "meaning": [],
+          "suggestions": [],
+          "programming": [],
+          "notMeasured": [
+            "Heel line and Achilles",
+            "Knee window",
+            "Hip points level",
+            "Shoulder height",
+            "Rib angle and breath",
+            "Head float",
+            "Pelvic tilt (hands on the hip points)",
+            "Seated rotation, each side",
+            "Single-leg stance, 30 seconds a side"
+          ],
+          "ranAll": false
+        },
+        "stored": {
+          "screenId": "fixture-full",
+          "screen": "full",
+          "graded": false,
+          "results": [],
+          "summary": {
+            "screen": "full",
+            "graded": false,
+            "movementFlags": 0,
+            "redFlags": 0,
+            "asymmetries": 0,
+            "score": null,
+            "triage": "notGraded",
+            "headline": "Not graded yet: the camera can't score this screen.",
+            "meaning": [],
+            "suggestions": [],
+            "programming": [],
+            "notMeasured": [
+              "Heel line and Achilles",
+              "Knee window",
+              "Hip points level",
+              "Shoulder height",
+              "Rib angle and breath",
+              "Head float",
+              "Pelvic tilt (hands on the hip points)",
+              "Seated rotation, each side",
+              "Single-leg stance, 30 seconds a side"
+            ],
+            "ranAll": false
+          }
+        },
+        "reward": {
+          "pay": false,
+          "reasonCode": "MOVEMENT_SCREEN_COMPLETED",
+          "idempotencyKey": "screen:fixture-athlete:fixture-full",
+          "message": "Not graded yet: the camera can't score this screen."
+        },
+        "prescribeReason": "ungraded_screen",
+        "athletePanel": "Not graded yet: the camera can't score this screen."
+      }
+    }
+  }
+}
