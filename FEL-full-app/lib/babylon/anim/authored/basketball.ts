@@ -75,12 +75,25 @@ export function buildHesi(scene: Scene, sk: Skeleton): AnimationGroup | null {
 }
 
 /** Mirror a pose key across the body's midline: hands / poles / feet x negated and the sides swapped, the left and right
- *  leg bones swapped, the torso's yaw / roll negated. (The keys authored here are pitch-only in the torso.) */
-function mirrorKey(k: { t: number; bones?: Record<string, Deg3>; hands?: { Left?: V3; Right?: V3 }; poles?: { Left?: V3; Right?: V3 }; hipsY?: number }): typeof k {
+ *  leg bones swapped, the torso's yaw / roll negated. (The keys authored here are pitch-only in the torso.)
+ *  HOOPS MOTION phase 3 (2026-09-25): EVERY sided field. It carried `hands` and `poles` only, so a `_left` clip lost its `handsRel`
+ *  (the left spin layup's two-hand tuck — its gather was one hand), its `feet` and `kneePoles`, and its `hold` accents. */
+export function mirrorKey(k: PoseKey): PoseKey {
   const swapSide = (n: string) => n.startsWith('Left') ? 'Right' + n.slice(4) : n.startsWith('Right') ? 'Left' + n.slice(5) : n;
   const bones: Record<string, Deg3> | undefined = k.bones && Object.fromEntries(Object.entries(k.bones).map(([n, [x, y, z]]) => [swapSide(n), [x, -y, -z] as Deg3]));
-  const flip = (h?: { Left?: V3; Right?: V3 }) => h && { Left: h.Right && mirror(h.Right), Right: h.Left && mirror(h.Left) };
-  return { t: k.t, bones, hands: flip(k.hands), poles: flip(k.poles), hipsY: k.hipsY };
+  const flip = (h?: { Left?: V3; Right?: V3 }) => {
+    if (!h) return undefined;
+    const o: { Left?: V3; Right?: V3 } = {};
+    if (h.Right) o.Left = mirror(h.Right);
+    if (h.Left) o.Right = mirror(h.Left);
+    return o;
+  };
+  const out: PoseKey = { t: k.t, bones, hands: flip(k.hands), poles: flip(k.poles), hipsY: k.hipsY };
+  if (k.handsRel) out.handsRel = flip(k.handsRel);
+  if (k.feet) out.feet = flip(k.feet);
+  if (k.kneePoles) out.kneePoles = flip(k.kneePoles);
+  if (k.hold !== undefined) out.hold = k.hold;
+  return out;
 }
 
 /** The right-hand layup: the inside (right) knee drives up as the ball hand rises to the top, the finish extends toward the

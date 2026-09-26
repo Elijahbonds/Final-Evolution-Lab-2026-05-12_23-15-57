@@ -184,8 +184,10 @@
   const state = () => {
     try {
       const s = seam(); const h = hudNow();
-      if (MODE === 'onevone' && s) { const p = s.post(), c = s.carry(); return { po: s.possession(), ca: c.active ? c.side : '', sh: p.shooting ? 1 : 0, fi: p.finish ? 1 : 0, ga: p.gather ? 1 : 0, pst: p.posting ? 1 : 0, sp: p.spinning ? 1 : 0, st: h.shotType || '', ph: s.attackPhase ? s.attackPhase() : '', fj: s.foeJob ? s.foeJob() : '' }; }
-      if (MODE === 'threevthree' && s) { const p = s.post(), c = s.carry(); const jobs = s.jobs ? s.jobs().map((j) => j.id + ':' + j.job + (j.boxing ? '!' : '')).join(' ') : ''; return { cr: s.carrier(), ca: c.active ? c.side : '', sh: p.shooting ? 1 : 0, fi: p.finish ? 1 : 0, ga: p.gather ? 1 : 0, pst: p.posting ? 1 : 0, st: h.shotType || '', ph: s.attackPhase ? s.attackPhase() : '', jb: jobs }; }
+      // PHASE 3a: hh = the athlete's hand each live dribble is on ('R' / 'L', per body id; the mode's carry says it); cf = the 3v3 foe
+      // dribbling on their possession (the foes had no carry before phase 3)
+      if (MODE === 'onevone' && s) { const p = s.post(), c = s.carry(); return { po: s.possession(), ca: c.active ? c.side : '', sh: p.shooting ? 1 : 0, fi: p.finish ? 1 : 0, ga: p.gather ? 1 : 0, pst: p.posting ? 1 : 0, sp: p.spinning ? 1 : 0, st: h.shotType || '', ph: s.attackPhase ? s.attackPhase() : '', fj: s.foeJob ? s.foeJob() : '', hh: s.carryHands ? s.carryHands() : undefined }; }
+      if (MODE === 'threevthree' && s) { const p = s.post(), c = s.carry(); const jobs = s.jobs ? s.jobs().map((j) => j.id + ':' + j.job + (j.boxing ? '!' : '')).join(' ') : ''; return { cr: s.carrier(), ca: c.active ? c.side : '', sh: p.shooting ? 1 : 0, fi: p.finish ? 1 : 0, ga: p.gather ? 1 : 0, pst: p.posting ? 1 : 0, st: h.shotType || '', ph: s.attackPhase ? s.attackPhase() : '', jb: jobs, hh: s.carryHands ? s.carryHands() : undefined, cf: s.foeCarrier ? s.foeCarrier() : undefined }; }
       if (MODE === 'threepoint') return { m: h.meter == null ? null : h.meter, mo: h.money ? 1 : 0, r: h.rackIdx, b: h.ballIdx, rd: h.round || '', bn: h.banner || '' };
       return { tm: h.time == null ? null : h.time, bn: h.banner || '' };
     } catch (e) { return { err: String((e && e.message) || e).slice(0, 60) }; }
@@ -363,7 +365,9 @@
   const Rs = (x, y) => bus().emit({ t: 'stick', side: 'R', x, y });
   const flick = async (x, y) => { Rs(x, y); await sleep(30); Rs(x * 0.9, y * 0.9); await sleep(60); Rs(0, 0); };
   const sweep = async () => { for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; Rs(Math.cos(a) * 0.95, Math.sin(a) * 0.95); await sleep(28); } Rs(0, 0); };
-  const ballMir = () => { const s = seam(); const c = s && s.carry ? s.carry() : null; return c && c.side === 'Left' ? -1 : 1; };
+  // PHASE 3a: the stick map's "hand" is the ATHLETE's (the carry's `hand`, as drawn); `side` is the rig's (rig LeftHand = his right since
+  // the hoops family was mirrored). Before phase 3 the two were the same word for different things, and `side` was all there was.
+  const ballMir = () => { const s = seam(); const c = s && s.carry ? s.carry() : null; const h = c ? c.hand || c.side : ''; return h === 'Left' ? -1 : 1; };
   const key = (k, down) => window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key: k, bubbles: true }));
   const tapKey = async (k, ms) => { key(k, true); await sleep(ms || 70); key(k, false); };
   HM.key = key; HM.tapKey = tapKey;

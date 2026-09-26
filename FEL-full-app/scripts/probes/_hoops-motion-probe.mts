@@ -583,6 +583,30 @@ export interface Metrics {
     /** 1. the ball path's worst frame is in ball.pathMaxM; here: the same for the CATCH frame alone (the warp into the palm) */
     catchWarpM: number | null;
   };
+  /** PHASE 3a (2026-09-25) — the "right-handed on screen" and "a carry on every body" gate lines. */
+  h3: {
+    /** held frames (the ball parented to this body's hand) by the side the holding hand is DRAWN on; `deliberateLeft` = left frames a
+     *  `_left` clip is on (top, or ≥ 0.25 of the pose: a left finish, hook or move the game chose), excluded from `rightFracExcl`;
+     *  `leftClips` lists the top clip on every left frame */
+    held: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null; leftClips: Record<string, number>; pelvis: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null } };
+    /** dribble frames (the ball on this body's live carry) by the side the BALL is drawn on; `deliberateLeft` = frames the mode had
+     *  this body's carry on its left hand (hh 'L': a crossing the move ended on), excluded from `rightFracExcl` */
+    dribble: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null; pelvis: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null } };
+    /** the ball path on frames it was this body's on BOTH ends (held or dribbled) — the arrival of a catch, a board or a check is
+     *  excluded (phase 11's catch gate); world and against the hips; frames over 0.15 m */
+    pathHeld: { frames: number; maxM: number | null; atMs: number | null; maxRelM: number | null; over015: number };
+    /** the palm at every bounce top: the nearer hand bone's distance to the ball's centre, less 0.15 m (the palm-held distance:
+     *  ballRig's PALM_OFFSET, the constant the old "ball against the palm" read) — ≤ 0.08 m is the palm on the ball */
+    palm: { bounces: number; maxGapM: number | null; p90GapM: number | null; over008: number;
+      /** (3a review) the ALONG-TRAVEL part of the ball's offset from that hand bone at the tops where the body moves (root > 1 m/s over
+       *  the frames either side): + = the ball ahead of the hand, − = behind. The gap above cannot see a trail — the ball sits ~0.12 m
+       *  under the bone at a top, so a 7–10 cm horizontal lag still reads as a pass. |trail| ≤ 0.08 m is the palm on the ball. */
+      movingTops?: number; trailMeanM?: number | null; trailMaxAbsM?: number | null; trailOver008?: number } | null;
+    /** each hand bone's local rotation range over the window (degrees, the largest angle from the first frame) */
+    hands: { L: number | null; R: number | null; bothMove: boolean | null };
+    /** the subject had the ball (held or dribbled) on at least one frame of the window */
+    withBall: boolean;
+  };
 }
 /** The look target of an action kind: the rim while shooting / finishing / dunking, the ball otherwise (a defender watches the
  *  handler; a receiver the pass); a reaction has none. */
@@ -870,13 +894,74 @@ export function measure(rec: Rec): Metrics {
   const stacked = { frames: 0, pairs: {} as Record<string, number> };
   for (const b of bw) { const full = b.c.filter((c) => c[1] >= 0.9).map((c) => clipName(c[0]).replace(/^bball_/, '')).sort(); if (full.length >= 2) { stacked.frames++; const k = full.join('+'); stacked.pairs[k] = (stacked.pairs[k] ?? 0) + 1; } }
   const h2: Metrics['h2'] = { dribbleContact, hipYawSeam, cadence, finish, guideHand, wristFlex, overlap, aiArms, look, shield, catchReach, celebration, pacing, stacked, catchWarpM: catchWarp.length ? r3(Math.max(...catchWarp)) : null };
+  // ── PHASE 3a: the right hand, the held path, the palm at the top, the hands ─────────────────────────────────────────────
+  const LEFT_CLIP = /_left$/;
+  // TWO READS OF "THE ATHLETE'S RIGHT". `visSide` is phases 1–2's: the feet's heel→toe line. On a run it is noise — a swinging foot's
+  // toe points back and down, and the feet's facing turned 145° in five frames at a sprint while the root and the pelvis held
+  // (3a smoke, the dunk run-up; the ball read "left" on those frames). `pelvisSide` reads the pelvis: the hip line's normal, turned
+  // to agree with the root's facing (AUD: the root's yaw matches the body's). Both are reported; see the step's report.
+  const pelvisSide = (b: BodyFrame, p: number[]): 'R' | 'L' | '' => {
+    const h = b.j[J.Hips], lu = b.j[J.LeftUpLeg], ru = b.j[J.RightUpLeg]; if (!h || !lu || !ru) return '';
+    const ax = ru[0] - lu[0], az = ru[2] - lu[2], l = Math.hypot(ax, az); if (l < 1e-4) return '';
+    let fx = az / l, fz = -ax / l; const y = yawOf(b); if (fx * Math.sin(y) + fz * Math.cos(y) < 0) { fx = -fx; fz = -fz; }
+    const d = (p[0] - h[0]) * fz + (p[2] - h[2]) * -fx;   // rightOf(fwd) = (fwd.z, 0, −fwd.x)
+    return Math.abs(d) < 0.03 ? '' : d > 0 ? 'R' : 'L';
+  };
+  type SideTally = { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null };
+  const tally = (): SideTally => ({ frames: 0, right: 0, left: 0, deliberateLeft: 0, rightFrac: null, rightFracExcl: null });
+  const add = (t: SideTally, v: string, deliberate: boolean) => { if (!v) return; t.frames++; if (v === 'R') t.right++; else { t.left++; if (deliberate) t.deliberateLeft++; } };
+  const close = (t: SideTally) => { t.rightFrac = t.frames ? r3(t.right / t.frames) : null; t.rightFracExcl = t.frames - t.deliberateLeft > 0 ? r3(t.right / (t.frames - t.deliberateLeft)) : null; };
+  const heldH = { ...tally(), leftClips: {} as Record<string, number>, pelvis: tally() };
+  for (const f of heldF) {
+    const b = f.B[S]; const hand = f.bh === 'L' ? b.j[J.LeftHand] : f.bh === 'R' ? b.j[J.RightHand] : null; if (!hand) continue;
+    const top = topClip(b);
+    // deliberate: a `_left` clip the game chose is on (top, or ≥ 0.25 of the pose — its crossfade's first frames count too)
+    const delib = LEFT_CLIP.test(top) || b.c.some((c) => c[1] >= 0.25 && LEFT_CLIP.test(clipName(c[0])));
+    const v = visSide(b, hand);
+    add(heldH, v, delib); add(heldH.pelvis, pelvisSide(b, hand), delib);
+    if (v === 'L') heldH.leftClips[top || '-'] = (heldH.leftClips[top || '-'] ?? 0) + 1;
+  }
+  close(heldH); close(heldH.pelvis);
+  const dribH = { ...tally(), pelvis: tally() };
+  for (const f of carryF) {
+    const hh = (f.s as { hh?: Record<string, string> } | undefined)?.hh; const delib = !!hh && hh[S] === 'L';
+    add(dribH, visSide(f.B[S], f.ball!), delib); add(dribH.pelvis, pelvisSide(f.B[S], f.ball!), delib);
+  }
+  close(dribH); close(dribH.pelvis);
+  const ph = path.filter((x) => !x.catchF);
+  const phMax = ph.length ? ph.reduce((a, x) => (x.d > a.d ? x : a), ph[0]) : null; const phRel = ph.filter((x) => isFinite(x.rel));
+  const pathHeld = { frames: ph.length, maxM: phMax ? r3(phMax.d) : null, atMs: phMax ? Math.round(phMax.t - A0) : null, maxRelM: phRel.length ? r3(Math.max(...phRel.map((x) => x.rel))) : null, over015: ph.filter((x) => x.d > 0.15).length };
+  let palm: Metrics['h3']['palm'] = null;
+  {
+    const gaps: number[] = []; const trails: number[] = [];
+    // a top is a top OF THE DRIBBLE: this body's dribble on the frames either side too (the frame a hand-off or a board puts the ball
+    // on it is an arrival, not a bounce — phase 11's catch)
+    const onDribble = (g: Frame | undefined) => !!g && !!g.ball && !g.bb && !g.br && carrierIs(g, S);
+    for (let i = 1; i < win.length - 1; i++) {
+      const f = win[i]; if (!onDribble(f) || !onDribble(win[i - 1]) || !onDribble(win[i + 1])) continue;
+      if (!(f.ball[1] > win[i - 1].ball![1] && f.ball[1] >= win[i + 1].ball![1])) continue;
+      const b = f.B[S]; const hs = [b.j[J.LeftHand], b.j[J.RightHand]].filter((h): h is number[] => !!h); if (!hs.length) continue;
+      const near = hs.reduce((a, h) => (len(sub(f.ball!, h)) < len(sub(f.ball!, a)) ? h : a), hs[0]);
+      gaps.push(len(sub(f.ball!, near)) - 0.15);
+      const r0 = win[i - 1].B[S]?.rp, r1 = win[i + 1].B[S]?.rp, tdt = (win[i + 1].t - win[i - 1].t) / 1000;
+      if (r0 && r1 && tdt > 0) {
+        const vx = (r1[0] - r0[0]) / tdt, vz = (r1[2] - r0[2]) / tdt, sp = Math.hypot(vx, vz);
+        if (sp > 1 && sp < 12) trails.push(((f.ball![0] - near[0]) * vx + (f.ball![2] - near[2]) * vz) / sp);
+      }
+    }
+    if (carryF.length) palm = { bounces: gaps.length, maxGapM: gaps.length ? r3(Math.max(...gaps)) : null, p90GapM: gaps.length ? r3(pctl(gaps, 0.9)) : null, over008: gaps.filter((g) => g > 0.08).length,
+      movingTops: trails.length, trailMeanM: trails.length ? r3(trails.reduce((a, x) => a + x, 0) / trails.length) : null, trailMaxAbsM: trails.length ? r3(Math.max(...trails.map(Math.abs))) : null, trailOver008: trails.filter((x) => Math.abs(x) > 0.08).length };
+  }
+  const handRange = (bn: string): number | null => { const bi = idxOf(bn); if (bi < 0 || !bw.length) return null; const q0 = bw[0].q.slice(bi * 4, bi * 4 + 4); let mx = 0; for (const b of bw) mx = Math.max(mx, qAngleDeg(q0, b.q.slice(bi * 4, bi * 4 + 4))); return r2(mx); };
+  const hL = handRange('LeftHand'), hR = handRange('RightHand');
+  const h3: Metrics['h3'] = { held: heldH, dribble: dribH, pathHeld, palm, hands: { L: hL, R: hR, bothMove: hL == null || hR == null ? null : hL >= 3 && hR >= 3 }, withBall: heldF.length + carryF.length > 0 };
   return {
     id: rec.action, label: rec.label, who: rec.who, kind: rec.kind, family: rec.family, session: rec.session, take: rec.take, subject: S, anchorClip: rec.anchorClip, attempt: rec.attempt ?? 1,
     frames: win.length, fps: +fs.toFixed(1), windowMs: [rec.pre, rec.post], clips, shotTypes,
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
     pops, popsN: pops.length, severe: pops.filter((p) => p.degPerSec >= 3000).length, whips,
     heldFrac: held, wristStill: r2(((held.LeftHand ?? 0) + (held.RightHand ?? 0)) / 2), thoracicStill: held.Spine2 ?? 0,
-    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2,
+    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2, h3,
     audit: (() => { const cl = bw.map((b) => Math.min(b.j[J.LeftFoot]?.[1] ?? 9, b.j[J.RightFoot]?.[1] ?? 9) - floorY); let fi = -1, ft = -1e9; win.forEach((f, i) => { if (f.t >= A0 - 100 && cl[i] > ft) { ft = cl[i]; fi = i; } });
       return { windowMs: [Math.round(Math.max(wS, win[0]?.t ?? wS) - A0), Math.round(Math.min(wE, win[win.length - 1]?.t ?? wE) - A0)] as [number, number], frames: win.length, resetsMs: resetsT.map((t) => Math.round(t - A0)), anchorAtReset, snaps, preMs, frozen, flight: { feetUpM: r2(ft), feetApexMs: fi >= 0 ? Math.round(win[fi].t - A0) : null, rootUpM: r2(Math.max(0, ...bw.map((b) => b.rp[1]))) } }; })(),
   };
@@ -887,14 +972,16 @@ function holderOf(f: Frame): string {
   if (f.bb) return f.bb;
   if (!f.ball || f.br) return '';
   const s = f.s || {};
-  if (typeof s.cr === 'string') return s.cr === 'foeTeam' ? '' : s.cr;
+  if (typeof s.cr === 'string') return s.cr === 'foeTeam' ? (typeof s.cf === 'string' ? s.cf : '') : s.cr;   // PHASE 3a: the 3v3 foe on his own dribble
+  // PHASE 3a: with the carries' hands recorded (hh), the 1v1 rival's own dribble is his (s.ca is MY carry only)
+  if (typeof s.po === 'string' && s.hh && typeof s.hh === 'object') { const hh = s.hh as Record<string, string>; return s.po === 'mine' ? (hh.me ? 'me' : '') : s.po === 'defense' ? (hh.foe ? 'foe' : '') : ''; }
   if (typeof s.po === 'string' && s.ca) return s.po === 'mine' ? 'me' : s.po === 'defense' ? 'foe' : '';
   return '';
 }
 function carrierIs(f: Frame, id: string): boolean {
   const s = f.s || {};
   if (typeof s.po === 'string') return id === 'me' ? s.po === 'mine' : id === 'foe' ? s.po === 'defense' : false;
-  if (typeof s.cr === 'string') return id === 'me' ? s.cr === 'me' : id.startsWith('mate') ? s.cr === id : false;
+  if (typeof s.cr === 'string') return id === 'me' ? s.cr === 'me' : id.startsWith('mate') ? s.cr === id : id.startsWith('foe') ? s.cr === 'foeTeam' && s.cf === id : false;
   return id === 'me';
 }
 /** PHASE 2a: the animation-group weights of the subject on every frame around the anchor — the crossFade re-entrancy question
