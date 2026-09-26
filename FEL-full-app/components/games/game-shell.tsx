@@ -15,7 +15,7 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
-import { reportEarn } from '@/lib/wallet/client';
+import { reportEarnGrant } from '@/lib/wallet/client';
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
@@ -121,6 +121,10 @@ function GameShellInner({
   const [profileTry, setProfileTry] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [recap, setRecap] = useState<RecapData | null>(null);
+  /** The wallet coins this run's earn reports were granted (BRAINBRAWL-POLISH-2 N10), and whether a cap cut the coin earn —
+   *  null until a grant lands, and left null for a refused earn or a zero grant nothing capped (no "+0" tile). */
+  const [recapCoins, setRecapCoins] = useState<{ coins: number; capped: boolean } | null>(null);
+  const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
   const [mpResult, setMpResult] = useState<{ status: string; hostScore: number; guestScore: number; hostName?: string; iWon: boolean; tie: boolean } | null>(null);
@@ -199,6 +203,11 @@ function GameShellInner({
   const handleEnd = useCallback(
     (res: GameResult) => {
       setResult(res);
+      // Which run this is, read NOW: the card and its REPLAY show before /api/sessions answers, and Brain Brawl's REPLAY in
+      // place is instant — a read taken after the round-trip saw the rematch's number and passed run 1's coins off as run
+      // 2's. Every answer below still does its work for this run (grants, Story, Arena); only the card is guarded.
+      const run = runSeq.current;
+      const mine = () => run === runSeq.current;
       fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -216,7 +225,7 @@ function GameShellInner({
         .then((r) => (r?.ok ? r.json() : null))
         .then(async (j) => {
           if (j?.ok) {
-            setRecap({
+            if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
@@ -231,19 +240,28 @@ function GameShellInner({
             // this shared choke point. Dunk is skipped here because the dunk
             // component self-reports richer per-attempt events. Keyed on the
             // server sessionId so a retry is idempotent. Best-effort only.
+            // BRAINBRAWL-POLISH-2 N10: the card shows the coins those grants paid (the server's figure, summed) — the eye's paid
+            // Brain Brawl match landed +316 wallet coins and the card said nothing about them.
             if (j?.sessionId && mode !== 'dunk') {
-              void reportEarn({
+              const grants = [reportEarnGrant({
                 idempotency_key: `sess:${j.sessionId}:complete`,
                 event_type: 'mode_session_completed',
                 payload: { mode, run_id: j.sessionId, score: res?.score ?? 0 },
-              });
+              })];
               if (res?.won) {
-                void reportEarn({
+                grants.push(reportEarnGrant({
                   idempotency_key: `sess:${j.sessionId}:won`,
                   event_type: 'mode_session_won',
                   payload: { mode, run_id: j.sessionId },
-                });
+                }));
               }
+              void Promise.all(grants).then((gs) => {
+                if (!mine()) return;
+                const paid = gs.filter((g): g is NonNullable<typeof g> => g !== null);
+                const coins = paid.reduce((sum, g) => sum + (Number.isFinite(g.coins) ? g.coins : 0), 0);
+                const capped = Boolean(gs[0]?.capped);   // the completed earn is the coin one (the won earn pays shards)
+                if (coins > 0 || capped) setRecapCoins({ coins, capped });
+              });
             }
 
             // If this is a story run, complete the node
@@ -255,7 +273,7 @@ function GameShellInner({
                   body: JSON.stringify({ nodeId: storyNodeId, sessionId: j.sessionId }),
                 }).then((r2) => r2.ok ? r2.json() : null);
                 if (sr?.ok && !sr?.alreadyCompleted) {
-                  setStoryReward({ rewardLC: sr.rewardLC ?? 0, badge: sr.badge ?? null });
+                  if (mine()) setStoryReward({ rewardLC: sr.rewardLC ?? 0, badge: sr.badge ?? null });
                 }
               } catch {}
             }
@@ -293,7 +311,7 @@ function GameShellInner({
                 if (ar?.ok) {
                   // ARENA-10PHASE P1/P2: keep both settled scores — the card reads the duel from them, not from the mode's own rival.
                   const p1 = typeof ar.p1Score === 'number' ? ar.p1Score : undefined, p2 = typeof ar.p2Score === 'number' ? ar.p2Score : undefined;
-                  setArenaResult({
+                  if (mine()) setArenaResult({
                     settled: Boolean(ar.settled),
                     status: ar.status,
                     result: ar.result,
@@ -313,14 +331,15 @@ function GameShellInner({
               try {
                 const mj = await fetch('/api/v1/mp/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: mpCode }) }).then((r2) => (r2.ok ? r2.json() : null));
                 const m = mj?.match ?? mj;
-                if (m && m.status) setMpResult({ status: m.status, hostScore: Number(m.hostScore ?? 0), guestScore: Number(m.guestScore ?? 0), hostName: m.hostName, iWon: !!m.winnerId && m.winnerId === m.guestId, tie: m.status === 'settled' && !m.winnerId });
+                if (m && m.status && mine()) setMpResult({ status: m.status, hostScore: Number(m.hostScore ?? 0), guestScore: Number(m.guestScore ?? 0), hostName: m.hostName, iWon: !!m.winnerId && m.winnerId === m.guestId, tie: m.status === 'settled' && !m.winnerId });
               } catch {}
             }
 
             // Court Carnival relay: this stop's reward already posted above
             // through the normal pipeline — this only advances the run so
             // the recap can offer "next stop" instead of Replay/Hub.
-            if (carnivalFlag) {
+            // a stop advances on the run whose card is up: REPLAY before this answered means the rematch is the stop's run
+            if (carnivalFlag && mine()) {
               const updated = recordCarnivalResult(mode as CarnivalStop, {
                 score: res?.score ?? 0,
                 won: Boolean(res?.won),
@@ -343,11 +362,11 @@ function GameShellInner({
                 }),
               }).catch(() => {}); // best-effort, never block the recap
             }
-          } else {
+          } else if (mine()) {
             setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 });
           }
         })
-        .catch(() => setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }));
+        .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
     },
     [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode]
   );
@@ -361,6 +380,9 @@ function GameShellInner({
   const replay = () => {
     setResult(null);
     setRecap(null);
+    setRecapCoins(null);
+    setStoryReward(null);
+    runSeq.current += 1;
     setArenaResult(null);
     setMpResult(null);
     setShareUrl(null);
@@ -629,6 +651,15 @@ function GameShellInner({
                       </div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
                     </div>
+                    {recapCoins !== null && (
+                      <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
+                        <Coins className="h-4 w-4 text-[#FFB020]" />
+                        {recapCoins.coins > 0 && <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>}
+                        <span className="text-[10px] uppercase tracking-wider text-white/40">
+                          {recapCoins.coins > 0 ? (recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins') : 'Wallet coin limit reached for now'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   )}
                   {storyReward && (

@@ -38,7 +38,9 @@ export const HOST_LINES: readonly HostLine[] = [
   // the intros ride the first spin (2.2 s to the landing call), so they are over before it
   ...L('intro.solo', 'Welcome to Brain Brawl!', 'Brains at the ready!', 'Good evening, brawlers!'),
   ...L('intro.duel', 'Two brains, one wheel!', 'Let the brawl begin!', 'Welcome to Brain Brawl!'),
-  ...L('again', 'Back for more? Splendid. Spin it!', 'Round two of the brains. Here we go!', 'Once more, with feeling!'),
+  // POLISH-2 N9: 'again' opens round ONE of a replayed match, so no line may name a round ('Round two of the brains' read as the
+  // wrong round). again.02 is re-voiced with the new text; the ids stay put so the bank keys do not shift.
+  ...L('again', 'Back for more? Splendid. Spin it!', 'A rematch! Fresh brains, here we go!', 'Once more, with feeling!'),
   ...L('spin', 'Round and round she goes…', 'Spin that wheel!', 'Where will it stop?', 'Let us see where it lands.', 'The wheel decides!', 'Big wheel, keep on turning.'),
   ...L('spin.last', 'The last category. Make it count!', 'Final spin of the night!'),
   ...L('land.LOGIC', 'Logic! Find the rule.', 'It is Logic!'),
@@ -65,14 +67,16 @@ export const HOST_LINES: readonly HostLine[] = [
   ...L('draw', 'Dead level! What a brawl.', 'A draw! Nothing between them.'),
 ];
 
-/** A contestant's bubble lines, by the beat they go with. Short: a bubble is read in a glance. */
+/** A contestant's bubble lines, by the beat they go with. Short: a bubble is read in a glance. The spin's category wishes are
+ *  not here: they depend on what the wheel can still land on (spinLines). */
 export const SEAT_LINES = {
-  spin: ['Come on, big wheel!', 'Land on a good one…', 'Give me LOGIC!', 'Not MEMORY, not MEMORY…', 'Big brain time.', 'Spin it!'],
+  spin: ['Come on, big wheel!', 'Land on a good one…', 'Big brain time.', 'Spin it!'],
   think: ['Hmm…', 'Let me think…', 'Ooh, tricky.', 'Wait for it…', 'I know this!'],
   lock: ['Final answer!', 'Locked in!', 'Got it!', 'Easy.', 'That one.'],
   right: ['Yes!', 'Too easy!', 'Knew it!', 'Big brain!', 'Get in!'],
   rightFast: ['Instant!', 'Didn’t even blink!', 'Speed AND brains!'],
-  wrong: ['No way…', 'Argh!', 'I knew that!', 'Seriously?', 'Nooo…'],
+  // POLISH-2 N6: no 'I knew that!' here — on a wrong pick it read as a boast
+  wrong: ['No way…', 'Argh!', 'Oh no…', 'Seriously?', 'Nooo…'],
   timeout: ['Wait — what?', 'Too slow!', 'Blanked!', 'Brain freeze!'],
   claim: ['Mine!', 'On the board!', 'Claimed it!'],
   steal: ['Mine now!', 'Thanks for that!', 'I’ll take that!'],
@@ -80,6 +84,20 @@ export const SEAT_LINES = {
   lose: ['Rematch. Now.', 'Next time…', 'GG.', 'I was warming up!'],
 } as const;
 export type SeatBeat = keyof typeof SEAT_LINES;
+
+/**
+ * The spinner's lines for THIS spin (POLISH-2 N5). The eye heard "Not MEMORY, not MEMORY…" on a round-five spin when MEMORY
+ * had been played and only LOGIC could land. A line that names a category now names one the wheel can still land on
+ * (`landable`: BrainBrawlCore.wheelPool); dreading one only makes sense while another could come up instead; and when only
+ * one can land, the line says so.
+ */
+export function spinLines(landable: readonly Category[], rnd: () => number): string[] {
+  if (landable.length === 0) return [...SEAT_LINES.spin];
+  if (landable.length === 1) return [`Last one: ${landable[0]}!`, `${landable[0]}, here we come!`, 'Spin it!'];
+  const pick = () => landable[Math.floor(rnd() * landable.length) % landable.length];
+  const wish = pick(), dread = pick();
+  return [...SEAT_LINES.spin, `Give me ${wish}!`, `Not ${dread}, not ${dread}…`];
+}
 
 /** One of `pool`, never the one said last time (a rotation that does not repeat back to back). */
 export function pickFrom<T>(pool: readonly T[], rnd: () => number, last?: T): T {

@@ -74,24 +74,76 @@ function SequenceRow({ line, color }: { line: string; color: string }) {
   );
 }
 
-/** A speech bubble over a head (anchor = the head's top in % of the stage), popping in when its line changes. */
-function Bubble({ id, text, anchor, color, who }: { id: string; text: string; anchor: [number, number] | null; color: string; who: string }) {
+/**
+ * A speech bubble at a head (anchor = % of the stage): over it (`above`), or beside it on the stage's side (`left`: the box to
+ * the left, the tail pointing right at the head — the host's, stage right of the card).
+ *
+ * ONE bubble per speaker (POLISH-2 N1). Keyed by the line, a new line used to mount a second bubble while the last one was still
+ * fading out, so on every landing two DOC VOLT bubbles ("Welcome to Brain Brawl!" under "Memory! Look closely.") stacked
+ * half-transparent and neither read. The bubble is keyed by the SPEAKER now: a new line replaces the old one in place and the box
+ * pops; it only fades when the speaker goes quiet.
+ */
+function Bubble({ id, text, anchor, color, who, place = 'above' }: { id: string; text: string; anchor: [number, number] | null; color: string; who: string; place?: 'above' | 'left' }) {
+  const left = place === 'left';
   return (
     <AnimatePresence>
       {text && anchor && (
-        <motion.div key={id} data-bb-bubble={who} initial={{ opacity: 0, scale: 0.7, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
-          transition={{ type: 'spring', stiffness: 520, damping: 26 }}
-          className="pointer-events-none absolute z-10 origin-bottom font-mono"
-          style={{ left: `${Math.max(20, Math.min(80, anchor[0]))}%`, top: `${Math.max(16, anchor[1])}%` }}>   {/* never off the stage's edge */}
-          <div className="relative -translate-x-1/2 -translate-y-full">
-            <div className="w-max max-w-[130px] rounded-2xl border-2 bg-white px-2.5 py-1 text-center text-[11px] font-black leading-tight text-[#120c2c] shadow-lg sm:max-w-[300px] sm:px-3 sm:py-1.5 sm:text-sm" style={{ borderColor: color }}>
+        <motion.div key={who} data-bb-bubble={who} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.16 } }}
+          className="pointer-events-none absolute z-10 font-mono"
+          style={{ left: `${Math.max(left ? 30 : 20, Math.min(left ? 94 : 80, anchor[0]))}%`, top: `${Math.max(16, anchor[1])}%` }}>   {/* never off the stage's edge */}
+          <div className={`relative ${left ? '-translate-x-full -translate-y-1/2' : '-translate-x-1/2 -translate-y-full'}`}>
+            <motion.div key={id} initial={{ opacity: 0.3, scale: 0.78 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 560, damping: 26 }}
+              className={`w-max max-w-[130px] rounded-2xl border-2 bg-white px-2.5 py-1 text-center text-[11px] font-black leading-tight text-[#120c2c] shadow-lg sm:max-w-[300px] sm:px-3 sm:py-1.5 sm:text-sm ${left ? 'origin-right' : 'origin-bottom'}`} style={{ borderColor: color }}>
               <span className="mr-1 text-[9px] font-bold tracking-wider" style={{ color }}>{who}</span>{text}
-            </div>
-            <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[8px] border-t-[10px] border-x-transparent" style={{ borderTopColor: color }} />
+            </motion.div>
+            {left
+              ? <div className="absolute left-full top-1/2 h-0 w-0 -translate-y-1/2 border-y-[8px] border-l-[10px] border-y-transparent" style={{ borderLeftColor: color }} />
+              : <div className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-[8px] border-t-[10px] border-x-transparent" style={{ borderTopColor: color }} />}
           </div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+const POP_TONE: Record<string, string> = { correct: '#4ade80', wrong: '#ff5c5c', timeout: '#e2e8f0' };
+
+/**
+ * A seat's score pop (POLISH-2 R1): "+94" / "WRONG" / "TIME" beside the podium, on its outboard side. The shared 3D pop it replaces
+ * was dark green / dark red on the dark set and drew BEHIND the gallery bodies; this one is the card layer's — always in front,
+ * bright text on a dark plate with the verdict's colour round it.
+ */
+function ScorePop({ id, text, tone, anchor }: { id: string; text: string; tone: string; anchor: [number, number] | null }) {
+  const color = POP_TONE[tone] ?? '#ffffff';
+  return (
+    <AnimatePresence>
+      {text && anchor && (
+        <motion.div key={id} data-bb-pop={tone} initial={{ opacity: 0, scale: 0.4, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, y: -16, transition: { duration: 0.3 } }}
+          transition={{ type: 'spring', stiffness: 460, damping: 17 }}
+          className="pointer-events-none absolute z-20 font-mono"
+          style={{ left: `${Math.max(7, Math.min(93, anchor[0]))}%`, top: `${Math.max(14, Math.min(90, anchor[1]))}%` }}>
+          <div className="-translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl border-2 bg-[#0a0618]/90 px-2.5 py-0.5 text-2xl font-black leading-none tracking-tight shadow-lg sm:px-3 sm:py-1 sm:text-4xl"
+            style={{ color, borderColor: color, textShadow: `0 0 14px ${color}99, 0 2px 0 #000` }}>{text}</div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/**
+ * The question (POLISH-2 N4). The MEMORY prompt wrapped inside its own range — "(rows A–C, columns 1–" / "3)" — because a line
+ * may break after an en dash. A closing aside in brackets goes on its own line and never breaks, and a range (A–C, 1–3) never
+ * splits anywhere.
+ */
+function PromptText({ text }: { text: string }) {
+  const keep = (s: string) => s.replace(/(\w)–(\w)/g, '$1⁠–⁠$2');   // word joiners: no break inside a range
+  const m = text.match(/^(.*\S)\s*(\([^()]*\))$/);
+  if (!m) return <>{keep(text)}</>;
+  return (
+    <>
+      <span className="block">{keep(m[1])}</span>
+      <span data-bb="prompt-aside" className="block whitespace-nowrap text-[0.85em] font-semibold text-white/75">{keep(m[2])}</span>
+    </>
   );
 }
 
@@ -204,7 +256,10 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         <>
           <Bubble id={`s1-${hnum(hud.sayN1, 0)}`} text={typeof hud.say1 === 'string' ? hud.say1 : ''} anchor={anchorOf(hud.anchor1)} color={SEAT[0]} who={twoP ? 'P1' : 'YOU'} />
           {twoP && <Bubble id={`s2-${hnum(hud.sayN2, 0)}`} text={typeof hud.say2 === 'string' ? hud.say2 : ''} anchor={anchorOf(hud.anchor2)} color={SEAT[1]} who="P2" />}
-          {!cardUp && !(hud.phase === 'done' && isBoard(hud.board)) && <Bubble id={`h-${hostN}`} text={hostSay} anchor={anchorOf(hud.anchorHost)} color={HOST_COLOR} who={String(hnode(hud.hostName, 'HOST'))} />}
+          {!cardUp && !(hud.phase === 'done' && isBoard(hud.board)) && <Bubble id={`h-${hostN}`} text={hostSay} anchor={anchorOf(hud.anchorHost)} color={HOST_COLOR} who={String(hnode(hud.hostName, 'HOST'))} place={hud.hostBubble === 'left' ? 'left' : 'above'} />}
+          {/* the verdict beside each podium (R1) */}
+          <ScorePop id={`p1-${hnum(hud.popN1, 0)}`} text={typeof hud.pop1 === 'string' ? hud.pop1 : ''} tone={String(hnode(hud.popTone1, ''))} anchor={anchorOf(hud.anchorPop1)} />
+          {twoP && <ScorePop id={`p2-${hnum(hud.popN2, 0)}`} text={typeof hud.pop2 === 'string' ? hud.pop2 : ''} tone={String(hnode(hud.popTone2, ''))} anchor={anchorOf(hud.anchorPop2)} />}
         </>
       )}
 
@@ -216,14 +271,15 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
             {revealed && banner && <div data-bb="banner" className="fel-heading fel-panel px-4 py-1 text-center text-base font-black text-white sm:text-xl">{banner}</div>}
             <div className="fel-panel flex w-full items-center gap-2 px-3 py-1 sm:px-4">
               <span className="shrink-0 text-[10px] font-bold tracking-widest sm:text-[11px]" style={{ color: catColor }}>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</span>
-              {/* the host's call while the card hides him */}
-              <span data-bb="host-line" className="min-w-0 flex-1 truncate text-center text-[10px] sm:text-[11px]" style={{ color: HOST_COLOR }}>{hostSay ? `🎙 ${hostSay}` : ''}</span>
+              {/* the host's call while the card is up — the WHOLE line, wrapped when it is long (POLISH-2 N3: it was cut to "That is a
+                  no, I am afrai…") */}
+              <span data-bb="host-line" className="min-w-0 flex-1 whitespace-normal break-words text-center text-[10px] leading-tight sm:text-[11px]" style={{ color: HOST_COLOR }}>{hostSay ? `🎙 ${hostSay}` : ''}</span>
               {/* the clock as a bar: it drains in step with the number, red in the last third */}
               <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white/10 sm:w-20">
                 {clockFrac !== null && <span className="block h-full rounded-full transition-[width] duration-300 ease-linear" style={{ width: `${Math.round(clockFrac * 100)}%`, background: clockFrac < 0.34 ? '#ff2d78' : '#22d3ee' }} />}
               </span>
             </div>
-            <div className="fel-panel max-w-full px-4 py-1 text-center text-sm font-bold text-white sm:px-5 sm:py-1.5 sm:text-base">{String(hud.prompt)}</div>
+            <div data-bb="prompt" className="fel-panel max-w-full px-4 py-1 text-center text-sm font-bold text-white sm:px-5 sm:py-1.5 sm:text-base"><PromptText text={String(hud.prompt)} /></div>
             {display.length > 0 && !revealed && (
               sequence
                 ? <div className="fel-panel max-w-full px-3 py-2 sm:px-4"><SequenceRow line={display[0]} color={catColor} /></div>

@@ -363,12 +363,18 @@ export function freshClaims(): Record<Category, number | null> {
   return { LOGIC: null, MEMORY: null, COMPUTE: null, ANALYZE: null, IDENTIFY: null };
 }
 
+/** The categories `player`'s spin can land on: every one they do not hold (all five once they hold them all). POLISH-2: the
+ *  spinner's lines read this too, so a line never names a category the wheel cannot land on. */
+export function wheelPool(claims: Record<Category, number | null>, player: number): Category[] {
+  const open = CATEGORIES.filter((c) => claims[c] !== player);
+  return open.length ? open : [...CATEGORIES];
+}
+
 /** Spin: the wheel prefers categories the spinner has not claimed; with every category claimed by someone it may land
  *  anywhere (a duel then contests the holder's claim). Returns the category, the wheel's landing angle in turns from a
  *  wheel at REST (0), and the whole turns alone — which is what a wheel that is already turned needs (`wheelLanding`). */
 export function spinWheel(rnd: () => number, claims: Record<Category, number | null>, player: number): { category: Category; turns: number; fullTurns: number } {
-  const open = CATEGORIES.filter((c) => claims[c] !== player);
-  const pool = open.length ? open : [...CATEGORIES];
+  const pool = wheelPool(claims, player);
   const category = pick(rnd, pool);
   const idx = CATEGORIES.indexOf(category);
   const fullTurns = 3 + Math.floor(rnd() * 3);                         // three to five full spins…
