@@ -562,6 +562,37 @@ describe('StudioLibrary — on studioStore.ts (the real StudioStore over its Mem
     expect(l.list()).toHaveLength(19);
   });
 
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25; P4 deferred it to P5): delete went through a raw kv.delete, ahead of a put of the
+  // same key still queued — the compat publish() copies its audio in the background, so a delete right after it left the
+  // audio behind (an orphan the sweep never takes: library/ keys are not the room's).
+  it('publish (the compat path: its audio copied in the background) then DELETE at once — the audio is gone once both settle', async () => {
+    const studio = new StudioStore(durableKv());
+    const storage = new FakeStorage(QUOTA_5MB);
+    const l = lib(storage, libraryStoreOver(async () => studio));
+    const rec = l.publish({ ...draft(3), mixdownDataUrl: await blobToDataUrl(wav(40_000, 3)) });
+    const removed = l.remove(rec.id);                              // no await between: the put is still on its way
+    expect((await removed).ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await studio.getAudio(audioKeyFor(rec.id))).toBeNull();
+    expect((await studio.kv.keys('audio')).filter((k) => k.startsWith('library/'))).toEqual([]);
+  });
+
+  it('the adapter deletes through the store\'s queued deleteAudio, never a raw kv.delete', async () => {
+    const calls: string[] = [];
+    const fake = {
+      persistent: true,
+      getAudio: async () => null,
+      putAudio: async (k: string) => { await new Promise((r) => setTimeout(r, 5)); calls.push(`put ${k}`); },
+      deleteAudio: async (k: string) => { calls.push(`delete ${k}`); },
+      kv: { keys: async () => [] as string[] },
+    };
+    const store = libraryStoreOver(async () => fake);
+    const put = store.put('library/a', wav(100));
+    const del = store.delete('library/a');
+    await Promise.all([put, del]);
+    expect(calls).toEqual(['put library/a', 'delete library/a']);   // in the order they were called
+  });
+
   it('the memory fallback is reported as not persistent: published for this visit, and no migration', async () => {
     const studio = new StudioStore(new MemoryKv(), 'IndexedDB is not available here');
     const storage = new FakeStorage(QUOTA_5MB);

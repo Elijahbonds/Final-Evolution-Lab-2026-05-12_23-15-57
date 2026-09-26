@@ -77,6 +77,26 @@ export function syncWalletBalances(balances: { coins: number; shards: number }):
 
 /** Fire-and-forget earn report. Resolves to true on 2xx, false otherwise. */
 export async function reportEarn(report: EarnReport): Promise<boolean> {
+  return (await postEarn(report)) !== null;
+}
+
+/** What a report was paid: the server's grant, and whether a rate or daily cap cut it (a zero grant, or part of one). */
+export interface EarnGrant { coins: number; shards: number; capped: boolean }
+
+/**
+ * The same report, resolving to what the SERVER granted for it — null when the report failed or the server refused the event
+ * (it refuses with a 200 whose `rejected` names why: run_already_paid, session_not_won, replay_detected…), a zero grant on a 2xx
+ * whose body could not be read. A cap is not a refusal: it comes back `capped`, with the coins the cap left (often 0). For a
+ * results card that shows the coins a run paid (BRAINBRAWL-POLISH-2 N10: the end card showed XP, shards, credits and PRQ, and
+ * never the wallet coins that had just landed).
+ */
+export async function reportEarnGrant(report: EarnReport): Promise<EarnGrant | null> {
+  const r = await postEarn(report);
+  return r && !r.rejected ? { ...r.granted, capped: r.capped } : null;
+}
+
+/** One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws. */
+async function postEarn(report: EarnReport): Promise<{ granted: { coins: number; shards: number }; capped: boolean; rejected: string | null } | null> {
   try {
     const res = await fetch('/api/v1/wallet/earn', {
       method: 'POST',
@@ -84,14 +104,17 @@ export async function reportEarn(report: EarnReport): Promise<boolean> {
       body: JSON.stringify(report),
       keepalive: true,
     });
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     // Best-effort: broadcast the grant so the HUD can react. Never throw.
+    const out = { granted: { coins: 0, shards: 0 }, capped: false, rejected: null as string | null };
     try {
       const data = await res.json();
-      const granted = {
+      out.granted = {
         coins: Number(data?.granted?.coins ?? 0),
         shards: Number(data?.granted?.shards ?? 0),
       };
+      out.capped = !!data?.capped;
+      out.rejected = typeof data?.rejected === 'string' && data.rejected ? data.rejected : null;
       const balances = {
         coins: Number(data?.balances?.coins ?? 0),
         shards: Number(data?.balances?.shards ?? 0),
@@ -100,15 +123,15 @@ export async function reportEarn(report: EarnReport): Promise<boolean> {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent<WalletEarnDetail>(WALLET_EARN_EVENT, {
-            detail: { granted, balances, capped: !!data?.capped },
+            detail: { granted: out.granted, balances, capped: out.capped },
           }),
         );
       }
     } catch {
       /* response body optional — a bare 2xx is still a success */
     }
-    return true;
+    return out;
   } catch {
-    return false; // Never surface a wallet failure into the game loop.
+    return null; // Never surface a wallet failure into the game loop.
   }
 }

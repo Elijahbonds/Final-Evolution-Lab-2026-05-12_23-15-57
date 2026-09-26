@@ -11,12 +11,28 @@
 //
 // Used by scripts/music/baseline-sim.ts (the P1 baseline numbers) and lib/babylon/music/AudioEngine.baseline.test.ts.
 // NEVER imported by the app: nothing here makes a sound, and installing it replaces globals.
+//
+// MUSIC-SUITE P4 (2026-09-25): the mixer graph (mixGraph.ts) is tested on this too, so the fake now REMEMBERS the graph
+// (additive — every earlier caller sees the same behaviour): each node has a `kind` and the `outputs` it was connected
+// to (disconnect() forgets them), the node types the graph adds exist (delay, convolver, analyser, wave shaper, channel
+// splitter), and a source's start() logs its offset, duration, playbackRate, buffer and the source itself, and its
+// stop() logs when (`stops`) — so a test can walk a hit from its source to the speakers, and see a take cut on STOP.
 
 /** One buffer-source (or oscillator) start(): when, on its context's clock, the sound would have begun. */
 export interface FakeStart {
   at: number;
   kind: 'buffer' | 'osc';
+  /** MUSIC-SUITE P4: start(at, offset, duration)'s other two arguments (undefined when not given). */
+  offset?: number;
+  duration?: number;
+  /** MUSIC-SUITE P4: the source's playbackRate when it started (a pitched note plays at 2^((note − root) / 12)). */
+  rate?: number;
+  /** MUSIC-SUITE P4: the buffer it played, and the source node (walk its `outputs` to see where it went). */
+  buffer?: unknown;
+  src?: FakeScheduledSource;
 }
+/** MUSIC-SUITE P4: one stop() on a source — when it was told to stop, on its context's clock. */
+export interface FakeStop { at: number; src: FakeScheduledSource }
 
 export class FakeAudioParam {
   constructor(public value = 0) {}
@@ -28,9 +44,18 @@ export class FakeAudioParam {
 }
 
 export class FakeNode {
+  /** MUSIC-SUITE P4: where this node was connected (in order); nothing is routed, the list is only read by tests. */
+  readonly outputs: object[] = [];
+  /** MUSIC-SUITE P4: what kind of node this is ('gain', 'panner', 'compressor', 'analyser', 'destination', …). */
+  constructor(readonly kind: string = 'node') {}
   /** Returns its argument, so the engines' `a.connect(b).connect(c)` chains run. Nothing is routed. */
-  connect<T>(dest: T): T { return dest; }
-  disconnect(): void { /* nothing is routed */ }
+  connect<T>(dest: T): T { this.outputs.push(dest as object); return dest; }
+  /** Forget every output (or just `dest`). */
+  disconnect(dest?: unknown): void {
+    if (dest === undefined) { this.outputs.length = 0; return; }
+    const i = this.outputs.indexOf(dest as object);
+    if (i >= 0) this.outputs.splice(i, 1);
+  }
 }
 
 /** A silent buffer of the requested shape. Channel data is allocated on first read (encodeWav reads it). */
@@ -52,38 +77,64 @@ export class FakeScheduledSource extends FakeNode {
   readonly frequency = new FakeAudioParam(440);
   readonly detune = new FakeAudioParam(0);
   onended: (() => void) | null = null;
-  constructor(private readonly log: FakeStart[], private readonly kind: FakeStart['kind']) { super(); }
-  start(at = 0): void { this.log.push({ at, kind: this.kind }); }
-  stop(_at?: number): void { /* silent */ }
+  /** MUSIC-SUITE P4: when stop() was last called with (null = never). */
+  stoppedAt: number | null = null;
+  constructor(private readonly log: FakeStart[], private readonly sourceKind: FakeStart['kind'], private readonly stopLog: FakeStop[] = []) { super(sourceKind); }
+  start(at = 0, offset?: number, duration?: number): void {
+    this.log.push({ at, kind: this.sourceKind, offset, duration, rate: this.playbackRate.value, buffer: this.buffer, src: this });
+  }
+  stop(at = 0): void { this.stoppedAt = at; this.stopLog.push({ at, src: this }); }
 }
 
 export class FakeBaseAudioContext {
   currentTime = 0;
   sampleRate = 44100;
   state: 'running' | 'suspended' | 'closed' = 'running';
-  readonly destination = new FakeNode();
+  readonly destination = new FakeNode('destination');
   /** Every start(), in call order. For a sequencer this is its schedule: what would have sounded, and when. */
   readonly starts: FakeStart[] = [];
+  /** MUSIC-SUITE P4: every stop() on a source made here, in call order. */
+  readonly stops: FakeStop[] = [];
 
   createGain(): FakeNode & { gain: FakeAudioParam } {
-    return Object.assign(new FakeNode(), { gain: new FakeAudioParam(1) });
+    return Object.assign(new FakeNode('gain'), { gain: new FakeAudioParam(1) });
   }
   createStereoPanner(): FakeNode & { pan: FakeAudioParam } {
-    return Object.assign(new FakeNode(), { pan: new FakeAudioParam(0) });
+    return Object.assign(new FakeNode('panner'), { pan: new FakeAudioParam(0) });
   }
   createBiquadFilter(): FakeNode & { type: string; frequency: FakeAudioParam; Q: FakeAudioParam; gain: FakeAudioParam } {
-    return Object.assign(new FakeNode(), {
+    return Object.assign(new FakeNode('biquad'), {
       type: 'lowpass', frequency: new FakeAudioParam(350), Q: new FakeAudioParam(1), gain: new FakeAudioParam(0),
     });
   }
-  createDynamicsCompressor(): FakeNode & Record<'threshold' | 'knee' | 'ratio' | 'attack' | 'release', FakeAudioParam> {
-    return Object.assign(new FakeNode(), {
+  createDynamicsCompressor(): FakeNode & Record<'threshold' | 'knee' | 'ratio' | 'attack' | 'release', FakeAudioParam> & { reduction: number } {
+    return Object.assign(new FakeNode('compressor'), {
       threshold: new FakeAudioParam(-24), knee: new FakeAudioParam(30), ratio: new FakeAudioParam(12),
-      attack: new FakeAudioParam(0.003), release: new FakeAudioParam(0.25),
+      attack: new FakeAudioParam(0.003), release: new FakeAudioParam(0.25), reduction: 0,
     });
   }
-  createBufferSource(): FakeScheduledSource { return new FakeScheduledSource(this.starts, 'buffer'); }
-  createOscillator(): FakeScheduledSource { return new FakeScheduledSource(this.starts, 'osc'); }
+  /** MUSIC-SUITE P4: the node types the mixer graph adds. */
+  createDelay(_max = 1): FakeNode & { delayTime: FakeAudioParam } {
+    return Object.assign(new FakeNode('delay'), { delayTime: new FakeAudioParam(0) });
+  }
+  createConvolver(): FakeNode & { buffer: unknown; normalize: boolean } {
+    return Object.assign(new FakeNode('convolver'), { buffer: null as unknown, normalize: true });
+  }
+  createWaveShaper(): FakeNode & { curve: Float32Array | null; oversample: string } {
+    return Object.assign(new FakeNode('shaper'), { curve: null as Float32Array | null, oversample: 'none' });
+  }
+  createChannelSplitter(outputs = 6): FakeNode & { numberOfOutputs: number } {
+    return Object.assign(new FakeNode('splitter'), { numberOfOutputs: outputs });
+  }
+  /** A meter that always reads silence (nothing is rendered here). */
+  createAnalyser(): FakeNode & { fftSize: number; smoothingTimeConstant: number; getFloatTimeDomainData(a: Float32Array): void } {
+    return Object.assign(new FakeNode('analyser'), {
+      fftSize: 2048, smoothingTimeConstant: 0.8,
+      getFloatTimeDomainData(a: Float32Array): void { a.fill(0); },
+    });
+  }
+  createBufferSource(): FakeScheduledSource { return new FakeScheduledSource(this.starts, 'buffer', this.stops); }
+  createOscillator(): FakeScheduledSource { return new FakeScheduledSource(this.starts, 'osc', this.stops); }
   createBuffer(channels: number, length: number, sampleRate: number): FakeAudioBuffer {
     return new FakeAudioBuffer(channels, length, sampleRate);
   }
@@ -96,7 +147,14 @@ export class FakeBaseAudioContext {
   async close(): Promise<void> { this.state = 'closed'; }
 }
 
-export class FakeAudioContext extends FakeBaseAudioContext {}
+/**
+ * MUSIC-SUITE P4 FIX PASS (2026-09-25): the live context's rate is the DEVICE's (48 000 on most phones and the booth
+ * proof), so a test can set it (installFakeWebAudio({ sampleRate })) — renders must follow it (AudioEngine.renderRate).
+ */
+export class FakeAudioContext extends FakeBaseAudioContext {
+  static rate = 44100;
+  constructor() { super(); this.sampleRate = FakeAudioContext.rate; }
+}
 
 export class FakeOfflineAudioContext extends FakeBaseAudioContext {
   constructor(public readonly numberOfChannels: number, public readonly length: number, sampleRate: number) {
@@ -154,7 +212,7 @@ const FAKE_ID_BASE = 7_000_000;   // far above node's own timer ids, so clearInt
  * Install the fakes on globalThis: AudioContext, OfflineAudioContext, window (setInterval / clearInterval /
  * localStorage) and localStorage. clearInterval is wrapped so a fake id is removed and anything else reaches node's own.
  */
-export function installFakeWebAudio(opts: { quotaChars?: number } = {}): FakeWebAudio {
+export function installFakeWebAudio(opts: { quotaChars?: number; sampleRate?: number } = {}): FakeWebAudio {
   const g = globalThis as unknown as Record<string, unknown>;
   // Descriptors, not values: node 22+ defines its own `localStorage` accessor on globalThis (it warns when read without
   // --localstorage-file), so the original is saved and restored as a property, never read.
@@ -172,6 +230,7 @@ export function installFakeWebAudio(opts: { quotaChars?: number } = {}): FakeWeb
   };
   const storage = new FakeStorage(opts.quotaChars);
   FakeOfflineAudioContext.created = [];
+  FakeAudioContext.rate = opts.sampleRate ?? 44100;
   put('AudioContext', FakeAudioContext);
   put('OfflineAudioContext', FakeOfflineAudioContext);
   put('localStorage', storage);
@@ -189,6 +248,7 @@ export function installFakeWebAudio(opts: { quotaChars?: number } = {}): FakeWeb
     tick(): void { for (const { fn } of [...intervals.values()]) fn(); },
     uninstall(): void {
       intervals.clear();
+      FakeAudioContext.rate = 44100;
       for (const [k, d] of saved) {
         if (d) Object.defineProperty(globalThis, k, d);
         else delete g[k];

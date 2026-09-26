@@ -3,9 +3,9 @@
 // Twenty hosts drew their own "PAUSED — TAP TO RESUME" (BACKLOG B16), and one (who-scene-it) drew none. Step 4a draws
 // it once — PausedLayer, rendered by BootSplash on 'paused' and mounted by the one host without a splash — and this
 // pins that it STAYS once:
-//   the headline is drawn in one file, and the layer is rendered by two (BootSplash, who-scene-it). Brain Brawl keeps
-//   its copy until step 5 (the Brain Brawl session owns that file), and BootSplash draws nothing for it on 'paused'
-//   until then: two layers stacked doubled the headline (the step-4a review), so the two go together;
+//   the headline is drawn in one file, and the layer is rendered by two (BootSplash, who-scene-it). Brain Brawl kept
+//   its copy until step 5 (2026-09-26), with BootSplash drawing nothing for it on 'paused' — two layers stacked doubled
+//   the headline (the step-4a review) — and the two went together: no copy, and the shared layer for Brain Brawl too;
 //   every host that runs a mode shows the layer, and the layer's tap is that host's own START (the harness's paused
 //   branch resumes on it) — the splash rendered ALWAYS, with the host's own phase: a splash behind a condition, or
 //   handed a phase that is never 'paused', loses the pause with it (the review's M2 and M7);
@@ -46,8 +46,8 @@ const read = (rel: string): string => stripComments(fs.readFileSync(path.join(RO
 /** The old copy's classes, verbatim: the layer must stack exactly where the twenty copies did. */
 const OLD_COPY_CLASSES = 'absolute inset-0 flex items-center justify-center bg-black/60';
 const GAMES = path.join('components', 'games');
-/** Until step 5 (after the Brain Brawl session commits): the one host allowed to keep its own copy. */
-const ALLOWED_COPY = path.join(GAMES, 'brainbrawl-babylon.tsx');
+/** Brain Brawl: the last host with its own copy, deleted in step 5 (2026-09-26). */
+const BRAINBRAWL = path.join(GAMES, 'brainbrawl-babylon.tsx');
 
 /** The game hosts: every components/games file that runs a mode (the dev runner under app/ prints its phase instead). */
 const hosts = (): string[] =>
@@ -107,20 +107,24 @@ const splash = (phase: SplashProps['phase']): string => renderToStaticMarkup(cre
 const card = (phase: SplashProps['phase'], modeId = 'dunk'): string => renderToStaticMarkup(createElement(SplashCard, splashProps(phase, modeId)));
 
 describe('one paused layer (plan step 4a)', () => {
-  it('"TAP TO RESUME" is drawn in one file, and the layer rendered by two (brainbrawl allow-listed until step 5)', () => {
+  it('"TAP TO RESUME" is drawn in one file, and the layer rendered by two (Brain Brawl\'s copy gone in step 5)', () => {
     expect(PAUSED_HEADLINE).toBe('PAUSED — TAP TO RESUME');   // the pinned text (Z8; scripts/probes/_miss-retry.mts reads it)
     const files = sourceFiles(ROOT, ['components', 'app', 'lib'], fs, path);
     const drawers = files.filter((f) => read(f).includes('TAP TO RESUME')).sort();
-    // exact, so the allow-list cannot go stale: step 5 deletes brainbrawl's copy and this entry with it
-    expect(drawers).toEqual([ALLOWED_COPY, path.join(GAMES, 'paused-layer.tsx')]);
+    // exact: step 5 deleted Brain Brawl's copy, the last one, and the allow-list with it
+    expect(drawers).toEqual([path.join(GAMES, 'paused-layer.tsx')]);
     // nor a copy that borrows the headline (the review: `{PAUSED_HEADLINE}` in a host passed the text scan)…
     expect(files.filter((f) => /\bPAUSED_HEADLINE\b/.test(read(f)))).toEqual([path.join(GAMES, 'paused-layer.tsx')]);
     // …nor a second layer beside the splash's own (a double dim): BootSplash renders it, and the host without a splash
     expect(files.filter((f) => /<PausedLayer\b/.test(read(f))).sort()).toEqual([path.join(GAMES, 'boot-splash.tsx'), path.join(GAMES, 'who-scene-it-babylon.tsx')]);
-    // Brain Brawl: BootSplash draws nothing on its pause exactly while it draws its own copy. Step 5 deletes both
-    // together — one without the other is a Brain Brawl with two pauses stacked, or with none
-    const ownCopy = read(ALLOWED_COPY).includes('TAP TO RESUME');
-    expect(returned(SplashCard, splashProps('paused', 'brainbrawl')) === null, 'BootSplash skips brainbrawl\'s pause').toBe(ownCopy);
+    // Brain Brawl: no copy of its own, so BootSplash draws its pause like every host's — one without the other is a
+    // Brain Brawl with two pauses stacked, or with none (step 5 deleted the two together)
+    expect(read(BRAINBRAWL)).not.toMatch(/phase === 'paused' &&/);
+    const onStart = (): void => {};
+    const bb = returned(SplashCard, splashProps('paused', 'brainbrawl', onStart));
+    expect(bb?.type, 'BootSplash draws Brain Brawl\'s pause').toBe(PausedLayer);
+    expect((bb?.props as { onResume?: unknown }).onResume).toBe(onStart);
+    expect(read(path.join(GAMES, 'boot-splash.tsx'))).not.toContain("'brainbrawl'");
   });
 
   it('every host that runs a mode shows the layer — its splash always rendered, with its own phase — and its tap is the host\'s START', () => {

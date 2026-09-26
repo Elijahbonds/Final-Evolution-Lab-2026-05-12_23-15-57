@@ -43,6 +43,18 @@
 //   * THE FALLBACK IS RETRIED. A timeout or a transient refusal fell back to memory for the page, and a later load that
 //     got IndexedDB never read the memory mode's rescue (it sat in sessionStorage). The next mount tries IndexedDB again
 //     and brings the memory store's work into it; restore reads every rescue slot.
+//
+// MUSIC-SUITE P4 (2026-09-25) — the two items P3 carried (outbox musicsuite/p3/REPORT.md, "carry into P4"; the library
+// lane asked for both):
+//   * deleteAudio(key) GOES THROUGH THE WRITE QUEUE. The library deleted a song's bytes with a raw `kv.delete('audio', key)`
+//     (StudioLibrary.ts libraryStoreOver, "assumption: fine outside its write queue") — which runs at once, ahead of any
+//     write still queued: a put of the same key issued before the delete landed AFTER it, and the deleted audio came back
+//     (studioStore.test.ts shows it on the memory table). The store now has the queued delete; the library should call it.
+//   * A DATABASE WITHOUT ITS TABLES IS REPAIRED. openIdb opened 'fel-studio' at version 1 and created the tables only in
+//     onupgradeneeded — so a database that already existed at version 1 WITHOUT them (a probe's bare `indexedDB.open
+//     ('fel-studio')` makes exactly that) opened "fine", every transaction then threw NotFoundError, and the room fell back
+//     to nothing it could name. It now opens at whatever version is there, checks the tables, and when any is missing
+//     reopens one version up so the upgrade creates them (once; a second miss is a refusal the room names).
 import {
   STUDIO_PROJECT_VERSION, duplicateProject, migrateProject, newProject, projectAudioKeys, projectSignature, refusalLine, repairLine,
   type AudioRef, type StudioProject,
@@ -50,6 +62,7 @@ import {
 import type { KitId } from './SynthKit';
 
 export const STUDIO_DB = 'fel-studio';
+/** The version a NEW database is created at. MUSIC-SUITE P4: an existing one is opened at its own version (openIdb). */
 export const STUDIO_DB_VERSION = 1;
 export type Table = 'projects' | 'audio' | 'meta';
 export const STUDIO_TABLES: readonly Table[] = ['projects', 'audio', 'meta'];
@@ -133,27 +146,47 @@ export class IdbKv implements KvBackend {
   delete(table: Table, key: string): Promise<void> { return this.run<unknown>(table, 'readwrite', (s) => s.delete(key)).then(() => undefined); }
 }
 
-/** Open (and on first run create) the database. Rejects when there is no IndexedDB, it throws, refuses, or never answers. */
+/** The tables a database lacks (MUSIC-SUITE P4: a bare 'fel-studio' made by something other than openIdb has none). */
+export function missingTables(db: Pick<IDBDatabase, 'objectStoreNames'>): Table[] {
+  return STUDIO_TABLES.filter((t) => !db.objectStoreNames.contains(t));
+}
+
+/**
+ * Open (and on first run create) the database. Rejects when there is no IndexedDB, it throws, refuses, or never answers.
+ * MUSIC-SUITE P4: opened at the version it has (a new one is created at STUDIO_DB_VERSION); when a table is missing it is
+ * reopened one version up and the upgrade creates what is missing — once (a database still short of a table after that
+ * is refused, and the room says why).
+ */
 export function openIdb(factory: IDBFactory | null | undefined, timeoutMs = IDB_OPEN_TIMEOUT_MS): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (!factory) { reject(new Error('IndexedDB is not available here')); return; }
     let settled = false;
     const finish = (fn: () => void): void => { if (settled) return; settled = true; clearTimeout(timer); fn(); };
     const timer = setTimeout(() => finish(() => reject(new Error('IndexedDB did not open in time'))), timeoutMs);
-    let req: IDBOpenDBRequest;
-    try { req = factory.open(STUDIO_DB, STUDIO_DB_VERSION); } catch (e) { finish(() => reject(e)); return; }
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      for (const t of STUDIO_TABLES) if (!db.objectStoreNames.contains(t)) db.createObjectStore(t);
+    const attempt = (version: number | null): void => {
+      let req: IDBOpenDBRequest;
+      try { req = version === null ? factory.open(STUDIO_DB) : factory.open(STUDIO_DB, version); } catch (e) { finish(() => reject(e)); return; }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        for (const t of STUDIO_TABLES) if (!db.objectStoreNames.contains(t)) db.createObjectStore(t);
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        if (settled) { db.close(); return; }   // answered after the timeout: the room already runs on memory
+        const missing = missingTables(db);
+        if (missing.length) {
+          db.close();
+          if (version !== null) { finish(() => reject(new Error(`the studio's device storage is missing its ${missing.join(', ')} table${missing.length === 1 ? '' : 's'}`))); return; }
+          attempt(db.version + 1);   // MUSIC-SUITE P4: a bare database — one version up, and the upgrade makes the tables
+          return;
+        }
+        // another tab upgrading the schema: let it, and open again next time the room mounts
+        db.onversionchange = () => { db.close(); sharedStore = null; };
+        finish(() => resolve(db));
+      };
+      req.onerror = () => finish(() => reject(req.error ?? new Error('IndexedDB refused to open')));
     };
-    req.onsuccess = () => {
-      const db = req.result;
-      if (settled) { db.close(); return; }   // answered after the timeout: the room already runs on memory
-      // another tab upgrading the schema: let it, and open again next time the room mounts
-      db.onversionchange = () => { db.close(); sharedStore = null; };
-      finish(() => resolve(db));
-    };
-    req.onerror = () => finish(() => reject(req.error ?? new Error('IndexedDB refused to open')));
+    attempt(null);
   });
 }
 
@@ -309,6 +342,11 @@ export class StudioStore {
     const rec: AudioRecord = { data, mime, bytes: data.byteLength };
     return this.write(() => this.kv.put('audio', key, rec));
   }
+  /**
+   * MUSIC-SUITE P4: delete one audio record IN ORDER with every write issued before it (a raw kv.delete ran at once, so a
+   * put of the same key still queued landed after it and the "deleted" audio came back). What the library's DELETE uses.
+   */
+  deleteAudio(key: string): Promise<void> { return this.write(() => this.kv.delete('audio', key)); }
   async getAudio(key: string): Promise<AudioRecord | null> {
     await this.settled();
     const v = await this.kv.get('audio', key);

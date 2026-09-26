@@ -115,12 +115,13 @@ async function buildPattern(p: Page): Promise<void> {
   await p.waitForTimeout(150);
 }
 const btn = (p: Page, name: string) => p.getByRole('button', { name, exact: true }).first();
-/** The room's toast lines (StudioMode S.toast: a sticky div at the bottom of the view, cleared after 2.2 s). */
-const toastsNow = (p: Page) => p.evaluate(() => [...document.querySelectorAll('div')].filter((d) => d.style.position === 'sticky').map((d) => d.textContent ?? '').filter(Boolean));
+/** The room's toast lines (StudioMode S.toast, cleared after 2.2 s — MUSIC-SUITE P4: fixed, [data-qa="toast"]) and the lasting library line. */
+// MUSIC-SUITE P4 (grid-ui): [data-qa="toast"] (fixed now, clear of the grid) and the lasting [data-qa="library-line"]
+const toastsNow = (p: Page) => p.evaluate(() => [...document.querySelectorAll('[data-qa="toast"], [data-qa="library-line"] > span')].map((d) => d.textContent ?? '').map((t) => t.replace(/^LIBRARY: /, '')).filter(Boolean));
 /** MUSIC-SUITE P3: a frame taken while a toast is up shows the toast over whatever sits at the bottom of the view (the
  *  dance-export button, a library card's delete question) — wait it out (≤ 3 s) so the frame shows the control itself. */
 async function toastGone(p: Page): Promise<void> {
-  await p.waitForFunction(() => ![...document.querySelectorAll('div')].some((d) => d.style.position === 'sticky' && (d.textContent ?? '') !== ''), undefined, { timeout: 3000 }).catch(() => undefined);
+  await p.waitForFunction(() => !document.querySelector('[data-qa="toast"]'), undefined, { timeout: 3000 }).catch(() => undefined);
 }
 /** MUSIC-SUITE P2 (2026-09-25): a spend opens the inline confirm; note it (and any spend before the yes), then BUY. */
 async function confirmThenYes(p: Page, spendsBefore: number): Promise<{ confirmShown: boolean; spentBeforeYes: number; text: string | null }> {
@@ -645,7 +646,7 @@ async function mainRun(browser: Browser): Promise<void> {
     const toasts: string[] = [];
     const w0 = Date.now();
     while (Date.now() - w0 < 20000) {
-      const t = await p.evaluate(() => [...document.querySelectorAll('div')].filter((d) => d.style.position === 'sticky').map((d) => d.textContent ?? ''));
+      const t = await toastsNow(p);   // MUSIC-SUITE P4: the toast + the lasting library line
       for (const s of t) if (s && !toasts.includes(s)) toasts.push(s);
       const busy = await p.getByRole('button', { name: 'RENDERING…' }).count();
       if (!busy && Date.now() - w0 > 400) break;
@@ -664,7 +665,7 @@ async function mainRun(browser: Browser): Promise<void> {
   }
   const okN = pubs.filter((r) => r.libraryAfter > r.libraryBefore).length;
   R.publishUntilFailure = { attempts: pubs, succeeded: okN, failedAt: pubs.find((r) => r.libraryAfter <= r.libraryBefore)?.attempt ?? null,
-    how: 'title filled, PUBLISH TO LIBRARY clicked, waited for RENDERING… to clear; library = the P3 index fel_studio_library_v2 .tracks.length; audio = IndexedDB fel-studio/audio library/* keys; toasts = the sticky toast div\'s text while waiting; up to 20, stops at the first publish that did not grow the library' };
+    how: 'title filled, PUBLISH TO LIBRARY clicked, waited for RENDERING… to clear; library = the P3 index fel_studio_library_v2 .tracks.length; audio = IndexedDB fel-studio/audio library/* keys; toasts = the toast + library line text while waiting; up to 20, stops at the first publish that did not grow the library' };
   check('20 publishes in a row succeed (P1: the 4th failed with no message)', okN === 20 && pubs.every((r) => r.newPageErrors.length === 0 && r.titleFieldAfter === ''), { succeeded: okN, failedAt: R.publishUntilFailure.failedAt, lastAudioKeys: pubs[pubs.length - 1]?.audioKeysAfter, lastLsChars: pubs[pubs.length - 1]?.localStorageCharsAfter }, '20, no page errors, title cleared each time');
 
   await btn(p, 'LIBRARY').click();
@@ -684,7 +685,7 @@ async function mainRun(browser: Browser): Promise<void> {
   const delToasts: string[] = [];
   const w1 = Date.now();
   while (Date.now() - w1 < 3000) {
-    const t = await p.evaluate(() => [...document.querySelectorAll('div')].filter((d) => d.style.position === 'sticky').map((d) => d.textContent ?? ''));
+    const t = await toastsNow(p);   // MUSIC-SUITE P4: the toast + the lasting library line
     for (const s of t) if (s && !delToasts.includes(s)) delToasts.push(s);
     if ((await p.getByRole('button', { name: 'YES, DELETE' }).count()) === 0 && Date.now() - w1 > 400) break;
     await p.waitForTimeout(100);

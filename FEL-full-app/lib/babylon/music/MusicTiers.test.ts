@@ -226,9 +226,10 @@ describe('the pattern gate does what its words say ("Play a pattern with at leas
 describe('the tier chips say what each tier opens and what unlocks the next', () => {
   it('what each tier opens is derived from its flags (the dance floor at the GRID; takes + stems at the STUDIO)', () => {
     // MUSIC-SUITE P3 FIX PASS: kit rows are counted as kit rows — the grid also draws every Flip row, at every tier
-    expect(tierOpens('grid')).toBe('4 kit rows + your Flip rows · send it to the dance floor');
+    // MUSIC-SUITE P4 FIX PASS (decision #4): mute / solo from the first tier; the rest of the desk with the render
+    expect(tierOpens('grid')).toBe('4 kit rows + your Flip rows · mute / solo · send it to the dance floor');
     expect(tierOpens('chain')).toBe('6 kit rows (+2) · sections, the chain and song mode');
-    expect(tierOpens('studio')).toBe('8 kit rows (+2) · record takes over it · render the song + stems');
+    expect(tierOpens('studio')).toBe('8 kit rows (+2) · record takes over it · the mixer\'s faders, pan, room + delay · render the song + stems');
     expect(TIERS.grid.blurb).toMatch(/four kit sounds — plus every pad you send from the FLIP/);
     for (const t of MUSIC_TIERS) {
       // every flag a tier turns on is named on its chip or a lower one — a chip never omits a gate, never invents one

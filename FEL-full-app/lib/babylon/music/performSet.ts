@@ -202,13 +202,21 @@ export const PERFORM_MAX_OUTPUT_LATENCY_S = 0.5;
  * (lib/feel/rhythm-calibrate.ts loadAudioOffsetMs, `savedOffsetMs`, null when never saved) wins: it was measured as tap
  * minus the click's audio-clock time on this device, so it already holds the output delay — outputLatency is NOT added
  * on top. With no calibration, the context's outputLatency, else its baseLatency, else 0.
+ *
+ * MUSIC-SUITE P4 FIX PASS (2026-09-25): + `graphLatencySec`, the Academy desk's own delay (AudioEngine.graphLatencySec: the
+ * P4 limiter's 6 ms look-ahead, 12 ms with MASTER). P2 had no compressor in the default path; P4's limiter is always in it,
+ * so every note reaches the speakers 6–12 ms after its audio-clock time — on BOTH paths: the device's figures don't know
+ * the desk, and a saved calibration was measured on /play/calibrate's clicks (osc → destination, no compressor) — and
+ * CHECK MY TIMING now saves its reading without the desk's delay too (StudioMode), so a calibration means one thing
+ * everywhere. Without this every player was judged 6–12 ms late. Absent = 0 (the P2 rule, for a room with no desk).
  */
-export function performLatencySec(src: { savedOffsetMs: number | null; outputLatency?: number | null; baseLatency?: number | null }): number {
-  if (src.savedOffsetMs !== null && Number.isFinite(src.savedOffsetMs)) return src.savedOffsetMs / 1000;
+export function performLatencySec(src: { savedOffsetMs: number | null; outputLatency?: number | null; baseLatency?: number | null; graphLatencySec?: number | null }): number {
+  const graph = typeof src.graphLatencySec === 'number' && Number.isFinite(src.graphLatencySec) && src.graphLatencySec > 0 ? src.graphLatencySec : 0;
+  if (src.savedOffsetMs !== null && Number.isFinite(src.savedOffsetMs)) return src.savedOffsetMs / 1000 + graph;
   for (const v of [src.outputLatency, src.baseLatency]) {
-    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return Math.min(v, PERFORM_MAX_OUTPUT_LATENCY_S);
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return Math.min(v, PERFORM_MAX_OUTPUT_LATENCY_S) + graph;
   }
-  return 0;
+  return graph;
 }
 
 // ── input ────────────────────────────────────────────────────────────────────────────────────────────────────────

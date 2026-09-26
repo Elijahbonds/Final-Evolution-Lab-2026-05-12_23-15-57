@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   COALESCE_MS, EditHistory, UNDO_LIMIT, applyFoundation, cellFoundation, chainUses, changedFlipRows, chopSignature, cleanSectionName, clearGrid,
-  deleteSection, foundationPreview, gridHitCount, historyAudioKeys, moveChainEntry, playbackSource, publishRender, publishTracks,
-  publishedAudioKeys, publishedHasUpload, remixSeed, removedFlipRows, renameSection, sameSlice, sectionForBar, shownSection, sliceChanges,
+  deleteSection, flipSoundMap, foundationPreview, gridHitCount, historyAudioKeys, moveChainEntry, playbackSource, publishRender, publishTracks,
+  publishedAudioKeys, publishedHasUpload, remixSeed, removedFlipRows, renameSection, sameSlice, sectionForBar, shownSection, sliceChanges, songBarSounds, songChops,
   toggleStep, undoSlice, updateSectionFromGrid, type UndoSlice,
 } from './studioEdit';
 import { emptyFlip, emptyKitTracks, migrateProject, newProject, projectFromSeed, withFlipHit, withFlipRow, type ProjectFlipRow, type ProjectSection, type StudioProject } from './StudioProject';
@@ -64,7 +64,8 @@ describe('UNDO / REDO — the Academy had neither (one stray tap and the pattern
   it('the project slice it keeps is the grid, the Flip rows, the sections, the chain — and (P3 FIX PASS) the takes, the FLIP tab, tempo, swing, kit and MASTER — compared by content', () => {
     const p = newProject({ now: 1 });
     const s: UndoSlice = undoSlice(p);
-    expect(Object.keys(s).sort()).toEqual(['bpm', 'chain', 'flip', 'flipRows', 'kit', 'mixer', 'sections', 'swing', 'takes', 'tracks']);
+    // MUSIC-SUITE P4 (grid-ui): + the song's key — a key change moves the notes, so an undo must put both back
+    expect(Object.keys(s).sort()).toEqual(['bpm', 'chain', 'flip', 'flipRows', 'key', 'kit', 'mixer', 'sections', 'swing', 'takes', 'tracks']);
     expect(sameSlice(s, undoSlice(JSON.parse(JSON.stringify(p))))).toBe(true);
     expect(sameSlice(s, { ...s, tracks: lit(p.tracks, 'kick', [0]) })).toBe(false);
   });
@@ -213,6 +214,7 @@ describe('PUBLISH AND REMIX CARRY THE FLIP CHOPS (a remix\'s Flip rows were sile
     expect(out.tracks.find((t) => t.sampleId === 'lead')).toBeUndefined();   // hidden at the grid: not in the mixdown
     expect(out.tracks.find((t) => t.sampleId === 'flip_5')!.chop).toEqual({
       pad: 5, label: 'FLIP 6', source: own, slice: { start: 10, end: 20 }, reverse: true, pitch: -3, gate: false,
+      baked: true,   // MUSIC-SUITE P5 FIX PASS: a P5 chop is marked (remixSeed reads an unmarked P3 / P4 one as v2)
     });
     expect(out.silent).toEqual([]);
   });
@@ -263,7 +265,8 @@ describe('an undo that changes a Flip row\'s chop reloads that row\'s sound', ()
     const a = [flipRow(0), flipRow(1)];
     expect(changedFlipRows(a, a)).toEqual([]);
     const b = [flipRow(0, { slice: { start: 0, end: 50 } }), flipRow(1, { pitch: 5 }), flipRow(2)];
-    expect(changedFlipRows(a, b).map((r) => r.sampleId)).toEqual(['flip_0', 'flip_2']);   // pitch is not baked in yet (P5)
+    // MUSIC-SUITE P5 FIX PASS (2026-09-25): the pitch is baked into the row's buffer now, so a retuned row reloads too
+    expect(changedFlipRows(a, b).map((r) => r.sampleId)).toEqual(['flip_0', 'flip_1', 'flip_2']);
   });
 });
 
@@ -304,7 +307,7 @@ describe('the library keeps a published row\'s chop (StudioLibrary stores sequen
 // ── MUSIC-SUITE P3 FIX PASS (2026-09-25) ───────────────────────────────────────────────────────────────────────────────
 
 describe('undo covers what the review found could not be taken back (owner decision #4)', () => {
-  const take = (id: string, key: string) => ({ id, atBar: 1, gain: 0.9, durationSec: 4.2, audio: { key, mime: 'audio/webm', bytes: 9 } });
+  const take = (id: string, key: string) => ({ id, atBar: 1, gain: 0.9, durationSec: 4.2, audio: { key, mime: 'audio/webm', bytes: 9 }, bars: 2, loopBars: 4, trimStart: 0, trimEnd: 0, muted: false, pickedAt: 0 });   // MUSIC-SUITE P4: + the booth's fields
   /** What the room's `edit` does: record the state it replaces when the slice changes, then apply. */
   const editWith = (h: EditHistory<UndoSlice>, p: StudioProject, fn: (p: StudioProject) => StudioProject, group?: string, at = 0): StudioProject => {
     const next = fn(p);
@@ -416,12 +419,46 @@ describe('uploads are marked (owner decision #15: songs containing uploads stay 
 });
 
 describe('a Flip row\'s sound: what changes it, and what an undo removes', () => {
-  it('the rate is part of the cut; pitch and gate are not (not baked in until P5)', () => {
-    expect(chopSignature(flipRow(0))).toBe(chopSignature(flipRow(0, { pitch: 7, gate: false })));
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): P5 bakes pitch and gate into the row's buffer, so they are part of its sound
+  // (the room had patched the gap with chopEdit.retunedRows; one signature covers it now)
+  it('the rate is part of the cut; so are pitch and gate (baked since P5)', () => {
+    expect(chopSignature(flipRow(0))).not.toBe(chopSignature(flipRow(0, { pitch: 7 })));
+    expect(chopSignature(flipRow(0))).not.toBe(chopSignature(flipRow(0, { gate: false })));
+    expect(chopSignature(flipRow(0))).toBe(chopSignature(flipRow(0, { label: 'another name' })));
     expect(chopSignature(flipRow(0))).not.toBe(chopSignature(flipRow(0, { rate: 44100 })));
   });
   it('removedFlipRows names the rows an undo took away (their sound leaves the engine)', () => {
     expect(removedFlipRows([flipRow(0), flipRow(3)], [flipRow(3)])).toEqual(['flip_0']);
     expect(removedFlipRows([flipRow(0)], [flipRow(0)])).toEqual([]);
+  });
+});
+
+// MUSIC-SUITE P5 FIX PASS (2026-09-25): a render's Flip sounds are handed to it (AudioEngine RenderSounds) — PUBLISH the
+// working grid's chops, RENDER SONG / STEMS each bar's section's own — never what song mode swapped into the engine last.
+describe('what a render\'s Flip rows play', () => {
+  const grid = [flipRow(0), flipRow(1, { pitch: 3 })];
+  const tracksOf = (ids: string[]): TrackState[] => ids.map((sampleId) => ({ sampleId, pattern: new Array(16).fill(false), volume: 1, muted: false, pan: 0 }));
+  const sound = (r: ProjectFlipRow): string => `${r.sampleId}:${r.slice.start}:${r.pitch}`;
+
+  it('flipSoundMap: each Flip row the tracks hold → its chop\'s sound; no chop (or not decoded) = null, silent', () => {
+    const m = flipSoundMap(tracksOf(['kick', 'flip_0', 'flip_1', 'flip_7']), grid, sound);
+    expect([...m.entries()]).toEqual([['flip_0', 'flip_0:100:0'], ['flip_1', 'flip_1:100:3'], ['flip_7', null]]);
+    expect(flipSoundMap(tracksOf(['flip_0']), grid, () => null).get('flip_0')).toBeNull();
+  });
+
+  it('songBarSounds: bar by bar, the section\'s own chops, else the grid\'s — the chain looped out', () => {
+    const verse: ProjectSection = { ...section('v', 'verse', tracksOf(['flip_0', 'flip_1'])), chops: [flipRow(0, { slice: { start: 5000, end: 6000 } })] };
+    const hook = section('h', 'hook', tracksOf(['flip_0']));
+    const bars = songBarSounds([{ sectionId: 'v', bars: 2 }, { sectionId: 'h', bars: 1 }], [verse, hook], grid, 4, sound);
+    expect(bars.map((m) => m.get('flip_0'))).toEqual(['flip_0:5000:0', 'flip_0:5000:0', 'flip_0:100:0', 'flip_0:5000:0']);
+    expect(bars[0].get('flip_1')).toBe('flip_1:100:3');     // the verse has no own chop for row 2: the grid's
+    expect(bars[2].has('flip_1')).toBe(false);               // the hook does not hold row 2
+    expect(songBarSounds([], [], grid, 2, sound)).toEqual([new Map(), new Map()]);
+  });
+
+  it('songChops: every chop the song can play, once each (what the room bakes before a render)', () => {
+    const own = flipRow(0, { slice: { start: 5000, end: 6000 } });
+    const rows = songChops(grid, [{ chops: [own, flipRow(1, { pitch: 3 })] }, {}], sound);
+    expect(rows.map(sound)).toEqual(['flip_0:100:0', 'flip_1:100:3', 'flip_0:5000:0']);
   });
 });

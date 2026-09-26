@@ -117,11 +117,16 @@ describe('the endless ceiling (owner decision #14)', () => {
     expect(h.updates[0]).toMatchObject({ xp: { increment: 14_150 }, shards: { increment: 473 } });
   });
 
-  it('a set from today\'s client (no stats) is free play: capped — and, until the shell forwards stats, its room\'s win stands', async () => {
-    // MUSIC-SUITE P2 FIX PASS: this refused every honest win (the card said "set won", the recap paid none of it)
+  it('a set with no stats is free play: capped — and, now the shell forwards them, a claimed win with no counts is none', async () => {
+    // MUSIC-SUITE P2 FIX PASS: while the shell sent no stats this door kept the room's own win (it had refused every
+    // honest one). 2026-09-26: GameShell sends `stats` (ROOM_STATS_FORWARDED), so a set without its counts is not a
+    // client from before the contract any more — it is a claim with nothing behind it, and wins nothing
     const r = await post({ mode: 'music', score: 5_000_000, won: true, duration: 240 });
-    expect(r.body).toMatchObject({ won: true, capped: true, xp: 14_150, shards: 473, credits: 15 });
-    expect(h.lc).toHaveLength(1);
+    expect(r.body).toMatchObject({ won: false, capped: true, xp: 14_150, shards: 473, credits: 0 });
+    expect(h.lc).toHaveLength(0);
+    // the same set WITH its counts, as the shell posts it now, keeps its win
+    const withStats = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(withStats.body).toMatchObject({ won: true, credits: 15 });
   });
 
   it('a real Arena set — its match found — ends itself and is paid as before (a scored game with an end card)', async () => {
@@ -143,6 +148,22 @@ describe('the endless ceiling (owner decision #14)', () => {
       const r = await post({ mode: 'music', score, won: true, duration: 84, arenaMatchId, stats: musicSet({ bars: 32, arena: true }) });
       expect(r.body, String(arenaMatchId)).toMatchObject({ capped: true, xp: 14_150, shards: 473 });
     }
+  });
+
+  it('a WAITING duel with no opponent is free play: the Arena will not record its score, so it can never stop uncapping', async () => {
+    // review (2026-09-26): the shell now sends arenaMatchId. A music duel posted before the staking pause and never joined
+    // sits WAITING (player2Id null) — submit-score 409s it (WAITING_OPPONENT) before any write, so player1Score stays null
+    // for good, and every set played against it was paid 615,010 XP / 20,500 shards, even a loss, REPLAY after REPLAY
+    const score = perfectScore(512);
+    h.matches.lonely = musicDuel({ status: 'WAITING', player2Id: null, player1Score: null });
+    for (let set = 0; set < 3; set++) {
+      const r = await post({ mode: 'music', score, won: true, duration: 84, arenaMatchId: 'lonely', stats: musicSet({ bars: 32, arena: true }) });
+      expect(r.body, `set ${set + 1}`).toMatchObject({ capped: true, xp: 14_150, shards: 473 });
+    }
+    // once someone joins it, the Arena records the set: the duel is real, and the set is an Arena set
+    h.matches.joined = musicDuel({ status: 'WAITING', player2Id: 'u2', player1Score: null });
+    const r = await post({ mode: 'music', score, won: true, duration: 84, arenaMatchId: 'joined', stats: musicSet({ bars: 32, arena: true }) });
+    expect(r.body).toMatchObject({ capped: false });
   });
 
   it('P2 fix pass: an Arena set\'s score is held to what its counts allow (review: 1e9 on 16 hits paid 1,500,000,050 XP)', async () => {
@@ -263,11 +284,13 @@ describe('PRQ: dance trains agility + mental, music mental, both by accuracy', (
     expect(h.prqRows.map((r) => r.attribute)).toEqual(['mental']);
   });
 
-  it('P2 fix pass: until the shell forwards stats, a session with none trains by its score as before (review: every run 0)', async () => {
+  it('a session with no stats trains nothing now the shell forwards them (the old score path was the legacy door)', async () => {
+    // P2 fix pass: while the shell sent none, a dance session trained by its saturating score (agility / mental +0.96);
+    // 2026-09-26: GameShell sends `stats` (ROOM_STATS_FORWARDED), so no counts is no accuracy, and no accuracy trains nothing
     const r = await post({ mode: 'dance', score: 4000, won: true, duration: 120 });
     expect(r.body.ok).toBe(true);
-    expect(h.updates[0]).toMatchObject({ agility: 50.96, mental: 50.96 });                 // HEAD's score-saturated gain
-    expect(h.prqRows.map((x) => x.attribute).sort()).toEqual(['agility', 'mental']);
+    expect(h.updates[0]).toMatchObject({ agility: 50, mental: 50 });
+    expect(h.prqRows).toEqual([]);
   });
 
   it('stats without counts train nothing (never the saturating score)', async () => {

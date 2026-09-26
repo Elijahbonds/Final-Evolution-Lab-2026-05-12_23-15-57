@@ -25,11 +25,12 @@
 import type { TrackState } from './AudioEngine';
 import { normalizeChain, sectionAtBar, snapshotTracks, type SongChain } from './Song';
 import {
-  PROJECT_STEPS, STUDIO_PROJECT_VERSION, migrateProject, projectAudioKeys,
+  PROJECT_STEPS, STUDIO_PROJECT_VERSION, migrateProject, projectAudioKeys, sectionChopsFor,
   type ProjectFlipRow, type ProjectFlipSource, type ProjectSection, type StudioProject,
 } from './StudioProject';
 import { isFlipRowId } from './MusicTiers';
 import type { Slice } from './Flip';
+import { tracksHaveUpload } from './uploadPrivacy';
 
 // ── undo / redo ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -41,16 +42,19 @@ import type { Slice } from './Flip';
  * change — so UNDO undid an unrelated grid edit instead), and that a tap on a FEL stem replaced a mic take and 16 edited
  * chops for good. A removed recording's bytes stay in the store while the history can bring it back (the room adds
  * historyAudioKeys to the store's keep set).
+ * MUSIC-SUITE P4 (2026-09-25), grid-ui: and the song's KEY. A key change moves every bass / lead note with it
+ * (StudioProject.setProjectKey), so an undo that put the notes back but left the new key would leave them outside it —
+ * and a key change on a grid with no lit notes changed nothing in the old slice, so it could not be undone at all.
  */
-export type UndoSlice = Pick<StudioProject, 'tracks' | 'flipRows' | 'sections' | 'chain' | 'takes' | 'flip' | 'bpm' | 'swing' | 'kit' | 'mixer'>;
-export const UNDO_KEYS = ['tracks', 'flipRows', 'sections', 'chain', 'takes', 'flip', 'bpm', 'swing', 'kit', 'mixer'] as const;
+export type UndoSlice = Pick<StudioProject, 'tracks' | 'flipRows' | 'sections' | 'chain' | 'takes' | 'flip' | 'bpm' | 'swing' | 'kit' | 'mixer' | 'key'>;
+export const UNDO_KEYS = ['tracks', 'flipRows', 'sections', 'chain', 'takes', 'flip', 'bpm', 'swing', 'kit', 'mixer', 'key'] as const;
 /** Steps kept (the brief asks for at least 50). */
 export const UNDO_LIMIT = 100;
 /** A grouped burst (live pad taps with REC armed) within this long of its last edit is ONE undo step. */
 export const COALESCE_MS = 1500;
 
 export function undoSlice(p: UndoSlice): UndoSlice {
-  return { tracks: p.tracks, flipRows: p.flipRows, sections: p.sections, chain: p.chain, takes: p.takes, flip: p.flip, bpm: p.bpm, swing: p.swing, kit: p.kit, mixer: p.mixer };
+  return { tracks: p.tracks, flipRows: p.flipRows, sections: p.sections, chain: p.chain, takes: p.takes, flip: p.flip, bpm: p.bpm, swing: p.swing, kit: p.kit, mixer: p.mixer, key: p.key };
 }
 export function sameSlice(a: UndoSlice, b: UndoSlice): boolean {
   return UNDO_KEYS.every((k) => a[k] === b[k] || JSON.stringify(a[k]) === JSON.stringify(b[k]));
@@ -243,6 +247,12 @@ export interface PublishedChop {
   pad: number; label: string; source: ProjectFlipSource; slice: Slice; reverse: boolean; pitch: number; gate: boolean;
   /** MUSIC-SUITE P3 FIX PASS: the sample rate the slice counts in (StudioProject ProjectFlip.rate). */
   rate?: number;
+  /**
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): this chop was published BAKED (v3: pitch and gate are in the row's buffer, and
+   * the steps' notes are intervals from the pad as tuned). Absent = published by P3 / P4 (the deployed builds), whose row
+   * played the RAW chop with the pitch on the notes and no gate — remixSeed reads those as v2 (see there).
+   */
+  baked?: true;
 }
 /** A published grid row. A Flip row carries its chop; StudioLibrary keeps `sequencer.tracks` verbatim (normalizeEntry). */
 export type PublishedTrack = TrackState & { chop?: PublishedChop };
@@ -260,7 +270,7 @@ export function publishTracks(tracks: readonly TrackState[], flipRows: readonly 
     if (!isFlipRowId(t.sampleId)) { out.push(row); continue; }
     const r = flipRows.find((x) => x.sampleId === t.sampleId);
     if (!r) { silent.push(t.sampleId); continue; }
-    out.push({ ...row, chop: { pad: r.pad, label: r.label, source: JSON.parse(JSON.stringify(r.source)) as ProjectFlipSource, slice: { ...r.slice }, reverse: r.reverse, pitch: r.pitch, gate: r.gate, ...(r.rate ? { rate: r.rate } : {}) } });
+    out.push({ ...row, chop: { pad: r.pad, label: r.label, source: JSON.parse(JSON.stringify(r.source)) as ProjectFlipSource, slice: { ...r.slice }, reverse: r.reverse, pitch: r.pitch, gate: r.gate, ...(r.rate ? { rate: r.rate } : {}), baked: true } });
   }
   return { tracks: out, silent };
 }
@@ -269,17 +279,38 @@ export function publishTracks(tracks: readonly TrackState[], flipRows: readonly 
  * A remix's grid and Flip rows from a published record's rows, through the project's one door (migrateProject: a stored
  * record never makes the room fetch anything but a first-party /audio/ path or its own bytes). A Flip row whose chop is
  * missing (published before P3) or unreadable is LEFT OUT and named in `dropped` — never written as a row that plays nothing.
+ *
+ * MUSIC-SUITE P4 FIX PASS (2026-09-25): `kit` — the SOURCE record's kit (the voice its published audio played). A row
+ * published before P4 has no notes, and migrateProject gives a note row its kit voice's note (VOICE_ROOTS) — but this
+ * called it with no kit, so every pre-P4 bass / lead got STREET's A1 / A4 (33 / 69), and a remix of a NEON song (C2 / C5,
+ * 36 / 72) or a DUST one (G1 / G4, 31 / 67) opened in another key than its source (the review reproduced it: bass 33, lead
+ * 69 on a NEON remix, no issue said). P3's promise is that a remix plays the same sounds as its source.
  */
-export function remixSeed(rows: readonly unknown[]): { tracks: TrackState[]; flipRows: ProjectFlipRow[]; dropped: string[] } {
+export function remixSeed(rows: readonly unknown[], kit?: unknown): { tracks: TrackState[]; flipRows: ProjectFlipRow[]; dropped: string[] } {
   const plain: unknown[] = [];
   const chops: unknown[] = [];
+  let legacy = false;
   for (const r of rows) {
     if (!r || typeof r !== 'object') { plain.push(r); continue; }
     const { chop, ...track } = r as PublishedTrack;
     plain.push(track);
-    if (chop && typeof chop === 'object' && typeof track.sampleId === 'string') chops.push({ ...chop, sampleId: track.sampleId });
+    if (chop && typeof chop === 'object' && typeof track.sampleId === 'string') {
+      const { baked, ...rest } = chop;
+      if (baked !== true) legacy = true;
+      chops.push({ ...rest, sampleId: track.sampleId });
+    }
   }
-  const m = migrateProject({ v: STUDIO_PROJECT_VERSION, id: 'remix', tracks: plain, flipRows: chops }, { now: 1 });
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): A SONG PUBLISHED BEFORE P5 REMIXED AT TWICE ITS PITCH, CUT AT 1.2 s. This always
+  // read the record as the CURRENT version (v3, baked chops), so migrateProject's v2 → v3 step (rebaseLegacyFlip: the
+  // notes move down by the row's pitch, the gate goes off) never ran for a published record — and a P3 / P4 record looks
+  // exactly like a v3 one. The review reproduced it: a P4 row (pitch +5, every note 65 — P4 padNote — gate true, the pad
+  // default, a 2 s slice) remixed as pitch 5, notes 65, gate true: +5 baked + 5 on the note = +10 semitones, gated at 1.2 s,
+  // where the published mixdown played it at +5 for the full 2 s. A P3 record (pitch 5, no notes) remixed at +5 where its
+  // source played the raw chop. Decision #20 deploys every green phase, so those songs are in players' libraries now.
+  // publishTracks marks a P5 chop `baked`; a record with a chop that lacks the mark is read as v2, and the migration makes
+  // it sound as it was published: each row's notes move down by its pitch (a P4 row's 65s become 60; a P3 row, which has
+  // no notes, gets 60 − pitch on every step) and its gate goes off.
+  const m = migrateProject({ v: legacy ? 2 : STUDIO_PROJECT_VERSION, id: 'remix', tracks: plain, flipRows: chops, ...(kit !== undefined ? { kit } : {}) }, { now: 1 });
   if (!m.ok) return { tracks: [], flipRows: [], dropped: [] };
   const kept = new Set(m.project.flipRows.map((r) => r.sampleId));
   const dropped = m.project.tracks.filter((t) => isFlipRowId(t.sampleId) && !kept.has(t.sampleId)).map((t) => t.sampleId);
@@ -298,9 +329,13 @@ export function publishedAudioKeys(records: readonly { sequencer?: { tracks?: re
   return keys;
 }
 
-/** What a Flip row SOUNDS like (pitch and gate are not baked in until P5): its source, its cut, its direction. */
-export function chopSignature(r: Pick<ProjectFlipRow, 'source' | 'slice' | 'reverse' | 'rate'>): string {
-  return JSON.stringify([r.source.audio?.key ?? r.source.url ?? r.source.id, r.slice.start, r.slice.end, r.reverse, r.rate ?? null]);
+/**
+ * What a Flip row SOUNDS like: its source, its cut, its direction — and (MUSIC-SUITE P5 FIX PASS, 2026-09-25) its pitch
+ * and gate, which P5 bakes into the row's buffer. Without them an undo or a recorded hit that changed only a pitch or a
+ * gate kept the old buffer, and the room patched it with chopEdit.retunedRows; the one signature covers it now.
+ */
+export function chopSignature(r: Pick<ProjectFlipRow, 'source' | 'slice' | 'reverse' | 'rate' | 'pitch' | 'gate'>): string {
+  return JSON.stringify([r.source.audio?.key ?? r.source.url ?? r.source.id, r.slice.start, r.slice.end, r.reverse, r.rate ?? null, r.pitch, r.gate]);
 }
 
 /** Flip rows in `after` whose sound differs from `before` (new, or another chop): the engine must load them again. */
@@ -320,7 +355,7 @@ export function removedFlipRows(before: readonly ProjectFlipRow[], after: readon
  * Songs that do stay device-private until online review exists — this is what the sharing pass keys that rule on.
  */
 export function publishedHasUpload(tracks: readonly unknown[]): boolean {
-  return tracks.some((t) => (t as PublishedTrack | null)?.chop?.source?.upload === true);
+  return tracksHaveUpload(tracks);   // MUSIC-SUITE P5: the one reader lives in uploadPrivacy.ts (the library guards on it too)
 }
 
 // ── what plays, and what a publish renders (MUSIC-SUITE P3 FIX PASS: pure, so they are tested by behaviour) ─────────
@@ -344,4 +379,45 @@ export function playbackSource(o: { preview: readonly TrackState[] | null; songM
  */
 export function publishRender(p: Pick<StudioProject, 'tracks' | 'swing'>): { tracks: TrackState[]; swing: number } {
   return { tracks: p.tracks.map((t) => ({ ...t, pattern: [...t.pattern] })), swing: p.swing };
+}
+
+// ── MUSIC-SUITE P5 FIX PASS (2026-09-25): what a render's Flip rows play ──────────────────────────────────────────────
+//
+// What was wrong: P5 gave a song section its own chops, and song mode swaps them into the ENGINE's sounds on the bar line
+// (StudioMode swapSectionChops → engine.loadBuffer under the working rows' ids). Every render read the engine's sounds
+// (AudioEngine placeBar → this.samples), so:
+//   · PUBLISH rendered the working grid with whatever section's chops song mode swapped in last (turning SONG MODE on
+//     swaps section 0's in even while stopped) — the library audio played the section's old chop while the record, a
+//     remix and the card named the grid's (the P3 FIX PASS promise "PUBLISH renders the working grid" broken again, the
+//     same bug class P3 fixed for swing);
+//   · RENDER SONG and STEMS rendered every bar with the last-swapped section's chops, while live song mode plays each
+//     section's own (P4's "live == exported" broken).
+// A render now takes the Flip sounds explicitly: flipSoundMap for the working grid (publish), songBarSounds for each bar
+// of the song. A row with no chop, or one not on this device, is null — SILENT in that render, never the engine's.
+
+/** Each Flip row id `tracks` hold → the buffer `sound` gives its chop in `rows` (null = silent: no chop, or not decoded). */
+export function flipSoundMap<B>(tracks: readonly Pick<TrackState, 'sampleId'>[], rows: readonly ProjectFlipRow[], sound: (r: ProjectFlipRow) => B | null): Map<string, B | null> {
+  const out = new Map<string, B | null>();
+  for (const t of tracks) {
+    if (!isFlipRowId(t.sampleId) || out.has(t.sampleId)) continue;
+    const r = rows.find((x) => x.sampleId === t.sampleId);
+    out.set(t.sampleId, r ? sound(r) : null);
+  }
+  return out;
+}
+
+/** Bar b of the song (the chain looped): its section's Flip sounds — the chops it was saved with, else the grid's. */
+export function songBarSounds<B>(chain: SongChain, sections: readonly ProjectSection[], flipRows: readonly ProjectFlipRow[], bars: number, sound: (r: ProjectFlipRow) => B | null): Map<string, B | null>[] {
+  return Array.from({ length: Math.max(0, bars) }, (_, b) => {
+    const sec = sectionForBar(chain, sections, b);
+    return sec ? flipSoundMap(sec.tracks, sectionChopsFor(sec, flipRows), sound) : new Map<string, B | null>();
+  });
+}
+
+/** Every chop the song's render can play (the grid's rows and each section's own), once each by `key`. */
+export function songChops(flipRows: readonly ProjectFlipRow[], sections: readonly Pick<ProjectSection, 'chops'>[], key: (r: ProjectFlipRow) => string): ProjectFlipRow[] {
+  const seen = new Set<string>();
+  const out: ProjectFlipRow[] = [];
+  for (const r of [...flipRows, ...sections.flatMap((s) => s.chops ?? [])]) { const k = key(r); if (!seen.has(k)) { seen.add(k); out.push(r); } }
+  return out;
 }

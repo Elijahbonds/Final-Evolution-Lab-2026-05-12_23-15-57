@@ -45,7 +45,7 @@ describe('round-trip', () => {
     expect(back.ok).toBe(true);
     if (!back.ok) return;
     expect(back.issues).toEqual([]);
-    expect(back.from).toBe(1);
+    expect(back.from).toBe(STUDIO_PROJECT_VERSION);
     expect(back.project).toEqual(p);
     expect(projectSignature(back.project)).toBe(projectSignature(p));
   });
@@ -102,14 +102,14 @@ describe('the dance export keeps the project\'s title and id (was \'My Track\' a
 });
 
 describe('migrate: versions', () => {
-  it('v0 (the unversioned room state) becomes v1 with an id, a title, empty takes / Flip / mixer', () => {
+  it('v0 (the unversioned room state) becomes the current version with an id, a title, empty takes / Flip / mixer', () => {
     const v0 = { bpm: 100, swing: 0.1, kit: 'dust', polished: true, tracks: emptyKitTracks().map((t, i) => (i === 0 ? { ...t, pattern: steps([0]) } : t)), sections: [], chain: [] };
     const m = migrateProject(v0, { now: NOW, newId: () => 'prj_fromv0' });
     expect(m.ok).toBe(true);
     if (!m.ok) return;
     expect(m.from).toBe(0);
     expect(m.issues).toEqual([]);
-    expect(m.project).toMatchObject({ v: 1, id: 'prj_fromv0', bpm: 100, swing: 0.1, kit: 'dust', takes: [], flipRows: [], remixOf: null, createdAt: NOW, updatedAt: NOW });
+    expect(m.project).toMatchObject({ v: STUDIO_PROJECT_VERSION, id: 'prj_fromv0', bpm: 100, swing: 0.1, kit: 'dust', takes: [], flipRows: [], remixOf: null, createdAt: NOW, updatedAt: NOW });
     expect(m.project.mixer.polish).toBe(true);
     expect(m.project.title).toBe(defaultProjectTitle(NOW));
     expect(m.project.tracks[0].pattern[0]).toBe(true);

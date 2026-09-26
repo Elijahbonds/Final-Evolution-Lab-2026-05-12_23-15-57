@@ -63,10 +63,59 @@
 //   · The take being recorded has a STOP wherever the player is; SEND TO THE DANCE FLOOR says when the export was not
 //     kept; ARM REC on a pad whose row holds another chop replaces the row's chop (one undo step); the remix-kit note
 //     belongs to the project it was said about.
+//
+// MUSIC-SUITE P4 (2026-09-25), "Pocket studio + melody" — grid-ui: the room on top of the PHASE-4 ENGINE CONTRACT (one
+// mix graph, notes on steps, metronome + count-in, looping takes, the mixer in the project). What P1 / P3 measured and
+// the map found (outbox musicsuite/BASELINE.md, p3/REPORT.md "Not done", understand-wf_3a55346f-032.json), and now:
+//   · THE PHONE GRID. 16.5 px cells and 43 px of sideways scroll at 375 px: the grid was `90px repeat(16, 1fr)` at every
+//     width (~:866 then). ui/StepGrid: under 640 px two pages of 8 steps (page buttons + a swipe on the step strip) with
+//     ≥ 40 px cells, and the room's side padding is 8 px there; desktop keeps 16 columns. Beat shading, the playhead on
+//     either page, a key cursor, and DRAG-TO-PAINT (down on an off cell paints on, on an on cell paints off, across
+//     cells; one stroke = one undo step). The rules are ui/gridMath (tested).
+//   · MELODY. A pitched row (bass, lead, every Flip row) has a ♪ that opens its NoteRow: one octave of the song's key at a
+//     time with an octave switch, one note per step (ui/noteMath; every note goes through StudioProject.withStep, which
+//     locks it to the key). The KEY + SCALE picker sits over the grid; a key change moves every note with it
+//     (setProjectKey — one undo step: the key is in the undo slice now) and the key rides on the dance export's card and
+//     the library record. The bass / lead notes in use are rendered ON their note for the kit that plays (noteRenders).
+//   · THE MIXER at THE STUDIO (the ladder's "mix it"; the chip names it): ui/MixerStrip — a strip per drawn row (+ TAKES)
+//     with M / S / VOL / PAN / ROOM / DELAY, a peak meter and clip light, and the MASTER with its meters and the limiter's
+//     pull. Every move is a project edit (undo, autosave — P3); the engine follows (setMixer).
+//   · METRONOME + COUNT-IN in the transport (engine.setMetronome / countIn; remembered on this device). PLAY counts in.
+//   · DESKTOP KEYS (ui/keys): Space play/stop, the arrows + Enter on the grid, ⌥↑↓ a note, B the booth (P4 FIX PASS: was ⇧R),
+//     ⌘Z / ⇧⌘Z undo / redo (P4 FIX PASS: the bare Z / ⇧Z went — pad letters); as first written: ⇧R the booth, Z / ⇧Z undo /
+//     redo, ? the key map — never on the FLIP tab (its pad keys), never PERFORM's Space / J, never while typing.
+//   · CHECK MY TIMING (moved here from P2): a 2-bar count-in at the calibration tempo, 8 taps, the offset read with
+//     rhythm-calibrate computeOffsetMs and saved dated — "your offset +75 ms" (ui/timingCheck).
+//   · P3's open items: the 2.2 s line floats at the top or the bottom, whichever covers less of the grid and the
+//     transport, and never takes a tap; a library failure stays on a lasting line under the project bar; a new project's
+//     default name gets " (2)" when the minute's name is taken (useStudioProject / StudioProject.uniqueTitle).
+//
+// MUSIC-SUITE P4 FIX PASS (2026-09-25) — the review's findings against this room (outbox musicsuite/p4/fixes):
+//   · THE KEYS WAIT FOR THE ROOM. The key map listened on window from mount — behind the boot splash (Space on the focused
+//     TAP TO START started the beat behind it and never pressed START: measured {splashStillThere, engineRunning}) and
+//     under GameShell's end card (the Game stays mounted: Space toggled the transport behind REPLAY, Z undid and autosaved
+//     the grid). Now it listens only while the room is on screen (started, ready, restored), and it is SUSPENDED from the
+//     moment a set is handed to the shell's card until the room is touched again (a remount — REPLAY — starts clean).
+//     The map itself (ui/keys) gives a focused button its own Space, keeps the arrows / Enter to the GRID, swallows a held
+//     Space, and uses no Flip pad letter (B is the booth; undo / redo are ⌘Z / Ctrl+Z / ⇧⌘Z / Ctrl+Y).
+//   · PERFORM IGNORES THE STUDIO'S COUNT-IN AND METRO (decision #13). PLAY in PERFORM counted in and the metronome ticked
+//     through a scored set; a tap on a count-in click settled as an EXTRA — a miss (tsx on performSet: a 1-bar count-in
+//     tapped on time + 9 bars perfect = 36 of 40, combo broken; a sparse beat with a 2-bar count-in sat at 50 %, the win
+//     line). PERFORM starts on the press with no clicks, as P2's did.
+//   · THE DESK HEARS ONLY WHAT CAN SOUND (decision #11). A solo left on TAKES after its last take was deleted silenced every
+//     row — PLAY, PUBLISH and PERFORM's notes — with no S left on screen. The engine gets the desk scoped to the strips
+//     drawn (mixGraph.scopeSolo), and removing the last take clears the TAKES strip's mute / solo in the same undo step.
+//   · MUTE / SOLO AT EVERY TIER (decision #4): the MIXER shows each row's M / S and meter from THE GRID; its faders, sends and
+//     the master LEVEL open at THE STUDIO (the ladder's "mix it"). The lane had hidden the whole desk until THE STUDIO.
+//   · CHECK MY TIMING counts in a LEAD-IN bar and reads the last 8 clicks (the first click was a reaction), and reads them
+//     as they leave the desk (engine.graphLatencySec), so the saved offset is the device's alone; PERFORM adds the desk.
+//   · WHAT IS PUBLISHED IS WHAT YOU HEAR: the record and the dance export leave out rows the desk silences, as the render
+//     does; a remix of a pre-P4 song keeps its SOURCE kit's notes (studioEdit.remixSeed(rows, kit)); the dance card says
+//     the key in words ('A minor' — the Cypher's chip upper-cased 'Am' into 'AM').
 
 import React, { useEffect, useMemo, useRef, useState, useCallback, useReducer } from 'react';
-import { AudioEngine, type TrackState } from './AudioEngine';
-import { synthesizeKit, KIT_SLOTS, KIT_META, type KitId } from './SynthKit';
+import { AudioEngine, type RenderSounds, type TrackState } from './AudioEngine';
+import { synthesizeKit, synthesizeNote, isPitchedSlot, KIT_SLOTS, KIT_META, VOICE_ROOTS, type KitId, type PitchedSlot } from './SynthKit';
 // MUSIC-SUITE P3 (2026-09-25): the library's audio lives in the Academy's IndexedDB store now (StudioLibrary.ts header);
 // publish hands it the rendered Blob, PLAY asks it for a source, and every failure comes back as a line to say.
 import { StudioLibrary, type TrackRecord } from './StudioLibrary';
@@ -80,6 +129,13 @@ import SongPanel from './SongPanel';   // lane 2 M2–M4 — sections, chain, ta
 import { useStudioProject } from './useStudioProject';
 import MyProjects from './MyProjects';
 import { withFlipHit, withFlipRow, type ProjectFlip, type ProjectFlipRow, type ProjectFlipSource, type ProjectTake, type SongSlice, type StudioProject } from './StudioProject';
+// MUSIC-SUITE P5 (2026-09-25), "The Flip, for real": baked chops, a section's own chops, ARM REC on the audio clock, and
+// decoded sources let go when the project no longer plays them (chopEdit.ts).
+import { sectionChopsFor, stampSectionChops } from './StudioProject';
+import { bakeKey, liveSourceKeys, planChopSwap, pruneMap, type StepMark } from './chopEdit';
+import { stepDurSec } from './stepTime';
+// MUSIC-SUITE P4 (2026-09-25): the contract's step / key / desk edits (StudioProject.ts) — every note is locked there
+import { mixerOf, setProjectKey, withChannel, withMaster, withTrackStep } from './StudioProject';
 // MUSIC-SUITE P3 FIX PASS (2026-09-25): which sound each Flip row plays — the open project's, and only its.
 import { openFlipRowSounds, reloadFlipRowSounds } from './flipRowSounds';
 // MUSIC-SUITE P3 (2026-09-25), tier-honesty-editing: the edit rules (undo, sections, CLEAR, CELL's preview, the chops a
@@ -88,9 +144,21 @@ import {
   EditHistory, applyFoundation, cellFoundation, chopSignature, clearGrid, foundationPreview, gridHitCount, historyAudioKeys, playbackSource,
   previewTracks, publishRender, publishTracks, publishedAudioKeys, remixSeed, sameSlice, shownSection, toggleStep, undoSlice, type UndoSlice,
 } from './studioEdit';
+// MUSIC-SUITE P5 FIX PASS (2026-09-25): a render's Flip rows play the sounds handed to it (the working grid's for PUBLISH,
+// each bar's section's for RENDER SONG / STEMS) — never whatever song mode swapped into the engine last
+import { flipSoundMap, songBarSounds, songChops } from './studioEdit';
 import { danceSongAtTier, exportSongToDance, saveExportedTrack } from './DanceExport';
-import { chopBuffer, monoOf, sourceKey, type DecodedSource } from './FlipPad';
-import { padFromAction } from './Flip';
+import { bakedBuffer, monoOf, sourceKey, type DecodedSource, type StepClock } from './FlipPad';
+// MUSIC-SUITE P5 (2026-09-25), phone-mpc: the phone's room lives at ROOM level, its pads play the room's bank on any tab
+// (the pad_N parse moved from Flip.padFromAction to phonePad.phoneCommand, which also reads PLAY / STOP / REC / BANK A–D)
+import { padRowFor, readBankView, readQuantize, tapStep, writeBankView, type PadHit } from './FlipPad';
+import { medianRtt, padGain, phoneBadgeShown, phoneCommand, phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, PHONE_BANKS, PHONE_LATE_S } from './phonePad';
+import { bankOf, flipSampleId } from './StudioProject';
+import { rowSlotFor } from './chopEdit';
+import type { ControlEvent, LobbyPeer, PeerId } from '@/lib/controller-link/types';
+import { decodeFlipPackSource } from './flipPack';            // MUSIC-SUITE P5: FEL's Flip pack items and kits
+import { projectUploadPrivacy, tracksHaveUpload, uploadDoorOpen, uploadNeedsTick, UPLOAD_DOORS } from './uploadPrivacy';   // MUSIC-SUITE P5: decision #15
+import { judgesPhoneTap } from './phonePad';
 import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b — the phone is the pad controller
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 import { BootSplash } from '@/components/games/boot-splash';
@@ -105,13 +173,23 @@ import { PerformSet, PERFORM_STEPS_PER_BAR, ARENA_SET_NOTE, performStatusLine } 
 import { isPerformTapKey, performLatencySec, performNoteAt, performResultStats, performTapLabel, PERFORM_WIN_MIN_BARS, type PerformTap } from './performSet';
 // MUSIC-SUITE P2 FIX PASS (2026-09-25): a held Enter on the focused TAP button is one tap, not one per key repeat.
 import { isRepeatedActivation } from './performSet';
-import { loadRoomCalibration } from '@/lib/feel/rhythm-calibrate';
+import { calibrationAgeText, loadAudioCalibration, loadRoomCalibration, saveAudioOffsetMs } from '@/lib/feel/rhythm-calibrate';
 // MUSIC-SUITE P2 (2026-09-25): the room's shop — ask first, typed answers, the account's kits, a remix that never buys.
 import {
   DEFAULT_KIT, SPEND_FAILURE_TEXT, SPEND_REFUSED, SPEND_UNREACHABLE, assistSpend, confirmCopy, initialShop, kitSpend, readKitCache,
   remixKit, remixKitNote, shopReducer, spendReason, writeKitCache,
   type PendingSpend, type ReadOwnedKits, type ShardSpend, type ShardSpendResult,
 } from './purchases';
+// MUSIC-SUITE P4 (2026-09-25), grid-ui: the pocket studio's UI (ui/*) over the phase-4 engine contract.
+import { SCALES, SCALE_IDS, isPitchedRow, keyCardText, keyLabel, keySignature, pitchName, type ScaleId, type SongKey } from './scales';
+import { TAKES_CHANNEL, anySolo, channelMix, gateOpen, scopeSolo, type ChannelMix } from './mixGraph';
+import StepGrid, { type StepGridRow } from './ui/StepGrid';
+import NoteRow from './ui/NoteRow';
+import MixerPanel from './ui/MixerStrip';
+import { KEY_HELP, cancelsKeyUp, keyTargetOf, studioKeyAction, type StudioKeyAction } from './ui/keys';
+import { PHONE_PAD_PX, gridLayout, moveCursor, pageOfStep, stepsOnPage, toastSpot } from './ui/gridMath';
+import { cellNoteLabel, nudgeNote, pickNote } from './ui/noteMath';
+import { CHECK_BPM, CHECK_COUNT_BARS, CHECK_TAPS, acceptsTap, checkClicks, checkLine, checkWindow, formatOffset, heardClicks, readTimingCheck } from './ui/timingCheck';
 
 // HOTFIX (2026-09-24): the grid's steps and PERFORM's set are one number, so the set's length in bars is the grid's bars.
 const STEPS = PERFORM_STEPS_PER_BAR;
@@ -140,6 +218,60 @@ function savedAudioOffsetMs(): number | null {
 /** MUSIC-SUITE P2: the kits cache's storage, or null where reading it throws (blocked site data, some previews). */
 function kitStorage(): Storage | null {
   try { return window.localStorage; } catch { return null; }
+}
+
+/**
+ * MUSIC-SUITE P4 (2026-09-25): the transport's METRO and COUNT-IN, remembered on this device — a per-viewer convenience,
+ * like a DAW's click settings, not part of the song (so they are not in the project, and not undo steps).
+ */
+const TRANSPORT_KEY = 'fel-studio-transport';
+interface TransportPrefs { metronome: boolean; countIn: 0 | 1 | 2 }
+function readTransportPrefs(): TransportPrefs {
+  try {
+    const o = JSON.parse(window.localStorage.getItem(TRANSPORT_KEY) ?? 'null') as Partial<TransportPrefs> | null;
+    return { metronome: o?.metronome === true, countIn: o?.countIn === 1 || o?.countIn === 2 ? o.countIn : 0 };
+  } catch { return { metronome: false, countIn: 0 }; }
+}
+function writeTransportPrefs(p: TransportPrefs): void {
+  try { window.localStorage.setItem(TRANSPORT_KEY, JSON.stringify(p)); } catch { /* not kept: the toggles still work this visit */ }
+}
+
+/** MUSIC-SUITE P4: the saved calibration the rooms apply (dated, P2), for "your offset +75 ms · today"; null = none. */
+function readSavedCal(): { offsetMs: number; age: string | null } | null {
+  try {
+    const room = loadRoomCalibration();
+    if (room.offsetMs === null) return null;
+    return { offsetMs: room.offsetMs, age: calibrationAgeText(loadAudioCalibration().measuredAt, Date.now()) };
+  } catch { return null; }
+}
+
+/** MUSIC-SUITE P4: where the transient line goes — the band covering less of these (the grid, the transport). */
+function toastSpotFor(els: readonly (HTMLElement | null)[]): 'top' | 'bottom' {
+  if (typeof window === 'undefined') return 'bottom';
+  const rects = els.filter((e): e is HTMLElement => !!e).map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
+  return toastSpot(window.innerHeight, rects);
+}
+
+declare global {
+  interface Window {
+    /** MUSIC-SUITE P4 dev/probe hook: the pocket studio's UI state (the grid's layout, cursor, notes, desk, check). */
+    __FEL_GRID__?: {
+      compact: boolean; page: number; pages: number; pageSteps: number; cursor: { row: string; step: number } | null;
+      openNote: string | null; key: string; metronome: boolean; countIn: number; mixerOpen: boolean; help: boolean;
+      check: string | null; checkTaps: number; checkClicks: number[]; savedOffsetMs: number | null; toastAt: 'top' | 'bottom'; libraryLine: string | null;
+      noteRenders: Record<string, number[]>;
+      /** MUSIC-SUITE P4 FIX PASS: the key map is listening (the room is on screen and not under the shell's card). */
+      keysLive?: boolean;
+      /** MUSIC-SUITE P4 FIX PASS: the desk's delay the room reads latencies with (engine.graphLatencySec, s). */
+      graphLatencySec?: number;
+    };
+    /** MUSIC-SUITE P5 dev/probe hook: ARM REC's audio clock, the decoded sources and baked chops the room holds. */
+    __FEL_FLIP_ROOM__?: {
+      clock: () => StepClock | null; sources: () => string[]; chops: () => number; loaded: (id: string) => boolean;
+      /** the decoded source's samples [at − n, at + n) (a probe checks a cut is on a zero crossing) */
+      peek: (key: string, at: number, n: number) => Promise<number[] | null>;
+    };
+  }
 }
 
 // CELL SEAM — the local generator that writes a musically sensible foundation (kick/snare/hat/bass locked to each other)
@@ -246,8 +378,18 @@ export default function StudioMode({
   const setPolished = useCallback((on: boolean) => edit((p) => ({ ...p, mixer: { ...p.mixer, polish: on } })), [edit]);
   /** SongPanel's and FlipPad's slices of the project (they were those components' own useState — lost on unmount). A
    *  section, chain or take change is an undo step (MUSIC-SUITE P3 FIX PASS: the takes too), and so is the FLIP tab's. */
+  // MUSIC-SUITE P4 FIX PASS (2026-09-25): the LAST take removed takes the TAKES strip's mute / solo with it (the same undo
+  // step) — its strip is only drawn while there are takes, and a solo left on it silenced every row (decision #11)
+  // MUSIC-SUITE P5 (2026-09-25), P3 deferred: A SECTION KEEPS ITS OWN CHOPS. A section snapshot kept its Flip rows' steps
+  // but not their chops, so re-sending a pad changed how every older section sounded. A section saved (or retaken with
+  // UPDATE FROM GRID) now keeps a copy of the chops its Flip rows play (StudioProject.stampSectionChops), and song mode
+  // plays them (swapSectionChops, on the bar line).
   const songChange = useCallback((fn: (s: SongSlice) => SongSlice) =>
-    edit((p) => ({ ...p, ...fn({ sections: p.sections, chain: p.chain, takes: p.takes }) })), [edit]);
+    edit((p) => {
+      const next = { ...p, ...fn({ sections: p.sections, chain: p.chain, takes: p.takes }) };
+      next.sections = stampSectionChops(p.sections, next.sections, p.flipRows);   // MUSIC-SUITE P5 (a fresh object: safe to set)
+      return p.takes.length && !next.takes.length ? withChannel(next, TAKES_CHANNEL, { mute: false, solo: false }) : next;
+    }), [edit]);
   /**
    * MUSIC-SUITE P3 FIX PASS: the FLIP tab's changes are undo steps (a new source replaced a mic take and 16 edited chops
    * for good), and a mic take that finished after another project opened goes to the project it was recorded in.
@@ -277,11 +419,16 @@ export default function StudioMode({
   /** A take or a Flip mic take is recording: MY PROJECTS waits (a take lands in the project it started in). */
   const [takeRec, setTakeRec] = useState(false);
   const [micRec, setMicRec] = useState(false);
+  /** What the booth has open: only the mic ('mic'), or a take counting in / recording ('take') — for the room's chip. */
+  const [takeWhat, setTakeWhat] = useState<'mic' | 'take'>('take');
   /**
    * MUSIC-SUITE P3 FIX PASS: why the open project can't be switched right now — ONE rule for MY PROJECTS and REMIX (REMIX
    * got past the hold: a take recording landed in the remix, and a PERFORM set's grid was swapped mid-set).
+   * MUSIC-SUITE P4 FIX PASS (2026-09-25): with only the booth's MIC armed (nothing recording) it says so — it said "Stop the
+   * recording first" of a recording that did not exist (the booth reports phase 'armed' as on, what 'mic').
    */
-  const switchLock = mode === 'perform' ? 'End the set to switch projects' : takeRec || micRec ? 'Stop the recording first' : null;
+  const boothOnlyMic = takeRec && takeWhat === 'mic' && !micRec;
+  const switchLock = mode === 'perform' ? 'End the set to switch projects' : boothOnlyMic ? 'Close the mic first' : takeRec || micRec ? 'Stop the recording first' : null;
 
   // THE LADDER, FINALLY READ. MusicTiers has existed since 2026-09-13 with a header explaining that the room
   // "shipped M1-M4 all at once ... a player who opens it meets ALL of it — a full DAW on the first visit. That
@@ -360,7 +507,89 @@ export default function StudioMode({
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  const flipTrigger = useRef<((pad: number) => void) | null>(null);   // filled by FlipPad; hit by paired phones
+  const flipTrigger = useRef<((pad: number, hit?: PadHit) => void) | null>(null);   // filled by FlipPad; hit by paired phones
+
+  // ── MUSIC-SUITE P5 (2026-09-25), phone-mpc: THE PHONE'S ROOM IS THE ROOM'S ─────────────────────────────────────────
+  // Owner decision #16 ("stays connected across tabs, transport, banks"). <HostLobby> was mounted inside the FLIP tab, and
+  // its unmount disposes the HostSession (host-lobby.tsx :102-118): every tab switch closed the phone's data channel and
+  // the next FLIP visit opened a new room with a new code. It is mounted beside the tabs now, from the first FLIP visit
+  // (phonePad.phoneRoomOpen) until the Academy unmounts; the bank on the pads and ARM REC moved up here with it, so the
+  // phone's BANK A–D and REC work on every tab and FLIP shows what the phone picked.
+  const [phoneRoom, setPhoneRoom] = useState(false);
+  useEffect(() => { setPhoneRoom((on) => phoneRoomOpen(on, view)); }, [view]);
+  /** Phones connected now (the badge stays on screen on every tab while one is). */
+  const [phones, setPhones] = useState(0);
+  /** Each phone's recent round trips, ms (the lobby's rttMs — host.ts:149), for moving its taps back (phonePad.phoneTapSec). */
+  const rttRef = useRef(new Map<PeerId, number[]>());
+  /** The Flip bank on the pads (FlipPad's view, held here): per project for this browser tab, as FlipPad kept it. */
+  const [flipBank, setFlipBankState] = useState(() => readBankView(project.id));
+  const flipBankRef = useRef(flipBank); flipBankRef.current = flipBank;
+  useEffect(() => { const b = readBankView(project.id); flipBankRef.current = b; setFlipBankState(b); }, [project.id]);
+  const setFlipBank = useCallback((b: number): void => { flipBankRef.current = b; setFlipBankState(b); writeBankView(projectRef.current.id, b); }, []);
+  /** ARM REC (FlipPad's, held here): a phone's REC arms it from any tab, and a phone hit on any tab records. */
+  const [flipRecArm, setFlipRecArmState] = useState(false);
+  const flipRecArmRef = useRef(flipRecArm); flipRecArmRef.current = flipRecArm;
+  const setFlipRecArm = useCallback((on: boolean): void => { flipRecArmRef.current = on; setFlipRecArmState(on); }, []);
+  /** MUSIC-SUITE P5: the steps the engine scheduled lately, with their audio-clock times (onStepScheduled). */
+  const stepMarksRef = useRef<StepMark[]>([]);
+  /**
+   * MUSIC-SUITE P5 (2026-09-25): ARM REC's clock. FlipPad wrote a tap to quantizeTap(playhead) — the step that had already
+   * SOUNDED (onStep fires after a step's time), so a tap 20 ms before a beat landed on the beat before it. It reads the
+   * audio clock now: the time of the tap, minus the player's delay (the saved calibration, else the device's output delay,
+   * plus the desk's — the same performLatencySec PERFORM judges with), against the steps actually scheduled.
+   */
+  const flipClock = useCallback((): StepClock | null => {
+    const eng = engineRef.current;
+    if (!eng || !eng.isRunning) return null;
+    return {
+      now: eng.context.currentTime,
+      latencySec: performLatencySec({ savedOffsetMs: savedAudioOffsetMs(), outputLatency: eng.context.outputLatency, baseLatency: eng.context.baseLatency, graphLatencySec: eng.graphLatencySec }),
+      marks: stepMarksRef.current, stepSec: stepDurSec(projectRef.current.bpm), startSec: eng.songStartSec,
+    };
+  }, []);
+  /** MUSIC-SUITE P5: the grid's row ids — a Flip row whose chop was lost still holds its number (chopEdit.rowSlotFor). */
+  const flipTrackIds = useMemo(() => new Set(tracks.map((t) => t.sampleId)), [tracks]);
+
+  // ── MUSIC-SUITE P4 (2026-09-25), grid-ui: the pocket studio's own state ────────────────────────────────────────────
+  /** The viewport's width: under 640 px the grid is the phone grid, pages of 8 (ui/gridMath gridLayout). */
+  const [vw, setVw] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
+  useEffect(() => {
+    const on = (): void => setVw(window.innerWidth);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  const layout = useMemo(() => gridLayout(vw, STEPS), [vw]);
+  const [page, setPage] = useState(0);
+  /** The key cursor (a row id and a step), shown from the first arrow key. */
+  const [cursor, setCursor] = useState<{ row: string; step: number } | null>(null);
+  /** The pitched row whose NoteRow is open. */
+  const [openNote, setOpenNote] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  /** MUSIC-SUITE P4 FIX PASS: the key map's panel (scrolled into view when it opens), and a touch-only device (no '?'). */
+  const helpRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (helpOpen) helpRef.current?.scrollIntoView?.({ block: 'nearest' }); }, [helpOpen]);
+  const [touchOnly] = useState(() => {
+    try { return typeof window !== 'undefined' && !!window.matchMedia?.('(hover: none) and (pointer: coarse)').matches; } catch { return false; }
+  });
+  const [mixerOpen, setMixerOpen] = useState(false);
+  const [transport, setTransportState] = useState<TransportPrefs>(readTransportPrefs);
+  const setTransport = useCallback((next: TransportPrefs): void => { setTransportState(next); writeTransportPrefs(next); }, []);
+  /** CHECK MY TIMING: listening (taps so far), or its result line. The run itself (clicks, taps, the timer) is in the ref. */
+  const [check, setCheck] = useState<{ phase: 'listening'; taps: number } | { phase: 'done'; ok: boolean; line: string } | null>(null);
+  const checkRef = useRef<{ clicks: number[]; taps: number[]; beat: number; timer: number | null } | null>(null);
+  /** The saved calibration the rooms apply, shown as "your offset +75 ms". */
+  const [savedCal, setSavedCal] = useState(readSavedCal);
+  useEffect(() => {
+    const on = (): void => setSavedCal(readSavedCal());   // another tab (the calibrate page) saved one
+    window.addEventListener('storage', on);
+    return () => window.removeEventListener('storage', on);
+  }, []);
+  /** A library failure, kept on screen until dismissed or the next library success (P3: a 2.2 s toast said it). */
+  const [libraryLine, setLibraryLine] = useState<string | null>(null);
+  /** Where the transient line floats (ui/gridMath toastSpot): clear of the grid and the transport. */
+  const [toastAt, setToastAt] = useState<'top' | 'bottom'>('bottom');
+  const gridRef = useRef<HTMLDivElement>(null);
+  const transportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => {
@@ -370,11 +599,19 @@ export default function StudioMode({
 
   const say = useCallback((msg: string) => {
     setToast(msg);
+    setToastAt(toastSpotFor([gridRef.current, transportRef.current]));   // MUSIC-SUITE P4: clear of the grid + transport
     // MUSIC-SUITE P3 FIX PASS (2026-09-25): clear THIS line only — every say scheduled a blind clear, so an older line's
     // timer wiped a newer one early (a save-failure or "turn SONG MODE off" line vanished in ~200 ms; measured in the probe)
     setTimeout(() => setToast((t) => (t === msg ? '' : t)), 2200);
   }, []);
   sayLater.current = say;   // MUSIC-SUITE P3: the project hook speaks through the room's toast
+  // MUSIC-SUITE P4: the line moves as the page scrolls under it (it follows the free band, and never takes a tap)
+  useEffect(() => {
+    if (!toast) return;
+    const on = (): void => setToastAt(toastSpotFor([gridRef.current, transportRef.current]));
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, [toast]);
 
   // MUSIC-SUITE P3 (2026-09-25): the library's first-read work — moving pre-P3 songs' audio out of localStorage, repairing
   // the walk-out's copy, clearing audio a failed delete left — then a re-read, and any line it has for the player.
@@ -383,7 +620,9 @@ export default function StudioMode({
     void StudioLibrary.ready().then((rep) => {
       if (!live) return;
       setLibraryRev((r) => r + 1);
-      if (rep.lines.length) say(rep.lines.join(' · '));
+      // MUSIC-SUITE P4 (P3's open item): the library's lines last — a moved library or a list that could not be read is
+      // not a 2.2 s toast
+      if (rep.lines.length) setLibraryLine(rep.lines.join(' · '));
     });
     return () => { live = false; };
   }, [say]);
@@ -419,10 +658,16 @@ export default function StudioMode({
     // nothing open and scored EARLY in 25 of 25 timer phases). The judge listens where the player does: the saved
     // calibration, else the device's output delay (performLatencySec). An empty grid offers no notes (performNoteAt).
     eng.onStepScheduled = (s, t, sound) => {
+      // MUSIC-SUITE P5 (2026-09-25): the FLIP's ARM REC places a tap by these (chopEdit.recordStep — the nearest step on
+      // the audio clock, swing included); the last three bars are plenty
+      const marks = stepMarksRef.current;
+      marks.push({ step: s, time: t });
+      if (marks.length > 48) marks.splice(0, marks.length - 48);
       if (modeRef.current !== 'perform') return;
       const set = setRef.current;
       set.latencySec = performLatencySec({
         savedOffsetMs: savedOffsetRef.current, outputLatency: eng.context.outputLatency, baseLatency: eng.context.baseLatency,
+        graphLatencySec: eng.graphLatencySec,   // MUSIC-SUITE P4 FIX PASS: the limiter's 6 ms (12 with MASTER) — neither path holds it
       });
       const now = eng.context.currentTime;
       const { missed } = performNoteAt(sound) ? set.note(s, t, now) : set.rest(s, t, now);
@@ -455,6 +700,20 @@ export default function StudioMode({
   useEffect(() => { engineRef.current?.masterPolish(polished); }, [polished, ready]);
   // …and WHICH ROWS sound: exactly the rows the grid draws (MusicTiers.shownRowIds), whatever the source.
   useEffect(() => { engineRef.current?.setAudible(shownIds); }, [shownIds]);
+  // MUSIC-SUITE P4 (2026-09-25): THE DESK follows the project (PHASE-4 ENGINE CONTRACT (5)) — a strip moved, an undo, a
+  // project opened — live now and in every render after (the same graph builder: mixGraph.ts)
+  // MUSIC-SUITE P4 FIX PASS (2026-09-25): …as it can SOUND — a solo on a strip that is not drawn (TAKES with no take left, a
+  // row the tier hides) is dropped (mixGraph.scopeSolo): it silenced every row from where no S could turn it off.
+  const liveStripIds = useMemo(() => {
+    const own = visibleRows(tracks, caps);
+    return [...own.kit, ...own.flip].map((t) => t.sampleId).concat(project.takes.length ? [TAKES_CHANNEL] : []);
+  }, [tracks, caps.tracks, project.takes.length]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const deskHeard = useMemo(() => scopeSolo(mixerOf(project), liveStripIds), [project.mixer, liveStripIds]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { engineRef.current?.setMixer(deskHeard); }, [deskHeard, ready]);
+  // …and the METRONOME (contract (3)): a quarter-note click on the audio clock, the downbeat accented, never in a render.
+  // MUSIC-SUITE P4 FIX PASS: never in a PERFORM set either (decision #13 — its clicks are tapped, and a tap that finds no
+  // note is an EXTRA: a miss)
+  useEffect(() => { engineRef.current?.setMetronome(transport.metronome && mode !== 'perform'); }, [transport.metronome, mode, ready]);
 
   // ── MUSIC-SUITE P2 (2026-09-25): THE SHOP ────────────────────────────────────────────────────────────────────────
   // P1 (outbox musicsuite/understand-wf_3a55346f-032.json): pickKit and cellAssist charged straight from the click
@@ -541,6 +800,9 @@ export default function StudioMode({
     const p = (async (): Promise<DecodedSource> => {
       const eng = engineRef.current;
       if (!eng) throw new Error('the studio is still starting');
+      // MUSIC-SUITE P5 (2026-09-25): a FEL Flip pack item comes back gapless with FEL's cuts, a kit as its files joined one
+      // per pad (flipPack.ts); null = not a pack source (or pack.json unreachable), decoded the plain way below
+      if (!src.audio && src.url) { const packed = await decodeFlipPackSource(eng.context, src.url); if (packed) return packed; }
       let bytes: ArrayBuffer | null = null;
       if (src.audio) bytes = await room.loadAudio(src.audio);
       else if (src.url) { const r = await fetch(src.url); if (!r.ok) throw new Error(String(r.status)); bytes = await r.arrayBuffer(); }
@@ -553,16 +815,195 @@ export default function StudioMode({
     return p;
   }, [room.loadAudio]);
 
-  /** One Flip row's chop, decoded from its source and cut at the rate it was sliced at. */
+  /**
+   * One Flip row's chop, decoded from its source and cut at the rate it was sliced at.
+   * MUSIC-SUITE P5 (2026-09-25): BAKED — the pad's pitch, gate and reverse and the edge fades are in the buffer
+   * (FlipPad.bakedBuffer, the same one the pad plays). It was the raw slice (chopBuffer), so a row never had the pad's
+   * gate, and its pitch only as the steps' notes. Kept by bakeKey (chopCache) so song mode can swap a section's own
+   * chops in on the bar line without waiting for a decode.
+   */
+  const chopCache = useRef(new Map<string, AudioBuffer>());
   const chopFor = useCallback(async (row: ProjectFlipRow): Promise<AudioBuffer> => {
+    const key = bakeKey(row);
+    const hit = chopCache.current.get(key);
+    if (hit) return hit;
     const d = await loadFlipSource(row.source);
     const eng = engineRef.current;
     if (!eng) throw new Error('the studio is still starting');
-    return chopBuffer(eng.context, d, row.slice, row.reverse, row.rate);
+    const b = bakedBuffer(eng.context, d, row);
+    chopCache.current.set(key, b);
+    return b;
   }, [loadFlipSource]);
   const sayGone = useCallback((gone: readonly string[]): void => {
     if (gone.length) say(`${gone.join(', ')}: the sound isn't on this device any more — the row is silent until you send a pad to ${gone.length === 1 ? 'it' : 'them'} again`);
   }, [say]);
+
+  // MUSIC-SUITE P5 (2026-09-25), P3 deferred: "decoded Flip sources stay in memory for the room's life (large uploads)".
+  // sourceCache only ever grew — every source ever opened, in every project, until the room closed. Now whatever the open
+  // project no longer plays (a cleared bank, a replaced source, the last project's sources after another opens) is let go
+  // (chopEdit.liveSourceKeys); an UNDO that brings one back decodes it again. The baked chops follow the same rule.
+  useEffect(() => {
+    pruneMap(sourceCache.current, liveSourceKeys(project));
+    const rows = [...project.flipRows, ...project.sections.flatMap((s) => s.chops ?? [])];
+    pruneMap(chopCache.current, new Set(rows.map(bakeKey)));
+    // song mode: every section's own chops ready before its bar line comes (a decode can't wait for the bar)
+    if (ready && room.restored) for (const r of rows) if (!chopCache.current.has(bakeKey(r))) void chopFor(r).catch(() => undefined);
+  }, [project.flip, project.flipRows, project.sections, ready, room.restored, chopFor]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { sourceCache.current.clear(); chopCache.current.clear(); }, []);
+
+  /**
+   * MUSIC-SUITE P5: SONG MODE PLAYS A SECTION'S OWN CHOPS. SongPanel tells the room which section a bar plays (onSongNow,
+   * from engine.onBar — before that bar's steps are scheduled); the section's Flip rows get the chops it was saved with
+   * (StudioProject.sectionChopsFor; the grid's chops when it has none, and when song mode ends). Loaded only when they
+   * change.
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): a chop not baked yet was SKIPPED and retried only on the next bar line — which
+   * song mode off never has — so (a) a section chop that could not be decoded (a mic take swept from the store) left the
+   * row playing the GRID's chop, with no line; (b) after song mode ended, a grid row whose chop had failed kept the last
+   * SECTION's chop instead of going silent; (c) an undo, a SEND or a recorded hit during song mode loaded the WORKING
+   * chops over the playing section's until the next bar. Now a missing chop is baked and the swap runs again the moment
+   * it is ready (no bar line needed); one that can't be had leaves its row SILENT and says so once (swapFailed); and the
+   * working-chop loads re-apply the playing section's own (resyncSection). `p` = the project to read (an undo's target).
+   */
+  const swapSig = useRef('');
+  /** MUSIC-SUITE P5 FIX PASS: the section song mode is playing (null = the grid), and the chops that could not be had. */
+  const swapNow = useRef<string | null>(null);
+  const swapFailed = useRef(new Set<string>());
+  const swapRef = useRef<(id: string | null, p?: Pick<StudioProject, 'sections' | 'flipRows'>) => void>(() => undefined);
+  const swapSectionChops = useCallback((sectionId: string | null, p: Pick<StudioProject, 'sections' | 'flipRows'> = projectRef.current): void => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    swapNow.current = sectionId;
+    const want = sectionChopsFor(sectionId ? p.sections.find((s) => s.id === sectionId) ?? null : null, p.flipRows);
+    const sig = JSON.stringify([sectionId, want.map(bakeKey)]);
+    if (sig === swapSig.current) return;
+    const plan = planChopSwap(want, (k) => chopCache.current.get(k), swapFailed.current);
+    for (const { row, buffer } of plan.load) eng.loadBuffer(row.sampleId, row.label, buffer, 'melody');
+    for (const id of plan.silence) eng.unloadSample(id);   // a chop that can't be had: silent, never another chop
+    for (const r of plan.pending) {
+      const key = bakeKey(r);
+      void chopFor(r).then(
+        () => { if (swapNow.current === sectionId) { swapSig.current = ''; swapRef.current(sectionId); } },
+        () => {
+          const first = !swapFailed.current.has(key);
+          swapFailed.current.add(key);
+          if (swapNow.current !== sectionId) return;
+          eng.unloadSample(r.sampleId);
+          if (first) sayGone([r.label]);
+        },
+      );
+    }
+    swapSig.current = plan.done ? sig : '';
+  }, [chopFor, sayGone]);
+  swapRef.current = swapSectionChops;
+  /**
+   * MUSIC-SUITE P5 FIX PASS: the engine was just given WORKING chops (an undo, a SEND, a recorded hit); while song mode
+   * plays a section, its own chops go back at once — read from `p`, the project as the edit leaves it.
+   */
+  const resyncSection = useCallback((p: Pick<StudioProject, 'sections' | 'flipRows'>): void => {
+    swapSig.current = '';
+    if (swapNow.current !== null) swapRef.current(swapNow.current, p);
+  }, []);
+  const songNowChanged = useCallback((id: string | null): void => { setSongNow(id); swapSectionChops(id); }, [swapSectionChops]);
+  /**
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): RENDER SONG and STEMS — what each bar's Flip rows play: its section's own chops
+   * (else the grid's), every one baked first (studioEdit.songBarSounds). The renders read the engine's sounds, i.e. the
+   * last section song mode swapped in, for every bar.
+   */
+  const songRenderSounds = useCallback(async (bars: number): Promise<RenderSounds[]> => {
+    const p = projectRef.current;
+    await Promise.allSettled(songChops(p.flipRows, p.sections, bakeKey).map((r) => chopFor(r)));
+    return songBarSounds(p.chain, p.sections, p.flipRows, bars, (r) => chopCache.current.get(bakeKey(r)) ?? null);
+  }, [chopFor]);
+  // MUSIC-SUITE P5: the dev/probe hook (scripts/probes/_music-p5-flip-editor.mts)
+  useEffect(() => {
+    window.__FEL_FLIP_ROOM__ = {
+      clock: flipClock, sources: () => [...sourceCache.current.keys()], chops: () => chopCache.current.size,
+      loaded: (id) => engineRef.current?.hasSample(id) ?? false,
+      peek: async (key, at, n) => { const d = await sourceCache.current.get(key)?.catch(() => null); return d ? Array.from(d.mono.slice(Math.max(0, at - n), at + n)) : null; },
+    };
+    return () => { delete window.__FEL_FLIP_ROOM__; };
+  }, [flipClock]);
+
+  /**
+   * A live pad hit written into the grid (FlipPad's ARM REC, and a phone hit on any tab). MUSIC-SUITE P5 (phone-mpc): this
+   * was FlipPad's inline onRecordHit; it is the room's now so a phone hit on the STUDIO tab records by the same rule, and
+   * a MEASURED velocity (a paired phone's) is written into the step (StudioProject.withTrackStep — the grid plays a step at
+   * volume × vel). A hit with no velocity leaves the step's velocity as it was (a screen tap never had one).
+   */
+  const recordFlipHit = useCallback((pad: number, step: number, chop: { buffer: AudioBuffer; row: ProjectFlipRow }, velocity?: number | null): void => {
+    // MUSIC-SUITE P3 FIX PASS: a row that holds ANOTHER chop (sent from an earlier source, or one that failed to
+    // load after a reload) takes the pad's chop on the first recorded hit — what the taps sound like is what the
+    // row plays. One undo step with the burst.
+    // MUSIC-SUITE P5: pitch and gate are baked into the chop — a retuned pad is another chop (MUSIC-SUITE P5 FIX PASS:
+    // chopSignature carries both now)
+    const differs = (p: StudioProject): boolean => {
+      const r = p.flipRows.find((x) => x.sampleId === chop.row.sampleId);
+      return !r || chopSignature(r) !== chopSignature(chop.row);
+    };
+    const had = projectRef.current.flipRows.some((r) => r.sampleId === chop.row.sampleId);
+    if (differs(projectRef.current)) {
+      engineRef.current?.loadBuffer(chop.row.sampleId, chop.row.label, chop.buffer, 'melody');
+      chopCache.current.set(bakeKey(chop.row), chop.buffer);
+      resyncSection(withFlipRow(projectRef.current, chop.row));   // MUSIC-SUITE P5 FIX PASS: a playing section keeps its own
+      if (had) say(`${chop.row.label} now plays pad ${pad + 1}'s chop (it replaced the row's old one — UNDO puts it back)`);
+    }
+    edit((p) => withFlipHit(differs(p) ? withFlipRow(p, chop.row) : p, chop.row.sampleId, step), 'flip-rec');
+    // …and the phone's measured velocity on that step (the same 'flip-rec' undo step as the hit)
+    if (typeof velocity === 'number' && Number.isFinite(velocity)) edit((p) => ({ ...p, tracks: withTrackStep(p.tracks, chop.row.sampleId, step, { vel: velocity }, p.key) }), 'flip-rec');
+  }, [edit, say, resyncSection]);
+
+  // ── MUSIC-SUITE P5 (2026-09-25), phone-mpc: a phone hit on a tab where FlipPad is not mounted ─────────────────────
+  // The room plays the bank's pad itself: the same baked chop FlipPad plays (padRowFor → chopFor → FlipPad.bakedBuffer),
+  // through the strip of the row it goes to, at the phone's velocity; with ARM REC on and the transport running it lands
+  // on the step tapStep picks (the same rule as FLIP's ARM REC) at the tap's own time. A chop still decoding when the hit
+  // comes (the first hit after a reload) is NOT played late: a pad that sounds 300 ms after the finger is worse than one
+  // that says it is loading — the bank's pads are baked ahead while a phone is connected (below) so this is rare.
+  const phoneSaid = useRef({ full: false, loading: false, tick: false });
+  const playPhonePad = (pad: number, hit: PadHit): 'played' | 'loading' | 'empty' => {
+    const eng = engineRef.current;
+    if (!eng) return 'empty';
+    const p = projectRef.current;
+    const bk = flipBankRef.current;
+    const b = bankOf(p.flip, bk);
+    if (!b.source || !b.chops[pad]?.slice) return 'empty';
+    const slot = rowSlotFor(p.flipRows, p.tracks.map((t) => t.sampleId), bk, pad);
+    const row = padRowFor(b, bk, pad, slot, null);                  // null when all 16 rows are taken: it still plays
+    const spec = row ?? padRowFor(b, bk, pad, { slot: pad }, null);
+    if (!spec) return 'empty';
+    const go = (buffer: AudioBuffer): void => {
+      const ctx = eng.context;
+      if (ctx.state === 'suspended') void ctx.resume();
+      const node = ctx.createBufferSource(); node.buffer = buffer;
+      const g = ctx.createGain(); g.gain.value = padGain(hit.velocity);
+      node.connect(g).connect(eng.channelInput(flipSampleId(slot?.slot ?? pad))); node.start();
+      if (!flipRecArmRef.current || !eng.isRunning) return;
+      // MUSIC-SUITE P5 FIX PASS (decision #15): an upload from before the tick is not recorded until it is ticked (FLIP tab)
+      if (uploadNeedsTick(b.source)) { if (!phoneSaid.current.tick) { phoneSaid.current.tick = true; say(`Tick "I made this or I own the rights" for ${b.source?.label} on the FLIP tab to record it`); } return; }
+      const step = tapStep(flipClock(), STEPS, readQuantize(), playhead, hit.atSec);
+      if (!row) { if (!phoneSaid.current.full) { phoneSaid.current.full = true; say('All 16 Flip rows are taken — this pad has no row to record into (clear a row in STUDIO first)'); } return; }
+      if (step !== null) recordFlipHit(pad, step, { buffer, row }, hit.velocity ?? null);
+    };
+    const cached = chopCache.current.get(bakeKey(spec));
+    if (cached) { go(cached); return 'played'; }
+    // not baked yet: a decoded source bakes in a microtask (played at once); a source still decoding may miss the hit
+    const t0 = eng.context.currentTime;
+    void chopFor(spec).then(
+      (buffer) => {
+        if (eng.context.currentTime - t0 <= PHONE_LATE_S) { go(buffer); return; }
+        if (!phoneSaid.current.loading) { phoneSaid.current.loading = true; say(`Phone: bank ${PHONE_BANKS[bk]} was still loading — that hit came too late to play`); }
+      },
+      () => undefined,
+    );
+    return 'loading';
+  };
+  // while a phone is connected, the bank on its pads is baked ahead (a hit then never waits for a decode) — again after
+  // every change that lets the room's chop cache go (the prune above runs on the same changes, before this)
+  useEffect(() => {
+    if (!phones || !ready || !room.restored) return;
+    const b = bankOf(project.flip, flipBank);
+    if (!b.source) return;
+    b.chops.forEach((_c, i) => { const r = padRowFor(b, flipBank, i, { slot: i }, null); if (r && !chopCache.current.has(bakeKey(r))) void chopFor(r).catch(() => undefined); });
+  }, [phones, flipBank, project.flip, project.flipRows, project.sections, ready, room.restored, chopFor]);
 
   // MUSIC-SUITE P3 FIX PASS: a project opened — the engine forgets every Flip sound first (flipRowSounds.openFlipRowSounds),
   // so a row whose chop can't be had plays nothing instead of the last project's chop. The kit and MASTER follow their
@@ -572,6 +1013,8 @@ export default function StudioMode({
     const eng = engineRef.current;
     if (!eng) return;
     let alive = true;
+    swapSig.current = '';   // MUSIC-SUITE P5: the engine's Flip sounds are the new project's now
+    swapNow.current = null; swapFailed.current.clear();   // MUSIC-SUITE P5 FIX PASS: song mode is off in a newly opened project
     void openFlipRowSounds(eng, projectRef.current.flipRows, chopFor, () => alive).then((gone) => { if (alive) sayGone(gone); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -621,7 +1064,7 @@ export default function StudioMode({
   const toggleHearPreview = (): void => {
     if (!hearPreview) {
       if (songMode) setSongMode(false);
-      if (!playing) togglePlay();
+      if (!playing) playOrStop(false);   // MUSIC-SUITE P4: a preview starts at once, never after a count-in
     }
     setHearPreview((h) => !h);
   };
@@ -656,6 +1099,32 @@ export default function StudioMode({
   const songSection = songMode ? shownSection(project.chain, project.sections, songNow) : null;
   const gridTracks = previewing ?? songSection?.tracks ?? tracks;
   const gridLock: 'preview' | 'song' | null = previewing ? 'preview' : songSection ? 'song' : null;
+  // MUSIC-SUITE P4: the rows the grid draws — kit then Flip, P3's one rule (MusicTiers.visibleRows) — for the grid, the
+  // key cursor and the mixer's strips alike
+  const rows = visibleRows(gridTracks, caps);
+  const drawn = [...rows.kit, ...rows.flip];
+  const flipName = (id: string): string => {
+    const r = project.flipRows.find((x) => x.sampleId === id);
+    return r ? `${r.label} · ${r.source.label}` : `FLIP ${Number(id.slice(5)) + 1}`;
+  };
+  const rowName = (id: string): string => KIT_SLOTS.find((k) => k.id === id)?.name ?? flipName(id);
+  /** A row as the grid draws it: its notes' names (pitched rows) and whether the desk keeps it silent (M / S). */
+  const gridRow = (t: TrackState): StepGridRow => {
+    const pitched = isPitchedRow(t.sampleId);
+    const c = channelMix(deskHeard, t.sampleId);   // MUSIC-SUITE P4 FIX PASS: the desk as it sounds (scopeSolo)
+    return {
+      id: t.sampleId, label: rowName(t.sampleId), track: t, pitched,
+      notes: pitched ? t.pattern.map((_, i) => cellNoteLabel(t, i, project.key)) : undefined,
+      silent: c.mute ? 'mute' : anySolo(deskHeard) && !c.solo ? 'solo' : null,
+    };
+  };
+  /** MUSIC-SUITE P4: the booth starts / stops the room's transport (RECORD from a stop: the engine has counted in already). */
+  const boothTransport = (play: boolean): void => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    if (play) { if (!eng.isRunning) eng.start(); setPlaying(true); }
+    else { eng.stop(); setPlaying(false); setPlayhead(-1); }
+  };
 
   /** A cell, by row id (the grid draws a filtered list, so its index is not the project's). An undo step. */
   const toggleCell = (sampleId: string, si: number): void => {
@@ -663,6 +1132,38 @@ export default function StudioMode({
     if (gridLock === 'preview') { say("That's CELL's preview — BUY it or CANCEL to edit your grid"); return; }
     edit((p) => ({ ...p, tracks: toggleStep(p.tracks, sampleId, si) }));
   };
+
+  // ── MUSIC-SUITE P4 (2026-09-25), grid-ui: the pocket studio's edits ──────────────────────────────────────────────
+  /** Why the grid can't be edited right now (song mode's section, CELL's preview) — said on a press, as toggleCell does. */
+  const lockLine = (): string => (gridLock === 'song'
+    ? `SONG MODE is playing "${songSection?.name ?? 'the song'}" — turn it off to edit your own grid`
+    : "That's CELL's preview — BUY it or CANCEL to edit your grid");
+  /**
+   * DRAG-TO-PAINT (ui/StepGrid → ui/gridMath): the stroke's cells take its one value — an off cell pressed paints ON, an
+   * on cell paints OFF. Each cell goes through StudioProject.withTrackStep (a pitched row keeps its step's note). The whole
+   * stroke is ONE undo step (grouped by its number).
+   */
+  const paintCells = (cells: readonly { row: string; step: number }[], value: boolean, stroke: number): void => {
+    if (gridLock) { say(lockLine()); return; }
+    edit((p) => ({ ...p, tracks: cells.reduce((t, c) => withTrackStep(t, c.row, c.step, { on: value }, p.key), p.tracks) }), `paint:${stroke}`);
+  };
+  /** A NoteRow tap (ui/noteMath pickNote): the step lights on that note, or goes off if it already plays it. Locked to the key. */
+  const pickStepNote = (rowId: string, step: number, midi: number): void => {
+    if (gridLock) { say(lockLine()); return; }
+    edit((p) => {
+      const t = p.tracks.find((x) => x.sampleId === rowId);
+      return t ? { ...p, tracks: withTrackStep(p.tracks, rowId, step, pickNote(t, step, midi, p.key), p.key) } : p;
+    });
+  };
+  /** THE KEY: every note row's notes move with it (StudioProject.setProjectKey); one undo step (the key is in the slice). */
+  const changeKey = (k: SongKey): void => {
+    if (k.root === project.key.root && k.scale === project.key.scale) return;
+    edit((p) => setProjectKey(p, k), 'key');
+    say(`Key: ${keyLabel(k)} — your bass and lead notes moved with it (UNDO puts them back)`);
+  };
+  /** THE DESK (THE STUDIO tier): a strip or the master moved — a project edit (one undo step per slider drag, autosaved). */
+  const stripChange = (id: string, patch: Partial<ChannelMix>, group?: string): void => { edit((p) => withChannel(p, id, patch), group); };
+  const masterChange = (level: number, group?: string): void => { edit((p) => withMaster(p, level), group); };
 
   /**
    * UNDO / REDO: put back what an edit replaced (an other chop reloads its sound). MUSIC-SUITE P3 FIX PASS: rows it
@@ -677,26 +1178,45 @@ export default function StudioMode({
     update((p) => ({ ...p, ...to }));
     const eng = engineRef.current;
     const gen = genRef.current;
-    if (eng) void reloadFlipRowSounds(eng, cur.flipRows, to.flipRows, chopFor, () => genRef.current === gen).then((gone) => { if (genRef.current === gen) sayGone(gone); });
+    // MUSIC-SUITE P5 FIX PASS: …and then, under song mode, the playing section's own chops go back over the working ones
+    if (eng) void reloadFlipRowSounds(eng, cur.flipRows, to.flipRows, chopFor, () => genRef.current === gen).then((gone) => {
+      if (genRef.current !== gen) return;
+      sayGone(gone);
+      resyncSection({ sections: to.sections, flipRows: to.flipRows });
+    });
+    // (MUSIC-SUITE P5 FIX PASS: a row whose pitch or gate the step moved reloads through the same call — studioEdit
+    // chopSignature carries both now; P5 had a second pass here, chopEdit.retunedRows)
+    resyncSection({ sections: to.sections, flipRows: to.flipRows });
     const done = dir === 'undo' ? 'Undone' : 'Redone';
     say(gridLock === 'song' ? `${done} (your own grid, hidden under SONG MODE)` : done);
   };
-  const stepHistoryRef = useRef(stepHistory); stepHistoryRef.current = stepHistory;
-  // ⌘Z / Ctrl+Z undo, ⇧⌘Z / Ctrl+Shift+Z / Ctrl+Y redo — on the STUDIO tab only (the FLIP tab's keys are its pads), and
-  // never while typing in a field (a title, a section's new name).
+  // MUSIC-SUITE P4 (2026-09-25): THE KEY MAP (ui/keys.ts, one pure table — P3's ⌘Z / Ctrl+Z / ⇧⌘Z / Ctrl+Y are in it, plus
+  // Space, the arrows, Enter, ⌥↑↓, B (the booth), ? and Esc). It never answers on the FLIP tab (the pad keys, Flip.ts:22), never
+  // takes PERFORM's Space / J (P2's handler below), and nothing while typing in a field. A taken Space also cancels its
+  // keyup, so a focused button (STOP) is not pressed by it a second time (P2's rule). `keyActRef` does the action.
+  const keyActRef = useRef<(a: StudioKeyAction) => boolean>(() => false);
+  // MUSIC-SUITE P4 FIX PASS (2026-09-25): THE ROOM IS ON SCREEN — the keys (this map and PERFORM's Space / J below) listen
+  // only once the splash has let the player in; before that the splash's own buttons have their keys. And SUSPENDED: set
+  // when a set is handed to the shell's end card (endSet), which covers the still-mounted room until REPLAY remounts it;
+  // cleared by a press inside the room (a host with no card over it — /dev/music — is back at the first touch).
+  const roomShown = started && ready && room.restored;
+  const keysSuspended = useRef(false);
   useEffect(() => {
-    if (view !== 'studio') return;
+    if (!roomShown) return;
+    const ctx = (e: KeyboardEvent) => ({ view, mode, target: keyTargetOf(e.target as HTMLElement | null), checking: !!checkRef.current });
     const onKey = (e: KeyboardEvent): void => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
-      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (k === 'z') { e.preventDefault(); stepHistoryRef.current(e.shiftKey ? 'redo' : 'undo'); }
-      else if (k === 'y') { e.preventDefault(); stepHistoryRef.current('redo'); }
+      if (keysSuspended.current) return;
+      const a = studioKeyAction(e, ctx(e));
+      if (a && keyActRef.current(a)) e.preventDefault();
+    };
+    const onUp = (e: KeyboardEvent): void => {
+      if (keysSuspended.current) return;
+      if (cancelsKeyUp(e, studioKeyAction({ key: e.key, shiftKey: e.shiftKey, metaKey: e.metaKey, ctrlKey: e.ctrlKey, altKey: e.altKey }, ctx(e)))) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [view]);
+    window.addEventListener('keyup', onUp);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onUp); };
+  }, [view, mode, roomShown]);
 
   /** CLEAR (asked first): every step off, every row kept. An undo step. */
   const clearNow = (): void => {
@@ -707,14 +1227,28 @@ export default function StudioMode({
 
   // MUSIC-SUITE P3: SEND TO THE DANCE FLOOR at the tier the ladder names (the GRID): the chain once there is one, else the
   // grid itself looped — only the rows the room draws and plays (DanceExport.danceSongAtTier).
+  // MUSIC-SUITE P4 FIX PASS (2026-09-25): …and only rows the DESK lets through (a muted or soloed-out row is not in the
+  // render, so it is not charted either — the dance floor charted rows the published audio left out)
   const danceSong = useMemo(() => danceSongAtTier({
     danceExport: caps.danceExport, arrangement: caps.arrangement, chain: project.chain, sections: project.sections, grid: tracks,
-    heard: (t) => shownIds.has(t.sampleId),
-  }), [caps.danceExport, caps.arrangement, project.chain, project.sections, tracks, shownIds]);
-  const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong]);
+    heard: (t) => shownIds.has(t.sampleId) && gateOpen(deskHeard, t.sampleId),
+  }), [caps.danceExport, caps.arrangement, project.chain, project.sections, tracks, shownIds, deskHeard]);
+  const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong, project.key]);
+  // MUSIC-SUITE P5 (2026-09-25), owner decision #15: a song that plays a YOUR FILE upload stays on this device; the line
+  // says why. Before, the P3 mark (ProjectFlipSource.upload) was carried everywhere and read nowhere (uploadPrivacy.ts).
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): "on this device" = never shared off it. P5 closed PUBLISH and SEND TO THE DANCE
+  // FLOOR for any project with an upload ANYWHERE (an idle bank D, a saved kit) — both stay on the device (the library's
+  // server calls are unimplemented seams; the dance export is an audio-free chart), so decision #7 went for nothing. The
+  // doors are uploadPrivacy.UPLOAD_DOORS (one switch back to the stricter reading); the rule counts what the SONG plays.
+  const privacy = useMemo(() => projectUploadPrivacy(project), [project]);
+  const danceOpen = uploadDoorOpen('danceFloor', privacy);
+  const libraryOpen = uploadDoorOpen('library', privacy);
   const sendToDance = (): void => {
     if (!danceSong) return;
-    const out = exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong });
+    if (!danceOpen) { setLibraryLine(privacy.line); return; }
+    // MUSIC-SUITE P4: the song's key rides on the dance floor's card ('Your song · Am · 64 hits')
+    // MUSIC-SUITE P4 FIX PASS: the key in words ('A minor') — the Cypher's chip upper-cases the blurb ('Am' read 'AM')
+    const out = exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) });
     if (!out) { say('nothing to dance to yet — put a hit in the grid first'); return; }
     // MUSIC-SUITE P3 FIX PASS: the write can fail (a full localStorage, private mode) — then it was NOT sent, and says so
     if (!saveExportedTrack(out)) { say("Not sent — this browser wouldn't keep the dance export (storage full or private mode). Free some space and send it again."); return; }
@@ -722,24 +1256,120 @@ export default function StudioMode({
     say(`"${out.track.name}" sent to the dance floor · ${out.summary.hits} hits · ${out.track.bars} bars${danceSong.from === 'grid' ? ' (your grid, looped)' : ''} · ${'●'.repeat(out.track.difficulty)}`);
   };
 
-  const togglePlay = (): void => {
+  const togglePlay = (): void => { playOrStop(true); };
+  /**
+   * PLAY / STOP. MUSIC-SUITE P4: with COUNT-IN on, PLAY counts the bars in on the audio clock first (engine.countIn — the
+   * count's own click, its downbeats accented) and the song starts on bar 0; `countIn` false starts at once (HEAR IT). A
+   * running timing check is called off by either.
+   * MUSIC-SUITE P5 (phone-mpc): `want` = a paired phone's PLAY or STOP, decided on the ENGINE's state (phonePad
+   * transportEffect) — two phone presses can land before a render, when `playing` here still says what it was.
+   */
+  const playOrStop = (countIn: boolean, want?: 'start' | 'stop'): void => {
     const eng = engineRef.current;
     if (!eng) return;
-    if (playing) { eng.stop(); setPlaying(false); setPlayhead(-1); }
+    if (checkRef.current) finishCheckRef.current(true);
+    if (want ? want === 'stop' : playing) { eng.stop(); setPlaying(false); setPlayhead(-1); }
     else {
-      eng.start(); setPlaying(true);
+      // MUSIC-SUITE P4 FIX PASS (2026-09-25), decision #13: a PERFORM set starts on the press, never after the studio's
+      // COUNT-IN (its clicks were tapped and scored as EXTRAs)
+      if (countIn && transport.countIn > 0 && mode !== 'perform' && modeRef.current !== 'perform') eng.countIn(transport.countIn); else eng.start();
+      setPlaying(true);
     }
+  };
+
+  // ── MUSIC-SUITE P4 (2026-09-25): CHECK MY TIMING (ui/timingCheck) ─────────────────────────────────────────────────
+  // P2 promised "an 8-tap check in the count-in" and moved it here (the Academy had no count-in). The engine counts in 2
+  // bars at the calibration tempo (80 BPM — ui/timingCheck says why), the player taps the 8 clicks, the transport stops
+  // before bar 0 (nothing of the song plays), and the reading is saved DATED where PERFORM and the Cypher read it.
+  // MUSIC-SUITE P4 FIX PASS (2026-09-25): a LEAD-IN bar first (CHECK_COUNT_BARS = 3; the last 8 clicks are read — the
+  // first click came 50 ms after the press, so tap 1 was a reaction, and a phone's TAP appeared only after the press), and
+  // the clicks are read as they leave the desk (heardClicks + engine.graphLatencySec): the saved offset is the device's
+  // alone, as /play/calibrate saves it. The review's "the window closes 200 ms into bar 0" does not hold: it closes at the
+  // last click + beat − 200 ms (checkWindow), 200 ms BEFORE bar 0, and stop() takes back every hit not yet begun.
+  const finishCheckRef = useRef<(cancelled?: boolean) => void>(() => undefined);
+  const bpmRef = useRef(bpm); bpmRef.current = bpm;
+  const finishCheck = (cancelled = false): void => {
+    const run = checkRef.current;
+    if (!run) return;
+    checkRef.current = null;
+    if (run.timer !== null) window.clearTimeout(run.timer);
+    const eng = engineRef.current;
+    if (eng) { eng.stop(); eng.setBpm(bpmRef.current); }   // the count-in ran at the check's tempo; the song's comes back
+    if (cancelled) { setCheck(null); say('Timing check called off — nothing was saved'); return; }
+    const r = readTimingCheck(run.clicks, run.taps, run.beat);
+    if (r.ok) {
+      saveAudioOffsetMs(r.offsetMs, Date.now());
+      setSavedCal(readSavedCal());
+      setCalStale(false);
+    }
+    setCheck({ phase: 'done', ok: r.ok, line: checkLine(r) });
+  };
+  finishCheckRef.current = finishCheck;
+  const startCheck = (): void => {
+    const eng = engineRef.current;
+    if (!eng || checkRef.current) return;
+    if (mode === 'perform') { say('End the set first — the timing check runs on the studio floor'); return; }
+    if (takeRec) { say(`${boothOnlyMic ? 'Close the mic first' : 'Stop the recording first'} — the timing check stops the transport`); return; }
+    if (playing) { eng.stop(); setPlaying(false); setPlayhead(-1); }
+    eng.setBpm(CHECK_BPM);
+    // the count-in fires the bar-0 hook as it starts; song mode's (SongPanel) would put the section's tempo back before the
+    // clicks are placed, so the hook is held off for the check (nothing of the song plays: it stops before bar 0)
+    const onBar = eng.onBar;
+    eng.onBar = null;
+    const all = eng.countIn(CHECK_COUNT_BARS).clicks.map((c) => c.at);
+    eng.onBar = onBar;
+    // the lead-in bar is heard, never read; the read clicks are taken as they leave the desk (its limiter's look-ahead)
+    const clicks = heardClicks(checkClicks(all), eng.graphLatencySec);
+    const beat = clicks.length > 1 ? clicks[1] - clicks[0] : 0;
+    const w = checkWindow(clicks, beat);
+    if (!w || clicks.length !== CHECK_TAPS) { eng.stop(); eng.setBpm(bpmRef.current); say('The timing check could not start — try again'); return; }
+    const ms = Math.max(0, (w.close - eng.context.currentTime) * 1000);
+    checkRef.current = { clicks, taps: [], beat, timer: window.setTimeout(() => finishCheckRef.current(), ms) };
+    setCheck({ phase: 'listening', taps: 0 });
+  };
+  /** One tap of the check (Space / J / Enter, or the TAP button's pointerdown) on the audio clock. */
+  const tapCheck = (): void => {
+    const run = checkRef.current;
+    const eng = engineRef.current;
+    if (!run || !eng) return;
+    const t = eng.context.currentTime;
+    if (!acceptsTap(t, run.taps, run.clicks, run.beat)) return;
+    run.taps.push(t);
+    setCheck({ phase: 'listening', taps: run.taps.length });
+    if (run.taps.length >= CHECK_TAPS) finishCheck();
+  };
+  // the check never outlives the room (a REPLAY remount, leaving the page)
+  useEffect(() => () => { const run = checkRef.current; if (run?.timer != null) window.clearTimeout(run.timer); checkRef.current = null; }, []);
+
+  /**
+   * B (MUSIC-SUITE P4 FIX PASS: was ⇧R, a Flip pad letter) — THE RECORDING BOOTH (ui/RecordBooth, the booth lane's): arm the mic → RECORD → STOP the take, by pressing the
+   * booth's own buttons (the booth keeps every rule: the tier, the count-in, what a STOP means). Below THE STUDIO there is
+   * no booth, and the room says where recording opens.
+   */
+  const recordKey = (): boolean => {
+    const panel = typeof document === 'undefined' ? null : document.querySelector('[data-qa="song-panel"]');
+    const pick = (qa: string): HTMLButtonElement | null => panel?.querySelector<HTMLButtonElement>(`[data-qa="${qa}"]:not([disabled])`) ?? null;
+    const b = pick('booth-stop') ?? pick('booth-record') ?? pick('booth-arm');
+    if (b) { b.click(); return true; }
+    say(caps.takes ? 'The recording booth is busy — one moment' : `Recording opens at THE STUDIO — ${tierChips(progress).find((c) => c.tier === 'studio')?.needs ?? 'keep building'}`);
+    return true;
   };
 
   // MUSIC-SUITE P2: one tap, from the TAP button's pointerdown or the keyboard's Space / J. The judge takes the nearest
   // note by signed error, so the line says which side it landed on (GOOD · EARLY 112ms), not just that it landed.
-  const performTap = useCallback((): void => {
+  // MUSIC-SUITE P5 (phone-mpc): `at` = a paired phone's tap time (the arrival moved back by half the round trip —
+  // phonePad.phoneTapSec); a screen or key tap is judged at now, as before. NOT in an Arena (staked) set: the round trip
+  // is measured by pings the PHONE answers, so a phone that held its pongs back would buy its late taps an earlier time
+  // (up to MAX_ONE_WAY_MS), and the server cannot check a round trip — a staked set judges a phone tap as it arrives, as
+  // it did before this pass (lib/arena-score-integrity.test.ts pins the judge to the audio clock). Free play corrects.
+  const performTapAt = useCallback((at?: number): void => {
     const eng = engineRef.current;
     if (!eng || modeRef.current !== 'perform') return;
     const set = setRef.current;
-    set.tap(eng.context.currentTime);
+    if (at === undefined || arenaSet) set.tap(eng.context.currentTime); else set.tap(at);
     showTally(set, 0);   // a tap that must WAIT for its note (not scheduled yet) shows when it settles
-  }, [showTally]);
+  }, [showTally, arenaSet]);
+  const performTap = useCallback((): void => { performTapAt(); }, [performTapAt]);
 
   // MUSIC-SUITE P2: PERFORM on the keyboard — Space and J, judged on keydown (a held key is one tap, e.repeat is
   // ignored). Neither is a Flip pad key (Flip.ts PAD_KEYS: 1-4 / q-r / a-f / z-v), and the Flip's own listener only exists
@@ -747,7 +1377,8 @@ export default function StudioMode({
   // Space is taken on keyup too: a focused button (PLAY!) activates on Space's keyup and would stop the music mid-set.
   // Typing in a field is left alone.
   useEffect(() => {
-    if (mode !== 'perform' || view !== 'studio') return;
+    // MUSIC-SUITE P4 FIX PASS: not behind the splash (with the PERFORM stage picked, Space on TAP TO START was taken here)
+    if (mode !== 'perform' || view !== 'studio' || !roomShown) return;
     const typing = (t: EventTarget | null): boolean => {
       const el = t as HTMLElement | null;
       return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
@@ -761,11 +1392,64 @@ export default function StudioMode({
     window.addEventListener('keydown', onDown);
     window.addEventListener('keyup', onUp);
     return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
-  }, [mode, view, performTap]);
+  }, [mode, view, performTap, roomShown]);
+
+  // ── MUSIC-SUITE P5 (2026-09-25), phone-mpc: WHAT THE PHONE'S BUTTONS DO (phonePad.phoneCommand) ──────────────────────
+  // A pad: the tap's time is the arrival moved back by half the phone's measured round trip (the median of its last 8
+  // pings, capped — phonePad.phoneTapSec); a free-play PERFORM set JUDGES it at that time (an Arena set at its arrival:
+  // performTapAt), and it plays the bank's pad — through
+  // FlipPad on the FLIP tab (the pad lights; ARM REC as a screen tap), else the room plays and records it (playPhonePad).
+  // BANK A–D picks the bank on the pads; PLAY / STOP drive the room's transport (the same count-in rule as the PLAY
+  // button); REC arms or disarms ARM REC. HostLobby calls the latest render's handler (its inputRef), so this reads the
+  // room as it is now; the bank / REC / transport decisions read refs and the engine, never a render behind.
+  const phoneInput = (ev: ControlEvent, _slot: number, peerId: PeerId): void => {
+    const cmd = phoneCommand(ev);
+    if (!cmd) return;
+    const eng = engineRef.current;
+    if (cmd.kind === 'pad') {
+      const arrivedAt = Date.now();   // (the probe's readout: the phone stamps ev.t on the same wall clock when both are one machine)
+      const rttMs = medianRtt(rttRef.current.get(peerId) ?? []);
+      const arrival = eng?.context.currentTime;
+      const hit: PadHit = { velocity: cmd.velocity, ...(arrival !== undefined ? { atSec: phoneTapSec(arrival, rttMs) } : {}) };
+      // judged at the finger's time — MUSIC-SUITE P5 FIX PASS: only where a screen tap or Space counts (PERFORM on the
+      // STUDIO view; phonePad.judgesPhoneTap). A pad played as an instrument on FLIP scored EXTRA misses against the set.
+      if (judgesPhoneTap({ mode: modeRef.current, view }) && hit.atSec !== undefined) performTapAt(hit.atSec);
+      const trigger = flipTrigger.current;
+      const how = trigger ? (trigger(cmd.pad, hit), 'flippad') : playPhonePad(cmd.pad, hit);
+      const w = window.__FEL_PHONE__;
+      window.__FEL_PHONE__ = {
+        hits: (w?.hits ?? 0) + 1, bank: PHONE_BANKS[flipBankRef.current], recArm: flipRecArmRef.current, phones,
+        last: { pad: cmd.pad, velocity: cmd.velocity, arrivalSec: arrival ?? null, atSec: hit.atSec ?? null, rttMs, view, how, sentAt: ev.t, arrivedAt },
+      };
+      return;
+    }
+    if (cmd.kind === 'bank') {
+      if (cmd.bank === flipBankRef.current) return;
+      setFlipBank(cmd.bank);
+      phoneSaid.current.loading = false;
+      const src = bankOf(projectRef.current.flip, cmd.bank).source;
+      say(`Phone: bank ${PHONE_BANKS[cmd.bank]} — ${src ? src.label : 'empty (load a sound into it on the FLIP tab)'}`);
+      if (window.__FEL_PHONE__) window.__FEL_PHONE__ = { ...window.__FEL_PHONE__, bank: PHONE_BANKS[cmd.bank] };
+      return;
+    }
+    const fx = transportEffect(cmd.op, { running: eng ? eng.isRunning : playing, recArm: flipRecArmRef.current });
+    if (fx === 'start' || fx === 'stop') playOrStop(true, fx);
+    else if (fx === 'arm' || fx === 'disarm') {
+      setFlipRecArm(fx === 'arm');
+      say(fx === 'arm' ? `Phone: REC armed — ${eng?.isRunning ? 'your pad hits' : 'press PLAY, then your pad hits'} write into the grid` : 'Phone: REC off');
+    }
+  };
+  /** The lobby's peers (every pong, ~1/s): each phone's round trip, and how many are connected (a render only on a change). */
+  const phonePeers = (ps: LobbyPeer[]): void => {
+    for (const p of ps) if (p.connected) rttRef.current.set(p.peerId, pushRtt(rttRef.current.get(p.peerId) ?? [], p.rttMs));
+    const n = ps.filter((p) => p.connected).length;
+    setPhones((was) => (was === n ? was : n));
+  };
 
   const publishTrack = async (): Promise<void> => {
     const eng = engineRef.current;
     if (!eng || saving) return;
+    if (!libraryOpen) { setLibraryLine(privacy.line); return; }   // MUSIC-SUITE P5: decision #15 (the switch shut this door)
     if (!title.trim()) { say('Name your track first'); return; }
     setSaving(true);
     // MUSIC-SUITE P3 (2026-09-25): this was try/finally with no catch around a publish that threw QuotaExceededError on
@@ -782,9 +1466,18 @@ export default function StudioMode({
       // remix plays the same sounds (the record kept flip_N rows with no sound, and a remix's Flip rows were silent).
       // MUSIC-SUITE P3 FIX PASS: at the PROJECT's swing (in song mode the engine's is the playing section's)
       const render = publishRender(project);
-      const blob = await eng.renderMixdown(2, render.tracks, render.swing);
+      // MUSIC-SUITE P5 FIX PASS (2026-09-25): …with the WORKING grid's own Flip chops handed to the render. It read the
+      // engine's, and song mode swaps a section's chops in under the same ids (turning SONG MODE on does it even while
+      // stopped): the library audio played the section's old chop while the record, a remix and the card named the grid's.
+      await Promise.allSettled(project.flipRows.map((r) => chopFor(r)));
+      const sounds = flipSoundMap(render.tracks, project.flipRows, (r) => chopCache.current.get(bakeKey(r)) ?? null);
+      const blob = await eng.renderMixdown(2, render.tracks, render.swing, sounds);
       room.noteCreation();   // MUSIC-SUITE P3: a render counts toward the day's creation session (the streak)
-      const pub = publishTracks(tracks, project.flipRows, shownIds);
+      // MUSIC-SUITE P4 FIX PASS: the record keeps the rows the render PLAYED — a row the desk mutes or solos out is left out
+      // of both (the library audio was bass-only under a solo while the record, a remix and the dance floor had every row)
+      const deskIds = new Set([...shownIds].filter((id) => gateOpen(deskHeard, id)));
+      const deskCut = [...shownIds].filter((id) => tracks.some((t) => t.sampleId === id) && !deskIds.has(id)).length;
+      const pub = publishTracks(tracks, project.flipRows, deskIds);
       const res = await StudioLibrary.publishWithAudio({
         // MUSIC-SUITE P3 FIX PASS: the signed-in player is the author (GameShell passes no `profile`, so every song was
         // 'me'), and the kit is the one that PLAYED in the render
@@ -793,15 +1486,21 @@ export default function StudioMode({
         sequencer: { bpm, steps: STEPS, tracks: pub.tracks, swing },
         remixOf,
         streamingLinks: link ? [link] : [],
+        key: project.key,   // MUSIC-SUITE P4: the song's key is on its record (the card says 'Am'; a remix opens in it)
       }, blob);
-      if (!res.ok) { say(res.line); return; }
-      onPublish?.(res.rec);                   // Creator Card pipeline hook (M28 contract)
+      // MUSIC-SUITE P4 (P3's open item): a library failure stays on screen (the lasting line), not a 2.2 s toast
+      if (!res.ok) { setLibraryLine(res.line); return; }
+      setLibraryLine(res.line);   // "kept for this visit only" and the like last too; a clean publish clears the line
+      // Creator Card pipeline hook (M28 contract). MUSIC-SUITE P5 FIX PASS (decision #15): this is the door OFF the device
+      // (UPLOAD_DOORS.offDevice) — a song that plays an upload never goes through it until FEL can review uploads online
+      if (UPLOAD_DOORS.offDevice || !tracksHaveUpload(res.rec.sequencer.tracks)) onPublish?.(res.rec);
       setLibraryRev((r) => r + 1);
-      const left = pub.silent.length ? ` · ${pub.silent.length} Flip row${pub.silent.length === 1 ? '' : 's'} with no sound left out` : '';
+      const left = (pub.silent.length ? ` · ${pub.silent.length} Flip row${pub.silent.length === 1 ? '' : 's'} with no sound left out` : '')
+        + (deskCut ? ` · as you hear it: ${deskCut} row${deskCut === 1 ? '' : 's'} muted or soloed out on the mixer left out` : '');
       say(res.line ? `"${res.rec.title}" published — ${res.line}${left}` : `"${res.rec.title}" published to the Academy library${left}`);
       setTitle(''); setStreamUrl('');
     } catch (e) {
-      say(`Could not publish (${e instanceof Error ? e.name : 'error'}) — nothing was saved; try again`);
+      setLibraryLine(`Could not publish (${e instanceof Error ? e.name : 'error'}) — nothing was saved; try again`);
     } finally {
       setSaving(false);
     }
@@ -812,14 +1511,14 @@ export default function StudioMode({
   const playRecord = (t: TrackRecord): void => {
     playerRef.current?.pause();
     void StudioLibrary.audioSource(t.id).then((src) => {
-      if (!src.ok) { say(src.line); return; }
+      if (!src.ok) { setLibraryLine(src.line); return; }   // MUSIC-SUITE P4: the lasting line
       const el = new Audio(src.src);
       playerRef.current?.pause();
       playerRef.current = el;
       void el.play().then(() => {
         StudioLibrary.countPlay(t.id);        // counted when audio actually starts, as the doc on countPlay says
         setLibraryRev((r) => r + 1);
-      }).catch(() => say('This browser would not start the audio — tap PLAY again'));
+      }).catch(() => setLibraryLine('This browser would not start the audio — tap PLAY again'));
     });
   };
 
@@ -840,11 +1539,13 @@ export default function StudioMode({
     // MUSIC-SUITE P3 (tier-honesty-editing): the remix CARRIES THE FLIP CHOPS the song was published with (studioEdit
     // remixSeed, through migrateProject); a Flip row whose sound can't come along (published before P3) is left out and
     // said, never opened as a row that plays nothing.
-    const seed = remixSeed(r.sequencer.tracks);
+    // MUSIC-SUITE P4 FIX PASS: with the SOURCE record's kit — a pre-P4 row's notes are its kit voice's (NEON C, DUST G);
+    // without it they were STREET's A for every remix, another key than the published audio
+    const seed = remixSeed(r.sequencer.tracks, r.kit);
     // MUSIC-SUITE P3 FIX PASS: MASTER comes along (a remix of a mastered song opened with MASTER off), and the remix-kit
     // note belongs to the remix project it was said about; nothing is said if the switch was refused (unsaved work)
     const note = remixKitNote(plan);
-    void room.ops.create({ title: `Remix · ${t.title}`, tracks: seed.tracks, flipRows: seed.flipRows, bpm: r.bpm, swing: r.swing, kit: plan.kit, remixOf: r.remixOf, polish: r.polished }).then((id) => {
+    void room.ops.create({ title: `Remix · ${t.title}`, tracks: seed.tracks, flipRows: seed.flipRows, bpm: r.bpm, swing: r.swing, kit: plan.kit, remixOf: r.remixOf, ...(r.key ? { key: r.key } : {}), polish: r.polished }).then((id) => {
       if (!id) return;
       setRemixNote(note ? { id, line: note } : null);
       setView('studio');
@@ -855,32 +1556,173 @@ export default function StudioMode({
     });
   };
 
+  // ── MUSIC-SUITE P4 (2026-09-25): the key map's actions (ui/keys) — true when the room did something ─────────────
+  const cursorCell = (): { row: number; step: number } | null => {
+    if (!cursor) return null;
+    const row = drawn.findIndex((t) => t.sampleId === cursor.row);
+    return row >= 0 ? { row, step: cursor.step } : null;
+  };
+  const keyAct = (a: StudioKeyAction): boolean => {
+    switch (a.kind) {
+      case 'hold': return true;   // MUSIC-SUITE P4 FIX PASS: a held Space — nothing, and no page scroll
+      case 'help': setHelpOpen((h) => !h); return true;
+      case 'escape':
+        if (checkRef.current) { finishCheck(true); return true; }
+        if (helpOpen) { setHelpOpen(false); return true; }
+        if (openNote) { setOpenNote(null); return true; }
+        if (cursor) { setCursor(null); return true; }
+        return false;
+      case 'undo': stepHistory('undo'); return true;
+      case 'redo': stepHistory('redo'); return true;
+      case 'tap': tapCheck(); return true;
+      case 'playStop': togglePlay(); return true;
+      case 'record': return recordKey();
+      case 'cursor': {
+        const next = moveCursor(cursorCell(), a.dRow, a.dStep, drawn.length, STEPS, stepsOnPage(page, layout)[0] ?? 0);
+        if (!next) return false;
+        setCursor({ row: drawn[next.row].sampleId, step: next.step });
+        setPage(pageOfStep(next.step, layout));   // the phone grid turns to the cursor's page
+        gridRef.current?.focus({ preventScroll: true });
+        return true;
+      }
+      case 'toggle':
+        if (!cursor || !cursorCell()) return keyAct({ kind: 'cursor', dRow: 0, dStep: 0 });
+        toggleCell(cursor.row, cursor.step);
+        return true;
+      case 'note': {
+        const c = cursor;
+        if (!c || !cursorCell()) return keyAct({ kind: 'cursor', dRow: 0, dStep: 0 });
+        if (!isPitchedRow(c.row)) { say('⌥↑ / ⌥↓ move a note on a bass, lead or Flip row'); return true; }
+        if (gridLock) { say(lockLine()); return true; }
+        // consecutive nudges of one step are one undo step
+        edit((p) => {
+          const t = p.tracks.find((x) => x.sampleId === c.row);
+          const patch = t ? nudgeNote(t, c.step, a.degrees, p.key) : null;
+          return patch ? { ...p, tracks: withTrackStep(p.tracks, c.row, c.step, patch, p.key) } : p;
+        }, `note:${c.row}:${c.step}`);
+        return true;
+      }
+    }
+    return false;
+  };
+  keyActRef.current = keyAct;
+  // the cursor's cell is kept in view (a long Flip section scrolls)
+  useEffect(() => {
+    if (!cursor) return;
+    const el = gridRef.current?.querySelector(`[data-qa="cell"][data-row="${cursor.row}"][data-step="${cursor.step}"]`) as HTMLElement | null;
+    el?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [cursor, page]);
+  // another project opened: no cursor or open NoteRow carried over from the last one
+  useEffect(() => { setCursor(null); setOpenNote(null); }, [room.generation]);
+
+  // MUSIC-SUITE P4 (2026-09-25): THE NOTES, RENDERED ON THEIR NOTE. A pitched kit voice (bass, lead) plays another note
+  // at a playbackRate from its root until a render of that note is loaded (AudioEngine voiceFor) — so a lead two octaves
+  // up played at rate 4: a quarter as long, and a chirp. Every note the grid and the sections light is rendered for the
+  // kit that PLAYS (SynthKit.synthesizeNote: the voice's own envelope and length) and handed to the engine (loadNote); a
+  // kit change drops them (swapKit) and the new kit's are rendered. The root note is the kit's own buffer already.
+  const noteWant = useMemo(() => {
+    const want = new Map<PitchedSlot, Set<number>>();
+    const add = (list: readonly TrackState[]): void => {
+      for (const t of list) {
+        if (!isPitchedSlot(t.sampleId)) continue;
+        const slot = t.sampleId;
+        t.pattern.forEach((on, i) => {
+          const n = t.notes?.[i];
+          if (!on || typeof n !== 'number' || !Number.isFinite(n)) return;
+          if (!want.has(slot)) want.set(slot, new Set());
+          want.get(slot)!.add(Math.round(n));
+        });
+      }
+    };
+    add(tracks);
+    for (const sec of project.sections) add(sec.tracks);
+    return [...want].map(([slot, ns]) => [slot, [...ns].sort((a, b) => a - b)] as const);
+  }, [tracks, project.sections]);
+  const noteWantSig = JSON.stringify(noteWant);
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng || !ready) return;
+    const kitNow = playingKit;
+    let alive = true;
+    void (async () => {
+      for (const [slot, notes] of noteWant) {
+        for (const n of notes) {
+          if (!alive || kitRef.current !== kitNow) return;
+          if (n === VOICE_ROOTS[kitNow][slot] || eng.loadedNotes(slot).includes(n)) continue;
+          const buf = await synthesizeNote(kitNow, slot, n);
+          if (!alive || kitRef.current !== kitNow) return;
+          eng.loadNote(slot, n, buf);
+        }
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, playingKit, noteWantSig]);
+
+  // MUSIC-SUITE P4: the dev/probe hook (window.__FEL_GRID__) — what the pocket studio's UI is showing right now
+  useEffect(() => {
+    const eng = engineRef.current;
+    window.__FEL_GRID__ = {
+      compact: layout.compact, page, pages: layout.pages, pageSteps: layout.pageSteps, cursor, openNote, key: keySignature(project.key),
+      metronome: transport.metronome, countIn: transport.countIn, mixerOpen, help: helpOpen,
+      check: check ? (check.phase === 'done' ? check.line : 'listening') : null,
+      checkTaps: checkRef.current?.taps.length ?? 0, checkClicks: checkRef.current?.clicks.slice() ?? [], savedOffsetMs: savedCal?.offsetMs ?? null, toastAt, libraryLine,
+      noteRenders: eng ? { bass: eng.loadedNotes('bass'), lead: eng.loadedNotes('lead') } : {},
+      keysLive: roomShown && !keysSuspended.current, graphLatencySec: eng?.graphLatencySec,
+    };
+  });
+
   // ── styles (warm music-school palette; deliberately NOT the neon bezel) ──
   const S: Record<string, React.CSSProperties> = {
-    root: { fontFamily: 'inherit', color: '#f5ead9', background: 'linear-gradient(165deg,#2a1a3a 0%,#3a1f2e 55%,#402a18 100%)', minHeight: '100%', padding: 16, borderRadius: 12 },
-    header: { display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 },
+    // MUSIC-SUITE P4: an 8 px side padding on the phone grid's widths (the ≥ 40 px cells need the room — ui/gridMath)
+    root: { fontFamily: 'inherit', color: '#f5ead9', background: 'linear-gradient(165deg,#2a1a3a 0%,#3a1f2e 55%,#402a18 100%)', minHeight: '100%', padding: layout.compact ? PHONE_PAD_PX : 16, borderRadius: 12, maxWidth: '100%', boxSizing: 'border-box' },
+    header: { display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10, flexWrap: 'wrap' },
     h1: { fontSize: 22, fontWeight: 800, letterSpacing: 1, color: '#ffd75e' },
-    tabs: { display: 'flex', gap: 8, margin: '10px 0' },
+    tabs: { display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' },
     tab: { padding: '6px 14px', borderRadius: 20, border: '1px solid #7a5c9e', background: 'transparent', color: '#e8d9c2', cursor: 'pointer' },
     tabOn: { background: '#7a5c9e', color: '#fff' },
-    grid: { display: 'grid', gridTemplateColumns: `90px repeat(${STEPS}, 1fr)`, gap: 3, marginTop: 8 },
-    cell: { aspectRatio: '1', borderRadius: 4, border: '1px solid #5a4470', background: '#33244a', cursor: 'pointer' },
-    cellOn: { background: '#ffb347', borderColor: '#ffd75e' },
-    cellHead: { outline: '2px solid #22d3ee' },
-    label: { fontSize: 11, alignSelf: 'center', opacity: 0.9 },
+    // (MUSIC-SUITE P4: the grid's own styles — `90px repeat(16, 1fr)` at every width — moved into ui/StepGrid)
     row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 },
     btn: { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#ffb347', color: '#2a1a10', fontWeight: 700, cursor: 'pointer' },
     btnAlt: { padding: '8px 14px', borderRadius: 8, border: '1px solid #ffb347', background: 'transparent', color: '#ffd75e', cursor: 'pointer' },
     mentor: { marginTop: 12, padding: '8px 12px', borderLeft: '3px solid #ffd75e', background: 'rgba(255,215,94,0.08)', fontStyle: 'italic', fontSize: 13 },
     card: { padding: 10, borderRadius: 10, background: 'rgba(0,0,0,0.25)', marginTop: 8, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
-    toast: { position: 'sticky', bottom: 8, marginTop: 12, padding: '8px 12px', borderRadius: 8, background: '#7a5c9e', color: '#fff', width: 'fit-content' },
+    // MUSIC-SUITE P4 (P3's open item): it was `position: sticky; bottom: 8` — on a phone it sat over the grid and the
+    // transport and took their taps. Now it floats in whichever band (top / bottom) covers less of them (toastAt), and
+    // never takes a tap (pointer-events: none).
+    toast: {
+      position: 'fixed', left: '50%', transform: 'translateX(-50%)', zIndex: 60, pointerEvents: 'none',
+      ...(toastAt === 'top' ? { top: 'calc(8px + env(safe-area-inset-top, 0px))' } : { bottom: 'calc(8px + env(safe-area-inset-bottom, 0px))' }),
+      padding: '8px 12px', borderRadius: 8, background: 'rgba(122,92,158,0.96)', color: '#fff', maxWidth: 'min(560px, calc(100vw - 24px))',
+      boxShadow: '0 6px 20px rgba(0,0,0,0.35)', fontSize: 13,
+    },
   };
+
+  // MUSIC-SUITE P4: THE KEY MAP's panel — the table ui/keys.ts answers from (P4 FIX PASS: drawn where it was asked for)
+  const keysHelp = (
+    <div ref={helpRef} data-qa="keys-help-panel" role="dialog" aria-label="Keyboard keys" style={{ ...S.card, display: 'block', border: '1px solid #7a5c9e' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ fontWeight: 800 }}>KEYS</span>
+        <span style={{ fontSize: 11, opacity: 0.7 }}>never while you type in a field</span>
+        <button type="button" style={{ ...S.btnAlt, marginLeft: 'auto', padding: '4px 10px' }} onClick={() => setHelpOpen(false)}>CLOSE</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(84px, max-content) minmax(0, 1fr)', gap: '4px 12px', fontSize: 12 }}>
+        {KEY_HELP.map((h) => (
+          <React.Fragment key={h.keys}>
+            <kbd style={{ fontFamily: 'inherit', fontWeight: 800, color: '#ffd75e' }}>{h.keys}</kbd>
+            <span>{h.does}{h.where === 'PERFORM' || h.where === 'FLIP' ? '' : h.where === 'STUDIO' ? ' — STUDIO tab' : ''}</span>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
 
   // ONE WAY INTO PERFORM. The set clock starts here and nowhere else — when this was
   // only stamped on the splash's READY tap, a player who built for ten minutes and then
   // tapped PERFORM reported the whole ten minutes as their set. That is the "both" path,
   // and it is the normal one: the stage pick chooses where you land, not where you stay.
   const enterPerform = useCallback(() => {
+    if (checkRef.current) finishCheckRef.current(true);   // MUSIC-SUITE P4: the timing check belongs to the studio floor
     setRef.current = new PerformSet({ arena: arenaSet });   // a fresh set: no notes, no score, nothing left over
     savedOffsetRef.current = savedAudioOffsetMs();           // MUSIC-SUITE P2: a calibration saved since last set counts
     setCalStale(loadRoomCalibration().stale);                // (P2 FIX PASS: saved in the calibrate tab since mount)
@@ -907,6 +1749,10 @@ export default function StudioMode({
     // maxCombo, arena } in stats.
     const r = setRef.current.result(engineRef.current?.context.currentTime ?? 0);
     const pct = Math.round(r.accuracy * 100);
+    // MUSIC-SUITE P4 FIX PASS: the shell's end card now covers the room (still mounted under it): no key reaches the room
+    // until it is touched again (REPLAY remounts it) — Space toggled the transport behind REPLAY, and Z undid the grid.
+    // (A host with no card — /dev/music's stand-in — gets its keys back at the first press in the room.)
+    keysSuspended.current = true;
     onEnd?.({
       score: r.score,
       won: r.won,
@@ -962,7 +1808,7 @@ export default function StudioMode({
   }
 
   return (
-    <div style={S.root}>
+    <div style={S.root} onPointerDownCapture={() => { keysSuspended.current = false; /* MUSIC-SUITE P4 FIX PASS: the room is touched: its keys again */ }}>
       <div style={S.header}>
         <div style={S.h1}>FEL GROOVE ACADEMY</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>the studio floor is yours</div>
@@ -991,11 +1837,38 @@ export default function StudioMode({
         conflict={room.conflict} onReload={() => void room.ops.reload()} onSaveCopy={() => void room.ops.saveCopy()}
         blocked={room.blocked} persisted={room.persisted} />
 
+      {/* MUSIC-SUITE P4 (P3's open item): a LIBRARY failure is a lasting line under the project bar (it was a 2.2 s toast —
+          "Your library is full", "this song's audio isn't on this device" came and went before a phone player read it). It
+          stays until OK or the next library success. */}
+      {libraryLine && (
+        <div data-qa="library-line" role="status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', margin: '4px 0', fontSize: 12, color: '#ffd7a8' }}>
+          <span>LIBRARY: {libraryLine}</span>
+          <button type="button" aria-label="dismiss the library line" onClick={() => setLibraryLine(null)} style={{ ...S.btnAlt, padding: '2px 10px', fontSize: 11 }}>OK</button>
+        </div>
+      )}
+
       {/* MUSIC-SUITE P3 FIX PASS: a take keeps recording while its panel is hidden on another tab — its STOP is here too */}
       {takeRec && view !== 'studio' && (
         <div data-qa="take-recording-chip" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0' }}>
-          <button style={{ ...S.btn, background: '#ff5c5c', color: '#fff' }} onClick={() => takeStopRef.current?.()}>● TAKE RECORDING — STOP</button>
-          <span style={{ fontSize: 12, opacity: 0.75 }}>the take lands in &quot;{project.title}&quot;</span>
+          {/* MUSIC-SUITE P4: the booth says whether it is only the open mic or a take (SongPanel onRecording's `what`) */}
+          <button style={{ ...S.btn, background: '#ff5c5c', color: '#fff' }} onClick={() => takeStopRef.current?.()}>{takeWhat === 'mic' ? '● MIC ON — CLOSE' : '● TAKE RECORDING — STOP'}</button>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>{takeWhat === 'mic' ? "the booth's mic is open" : <>the take lands in &quot;{project.title}&quot;</>}</span>
+        </div>
+      )}
+
+      {/* MUSIC-SUITE P5 (2026-09-25), phone-mpc: THE PHONE'S ROOM, at ROOM level — opened the first time FLIP shows and
+          kept until the Academy closes (it was inside the FLIP tab, and every tab switch disposed it: phonePad.ts). Its
+          badge shows on FLIP, and on the other tabs while a phone is connected (hidden, not unmounted, otherwise). */}
+      {phoneRoom && (
+        <div data-qa="phone-room" data-phones={phones} style={phoneBadgeShown(view, phones) ? undefined : { display: 'none' }}>
+          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={phoneInput} onPeers={phonePeers} />
+        </div>
+      )}
+      {/* …and a phone's REC armed from another tab says so where the player is (the ARM REC button is on FLIP) */}
+      {flipRecArm && view !== 'flip' && (
+        <div data-qa="phone-rec-chip" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0' }}>
+          <button style={{ ...S.btn, background: '#ff5c5c', color: '#fff' }} onClick={() => setFlipRecArm(false)}>● FLIP REC ARMED — DISARM</button>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>{playing ? `pad hits on bank ${PHONE_BANKS[flipBank]} write into the grid` : `press PLAY — pad hits on bank ${PHONE_BANKS[flipBank]} then write into the grid`}</span>
         </div>
       )}
 
@@ -1011,13 +1884,19 @@ export default function StudioMode({
         )}
       </div>
 
+      {/* MUSIC-SUITE P4: THE KEY MAP ('?' or the transport's ?) — the table ui/keys.ts answers from. MUSIC-SUITE P4 FIX PASS:
+          on the STUDIO tab it opens under the transport (keysHelp, below); on the other tabs here */}
+      {helpOpen && view !== 'studio' && keysHelp}
+
       {view === 'listen' && <StreamingDeck />}
 
       {view === 'flip' && (
         <>
-          {/* M1b: pair a phone — its 4×4 pad bank hits these pads (controller link, room code + QR in the badge) */}
-          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={(ev) => { const i = padFromAction(ev.a); if (i >= 0) flipTrigger.current?.(i); }} />
+          {/* M1b: pair a phone — its pad bank hits these pads. MUSIC-SUITE P5 (phone-mpc): the phone's room is mounted at
+              ROOM level now (above the tabs), so leaving FLIP no longer closes it */}
           <FlipPad engine={engineRef.current} playing={playing} playhead={playhead} steps={STEPS} say={say} triggerRef={flipTrigger}
+            /* MUSIC-SUITE P5 (phone-mpc): the bank on the pads and ARM REC are the room's (a phone's BANK / REC, any tab) */
+            bank={flipBank} onBank={setFlipBank} recArm={flipRecArm} onRecArm={setFlipRecArm}
             /* MUSIC-SUITE P3 (2026-09-25): the FLIP tab's source + chops are the project's (FlipPad remounts on every tab
                switch and restores from here); a pad sent or recorded to the grid brings its exact chop, so the row keeps
                sounding after a reload — and a recorded pad now loads its buffer (P1: flip_1 written but silent). */
@@ -1025,26 +1904,18 @@ export default function StudioMode({
             projectId={project.id} rowSourceKeys={new Set(project.flipRows.map((r) => sourceKey(r.source)))}
             /* MUSIC-SUITE P3 (tier-honesty-editing): the row a pad lands on is DRAWN now (the Flip section under the kit
                rows, every tier), the pad shows it has one, and a send or a burst of recorded hits is one undo step. */
-            rowPads={new Set(project.flipRows.map((r) => r.pad))}
+            /* MUSIC-SUITE P5: the rows (each knows the bank + pad it came from — bank B's pad 3 gets its own row) and the
+               audio clock ARM REC places a tap by (flipClock) */
+            flipRows={project.flipRows} trackIds={flipTrackIds} stepClock={flipClock}
+            playerId={me}   /* MUSIC-SUITE P5: the FEL-theme lesson is remembered per player */
             onAssign={(_pad, buffer, row) => {
               engineRef.current?.loadBuffer(row.sampleId, row.label, buffer, 'melody');
+              chopCache.current.set(bakeKey(row), buffer);   // MUSIC-SUITE P5: the baked chop the pad played
+              resyncSection(withFlipRow(projectRef.current, row));   // MUSIC-SUITE P5 FIX PASS: a playing section keeps its own
               edit((p) => withFlipRow(p, row));
             }}
-            onRecordHit={(pad, step, chop) => {
-              // MUSIC-SUITE P3 FIX PASS: a row that holds ANOTHER chop (sent from an earlier source, or one that failed to
-              // load after a reload) takes the pad's chop on the first recorded hit — what the taps sound like is what the
-              // row plays. One undo step with the burst.
-              const differs = (p: StudioProject): boolean => {
-                const r = p.flipRows.find((x) => x.sampleId === chop.row.sampleId);
-                return !r || chopSignature(r) !== chopSignature(chop.row);
-              };
-              const had = projectRef.current.flipRows.some((r) => r.sampleId === chop.row.sampleId);
-              if (differs(projectRef.current)) {
-                engineRef.current?.loadBuffer(chop.row.sampleId, chop.row.label, chop.buffer, 'melody');
-                if (had) say(`${chop.row.label} now plays pad ${pad + 1}'s chop (it replaced the row's old one — UNDO puts it back)`);
-              }
-              edit((p) => withFlipHit(differs(p) ? withFlipRow(p, chop.row) : p, chop.row.sampleId, step), 'flip-rec');
-            }} />
+            /* MUSIC-SUITE P5 (phone-mpc): the room's recordFlipHit (a phone hit on another tab records by the same rule) */
+            onRecordHit={recordFlipHit} />
           <div style={S.row}>
             <button style={S.btn} onClick={togglePlay}>{playing ? 'STOP' : 'PLAY'}</button>
             <span style={{ fontSize: 12, opacity: 0.75 }}>the groovebox runs under the pads — arm REC and your taps land in the STUDIO grid</span>
@@ -1091,48 +1962,102 @@ export default function StudioMode({
                 : `CELL PREVIEW — what BUY lays on your ${Object.keys(cellPreview ?? {}).length} rows. Nothing is charged until you BUY; CANCEL keeps your grid.`}
             </div>
           )}
-          {(() => {
-            const rows = visibleRows(gridTracks, caps);
-            const flipName = (id: string): string => {
-              const r = project.flipRows.find((x) => x.sampleId === id);
-              return r ? `${r.label} · ${r.source.label}` : `FLIP ${Number(id.slice(5)) + 1}`;
-            };
-            const row = (t: TrackState) => (
-              <React.Fragment key={t.sampleId}>
-                <div style={S.label} data-qa="grid-row" data-row={t.sampleId}>{KIT_SLOTS.find((k) => k.id === t.sampleId)?.name ?? flipName(t.sampleId)}</div>
-                {t.pattern.map((on, si) => (
-                  <div key={si} data-qa="cell" data-row={t.sampleId} data-step={si} data-on={on ? '1' : '0'}
-                    style={{ ...S.cell, ...(on ? S.cellOn : {}), ...(playhead === si ? S.cellHead : {}), ...(gridLock ? { cursor: 'not-allowed' } : {}) }}
-                    onClick={() => toggleCell(t.sampleId, si)} />
-                ))}
-              </React.Fragment>
-            );
-            return (
-              <>
-                <div style={S.grid} data-qa="kit-grid">{rows.kit.map(row)}</div>
-                {rows.flip.length > 0 && (
-                  <>
-                    <div data-qa="flip-rows-head" style={{ fontSize: 11, opacity: 0.8, marginTop: 10 }}>
-                      FLIP ROWS — pads you sent from the FLIP tab ({rows.flip.length}) · every pad gets a row, at every tier
-                    </div>
-                    <div style={S.grid} data-qa="flip-grid">{rows.flip.map(row)}</div>
-                  </>
-                )}
-              </>
-            );
-          })()}
+          {/* MUSIC-SUITE P4: THE KEY + SCALE — shown once a pitched row is drawn (the bass at THE CHAIN, or any Flip row). A
+              change moves every note with it (one undo step); the key is on the dance card and the library record. */}
+          {drawn.some((t) => isPitchedRow(t.sampleId)) && (
+            <div data-qa="key-bar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, margin: '4px 0' }}>
+              <span style={{ opacity: 0.8 }}>KEY</span>
+              <select aria-label="the song's key" data-qa="key-root" value={project.key.root}
+                onChange={(e) => changeKey({ root: Number(e.target.value), scale: project.key.scale })}
+                style={{ padding: '6px 8px', minHeight: 34, borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9' }}>
+                {Array.from({ length: 12 }, (_, pc) => <option key={pc} value={pc}>{pitchName(pc, { root: pc, scale: project.key.scale })}</option>)}
+              </select>
+              <select aria-label="the song's scale" data-qa="key-scale" value={project.key.scale}
+                onChange={(e) => changeKey({ root: project.key.root, scale: e.target.value as ScaleId })}
+                style={{ padding: '6px 8px', minHeight: 34, borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9' }}>
+                {SCALE_IDS.map((id) => <option key={id} value={id}>{SCALES[id].label}</option>)}
+              </select>
+              <span data-qa="key-sig" style={{ fontWeight: 800, color: '#ffd75e' }}>{keySignature(project.key)}</span>
+              <span style={{ opacity: 0.7, fontSize: 11 }}>♪ rows play only this key&apos;s notes</span>
+            </div>
+          )}
+          {/* MUSIC-SUITE P4: THE POCKET GRID (ui/StepGrid): pages of 8 under 640 px (≥ 40 px cells), drag-to-paint (one undo
+              step a stroke), beat shading, the playhead on either page, the key cursor, and a ♪ NoteRow under a pitched row.
+              A plain click with no stroke (a script, assistive tech) toggles one cell by row id, as P3's did. */}
+          <StepGrid
+            kit={rows.kit.map(gridRow)} flip={rows.flip.map(gridRow)}
+            flipHead={(
+              <div data-qa="flip-rows-head" style={{ fontSize: 11, opacity: 0.8, marginTop: 10 }}>
+                FLIP ROWS — pads you sent from the FLIP tab ({rows.flip.length}) · every pad gets a row, at every tier
+              </div>
+            )}
+            layout={layout} page={page} onPage={setPage} playhead={playhead} cursor={cursor} locked={gridLock}
+            onPaint={paintCells} onLocked={() => say(lockLine())} onToggle={(row, step) => toggleCell(row, step)}
+            openNote={openNote} onOpenNote={setOpenNote} focusRef={gridRef}
+            onKeyFocus={() => { if (!cursor) keyAct({ kind: 'cursor', dRow: 0, dStep: 0 }); /* P4 FIX PASS: Tab in shows where you are */ }}
+            renderNoteRow={(r) => (
+              <NoteRow row={{ id: r.id, label: r.label, track: r.track }} songKey={project.key} layout={layout}
+                steps={stepsOnPage(page, layout)} playhead={playhead} locked={!!gridLock}
+                onPick={(step, midi) => pickStepNote(r.id, step, midi)} onLocked={() => say(lockLine())} onClose={() => setOpenNote(null)} />
+            )} />
           {!gridLock && hiddenHits(tracks, caps) > 0 && (
             <div data-qa="hidden-hits" style={{ fontSize: 11, opacity: 0.75, marginTop: 4 }}>
               {hiddenHits(tracks, caps)} hit{hiddenHits(tracks, caps) === 1 ? '' : 's'} sit on rows {caps.name} doesn&apos;t show yet — silent until a tier opens them.
             </div>
           )}
 
-          <div style={S.row}>
+          {/* MUSIC-SUITE P4: THE TRANSPORT — PLAY (with the COUNT-IN when it is on), METRO, COUNT-IN, UNDO / REDO / CLEAR,
+              CHECK MY TIMING and the key map. */}
+          <div ref={transportRef} data-qa="transport" style={S.row}>
             <button style={S.btn} onClick={togglePlay}>{playing ? 'STOP' : 'PLAY'}</button>
-            {/* MUSIC-SUITE P3: UNDO / REDO (⌘Z / ⇧⌘Z) and CLEAR (asked first) */}
+            <button data-qa="metronome" aria-pressed={transport.metronome} title="A click on every beat, the downbeat accented — never in a render"
+              style={{ ...S.btnAlt, ...(transport.metronome ? { background: '#22d3ee', color: '#101018', border: '1px solid #22d3ee' } : {}) }}
+              onClick={() => setTransport({ ...transport, metronome: !transport.metronome })}>
+              METRO {transport.metronome ? 'ON' : 'OFF'}
+            </button>
+            <button data-qa="count-in" aria-pressed={transport.countIn > 0} title="PLAY counts this many bars in first (its own click)"
+              style={{ ...S.btnAlt, ...(transport.countIn > 0 ? { background: '#22d3ee', color: '#101018', border: '1px solid #22d3ee' } : {}) }}
+              onClick={() => setTransport({ ...transport, countIn: ((transport.countIn + 1) % 3) as 0 | 1 | 2 })}>
+              COUNT-IN {transport.countIn === 0 ? 'OFF' : `${transport.countIn} BAR${transport.countIn === 2 ? 'S' : ''}`}
+            </button>
+            {/* MUSIC-SUITE P3: UNDO / REDO (⌘Z / ⇧⌘Z) and CLEAR (asked first). (P4 FIX PASS: the bare Z / ⇧Z went — a pad letter.) */}
             <button data-qa="undo" style={S.btnAlt} disabled={!histDepth.undo} onClick={() => stepHistory('undo')} title="Undo (⌘Z / Ctrl+Z)">UNDO</button>
             <button data-qa="redo" style={S.btnAlt} disabled={!histDepth.redo} onClick={() => stepHistory('redo')} title="Redo (⇧⌘Z / Ctrl+Y)">REDO</button>
             <button data-qa="clear" style={S.btnAlt} disabled={!!gridLock || gridHitCount(tracks) === 0} onClick={() => setConfirmClear(true)}>CLEAR</button>
+            <button data-qa="timing-check" style={S.btnAlt} disabled={mode === 'perform' || check?.phase === 'listening'} onClick={startCheck}
+              title="8 taps on a 2-bar count-in: the offset PERFORM and the Cypher judge by">⏱ CHECK MY TIMING</button>
+            {savedCal && <span data-qa="timing-offset" style={{ fontSize: 12, color: '#22d3ee' }}>your offset {formatOffset(savedCal.offsetMs)}{savedCal.age ? ` · ${savedCal.age}` : ''}</span>}
+            {!touchOnly && <button data-qa="keys-help" aria-expanded={helpOpen} title="Keyboard keys (?)" style={{ ...S.btnAlt, padding: '8px 12px' }} onClick={() => setHelpOpen((h) => !h)}>?</button>}
+          </div>
+          {/* MUSIC-SUITE P4 FIX PASS: the key map opens HERE, under the ? that opened it (it rendered after the tabs, ~570 px
+              above the transport on a desktop and ~1100 px on a phone: pressing ? changed nothing the player could see) */}
+          {helpOpen && keysHelp}
+
+          {/* MUSIC-SUITE P4: CHECK MY TIMING — tap each of the 8 count-in clicks; the reading is saved dated */}
+          {check && (
+            <div data-qa="timing-check-panel" role="group" aria-label="Check my timing" style={{ ...S.card, border: '1px solid #22d3ee' }}>
+              {check.phase === 'listening' ? (
+                <>
+                  <span style={{ fontWeight: 700 }}>Listen to the first bar, then tap each of the next {CHECK_TAPS} clicks — {check.taps} / {CHECK_TAPS}</span>
+                  <span aria-hidden style={{ letterSpacing: 2, color: '#22d3ee' }}>{'●'.repeat(check.taps)}{'○'.repeat(Math.max(0, CHECK_TAPS - check.taps))}</span>
+                  <button data-qa="timing-tap" style={{ ...S.btn, minWidth: 120, minHeight: 48, touchAction: 'manipulation', userSelect: 'none' }}
+                    onKeyDown={(e) => { if (isRepeatedActivation(e)) e.preventDefault(); }}
+                    onPointerDown={(e) => { if (e.button === 0) tapCheck(); }}
+                    onClick={(e) => { if (e.detail === 0) tapCheck(); }}>TAP</button>
+                  <span style={{ fontSize: 11, opacity: 0.75 }}>or Space / J / Enter · 1 + 2 bars at {CHECK_BPM} BPM</span>
+                  <button style={S.btnAlt} onClick={() => finishCheck(true)}>CANCEL</button>
+                </>
+              ) : (
+                <>
+                  <span data-qa="timing-result" data-ok={check.ok ? '1' : '0'} style={{ fontWeight: 700, color: check.ok ? '#b8e6c1' : '#ffb4a2' }}>{check.line}</span>
+                  <button style={S.btnAlt} onClick={startCheck}>CHECK AGAIN</button>
+                  <button style={S.btnAlt} onClick={() => setCheck(null)}>CLOSE</button>
+                </>
+              )}
+            </div>
+          )}
+
+          <div style={S.row}>
             <button style={{ ...S.btnAlt, ...(polished ? { background: '#ffb347', color: '#2a1a10' } : {}) }}
               onClick={() => setPolished(!polished)}>
               MASTER {polished ? 'ON' : 'OFF'}
@@ -1159,11 +2084,25 @@ export default function StudioMode({
             </div>
           )}
 
+          {/* MUSIC-SUITE P4: THE MIXER (ui/MixerStrip) at THE STUDIO — the ladder's "mix it"; its chip names it. A strip per
+              row the grid draws (+ TAKES once there are takes) and the MASTER; every move is an undo step and autosaves.
+              MUSIC-SUITE P4 FIX PASS (2026-09-25), owner decision #4 (the mixer is part of the pocket studio): MUTE / SOLO and
+              the meters at EVERY tier (collapsed until opened — the ladder's worry was a full DAW on the first screen); the
+              faders, sends and the master LEVEL at THE STUDIO (`full`). Okta's own tip asks a first-tier player to mute. */}
+          {(() => {
+            const strips = liveStripIds.map((id) => ({ id, label: id === TAKES_CHANNEL ? 'TAKES' : rowName(id) }));
+            return (
+              <MixerPanel rows={strips} mixer={mixerOf(project)} engine={ready ? engineRef.current : null} open={mixerOpen} onOpen={setMixerOpen}
+                onStrip={stripChange} onMaster={masterChange} compact={layout.compact} S={S}
+                full={caps.mixdown} fullNeeds={tierChips(progress).find((c) => c.tier === 'studio')?.needs ?? undefined} />
+            );
+          })()}
+
           <div style={S.row}>
             <span style={{ fontSize: 12, opacity: 0.8 }}>KITS:</span>
             {(Object.keys(KIT_META) as KitId[]).map((k) => (
               <button key={k}
-                style={{ ...S.btnAlt, ...(playingKit === k ? { background: '#7a5c9e', color: '#fff', borderColor: '#7a5c9e' } : {}) }}
+                style={{ ...S.btnAlt, ...(playingKit === k ? { background: '#7a5c9e', color: '#fff', border: '1px solid #7a5c9e' } : {}) }}
                 onClick={() => pickKit(k)}>
                 {KIT_META[k].label}{shop.owned.includes(k) ? '' : ` · ${KIT_META[k].unlockShards}◈`}
               </button>
@@ -1194,7 +2133,7 @@ export default function StudioMode({
                         </React.Fragment>
                       ))}
                     </div>
-                    <button data-qa="cell-hear" style={{ ...S.btnAlt, marginTop: 6, ...(hearPreview ? { background: '#22d3ee', color: '#101018', borderColor: '#22d3ee' } : {}) }}
+                    <button data-qa="cell-hear" style={{ ...S.btnAlt, marginTop: 6, ...(hearPreview ? { background: '#22d3ee', color: '#101018', border: '1px solid #22d3ee' } : {}) }}
                       disabled={shop.busy} onClick={toggleHearPreview}>{hearPreview ? '■ STOP HEARING IT' : '▶ HEAR IT'}</button>
                   </div>
                 )}
@@ -1242,10 +2181,12 @@ export default function StudioMode({
               style={{ padding: 8, borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9' }} />
             <input placeholder="your Spotify/Apple link (optional)…" value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)}
               style={{ padding: 8, borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9', minWidth: 220 }} />
-            <button style={S.btn} disabled={saving} onClick={() => void publishTrack()}>
+            <button style={{ ...S.btn, ...(!libraryOpen ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }} disabled={saving || !libraryOpen} onClick={() => void publishTrack()}>
               {saving ? 'RENDERING…' : 'PUBLISH TO LIBRARY'}
             </button>
           </div>
+          {/* MUSIC-SUITE P5 (decision #15): a song with an upload stays on this device — the room says why, in one line */}
+          {privacy.private && <div data-qa="upload-private" role="note" style={{ fontSize: 12, color: '#ffd75e', marginTop: 6 }}>{privacy.line}</div>}
 
           {/* DANCE RHYTHM EXPORT. The chart is built from the song's own drums (music/DanceExport.ts), not from a seed, so the
               routine lands on the hits the player wrote. MUSIC-SUITE P3 (2026-09-25): at the tier the ladder names — THE
@@ -1253,8 +2194,8 @@ export default function StudioMode({
               only the rows the room draws and plays; under the project's own id and title. */}
           {caps.danceExport && danceSong && (
             <div style={S.row}>
-              <button data-qa="dance-export"
-                style={{ ...S.btnAlt, ...(dancedSig === danceSig ? { background: '#4FD1E8', color: '#101018', borderColor: '#4FD1E8' } : {}) }}
+              <button data-qa="dance-export" disabled={!danceOpen}
+                style={{ ...S.btnAlt, ...(dancedSig === danceSig ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}), ...(!danceOpen ? { opacity: 0.45 } : {}) }}
                 onClick={sendToDance}>
                 {dancedSig === danceSig ? '✓ ON THE DANCE FLOOR' : '♪ SEND TO THE DANCE FLOOR'}
               </button>
@@ -1281,9 +2222,11 @@ export default function StudioMode({
             onChained={() => noteProgress('chain')}
             song={{ id: project.id, title: project.title, sections: project.sections, chain: project.chain, takes: project.takes }}
             onSongChange={songChange} saveAudio={room.saveAudio} loadAudio={room.loadAudio}
-            onRendered={room.noteCreation} onRecording={setTakeRec} onTake={takeRecorded} stopRef={takeStopRef}
-            songMode={songMode} onSongMode={(on) => { if (on) setHearPreview(false); setSongMode(on); }} onSongNow={setSongNow}
+            onRendered={room.noteCreation} onRecording={(on, what) => { setTakeRec(on); setTakeWhat(what ?? 'take'); }} onTake={takeRecorded} stopRef={takeStopRef}
+            onTransport={boothTransport}
+            songMode={songMode} onSongMode={(on) => { if (on) setHearPreview(false); setSongMode(on); }} onSongNow={songNowChanged}
             caps={{ takes: caps.takes, mixdown: caps.mixdown }}
+            barSounds={songRenderSounds}
           />
         </div>
       ) : null}
@@ -1313,14 +2256,14 @@ export default function StudioMode({
               <div style={{ minWidth: 160 }}>
                 <div style={{ fontWeight: 700 }}>{t.title}</div>
                 <div style={{ fontSize: 11, opacity: 0.75 }}>
-                  {t.authorName} · {KIT_META[t.kit].label} · {t.bpm}bpm{t.polished ? ' · mastered' : ''}
+                  {t.authorName} · {KIT_META[t.kit].label} · {t.bpm}bpm{t.key ? ` · ${keySignature(t.key)}` : ''}{t.polished ? ' · mastered' : ''}
                   {t.remixOf ? ` · remix of "${t.remixOf.title}"` : ''}
                   {t.isWalkOut ? ' · your walk-out' : ''}{t.audio === 'visit' ? ' · this visit only' : t.audio === 'none' ? ' · no audio on this device' : ''}
                 </div>
                 <div style={{ fontSize: 11, opacity: 0.6 }}>{t.plays} plays · {t.saves} saves</div>
               </div>
               <button style={S.btn} onClick={() => playRecord(t)}>▶ PLAY</button>
-              <button style={S.btnAlt} onClick={() => { const kept = StudioLibrary.saveToMyLibrary(t.id); setLibraryRev((r) => r + 1); say(kept ? 'Saved to your library' : "Could not save — this device's storage is full"); }}>
+              <button style={S.btnAlt} onClick={() => { const kept = StudioLibrary.saveToMyLibrary(t.id); setLibraryRev((r) => r + 1); if (kept) { say('Saved to your library'); setLibraryLine(null); } else setLibraryLine("Could not save — this device's storage is full"); }}>
                 {StudioLibrary.mySavedIds().includes(t.id) ? 'SAVED ✓' : '+ SAVE'}
               </button>
               <button style={S.btnAlt} title={switchLock ?? undefined} onClick={() => startRemix(t)}>REMIX</button>
@@ -1328,7 +2271,7 @@ export default function StudioMode({
                   MUSIC-SUITE P3 FIX PASS: on YOUR songs only (it was offered on every author's, another player's walk-out
                   included); a legacy 'me' row is the device owner's until the per-player library split lands. */}
               {(t.authorId === me || t.authorId === 'me') && (
-                <LibraryDelete track={t} btnStyle={S.btnAlt} onDone={(line) => { setLibraryRev((r) => r + 1); say(line); }} />
+                <LibraryDelete track={t} btnStyle={S.btnAlt} onDone={(line, ok) => { setLibraryRev((r) => r + 1); if (ok) { say(line); setLibraryLine(null); } else setLibraryLine(line); }} />
               )}
               {(t.streamingLinks ?? []).map((l) => (
                 <button key={l.url}
@@ -1352,7 +2295,7 @@ export default function StudioMode({
         </>
       )}
 
-      {toast && <div style={S.toast}>{toast}</div>}
+      {toast && <div data-qa="toast" data-spot={toastAt} role="status" aria-live="polite" style={S.toast}>{toast}</div>}
     </div>
   );
 }

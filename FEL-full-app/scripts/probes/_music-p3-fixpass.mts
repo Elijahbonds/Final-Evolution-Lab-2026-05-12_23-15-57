@@ -8,6 +8,8 @@
 //   4. REMIX IS HELD WHILE A TAKE RECORDS — REMIX refuses with the line; the take's STOP shows on the LIBRARY tab; the take
 //      lands in the project it was recorded in.
 //   5. A TAKE'S × ASKS, and UNDO brings the take back (with its audio).
+//   (MUSIC-SUITE P4 FIX PASS, 2026-09-25: the take is recorded through the P4 booth — ARM, RECORD — and an armed-only mic
+//   holds REMIX with "close the mic first"; the probe crashed at SongPanel's removed RECORD TAKE.)
 //   6. A NEW FLIP SOURCE OVER YOUR OWN RECORDING ASKS, and UNDO brings the recording back.
 //   7. SONG MODE HOLDS SAVE GRID AS SECTION (it saved the hidden grid).
 // Usage: node node_modules/tsx/dist/cli.mjs scripts/probes/_music-p3-fixpass.mts   (BASE, OUT env override)
@@ -38,7 +40,8 @@ const flip = (p: Page) => p.evaluate(() => (window as Any).__FEL_FLIP__ ?? null)
 const btn = (p: Page, name: string) => p.getByRole('button', { name, exact: true }).first();
 const qa = (p: Page, id: string) => p.locator(`[data-qa="${id}"]`);
 const statusLine = (p: Page) => qa(p, 'save-status').textContent();
-const toastText = (p: Page) => p.evaluate(() => [...document.querySelectorAll('div')].filter((d) => d.style.position === 'sticky').map((d) => d.textContent ?? '').pop() ?? null);
+// MUSIC-SUITE P4 (grid-ui): the room's line is [data-qa="toast"] now (fixed, clear of the grid — it was a sticky div)
+const toastText = (p: Page) => p.evaluate(() => [...document.querySelectorAll('[data-qa="toast"]')].map((d) => d.textContent ?? '').pop() ?? null);
 const STUDIO_TIER = `try { if (!localStorage.getItem('fel-music-progress')) localStorage.setItem('fel-music-progress', '{"patternsMade":1,"sectionsSaved":2,"chainEntries":2}'); } catch {}`;
 
 async function startRoom(p: Page): Promise<void> {
@@ -194,9 +197,18 @@ async function studio(browser: Browser): Promise<void> {
   const id = (await proj(p)).id;
 
   // 4. a take recording → LIBRARY → REMIX: held; STOP on the LIBRARY tab; the take lands here
+  // (MUSIC-SUITE P4 FIX PASS: through the P4 booth — ARM, RECORD — where SongPanel's RECORD TAKE was; the probe crashed there)
   await btn(p, 'PLAY').click();
-  await btn(p, '● RECORD TAKE').click();
-  await p.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent === '■ STOP TAKE'), undefined, { timeout: 8000 });
+  await qa(p, 'booth-arm').click();
+  await qa(p, 'mic-on').waitFor({ timeout: 15000 });
+  // P4 FIX PASS: with only the MIC armed, REMIX says to close the mic (it said "stop the recording" of none)
+  await btn(p, 'LIBRARY').click(); await p.waitForTimeout(200);
+  await btn(p, 'REMIX').click(); await p.waitForTimeout(300);
+  const micToast = await toastText(p);
+  check('P4 FIX PASS: only the booth\'s mic armed — REMIX is held and says "close the mic first"', /REMIX opens a new project — close the mic first/.test(micToast ?? ''), micToast, '…close the mic first');
+  await btn(p, 'STUDIO').click(); await p.waitForTimeout(200);
+  await qa(p, 'booth-record').click();
+  await p.waitForFunction(() => (window as Any).__FEL_BOOTH__?.phase === 'recording', undefined, { timeout: 20000 });
   await btn(p, 'LIBRARY').click();
   await p.waitForTimeout(300);
   await btn(p, 'REMIX').click();
@@ -210,6 +222,7 @@ async function studio(browser: Browser): Promise<void> {
   await p.waitForFunction(() => ((window as Any).__FEL_SONG__?.takes ?? 0) >= 1, undefined, { timeout: 8000 }).catch(() => undefined);
   await btn(p, 'STUDIO').click();
   await btn(p, 'STOP').click().catch(() => undefined);
+  await qa(p, 'booth-close').click().catch(() => undefined);   // the mic, so nothing below is held by it
   const s1 = await song(p);
   check('the take landed in the project it was recorded in', s1?.takes === 1 && s1?.songId === id, { takes: s1?.takes, songId: s1?.songId }, `1 take in ${id}`);
 
@@ -224,7 +237,7 @@ async function studio(browser: Browser): Promise<void> {
   await p.waitForTimeout(500);
   const back = await song(p);
   check('a take\'s × asks first (naming it); REMOVE takes it out; UNDO brings it back, playable',
-    /Remove take 1 \(bar \d+, \d+\.\d s\)\?/.test(ask ?? '') && stillThere === 1 && removed === 0 && back?.takes === 1 && back?.takesLoaded === 1,
+    /Remove take 1 \(bars? [\d–]+, \d+\.\d s\)\?/.test(ask ?? '') && stillThere === 1 && removed === 0 && back?.takes === 1 && back?.takesLoaded === 1,
     { ask, stillThere, removed, back: { takes: back?.takes, loaded: back?.takesLoaded } }, 'asked; 1 → 0 → 1 (loaded)');
 
   // 6. an own recording on the FLIP; a FEL stem tap asks; KEEP keeps it; REPLACE replaces; UNDO brings it back
@@ -258,7 +271,7 @@ async function studio(browser: Browser): Promise<void> {
   const before = (await song(p))?.sections;
   await qa(p, 'song-mode').click(); await p.waitForTimeout(300);
   await btn(p, 'SAVE GRID AS SECTION').click();
-  await p.waitForFunction(() => [...document.querySelectorAll('div')].some((d) => d.style.position === 'sticky' && /Turn SONG MODE off first/.test(d.textContent ?? '')), undefined, { timeout: 1500 }).catch(() => undefined);
+  await p.waitForFunction(() => [...document.querySelectorAll('[data-qa="toast"]')].some((d) => /Turn SONG MODE off first/.test(d.textContent ?? '')), undefined, { timeout: 1500 }).catch(() => undefined);
   const held = await toastText(p);
   const after = (await song(p))?.sections;
   await qa(p, 'song-mode').click();

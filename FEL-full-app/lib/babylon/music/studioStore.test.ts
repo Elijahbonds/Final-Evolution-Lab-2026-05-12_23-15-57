@@ -1,14 +1,14 @@
 // MUSIC-SUITE P3 (2026-09-25): the Academy's store — IndexedDB and the memory fallback, autosave, restore, the streak post.
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import {
-  AUDIO_SWEEP_MIN_AGE_MS, CREATION_DAY_KEY, CREATION_NOT_DUE_RETRY_MS, CREATION_RETRY_MS, CREATION_SESSION_BODY, CreationLog, IdbKv,
+  AUDIO_SWEEP_MIN_AGE_MS, CREATION_DAY_KEY, STUDIO_DB_VERSION, missingTables, CREATION_NOT_DUE_RETRY_MS, CREATION_RETRY_MS, CREATION_SESSION_BODY, CreationLog, IdbKv,
   MEMORY_MODE_LINE, MEMORY_SLOW_LINE, MemoryKv, ProjectAutosave, STUDIO_DB, StoreConflictError, StudioStore, audioBytes, audioKeyTime,
   conflictOf, isQuotaError, isTransientFallback, keepAudio, localDayKey, memoryModeLine, memoryStudioStore, openIdb, openStudioStore,
   postCreationSession, rescueKey, resetStudioStoreForTests, restoreProject, saveFailureLine, saveStatus, RESCUE_KEY, clearRescue,
   readRescue, writeRescue, type AutosaveState, type Table,
 } from './studioStore';
-import { duplicateProject, migrateProject, newAudioKey, newProject, projectSignature, type StudioProject } from './StudioProject';
-import { NOW, ref, representativeProject } from '@/tests/fixtures/music/studioProject';
+import { STUDIO_PROJECT_VERSION, duplicateProject, migrateProject, newAudioKey, newProject, projectSignature, type StudioProject } from './StudioProject';
+import { BOOTH, NOW, ref, representativeProject } from '@/tests/fixtures/music/studioProject';
 
 const quota = (): DOMException => new DOMException('The quota has been exceeded.', 'QuotaExceededError');
 
@@ -19,7 +19,10 @@ function fakeIdb(opts: { failPut?: (table: string, value: unknown) => Error | nu
   const later = (fn: () => void) => setTimeout(fn, 0);
   type Req = { result: unknown; error: unknown; onsuccess: null | (() => void); onerror: null | (() => void); onupgradeneeded?: null | (() => void) };
   const newReq = (): Req => ({ result: undefined, error: null, onsuccess: null, onerror: null });
-  const makeDb = (tables: Map<string, Map<string, unknown>>) => ({
+  // MUSIC-SUITE P4: databases have a version (open() without one = the current; a lower one is a VersionError)
+  const versions = new Map<string, number>();
+  const makeDb = (tables: Map<string, Map<string, unknown>>, version = 1) => ({
+    version,
     objectStoreNames: { contains: (n: string) => tables.has(n) },
     createObjectStore: (n: string) => { tables.set(n, new Map()); },
     close() {},
@@ -58,24 +61,28 @@ function fakeIdb(opts: { failPut?: (table: string, value: unknown) => Error | nu
   });
   const factory = {
     opened: 0,
-    open(name: string) {
+    open(name: string, version?: number) {
       if (opts.openFails === 'throw') throw new DOMException('The operation is insecure.', 'SecurityError');
       const r = newReq() as Req & { onupgradeneeded: null | (() => void) };
       r.onupgradeneeded = null;
       if (opts.openFails === 'hang') return r;
       later(() => {
         if (opts.openFails === 'error') { r.error = new DOMException('A mutation operation was attempted on a database that did not allow mutations.', 'InvalidStateError'); r.onerror?.(); return; }
+        const cur = versions.get(name) ?? 0;
+        const want = version ?? Math.max(cur, 1);
+        if (want < cur) { r.error = new DOMException('The requested version is less than the existing version.', 'VersionError'); r.onerror?.(); return; }
         factory.opened++;
         let tables = dbs.get(name);
-        const fresh = !tables;
         if (!tables) { tables = new Map(); dbs.set(name, tables); }
-        r.result = makeDb(tables);
-        if (fresh) r.onupgradeneeded?.();
+        versions.set(name, want);
+        r.result = makeDb(tables, want);
+        if (want > cur) r.onupgradeneeded?.();
         r.onsuccess?.();
       });
       return r;
     },
     dbs,
+    versions,
   };
   return factory;
 }
@@ -136,6 +143,60 @@ describe('the tables', () => {
   });
 });
 
+// MUSIC-SUITE P4 (2026-09-25): the two studioStore items P3 carried (p3/REPORT.md) — the library lane asked for both.
+describe('P4: a database without its tables, and a delete in the write queue', () => {
+  it('fel-studio made bare (a probe\'s indexedDB.open, version 1, no tables) is repaired: reopened one version up, the tables made', async () => {
+    const f = fakeIdb();
+    f.dbs.set(STUDIO_DB, new Map());                                // exists, version 1, no tables
+    f.versions.set(STUDIO_DB, 1);
+    const db = await openIdb(f as unknown as IDBFactory, 1000);
+    expect(missingTables(db)).toEqual([]);
+    expect(f.versions.get(STUDIO_DB)).toBe(2);
+    const kv = new IdbKv(db);
+    await kv.put('projects', 'p', { id: 'p' });                   // P3: NotFoundError on every call, the room on nothing
+    expect(await kv.get('projects', 'p')).toEqual({ id: 'p' });
+    const again = await openIdb(f as unknown as IDBFactory, 1000); // the next mount opens v2 as it is (no VersionError)
+    expect(missingTables(again)).toEqual([]);
+    expect(f.versions.get(STUDIO_DB)).toBe(2);
+  });
+
+  it('a fresh device creates the database at STUDIO_DB_VERSION with every table; an existing good one is opened as it is', async () => {
+    const f = fakeIdb();
+    const db = await openIdb(f as unknown as IDBFactory, 1000);
+    expect(db.version).toBe(STUDIO_DB_VERSION);
+    expect(missingTables(db)).toEqual([]);
+    await openIdb(f as unknown as IDBFactory, 1000);
+    expect(f.versions.get(STUDIO_DB)).toBe(STUDIO_DB_VERSION);      // nothing was bumped
+  });
+
+  it('openStudioStore on a bare database gives a working DEVICE store, not the memory fallback', async () => {
+    const f = fakeIdb();
+    f.dbs.set(STUDIO_DB, new Map([['audio', new Map()]]));        // one table of three
+    f.versions.set(STUDIO_DB, 1);
+    const store = await openStudioStore({ factory: f as unknown as IDBFactory, timeoutMs: 1000 });
+    expect(store.persistent).toBe(true);
+    await store.saveProject({ ...newProject({ now: NOW, id: 'prj_r' }), updatedAt: NOW }, { open: true });
+    expect(await store.getOpenId()).toBe('prj_r');
+  });
+
+  it('deleteAudio waits for the writes issued before it: a queued put of the key cannot bring it back', async () => {
+    const s = memStore();
+    const key = newAudioKey(NOW);
+    // the raw delete the library used (StudioLibrary libraryStoreOver): it runs at once, AHEAD of the queued put
+    const slow = s.saveProject({ ...newProject({ now: NOW, id: 'prj_q' }), updatedAt: NOW });
+    const put = s.putAudio(key, new ArrayBuffer(4), 'audio/wav');
+    await s.kv.delete('audio', key);
+    await Promise.all([slow, put]);
+    expect(await s.getAudio(key)).not.toBeNull();                  // "deleted", and back
+    // the queued delete lands after the put
+    const put2 = s.putAudio(key, new ArrayBuffer(4), 'audio/wav');
+    const del = s.deleteAudio(key);
+    await Promise.all([put2, del]);
+    expect(await s.getAudio(key)).toBeNull();
+    expect(await s.kv.keys('audio')).toEqual([]);
+  });
+});
+
 describe('the store', () => {
   it('saves, lists newest first, loads back exactly, and remembers the open project', async () => {
     const s = memStore();
@@ -165,7 +226,7 @@ describe('the store', () => {
     const s = memStore();
     const a = representativeProject();
     const d = duplicateProject(a, { now: NOW + 1, id: 'prj_dup' });
-    const onlyA = { ...a, takes: [...a.takes, { id: 't9', atBar: 0, gain: 1, durationSec: 1, audio: ref('aud_mfz1abcdzzzz') }] };
+    const onlyA = { ...a, takes: [...a.takes, { id: 't9', atBar: 0, gain: 1, durationSec: 1, audio: ref('aud_mfz1abcdzzzz'), ...BOOTH }] };
     for (const k of ['aud_mfz1abcd1234', 'aud_mfz1abcd5678', 'aud_mfz1abcd9999', 'aud_mfz1abcdzzzz']) await s.putAudio(k, new ArrayBuffer(4), 'audio/webm');
     await s.saveProject(onlyA, { open: true });
     await s.saveProject(d);
@@ -182,7 +243,7 @@ describe('the store', () => {
     const old = newAudioKey(NOW), young = newAudioKey(now - 1000), used = newAudioKey(NOW);
     expect(audioKeyTime(old)).toBe(NOW);
     for (const k of [old, young, used, 'someone_elses']) await s.putAudio(k, new ArrayBuffer(4), 'audio/webm');
-    const p = { ...newProject({ now: NOW, id: 'prj_s' }), takes: [{ id: 't1', atBar: 0, gain: 1, durationSec: 1, audio: ref(used) }] };
+    const p = { ...newProject({ now: NOW, id: 'prj_s' }), takes: [{ id: 't1', atBar: 0, gain: 1, durationSec: 1, audio: ref(used), ...BOOTH }] };
     await s.saveProject(p);
     expect(await s.sweepAudio(now)).toBe(1);
     expect((await s.kv.keys('audio')).sort()).toEqual([young, used, 'someone_elses'].sort());
@@ -458,7 +519,7 @@ describe('restore (what a reload or a REPLAY remount opens)', () => {
 
   it('a record from a newer FEL is refused the same way', async () => {
     const s = memStore();
-    await s.saveProject({ ...representativeProject(), v: 2 as 1 }, { open: true });
+    await s.saveProject({ ...representativeProject(), v: (STUDIO_PROJECT_VERSION + 1) as typeof STUDIO_PROJECT_VERSION }, { open: true });   // MUSIC-SUITE P4: v2 is this FEL's now
     const r = await restoreProject(s, { now: NOW });
     expect(r.loaded).toBe(false);
     expect(r.notice).toMatch(/newer version of FEL/);
@@ -776,7 +837,7 @@ describe('two tabs on one project: a stale tab never overwrites the other\'s wor
     B.a.baseline(rb.project, rb.storedAt);
     let built = rb.project;
     for (let i = 1; i <= 11; i++) built = edit(built, i);
-    built = { ...built, takes: [{ id: 't1', atBar: 0, gain: 0.9, durationSec: 3, audio: ref(newAudioKey(NOW)) }] };
+    built = { ...built, takes: [{ id: 't1', atBar: 0, gain: 0.9, durationSec: 3, audio: ref(newAudioKey(NOW)), ...BOOTH }] };
     B.a.schedule(built); await B.a.flush();
     expect(B.a.current.phase).toBe('saved');
     A.a.schedule({ ...ra.project, bpm: ra.project.bpm + 1 }); await A.a.flush();
@@ -805,11 +866,12 @@ describe('two tabs on one project: a stale tab never overwrites the other\'s wor
 
   it('a record from a newer FEL is never rewritten by this one, even by an unconditional save', async () => {
     const store = memStore();
-    await store.kv.put('projects', 'prj_new', { id: 'prj_new', title: 'From v2', createdAt: 1, updatedAt: 2, v: 2, owner: null, body: { v: 2, tracks: [] } });
+    const NEXT = STUDIO_PROJECT_VERSION + 1;   // MUSIC-SUITE P4: v2 is this FEL's now; the "newer" record is v3
+    await store.kv.put('projects', 'prj_new', { id: 'prj_new', title: 'From v' + NEXT, createdAt: 1, updatedAt: 2, v: NEXT, owner: null, body: { v: NEXT, tracks: [] } });
     const err = await store.saveProject({ ...newProject({ now: NOW, id: 'prj_new' }), updatedAt: NOW }).catch((e) => e);
     expect(err).toBeInstanceOf(StoreConflictError);
     expect(conflictOf(err)).toBe('newer-version');
-    expect(((await store.kv.get('projects', 'prj_new')) as { v: number }).v).toBe(2);
+    expect(((await store.kv.get('projects', 'prj_new')) as { v: number }).v).toBe(NEXT);
   });
 
   it('a first save of a new project is refused if that id was saved meanwhile (base null)', async () => {
@@ -846,7 +908,7 @@ describe('projects are the player\'s, not the device\'s', () => {
     const A = page.forPlayer('player_a'), B = page.forPlayer('player_b');
     const key = newAudioKey(NOW);
     await page.putAudio(key, new ArrayBuffer(4), 'audio/webm');
-    await A.saveProject({ ...newProject({ now: NOW, id: 'prj_a' }), takes: [{ id: 't1', atBar: 0, gain: 1, durationSec: 1, audio: ref(key) }] });
+    await A.saveProject({ ...newProject({ now: NOW, id: 'prj_a' }), takes: [{ id: 't1', atBar: 0, gain: 1, durationSec: 1, audio: ref(key), ...BOOTH }] });
     expect(await B.sweepAudio(NOW + 10 * AUDIO_SWEEP_MIN_AGE_MS)).toBe(0);
     expect(await page.getAudio(key)).not.toBeNull();
   });

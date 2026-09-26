@@ -38,10 +38,21 @@
 //   * SONG MODE HIDES THE WORKING GRID, so SAVE GRID AS SECTION and UPDATE FROM GRID (which snapshot the hidden grid, not
 //     the section on screen) are held while it is on, and say why.
 //   * The room shows a STOP for a take recording while this panel is hidden on another tab (`stopRef`).
+//
+// MUSIC-SUITE P4 (2026-09-25), the recording booth: RECORD TAKE is gone from here. It opened the mic and a MediaRecorder
+// inside onBar (was :153-157 and :250-274), which fires up to ~125 ms before the bar is audible, behind a first-time
+// permission prompt, with echo cancellation and AGC on; the take was placed on the bar anyway, played once at its absolute
+// bar through setOneShots (was :194), and STOP only cleared a timer. The booth (ui/RecordBooth.tsx, clock math in
+// takeCapture.ts) arms the mic ahead of time with raw input and a meter, counts in, cuts the take sample-accurately from a
+// worklet tape stamped on the audio clock, and hands the takes to engine.setTakes (they loop on their bars and stop on
+// STOP), with gain / trim / mute / delete and best of N. This panel keeps the decoded takes (useTakeBuffers) because
+// RENDER SONG + STEMS uses them: each group's pick, trims as silence, muted takes left out (engineTakeList + gatePcm).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { AudioEngine, TrackState } from './AudioEngine';
+import type { AudioEngine, RenderSounds, TrackState } from './AudioEngine';
 import { MAX_SONG_BARS, SECTION_NAMES, expandChain, newSectionId, normalizeChain, renderLengthSec, snapshotTracks, songBars, type Section, type SongChain } from './Song';
-import { newTakeId, type AudioRef, type ProjectSection, type ProjectTake, type SongSlice } from './StudioProject';
+import type { AudioRef, ProjectSection, ProjectTake, SongSlice } from './StudioProject';
+import RecordBooth, { useTakeBuffers } from './ui/RecordBooth';
+import { engineTakeList } from './takeCapture';
 import {
   SECTION_NAME_MAX, chainUses, deleteSection, moveChainEntry, renameSection, sectionForBar, updateSectionFromGrid,
 } from './studioEdit';
@@ -86,8 +97,9 @@ export interface SongPanelProps {
   loadAudio: (ref: AudioRef) => Promise<ArrayBuffer | null>;
   /** MUSIC-SUITE P3: a render finished (it counts toward the day's creation session). */
   onRendered?: () => void;
-  /** MUSIC-SUITE P3: a take is armed or recording (the room holds MY PROJECTS until it stops). */
-  onRecording?: (on: boolean) => void;
+  /** MUSIC-SUITE P3: a take is armed or recording (the room holds MY PROJECTS until it stops).
+   *  MUSIC-SUITE P4: `what` says whether it is only the booth's open mic ('mic') or a take counting in / recording ('take'). */
+  onRecording?: (on: boolean, what?: 'mic' | 'take') => void;
   /** MUSIC-SUITE P3: song mode is the room's (the grid shows the playing section read-only; the engine effect stands down). */
   songMode: boolean;
   onSongMode: (on: boolean) => void;
@@ -99,9 +111,16 @@ export interface SongPanelProps {
   onTake?: (take: ProjectTake, projectId: string) => void;
   /** MUSIC-SUITE P3 FIX PASS: filled with this panel's STOP TAKE, so the room can show it while the panel is hidden. */
   stopRef?: React.MutableRefObject<(() => void) | null>;
+  /** MUSIC-SUITE P4: start/stop the room's transport (RECORD from a stop counts in and starts the song through it). */
+  onTransport?: (play: boolean) => void;
+  /**
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): what each of the song's first `bars` bars plays on its Flip rows — its section's
+   * own chops (StudioMode, studioEdit.songBarSounds). Absent = the engine's sounds (as before).
+   */
+  barSounds?: (bars: number) => Promise<readonly (RenderSounds | null)[]>;
 }
 
-export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S, onSectionSaved, onChained, swing, song, onSongChange, saveAudio, loadAudio, onRendered, onRecording, songMode, onSongMode, onSongNow, caps, onTake, stopRef }: SongPanelProps) {
+export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S, onSectionSaved, onChained, swing, song, onSongChange, saveAudio, loadAudio, onRendered, onRecording, songMode, onSongMode, onSongNow, caps, onTake, stopRef, onTransport, barSounds }: SongPanelProps) {
   const { sections, chain, takes } = song;
   const swingRef = useRef(swing); useEffect(() => { swingRef.current = swing; }, [swing]);
   const [bar, setBar] = useState(0);
@@ -112,27 +131,15 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
   /** MUSIC-SUITE P3: the section being renamed (inline), and the section whose DELETE is being asked about. */
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  /** MUSIC-SUITE P3 FIX PASS: the take whose removal is being asked about. */
-  const [confirmTake, setConfirmTake] = useState<string | null>(null);
-  /** MUSIC-SUITE P3: each take's decoded audio, by take id (the project holds only its bytes' ref). */
-  const [buffers, setBuffers] = useState<ReadonlyMap<string, AudioBuffer>>(new Map());
-  /** Takes whose bytes are not on this device (a write that failed, a cleared site): shown, never silently gone. */
-  const [missing, setMissing] = useState<ReadonlySet<string>>(new Set());
-  const loadingRef = useRef(new Set<string>());
-  const [armed, setArmed] = useState(false); const [recording, setRecording] = useState(false);
+  /** MUSIC-SUITE P3: each take's decoded audio, by take id (the project holds only its bytes' ref); takes whose bytes are
+   *  not on this device are shown, never silently gone. MUSIC-SUITE P4: the hook lives with the booth (ui/RecordBooth). */
+  const { buffers, missing, addBuffer } = useTakeBuffers(engine?.context ?? null, takes, loadAudio, say);
   const [stems, setStems] = useState<{ name: string; url: string }[]>([]);
   const [mixUrl, setMixUrl] = useState<string | null>(null); const [rendering, setRendering] = useState(false);
-  const recRef = useRef<MediaRecorder | null>(null); const streamRef = useRef<MediaStream | null>(null);
-  const armedRef = useRef(armed); useEffect(() => { armedRef.current = armed; }, [armed]);
   const chainRef = useRef(chain); useEffect(() => { chainRef.current = chain; }, [chain]);
   const sectionsRef = useRef(sections); useEffect(() => { sectionsRef.current = sections; }, [sections]);
   const songModeRef = useRef(songMode); songModeRef.current = songMode;
   const onSongNowRef = useRef(onSongNow); onSongNowRef.current = onSongNow;
-  useEffect(() => { onRecording?.(recording || armed); }, [recording, armed, onRecording]);
-  const onRecordingRef = useRef(onRecording); onRecordingRef.current = onRecording;
-  // the mic is never left open behind the player (the room remounts this panel when another project opens), and the room
-  // hears that it is off
-  useEffect(() => () => { if (recRef.current?.state === 'recording') recRef.current.stop(); onRecordingRef.current?.(false); }, []);
 
   /** MUSIC-SUITE P3: put a section on the engine (never on the grid) and tell the room which one is playing. */
   const playSection = useCallback((b: number): void => {
@@ -146,14 +153,13 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
     }
   }, [engine, bpm, steps]);
 
-  // the engine crosses a bar line → song mode plays that bar's section (the working grid is not written) and an armed
-  // take starts
+  // the engine crosses a bar line → song mode plays that bar's section (the working grid is not written). MUSIC-SUITE P4:
+  // a take no longer starts here (the booth watches the bar's scheduled audio time instead — ui/RecordBooth)
   useEffect(() => {
     if (!engine) return;
     engine.onBar = (b) => {
       setBar(b);
       if (songModeRef.current) playSection(b);
-      if (armedRef.current && !recRef.current) void beginTake(b);
     };
     return () => { engine.onBar = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,31 +175,8 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songMode, engine, chain.length === 0]);
 
-  // MUSIC-SUITE P3: a take restored from the project (a reload, a REPLAY, another project opened) is decoded from its bytes
-  useEffect(() => {
-    if (!engine) return;
-    for (const t of takes) {
-      if (buffers.has(t.id) || missing.has(t.id) || loadingRef.current.has(t.id)) continue;
-      loadingRef.current.add(t.id);
-      void (async () => {
-        try {
-          const bytes = await loadAudio(t.audio);
-          if (!bytes) throw new Error('not on this device');
-          const buf = await engine.context.decodeAudioData(bytes);
-          setBuffers((m) => new Map(m).set(t.id, buf));
-        } catch {
-          setMissing((s) => new Set(s).add(t.id));
-          say('A take\'s recording isn\'t on this device any more — it is marked "audio missing" in the song panel');
-        } finally { loadingRef.current.delete(t.id); }
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, takes]);
-
+  // MUSIC-SUITE P4: what the takes PLAY is the booth's (engine.setTakes: each group's pick, looping on its bars)
   const playable = takes.filter((t) => buffers.has(t.id));
-  useEffect(() => { engine?.setOneShots(playable.map((t) => ({ id: t.id, buffer: buffers.get(t.id)!, atBar: t.atBar, gain: t.gain }))); },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [engine, takes, buffers]);
   useEffect(() => {
     window.__FEL_SONG__ = {
       sections: sections.length, chain, bars: songBars(chain), songMode, bar, section: sectionNow, takes: takes.length, stems: stems.length,
@@ -210,13 +193,6 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
     say(`Saved "${name}" — added to the song`);
   };
   const setChain = (fn: (c: SongChain) => SongChain) => onSongChange((x) => ({ ...x, chain: fn(x.chain) }));
-  /** MUSIC-SUITE P3 FIX PASS: asked first (the confirm below), and an undo step (the room's undo slice holds the takes). */
-  const removeTake = (id: string): void => {
-    const i = takes.findIndex((t) => t.id === id);
-    onSongChange((x) => ({ ...x, takes: x.takes.filter((t) => t.id !== id) }));
-    setConfirmTake(null);
-    if (i >= 0) say(`Take ${i + 1} removed — UNDO brings it back`);
-  };
   /** MUSIC-SUITE P3 FIX PASS: song mode shows a section; the working grid these two snapshot is hidden under it. */
   const gridHidden = songMode;
   const HIDDEN_GRID_LINE = 'Turn SONG MODE off first — your own grid is hidden under the section that is playing';
@@ -245,55 +221,32 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
     if (s) say(`Deleted "${s.name}" — UNDO brings it back`);
   };
 
-  /** MUSIC-SUITE P3 FIX PASS: the project the take is being recorded in (read at the start, not at the stop). */
-  const songIdRef = useRef(song.id); songIdRef.current = song.id;
-  const beginTake = useCallback(async (atBar: number) => {
-    const startedIn = songIdRef.current;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); streamRef.current = stream;
-      const chunks: BlobPart[] = []; const rec = new MediaRecorder(stream);
-      rec.ondataavailable = (e) => chunks.push(e.data);
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop()); recRef.current = null; setRecording(false); setArmed(false);
-        if (!engine) return;
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        try {
-          const buf = await engine.context.decodeAudioData(await blob.arrayBuffer());
-          // MUSIC-SUITE P3: the bytes are kept (this session at once, the device behind it) and the take goes in the project
-          const audio = await saveAudio(blob);
-          const take: ProjectTake = { id: newTakeId(), atBar, gain: 0.9, durationSec: buf.duration, audio };
-          setBuffers((m) => new Map(m).set(take.id, buf));
-          // MUSIC-SUITE P3 FIX PASS: into the project it was recorded in — the room redirects it if another is open now
-          if (onTake) onTake(take, startedIn);
-          else onSongChange((x) => ({ ...x, takes: [...x.takes, take] }));
-          if (startedIn === songIdRef.current) say(`Take on bar ${atBar + 1} — ${buf.duration.toFixed(1)} s`);
-        } catch { say("That take couldn't be read — nothing was added; record it again"); }
-      };
-      recRef.current = rec; rec.start(); setRecording(true); say(`Recording from bar ${atBar + 1}…`);
-    } catch { setArmed(false); say('Microphone not available'); }
-  }, [engine, say, saveAudio, onSongChange, onTake]);
-  const stopTake = () => recRef.current?.stop();
-  useEffect(() => {
-    if (!stopRef) return;
-    stopRef.current = () => { if (recRef.current) recRef.current.stop(); else setArmed(false); };
-    return () => { stopRef.current = null; };
-  }, [stopRef]);
-
   const exportSong = async () => {
     if (!engine || rendering || !caps.mixdown) return;
     const bars = expandChain(chain, sections); if (!bars.length) { say('Chain some sections first'); return; }
     setRendering(true);
     try {
-      const len = renderLengthSec(bars.length, bpm, steps, playable);
-      // stems are named "take 1", "take 2" … by position (a take's id is only a key)
-      const shots = playable.map((t) => ({ id: String(takes.indexOf(t) + 1), buffer: buffers.get(t.id)!, atBar: t.atBar, gain: t.gain }));
+      // MUSIC-SUITE P4: the takes the song plays — each best-of-N group's pick, on its bar of the song, muted ones left
+      // out, the trim-in as a gate (the render's playTake starts it that far after the bar line, that far in: it keeps its
+      // place — MUSIC-SUITE P4 FIX PASS: no gated copy of the buffer, the engine never slid it) and the trim-out / the
+      // region's end as the engine's end position; stems are named "take 1", "take 2" … by position (a take's id is only a key)
+      const heard = engineTakeList(takes, buffers, { songMode: true, songBars: bars.length, bpm, stepsPerBar: steps }).filter((t) => !t.muted);
+      const shots = heard.map((t) => ({
+        id: String(takes.findIndex((x) => x.id === t.id) + 1),
+        buffer: t.buffer,
+        atBar: t.startBar, gain: t.gain, trimStart: t.trimStart, trimEnd: t.trimEnd,
+      }));
+      const len = renderLengthSec(bars.length, bpm, steps, heard.map((t) => ({ id: t.id, atBar: t.startBar, gain: t.gain, durationSec: t.trimEnd })));
       const barSwing = expandChainSwing(chain, sections, swing);   // MUSIC-SUITE P2: each bar at its section's swing
-      const mix = await engine.renderSong(bars, shots, len, barSwing);
-      const st = await engine.renderSongStems(bars, shots, len, barSwing);
+      // MUSIC-SUITE P5 FIX PASS (2026-09-25): …and each bar's Flip rows play its section's own chops, as live song mode does
+      // (the renders read the engine's sounds: the last section song mode swapped in, for every bar)
+      const sounds = barSounds ? await barSounds(bars.length) : undefined;
+      const mix = await engine.renderSong(bars, shots, len, barSwing, sounds);
+      const st = await engine.renderSongStems(bars, shots, len, barSwing, sounds);
       if (mixUrl) URL.revokeObjectURL(mixUrl); for (const s of stems) URL.revokeObjectURL(s.url);
       setMixUrl(URL.createObjectURL(mix)); setStems(st.map((s) => ({ name: s.name, url: URL.createObjectURL(s.blob) })));
       const gone = takes.length - playable.length;
-      say(`Rendered ${bars.length} bars · ${st.length} stems${gone ? ` · ${gone} take${gone === 1 ? '' : 's'} left out (audio missing)` : ''}`);
+      say(`Rendered ${bars.length} bars · ${st.length} stems${shots.length ? ` · ${shots.length} take${shots.length === 1 ? '' : 's'}` : ''}${gone ? ` · ${gone} take${gone === 1 ? '' : 's'} left out (audio missing)` : ''}`);
       onRendered?.();
     } finally { setRendering(false); }
   };
@@ -378,35 +331,16 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
       )}
 
       {/* MUSIC-SUITE P3: takes are a STUDIO feature (MusicTiers `takes`). A take already in the project is listed (and
-          plays) whatever the tier — nothing is hidden that is heard. */}
+          plays) whatever the tier — nothing is hidden that is heard. MUSIC-SUITE P4: the recording booth (arm, meter,
+          count-in, bar-aligned takes that loop and stop, gain / trim / mute / delete, best of N). */}
       {(caps.takes || takes.length > 0) && (
-        <div style={S.row}>
-          {caps.takes
-            ? <button style={{ ...S.btnAlt, ...(armed || recording ? { background: '#ff5c5c', color: '#fff', borderColor: '#ff5c5c' } : {}) }} onClick={() => (recording ? stopTake() : setArmed((a) => !a))}>{recording ? '■ STOP TAKE' : armed ? '● ARMED — starts next bar' : '● RECORD TAKE'}</button>
-            : <span style={{ fontSize: 12, opacity: 0.75 }}>Recording takes opens at THE STUDIO</span>}
-          {caps.takes && <span style={{ fontSize: 12, opacity: 0.75 }}>{playing ? 'the take starts on the next bar line and rides the song' : 'press PLAY first — the take punches in on a bar'}</span>}
-          {takes.map((t, i) => (
-            <span key={t.id} data-qa="song-take" style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, background: '#33244a' }}>
-              take {i + 1} · bar {t.atBar + 1} · {t.durationSec.toFixed(1)}s{missing.has(t.id) ? ' · audio missing' : !buffers.has(t.id) ? ' · loading…' : ''}
-              <button aria-label={`remove take ${i + 1}`} data-qa="take-remove" onClick={() => setConfirmTake(t.id)} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', opacity: 0.6 }}>×</button>
-            </span>
-          ))}
-        </div>
+        <RecordBooth
+          engine={engine} bpm={bpm} steps={steps} songMode={songMode} songBars={total} takes={takes} projectId={song.id}
+          canRecord={caps.takes} buffers={buffers} missing={missing} addBuffer={addBuffer}
+          onSongChange={onSongChange} onTake={onTake} saveAudio={saveAudio} say={say} S={S}
+          onRecording={onRecording} stopRef={stopRef} onTransport={onTransport}
+        />
       )}
-      {/* MUSIC-SUITE P3 FIX PASS: a take is the player's own recording — removing it asks, like a section's DELETE */}
-      {(() => {
-        const i = confirmTake ? takes.findIndex((t) => t.id === confirmTake) : -1;
-        if (i < 0) return null;
-        const t = takes[i];
-        return (
-          <div data-qa="take-remove-confirm" role="group" aria-label={`Remove take ${i + 1}?`} style={{ ...S.card, border: '1px solid #ffb4a2' }}>
-            <span style={{ fontWeight: 700 }}>Remove take {i + 1} (bar {t.atBar + 1}, {t.durationSec.toFixed(1)} s)?</span>
-            <span style={{ fontSize: 12, opacity: 0.8 }}>UNDO brings it back, with its recording.</span>
-            <button data-qa="take-remove-yes" style={S.btn} onClick={() => removeTake(t.id)}>REMOVE</button>
-            <button style={S.btnAlt} onClick={() => setConfirmTake(null)}>KEEP</button>
-          </div>
-        );
-      })()}
       {/* MUSIC-SUITE P3: the song render + stems are a STUDIO feature (MusicTiers `mixdown`). */}
       {caps.mixdown && (
         <div style={S.row}>

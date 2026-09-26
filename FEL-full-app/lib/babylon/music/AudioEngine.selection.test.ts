@@ -168,3 +168,52 @@ describe('sounds can be forgotten (a project opened; a chop that failed to load)
     expect(liveSteps(eng)).toEqual([0]);
   });
 });
+
+// MUSIC-SUITE P5 FIX PASS (2026-09-25): song mode swaps a section's own Flip chops into the ENGINE under the working rows'
+// ids, and every render read the engine's sounds — PUBLISH rendered the grid with the last-swapped section's chop, and
+// RENDER SONG / STEMS gave every bar that one section's. A render now takes its Flip sounds explicitly (RenderSounds).
+describe('a render plays the sounds it is given, not whatever song mode swapped in last', () => {
+  const buf = (n: number): AudioBuffer => new FakeAudioBuffer(1, n, 44100) as unknown as AudioBuffer;
+  const played = (c: FakeOfflineAudioContext): unknown[] => c.starts.map((s) => s.buffer);
+  const swapped = buf(111), gridChop = buf(222), verseChop = buf(333), hookChop = buf(444);
+
+  it('PUBLISH: the working grid\'s chop, although the engine holds a section\'s under the same id', async () => {
+    const eng = engine([row('kick', [0]), row('flip_0', [5])]);
+    eng.loadBuffer('flip_0', 'FLIP 1', swapped, 'melody');   // what swapSectionChops left in the engine
+    const before = FakeOfflineAudioContext.created.length;
+    await eng.renderMixdown(1, [row('kick', [0]), row('flip_0', [5])], 0, new Map([['flip_0', gridChop]]));
+    const bufs = played(FakeOfflineAudioContext.created[before]);
+    expect(bufs).toContain(gridChop);
+    expect(bufs).not.toContain(swapped);
+    expect(bufs).toHaveLength(2);                              // the kick still plays the engine's sound
+  });
+
+  it('a row given as null is silent in that render (its chop is not on this device) — never the engine\'s', async () => {
+    const eng = engine([row('flip_0', [5])]);
+    const before = FakeOfflineAudioContext.created.length;
+    await eng.renderMixdown(1, [row('flip_0', [5])], 0, new Map([['flip_0', null]]));
+    expect(FakeOfflineAudioContext.created[before].starts).toHaveLength(0);
+  });
+
+  it('RENDER SONG: each bar plays its own section\'s chop; STEMS too (one stem for the row, both chops in it)', async () => {
+    const eng = engine([row('flip_0', [5])]);
+    eng.loadBuffer('flip_0', 'FLIP 1', swapped, 'melody');
+    const bars = [[row('flip_0', [5])], [row('flip_0', [5])]];
+    const sounds = [new Map([['flip_0', verseChop]]), new Map([['flip_0', hookChop]])];
+    const before = FakeOfflineAudioContext.created.length;
+    await eng.renderSong(bars, [], 4, [0, 0], sounds);
+    expect(played(FakeOfflineAudioContext.created[before])).toEqual([verseChop, hookChop]);
+    const mid = FakeOfflineAudioContext.created.length;
+    const stems = await eng.renderSongStems(bars, [], 4, [0, 0], sounds);
+    expect(stems.map((s) => s.name)).toEqual(['FLIP 1']);
+    expect(played(FakeOfflineAudioContext.created[mid])).toEqual([verseChop, hookChop]);
+  });
+
+  it('with no sounds given, a render is what it was (the engine\'s)', async () => {
+    const eng = engine([row('flip_0', [5])]);
+    eng.loadBuffer('flip_0', 'FLIP 1', swapped, 'melody');
+    const before = FakeOfflineAudioContext.created.length;
+    await eng.renderMixdown(1, [row('flip_0', [5])], 0);
+    expect(played(FakeOfflineAudioContext.created[before])).toEqual([swapped]);
+  });
+});

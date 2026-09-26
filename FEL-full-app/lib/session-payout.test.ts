@@ -334,7 +334,7 @@ describe('the server mirrors the room (lib/babylon/music/performSet.ts)', () => 
 });
 
 // ── MUSIC-SUITE P2 FIX PASS (2026-09-25) ────────────────────────────────────────────────────────────────────────────
-describe('P2 fix pass: the shell does not send `stats` yet (held file), and the rules say so', () => {
+describe('the shell sends `stats` (2026-09-26), and the rules say so', () => {
   it('ROOM_STATS_FORWARDED matches what components/games/game-shell.tsx actually posts — flip the two together', () => {
     const shell = readFileSync(join(process.cwd(), 'components/games/game-shell.tsx'), 'utf8');
     const body = shell.slice(shell.indexOf("fetch('/api/sessions'"), shell.indexOf("fetch('/api/sessions'") + 900);
@@ -342,13 +342,17 @@ describe('P2 fix pass: the shell does not send `stats` yet (held file), and the 
     expect(/\bstats\s*:/.test(body)).toBe(ROOM_STATS_FORWARDED);
   });
 
-  it('until then, a music session with no stats keeps the room\'s own win (review: every honest win refused)', () => {
-    expect(ROOM_STATS_FORWARDED).toBe(false);
-    expect(sessionWon('music', true, null, 60, { score: 9000 })).toBe(true);
+  it('so a music session with no stats wins nothing now — the legacy door (the room\'s own win) is shut', () => {
+    // P2 fix pass: while the shell sent no stats, a set without them kept the room's own win (every honest win had been
+    // refused). GameShell's handleEnd sends `stats: res?.stats` now, so a body with no counts is a claim with nothing behind it
+    expect(ROOM_STATS_FORWARDED).toBe(true);
+    expect(sessionWon('music', true, null, 60, { score: 9000 })).toBe(false);
     expect(sessionWon('music', false, null, 60, { score: 9000 })).toBe(false);
-    expect(sessionWon('music', true, null, 60, { score: 0 })).toBe(false);                  // a won set always scored
-    // stats that ARE sent are always read: the legacy door is only for a body with none
+    expect(sessionWon('music', true, musicSet({ bars: 8 }), 60, { score: 9000 })).toBe(true);   // the counts win it
     expect(sessionWon('music', true, musicSet({ bars: 1, notes: 16, perfects: 1 }), 60, { score: 100 })).toBe(false);
+    // the door itself still works for a caller that says the shell does not forward (the rule is kept, not deleted)
+    expect(sessionWon('music', true, null, 60, { score: 9000, statsForwarded: false })).toBe(true);
+    expect(sessionWon('dance', true, null, 60)).toBe(true);                                     // every other mode keeps its claim
   });
 });
 

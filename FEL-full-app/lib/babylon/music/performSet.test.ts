@@ -341,6 +341,14 @@ describe('P2: the judge listens where the player listens (latency)', () => {
     expect(performLatencySec({ savedOffsetMs: null, outputLatency: 3 })).toBe(PERFORM_MAX_OUTPUT_LATENCY_S);
   });
 
+  it('P4 FIX PASS: + the Academy desk\'s own delay (the limiter\'s 6 ms, 12 with MASTER) on EVERY path — neither knows it', () => {
+    expect(performLatencySec({ savedOffsetMs: 120, outputLatency: 0.05, graphLatencySec: 0.006 })).toBeCloseTo(0.126, 12);
+    expect(performLatencySec({ savedOffsetMs: null, outputLatency: 0.042, graphLatencySec: 0.012 })).toBeCloseTo(0.054, 12);
+    expect(performLatencySec({ savedOffsetMs: null, graphLatencySec: 0.006 })).toBeCloseTo(0.006, 12);
+    expect(performLatencySec({ savedOffsetMs: null, outputLatency: 3, graphLatencySec: 0.006 })).toBeCloseTo(PERFORM_MAX_OUTPUT_LATENCY_S + 0.006, 12);
+    expect(performLatencySec({ savedOffsetMs: 0, graphLatencySec: Number.NaN })).toBe(0);           // absent / broken = the P2 rule
+  });
+
   it('a tap that arrives exactly one latency after the note\'s clock time is dead on; windows close on the heard clock', () => {
     const set = new PerformSet({ arena: false });
     set.latencySec = 0.04;
@@ -657,7 +665,8 @@ describe('P2: input', () => {
     expect(studio).toContain("onPointerDown={(e) => { if (e.button === 0) performTap(); }}");
     expect(studio).toContain("onClick={(e) => { if (e.detail === 0) performTap(); }}>TAP</button>");
     expect(studio).not.toContain('onClick={performTap}');                // the release is not the tap
-    expect(studio).toContain("if (mode !== 'perform' || view !== 'studio') return;");
+    // MUSIC-SUITE P4 FIX PASS: and only once the room is on screen (never behind the splash)
+    expect(studio).toContain("if (mode !== 'perform' || view !== 'studio' || !roomShown) return;");
     expect(studio).toContain('if (!e.repeat) performTap();');
     // FlipPad's key listener lives in FlipPad, which StudioMode mounts only on the FLIP tab
     expect(flipPad).toMatch(/window\.addEventListener\('keydown', onKey\)/);

@@ -5,7 +5,7 @@
 // (useSyncExternalStore re-renders on identity), and (the step-2 review) that the writers belong to one mount: a harness
 // torn down after the next one mounted blanks nothing.
 import { describe, it, expect, afterEach } from 'vitest';
-import { sessionStore, EvidenceCounter, EVIDENCE_TRIGGER_MS, type SessionWriter } from './sessionStore';
+import { sessionStore, EvidenceCounter, EVIDENCE_TRIGGER_MS, markRun, countedSince, type SessionWriter } from './sessionStore';
 import type { FelInput } from './InputBus';
 
 let w: SessionWriter | null = null;
@@ -79,6 +79,44 @@ describe('the run record', () => {
     expect(sessionStore.record()!.bodyInputs).toBe(1);
     w.count('body');                                       // a harness gone counts nothing more
     expect(sessionStore.record()).toBe(rec);
+  });
+});
+
+describe('what came after a mark (GameShell\'s `played`, movement play P3 step 5)', () => {
+  it('a run begun after the mark counts in full; the run before it never does, however much it counted', () => {
+    w = sessionStore.mount(card('skateboard'));
+    w.beginRun('skateboard');
+    for (let i = 0; i < 9; i++) w.count('external');           // the last match: nine presses
+    const mark = markRun(sessionStore.record());                 // the shell mounts its next game
+    expect(countedSince(sessionStore.record(), mark)).toBe(0);   // not woken yet: the old record is still there
+    w.unmount();
+    w.count('external');                                         // a harness gone counts nothing
+    expect(countedSince(sessionStore.record(), mark)).toBe(0);
+    w = sessionStore.mount(card('sprint'));
+    w.beginRun('sprint');
+    w.count('external'); w.count('body');
+    expect(countedSince(sessionStore.record(), mark)).toBe(2);   // pad and body alike: input the game received
+    w.count('body');
+    expect(countedSince(sessionStore.record(), mark)).toBe(3);
+  });
+  it('the run the mark saw counts only what came after it (an in-place REPLAY keeps one harness run going)', () => {
+    w = sessionStore.mount(card('brainbrawl'));
+    w.beginRun('brainbrawl');
+    for (let i = 0; i < 7; i++) w.count('external');           // match one, and a press on its results card
+    const mark = markRun(sessionStore.record());                 // REPLAY: the rematch starts in the same run
+    expect(countedSince(sessionStore.record(), mark)).toBe(0);
+    w.count('external'); w.count('external');
+    expect(countedSince(sessionStore.record(), mark)).toBe(2);
+    w.count('external');
+    expect(countedSince(sessionStore.record(), mark)).toBe(3);
+  });
+  it('no record, or a mark on none: nothing counted before a run exists, everything of the first run after', () => {
+    expect(markRun(null)).toEqual({ runId: 0, counted: 0 });
+    expect(countedSince(null, markRun(null))).toBe(0);
+    expect(countedSince({ runId: 4, modeId: 'dunk', inputs: 2, bodyInputs: 1 }, markRun(null))).toBe(3);
+    // a mark newer than the record read (it cannot happen with one store; the reader stays at zero, never negative)
+    expect(countedSince({ runId: 4, modeId: 'dunk', inputs: 2, bodyInputs: 1 }, { runId: 5, counted: 0 })).toBe(0);
+    expect(countedSince({ runId: 4, modeId: 'dunk', inputs: 2, bodyInputs: 1 }, { runId: 4, counted: 9 })).toBe(0);
   });
 });
 

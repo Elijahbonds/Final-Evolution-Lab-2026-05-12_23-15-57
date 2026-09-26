@@ -71,7 +71,9 @@ const STATE = `(async () => {
   return { usedChars: used, keys: ls, index, walkSrc, walk, idb };
 })()`;
 const state = (p: Page) => p.evaluate(STATE) as Promise<Any>;
-const toasts = (p: Page) => p.evaluate(() => [...document.querySelectorAll('div')].filter((d) => d.style.position === 'sticky').map((d) => d.textContent ?? '').filter(Boolean));
+// MUSIC-SUITE P4 (grid-ui): the room's line is [data-qa="toast"] (fixed, clear of the grid) and a library failure is the lasting
+// [data-qa="library-line"] — both are read, so every line this probe counts is still seen
+const toasts = (p: Page) => p.evaluate(() => [...document.querySelectorAll('[data-qa="toast"], [data-qa="library-line"] > span')].map((d) => d.textContent ?? '').map((t) => t.replace(/^LIBRARY: /, '')).filter(Boolean));
 const btn = (p: Page, name: string) => p.getByRole('button', { name, exact: true }).first();
 
 async function startRoom(p: Page): Promise<void> {

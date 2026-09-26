@@ -7,6 +7,8 @@ import { PAD_COUNT } from '@/lib/babylon/music/Flip';
 export const NOW = Date.UTC(2026, 8, 25, 17, 40);
 export const steps = (on: number[]): boolean[] => Array.from({ length: 16 }, (_, i) => on.includes(i));
 export const ref = (key: string, bytes = 1000) => ({ key, mime: 'audio/webm', bytes });
+/** MUSIC-SUITE P4: the booth's fields a take needs (StudioProject ProjectTake) — a one-bar region of a 4-bar loop, as recorded. */
+export const BOOTH = { bars: 1, loopBars: 4, trimStart: 0, trimEnd: 0, muted: false, pickedAt: 0 } as const;
 
 /** The P1 probe's beat (14 lit cells: kick 1/5/9/13, snare 5/13, hats on the eighths), two sections at their own swing,
  *  a chain, two takes, an own-recording Flip source with edited chops, a row sent from it, MASTER on, a remix credit. */
@@ -21,9 +23,10 @@ export function representativeProject(): StudioProject {
   const hook = { id: 'hook_b2', name: 'hook', tracks: emptyKitTracks().map((t) => (t.sampleId === 'kick' ? { ...t, pattern: steps([0, 8]) } : t)), swing: 0.4 };
   p.sections = [verse, hook];
   p.chain = [{ sectionId: 'verse_a1', bars: 2 }, { sectionId: 'hook_b2', bars: 4 }, { sectionId: 'verse_a1', bars: 1 }];
+  // MUSIC-SUITE P4: takes carry the booth's region (bars of a loop), trims, mute and pick order (StudioProject ProjectTake)
   p.takes = [
-    { id: 't1', atBar: 0, gain: 0.9, durationSec: 5.2, audio: ref('aud_mfz1abcd1234', 42_000) },
-    { id: 't2', atBar: 3, gain: 1.1, durationSec: 2.5, audio: ref('aud_mfz1abcd5678', 20_000) },
+    { id: 't1', atBar: 0, gain: 0.9, durationSec: 5.2, audio: ref('aud_mfz1abcd1234', 42_000), bars: 4, loopBars: 8, trimStart: 0.12, trimEnd: 0, muted: false, pickedAt: NOW },
+    { id: 't2', atBar: 3, gain: 1.1, durationSec: 2.5, audio: ref('aud_mfz1abcd5678', 20_000), bars: 2, loopBars: 8, trimStart: 0, trimEnd: 0.3, muted: true, pickedAt: NOW + 1 },
   ];
   const source = { id: 'mic_1', label: 'mic take', kind: 'own' as const, note: 'Recorded in the room.', audio: ref('aud_mfz1abcd9999', 60_000) };
   p.flip = {
@@ -32,6 +35,6 @@ export function representativeProject(): StudioProject {
   };
   const row: ProjectFlipRow = { sampleId: 'flip_1', pad: 1, label: 'FLIP 2', source, slice: { start: 1000, end: 2000 }, reverse: false, pitch: -5, gate: true };
   const withRow = withFlipHit(withFlipHit(withFlipRow(p, row), 'flip_1', 3), 'flip_1', 11);
-  return { ...withRow, mixer: { polish: true, channels: {} }, remixOf: { id: 'trk_1', title: 'Original', authorName: 'Okta' } };
+  return { ...withRow, mixer: { polish: true, master: 1, channels: {} }, remixOf: { id: 'trk_1', title: 'Original', authorName: 'Okta' } };
 }
 
