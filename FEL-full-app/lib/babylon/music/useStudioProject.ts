@@ -33,7 +33,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ReplayInPlaceContext } from '@/components/games/replay-in-place';
 import {
-  duplicateProject, migrateProject, newAudioKey, newProject, projectFromSeed, refusalLine, renameProject, repairLine,
+  duplicateProject, migrateProject, newAudioKey, newProject, projectFromSeed, refusalLine, renameProject, repairLine, uniqueTitle,
   type AudioRef, type ProjectSeed, type StudioProject,
 } from './StudioProject';
 import {
@@ -354,11 +354,21 @@ export function useStudioProject(say: (msg: string) => void, opts: { keepAudio?:
     return false;
   }, [dropRescue]);
 
+  /**
+   * MUSIC-SUITE P4 (2026-09-25), grid-ui — P3's open item: the titles a new project must not repeat — the player's STORED
+   * projects. Two NEWs in the same minute were both "Beat · Sep 25 17:40"; a second DUPLICATE or REMIX of the same song
+   * repeated its "(copy)" / "Remix · …" name too. StudioProject.uniqueTitle adds " (2)", " (3)" …. Read after the switch
+   * saved the open project (readyToSwitch / the duplicate's flush), so an edited project is in the list; a blank one
+   * that was never edited is not kept, so its name is free again.
+   */
+  const takenTitles = (s: StudioStore): Promise<string[]> => s.listProjects().then((l) => l.map((x) => x.title), () => [] as string[]);
+
   const ops = useMemo<ProjectOps>(() => {
     const o: ProjectOps = {
-      create: (seed, sw) => guard('The new project', async () => {
+      create: (seed, sw) => guard('The new project', async (s) => {
         if (!(await readyToSwitch(sw, () => void opsRef.current?.create(seed, { discard: true })))) return null;
-        const { project: seeded, issues } = projectFromSeed(seed, { now: Date.now(), kit: projectRef.current.kit });
+        const { project: made, issues } = projectFromSeed(seed, { now: Date.now(), kit: projectRef.current.kit });
+        const seeded = { ...made, title: uniqueTitle(made.title, await takenTitles(s)) };
         // a seeded project is saved at once; a blank one on its first edit
         show(seeded, { saved: false, storedAt: null, notice: seed?.tracks ? repairLine(seeded.title, issues) : null });
         if (!seed) sayRef.current('New project — it saves itself as you work');   // a remix says its own line
@@ -392,7 +402,8 @@ export function useStudioProject(say: (msg: string) => void, opts: { keepAudio?:
           if (!m.ok) { sayRef.current("That project can't be read, so it can't be copied"); return; }
           src = m.project;
         }
-        const copy = duplicateProject(src, { now: Date.now() });
+        const made = duplicateProject(src, { now: Date.now() });
+        const copy = { ...made, title: uniqueTitle(made.title, await takenTitles(s)) };   // MUSIC-SUITE P4: "(copy) (2)"
         await s.saveProject(copy, { open: true, base: null });
         show(copy, { saved: true, storedAt: copy.updatedAt });
         sayRef.current(`Copied — you're working in "${copy.title}" now`);

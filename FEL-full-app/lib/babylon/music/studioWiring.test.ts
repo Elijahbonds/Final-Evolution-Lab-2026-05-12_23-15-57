@@ -99,7 +99,9 @@ describe('the room keeps its work in the project (source pins)', () => {
   it('the dance export keeps the project\'s id and title (was \'My Track\' and a fresh id per mount)', () => {
     // MUSIC-SUITE P3 (tier-honesty-editing): the button moved to the room — the ladder opens it at the GRID, where the
     // song panel is not mounted — and the song it sends is decided per tier (DanceExport.danceSongAtTier)
-    expect(studio).toContain('exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong })');
+    // MUSIC-SUITE P4 (grid-ui): …and the song's key rides on the card ('Your song · Am · …')
+    // MUSIC-SUITE P4 FIX PASS: the key in words (keyCardText) — the Cypher's chip upper-cases the blurb
+    expect(studio).toContain('exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) })');
     expect(songPanel).not.toContain('exportSongToDance');
     expect(studio + songPanel).not.toContain("'My Track'");
     expect(songPanel).not.toMatch(/useRef\(`s\$\{Date\.now\(\)/);
@@ -159,12 +161,18 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
   const flipPad = code('lib/babylon/music/FlipPad.tsx');
 
   it('the grid draws visibleRows (kit section + Flip section) and the engine plays the same rows', () => {
+    // MUSIC-SUITE P4 (grid-ui): the grid is drawn by ui/StepGrid now (pages, paint, cursor); the room hands it the rows
+    const stepGrid = code('lib/babylon/music/ui/StepGrid.tsx');
     expect(studio).not.toContain('tracks.slice(0, caps.tracks)');                       // the rule that hid the Flip rows
     expect(studio).toContain('const rows = visibleRows(gridTracks, caps);');
-    expect(studio).toContain('data-qa="flip-grid"');
+    expect(studio).toContain('kit={rows.kit.map(gridRow)} flip={rows.flip.map(gridRow)}');
+    expect(stepGrid).toContain("section('flip-grid', flip, kit.length)");
     expect(studio).toContain('useEffect(() => { engineRef.current?.setAudible(shownIds); }, [shownIds]);');
     expect(studio).toContain('eng.setAudible(shownIdsRef.current);');                   // the engine's first bar too
-    expect(studio).toContain('onClick={() => toggleCell(t.sampleId, si)}');             // by row id, not by drawn index
+    // by row id, not by drawn index: a click with no stroke toggles through toggleCell; a stroke paints by row id too
+    expect(studio).toContain('onToggle={(row, step) => toggleCell(row, step)}');
+    expect(stepGrid).toContain('const out = cells.filter((c) => rs[c.row]).map((c) => ({ row: rs[c.row].id, step: c.step }));');
+    expect(studio).toContain('edit((p) => ({ ...p, tracks: cells.reduce((t, c) => withTrackStep(t, c.row, c.step, { on: value }, p.key), p.tracks) }), `paint:${stroke}`);');
   });
 
   it('song mode never writes the working grid; the room plays the grid again when it goes off', () => {
@@ -183,7 +191,9 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
     expect(studio).toContain('edit((p) => ({ ...p, tracks: toggleStep(p.tracks, sampleId, si) }));');
     expect(studio).toContain("edit((p) => withFlipRow(p, row));");
     expect(studio).toMatch(/edit\(\(p\) => withFlipHit\([\s\S]*?'flip-rec'\);/);
-    expect(studio).toContain('edit((p) => ({ ...p, ...fn({ sections: p.sections, chain: p.chain, takes: p.takes }) }))');
+    // MUSIC-SUITE P4 FIX PASS: …and the last take removed clears the TAKES strip's mute / solo in the same step
+    expect(studio).toContain('const next = { ...p, ...fn({ sections: p.sections, chain: p.chain, takes: p.takes }) };');
+    expect(studio).toContain('p.takes.length && !next.takes.length ? withChannel(next, TAKES_CHANNEL, { mute: false, solo: false }) : next');
     expect(studio).toContain('data-qa="clear-confirm"');
     expect(studio).toContain("<button data-qa=\"clear\" style={S.btnAlt} disabled={!!gridLock || gridHitCount(tracks) === 0} onClick={() => setConfirmClear(true)}>CLEAR</button>");
   });
@@ -205,9 +215,11 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
   });
 
   it('publish and remix carry the Flip chops; the store keeps a published chop\'s audio', () => {
-    expect(studio).toContain('const pub = publishTracks(tracks, project.flipRows, shownIds);');
+    // MUSIC-SUITE P4 FIX PASS: the rows the render PLAYED — the desk's muted / soloed-out rows are left out of the record
+    expect(studio).toContain('const deskIds = new Set([...shownIds].filter((id) => gateOpen(deskHeard, id)));');
+    expect(studio).toContain('const pub = publishTracks(tracks, project.flipRows, deskIds);');
     expect(studio).toContain('sequencer: { bpm, steps: STEPS, tracks: pub.tracks, swing },');
-    expect(studio).toContain('const seed = remixSeed(r.sequencer.tracks);');
+    expect(studio).toContain('const seed = remixSeed(r.sequencer.tracks, r.kit);');   // MUSIC-SUITE P4 FIX PASS: the source's kit voices
     expect(studio).toContain('flipRows: seed.flipRows,');
     // MUSIC-SUITE P3 FIX PASS: and the audio the undo history can bring back
     expect(studio).toContain('keepAudio: () => new Set([...publishedAudioKeys(StudioLibrary.list()), ...historyAudioKeys(historyRef.current.states())]),');
@@ -231,17 +243,22 @@ describe('the P3 fix pass wiring (source pins)', () => {
   const studio = code('lib/babylon/music/StudioMode.tsx');
   const songPanel = code('lib/babylon/music/SongPanel.tsx');
   const flipPad = code('lib/babylon/music/FlipPad.tsx');
+  // MUSIC-SUITE P4 (2026-09-25): RECORD TAKE moved out of SongPanel into the recording booth (ui/RecordBooth.tsx); the
+  // take pins below follow it there, and pin that SongPanel hands the booth the room's onTake and stopRef.
+  const booth = code('lib/babylon/music/ui/RecordBooth.tsx');
 
   it('REMIX is held exactly when MY PROJECTS is (a take recording, a PERFORM set)', () => {
-    expect(studio).toContain("const switchLock = mode === 'perform' ? 'End the set to switch projects' : takeRec || micRec ? 'Stop the recording first' : null;");
+    // MUSIC-SUITE P4 FIX PASS: only the booth's mic armed says so (there is no recording to stop)
+    expect(studio).toContain("const switchLock = mode === 'perform' ? 'End the set to switch projects' : boothOnlyMic ? 'Close the mic first' : takeRec || micRec ? 'Stop the recording first' : null;");
     expect(studio).toContain('locked={switchLock}');
     const i = studio.indexOf('const startRemix = ');
     expect(studio.slice(i, i + 400)).toMatch(/if \(switchLock\) \{ say\(/);
   });
 
   it('a take and a mic take land in the project they were recorded in', () => {
-    expect(songPanel).toContain('const startedIn = songIdRef.current;');
-    expect(songPanel).toContain('if (onTake) onTake(take, startedIn);');
+    expect(booth).toContain('startedIn: p.projectId,');
+    expect(booth).toContain('if (live.current.onTake) live.current.onTake(take, r.startedIn);');
+    expect(songPanel).toMatch(/<RecordBooth[\s\S]*?projectId=\{song\.id\}[\s\S]*?onTake=\{onTake\}/);
     expect(studio).toContain('onTake={takeRecorded}');
     expect(studio).toMatch(/if \(room\.isOpen\(projectId\)\) songChange[\s\S]*?else void room\.ops\.amend\(projectId,/);
     expect(flipPad).toContain('const startedIn = projectId;');
@@ -249,8 +266,8 @@ describe('the P3 fix pass wiring (source pins)', () => {
   });
 
   it('a take\'s × and a new source over an own recording ask first; every FLIP change is an undo step', () => {
-    expect(songPanel).toContain('onClick={() => setConfirmTake(t.id)}');
-    expect(songPanel).toContain('data-qa="take-remove-confirm"');
+    expect(booth).toContain('onClick={() => setConfirmTake(t.id)}');
+    expect(booth).toContain('data-qa="take-remove-confirm"');
     expect(flipPad).toContain('data-qa="flip-replace-confirm"');
     expect(flipPad).toMatch(/onClick=\{\(\) => guardReplace\(s\.label, \(\) => void loadFel\(s\)\)\}/);
     expect(studio).toContain('edit((p) => ({ ...p, flip: fn(p.flip) }), o.group);');
@@ -272,7 +289,8 @@ describe('the P3 fix pass wiring (source pins)', () => {
     expect(studio).toMatch(/\{\(t\.authorId === me \|\| t\.authorId === 'me'\) && \(\s*<LibraryDelete /);
     expect(studio).toContain('if (!saveExportedTrack(out)) {');
     expect(studio).toContain('data-qa="take-recording-chip"');
-    expect(songPanel).toContain('stopRef.current = () => { if (recRef.current) recRef.current.stop(); else setArmed(false); };');
+    expect(booth).toContain('p.stopRef.current = () => stopFn.current();');
+    expect(songPanel).toMatch(/<RecordBooth[\s\S]*?stopRef=\{stopRef\}/);
   });
 
   it('ARM REC on a pad whose row holds ANOTHER chop replaces the row\'s chop (what the taps sound like is what the row plays)', () => {
@@ -290,5 +308,48 @@ describe('the P3 fix pass wiring (source pins)', () => {
     expect(my).toContain('data-qa="project-reload"');
     expect(my).toContain('data-qa="switch-anyway"');
     expect(studio).toContain('conflict={room.conflict} onReload={() => void room.ops.reload()} onSaveCopy={() => void room.ops.saveCopy()}');
+  });
+});
+
+// MUSIC-SUITE P4 FIX PASS (2026-09-25): the review's findings, pinned where they are React + Web Audio (driven for real in
+// scripts/probes/_music-p4-fixpass.mts on :3121).
+describe('the P4 fix pass wiring (source pins)', () => {
+  const room = code('lib/babylon/music/StudioMode.tsx');
+  const pad = code('lib/babylon/music/FlipPad.tsx');
+  const rec = code('lib/babylon/music/ui/RecordBooth.tsx');
+  it('the keys listen only while the room is on screen, and not under the shell\'s end card until the room is touched', () => {
+    expect(room).toContain('const roomShown = started && ready && room.restored;');
+    expect(room).toMatch(/useEffect\(\(\) => \{\s*if \(!roomShown\) return;[\s\S]*?if \(keysSuspended\.current\) return;/);
+    expect(room).toContain('}, [view, mode, roomShown]);');
+    expect(room).toMatch(/const r = setRef\.current\.result\([\s\S]*?keysSuspended\.current = true;\s*onEnd\?\.\(\{/);
+    expect(room).toMatch(/onPointerDownCapture=\{\(\) => \{ keysSuspended\.current = false;\s*\}\}/);
+  });
+  it('PERFORM starts on the press with no count-in and no metronome (decision #13)', () => {
+    expect(room).toContain("if (countIn && transport.countIn > 0 && mode !== 'perform' && modeRef.current !== 'perform') eng.countIn(transport.countIn); else eng.start();");
+    expect(room).toContain("engineRef.current?.setMetronome(transport.metronome && mode !== 'perform');");
+  });
+  it('the desk the engine plays is scoped to what can sound; the grid\'s M / S badges read the same desk', () => {
+    expect(room).toContain('const deskHeard = useMemo(() => scopeSolo(mixerOf(project), liveStripIds), [project.mixer, liveStripIds]);');
+    expect(room).toContain('useEffect(() => { engineRef.current?.setMixer(deskHeard); }, [deskHeard, ready]);');
+    expect(room).toContain("silent: c.mute ? 'mute' : anySolo(deskHeard) && !c.solo ? 'solo' : null,");
+  });
+  it('the mixer shows at every tier; its faders are THE STUDIO\'s (decision #4)', () => {
+    expect(room).not.toContain('{caps.mixdown && (() => {');
+    expect(room).toContain('full={caps.mixdown}');
+  });
+  it('the judge, the booth and the timing check all read the desk\'s own delay', () => {
+    expect(room).toContain('graphLatencySec: eng.graphLatencySec,');
+    expect(room).toContain('const all = eng.countIn(CHECK_COUNT_BARS).clicks.map((c) => c.at);');
+    expect(room).toContain('const clicks = heardClicks(checkClicks(all), eng.graphLatencySec);');
+    expect(rec).toContain('mic.latency(loadSavedOffsetMs(), live.current.engine?.graphLatencySec ?? 0)');
+  });
+  it('a Flip pad is heard through its row\'s strip, never beside the desk', () => {
+    expect(pad).toContain('node.connect(g).connect(engine.channelInput(flipSampleId(i)));');
+    expect(pad).not.toContain('connect(ctx.destination)');
+  });
+  it('the booth: trims go to the engine as they are (no gated copies), a running song is counted in, the recording slot is muted', () => {
+    expect(rec).not.toContain('gatedBuffer');
+    expect(rec).toContain('engine.countInBefore?.(startBar, countIn);');
+    expect(rec).toContain('const toPlay = useMemo(() => muteRecordingSlot(engineList, takes, recordingSlot), [engineList, takes, recordingSlot]);');
   });
 });

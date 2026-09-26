@@ -9,6 +9,11 @@
 //   5. NO INDEXEDDB — the memory fallback: the line, REPLAY keeps the work, a reload does not (as the line says).
 //   6. QUOTA — every put refused with QuotaExceededError: the line in the room.
 //   7. THE STREAK POST — /dev/music is outside the signed-in shell: no POST /api/sessions, ever.
+//
+// MUSIC-SUITE P4 FIX PASS (2026-09-25): P4 replaced SongPanel's RECORD TAKE with the recording booth (ui/RecordBooth), so
+// this probe crashed at "● RECORD TAKE" on the P4 tree (p4/grid/regress/p3-autosave: 9/10, the survival matrix never ran).
+// The take is now recorded THROUGH THE BOOTH — ARM (the fake mic), RECORD over the playing song, a FLIP tab switch while it
+// records, ■ STOP TAKE, the room's STOP, CLOSE MIC — and the matrix measures what it always did.
 // Usage: node node_modules/tsx/dist/cli.mjs scripts/probes/_music-p3-autosave.mts   (BASE, OUT env override)
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import fs from 'node:fs';
@@ -160,16 +165,21 @@ async function survival(browser: Browser): Promise<void> {
   await p.waitForTimeout(300);
   const flipBuilt = await flip(p);
   await btn(p, 'STUDIO').click();
-  // a take on the fake mic: PLAY, arm, it starts on the next bar; switch to FLIP mid-take and back; STOP TAKE
+  // a take on the fake mic, THROUGH THE BOOTH (P4): PLAY, ARM, RECORD (it counts in and starts on a bar line); switch to
+  // FLIP mid-take and back; ■ STOP TAKE; the room's STOP; CLOSE MIC
   await btn(p, 'PLAY').click();
-  await btn(p, '● RECORD TAKE').click();
-  await p.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent === '■ STOP TAKE'), undefined, { timeout: 8000 });
+  await p.locator('[data-qa="booth-arm"]').click();
+  await p.locator('[data-qa="mic-on"]').waitFor({ timeout: 15000 });
+  await p.locator('[data-qa="booth-record"]').click();
+  await p.waitForFunction(() => (window as Any).__FEL_BOOTH__?.phase === 'recording', undefined, { timeout: 20000 });
+  await p.waitForTimeout(600);
   await btn(p, 'FLIP').click(); await p.waitForTimeout(900);
   await btn(p, 'STUDIO').click(); await p.waitForTimeout(300);
-  const stillRecording = await p.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent === '■ STOP TAKE'));
-  await btn(p, '■ STOP TAKE').click();
+  const stillRecording = await p.evaluate(() => (window as Any).__FEL_BOOTH__?.phase === 'recording');
+  await p.locator('[data-qa="booth-stop"]').click();
   await p.waitForFunction(() => ((window as Any).__FEL_SONG__?.takes ?? 0) >= 1, undefined, { timeout: 8000 }).catch(() => undefined);
-  await btn(p, 'STOP').click();
+  await p.locator('[data-qa="transport"] button').first().click();          // the room's STOP
+  await p.locator('[data-qa="booth-close"]').click().catch(() => undefined);
   check('a take keeps recording across a tab switch (the song panel stays mounted)', stillRecording, stillRecording, true);
   await saved(p);
   // a dev read of the section swings, from the store's own record (what a reload will read)

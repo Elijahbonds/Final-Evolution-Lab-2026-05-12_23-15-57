@@ -156,8 +156,8 @@ export function routineFromGroove(hits: GrooveHit[], totalBeats: number, difficu
 export interface ExportedTrack {
   track: DanceTrack;
   steps: DanceStep[];
-  /** What the chart was built from, for the card that explains the export. */
-  summary: { hits: number; density: number; bars: number; beats: number };
+  /** What the chart was built from, for the card that explains the export. MUSIC-SUITE P4: + the song's key ('Am'). */
+  summary: { hits: number; density: number; bars: number; beats: number; key?: string };
 }
 
 /** A song id that is stable for the same song, so re-exporting overwrites rather than piling up. */
@@ -180,7 +180,7 @@ export function seedFrom(songId: string): number {
  * without a store, a scene or an audio context in the room.
  */
 export function exportSongToDance(
-  song: { id: string; name: string; bpm: number; steps: number; chain: SongChain; sections: Section[] },
+  song: { id: string; name: string; bpm: number; steps: number; chain: SongChain; sections: Section[]; key?: string },
 ): ExportedTrack | null {
   const bars = expandChain(song.chain, song.sections);
   if (!bars.length) return null;                  // an empty arrangement is not a track
@@ -200,10 +200,13 @@ export function exportSongToDance(
       bars: bars.length,
       difficulty,
       seed,
-      blurb: `Your song · ${hits.length} hits · ${'●'.repeat(difficulty)}${'○'.repeat(3 - difficulty)}`,
+      // MUSIC-SUITE P4 (2026-09-25), grid-ui: the song's key rides on the card ('Your song · A minor · 64 hits') — the project
+      // has one now (StudioProject.key), and the dance floor's pick card is where the player sees it. MUSIC-SUITE P4 FIX
+      // PASS: in words (scales.ts keyCardText) — the Cypher's chip upper-cases the blurb, and 'Am' read 'AM'
+      blurb: `Your song · ${song.key ? `${song.key} · ` : ''}${hits.length} hits · ${'●'.repeat(difficulty)}${'○'.repeat(3 - difficulty)}`,
     },
     steps,
-    summary: { hits: hits.length, density: +d.toFixed(3), bars: bars.length, beats: totalBeats },
+    summary: { hits: hits.length, density: +d.toFixed(3), bars: bars.length, beats: totalBeats, ...(song.key ? { key: song.key } : {}) },
   };
 }
 

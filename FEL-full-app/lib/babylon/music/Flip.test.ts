@@ -30,7 +30,7 @@ describe('slicing', () => {
   it('respects the minimum gap and falls back to a grid on a steady tone', () => {
     const sr = 8000; const sig = burstSignal(sr, [0.1, 0.12, 0.14, 0.5], 0.8);
     expect(onsetSlices(sig, sr).length).toBe(2);                    // 0.12 and 0.14 are inside the 80 ms gap
-    const tone = new Float32Array(sr).map((_, i) => 0.5 * Math.sin(i * 0.05));
+    const tone = new Float32Array(sr).map((_: number, i: number) => 0.5 * Math.sin(i * 0.05));
     expect(onsetSlices(tone, sr).length).toBe(8);                   // grid fallback
   });
   it('energy envelope is per window', () => {

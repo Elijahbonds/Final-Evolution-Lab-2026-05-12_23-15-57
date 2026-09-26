@@ -227,8 +227,14 @@ const FEATURE_WORDS: Record<'arrangement' | 'takes' | 'mixdown' | 'danceExport',
   danceExport: 'send it to the dance floor',
   arrangement: 'sections, the chain and song mode',
   takes: 'record takes over it',
-  mixdown: 'render the song + stems',
+  // MUSIC-SUITE P4 (2026-09-25), grid-ui: the MIXER opens with the render, at THE STUDIO — the tier whose blurb has always
+  // said "mix it" (StudioMode gates the mixer on this same flag, so the chip names it)
+  // MUSIC-SUITE P4 FIX PASS (2026-09-25), owner decision #4: mute / solo are at EVERY tier now (the first chip says so);
+  // what THE STUDIO opens is the rest of the desk — the faders, pan and the room / delay sends — with the render
+  mixdown: 'the mixer\'s faders, pan, room + delay · render the song + stems',
 };
+/** MUSIC-SUITE P4 FIX PASS: what every tier has from the first (the MIXER's mute / solo — StudioMode draws them at all tiers). */
+const FIRST_TIER_EXTRAS = 'mute / solo';
 
 /** What a tier opens over the one below it (the first tier: all it has). */
 export function tierOpens(t: MusicTier): string {
@@ -236,7 +242,7 @@ export function tierOpens(t: MusicTier): string {
   const def = TIERS[t];
   const below = i > 0 ? TIERS[MUSIC_TIERS[i - 1]] : null;
   // MUSIC-SUITE P3 FIX PASS: "4 rows" at a grid that can draw 4 kit rows AND up to 16 Flip rows — the chips count kit rows
-  const parts: string[] = [below ? `${def.tracks} kit rows (+${def.tracks - below.tracks})` : `${def.tracks} kit rows + your Flip rows`];
+  const parts: string[] = [below ? `${def.tracks} kit rows (+${def.tracks - below.tracks})` : `${def.tracks} kit rows + your Flip rows · ${FIRST_TIER_EXTRAS}`];
   for (const f of ['danceExport', 'arrangement', 'takes', 'mixdown'] as const) if (def[f] && !(below && below[f])) parts.push(FEATURE_WORDS[f]);
   return parts.join(' · ');
 }

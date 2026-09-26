@@ -64,7 +64,8 @@ describe('UNDO / REDO — the Academy had neither (one stray tap and the pattern
   it('the project slice it keeps is the grid, the Flip rows, the sections, the chain — and (P3 FIX PASS) the takes, the FLIP tab, tempo, swing, kit and MASTER — compared by content', () => {
     const p = newProject({ now: 1 });
     const s: UndoSlice = undoSlice(p);
-    expect(Object.keys(s).sort()).toEqual(['bpm', 'chain', 'flip', 'flipRows', 'kit', 'mixer', 'sections', 'swing', 'takes', 'tracks']);
+    // MUSIC-SUITE P4 (grid-ui): + the song's key — a key change moves the notes, so an undo must put both back
+    expect(Object.keys(s).sort()).toEqual(['bpm', 'chain', 'flip', 'flipRows', 'key', 'kit', 'mixer', 'sections', 'swing', 'takes', 'tracks']);
     expect(sameSlice(s, undoSlice(JSON.parse(JSON.stringify(p))))).toBe(true);
     expect(sameSlice(s, { ...s, tracks: lit(p.tracks, 'kick', [0]) })).toBe(false);
   });
@@ -304,7 +305,7 @@ describe('the library keeps a published row\'s chop (StudioLibrary stores sequen
 // ── MUSIC-SUITE P3 FIX PASS (2026-09-25) ───────────────────────────────────────────────────────────────────────────────
 
 describe('undo covers what the review found could not be taken back (owner decision #4)', () => {
-  const take = (id: string, key: string) => ({ id, atBar: 1, gain: 0.9, durationSec: 4.2, audio: { key, mime: 'audio/webm', bytes: 9 } });
+  const take = (id: string, key: string) => ({ id, atBar: 1, gain: 0.9, durationSec: 4.2, audio: { key, mime: 'audio/webm', bytes: 9 }, bars: 2, loopBars: 4, trimStart: 0, trimEnd: 0, muted: false, pickedAt: 0 });   // MUSIC-SUITE P4: + the booth's fields
   /** What the room's `edit` does: record the state it replaces when the slice changes, then apply. */
   const editWith = (h: EditHistory<UndoSlice>, p: StudioProject, fn: (p: StudioProject) => StudioProject, group?: string, at = 0): StudioProject => {
     const next = fn(p);

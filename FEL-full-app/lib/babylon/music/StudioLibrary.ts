@@ -36,6 +36,7 @@ import type { SequencerState } from './AudioEngine';
 import type { KitId } from './SynthKit';
 import type { StreamingLink } from './StreamingBridge';
 import { WALKOUT_KEY, makeWalkOut, parseWalkOut, type WalkOut } from './WalkOut';
+import { readKey, type SongKey } from './scales';
 
 // ── shapes ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,11 @@ export interface TrackIndexEntry {
   audio: AudioHome;
   /** Size of the stored WAV. 0 when unknown or none. */
   audioBytes: number;
+  /**
+   * MUSIC-SUITE P4 (2026-09-25), grid-ui: the song's key (StudioProject.key) — the card shows it ('Am') and a remix opens
+   * in it. Absent on songs published before P4 (their key was never known; the card says nothing rather than guess).
+   */
+  key?: SongKey;
 }
 
 /** What `list()` / `get()` hand out: the index row plus the two derived fields. */
@@ -87,7 +93,7 @@ export interface TrackRecord extends TrackIndexEntry {
 /** What a publish carries in. The audio comes separately, as the rendered Blob. */
 export type PublishDraft = Pick<TrackIndexEntry,
   'title' | 'authorId' | 'authorName' | 'kit' | 'bpm' | 'swing' | 'polished' | 'sequencer' | 'remixOf'>
-  & { streamingLinks?: StreamingLink[] };
+  & { streamingLinks?: StreamingLink[]; key?: SongKey };
 
 export type LibraryFailure = 'full' | 'device-full' | 'unavailable' | 'newer' | 'missing' | 'no-audio' | 'storage';
 
@@ -286,6 +292,7 @@ export function normalizeEntry(raw: unknown): { entry: TrackIndexEntry; legacyDa
       audioKey: audio === 'none' ? null : audioKey,
       audio,
       audioBytes: Math.max(0, Math.floor(num(r.audioBytes, 0))),
+      ...(readKey(r.key) ? { key: readKey(r.key)! } : {}),   // MUSIC-SUITE P4: only a real key is kept
     },
   };
 }
@@ -630,6 +637,7 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
       polished: d.polished, sequencer: d.sequencer, remixOf: d.remixOf, streamingLinks: d.streamingLinks ?? [],
       createdAt: now(), plays: 0, saves: 0,
       audioKey: audio === 'none' ? null : audioKeyFor(id), audio, audioBytes,
+      ...(readKey(d.key) ? { key: readKey(d.key)! } : {}),   // MUSIC-SUITE P4: the song's key
     };
   }
 
@@ -808,13 +816,14 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
      * `polished` — a remix of a mastered song opened with MASTER off (the project's mixer defaulted), so it did not sound
      * like its source and nothing said why.
      */
-    beginRemix(id: string): { sequencer: SequencerState; kit: KitId; bpm: number; swing: number; polished: boolean; remixOf: TrackRecord['remixOf'] } | null {
+    beginRemix(id: string): { sequencer: SequencerState; kit: KitId; bpm: number; swing: number; polished: boolean; remixOf: TrackRecord['remixOf']; key: SongKey | null } | null {
       const t = api.get(id);
       if (!t) return null;
       return {
         sequencer: JSON.parse(JSON.stringify(t.sequencer)) as SequencerState,
         kit: t.kit, bpm: t.bpm, swing: t.swing, polished: t.polished === true,
         remixOf: { id: t.id, title: t.title, authorName: t.authorName },
+        key: t.key ?? null,   // MUSIC-SUITE P4: a remix opens in the song's key (null: published before P4 — the default key)
       };
     },
 

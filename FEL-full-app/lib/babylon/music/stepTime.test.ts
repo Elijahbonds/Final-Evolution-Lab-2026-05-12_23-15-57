@@ -16,6 +16,7 @@ import {
   SWING_DEPTH, clampSwing, gridStepTime, renderGrid, retempoGrid, songStepTime, stepDurSec, swingDelaySec,
 } from './stepTime';
 import { AudioEngine, type TrackState } from './AudioEngine';
+import { SAFETY_GAIN } from './mixGraph';
 import { AudioEngine as LegacyAudioEngine } from '@/lib/modes/music/audio-engine';
 import { expandChainSwing, type SwungSection } from './SongPanel';
 import { expandChain, MAX_SONG_BARS, type SongChain } from './Song';
@@ -182,6 +183,8 @@ describe('GOLDEN: the legacy /create maker (lib/modes/music/audio-engine.ts)', (
 /**
  * Run `fn` and return, per audio context it touched, every buffer source it started: "<start time> <chain>", where the
  * chain is the nodes the source is wired through to the destination (gain(v) → pan(v) → gain(0.8) → comp → … → out).
+ * MUSIC-SUITE P4: a node's FIRST connection is its signal path — the desk (mixGraph.ts) connects a strip's gate to the bus
+ * before its sends and meter, and the ceiling to the speakers before its meter tap — so the chain follows that one.
  */
 async function wired(fn: () => Promise<unknown> | void): Promise<{ ctx: FakeBaseAudioContext; hits: string[] }[]> {
   const edges = new Map<object, object>();
@@ -190,7 +193,7 @@ async function wired(fn: () => Promise<unknown> | void): Promise<{ ctx: FakeBase
   const origConnect = FakeNode.prototype.connect;
   const origCreate = FakeBaseAudioContext.prototype.createBufferSource;
   const origStart = FakeScheduledSource.prototype.start;
-  FakeNode.prototype.connect = function <T>(this: FakeNode, dest: T): T { edges.set(this, dest as object); return dest; };
+  FakeNode.prototype.connect = function <T>(this: FakeNode, dest: T): T { if (!edges.has(this)) edges.set(this, dest as object); return dest; };
   FakeBaseAudioContext.prototype.createBufferSource = function (this: FakeBaseAudioContext) {
     const src = origCreate.call(this); owner.set(src, this); return src;
   };
@@ -210,7 +213,7 @@ async function wired(fn: () => Promise<unknown> | void): Promise<{ ctx: FakeBase
     if ('Q' in o) return String(o.type);
     if ('pan' in o) return `pan(${(o.pan as { value: number }).value})`;
     if ('gain' in o) return `gain(${(o.gain as { value: number }).value})`;
-    return '?';
+    return typeof o.kind === 'string' ? o.kind : '?';   // MUSIC-SUITE P4: the ceiling's wave shaper reads 'shaper'
   };
   const byCtx = new Map<FakeBaseAudioContext, string[]>();
   for (const { src, ctx, at } of started) {
@@ -234,8 +237,12 @@ describe('the stems sum to the mix: same hits, same chain, same bus', () => {
     { sampleId: 'fx', pattern: new Array<boolean>(STEPS).fill(true), volume: 1, muted: true, pan: 0 },   // muted: in neither
   ];
 
+  // MUSIC-SUITE P4: every hit now crosses its row's strip (fader 1 → pan 0 → gate 1 at the desk's defaults) and the master
+  // ends in the limiter, the safety gain and the ceiling — in the stems and in the mix alike (mixGraph.ts, the one builder)
+  const strip = 'gain(1) → pan(0) → gain(1)';
   for (const polished of [false, true]) {
-    const bus = polished ? 'gain(0.8) → comp → lowshelf → highshelf → out' : 'gain(0.8) → out';
+    const master = `comp → gain(${SAFETY_GAIN}) → shaper → out`;
+    const bus = `${strip} → ${polished ? `gain(0.8) → comp → lowshelf → highshelf → ${master}` : `gain(0.8) → ${master}`}`;
 
     it(`renderStems ≡ renderMixdown, MASTER ${polished ? 'ON' : 'OFF'}`, async () => {
       const eng = academy(0.2, tracks());

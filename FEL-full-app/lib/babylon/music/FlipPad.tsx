@@ -34,6 +34,15 @@
 //   * THE PROJECT A RECORDING BELONGS TO. A mic take that finishes after another project opened lands in the project it
 //     was recorded in (onFlipChange's `projectId`), not in whatever is open.
 //   * A pad's pitch reaches only the pad (a grid row plays its chop at the recorded pitch until P5 bakes chops): said.
+//
+// MUSIC-SUITE P4 FIX PASS (2026-09-25):
+//   * A PAD IS HEARD THROUGH THE DESK. play() connected every hit as node → gain 0.9 → ctx.destination, beside the P4
+//     desk: over a running beat already at up to −0.3 dBFS (render-peak.json worstP4Grid 0.897) the sum at the
+//     destination could pass full scale and clip — what the limiter was built to end — and the pad's row's mute / solo /
+//     fader / sends and the meters never saw it. Now a pad goes into its row's strip (engine.channelInput(flip_<pad>)):
+//     the same fader, pan, gate, sends, limiter and meters as the row's grid hits (live == render).
+//   * A PAD'S PITCH REACHES THE GRID NOW: a recorded hit and a new row carry it as the step's note (StudioProject padNote);
+//     only the GATE stays the pad's (the row plays the chop's full length until P5 bakes chops) — the line says so.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AudioEngine } from './AudioEngine';
 import { FEL_SOURCES, PAD_COUNT, PAD_KEYS, onsetSlices, gridSlices, padForKey, padsFromSlices, quantizeTap, rateForPitch, sliceSamples, type FlipSource, type Pad, type Slice } from './Flip';
@@ -215,7 +224,7 @@ export default function FlipPad({ engine, playing, playhead, steps, flip, onFlip
     const b = padBuffer(i); if (!b) return;
     const ctx = engine.context; if (ctx.state === 'suspended') void ctx.resume();
     const node = ctx.createBufferSource(); node.buffer = b; node.playbackRate.value = rateForPitch(pads[i].pitch);
-    const g = ctx.createGain(); g.gain.value = 0.9; node.connect(g).connect(ctx.destination); node.start();
+    const g = ctx.createGain(); g.gain.value = 0.9; node.connect(g).connect(engine.channelInput(flipSampleId(i))); node.start();
     if (pads[i].gate) node.stop(ctx.currentTime + Math.min(b.duration / node.playbackRate.value, 1.2));
     setLit(i); setTimeout(() => setLit((l) => (l === i ? null : l)), 120);
     if (recArmRef.current && playingRef.current) {
@@ -287,9 +296,15 @@ export default function FlipPad({ engine, playing, playhead, steps, flip, onFlip
           <label style={{ fontSize: 12 }}>pitch {pads[selected].pitch > 0 ? '+' : ''}{pads[selected].pitch}
             <input type="range" min={-12} max={12} value={pads[selected].pitch} onChange={(e) => setPads((ps) => ps.map((p, j) => (j === selected ? { ...p, pitch: Number(e.target.value) } : p)), `flip-pitch-${selected}`)} />
           </label>
-          {/* MUSIC-SUITE P3 FIX PASS: pitch and gate are the PAD's — a grid row plays the chop as recorded (baked chops come later) */}
+          {/* MUSIC-SUITE P3 FIX PASS: pitch and gate are the PAD's — a grid row plays the chop as recorded (baked chops come later).
+              MUSIC-SUITE P4 FIX PASS: the PITCH reaches the grid now (a recorded hit or a new row plays it — the step's note);
+              the gate is still the pad's alone */}
           {(pads[selected].pitch !== 0 || !pads[selected].gate) && (
-            <span data-qa="flip-pitch-note" style={{ fontSize: 11, opacity: 0.7 }}>pad only — a grid row plays this chop at its recorded pitch and full length</span>
+            <span data-qa="flip-pitch-note" style={{ fontSize: 11, opacity: 0.7 }}>
+              {pads[selected].pitch !== 0 ? 'the grid plays this pitch on the hits you record (♪ NOTES changes a step)' : ''}
+              {pads[selected].pitch !== 0 && !pads[selected].gate ? ' · ' : ''}
+              {!pads[selected].gate ? 'gate is pad only — a grid row plays the chop at its full length' : ''}
+            </span>
           )}
           <button style={{ ...S.alt, ...(pads[selected].reverse ? { background: '#7a5c9e', color: '#fff' } : {}) }} onClick={() => setPads((ps) => ps.map((p, j) => (j === selected ? { ...p, reverse: !p.reverse } : p)))}>REVERSE</button>
           <button style={{ ...S.alt, ...(pads[selected].gate ? { background: '#7a5c9e', color: '#fff' } : {}) }} onClick={() => setPads((ps) => ps.map((p, j) => (j === selected ? { ...p, gate: !p.gate } : p)))}>GATE</button>

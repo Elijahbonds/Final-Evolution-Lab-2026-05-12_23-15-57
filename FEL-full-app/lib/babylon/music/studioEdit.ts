@@ -41,16 +41,19 @@ import type { Slice } from './Flip';
  * change — so UNDO undid an unrelated grid edit instead), and that a tap on a FEL stem replaced a mic take and 16 edited
  * chops for good. A removed recording's bytes stay in the store while the history can bring it back (the room adds
  * historyAudioKeys to the store's keep set).
+ * MUSIC-SUITE P4 (2026-09-25), grid-ui: and the song's KEY. A key change moves every bass / lead note with it
+ * (StudioProject.setProjectKey), so an undo that put the notes back but left the new key would leave them outside it —
+ * and a key change on a grid with no lit notes changed nothing in the old slice, so it could not be undone at all.
  */
-export type UndoSlice = Pick<StudioProject, 'tracks' | 'flipRows' | 'sections' | 'chain' | 'takes' | 'flip' | 'bpm' | 'swing' | 'kit' | 'mixer'>;
-export const UNDO_KEYS = ['tracks', 'flipRows', 'sections', 'chain', 'takes', 'flip', 'bpm', 'swing', 'kit', 'mixer'] as const;
+export type UndoSlice = Pick<StudioProject, 'tracks' | 'flipRows' | 'sections' | 'chain' | 'takes' | 'flip' | 'bpm' | 'swing' | 'kit' | 'mixer' | 'key'>;
+export const UNDO_KEYS = ['tracks', 'flipRows', 'sections', 'chain', 'takes', 'flip', 'bpm', 'swing', 'kit', 'mixer', 'key'] as const;
 /** Steps kept (the brief asks for at least 50). */
 export const UNDO_LIMIT = 100;
 /** A grouped burst (live pad taps with REC armed) within this long of its last edit is ONE undo step. */
 export const COALESCE_MS = 1500;
 
 export function undoSlice(p: UndoSlice): UndoSlice {
-  return { tracks: p.tracks, flipRows: p.flipRows, sections: p.sections, chain: p.chain, takes: p.takes, flip: p.flip, bpm: p.bpm, swing: p.swing, kit: p.kit, mixer: p.mixer };
+  return { tracks: p.tracks, flipRows: p.flipRows, sections: p.sections, chain: p.chain, takes: p.takes, flip: p.flip, bpm: p.bpm, swing: p.swing, kit: p.kit, mixer: p.mixer, key: p.key };
 }
 export function sameSlice(a: UndoSlice, b: UndoSlice): boolean {
   return UNDO_KEYS.every((k) => a[k] === b[k] || JSON.stringify(a[k]) === JSON.stringify(b[k]));
@@ -269,8 +272,14 @@ export function publishTracks(tracks: readonly TrackState[], flipRows: readonly 
  * A remix's grid and Flip rows from a published record's rows, through the project's one door (migrateProject: a stored
  * record never makes the room fetch anything but a first-party /audio/ path or its own bytes). A Flip row whose chop is
  * missing (published before P3) or unreadable is LEFT OUT and named in `dropped` — never written as a row that plays nothing.
+ *
+ * MUSIC-SUITE P4 FIX PASS (2026-09-25): `kit` — the SOURCE record's kit (the voice its published audio played). A row
+ * published before P4 has no notes, and migrateProject gives a note row its kit voice's note (VOICE_ROOTS) — but this
+ * called it with no kit, so every pre-P4 bass / lead got STREET's A1 / A4 (33 / 69), and a remix of a NEON song (C2 / C5,
+ * 36 / 72) or a DUST one (G1 / G4, 31 / 67) opened in another key than its source (the review reproduced it: bass 33, lead
+ * 69 on a NEON remix, no issue said). P3's promise is that a remix plays the same sounds as its source.
  */
-export function remixSeed(rows: readonly unknown[]): { tracks: TrackState[]; flipRows: ProjectFlipRow[]; dropped: string[] } {
+export function remixSeed(rows: readonly unknown[], kit?: unknown): { tracks: TrackState[]; flipRows: ProjectFlipRow[]; dropped: string[] } {
   const plain: unknown[] = [];
   const chops: unknown[] = [];
   for (const r of rows) {
@@ -279,7 +288,7 @@ export function remixSeed(rows: readonly unknown[]): { tracks: TrackState[]; fli
     plain.push(track);
     if (chop && typeof chop === 'object' && typeof track.sampleId === 'string') chops.push({ ...chop, sampleId: track.sampleId });
   }
-  const m = migrateProject({ v: STUDIO_PROJECT_VERSION, id: 'remix', tracks: plain, flipRows: chops }, { now: 1 });
+  const m = migrateProject({ v: STUDIO_PROJECT_VERSION, id: 'remix', tracks: plain, flipRows: chops, ...(kit !== undefined ? { kit } : {}) }, { now: 1 });
   if (!m.ok) return { tracks: [], flipRows: [], dropped: [] };
   const kept = new Set(m.project.flipRows.map((r) => r.sampleId));
   const dropped = m.project.tracks.filter((t) => isFlipRowId(t.sampleId) && !kept.has(t.sampleId)).map((t) => t.sampleId);
