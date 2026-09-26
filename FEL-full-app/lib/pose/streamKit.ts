@@ -11,9 +11,16 @@
 // The scripted bodies are synth.ts's rest body moved by hand: its truth comes from synthesize() like any clip's, so a
 // stream can be rebuilt under any camera, rate or noise the fixtures (one camera, baked) cannot be.
 //
+// MOVEMENT PLAY P4 (2026-09-25): the space check's streams live here too, so its gate (lib/move/spaceGate.test.ts), its
+// report (scripts/body/space.mts) and its live probe share one copy: the owner's takes shot again from another spot
+// (reshoot), both arms overhead (armsUp), the stand → reach → lower → stand the check asks for (spaceSession), and two
+// bodies taking turns in one picture (swapStream).
+//
 // Pure: no DOM, no fs, deterministic for a seed.
-import { LANDMARK_COUNT, type PoseFrame, emptyFrame } from './landmarks';
-import { mulberry32, DEFAULT_NOISE, moveJoints, type NoiseSpec, type Joints, type JointClip, type V3 } from './synth';
+import { CORE_POINTS, LANDMARK_COUNT, type Lm, type PoseFrame, emptyFrame } from './landmarks';
+import {
+  mulberry32, DEFAULT_NOISE, moveJoints, restPose, type NoiseSpec, type Joints, type JointClip, type V3, type CameraSpec, type PoseFixture,
+} from './synth';
 
 // the synth's torso + face points (their jitter is the smaller one), as synth.ts TORSO_FACE
 const TORSO_FACE = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 23, 24]);
@@ -207,4 +214,80 @@ export function script(beats: Beat[], fps = 120): JointClip {
     frames.push(beats[i][1](Math.min(t, beats[i][0])));
   }
   return { fps, frames };
+}
+
+// ── the space check's streams (movement play P4) ─────────────────────────────────────────────────────────────────
+
+const insideImg = (l: Lm) => l.x >= 0 && l.x <= 1 && l.y >= 0 && l.y <= 1;
+
+/**
+ * A fixture shot again from another spot. Each landmark goes back into the room along its ray, at its depth (the
+ * hips at the room's origin, where toRoom holds them, plus the landmark's own world z), and through the new lens.
+ * Both lenses level (the synth's default). Visibility follows a point in or out of the frame the way synth.ts sets it,
+ * and a frame with fewer than 5 core points left inside is a frame without a body.
+ */
+export function reshoot(fx: Pick<PoseFixture, 'settings' | 'frames'>, spec: Partial<CameraSpec>): PoseFrame[] {
+  const a = fx.settings.synth.camera, b = { ...a, ...spec };
+  const fa = a.width / 2 / Math.tan((a.hfovDeg * Math.PI) / 360), fb = b.width / 2 / Math.tan((b.hfovDeg * Math.PI) / 360);
+  return fx.frames.map((fr) => {
+    if (!fr.present || !fr.world) return fr;
+    const image = fr.image.map((l, i) => {
+      const depth = a.distance + fr.world![i].z;
+      const X = ((l.x - 0.5) * a.width / fa) * depth;
+      const Y = a.heightM - ((l.y - 0.5) * a.height / fa) * depth;   // height above the floor
+      const d = depth + (b.distance - a.distance);
+      const n = { x: 0.5 + (fb / b.width) * (X / d), y: 0.5 - (fb / b.height) * ((Y - b.heightM) / d), z: (l.z * a.distance) / b.distance, v: l.v };
+      if (insideImg(n) !== insideImg(l)) n.v = insideImg(n) ? 0.93 : 0.07;
+      return n;
+    });
+    return CORE_POINTS.filter((i) => insideImg(image[i])).length < 5 ? emptyFrame(fr.t, fr.arrive) : { ...fr, image };
+  });
+}
+
+/**
+ * Both arms overhead (the rest body's 0.28 m upper arm, 0.25 m forearm), straight, or with the upper arm flared out by
+ * `flareDeg` and the forearm folded back in over the head by `foldDeg` (the limbs keep their lengths).
+ */
+export function armsUp(j: Joints = restPose(), flareDeg = 6, foldDeg = 0): Joints {
+  const o = { ...j };
+  const a = (flareDeg * Math.PI) / 180, b = ((foldDeg - flareDeg) * Math.PI) / 180;
+  for (const s of ['Left', 'Right'] as const) {
+    const sh = j[`${s}Arm`], out = s === 'Left' ? 1 : -1;
+    const el: V3 = [sh[0] + 0.28 * Math.sin(a) * out, sh[1] + 0.28 * Math.cos(a), sh[2]];
+    o[`${s}ForeArm`] = el;
+    o[`${s}Hand`] = [el[0] - 0.25 * Math.sin(b) * out, el[1] + 0.25 * Math.cos(b), sh[2]];
+  }
+  return o;
+}
+
+const lerpJ = (a: Joints, b: Joints, u: number) =>
+  Object.fromEntries(Object.keys(a).map((k) => [k, a[k as keyof Joints].map((v, i) => v + (b[k as keyof Joints][i] - v) * u)])) as Joints;
+const easeCos = (u: number) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, u)))) / 2;
+
+/**
+ * What the space check asks a player to do: stand, reach both arms overhead and hold, lower them, stand still.
+ * Keys (s): raised over 0.4 s from `up`, held until `down`, lowered over 0.4 s, then standing to `end`.
+ */
+export function spaceSession(o: { up?: number; down?: number; end?: number; body?: Joints } = {}, fps = 30): JointClip {
+  const up = o.up ?? 1.2, down = o.down ?? 2.6, end = o.end ?? 5, rest = o.body ?? restPose(), top = armsUp(rest);
+  const frames: Joints[] = [];
+  for (let i = 0; i <= Math.round(end * fps); i++) {
+    const t = i / fps;
+    frames.push(lerpJ(rest, top, t < down ? easeCos((t - up) / 0.4) : 1 - easeCos((t - down) / 0.4)));
+  }
+  return { fps, frames };
+}
+
+/**
+ * Two bodies in one picture, frame by frame (the model follows ONE: numPoses 1): the stream is `a`'s frames, with
+ * `b`'s at the same index from `from` on — a hand-over once, or, with `every`, the two taking turns every `every`
+ * frames (the tracker jumping between them). Each frame keeps `a`'s capture clock.
+ */
+export function swapStream(a: readonly PoseFrame[], b: readonly PoseFrame[], opt: { from: number; every?: number }): PoseFrame[] {
+  return a.map((f, i) => {
+    if (i < opt.from || i >= b.length) return f;
+    const k = Math.floor((i - opt.from) / (opt.every ?? Infinity));
+    const g = opt.every && k % 2 === 1 ? f : b[i];
+    return g === f ? f : { ...g, t: f.t, arrive: f.arrive };
+  });
 }

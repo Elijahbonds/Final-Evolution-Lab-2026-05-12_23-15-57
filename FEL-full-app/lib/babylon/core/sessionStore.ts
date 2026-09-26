@@ -19,7 +19,12 @@
 // remount) runs its teardown after the next one has mounted — and a bare sessionStore.unmount() there would blank the
 // live card and pause line. So the writers belong to the mount: mount() returns this harness's SessionWriter, and every
 // writer on it does nothing once another mount has taken over (or after its own unmount).
+//
+// MOVEMENT PLAY P4 (2026-09-25): the view carries the game's PHASE too (the harness's setPhase writes it). The body-play
+// store feeds the space check only at READY (or over a pause it was asked for), and the header's Body button — which
+// lives in the shell and cannot see the host's phase — pauses a game that is playing before it runs the check.
 import type { FelInput } from './InputBus';
+import type { ModePhase } from './ModeHarness';
 import type { BodyProfile } from '@/lib/input/bodyProfiles';
 
 export type BodyPresence = 'off' | 'calibrating' | 'present' | 'absent';
@@ -30,6 +35,8 @@ export interface SessionView {
   lines: readonly CardLine[]; drives: boolean; later: BodyProfile['later'];
   body: BodyPresence; handsUp01: number;                           // hold-ring progress in READY / PAUSED
   pause: PauseReason | null;
+  /** The game's phase, as the harness last set it (null: no game mounted). */
+  phase: ModePhase | null;
 }
 export interface RunRecord { runId: number; modeId: string; inputs: number; bodyInputs: number }
 /** One harness's hold on the store: every writer is a no-op once `live` is false. */
@@ -39,6 +46,8 @@ export interface SessionWriter {
   /** Every body packet writes this: only a change is a new snapshot (a steady 30 Hz of the same presence is not). */
   setBody(body: BodyPresence, handsUp01: number): void;
   setPause(r: PauseReason | null): void;
+  /** The harness's setPhase: only a change is a new snapshot. */
+  setPhase(p: ModePhase): void;
   /** At wake(): a new run, a new record (the one before it is replaced only now). */
   beginRun(modeId: string): void;
   /** One counted input (EvidenceCounter's verdict, or a claimed onBody verb) into the current run's record. */
@@ -47,7 +56,7 @@ export interface SessionWriter {
   unmount(): void;
 }
 
-const EMPTY: SessionView = { modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null };
+const EMPTY: SessionView = { modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null, phase: null };
 
 let view: SessionView = EMPTY;
 let record: RunRecord | null = null;
@@ -85,6 +94,11 @@ export const sessionStore = {
       setPause(r) {
         if (!live() || view.pause === r) return;
         view = { ...view, pause: r };
+        notify();
+      },
+      setPhase(p) {
+        if (!live() || view.phase === p) return;
+        view = { ...view, phase: p };
         notify();
       },
       beginRun(modeId) {

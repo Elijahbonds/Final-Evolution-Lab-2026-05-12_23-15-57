@@ -9,6 +9,7 @@ import { CURRENT_POLICY_VERSION, PRIVACY_CONTENT, TERMS_CONTENT } from './polici
 // so an edit to either text fails here until CURRENT_POLICY_VERSION moves and its fingerprint is added.
 const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-24-draft': 'ffc1193b4f45a4c8',   // + §6 Camera and Body Tracking (movement play, phase 2)
+  '2026-09-25-draft': '2950422a8d3c13c7',   // + §6's space check paragraph (movement play, phase 4)
 };
 
 describe('the policy version', () => {
@@ -25,6 +26,7 @@ describe('the policy version', () => {
 
   it('is past the version signed up to before the camera section, and both pages print it', () => {
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-07-15-draft');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-09-24-draft');   // live without the space check paragraph
     expect(CURRENT_POLICY_VERSION.length).toBeLessThanOrEqual(60);   // /api/signup's zod cap on policyVersion
     expect(TERMS_CONTENT).toContain(`**Version: ${CURRENT_POLICY_VERSION}**`);
     expect(PRIVACY_CONTENT).toContain(`**Version: ${CURRENT_POLICY_VERSION}**`);
@@ -72,7 +74,24 @@ describe('privacy policy, the camera', () => {
     const section = PRIVACY_CONTENT.slice(start, PRIVACY_CONTENT.indexOf('## 7.', start));
     expect(section).not.toContain('_');
     const paragraphs = section.split('\n\n').slice(1).map((p) => p.trim()).filter(Boolean);
-    expect(paragraphs.length).toBe(3);
+    expect(paragraphs.length).toBe(4);
     for (const p of paragraphs) expect(p).not.toContain('\n');
+  });
+});
+
+// MOVEMENT PLAY P4 (2026-09-25): body play runs a space check before it starts (lib/move/spaceCheck), reads how bright
+// the picture is (lib/move/luma: a small canvas sample, counted and dropped), remembers per game that the player chose
+// it (localStorage: fel-body-play-<game>), and shows a small mirrored self-view. The page has to say so.
+describe('privacy policy, the space check', () => {
+  const text = PRIVACY_CONTENT.toLowerCase();
+  it('says what the check reads and that nothing from it leaves the device', () => {
+    expect(text).toContain('space check');
+    expect(text).toContain('how bright the picture is');
+    expect(text).toMatch(/both happen on your device, and nothing from them is sent or saved/);
+  });
+  it('says the choice is remembered on this device only, and the self-view is only on the player\'s screen', () => {
+    expect(text).toContain('remembered on this device only');
+    expect(text).toContain('self-view');
+    expect(text).toContain('shown only on your screen');
   });
 });

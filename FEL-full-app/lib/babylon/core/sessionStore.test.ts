@@ -87,9 +87,9 @@ describe('the view', () => {
     const a = sessionStore.mount({ modeId: 'skateboard', key: 'skateboard', lines: [{ move: 'Jump', verb: 'POP' }], drives: true, later: 'P8' });
     a.setBody('present', 0.5); a.setPause('body-lost');
     w = sessionStore.mount({ modeId: 'dunk', key: 'dunk', lines: [], drives: false, later: 'P5' });
-    expect(sessionStore.view()).toEqual({ modeId: 'dunk', key: 'dunk', lines: [], drives: false, later: 'P5', body: 'off', handsUp01: 0, pause: null });
+    expect(sessionStore.view()).toEqual({ modeId: 'dunk', key: 'dunk', lines: [], drives: false, later: 'P5', body: 'off', handsUp01: 0, pause: null, phase: null });
     w.unmount();
-    expect(sessionStore.view()).toEqual({ modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null });
+    expect(sessionStore.view()).toEqual({ modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null, phase: null });
   });
   it('a writer that changes nothing keeps the snapshot and tells nobody; one that does, replaces it and tells every subscriber', () => {
     let n = 0;
@@ -111,6 +111,33 @@ describe('the view', () => {
     un();
     w.setPause(null);
     expect(n).toBe(4);
+  });
+});
+
+describe('the phase (movement play P4)', () => {
+  it('the harness writes it: only a change is a new snapshot, and a mount starts it clear', () => {
+    let n = 0;
+    const un = sessionStore.subscribe(() => { n++; });
+    w = sessionStore.mount(card('skateboard'));
+    expect(sessionStore.view().phase).toBeNull();
+    w.setPhase('loading');
+    const v = sessionStore.view();
+    w.setPhase('loading');
+    expect(sessionStore.view()).toBe(v);
+    w.setPhase('ready');
+    w.setPhase('playing');
+    expect(sessionStore.view().phase).toBe('playing');
+    expect(n).toBe(4);
+    un();
+  });
+  it('a stale writer (a harness torn down after the next mounted) moves nobody\'s phase', () => {
+    const first = sessionStore.mount(card('skateboard'));
+    w = sessionStore.mount(card('sprint'));
+    w.setPhase('ready');
+    const v = sessionStore.view();
+    first.setPhase('playing');
+    expect(sessionStore.view()).toBe(v);
+    expect(sessionStore.view().phase).toBe('ready');
   });
 });
 
