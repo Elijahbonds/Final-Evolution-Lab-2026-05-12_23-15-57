@@ -20,6 +20,8 @@ export interface Prescription {
   exercise: { id: string; name: string } | null;
   sets: number;
   reps: string;
+  /** Seconds per set for a timed dose (lib/coach/mirrorToProgram.ts); optional so an older payload still renders. */
+  workSeconds?: number | null;
   wanted: string[];
 }
 interface Draft {
@@ -128,7 +130,7 @@ export function ScreenPrescriptions({ clientId, sessions, onAdd }: ScreenPrescri
             </span>
             {p.exercise && into && (
               <button
-                onClick={() => void onAdd(into, { action: 'add', sessionId: into, exerciseId: p.exercise!.id, sets: p.sets, reps: p.reps, coachNote: p.because })}
+                onClick={() => void onAdd(into, { action: 'add', sessionId: into, exerciseId: p.exercise!.id, sets: p.sets, reps: p.reps, workSeconds: p.workSeconds ?? null, coachNote: p.because })}
                 className="shrink-0 rounded-lg border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]"
                 aria-label={`Add ${p.exercise.name} to the program`}
               >

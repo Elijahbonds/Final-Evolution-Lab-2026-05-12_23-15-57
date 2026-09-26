@@ -390,6 +390,15 @@ export type ClientSession = $Result.DefaultSelection<Prisma.$ClientSessionPayloa
  */
 export type ExerciseLog = $Result.DefaultSelection<Prisma.$ExerciseLogPayload>
 /**
+ * Model SetLog
+ * MIRROR-COACH P2 (2026-09-25): ONE ROW PER SET. ExerciseLog was one row per exercise with reps as free text
+ * ("8,9,10") and load as free text that mixed kilograms with "RPE7", so no progress line could be drawn and no
+ * reps-in-reserve could be kept. Here the weight and the effort are separate numbers. ExerciseLog keeps every field
+ * it had (old clients and the coach review read them). (exerciseLogId, setIndex) is unique so a re-save of set 2
+ * replaces set 2 instead of adding a second one.
+ */
+export type SetLog = $Result.DefaultSelection<Prisma.$SetLogPayload>
+/**
  * Model ProgramMessage
  * lane 1 C3 — the coach ↔ client thread on a program (both sides write; read by both).
  */
@@ -634,6 +643,44 @@ export const CrmActivityStatus: {
 export type CrmActivityStatus = (typeof CrmActivityStatus)[keyof typeof CrmActivityStatus]
 
 
+export const MovementPattern: {
+  squat: 'squat',
+  hinge: 'hinge',
+  lunge: 'lunge',
+  push: 'push',
+  pull: 'pull',
+  carry: 'carry',
+  rotation: 'rotation',
+  locomotion: 'locomotion',
+  breath: 'breath',
+  mobility: 'mobility',
+  other: 'other'
+};
+
+export type MovementPattern = (typeof MovementPattern)[keyof typeof MovementPattern]
+
+
+export const BraceMode: {
+  set: 'set',
+  reflex: 'reflex',
+  none: 'none'
+};
+
+export type BraceMode = (typeof BraceMode)[keyof typeof BraceMode]
+
+
+export const SessionSection: {
+  prep: 'prep',
+  prime: 'prime',
+  key: 'key',
+  assist: 'assist',
+  finish: 'finish',
+  cooldown: 'cooldown'
+};
+
+export type SessionSection = (typeof SessionSection)[keyof typeof SessionSection]
+
+
 export const CertificationStatus: {
   none: 'none',
   in_progress: 'in_progress',
@@ -719,6 +766,18 @@ export const CrmActivityKind: typeof $Enums.CrmActivityKind
 export type CrmActivityStatus = $Enums.CrmActivityStatus
 
 export const CrmActivityStatus: typeof $Enums.CrmActivityStatus
+
+export type MovementPattern = $Enums.MovementPattern
+
+export const MovementPattern: typeof $Enums.MovementPattern
+
+export type BraceMode = $Enums.BraceMode
+
+export const BraceMode: typeof $Enums.BraceMode
+
+export type SessionSection = $Enums.SessionSection
+
+export const SessionSection: typeof $Enums.SessionSection
 
 export type CertificationStatus = $Enums.CertificationStatus
 
@@ -1584,6 +1643,16 @@ export class PrismaClient<
   get exerciseLog(): Prisma.ExerciseLogDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.setLog`: Exposes CRUD operations for the **SetLog** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SetLogs
+    * const setLogs = await prisma.setLog.findMany()
+    * ```
+    */
+  get setLog(): Prisma.SetLogDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.programMessage`: Exposes CRUD operations for the **ProgramMessage** model.
     * Example usage:
     * ```ts
@@ -2205,6 +2274,7 @@ export namespace Prisma {
     SessionExercise: 'SessionExercise',
     ClientSession: 'ClientSession',
     ExerciseLog: 'ExerciseLog',
+    SetLog: 'SetLog',
     ProgramMessage: 'ProgramMessage',
     FacilitatorProfile: 'FacilitatorProfile',
     Credential: 'Credential',
@@ -2234,7 +2304,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -7640,6 +7710,80 @@ export namespace Prisma {
           }
         }
       }
+      SetLog: {
+        payload: Prisma.$SetLogPayload<ExtArgs>
+        fields: Prisma.SetLogFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SetLogFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SetLogFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>
+          }
+          findFirst: {
+            args: Prisma.SetLogFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SetLogFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>
+          }
+          findMany: {
+            args: Prisma.SetLogFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>[]
+          }
+          create: {
+            args: Prisma.SetLogCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>
+          }
+          createMany: {
+            args: Prisma.SetLogCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SetLogCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>[]
+          }
+          delete: {
+            args: Prisma.SetLogDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>
+          }
+          update: {
+            args: Prisma.SetLogUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>
+          }
+          deleteMany: {
+            args: Prisma.SetLogDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SetLogUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SetLogUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>[]
+          }
+          upsert: {
+            args: Prisma.SetLogUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SetLogPayload>
+          }
+          aggregate: {
+            args: Prisma.SetLogAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSetLog>
+          }
+          groupBy: {
+            args: Prisma.SetLogGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SetLogGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SetLogCountArgs<ExtArgs>
+            result: $Utils.Optional<SetLogCountAggregateOutputType> | number
+          }
+        }
+      }
       ProgramMessage: {
         payload: Prisma.$ProgramMessagePayload<ExtArgs>
         fields: Prisma.ProgramMessageFieldRefs
@@ -8611,6 +8755,7 @@ export namespace Prisma {
     sessionExercise?: SessionExerciseOmit
     clientSession?: ClientSessionOmit
     exerciseLog?: ExerciseLogOmit
+    setLog?: SetLogOmit
     programMessage?: ProgramMessageOmit
     facilitatorProfile?: FacilitatorProfileOmit
     credential?: CredentialOmit
@@ -9876,6 +10021,37 @@ export namespace Prisma {
    */
   export type ClientSessionCountOutputTypeCountExerciseLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ExerciseLogWhereInput
+  }
+
+
+  /**
+   * Count Type ExerciseLogCountOutputType
+   */
+
+  export type ExerciseLogCountOutputType = {
+    setLogs: number
+  }
+
+  export type ExerciseLogCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    setLogs?: boolean | ExerciseLogCountOutputTypeCountSetLogsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * ExerciseLogCountOutputType without action
+   */
+  export type ExerciseLogCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExerciseLogCountOutputType
+     */
+    select?: ExerciseLogCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * ExerciseLogCountOutputType without action
+   */
+  export type ExerciseLogCountOutputTypeCountSetLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SetLogWhereInput
   }
 
 
@@ -86968,6 +87144,9 @@ export namespace Prisma {
     defaultTempo: string | null
     progressionOfId: string | null
     regressionOfId: string | null
+    pattern: $Enums.MovementPattern | null
+    braceMode: $Enums.BraceMode | null
+    skillLayer: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -86981,6 +87160,9 @@ export namespace Prisma {
     defaultTempo: string | null
     progressionOfId: string | null
     regressionOfId: string | null
+    pattern: $Enums.MovementPattern | null
+    braceMode: $Enums.BraceMode | null
+    skillLayer: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -86997,6 +87179,9 @@ export namespace Prisma {
     defaultTempo: number
     progressionOfId: number
     regressionOfId: number
+    pattern: number
+    braceMode: number
+    skillLayer: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -87012,6 +87197,9 @@ export namespace Prisma {
     defaultTempo?: true
     progressionOfId?: true
     regressionOfId?: true
+    pattern?: true
+    braceMode?: true
+    skillLayer?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -87025,6 +87213,9 @@ export namespace Prisma {
     defaultTempo?: true
     progressionOfId?: true
     regressionOfId?: true
+    pattern?: true
+    braceMode?: true
+    skillLayer?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -87041,6 +87232,9 @@ export namespace Prisma {
     defaultTempo?: true
     progressionOfId?: true
     regressionOfId?: true
+    pattern?: true
+    braceMode?: true
+    skillLayer?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -87130,6 +87324,9 @@ export namespace Prisma {
     defaultTempo: string
     progressionOfId: string | null
     regressionOfId: string | null
+    pattern: $Enums.MovementPattern | null
+    braceMode: $Enums.BraceMode | null
+    skillLayer: string | null
     createdAt: Date
     updatedAt: Date
     _count: ProgramExerciseCountAggregateOutputType | null
@@ -87163,6 +87360,9 @@ export namespace Prisma {
     defaultTempo?: boolean
     progressionOfId?: boolean
     regressionOfId?: boolean
+    pattern?: boolean
+    braceMode?: boolean
+    skillLayer?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     sessionExercises?: boolean | ProgramExercise$sessionExercisesArgs<ExtArgs>
@@ -87181,6 +87381,9 @@ export namespace Prisma {
     defaultTempo?: boolean
     progressionOfId?: boolean
     regressionOfId?: boolean
+    pattern?: boolean
+    braceMode?: boolean
+    skillLayer?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["programExercise"]>
@@ -87197,6 +87400,9 @@ export namespace Prisma {
     defaultTempo?: boolean
     progressionOfId?: boolean
     regressionOfId?: boolean
+    pattern?: boolean
+    braceMode?: boolean
+    skillLayer?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["programExercise"]>
@@ -87213,11 +87419,14 @@ export namespace Prisma {
     defaultTempo?: boolean
     progressionOfId?: boolean
     regressionOfId?: boolean
+    pattern?: boolean
+    braceMode?: boolean
+    skillLayer?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type ProgramExerciseOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "coachId" | "name" | "category" | "demoVideoUrl" | "primaryCues" | "commonFaults" | "equipment" | "defaultTempo" | "progressionOfId" | "regressionOfId" | "createdAt" | "updatedAt", ExtArgs["result"]["programExercise"]>
+  export type ProgramExerciseOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "coachId" | "name" | "category" | "demoVideoUrl" | "primaryCues" | "commonFaults" | "equipment" | "defaultTempo" | "progressionOfId" | "regressionOfId" | "pattern" | "braceMode" | "skillLayer" | "createdAt" | "updatedAt", ExtArgs["result"]["programExercise"]>
   export type ProgramExerciseInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     sessionExercises?: boolean | ProgramExercise$sessionExercisesArgs<ExtArgs>
     _count?: boolean | ProgramExerciseCountOutputTypeDefaultArgs<ExtArgs>
@@ -87242,6 +87451,9 @@ export namespace Prisma {
       defaultTempo: string
       progressionOfId: string | null
       regressionOfId: string | null
+      pattern: $Enums.MovementPattern | null
+      braceMode: $Enums.BraceMode | null
+      skillLayer: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["programExercise"]>
@@ -87679,6 +87891,9 @@ export namespace Prisma {
     readonly defaultTempo: FieldRef<"ProgramExercise", 'String'>
     readonly progressionOfId: FieldRef<"ProgramExercise", 'String'>
     readonly regressionOfId: FieldRef<"ProgramExercise", 'String'>
+    readonly pattern: FieldRef<"ProgramExercise", 'MovementPattern'>
+    readonly braceMode: FieldRef<"ProgramExercise", 'BraceMode'>
+    readonly skillLayer: FieldRef<"ProgramExercise", 'String'>
     readonly createdAt: FieldRef<"ProgramExercise", 'DateTime'>
     readonly updatedAt: FieldRef<"ProgramExercise", 'DateTime'>
   }
@@ -91663,12 +91878,16 @@ export namespace Prisma {
     order: number | null
     sets: number | null
     restSeconds: number | null
+    workSeconds: number | null
+    holdSeconds: number | null
   }
 
   export type SessionExerciseSumAggregateOutputType = {
     order: number | null
     sets: number | null
     restSeconds: number | null
+    workSeconds: number | null
+    holdSeconds: number | null
   }
 
   export type SessionExerciseMinAggregateOutputType = {
@@ -91682,6 +91901,12 @@ export namespace Prisma {
     tempo: string | null
     restSeconds: number | null
     coachNote: string | null
+    section: $Enums.SessionSection | null
+    isKeySet: boolean | null
+    supersetGroup: string | null
+    workSeconds: number | null
+    holdSeconds: number | null
+    effortBand: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -91697,6 +91922,12 @@ export namespace Prisma {
     tempo: string | null
     restSeconds: number | null
     coachNote: string | null
+    section: $Enums.SessionSection | null
+    isKeySet: boolean | null
+    supersetGroup: string | null
+    workSeconds: number | null
+    holdSeconds: number | null
+    effortBand: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -91712,6 +91943,13 @@ export namespace Prisma {
     tempo: number
     restSeconds: number
     coachNote: number
+    section: number
+    isKeySet: number
+    supersetGroup: number
+    workSeconds: number
+    holdSeconds: number
+    setupCues: number
+    effortBand: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -91722,12 +91960,16 @@ export namespace Prisma {
     order?: true
     sets?: true
     restSeconds?: true
+    workSeconds?: true
+    holdSeconds?: true
   }
 
   export type SessionExerciseSumAggregateInputType = {
     order?: true
     sets?: true
     restSeconds?: true
+    workSeconds?: true
+    holdSeconds?: true
   }
 
   export type SessionExerciseMinAggregateInputType = {
@@ -91741,6 +91983,12 @@ export namespace Prisma {
     tempo?: true
     restSeconds?: true
     coachNote?: true
+    section?: true
+    isKeySet?: true
+    supersetGroup?: true
+    workSeconds?: true
+    holdSeconds?: true
+    effortBand?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -91756,6 +92004,12 @@ export namespace Prisma {
     tempo?: true
     restSeconds?: true
     coachNote?: true
+    section?: true
+    isKeySet?: true
+    supersetGroup?: true
+    workSeconds?: true
+    holdSeconds?: true
+    effortBand?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -91771,6 +92025,13 @@ export namespace Prisma {
     tempo?: true
     restSeconds?: true
     coachNote?: true
+    section?: true
+    isKeySet?: true
+    supersetGroup?: true
+    workSeconds?: true
+    holdSeconds?: true
+    setupCues?: true
+    effortBand?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -91873,6 +92134,13 @@ export namespace Prisma {
     tempo: string
     restSeconds: number
     coachNote: string | null
+    section: $Enums.SessionSection
+    isKeySet: boolean
+    supersetGroup: string | null
+    workSeconds: number | null
+    holdSeconds: number | null
+    setupCues: string[]
+    effortBand: string | null
     createdAt: Date
     updatedAt: Date
     _count: SessionExerciseCountAggregateOutputType | null
@@ -91907,6 +92175,13 @@ export namespace Prisma {
     tempo?: boolean
     restSeconds?: boolean
     coachNote?: boolean
+    section?: boolean
+    isKeySet?: boolean
+    supersetGroup?: boolean
+    workSeconds?: boolean
+    holdSeconds?: boolean
+    setupCues?: boolean
+    effortBand?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     session?: boolean | SessionDefaultArgs<ExtArgs>
@@ -91926,6 +92201,13 @@ export namespace Prisma {
     tempo?: boolean
     restSeconds?: boolean
     coachNote?: boolean
+    section?: boolean
+    isKeySet?: boolean
+    supersetGroup?: boolean
+    workSeconds?: boolean
+    holdSeconds?: boolean
+    setupCues?: boolean
+    effortBand?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     session?: boolean | SessionDefaultArgs<ExtArgs>
@@ -91943,6 +92225,13 @@ export namespace Prisma {
     tempo?: boolean
     restSeconds?: boolean
     coachNote?: boolean
+    section?: boolean
+    isKeySet?: boolean
+    supersetGroup?: boolean
+    workSeconds?: boolean
+    holdSeconds?: boolean
+    setupCues?: boolean
+    effortBand?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     session?: boolean | SessionDefaultArgs<ExtArgs>
@@ -91960,11 +92249,18 @@ export namespace Prisma {
     tempo?: boolean
     restSeconds?: boolean
     coachNote?: boolean
+    section?: boolean
+    isKeySet?: boolean
+    supersetGroup?: boolean
+    workSeconds?: boolean
+    holdSeconds?: boolean
+    setupCues?: boolean
+    effortBand?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type SessionExerciseOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "sessionId" | "exerciseId" | "order" | "sets" | "reps" | "load" | "tempo" | "restSeconds" | "coachNote" | "createdAt" | "updatedAt", ExtArgs["result"]["sessionExercise"]>
+  export type SessionExerciseOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "sessionId" | "exerciseId" | "order" | "sets" | "reps" | "load" | "tempo" | "restSeconds" | "coachNote" | "section" | "isKeySet" | "supersetGroup" | "workSeconds" | "holdSeconds" | "setupCues" | "effortBand" | "createdAt" | "updatedAt", ExtArgs["result"]["sessionExercise"]>
   export type SessionExerciseInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     session?: boolean | SessionDefaultArgs<ExtArgs>
     exercise?: boolean | ProgramExerciseDefaultArgs<ExtArgs>
@@ -91998,6 +92294,13 @@ export namespace Prisma {
       tempo: string
       restSeconds: number
       coachNote: string | null
+      section: $Enums.SessionSection
+      isKeySet: boolean
+      supersetGroup: string | null
+      workSeconds: number | null
+      holdSeconds: number | null
+      setupCues: string[]
+      effortBand: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["sessionExercise"]>
@@ -92436,6 +92739,13 @@ export namespace Prisma {
     readonly tempo: FieldRef<"SessionExercise", 'String'>
     readonly restSeconds: FieldRef<"SessionExercise", 'Int'>
     readonly coachNote: FieldRef<"SessionExercise", 'String'>
+    readonly section: FieldRef<"SessionExercise", 'SessionSection'>
+    readonly isKeySet: FieldRef<"SessionExercise", 'Boolean'>
+    readonly supersetGroup: FieldRef<"SessionExercise", 'String'>
+    readonly workSeconds: FieldRef<"SessionExercise", 'Int'>
+    readonly holdSeconds: FieldRef<"SessionExercise", 'Int'>
+    readonly setupCues: FieldRef<"SessionExercise", 'String[]'>
+    readonly effortBand: FieldRef<"SessionExercise", 'String'>
     readonly createdAt: FieldRef<"SessionExercise", 'DateTime'>
     readonly updatedAt: FieldRef<"SessionExercise", 'DateTime'>
   }
@@ -94274,6 +94584,8 @@ export namespace Prisma {
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
     sessionExercise?: boolean | SessionExerciseDefaultArgs<ExtArgs>
+    setLogs?: boolean | ExerciseLog$setLogsArgs<ExtArgs>
+    _count?: boolean | ExerciseLogCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["exerciseLog"]>
 
   export type ExerciseLogSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -94335,6 +94647,8 @@ export namespace Prisma {
   export type ExerciseLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
     sessionExercise?: boolean | SessionExerciseDefaultArgs<ExtArgs>
+    setLogs?: boolean | ExerciseLog$setLogsArgs<ExtArgs>
+    _count?: boolean | ExerciseLogCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ExerciseLogIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -94350,6 +94664,7 @@ export namespace Prisma {
     objects: {
       clientSession: Prisma.$ClientSessionPayload<ExtArgs>
       sessionExercise: Prisma.$SessionExercisePayload<ExtArgs>
+      setLogs: Prisma.$SetLogPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -94762,6 +95077,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     clientSession<T extends ClientSessionDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ClientSessionDefaultArgs<ExtArgs>>): Prisma__ClientSessionClient<$Result.GetResult<Prisma.$ClientSessionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     sessionExercise<T extends SessionExerciseDefaultArgs<ExtArgs> = {}>(args?: Subset<T, SessionExerciseDefaultArgs<ExtArgs>>): Prisma__SessionExerciseClient<$Result.GetResult<Prisma.$SessionExercisePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    setLogs<T extends ExerciseLog$setLogsArgs<ExtArgs> = {}>(args?: Subset<T, ExerciseLog$setLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -95201,6 +95517,30 @@ export namespace Prisma {
   }
 
   /**
+   * ExerciseLog.setLogs
+   */
+  export type ExerciseLog$setLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    where?: SetLogWhereInput
+    orderBy?: SetLogOrderByWithRelationInput | SetLogOrderByWithRelationInput[]
+    cursor?: SetLogWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SetLogScalarFieldEnum | SetLogScalarFieldEnum[]
+  }
+
+  /**
    * ExerciseLog without action
    */
   export type ExerciseLogDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -95216,6 +95556,1183 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: ExerciseLogInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SetLog
+   */
+
+  export type AggregateSetLog = {
+    _count: SetLogCountAggregateOutputType | null
+    _avg: SetLogAvgAggregateOutputType | null
+    _sum: SetLogSumAggregateOutputType | null
+    _min: SetLogMinAggregateOutputType | null
+    _max: SetLogMaxAggregateOutputType | null
+  }
+
+  export type SetLogAvgAggregateOutputType = {
+    setIndex: number | null
+    reps: number | null
+    weightKg: number | null
+    rir: number | null
+    effort: number | null
+    workSeconds: number | null
+  }
+
+  export type SetLogSumAggregateOutputType = {
+    setIndex: number | null
+    reps: number | null
+    weightKg: number | null
+    rir: number | null
+    effort: number | null
+    workSeconds: number | null
+  }
+
+  export type SetLogMinAggregateOutputType = {
+    id: string | null
+    exerciseLogId: string | null
+    setIndex: number | null
+    reps: number | null
+    weightKg: number | null
+    rir: number | null
+    effort: number | null
+    workSeconds: number | null
+    note: string | null
+    createdAt: Date | null
+  }
+
+  export type SetLogMaxAggregateOutputType = {
+    id: string | null
+    exerciseLogId: string | null
+    setIndex: number | null
+    reps: number | null
+    weightKg: number | null
+    rir: number | null
+    effort: number | null
+    workSeconds: number | null
+    note: string | null
+    createdAt: Date | null
+  }
+
+  export type SetLogCountAggregateOutputType = {
+    id: number
+    exerciseLogId: number
+    setIndex: number
+    reps: number
+    weightKg: number
+    rir: number
+    effort: number
+    workSeconds: number
+    note: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type SetLogAvgAggregateInputType = {
+    setIndex?: true
+    reps?: true
+    weightKg?: true
+    rir?: true
+    effort?: true
+    workSeconds?: true
+  }
+
+  export type SetLogSumAggregateInputType = {
+    setIndex?: true
+    reps?: true
+    weightKg?: true
+    rir?: true
+    effort?: true
+    workSeconds?: true
+  }
+
+  export type SetLogMinAggregateInputType = {
+    id?: true
+    exerciseLogId?: true
+    setIndex?: true
+    reps?: true
+    weightKg?: true
+    rir?: true
+    effort?: true
+    workSeconds?: true
+    note?: true
+    createdAt?: true
+  }
+
+  export type SetLogMaxAggregateInputType = {
+    id?: true
+    exerciseLogId?: true
+    setIndex?: true
+    reps?: true
+    weightKg?: true
+    rir?: true
+    effort?: true
+    workSeconds?: true
+    note?: true
+    createdAt?: true
+  }
+
+  export type SetLogCountAggregateInputType = {
+    id?: true
+    exerciseLogId?: true
+    setIndex?: true
+    reps?: true
+    weightKg?: true
+    rir?: true
+    effort?: true
+    workSeconds?: true
+    note?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type SetLogAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SetLog to aggregate.
+     */
+    where?: SetLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SetLogs to fetch.
+     */
+    orderBy?: SetLogOrderByWithRelationInput | SetLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SetLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SetLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SetLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SetLogs
+    **/
+    _count?: true | SetLogCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SetLogAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SetLogSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SetLogMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SetLogMaxAggregateInputType
+  }
+
+  export type GetSetLogAggregateType<T extends SetLogAggregateArgs> = {
+        [P in keyof T & keyof AggregateSetLog]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSetLog[P]>
+      : GetScalarType<T[P], AggregateSetLog[P]>
+  }
+
+
+
+
+  export type SetLogGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SetLogWhereInput
+    orderBy?: SetLogOrderByWithAggregationInput | SetLogOrderByWithAggregationInput[]
+    by: SetLogScalarFieldEnum[] | SetLogScalarFieldEnum
+    having?: SetLogScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SetLogCountAggregateInputType | true
+    _avg?: SetLogAvgAggregateInputType
+    _sum?: SetLogSumAggregateInputType
+    _min?: SetLogMinAggregateInputType
+    _max?: SetLogMaxAggregateInputType
+  }
+
+  export type SetLogGroupByOutputType = {
+    id: string
+    exerciseLogId: string
+    setIndex: number
+    reps: number | null
+    weightKg: number | null
+    rir: number | null
+    effort: number | null
+    workSeconds: number | null
+    note: string | null
+    createdAt: Date
+    _count: SetLogCountAggregateOutputType | null
+    _avg: SetLogAvgAggregateOutputType | null
+    _sum: SetLogSumAggregateOutputType | null
+    _min: SetLogMinAggregateOutputType | null
+    _max: SetLogMaxAggregateOutputType | null
+  }
+
+  type GetSetLogGroupByPayload<T extends SetLogGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SetLogGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SetLogGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SetLogGroupByOutputType[P]>
+            : GetScalarType<T[P], SetLogGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SetLogSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    exerciseLogId?: boolean
+    setIndex?: boolean
+    reps?: boolean
+    weightKg?: boolean
+    rir?: boolean
+    effort?: boolean
+    workSeconds?: boolean
+    note?: boolean
+    createdAt?: boolean
+    exerciseLog?: boolean | ExerciseLogDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["setLog"]>
+
+  export type SetLogSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    exerciseLogId?: boolean
+    setIndex?: boolean
+    reps?: boolean
+    weightKg?: boolean
+    rir?: boolean
+    effort?: boolean
+    workSeconds?: boolean
+    note?: boolean
+    createdAt?: boolean
+    exerciseLog?: boolean | ExerciseLogDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["setLog"]>
+
+  export type SetLogSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    exerciseLogId?: boolean
+    setIndex?: boolean
+    reps?: boolean
+    weightKg?: boolean
+    rir?: boolean
+    effort?: boolean
+    workSeconds?: boolean
+    note?: boolean
+    createdAt?: boolean
+    exerciseLog?: boolean | ExerciseLogDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["setLog"]>
+
+  export type SetLogSelectScalar = {
+    id?: boolean
+    exerciseLogId?: boolean
+    setIndex?: boolean
+    reps?: boolean
+    weightKg?: boolean
+    rir?: boolean
+    effort?: boolean
+    workSeconds?: boolean
+    note?: boolean
+    createdAt?: boolean
+  }
+
+  export type SetLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "exerciseLogId" | "setIndex" | "reps" | "weightKg" | "rir" | "effort" | "workSeconds" | "note" | "createdAt", ExtArgs["result"]["setLog"]>
+  export type SetLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    exerciseLog?: boolean | ExerciseLogDefaultArgs<ExtArgs>
+  }
+  export type SetLogIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    exerciseLog?: boolean | ExerciseLogDefaultArgs<ExtArgs>
+  }
+  export type SetLogIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    exerciseLog?: boolean | ExerciseLogDefaultArgs<ExtArgs>
+  }
+
+  export type $SetLogPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SetLog"
+    objects: {
+      exerciseLog: Prisma.$ExerciseLogPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      exerciseLogId: string
+      setIndex: number
+      reps: number | null
+      weightKg: number | null
+      rir: number | null
+      effort: number | null
+      workSeconds: number | null
+      note: string | null
+      createdAt: Date
+    }, ExtArgs["result"]["setLog"]>
+    composites: {}
+  }
+
+  type SetLogGetPayload<S extends boolean | null | undefined | SetLogDefaultArgs> = $Result.GetResult<Prisma.$SetLogPayload, S>
+
+  type SetLogCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SetLogFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SetLogCountAggregateInputType | true
+    }
+
+  export interface SetLogDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SetLog'], meta: { name: 'SetLog' } }
+    /**
+     * Find zero or one SetLog that matches the filter.
+     * @param {SetLogFindUniqueArgs} args - Arguments to find a SetLog
+     * @example
+     * // Get one SetLog
+     * const setLog = await prisma.setLog.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SetLogFindUniqueArgs>(args: SelectSubset<T, SetLogFindUniqueArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SetLog that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SetLogFindUniqueOrThrowArgs} args - Arguments to find a SetLog
+     * @example
+     * // Get one SetLog
+     * const setLog = await prisma.setLog.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SetLogFindUniqueOrThrowArgs>(args: SelectSubset<T, SetLogFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SetLog that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogFindFirstArgs} args - Arguments to find a SetLog
+     * @example
+     * // Get one SetLog
+     * const setLog = await prisma.setLog.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SetLogFindFirstArgs>(args?: SelectSubset<T, SetLogFindFirstArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SetLog that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogFindFirstOrThrowArgs} args - Arguments to find a SetLog
+     * @example
+     * // Get one SetLog
+     * const setLog = await prisma.setLog.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SetLogFindFirstOrThrowArgs>(args?: SelectSubset<T, SetLogFindFirstOrThrowArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SetLogs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SetLogs
+     * const setLogs = await prisma.setLog.findMany()
+     * 
+     * // Get first 10 SetLogs
+     * const setLogs = await prisma.setLog.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const setLogWithIdOnly = await prisma.setLog.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SetLogFindManyArgs>(args?: SelectSubset<T, SetLogFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SetLog.
+     * @param {SetLogCreateArgs} args - Arguments to create a SetLog.
+     * @example
+     * // Create one SetLog
+     * const SetLog = await prisma.setLog.create({
+     *   data: {
+     *     // ... data to create a SetLog
+     *   }
+     * })
+     * 
+     */
+    create<T extends SetLogCreateArgs>(args: SelectSubset<T, SetLogCreateArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SetLogs.
+     * @param {SetLogCreateManyArgs} args - Arguments to create many SetLogs.
+     * @example
+     * // Create many SetLogs
+     * const setLog = await prisma.setLog.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SetLogCreateManyArgs>(args?: SelectSubset<T, SetLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SetLogs and returns the data saved in the database.
+     * @param {SetLogCreateManyAndReturnArgs} args - Arguments to create many SetLogs.
+     * @example
+     * // Create many SetLogs
+     * const setLog = await prisma.setLog.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SetLogs and only return the `id`
+     * const setLogWithIdOnly = await prisma.setLog.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SetLogCreateManyAndReturnArgs>(args?: SelectSubset<T, SetLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SetLog.
+     * @param {SetLogDeleteArgs} args - Arguments to delete one SetLog.
+     * @example
+     * // Delete one SetLog
+     * const SetLog = await prisma.setLog.delete({
+     *   where: {
+     *     // ... filter to delete one SetLog
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SetLogDeleteArgs>(args: SelectSubset<T, SetLogDeleteArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SetLog.
+     * @param {SetLogUpdateArgs} args - Arguments to update one SetLog.
+     * @example
+     * // Update one SetLog
+     * const setLog = await prisma.setLog.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SetLogUpdateArgs>(args: SelectSubset<T, SetLogUpdateArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SetLogs.
+     * @param {SetLogDeleteManyArgs} args - Arguments to filter SetLogs to delete.
+     * @example
+     * // Delete a few SetLogs
+     * const { count } = await prisma.setLog.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SetLogDeleteManyArgs>(args?: SelectSubset<T, SetLogDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SetLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SetLogs
+     * const setLog = await prisma.setLog.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SetLogUpdateManyArgs>(args: SelectSubset<T, SetLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SetLogs and returns the data updated in the database.
+     * @param {SetLogUpdateManyAndReturnArgs} args - Arguments to update many SetLogs.
+     * @example
+     * // Update many SetLogs
+     * const setLog = await prisma.setLog.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SetLogs and only return the `id`
+     * const setLogWithIdOnly = await prisma.setLog.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SetLogUpdateManyAndReturnArgs>(args: SelectSubset<T, SetLogUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SetLog.
+     * @param {SetLogUpsertArgs} args - Arguments to update or create a SetLog.
+     * @example
+     * // Update or create a SetLog
+     * const setLog = await prisma.setLog.upsert({
+     *   create: {
+     *     // ... data to create a SetLog
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SetLog we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SetLogUpsertArgs>(args: SelectSubset<T, SetLogUpsertArgs<ExtArgs>>): Prisma__SetLogClient<$Result.GetResult<Prisma.$SetLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SetLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogCountArgs} args - Arguments to filter SetLogs to count.
+     * @example
+     * // Count the number of SetLogs
+     * const count = await prisma.setLog.count({
+     *   where: {
+     *     // ... the filter for the SetLogs we want to count
+     *   }
+     * })
+    **/
+    count<T extends SetLogCountArgs>(
+      args?: Subset<T, SetLogCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SetLogCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SetLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SetLogAggregateArgs>(args: Subset<T, SetLogAggregateArgs>): Prisma.PrismaPromise<GetSetLogAggregateType<T>>
+
+    /**
+     * Group by SetLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SetLogGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SetLogGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SetLogGroupByArgs['orderBy'] }
+        : { orderBy?: SetLogGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SetLogGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSetLogGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SetLog model
+   */
+  readonly fields: SetLogFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SetLog.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SetLogClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    exerciseLog<T extends ExerciseLogDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ExerciseLogDefaultArgs<ExtArgs>>): Prisma__ExerciseLogClient<$Result.GetResult<Prisma.$ExerciseLogPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SetLog model
+   */
+  interface SetLogFieldRefs {
+    readonly id: FieldRef<"SetLog", 'String'>
+    readonly exerciseLogId: FieldRef<"SetLog", 'String'>
+    readonly setIndex: FieldRef<"SetLog", 'Int'>
+    readonly reps: FieldRef<"SetLog", 'Int'>
+    readonly weightKg: FieldRef<"SetLog", 'Float'>
+    readonly rir: FieldRef<"SetLog", 'Int'>
+    readonly effort: FieldRef<"SetLog", 'Int'>
+    readonly workSeconds: FieldRef<"SetLog", 'Int'>
+    readonly note: FieldRef<"SetLog", 'String'>
+    readonly createdAt: FieldRef<"SetLog", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SetLog findUnique
+   */
+  export type SetLogFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * Filter, which SetLog to fetch.
+     */
+    where: SetLogWhereUniqueInput
+  }
+
+  /**
+   * SetLog findUniqueOrThrow
+   */
+  export type SetLogFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * Filter, which SetLog to fetch.
+     */
+    where: SetLogWhereUniqueInput
+  }
+
+  /**
+   * SetLog findFirst
+   */
+  export type SetLogFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * Filter, which SetLog to fetch.
+     */
+    where?: SetLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SetLogs to fetch.
+     */
+    orderBy?: SetLogOrderByWithRelationInput | SetLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SetLogs.
+     */
+    cursor?: SetLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SetLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SetLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SetLogs.
+     */
+    distinct?: SetLogScalarFieldEnum | SetLogScalarFieldEnum[]
+  }
+
+  /**
+   * SetLog findFirstOrThrow
+   */
+  export type SetLogFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * Filter, which SetLog to fetch.
+     */
+    where?: SetLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SetLogs to fetch.
+     */
+    orderBy?: SetLogOrderByWithRelationInput | SetLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SetLogs.
+     */
+    cursor?: SetLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SetLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SetLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SetLogs.
+     */
+    distinct?: SetLogScalarFieldEnum | SetLogScalarFieldEnum[]
+  }
+
+  /**
+   * SetLog findMany
+   */
+  export type SetLogFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * Filter, which SetLogs to fetch.
+     */
+    where?: SetLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SetLogs to fetch.
+     */
+    orderBy?: SetLogOrderByWithRelationInput | SetLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SetLogs.
+     */
+    cursor?: SetLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SetLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SetLogs.
+     */
+    skip?: number
+    distinct?: SetLogScalarFieldEnum | SetLogScalarFieldEnum[]
+  }
+
+  /**
+   * SetLog create
+   */
+  export type SetLogCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SetLog.
+     */
+    data: XOR<SetLogCreateInput, SetLogUncheckedCreateInput>
+  }
+
+  /**
+   * SetLog createMany
+   */
+  export type SetLogCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SetLogs.
+     */
+    data: SetLogCreateManyInput | SetLogCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SetLog createManyAndReturn
+   */
+  export type SetLogCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * The data used to create many SetLogs.
+     */
+    data: SetLogCreateManyInput | SetLogCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SetLog update
+   */
+  export type SetLogUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SetLog.
+     */
+    data: XOR<SetLogUpdateInput, SetLogUncheckedUpdateInput>
+    /**
+     * Choose, which SetLog to update.
+     */
+    where: SetLogWhereUniqueInput
+  }
+
+  /**
+   * SetLog updateMany
+   */
+  export type SetLogUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SetLogs.
+     */
+    data: XOR<SetLogUpdateManyMutationInput, SetLogUncheckedUpdateManyInput>
+    /**
+     * Filter which SetLogs to update
+     */
+    where?: SetLogWhereInput
+    /**
+     * Limit how many SetLogs to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SetLog updateManyAndReturn
+   */
+  export type SetLogUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * The data used to update SetLogs.
+     */
+    data: XOR<SetLogUpdateManyMutationInput, SetLogUncheckedUpdateManyInput>
+    /**
+     * Filter which SetLogs to update
+     */
+    where?: SetLogWhereInput
+    /**
+     * Limit how many SetLogs to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SetLog upsert
+   */
+  export type SetLogUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SetLog to update in case it exists.
+     */
+    where: SetLogWhereUniqueInput
+    /**
+     * In case the SetLog found by the `where` argument doesn't exist, create a new SetLog with this data.
+     */
+    create: XOR<SetLogCreateInput, SetLogUncheckedCreateInput>
+    /**
+     * In case the SetLog was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SetLogUpdateInput, SetLogUncheckedUpdateInput>
+  }
+
+  /**
+   * SetLog delete
+   */
+  export type SetLogDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
+    /**
+     * Filter which SetLog to delete.
+     */
+    where: SetLogWhereUniqueInput
+  }
+
+  /**
+   * SetLog deleteMany
+   */
+  export type SetLogDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SetLogs to delete
+     */
+    where?: SetLogWhereInput
+    /**
+     * Limit how many SetLogs to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SetLog without action
+   */
+  export type SetLogDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SetLog
+     */
+    select?: SetLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SetLog
+     */
+    omit?: SetLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SetLogInclude<ExtArgs> | null
   }
 
 
@@ -109018,6 +110535,9 @@ export namespace Prisma {
     defaultTempo: 'defaultTempo',
     progressionOfId: 'progressionOfId',
     regressionOfId: 'regressionOfId',
+    pattern: 'pattern',
+    braceMode: 'braceMode',
+    skillLayer: 'skillLayer',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -109077,6 +110597,13 @@ export namespace Prisma {
     tempo: 'tempo',
     restSeconds: 'restSeconds',
     coachNote: 'coachNote',
+    section: 'section',
+    isKeySet: 'isKeySet',
+    supersetGroup: 'supersetGroup',
+    workSeconds: 'workSeconds',
+    holdSeconds: 'holdSeconds',
+    setupCues: 'setupCues',
+    effortBand: 'effortBand',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -109115,6 +110642,22 @@ export namespace Prisma {
   };
 
   export type ExerciseLogScalarFieldEnum = (typeof ExerciseLogScalarFieldEnum)[keyof typeof ExerciseLogScalarFieldEnum]
+
+
+  export const SetLogScalarFieldEnum: {
+    id: 'id',
+    exerciseLogId: 'exerciseLogId',
+    setIndex: 'setIndex',
+    reps: 'reps',
+    weightKg: 'weightKg',
+    rir: 'rir',
+    effort: 'effort',
+    workSeconds: 'workSeconds',
+    note: 'note',
+    createdAt: 'createdAt'
+  };
+
+  export type SetLogScalarFieldEnum = (typeof SetLogScalarFieldEnum)[keyof typeof SetLogScalarFieldEnum]
 
 
   export const ProgramMessageScalarFieldEnum: {
@@ -109661,6 +111204,48 @@ export namespace Prisma {
    * Reference to a field of type 'CrmActivityStatus[]'
    */
   export type ListEnumCrmActivityStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CrmActivityStatus[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'MovementPattern'
+   */
+  export type EnumMovementPatternFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MovementPattern'>
+    
+
+
+  /**
+   * Reference to a field of type 'MovementPattern[]'
+   */
+  export type ListEnumMovementPatternFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MovementPattern[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'BraceMode'
+   */
+  export type EnumBraceModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BraceMode'>
+    
+
+
+  /**
+   * Reference to a field of type 'BraceMode[]'
+   */
+  export type ListEnumBraceModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BraceMode[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'SessionSection'
+   */
+  export type EnumSessionSectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SessionSection'>
+    
+
+
+  /**
+   * Reference to a field of type 'SessionSection[]'
+   */
+  export type ListEnumSessionSectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SessionSection[]'>
     
 
 
@@ -115069,6 +116654,9 @@ export namespace Prisma {
     defaultTempo?: StringFilter<"ProgramExercise"> | string
     progressionOfId?: StringNullableFilter<"ProgramExercise"> | string | null
     regressionOfId?: StringNullableFilter<"ProgramExercise"> | string | null
+    pattern?: EnumMovementPatternNullableFilter<"ProgramExercise"> | $Enums.MovementPattern | null
+    braceMode?: EnumBraceModeNullableFilter<"ProgramExercise"> | $Enums.BraceMode | null
+    skillLayer?: StringNullableFilter<"ProgramExercise"> | string | null
     createdAt?: DateTimeFilter<"ProgramExercise"> | Date | string
     updatedAt?: DateTimeFilter<"ProgramExercise"> | Date | string
     sessionExercises?: SessionExerciseListRelationFilter
@@ -115086,6 +116674,9 @@ export namespace Prisma {
     defaultTempo?: SortOrder
     progressionOfId?: SortOrderInput | SortOrder
     regressionOfId?: SortOrderInput | SortOrder
+    pattern?: SortOrderInput | SortOrder
+    braceMode?: SortOrderInput | SortOrder
+    skillLayer?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     sessionExercises?: SessionExerciseOrderByRelationAggregateInput
@@ -115106,6 +116697,9 @@ export namespace Prisma {
     defaultTempo?: StringFilter<"ProgramExercise"> | string
     progressionOfId?: StringNullableFilter<"ProgramExercise"> | string | null
     regressionOfId?: StringNullableFilter<"ProgramExercise"> | string | null
+    pattern?: EnumMovementPatternNullableFilter<"ProgramExercise"> | $Enums.MovementPattern | null
+    braceMode?: EnumBraceModeNullableFilter<"ProgramExercise"> | $Enums.BraceMode | null
+    skillLayer?: StringNullableFilter<"ProgramExercise"> | string | null
     createdAt?: DateTimeFilter<"ProgramExercise"> | Date | string
     updatedAt?: DateTimeFilter<"ProgramExercise"> | Date | string
     sessionExercises?: SessionExerciseListRelationFilter
@@ -115123,6 +116717,9 @@ export namespace Prisma {
     defaultTempo?: SortOrder
     progressionOfId?: SortOrderInput | SortOrder
     regressionOfId?: SortOrderInput | SortOrder
+    pattern?: SortOrderInput | SortOrder
+    braceMode?: SortOrderInput | SortOrder
+    skillLayer?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: ProgramExerciseCountOrderByAggregateInput
@@ -115145,6 +116742,9 @@ export namespace Prisma {
     defaultTempo?: StringWithAggregatesFilter<"ProgramExercise"> | string
     progressionOfId?: StringNullableWithAggregatesFilter<"ProgramExercise"> | string | null
     regressionOfId?: StringNullableWithAggregatesFilter<"ProgramExercise"> | string | null
+    pattern?: EnumMovementPatternNullableWithAggregatesFilter<"ProgramExercise"> | $Enums.MovementPattern | null
+    braceMode?: EnumBraceModeNullableWithAggregatesFilter<"ProgramExercise"> | $Enums.BraceMode | null
+    skillLayer?: StringNullableWithAggregatesFilter<"ProgramExercise"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"ProgramExercise"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"ProgramExercise"> | Date | string
   }
@@ -115389,6 +116989,13 @@ export namespace Prisma {
     tempo?: StringFilter<"SessionExercise"> | string
     restSeconds?: IntFilter<"SessionExercise"> | number
     coachNote?: StringNullableFilter<"SessionExercise"> | string | null
+    section?: EnumSessionSectionFilter<"SessionExercise"> | $Enums.SessionSection
+    isKeySet?: BoolFilter<"SessionExercise"> | boolean
+    supersetGroup?: StringNullableFilter<"SessionExercise"> | string | null
+    workSeconds?: IntNullableFilter<"SessionExercise"> | number | null
+    holdSeconds?: IntNullableFilter<"SessionExercise"> | number | null
+    setupCues?: StringNullableListFilter<"SessionExercise">
+    effortBand?: StringNullableFilter<"SessionExercise"> | string | null
     createdAt?: DateTimeFilter<"SessionExercise"> | Date | string
     updatedAt?: DateTimeFilter<"SessionExercise"> | Date | string
     session?: XOR<SessionScalarRelationFilter, SessionWhereInput>
@@ -115407,6 +117014,13 @@ export namespace Prisma {
     tempo?: SortOrder
     restSeconds?: SortOrder
     coachNote?: SortOrderInput | SortOrder
+    section?: SortOrder
+    isKeySet?: SortOrder
+    supersetGroup?: SortOrderInput | SortOrder
+    workSeconds?: SortOrderInput | SortOrder
+    holdSeconds?: SortOrderInput | SortOrder
+    setupCues?: SortOrder
+    effortBand?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     session?: SessionOrderByWithRelationInput
@@ -115428,6 +117042,13 @@ export namespace Prisma {
     tempo?: StringFilter<"SessionExercise"> | string
     restSeconds?: IntFilter<"SessionExercise"> | number
     coachNote?: StringNullableFilter<"SessionExercise"> | string | null
+    section?: EnumSessionSectionFilter<"SessionExercise"> | $Enums.SessionSection
+    isKeySet?: BoolFilter<"SessionExercise"> | boolean
+    supersetGroup?: StringNullableFilter<"SessionExercise"> | string | null
+    workSeconds?: IntNullableFilter<"SessionExercise"> | number | null
+    holdSeconds?: IntNullableFilter<"SessionExercise"> | number | null
+    setupCues?: StringNullableListFilter<"SessionExercise">
+    effortBand?: StringNullableFilter<"SessionExercise"> | string | null
     createdAt?: DateTimeFilter<"SessionExercise"> | Date | string
     updatedAt?: DateTimeFilter<"SessionExercise"> | Date | string
     session?: XOR<SessionScalarRelationFilter, SessionWhereInput>
@@ -115446,6 +117067,13 @@ export namespace Prisma {
     tempo?: SortOrder
     restSeconds?: SortOrder
     coachNote?: SortOrderInput | SortOrder
+    section?: SortOrder
+    isKeySet?: SortOrder
+    supersetGroup?: SortOrderInput | SortOrder
+    workSeconds?: SortOrderInput | SortOrder
+    holdSeconds?: SortOrderInput | SortOrder
+    setupCues?: SortOrder
+    effortBand?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: SessionExerciseCountOrderByAggregateInput
@@ -115469,6 +117097,13 @@ export namespace Prisma {
     tempo?: StringWithAggregatesFilter<"SessionExercise"> | string
     restSeconds?: IntWithAggregatesFilter<"SessionExercise"> | number
     coachNote?: StringNullableWithAggregatesFilter<"SessionExercise"> | string | null
+    section?: EnumSessionSectionWithAggregatesFilter<"SessionExercise"> | $Enums.SessionSection
+    isKeySet?: BoolWithAggregatesFilter<"SessionExercise"> | boolean
+    supersetGroup?: StringNullableWithAggregatesFilter<"SessionExercise"> | string | null
+    workSeconds?: IntNullableWithAggregatesFilter<"SessionExercise"> | number | null
+    holdSeconds?: IntNullableWithAggregatesFilter<"SessionExercise"> | number | null
+    setupCues?: StringNullableListFilter<"SessionExercise">
+    effortBand?: StringNullableWithAggregatesFilter<"SessionExercise"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"SessionExercise"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"SessionExercise"> | Date | string
   }
@@ -115565,6 +117200,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     clientSession?: XOR<ClientSessionScalarRelationFilter, ClientSessionWhereInput>
     sessionExercise?: XOR<SessionExerciseScalarRelationFilter, SessionExerciseWhereInput>
+    setLogs?: SetLogListRelationFilter
   }
 
   export type ExerciseLogOrderByWithRelationInput = {
@@ -115584,6 +117220,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     clientSession?: ClientSessionOrderByWithRelationInput
     sessionExercise?: SessionExerciseOrderByWithRelationInput
+    setLogs?: SetLogOrderByRelationAggregateInput
   }
 
   export type ExerciseLogWhereUniqueInput = Prisma.AtLeast<{
@@ -115606,6 +117243,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     clientSession?: XOR<ClientSessionScalarRelationFilter, ClientSessionWhereInput>
     sessionExercise?: XOR<SessionExerciseScalarRelationFilter, SessionExerciseWhereInput>
+    setLogs?: SetLogListRelationFilter
   }, "id">
 
   export type ExerciseLogOrderByWithAggregationInput = {
@@ -115648,6 +117286,89 @@ export namespace Prisma {
     completedAt?: DateTimeNullableWithAggregatesFilter<"ExerciseLog"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"ExerciseLog"> | Date | string
+  }
+
+  export type SetLogWhereInput = {
+    AND?: SetLogWhereInput | SetLogWhereInput[]
+    OR?: SetLogWhereInput[]
+    NOT?: SetLogWhereInput | SetLogWhereInput[]
+    id?: StringFilter<"SetLog"> | string
+    exerciseLogId?: StringFilter<"SetLog"> | string
+    setIndex?: IntFilter<"SetLog"> | number
+    reps?: IntNullableFilter<"SetLog"> | number | null
+    weightKg?: FloatNullableFilter<"SetLog"> | number | null
+    rir?: IntNullableFilter<"SetLog"> | number | null
+    effort?: IntNullableFilter<"SetLog"> | number | null
+    workSeconds?: IntNullableFilter<"SetLog"> | number | null
+    note?: StringNullableFilter<"SetLog"> | string | null
+    createdAt?: DateTimeFilter<"SetLog"> | Date | string
+    exerciseLog?: XOR<ExerciseLogScalarRelationFilter, ExerciseLogWhereInput>
+  }
+
+  export type SetLogOrderByWithRelationInput = {
+    id?: SortOrder
+    exerciseLogId?: SortOrder
+    setIndex?: SortOrder
+    reps?: SortOrderInput | SortOrder
+    weightKg?: SortOrderInput | SortOrder
+    rir?: SortOrderInput | SortOrder
+    effort?: SortOrderInput | SortOrder
+    workSeconds?: SortOrderInput | SortOrder
+    note?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    exerciseLog?: ExerciseLogOrderByWithRelationInput
+  }
+
+  export type SetLogWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    exerciseLogId_setIndex?: SetLogExerciseLogIdSetIndexCompoundUniqueInput
+    AND?: SetLogWhereInput | SetLogWhereInput[]
+    OR?: SetLogWhereInput[]
+    NOT?: SetLogWhereInput | SetLogWhereInput[]
+    exerciseLogId?: StringFilter<"SetLog"> | string
+    setIndex?: IntFilter<"SetLog"> | number
+    reps?: IntNullableFilter<"SetLog"> | number | null
+    weightKg?: FloatNullableFilter<"SetLog"> | number | null
+    rir?: IntNullableFilter<"SetLog"> | number | null
+    effort?: IntNullableFilter<"SetLog"> | number | null
+    workSeconds?: IntNullableFilter<"SetLog"> | number | null
+    note?: StringNullableFilter<"SetLog"> | string | null
+    createdAt?: DateTimeFilter<"SetLog"> | Date | string
+    exerciseLog?: XOR<ExerciseLogScalarRelationFilter, ExerciseLogWhereInput>
+  }, "id" | "exerciseLogId_setIndex">
+
+  export type SetLogOrderByWithAggregationInput = {
+    id?: SortOrder
+    exerciseLogId?: SortOrder
+    setIndex?: SortOrder
+    reps?: SortOrderInput | SortOrder
+    weightKg?: SortOrderInput | SortOrder
+    rir?: SortOrderInput | SortOrder
+    effort?: SortOrderInput | SortOrder
+    workSeconds?: SortOrderInput | SortOrder
+    note?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: SetLogCountOrderByAggregateInput
+    _avg?: SetLogAvgOrderByAggregateInput
+    _max?: SetLogMaxOrderByAggregateInput
+    _min?: SetLogMinOrderByAggregateInput
+    _sum?: SetLogSumOrderByAggregateInput
+  }
+
+  export type SetLogScalarWhereWithAggregatesInput = {
+    AND?: SetLogScalarWhereWithAggregatesInput | SetLogScalarWhereWithAggregatesInput[]
+    OR?: SetLogScalarWhereWithAggregatesInput[]
+    NOT?: SetLogScalarWhereWithAggregatesInput | SetLogScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SetLog"> | string
+    exerciseLogId?: StringWithAggregatesFilter<"SetLog"> | string
+    setIndex?: IntWithAggregatesFilter<"SetLog"> | number
+    reps?: IntNullableWithAggregatesFilter<"SetLog"> | number | null
+    weightKg?: FloatNullableWithAggregatesFilter<"SetLog"> | number | null
+    rir?: IntNullableWithAggregatesFilter<"SetLog"> | number | null
+    effort?: IntNullableWithAggregatesFilter<"SetLog"> | number | null
+    workSeconds?: IntNullableWithAggregatesFilter<"SetLog"> | number | null
+    note?: StringNullableWithAggregatesFilter<"SetLog"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"SetLog"> | Date | string
   }
 
   export type ProgramMessageWhereInput = {
@@ -122491,6 +124212,9 @@ export namespace Prisma {
     defaultTempo?: string
     progressionOfId?: string | null
     regressionOfId?: string | null
+    pattern?: $Enums.MovementPattern | null
+    braceMode?: $Enums.BraceMode | null
+    skillLayer?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     sessionExercises?: SessionExerciseCreateNestedManyWithoutExerciseInput
@@ -122508,6 +124232,9 @@ export namespace Prisma {
     defaultTempo?: string
     progressionOfId?: string | null
     regressionOfId?: string | null
+    pattern?: $Enums.MovementPattern | null
+    braceMode?: $Enums.BraceMode | null
+    skillLayer?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     sessionExercises?: SessionExerciseUncheckedCreateNestedManyWithoutExerciseInput
@@ -122525,6 +124252,9 @@ export namespace Prisma {
     defaultTempo?: StringFieldUpdateOperationsInput | string
     progressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
     regressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    pattern?: NullableEnumMovementPatternFieldUpdateOperationsInput | $Enums.MovementPattern | null
+    braceMode?: NullableEnumBraceModeFieldUpdateOperationsInput | $Enums.BraceMode | null
+    skillLayer?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessionExercises?: SessionExerciseUpdateManyWithoutExerciseNestedInput
@@ -122542,6 +124272,9 @@ export namespace Prisma {
     defaultTempo?: StringFieldUpdateOperationsInput | string
     progressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
     regressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    pattern?: NullableEnumMovementPatternFieldUpdateOperationsInput | $Enums.MovementPattern | null
+    braceMode?: NullableEnumBraceModeFieldUpdateOperationsInput | $Enums.BraceMode | null
+    skillLayer?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessionExercises?: SessionExerciseUncheckedUpdateManyWithoutExerciseNestedInput
@@ -122559,6 +124292,9 @@ export namespace Prisma {
     defaultTempo?: string
     progressionOfId?: string | null
     regressionOfId?: string | null
+    pattern?: $Enums.MovementPattern | null
+    braceMode?: $Enums.BraceMode | null
+    skillLayer?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -122575,6 +124311,9 @@ export namespace Prisma {
     defaultTempo?: StringFieldUpdateOperationsInput | string
     progressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
     regressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    pattern?: NullableEnumMovementPatternFieldUpdateOperationsInput | $Enums.MovementPattern | null
+    braceMode?: NullableEnumBraceModeFieldUpdateOperationsInput | $Enums.BraceMode | null
+    skillLayer?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -122591,6 +124330,9 @@ export namespace Prisma {
     defaultTempo?: StringFieldUpdateOperationsInput | string
     progressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
     regressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    pattern?: NullableEnumMovementPatternFieldUpdateOperationsInput | $Enums.MovementPattern | null
+    braceMode?: NullableEnumBraceModeFieldUpdateOperationsInput | $Enums.BraceMode | null
+    skillLayer?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -122850,6 +124592,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     session: SessionCreateNestedOneWithoutExercisesInput
@@ -122868,6 +124617,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     exerciseLogs?: ExerciseLogUncheckedCreateNestedManyWithoutSessionExerciseInput
@@ -122882,6 +124638,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     session?: SessionUpdateOneRequiredWithoutExercisesNestedInput
@@ -122900,6 +124663,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     exerciseLogs?: ExerciseLogUncheckedUpdateManyWithoutSessionExerciseNestedInput
@@ -122916,6 +124686,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -122929,6 +124706,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -122944,6 +124728,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -123035,6 +124826,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
     sessionExercise: SessionExerciseCreateNestedOneWithoutExerciseLogsInput
+    setLogs?: SetLogCreateNestedManyWithoutExerciseLogInput
   }
 
   export type ExerciseLogUncheckedCreateInput = {
@@ -123052,6 +124844,7 @@ export namespace Prisma {
     completedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
   }
 
   export type ExerciseLogUpdateInput = {
@@ -123069,6 +124862,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
     sessionExercise?: SessionExerciseUpdateOneRequiredWithoutExerciseLogsNestedInput
+    setLogs?: SetLogUpdateManyWithoutExerciseLogNestedInput
   }
 
   export type ExerciseLogUncheckedUpdateInput = {
@@ -123086,6 +124880,7 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
   }
 
   export type ExerciseLogCreateManyInput = {
@@ -123135,6 +124930,96 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogCreateInput = {
+    id?: string
+    setIndex: number
+    reps?: number | null
+    weightKg?: number | null
+    rir?: number | null
+    effort?: number | null
+    workSeconds?: number | null
+    note?: string | null
+    createdAt?: Date | string
+    exerciseLog: ExerciseLogCreateNestedOneWithoutSetLogsInput
+  }
+
+  export type SetLogUncheckedCreateInput = {
+    id?: string
+    exerciseLogId: string
+    setIndex: number
+    reps?: number | null
+    weightKg?: number | null
+    rir?: number | null
+    effort?: number | null
+    workSeconds?: number | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SetLogUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    exerciseLog?: ExerciseLogUpdateOneRequiredWithoutSetLogsNestedInput
+  }
+
+  export type SetLogUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    exerciseLogId?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogCreateManyInput = {
+    id?: string
+    exerciseLogId: string
+    setIndex: number
+    reps?: number | null
+    weightKg?: number | null
+    rir?: number | null
+    effort?: number | null
+    workSeconds?: number | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SetLogUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    exerciseLogId?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProgramMessageCreateInput = {
@@ -128290,6 +130175,20 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type EnumMovementPatternNullableFilter<$PrismaModel = never> = {
+    equals?: $Enums.MovementPattern | EnumMovementPatternFieldRefInput<$PrismaModel> | null
+    in?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumMovementPatternNullableFilter<$PrismaModel> | $Enums.MovementPattern | null
+  }
+
+  export type EnumBraceModeNullableFilter<$PrismaModel = never> = {
+    equals?: $Enums.BraceMode | EnumBraceModeFieldRefInput<$PrismaModel> | null
+    in?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumBraceModeNullableFilter<$PrismaModel> | $Enums.BraceMode | null
+  }
+
   export type SessionExerciseListRelationFilter = {
     every?: SessionExerciseWhereInput
     some?: SessionExerciseWhereInput
@@ -128312,6 +130211,9 @@ export namespace Prisma {
     defaultTempo?: SortOrder
     progressionOfId?: SortOrder
     regressionOfId?: SortOrder
+    pattern?: SortOrder
+    braceMode?: SortOrder
+    skillLayer?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -128325,6 +130227,9 @@ export namespace Prisma {
     defaultTempo?: SortOrder
     progressionOfId?: SortOrder
     regressionOfId?: SortOrder
+    pattern?: SortOrder
+    braceMode?: SortOrder
+    skillLayer?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -128338,8 +130243,31 @@ export namespace Prisma {
     defaultTempo?: SortOrder
     progressionOfId?: SortOrder
     regressionOfId?: SortOrder
+    pattern?: SortOrder
+    braceMode?: SortOrder
+    skillLayer?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+  }
+
+  export type EnumMovementPatternNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.MovementPattern | EnumMovementPatternFieldRefInput<$PrismaModel> | null
+    in?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumMovementPatternNullableWithAggregatesFilter<$PrismaModel> | $Enums.MovementPattern | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedEnumMovementPatternNullableFilter<$PrismaModel>
+    _max?: NestedEnumMovementPatternNullableFilter<$PrismaModel>
+  }
+
+  export type EnumBraceModeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.BraceMode | EnumBraceModeFieldRefInput<$PrismaModel> | null
+    in?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumBraceModeNullableWithAggregatesFilter<$PrismaModel> | $Enums.BraceMode | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedEnumBraceModeNullableFilter<$PrismaModel>
+    _max?: NestedEnumBraceModeNullableFilter<$PrismaModel>
   }
 
   export type BlockListRelationFilter = {
@@ -128512,6 +130440,13 @@ export namespace Prisma {
     order?: SortOrder
   }
 
+  export type EnumSessionSectionFilter<$PrismaModel = never> = {
+    equals?: $Enums.SessionSection | EnumSessionSectionFieldRefInput<$PrismaModel>
+    in?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    notIn?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    not?: NestedEnumSessionSectionFilter<$PrismaModel> | $Enums.SessionSection
+  }
+
   export type SessionScalarRelationFilter = {
     is?: SessionWhereInput
     isNot?: SessionWhereInput
@@ -128543,6 +130478,13 @@ export namespace Prisma {
     tempo?: SortOrder
     restSeconds?: SortOrder
     coachNote?: SortOrder
+    section?: SortOrder
+    isKeySet?: SortOrder
+    supersetGroup?: SortOrder
+    workSeconds?: SortOrder
+    holdSeconds?: SortOrder
+    setupCues?: SortOrder
+    effortBand?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -128551,6 +130493,8 @@ export namespace Prisma {
     order?: SortOrder
     sets?: SortOrder
     restSeconds?: SortOrder
+    workSeconds?: SortOrder
+    holdSeconds?: SortOrder
   }
 
   export type SessionExerciseMaxOrderByAggregateInput = {
@@ -128564,6 +130508,12 @@ export namespace Prisma {
     tempo?: SortOrder
     restSeconds?: SortOrder
     coachNote?: SortOrder
+    section?: SortOrder
+    isKeySet?: SortOrder
+    supersetGroup?: SortOrder
+    workSeconds?: SortOrder
+    holdSeconds?: SortOrder
+    effortBand?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -128579,6 +130529,12 @@ export namespace Prisma {
     tempo?: SortOrder
     restSeconds?: SortOrder
     coachNote?: SortOrder
+    section?: SortOrder
+    isKeySet?: SortOrder
+    supersetGroup?: SortOrder
+    workSeconds?: SortOrder
+    holdSeconds?: SortOrder
+    effortBand?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -128587,6 +130543,18 @@ export namespace Prisma {
     order?: SortOrder
     sets?: SortOrder
     restSeconds?: SortOrder
+    workSeconds?: SortOrder
+    holdSeconds?: SortOrder
+  }
+
+  export type EnumSessionSectionWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.SessionSection | EnumSessionSectionFieldRefInput<$PrismaModel>
+    in?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    notIn?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    not?: NestedEnumSessionSectionWithAggregatesFilter<$PrismaModel> | $Enums.SessionSection
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumSessionSectionFilter<$PrismaModel>
+    _max?: NestedEnumSessionSectionFilter<$PrismaModel>
   }
 
   export type ClientSessionProgramIdSessionIdClientIdCreatedAtCompoundUniqueInput = {
@@ -128634,6 +130602,16 @@ export namespace Prisma {
   export type SessionExerciseScalarRelationFilter = {
     is?: SessionExerciseWhereInput
     isNot?: SessionExerciseWhereInput
+  }
+
+  export type SetLogListRelationFilter = {
+    every?: SetLogWhereInput
+    some?: SetLogWhereInput
+    none?: SetLogWhereInput
+  }
+
+  export type SetLogOrderByRelationAggregateInput = {
+    _count?: SortOrder
   }
 
   export type ExerciseLogCountOrderByAggregateInput = {
@@ -128695,6 +130673,100 @@ export namespace Prisma {
   export type ExerciseLogSumOrderByAggregateInput = {
     actualSets?: SortOrder
     rpe?: SortOrder
+  }
+
+  export type FloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type ExerciseLogScalarRelationFilter = {
+    is?: ExerciseLogWhereInput
+    isNot?: ExerciseLogWhereInput
+  }
+
+  export type SetLogExerciseLogIdSetIndexCompoundUniqueInput = {
+    exerciseLogId: string
+    setIndex: number
+  }
+
+  export type SetLogCountOrderByAggregateInput = {
+    id?: SortOrder
+    exerciseLogId?: SortOrder
+    setIndex?: SortOrder
+    reps?: SortOrder
+    weightKg?: SortOrder
+    rir?: SortOrder
+    effort?: SortOrder
+    workSeconds?: SortOrder
+    note?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SetLogAvgOrderByAggregateInput = {
+    setIndex?: SortOrder
+    reps?: SortOrder
+    weightKg?: SortOrder
+    rir?: SortOrder
+    effort?: SortOrder
+    workSeconds?: SortOrder
+  }
+
+  export type SetLogMaxOrderByAggregateInput = {
+    id?: SortOrder
+    exerciseLogId?: SortOrder
+    setIndex?: SortOrder
+    reps?: SortOrder
+    weightKg?: SortOrder
+    rir?: SortOrder
+    effort?: SortOrder
+    workSeconds?: SortOrder
+    note?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SetLogMinOrderByAggregateInput = {
+    id?: SortOrder
+    exerciseLogId?: SortOrder
+    setIndex?: SortOrder
+    reps?: SortOrder
+    weightKg?: SortOrder
+    rir?: SortOrder
+    effort?: SortOrder
+    workSeconds?: SortOrder
+    note?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SetLogSumOrderByAggregateInput = {
+    setIndex?: SortOrder
+    reps?: SortOrder
+    weightKg?: SortOrder
+    rir?: SortOrder
+    effort?: SortOrder
+    workSeconds?: SortOrder
+  }
+
+  export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedFloatNullableFilter<$PrismaModel>
+    _min?: NestedFloatNullableFilter<$PrismaModel>
+    _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
   export type ProgramMessageCountOrderByAggregateInput = {
@@ -133501,6 +135573,14 @@ export namespace Prisma {
     push?: string | string[]
   }
 
+  export type NullableEnumMovementPatternFieldUpdateOperationsInput = {
+    set?: $Enums.MovementPattern | null
+  }
+
+  export type NullableEnumBraceModeFieldUpdateOperationsInput = {
+    set?: $Enums.BraceMode | null
+  }
+
   export type SessionExerciseUpdateManyWithoutExerciseNestedInput = {
     create?: XOR<SessionExerciseCreateWithoutExerciseInput, SessionExerciseUncheckedCreateWithoutExerciseInput> | SessionExerciseCreateWithoutExerciseInput[] | SessionExerciseUncheckedCreateWithoutExerciseInput[]
     connectOrCreate?: SessionExerciseCreateOrConnectWithoutExerciseInput | SessionExerciseCreateOrConnectWithoutExerciseInput[]
@@ -133809,6 +135889,10 @@ export namespace Prisma {
     deleteMany?: ClientSessionScalarWhereInput | ClientSessionScalarWhereInput[]
   }
 
+  export type SessionExerciseCreatesetupCuesInput = {
+    set: string[]
+  }
+
   export type SessionCreateNestedOneWithoutExercisesInput = {
     create?: XOR<SessionCreateWithoutExercisesInput, SessionUncheckedCreateWithoutExercisesInput>
     connectOrCreate?: SessionCreateOrConnectWithoutExercisesInput
@@ -133833,6 +135917,15 @@ export namespace Prisma {
     connectOrCreate?: ExerciseLogCreateOrConnectWithoutSessionExerciseInput | ExerciseLogCreateOrConnectWithoutSessionExerciseInput[]
     createMany?: ExerciseLogCreateManySessionExerciseInputEnvelope
     connect?: ExerciseLogWhereUniqueInput | ExerciseLogWhereUniqueInput[]
+  }
+
+  export type EnumSessionSectionFieldUpdateOperationsInput = {
+    set?: $Enums.SessionSection
+  }
+
+  export type SessionExerciseUpdatesetupCuesInput = {
+    set?: string[]
+    push?: string | string[]
   }
 
   export type SessionUpdateOneRequiredWithoutExercisesNestedInput = {
@@ -133961,6 +136054,20 @@ export namespace Prisma {
     connect?: SessionExerciseWhereUniqueInput
   }
 
+  export type SetLogCreateNestedManyWithoutExerciseLogInput = {
+    create?: XOR<SetLogCreateWithoutExerciseLogInput, SetLogUncheckedCreateWithoutExerciseLogInput> | SetLogCreateWithoutExerciseLogInput[] | SetLogUncheckedCreateWithoutExerciseLogInput[]
+    connectOrCreate?: SetLogCreateOrConnectWithoutExerciseLogInput | SetLogCreateOrConnectWithoutExerciseLogInput[]
+    createMany?: SetLogCreateManyExerciseLogInputEnvelope
+    connect?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+  }
+
+  export type SetLogUncheckedCreateNestedManyWithoutExerciseLogInput = {
+    create?: XOR<SetLogCreateWithoutExerciseLogInput, SetLogUncheckedCreateWithoutExerciseLogInput> | SetLogCreateWithoutExerciseLogInput[] | SetLogUncheckedCreateWithoutExerciseLogInput[]
+    connectOrCreate?: SetLogCreateOrConnectWithoutExerciseLogInput | SetLogCreateOrConnectWithoutExerciseLogInput[]
+    createMany?: SetLogCreateManyExerciseLogInputEnvelope
+    connect?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+  }
+
   export type ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput = {
     create?: XOR<ClientSessionCreateWithoutExerciseLogsInput, ClientSessionUncheckedCreateWithoutExerciseLogsInput>
     connectOrCreate?: ClientSessionCreateOrConnectWithoutExerciseLogsInput
@@ -133975,6 +136082,56 @@ export namespace Prisma {
     upsert?: SessionExerciseUpsertWithoutExerciseLogsInput
     connect?: SessionExerciseWhereUniqueInput
     update?: XOR<XOR<SessionExerciseUpdateToOneWithWhereWithoutExerciseLogsInput, SessionExerciseUpdateWithoutExerciseLogsInput>, SessionExerciseUncheckedUpdateWithoutExerciseLogsInput>
+  }
+
+  export type SetLogUpdateManyWithoutExerciseLogNestedInput = {
+    create?: XOR<SetLogCreateWithoutExerciseLogInput, SetLogUncheckedCreateWithoutExerciseLogInput> | SetLogCreateWithoutExerciseLogInput[] | SetLogUncheckedCreateWithoutExerciseLogInput[]
+    connectOrCreate?: SetLogCreateOrConnectWithoutExerciseLogInput | SetLogCreateOrConnectWithoutExerciseLogInput[]
+    upsert?: SetLogUpsertWithWhereUniqueWithoutExerciseLogInput | SetLogUpsertWithWhereUniqueWithoutExerciseLogInput[]
+    createMany?: SetLogCreateManyExerciseLogInputEnvelope
+    set?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    disconnect?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    delete?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    connect?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    update?: SetLogUpdateWithWhereUniqueWithoutExerciseLogInput | SetLogUpdateWithWhereUniqueWithoutExerciseLogInput[]
+    updateMany?: SetLogUpdateManyWithWhereWithoutExerciseLogInput | SetLogUpdateManyWithWhereWithoutExerciseLogInput[]
+    deleteMany?: SetLogScalarWhereInput | SetLogScalarWhereInput[]
+  }
+
+  export type SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput = {
+    create?: XOR<SetLogCreateWithoutExerciseLogInput, SetLogUncheckedCreateWithoutExerciseLogInput> | SetLogCreateWithoutExerciseLogInput[] | SetLogUncheckedCreateWithoutExerciseLogInput[]
+    connectOrCreate?: SetLogCreateOrConnectWithoutExerciseLogInput | SetLogCreateOrConnectWithoutExerciseLogInput[]
+    upsert?: SetLogUpsertWithWhereUniqueWithoutExerciseLogInput | SetLogUpsertWithWhereUniqueWithoutExerciseLogInput[]
+    createMany?: SetLogCreateManyExerciseLogInputEnvelope
+    set?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    disconnect?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    delete?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    connect?: SetLogWhereUniqueInput | SetLogWhereUniqueInput[]
+    update?: SetLogUpdateWithWhereUniqueWithoutExerciseLogInput | SetLogUpdateWithWhereUniqueWithoutExerciseLogInput[]
+    updateMany?: SetLogUpdateManyWithWhereWithoutExerciseLogInput | SetLogUpdateManyWithWhereWithoutExerciseLogInput[]
+    deleteMany?: SetLogScalarWhereInput | SetLogScalarWhereInput[]
+  }
+
+  export type ExerciseLogCreateNestedOneWithoutSetLogsInput = {
+    create?: XOR<ExerciseLogCreateWithoutSetLogsInput, ExerciseLogUncheckedCreateWithoutSetLogsInput>
+    connectOrCreate?: ExerciseLogCreateOrConnectWithoutSetLogsInput
+    connect?: ExerciseLogWhereUniqueInput
+  }
+
+  export type NullableFloatFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type ExerciseLogUpdateOneRequiredWithoutSetLogsNestedInput = {
+    create?: XOR<ExerciseLogCreateWithoutSetLogsInput, ExerciseLogUncheckedCreateWithoutSetLogsInput>
+    connectOrCreate?: ExerciseLogCreateOrConnectWithoutSetLogsInput
+    upsert?: ExerciseLogUpsertWithoutSetLogsInput
+    connect?: ExerciseLogWhereUniqueInput
+    update?: XOR<XOR<ExerciseLogUpdateToOneWithWhereWithoutSetLogsInput, ExerciseLogUpdateWithoutSetLogsInput>, ExerciseLogUncheckedUpdateWithoutSetLogsInput>
   }
 
   export type CoachingProgramCreateNestedOneWithoutMessagesInput = {
@@ -134959,6 +137116,73 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumCrmActivityStatusFilter<$PrismaModel>
     _max?: NestedEnumCrmActivityStatusFilter<$PrismaModel>
+  }
+
+  export type NestedEnumMovementPatternNullableFilter<$PrismaModel = never> = {
+    equals?: $Enums.MovementPattern | EnumMovementPatternFieldRefInput<$PrismaModel> | null
+    in?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumMovementPatternNullableFilter<$PrismaModel> | $Enums.MovementPattern | null
+  }
+
+  export type NestedEnumBraceModeNullableFilter<$PrismaModel = never> = {
+    equals?: $Enums.BraceMode | EnumBraceModeFieldRefInput<$PrismaModel> | null
+    in?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumBraceModeNullableFilter<$PrismaModel> | $Enums.BraceMode | null
+  }
+
+  export type NestedEnumMovementPatternNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.MovementPattern | EnumMovementPatternFieldRefInput<$PrismaModel> | null
+    in?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.MovementPattern[] | ListEnumMovementPatternFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumMovementPatternNullableWithAggregatesFilter<$PrismaModel> | $Enums.MovementPattern | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedEnumMovementPatternNullableFilter<$PrismaModel>
+    _max?: NestedEnumMovementPatternNullableFilter<$PrismaModel>
+  }
+
+  export type NestedEnumBraceModeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.BraceMode | EnumBraceModeFieldRefInput<$PrismaModel> | null
+    in?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    notIn?: $Enums.BraceMode[] | ListEnumBraceModeFieldRefInput<$PrismaModel> | null
+    not?: NestedEnumBraceModeNullableWithAggregatesFilter<$PrismaModel> | $Enums.BraceMode | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedEnumBraceModeNullableFilter<$PrismaModel>
+    _max?: NestedEnumBraceModeNullableFilter<$PrismaModel>
+  }
+
+  export type NestedEnumSessionSectionFilter<$PrismaModel = never> = {
+    equals?: $Enums.SessionSection | EnumSessionSectionFieldRefInput<$PrismaModel>
+    in?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    notIn?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    not?: NestedEnumSessionSectionFilter<$PrismaModel> | $Enums.SessionSection
+  }
+
+  export type NestedEnumSessionSectionWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.SessionSection | EnumSessionSectionFieldRefInput<$PrismaModel>
+    in?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    notIn?: $Enums.SessionSection[] | ListEnumSessionSectionFieldRefInput<$PrismaModel>
+    not?: NestedEnumSessionSectionWithAggregatesFilter<$PrismaModel> | $Enums.SessionSection
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumSessionSectionFilter<$PrismaModel>
+    _max?: NestedEnumSessionSectionFilter<$PrismaModel>
+  }
+
+  export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedFloatNullableFilter<$PrismaModel>
+    _min?: NestedFloatNullableFilter<$PrismaModel>
+    _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
   export type NestedEnumCertificationStatusFilter<$PrismaModel = never> = {
@@ -154558,6 +156782,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     session: SessionCreateNestedOneWithoutExercisesInput
@@ -154574,6 +156805,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     exerciseLogs?: ExerciseLogUncheckedCreateNestedManyWithoutSessionExerciseInput
@@ -154619,6 +156857,13 @@ export namespace Prisma {
     tempo?: StringFilter<"SessionExercise"> | string
     restSeconds?: IntFilter<"SessionExercise"> | number
     coachNote?: StringNullableFilter<"SessionExercise"> | string | null
+    section?: EnumSessionSectionFilter<"SessionExercise"> | $Enums.SessionSection
+    isKeySet?: BoolFilter<"SessionExercise"> | boolean
+    supersetGroup?: StringNullableFilter<"SessionExercise"> | string | null
+    workSeconds?: IntNullableFilter<"SessionExercise"> | number | null
+    holdSeconds?: IntNullableFilter<"SessionExercise"> | number | null
+    setupCues?: StringNullableListFilter<"SessionExercise">
+    effortBand?: StringNullableFilter<"SessionExercise"> | string | null
     createdAt?: DateTimeFilter<"SessionExercise"> | Date | string
     updatedAt?: DateTimeFilter<"SessionExercise"> | Date | string
   }
@@ -154960,6 +157205,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     exercise: ProgramExerciseCreateNestedOneWithoutSessionExercisesInput
@@ -154976,6 +157228,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     exerciseLogs?: ExerciseLogUncheckedCreateNestedManyWithoutSessionExerciseInput
@@ -155121,6 +157380,9 @@ export namespace Prisma {
     defaultTempo?: string
     progressionOfId?: string | null
     regressionOfId?: string | null
+    pattern?: $Enums.MovementPattern | null
+    braceMode?: $Enums.BraceMode | null
+    skillLayer?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -155137,6 +157399,9 @@ export namespace Prisma {
     defaultTempo?: string
     progressionOfId?: string | null
     regressionOfId?: string | null
+    pattern?: $Enums.MovementPattern | null
+    braceMode?: $Enums.BraceMode | null
+    skillLayer?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -155160,6 +157425,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
+    setLogs?: SetLogCreateNestedManyWithoutExerciseLogInput
   }
 
   export type ExerciseLogUncheckedCreateWithoutSessionExerciseInput = {
@@ -155176,6 +157442,7 @@ export namespace Prisma {
     completedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
   }
 
   export type ExerciseLogCreateOrConnectWithoutSessionExerciseInput = {
@@ -155242,6 +157509,9 @@ export namespace Prisma {
     defaultTempo?: StringFieldUpdateOperationsInput | string
     progressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
     regressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    pattern?: NullableEnumMovementPatternFieldUpdateOperationsInput | $Enums.MovementPattern | null
+    braceMode?: NullableEnumBraceModeFieldUpdateOperationsInput | $Enums.BraceMode | null
+    skillLayer?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -155258,6 +157528,9 @@ export namespace Prisma {
     defaultTempo?: StringFieldUpdateOperationsInput | string
     progressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
     regressionOfId?: NullableStringFieldUpdateOperationsInput | string | null
+    pattern?: NullableEnumMovementPatternFieldUpdateOperationsInput | $Enums.MovementPattern | null
+    braceMode?: NullableEnumBraceModeFieldUpdateOperationsInput | $Enums.BraceMode | null
+    skillLayer?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -155372,6 +157645,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     sessionExercise: SessionExerciseCreateNestedOneWithoutExerciseLogsInput
+    setLogs?: SetLogCreateNestedManyWithoutExerciseLogInput
   }
 
   export type ExerciseLogUncheckedCreateWithoutClientSessionInput = {
@@ -155388,6 +157662,7 @@ export namespace Prisma {
     completedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
   }
 
   export type ExerciseLogCreateOrConnectWithoutClientSessionInput = {
@@ -155522,6 +157797,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     session: SessionCreateNestedOneWithoutExercisesInput
@@ -155539,6 +157821,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -155546,6 +157835,40 @@ export namespace Prisma {
   export type SessionExerciseCreateOrConnectWithoutExerciseLogsInput = {
     where: SessionExerciseWhereUniqueInput
     create: XOR<SessionExerciseCreateWithoutExerciseLogsInput, SessionExerciseUncheckedCreateWithoutExerciseLogsInput>
+  }
+
+  export type SetLogCreateWithoutExerciseLogInput = {
+    id?: string
+    setIndex: number
+    reps?: number | null
+    weightKg?: number | null
+    rir?: number | null
+    effort?: number | null
+    workSeconds?: number | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SetLogUncheckedCreateWithoutExerciseLogInput = {
+    id?: string
+    setIndex: number
+    reps?: number | null
+    weightKg?: number | null
+    rir?: number | null
+    effort?: number | null
+    workSeconds?: number | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SetLogCreateOrConnectWithoutExerciseLogInput = {
+    where: SetLogWhereUniqueInput
+    create: XOR<SetLogCreateWithoutExerciseLogInput, SetLogUncheckedCreateWithoutExerciseLogInput>
+  }
+
+  export type SetLogCreateManyExerciseLogInputEnvelope = {
+    data: SetLogCreateManyExerciseLogInput | SetLogCreateManyExerciseLogInput[]
+    skipDuplicates?: boolean
   }
 
   export type ClientSessionUpsertWithoutExerciseLogsInput = {
@@ -155599,6 +157922,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     session?: SessionUpdateOneRequiredWithoutExercisesNestedInput
@@ -155616,6 +157946,129 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogUpsertWithWhereUniqueWithoutExerciseLogInput = {
+    where: SetLogWhereUniqueInput
+    update: XOR<SetLogUpdateWithoutExerciseLogInput, SetLogUncheckedUpdateWithoutExerciseLogInput>
+    create: XOR<SetLogCreateWithoutExerciseLogInput, SetLogUncheckedCreateWithoutExerciseLogInput>
+  }
+
+  export type SetLogUpdateWithWhereUniqueWithoutExerciseLogInput = {
+    where: SetLogWhereUniqueInput
+    data: XOR<SetLogUpdateWithoutExerciseLogInput, SetLogUncheckedUpdateWithoutExerciseLogInput>
+  }
+
+  export type SetLogUpdateManyWithWhereWithoutExerciseLogInput = {
+    where: SetLogScalarWhereInput
+    data: XOR<SetLogUpdateManyMutationInput, SetLogUncheckedUpdateManyWithoutExerciseLogInput>
+  }
+
+  export type SetLogScalarWhereInput = {
+    AND?: SetLogScalarWhereInput | SetLogScalarWhereInput[]
+    OR?: SetLogScalarWhereInput[]
+    NOT?: SetLogScalarWhereInput | SetLogScalarWhereInput[]
+    id?: StringFilter<"SetLog"> | string
+    exerciseLogId?: StringFilter<"SetLog"> | string
+    setIndex?: IntFilter<"SetLog"> | number
+    reps?: IntNullableFilter<"SetLog"> | number | null
+    weightKg?: FloatNullableFilter<"SetLog"> | number | null
+    rir?: IntNullableFilter<"SetLog"> | number | null
+    effort?: IntNullableFilter<"SetLog"> | number | null
+    workSeconds?: IntNullableFilter<"SetLog"> | number | null
+    note?: StringNullableFilter<"SetLog"> | string | null
+    createdAt?: DateTimeFilter<"SetLog"> | Date | string
+  }
+
+  export type ExerciseLogCreateWithoutSetLogsInput = {
+    id?: string
+    actualSets?: number | null
+    actualReps?: string | null
+    actualLoad?: string | null
+    rpe?: number | null
+    clientNote?: string | null
+    videoUrl?: string | null
+    coachComment?: string | null
+    coachCommentAt?: Date | string | null
+    completedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
+    sessionExercise: SessionExerciseCreateNestedOneWithoutExerciseLogsInput
+  }
+
+  export type ExerciseLogUncheckedCreateWithoutSetLogsInput = {
+    id?: string
+    clientSessionId: string
+    sessionExerciseId: string
+    actualSets?: number | null
+    actualReps?: string | null
+    actualLoad?: string | null
+    rpe?: number | null
+    clientNote?: string | null
+    videoUrl?: string | null
+    coachComment?: string | null
+    coachCommentAt?: Date | string | null
+    completedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExerciseLogCreateOrConnectWithoutSetLogsInput = {
+    where: ExerciseLogWhereUniqueInput
+    create: XOR<ExerciseLogCreateWithoutSetLogsInput, ExerciseLogUncheckedCreateWithoutSetLogsInput>
+  }
+
+  export type ExerciseLogUpsertWithoutSetLogsInput = {
+    update: XOR<ExerciseLogUpdateWithoutSetLogsInput, ExerciseLogUncheckedUpdateWithoutSetLogsInput>
+    create: XOR<ExerciseLogCreateWithoutSetLogsInput, ExerciseLogUncheckedCreateWithoutSetLogsInput>
+    where?: ExerciseLogWhereInput
+  }
+
+  export type ExerciseLogUpdateToOneWithWhereWithoutSetLogsInput = {
+    where?: ExerciseLogWhereInput
+    data: XOR<ExerciseLogUpdateWithoutSetLogsInput, ExerciseLogUncheckedUpdateWithoutSetLogsInput>
+  }
+
+  export type ExerciseLogUpdateWithoutSetLogsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    actualSets?: NullableIntFieldUpdateOperationsInput | number | null
+    actualReps?: NullableStringFieldUpdateOperationsInput | string | null
+    actualLoad?: NullableStringFieldUpdateOperationsInput | string | null
+    rpe?: NullableIntFieldUpdateOperationsInput | number | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    videoUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    coachComment?: NullableStringFieldUpdateOperationsInput | string | null
+    coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
+    sessionExercise?: SessionExerciseUpdateOneRequiredWithoutExerciseLogsNestedInput
+  }
+
+  export type ExerciseLogUncheckedUpdateWithoutSetLogsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clientSessionId?: StringFieldUpdateOperationsInput | string
+    sessionExerciseId?: StringFieldUpdateOperationsInput | string
+    actualSets?: NullableIntFieldUpdateOperationsInput | number | null
+    actualReps?: NullableStringFieldUpdateOperationsInput | string | null
+    actualLoad?: NullableStringFieldUpdateOperationsInput | string | null
+    rpe?: NullableIntFieldUpdateOperationsInput | number | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    videoUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    coachComment?: NullableStringFieldUpdateOperationsInput | string | null
+    coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -162617,6 +165070,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -162630,6 +165090,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     session?: SessionUpdateOneRequiredWithoutExercisesNestedInput
@@ -162646,6 +165113,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     exerciseLogs?: ExerciseLogUncheckedUpdateManyWithoutSessionExerciseNestedInput
@@ -162661,6 +165135,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -162815,6 +165296,13 @@ export namespace Prisma {
     tempo?: string
     restSeconds?: number
     coachNote?: string | null
+    section?: $Enums.SessionSection
+    isKeySet?: boolean
+    supersetGroup?: string | null
+    workSeconds?: number | null
+    holdSeconds?: number | null
+    setupCues?: SessionExerciseCreatesetupCuesInput | string[]
+    effortBand?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -162837,6 +165325,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     exercise?: ProgramExerciseUpdateOneRequiredWithoutSessionExercisesNestedInput
@@ -162853,6 +165348,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     exerciseLogs?: ExerciseLogUncheckedUpdateManyWithoutSessionExerciseNestedInput
@@ -162868,6 +165370,13 @@ export namespace Prisma {
     tempo?: StringFieldUpdateOperationsInput | string
     restSeconds?: IntFieldUpdateOperationsInput | number
     coachNote?: NullableStringFieldUpdateOperationsInput | string | null
+    section?: EnumSessionSectionFieldUpdateOperationsInput | $Enums.SessionSection
+    isKeySet?: BoolFieldUpdateOperationsInput | boolean
+    supersetGroup?: NullableStringFieldUpdateOperationsInput | string | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    holdSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    setupCues?: SessionExerciseUpdatesetupCuesInput | string[]
+    effortBand?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -162931,6 +165440,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
+    setLogs?: SetLogUpdateManyWithoutExerciseLogNestedInput
   }
 
   export type ExerciseLogUncheckedUpdateWithoutSessionExerciseInput = {
@@ -162947,6 +165457,7 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
   }
 
   export type ExerciseLogUncheckedUpdateManyWithoutSessionExerciseInput = {
@@ -162995,6 +165506,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessionExercise?: SessionExerciseUpdateOneRequiredWithoutExerciseLogsNestedInput
+    setLogs?: SetLogUpdateManyWithoutExerciseLogNestedInput
   }
 
   export type ExerciseLogUncheckedUpdateWithoutClientSessionInput = {
@@ -163011,6 +165523,7 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
   }
 
   export type ExerciseLogUncheckedUpdateManyWithoutClientSessionInput = {
@@ -163027,6 +165540,54 @@ export namespace Prisma {
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogCreateManyExerciseLogInput = {
+    id?: string
+    setIndex: number
+    reps?: number | null
+    weightKg?: number | null
+    rir?: number | null
+    effort?: number | null
+    workSeconds?: number | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SetLogUpdateWithoutExerciseLogInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogUncheckedUpdateWithoutExerciseLogInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SetLogUncheckedUpdateManyWithoutExerciseLogInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    setIndex?: IntFieldUpdateOperationsInput | number
+    reps?: NullableIntFieldUpdateOperationsInput | number | null
+    weightKg?: NullableFloatFieldUpdateOperationsInput | number | null
+    rir?: NullableIntFieldUpdateOperationsInput | number | null
+    effort?: NullableIntFieldUpdateOperationsInput | number | null
+    workSeconds?: NullableIntFieldUpdateOperationsInput | number | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type GoalPlanCreateManyFacilitatorProfileInput = {

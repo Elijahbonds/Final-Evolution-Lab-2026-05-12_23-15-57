@@ -44,9 +44,14 @@ import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, type CueEvent } from '@/
 // MIRROR-COACH P1 (2026-09-25): the guided squat's stage clock is a pure step now (lib/mirror/squatStage.ts) — see
 // the onFrame squat branch for why it left the setSquatStage updater.
 import {
-  BREATH_CYCLES, SQUAT_CHECK_REPS, SQUAT_FAULT_LABEL, SQUAT_WORK_REPS, initialSquatSession, squatReviewVerdict,
-  stepSquatSession, type SquatStage,
+  BREATH_CYCLES, DEEPER_LINE, EMPTY_KNEE_RECORD, SQUARE_UP_LINE, SQUAT_CHECK_REPS, SQUAT_FAULT_LABEL, SQUAT_WORK_REPS, initialSquatSession,
+  kneeReadLine, paintableFaults, squatReviewVerdict, stepKneeRecord, stepSquatSession, type KneeRecord, type SquatStage,
 } from '@/lib/mirror/squatStage';
+// MIRROR-COACH P2 (2026-09-26): the knee arrows' geometry and the top-left chip are pure modules now, so their tests
+// hold what this file paints — the arrows point out from the hip midline, and the Movement Screen's chip names its
+// station (it read BREATHE through the whole screen).
+import { KNEE_OVERLAY_LINE, kneeArrows } from '@/lib/mirror/kneeOverlay';
+import { chipLabel } from '@/lib/mirror/hudChip';
 // THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
 // reward and the scoring sat in lib/mirror with no importer at all. lib/nav/modules.test.ts is what found them.
 import { ScreenRunner, type RunnerState } from '@/lib/mirror/screenRunner';
@@ -54,6 +59,8 @@ import { NOT_GRADED_LINE, scoreScreen, type ScreenId, type CheckResult, type Scr
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
+/** A protected line (square-up, deeper) holds ordinary cue speech at most this long, even if the voice never ends. */
+const PROTECT_MAX_MS = 6_000;
 
 type Status = 'idle' | 'requesting' | 'loading-model' | 'live' | 'error';
 type Pattern = 'pressRow' | 'jump' | 'squat' | 'screen';
@@ -61,13 +68,8 @@ type Pattern = 'pressRow' | 'jump' | 'squat' | 'screen';
 // lib/mirror/squatStage.ts). The Blueprint is emphatic that the breath comes FIRST — the pacer is not a warm-up
 // nicety, it is the foundation the book insists on. inhale 4s · hold 2s · exhale 6s, BREATH_CYCLES times.
 
-/**
- * What the knee read recorded over the check and the work set, while the coach is not allowed to judge it
- * (VALGUS_CUE_VERIFIED). Worst inward read per side (hip half-widths, estimated; + = inward), and how many frames the
- * audit flagged. Kept for the review and for the owner's verification capture — never spoken, never painted red.
- */
-interface KneeRecord { left: number | null; right: number | null; flaggedFrames: number }
-const EMPTY_KNEE_RECORD: KneeRecord = { left: null, right: null, flaggedFrames: 0 };
+// (The knee record — worst inward read per side over the frames read square, flagged frames, frames not square — is
+// lib/mirror/squatStage.ts KneeRecord / stepKneeRecord since MIRROR-COACH P2, 2026-09-26: it counted display frames here.)
 
 /** Pose skeleton bone pairs (MediaPipe indices) — the visible proof the
  *  tracker is locked on you. */
@@ -122,6 +124,13 @@ export function MirrorHarness() {
   const squatSessionRef = useRef(initialSquatSession());
   const kneeRecordRef = useRef<KneeRecord>(EMPTY_KNEE_RECORD);
   const [kneeRecord, setKneeRecord] = useState<KneeRecord>(EMPTY_KNEE_RECORD);
+  // MIRROR-COACH P2 (2026-09-26): the knee is read only square to the camera (squat-audit.ts squareOn). The latest
+  // read's squareness, for the knee row ("Not square · not read"), and whether the one-time square-up line was said.
+  const [squatSquare, setSquatSquare] = useState<boolean | null>(null);
+  const [squareUpSaid, setSquareUpSaid] = useState(false);
+  // MIRROR-COACH P2 review (2026-09-26): the one-time "sit a little deeper" line (squatStage.ts DEEPER_LINE), said on the
+  // first shallow descent of a session; after it, shallow reps count and are marked shallow.
+  const [deeperSaid, setDeeperSaid] = useState(false);
   // The screen runs as a state machine over the same pose stream; nothing here decides anything itself.
   const runnerRef = useRef<ScreenRunner | null>(null);
   const [screenId, setScreenId] = useState<ScreenId>('modified');
@@ -138,11 +147,22 @@ export function MirrorHarness() {
   const voiceRef = useRef(true);
   voiceRef.current = voiceOn;
 
-  const speak = useCallback((text: string) => {
+  // MIRROR-COACH P2 review (2026-09-26): a PROTECTED line (the one-time square-up and deeper lines) is not cut off. speak()
+  // cancels whatever is playing before each utterance, so the first work-set cue after the check cut SQUARE_UP_LINE off
+  // mid-word; while a protected line plays, an ordinary cue is not spoken (it is still shown on screen). The guard clears
+  // when the line ends, errors, or after PROTECT_MAX_MS — a voice that never fires onend cannot mute the coach for good.
+  const protectedUntilRef = useRef(0);
+  const speak = useCallback((text: string, opts: { protect?: boolean } = {}) => {
     if (!voiceRef.current || typeof speechSynthesis === 'undefined') return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (!opts.protect && now < protectedUntilRef.current) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.96; u.pitch = 0.9;
+    if (opts.protect) {
+      protectedUntilRef.current = now + PROTECT_MAX_MS;
+      u.onend = u.onerror = () => { protectedUntilRef.current = 0; };
+    }
     speechSynthesis.speak(u);
   }, []);
 
@@ -156,7 +176,9 @@ export function MirrorHarness() {
    *  band, and the knee fault behind it was inverted (it fired on knees already
    *  OUT). The overlay now takes only cueable faults — so it stays dark while
    *  VALGUS_CUE_VERIFIED is false — names the action, and points each arrow
-   *  away from the midpoint of the hips, whichever side of the image a leg is on. */
+   *  away from the midpoint of the hips, whichever side of the image a leg is on.
+   *  MIRROR-COACH P2 (2026-09-26): the knee cue is on, so the arrows paint; their
+   *  geometry is lib/mirror/kneeOverlay.ts kneeArrows, which its test holds. */
   const paintSkeleton = useCallback((pose: PoseFrame, ph: string, faults: readonly SquatFault[] = []) => {
     const c = skeletonRef.current;
     if (!c) return;
@@ -189,29 +211,29 @@ export function MirrorHarness() {
       g.arc(p.x * W, p.y * H, 3.5, 0, Math.PI * 2);
       g.fill();
     }
-    // the knee correction — only when the caller passed a CUEABLE knee fault (cueableFaults), so never while unverified
-    const lh = pose.landmarks[23], rh = pose.landmarks[24];
-    if (VALGUS_CUE_VERIFIED && faults.includes('kneeValgus') && lh && rh) {
-      const midX = ((lh.x + rh.x) / 2) * W;
-      for (const kneeIdx of [25, 26]) {
-        const k = pose.landmarks[kneeIdx];
-        if (!k || k.visibility < 0.5) continue;
-        const kx = k.x * W, ky = k.y * H;
-        const out = Math.sign(kx - midX) || 1;   // away from the midline: the direction to push
+    // the knee correction — only when the caller passed a CUEABLE knee fault (cueableFaults), so never while unverified,
+    // and the audit raises that fault only on a body square to the camera (squat-audit.ts squareOn)
+    if (VALGUS_CUE_VERIFIED && faults.includes('kneeValgus')) {
+      const arrows = kneeArrows(pose.landmarks, W, H);
+      for (const a of arrows) {
         g.strokeStyle = '#FF3366';
         g.lineWidth = 3;
         g.beginPath();
-        g.moveTo(kx + out * 10, ky);
-        g.lineTo(kx + out * 34, ky);
-        g.lineTo(kx + out * 28, ky - 6);
-        g.moveTo(kx + out * 34, ky);
-        g.lineTo(kx + out * 28, ky + 6);
+        g.moveTo(a.tail.x, a.tail.y);
+        g.lineTo(a.tip.x, a.tip.y);
+        g.lineTo(a.barbs[0].x, a.barbs[0].y);
+        g.moveTo(a.tip.x, a.tip.y);
+        g.lineTo(a.barbs[1].x, a.barbs[1].y);
         g.stroke();
       }
-      g.fillStyle = '#FF3366';
-      g.font = 'bold 11px monospace';
-      g.textAlign = 'center';
-      g.fillText('KNEES OUT — PRESS THE FLOOR APART', W / 2, H - 18);
+      if (arrows.length) {
+        g.fillStyle = '#FF3366';
+        g.font = 'bold 11px monospace';
+        g.textAlign = 'center';
+        // top centre, clear of the chips: at H − 18 (P1) it sat under the stage's button bar — the P2 live frame
+        // (p2/live-proof/arrows), the first time the line was ever painted, shows it unreadable there
+        g.fillText(KNEE_OVERLAY_LINE, W / 2, 30);
+      }
     }
   }, []);
 
@@ -251,6 +273,10 @@ export function MirrorHarness() {
     squatSessionRef.current = initialSquatSession();
     kneeRecordRef.current = EMPTY_KNEE_RECORD;
     setKneeRecord(EMPTY_KNEE_RECORD);
+    setSquatSquare(null);
+    setSquareUpSaid(false);
+    setDeeperSaid(false);
+    protectedUntilRef.current = 0;
     setSummary(null);
     setStatus('requesting');
     try {
@@ -317,27 +343,30 @@ export function MirrorHarness() {
           // fire — and escalate — twice. Now the transition is the pure stepSquatSession, called ONCE per frame here,
           // and its effects are applied once, below, outside any updater (lib/mirror/squatStage.test.ts runs the same
           // transition twice to hold that).
+          //
+          // MIRROR-COACH P2 (2026-09-26): this runs once per CAMERA frame now — the compositor hands on only frames whose
+          // timestamp advanced (render/pose-frame-gate.ts), and stepSquatSession / stepKneeRecord ignore a repeat as
+          // well. It used to run on every display frame, and a repeated frame counted a rep (P1 live proof: 11 reps
+          // inside one squat). The knee's squareness reaches the session too: a body turned from the camera, or a few
+          // degrees off square, is "not square — not read" (squat-audit.ts squareOn).
           if (patternRef.current === 'squat' && squat) {
             const now = pose.timestampMs;
             setSquatFaults(squat.faults);
             setSquatSeen(squat.present);
-            // the painter gets only what the coach may cue — an unverified knee read is never painted as a correction
-            paintSkeleton(pose, p, cueableFaults(squat.faults));
+            if (squat.present && squat.phase !== 'standing' && squat.square !== undefined) setSquatSquare(squat.square);
             const was = squatSessionRef.current.stage;
+            // the painter gets only what the coach may cue — an unverified knee read is never painted as a correction —
+            // and only in the WORK set, where the voice cues too (MIRROR-COACH P2 review, 2026-09-26): painted during the
+            // breath and the movement check, "KNEES OUT" corrected the athlete during the very measurement the review's
+            // "did the correction hold" is judged against, while the voice stayed silent by design (squatStage.ts)
+            paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)));
             const step = stepSquatSession(squatSessionRef.current, {
-              nowMs: now, phase: squat.phase, present: squat.present, faults: squat.faults,
+              nowMs: now, phase: squat.phase, present: squat.present, faults: squat.faults, square: squat.square, hipDrop: squat.hipDrop,
             });
             squatSessionRef.current = step.state;
-            // the knee read is MEASURED over the check and the work set even while the coach may not judge it (kept
-            // in memory for this session's review only — nothing is sent or saved)
-            if ((was === 'check' || was === 'work') && squat.present && squat.phase !== 'standing' && squat.valgusBySide) {
-              const k = kneeRecordRef.current;
-              kneeRecordRef.current = {
-                left: Math.max(k.left ?? -Infinity, squat.valgusBySide.left),
-                right: Math.max(k.right ?? -Infinity, squat.valgusBySide.right),
-                flaggedFrames: k.flaggedFrames + (squat.faults.includes('kneeValgus') ? 1 : 0),
-              };
-            }
+            // the knee read over the check and the work set, per POSE frame, square frames only (kept in memory for
+            // this session's review — nothing is sent or saved)
+            kneeRecordRef.current = stepKneeRecord(kneeRecordRef.current, was, squat, now);
             if (step.repCounted || step.stageChanged) setSquatReps(step.state.reps);
             if (step.findingsChanged) setSquatFindings(step.state.findings);
             if (step.stageChanged) {
@@ -347,6 +376,16 @@ export function MirrorHarness() {
                 setSquatWorkReps(step.state.workReps);
                 if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
               }
+            }
+            // a whole stage read off square: said ONCE a session, as the stage ends — never looped
+            if (step.squareUp) {
+              setSquareUpSaid(true);
+              speak(SQUARE_UP_LINE, { protect: true });
+            }
+            // the first shallow descent of the session: say it once, then shallow reps count, marked (squatStage.ts)
+            if (step.deeperPrompt) {
+              setDeeperSaid(true);
+              speak(DEEPER_LINE, { protect: true });
             }
             if (step.cueFaults) {
               const evt = cueEngineRef.current.decide(now, step.cueFaults);
@@ -492,10 +531,20 @@ export function MirrorHarness() {
   }, [speak]);
 
   // The screen ends itself. Nothing else in the Mirror does, which is the point of a protocol.
+  //
+  // MIRROR-COACH P2 (2026-09-26): …and now it lets go of the camera when it does. A finished screen used to leave the
+  // camera stream, the pose model and the render loop running — the LIVE chip on, the camera light on, the runner
+  // ticking over a complete screen — until somebody found "End session" (P1 report, "Minor"). The results are already
+  // posted by then; stop() is what End session does to the camera, without End session's press/row zone summary, which
+  // says nothing about a screen.
   useEffect(() => {
     if (pattern !== 'screen' || runner?.phase !== 'complete') return;
     void submitScreen(runner.results, runner.screen);
-  }, [pattern, runner, submitScreen]);
+    if (runtimeRef.current || streamRef.current) {
+      stop();
+      setStatus('idle');
+    }
+  }, [pattern, runner, submitScreen, stop]);
 
   /** The short label on the control, beside the full one it is announced by. A ternary here silently labelled
    *  the new pattern "Jump" — a map cannot, because TypeScript makes it name every case. */
@@ -638,11 +687,11 @@ export function MirrorHarness() {
           {live && (
             <>
               <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
-                <span className="rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase
-                                 tracking-[0.16em] text-white/75 backdrop-blur-sm">
-                  {pattern === 'pressRow' ? phase
-                    : pattern === 'jump' ? (jumpState === 'ready' ? 'Jump when ready' : jumpState === 'airborne' ? 'Airborne' : jumpState === 'calibrating' ? 'Stand still' : jumpState)
-                    : squatStage}
+                {/* MIRROR-COACH P2 (2026-09-26): a map over every pattern (lib/mirror/hudChip.ts). The ternary here sent
+                    the Movement Screen to its last arm, `squatStage`, so the chip read BREATHE through the whole screen. */}
+                <span className="max-w-[58vw] truncate rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[10px] font-bold
+                                 uppercase tracking-[0.16em] text-white/75 backdrop-blur-sm sm:max-w-none">
+                  {chipLabel({ pattern, phase, jumpState, squatStage, runner })}
                 </span>
                 {showFrameBudget && (
                   <span
@@ -784,7 +833,7 @@ export function MirrorHarness() {
               <><span className="font-bold text-white">Breathe first.</span> In through the nose 4s · hold 2s · out slow 6s, {BREATH_CYCLES} cycles. The breath is the bedrock — everything else builds on it.</>
             )}
             {squatStage === 'check' && (
-              <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
+              <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees (face the camera square-on)' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
             )}
             {squatStage === 'work' && (
               <><span className="font-bold text-white">The work set.</span> {SQUAT_WORK_REPS} squats — cued from what the camera measures. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
@@ -793,6 +842,13 @@ export function MirrorHarness() {
               <><span className="font-bold text-white">Review.</span> What faulted, what was cued, and whether the correction held.</>
             )}
           </p>
+        )}
+        {/* The one-time square-up line (MIRROR-COACH P2), shown where it was said so it is not lost if the voice is off. */}
+        {pattern === 'squat' && squareUpSaid && (
+          <p className="mt-2 text-[13px] font-semibold leading-relaxed text-[#FFC24B]">{SQUARE_UP_LINE}</p>
+        )}
+        {pattern === 'squat' && deeperSaid && squatStage !== 'review' && (
+          <p className="mt-2 text-[13px] font-semibold leading-relaxed text-[#FFC24B]">{DEEPER_LINE}</p>
         )}
 
         {error && (
@@ -884,7 +940,11 @@ export function MirrorHarness() {
                 ] as [SquatFault, string][]).map(([id, label]) => {
                   const judged = cueableFaults([id]).length > 0;
                   const seen = live && squatSeen;
-                  const faulting = seen && judged && squatFaults.includes(id);
+                  // MIRROR-COACH P2 (2026-09-26): the knee is read only square to the camera (squat-audit.ts squareOn);
+                  // off square its row says so rather than "stable" — a knee that was not read is not a clean knee
+                  // (P2 review: the sideways reads — shoulders and weight — are gated on square too, squat-audit.ts)
+                  const notRead = (id === 'kneeValgus' || id === 'armFall' || id === 'lateralShift') && squatSquare === false;
+                  const faulting = seen && judged && !notRead && squatFaults.includes(id);
                   return (
                     <li
                       key={id}
@@ -896,13 +956,15 @@ export function MirrorHarness() {
                     >
                       <span
                         className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: !judged || !seen ? 'rgba(255,255,255,0.25)' : faulting ? '#FF3366' : '#00FF9D' }}
+                        style={{ background: !judged || !seen || notRead ? 'rgba(255,255,255,0.25)' : faulting ? '#FF3366' : '#00FF9D' }}
                       />
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold text-white/85">{label}</span>
                         <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/35">
                           {!seen ? (live ? 'Not in view' : 'Waiting for the camera')
-                            : !judged ? 'Measured · not judged yet' : faulting ? 'Estimated fault' : 'Estimated stable'}
+                            : !judged ? 'Measured · not judged yet'
+                              : notRead ? 'Not square · not read'
+                                : faulting ? 'Estimated fault' : 'Estimated stable'}
                         </span>
                       </span>
                     </li>
@@ -1072,9 +1134,11 @@ export function MirrorHarness() {
               <div>
                 <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">Findings</p>
                 {/* Only faults the coach may judge are findings; the knee is reported separately below while unverified. */}
+                {/* MIRROR-COACH P2 (2026-09-26): "Clean structure — load it" was the verified line; with the knee on, a
+                    check with nothing flagged says only that — the knee line below says whether the knees were read. */}
                 {cueableFaults(squatFindings).length === 0 ? (
                   <p className="mt-2 text-[13px] text-white/60">
-                    {VALGUS_CUE_VERIFIED ? 'No faults measured in the check. Clean structure — load it.' : 'No judged faults in the check.'}
+                    {VALGUS_CUE_VERIFIED ? 'No faults measured in the check.' : 'No judged faults in the check.'}
                   </p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
@@ -1090,17 +1154,28 @@ export function MirrorHarness() {
                     is never mistaken for a clean one. The numbers are for the owner's verification capture: they show
                     in development builds only, labelled estimated, beside the frames the audit flagged. Nothing about
                     the knee read is sent or saved. */}
-                {!VALGUS_CUE_VERIFIED && (
-                  <p className="mt-3 text-[12px] leading-relaxed text-white/40">
-                    Knee tracking is measured but not judged yet — it stays quiet until a real capture confirms the read.
-                    {showFrameBudget && kneeRecord.left !== null && kneeRecord.right !== null && (
-                      <span className="mt-1 block font-mono text-[10.5px] text-white/35">
-                        estimated worst inward (hip half-widths): L {kneeRecord.left.toFixed(2)} · R {kneeRecord.right.toFixed(2)}
-                        {' '}· flagged frames {kneeRecord.flaggedFrames}
-                      </span>
-                    )}
-                  </p>
-                )}
+                {/* MIRROR-COACH P2 (2026-09-26): with the knee judged, what is said is whether it was READ — a set off
+                    square to the camera never was (squat-audit.ts squareOn; lib/mirror/squatStage.ts kneeReadLine). The
+                    dev-only numbers stay, per camera frame now, with the frames that were not square counted apart. */}
+                {(() => {
+                  const kneeLine = VALGUS_CUE_VERIFIED
+                    ? kneeReadLine(kneeRecord)
+                    : 'Knee tracking is measured but not judged yet — it stays quiet until a real capture confirms the read.';
+                  const numbers = showFrameBudget && kneeRecord.left !== null && kneeRecord.right !== null;
+                  if (!kneeLine && !numbers) return null;
+                  return (
+                    <p className="mt-3 text-[12px] leading-relaxed text-white/40">
+                      {kneeLine}
+                      {numbers && (
+                        <span className="mt-1 block font-mono text-[10.5px] text-white/35">
+                          estimated worst inward (hip half-widths): L {kneeRecord.left!.toFixed(2)} · R {kneeRecord.right!.toFixed(2)}
+                          {' '}· flagged frames {kneeRecord.flaggedFrames} · square frames {kneeRecord.squareFrames}
+                          {' '}· not square {kneeRecord.notSquareFrames}
+                        </span>
+                      )}
+                    </p>
+                  );
+                })()}
               </div>
               <div>
                 <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">What was cued</p>
@@ -1121,7 +1196,11 @@ export function MirrorHarness() {
                 squatReviewVerdict). It used to be "any cue and no regress", which said "The correction held" over a
                 set whose heels rose on all eight reps. */}
             <p className="mt-4 border-t border-white/[0.06] pt-4 text-[13px] leading-relaxed text-white/50">
-              {squatReviewVerdict(squatWorkReps, cueLog, { cueable: (f) => cueableFaults(f), kneeJudged: VALGUS_CUE_VERIFIED }).line}
+              {squatReviewVerdict(squatWorkReps, cueLog, {
+                cueable: (f) => cueableFaults(f),
+                // a knee never read square was not judged, cue or no cue (MIRROR-COACH P2)
+                kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
+              }).line}
             </p>
           </section>
         )}

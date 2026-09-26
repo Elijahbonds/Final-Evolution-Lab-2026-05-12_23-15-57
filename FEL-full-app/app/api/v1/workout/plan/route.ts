@@ -39,6 +39,19 @@ export async function POST() {
  * under 18, or never given, reads a plan with no jumps in any week; an adult's later depth drops are held for the
  * depth-drop protocol. A failed read of the birth year is treated as unknown, so as youth. And every plan is revised,
  * not only the newest ten: plans are no longer sold, so the count is what it is.
+ *
+ * MIRROR-COACH P2 (2026-09-25), owner decisions #22-#23: the same read, a wider revision. An adult's plan now loses the
+ * depth drop in EVERY week (P1 held weeks 5-12), P1's held and repeated swaps are picked again, and the note says the new
+ * training plans are free for them when they ship (no refund, #23). The plans nobody opens get the very same revision
+ * from scripts/workout/revise-all-plans.ts at deploy, so what this reads is usually revised already and it writes
+ * nothing. The findMany below has no `take`: every row is revised (the newest-ten limit went in the P1 review, and
+ * plan-route.test.ts pins it); the page may show them paged, the revision never is.
+ *
+ * MIRROR-COACH P2 review (2026-09-26): what this STORES no longer depends on who reads. The youth revision (under 18,
+ * or no birth year) is served on every read and never written — written, it survived the owner later answering an
+ * adult birth year, with every jump gone for good. The row gets only the depth-drop revision #22 asks for everyone
+ * (and a youth revision P1 stored is undone). So the `.catch(() => null)` below — a failed birth-year read served as
+ * youth — shows a youth plan once and writes nothing that depends on it.
  */
 export async function GET() {
   const session = await getServerSession(authOptions);

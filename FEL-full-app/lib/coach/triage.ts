@@ -26,6 +26,14 @@
 // NOT CLINICAL. A flag says what was OBSERVED and what to do next in movement terms. It never names a
 // condition, never claims a cause, and never says an athlete is at risk of anything. Swept by test.
 //
+// WHAT "CURRENT DATA" MEANS (MIRROR-COACH P2, 2026-09-25). `stale-scan` read one source, the PRQ snapshot, so the
+// day after a client ran a Mirror movement screen — or after a fortnight of coached sessions with every set logged —
+// it told the coach "No scan on file … Ask for a System Scan — there is nothing current to program from." Both are
+// things a coach programs from. A Mirror screen or coached work inside STALE_SCAN_DAYS now counts as current data
+// beside the PRQ System Scan, and when none of the three is current the flag says what IS on file, source by source,
+// instead of naming the one that is missing. The load read (`under-recovered`) counts coached sessions only: a game
+// is a separate signal (lib/coach/compliance.ts), and ten games in a day is not ten training sessions.
+//
 // Pure: no Prisma, no DOM.
 
 import type { SharedProfile } from '../profile/sharedProfile';
@@ -42,12 +50,22 @@ export interface AthleteRow {
   clientId: string;
   displayName: string;
   profile: SharedProfile;
-  /** Sessions in the last 7 days. */
+  /** COACHED sessions completed in the last 7 days (games are not sessions here — MIRROR-COACH P2). */
   sessions7d: number;
-  /** Sessions in the last 24 hours. */
+  /** COACHED sessions completed in the last 24 hours. */
   sessions24h: number;
-  /** ISO of the last activity of any kind, or null if never. */
+  /** ISO of the last activity of any kind (a game, a scan, a logged set), or null if never. */
   lastActiveAt: string | null;
+  /**
+   * ISO of the last coached work (a completed session or a logged set); null = none on file. Undefined = the caller
+   * did not read it, and only the PRQ snapshot decides `stale-scan` (the behaviour before MIRROR-COACH P2).
+   */
+  lastCoachedAt?: string | null;
+  /**
+   * ISO of the last GRADED Mirror movement screen (WorkoutScan kind mirror_screen that readStoredScreen reads; the
+   * caller passes graded ones only — MIRROR-COACH P2 review); null = none, undefined = not read.
+   */
+  lastScreenAt?: string | null;
 }
 
 export interface TriageFlag {
@@ -67,7 +85,10 @@ export interface TriageFlag {
 /** How many rows a coach is actually shown. The cap IS the product — see the header. */
 export const TOP_N = 6;
 
-/** No scan in this long and there is nothing current to program from. */
+/**
+ * Nothing current to program from after this long: no PRQ System Scan, no Mirror screen and no coached work inside it
+ * (MIRROR-COACH P2 — it used to be the PRQ scan alone).
+ */
 export const STALE_SCAN_DAYS = 14;
 /** No activity at all in this long and the athlete has gone quiet. */
 export const QUIET_DAYS = 10;
@@ -76,12 +97,42 @@ export const OFF_BASELINE_DROP = 8;
 /** Composite at or above this, trending up, means there is headroom to use. */
 export const PROGRESSION_COMPOSITE = 70;
 
+/** What stale-scan asks the coach to do. A System Scan only, until the Mirror screen is graded (P3). */
+export const STALE_SCAN_ACTION = 'Ask for a System Scan — there is nothing current to program from.';
+
 const DAY = 86_400_000;
 
 function daysSince(iso: string | null, now: number): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
   return Number.isFinite(t) ? (now - t) / DAY : null;
+}
+
+const agoText = (d: number): string => { const n = Math.floor(d); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`; };
+
+/**
+ * What the coach has to program from, source by source (MIRROR-COACH P2). `current` is true when any source is inside
+ * STALE_SCAN_DAYS; `parts` says each source the caller read, found or not. A source the caller did not read
+ * (undefined) is left out rather than reported as missing — not read is not the same as none.
+ */
+export function dataOnFile(row: AthleteRow, now: number = Date.now()): { current: boolean; parts: string[] } {
+  const snap = currentPRQ(row.profile);
+  const prqAge = daysSince(snap?.at ?? null, now);
+  const parts = [snap === null || prqAge === null ? 'No PRQ System Scan on file' : `Last PRQ System Scan ${agoText(prqAge)}`];
+  let current = prqAge !== null && prqAge < STALE_SCAN_DAYS;
+  if (row.lastScreenAt !== undefined) {
+    // GRADED screens only (MIRROR-COACH P2 review, 2026-09-26; lib/coach/attention.ts gradedScreenTimes): an ungraded
+    // screen is not data, and the line says which kind it counted
+    const age = daysSince(row.lastScreenAt, now);
+    parts.push(age === null ? 'no graded Mirror screen' : `last graded Mirror screen ${agoText(age)}`);
+    current ||= age !== null && age < STALE_SCAN_DAYS;
+  }
+  if (row.lastCoachedAt !== undefined) {
+    const age = daysSince(row.lastCoachedAt, now);
+    parts.push(age === null ? 'no coached work logged' : `last coached work ${agoText(age)}`);
+    current ||= age !== null && age < STALE_SCAN_DAYS;
+  }
+  return { current, parts };
 }
 
 /**
@@ -109,25 +160,31 @@ export function flagsFor(row: AthleteRow, now: number = Date.now()): TriageFlag[
   const snap = currentPRQ(row.profile);
   const scanAge = daysSince(snap?.at ?? null, now);
 
-  if (snap === null || scanAge === null || scanAge >= STALE_SCAN_DAYS) {
+  // A Mirror screen or coached work inside the window is something to program from too (MIRROR-COACH P2, F7 of the
+  // P1 baseline): the flag fires only when NOTHING is current, and then it lists what is on file rather than naming
+  // the one source it happened to read. P1 had already renamed "scan" to "PRQ System Scan"; that made the line true
+  // and still sent a coach to ask for a scan the day after the athlete had been screened.
+  const onFile = dataOnFile(row, now);
+  if (!onFile.current) {
     out.push({
       ...base, kind: 'stale-scan', positive: false,
       urgency: 55,
-      // "PRQ System Scan", not "scan" (MIRROR-COACH P1, 2026-09-25): this reads the PRQ snapshot only, so the day
-      // after a Mirror movement screen it said "No scan on file." about an athlete who had just been scanned.
-      observed: snap === null ? 'No PRQ System Scan on file.' : `Last PRQ System Scan ${Math.floor(scanAge ?? 0)} days ago.`,
-      action: 'Ask for a System Scan — there is nothing current to program from.',
+      observed: `${onFile.parts.join('; ')}.`,
+      // P2 review: not "or a Mirror screen" — no Mirror screen is graded until the P3 graders land, so asking for one
+      // cannot give the coach anything to program from yet. P3 puts it back with the graders.
+      action: STALE_SCAN_ACTION,
     });
   }
 
   // acute load, judged against their OWN week rather than a global number: four sessions is a lot for
-  // somebody who normally does three and unremarkable for somebody who does twelve
+  // somebody who normally does three and unremarkable for somebody who does twelve. Coached sessions only
+  // (MIRROR-COACH P2): the route no longer hands games in as sessions.
   const weeklyAverage = row.sessions7d / 7;
   if (row.sessions24h >= 3 && row.sessions24h > weeklyAverage * 2.5) {
     out.push({
       ...base, kind: 'under-recovered', positive: false,
       urgency: Math.min(90, 60 + row.sessions24h * 6),
-      observed: `${row.sessions24h} sessions today against a ${weeklyAverage.toFixed(1)}/day average.`,
+      observed: `${row.sessions24h} coached sessions today against a ${weeklyAverage.toFixed(1)}/day average.`,
       action: 'Keep the next session technical rather than maximal.',
     });
   }

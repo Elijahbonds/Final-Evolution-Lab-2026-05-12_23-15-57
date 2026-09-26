@@ -1,65 +1,76 @@
 /**
- * lib/workout/plan-revision.ts — the plans already bought on /workout, revised on read: no depth drop in weeks 1-4.
+ * lib/workout/plan-revision.ts — the plans already bought on /workout, revised: no depth drop in any week.
  *
  * MIRROR-COACH P1 (2026-09-25), owner decision #3: past buyers get their plan regenerated without the early depth drops,
  * plus an in-app note. Every stored WorkoutPlan carries "Depth Drop to Vertical" 4x4 in week 1 (the route saved
- * generatePlan's weeks as they were, app/api/v1/workout/plan/route.ts:49-51 before today; plan-generator.ts put the
+ * generatePlan's weeks as they were, app/api/v1/workout/plan/route.ts:49-51 before P1; plan-generator.ts put the
  * depth drop in the power pool, which is every plan's secondary pool in week 1, and a power focus's primary pool every
  * week). The protocol gate holds the same depth drop back until PRQ composite 70, flexibility 60, recovery 65 and a
  * scan inside 7 days (lib/profile/protocol.ts:189-202); these plans never asked it.
  *
- * No script runs against the database, so the revision is lazy, the pattern lib/wallet/dead-buy-refunds.ts uses: the
- * first read of a buyer's plans after the deploy revises each one and writes it back.
+ * MIRROR-COACH P2 (2026-09-25), owner decisions #22 and #23 (painfree/DECISIONS-2.md) — what P1 left, and what is now:
+ *   - P1 swapped weeks 1-4 only. An adult's later depth drops were HELD (kept, marked, "wait for the depth-drop
+ *     protocol"): 18 of the 36 depth drops the 12 stored plan shapes carry sit in weeks 5-12 of a 12-week plan
+ *     (measured, plan-revision.test.ts). #22: SWAP EVERY DEPTH DROP IN EVERY WEEK, for everyone. reviseDepthDrops now swaps them all, and swaps
+ *     out P1's held ones too; no revision makes the held mark any more.
+ *   - P1's swap was "the lowest-landing exercise of the same pool not already on that DAY", which put a Trap-Bar Jump on
+ *     week 1's Friday of a plan that already had one on Monday. The swap now may not repeat anything in the WEEK
+ *     (plan-generator.ts depthDropSwap; the power pool has nothing left in any stored depth-drop week, so the swap is a
+ *     no-flight exercise). In a week P1 revised, a P1 swap that repeats the week is picked again by the same rule.
+ *   - P1 revised a plan only when its buyer opened it. #22 includes the plans nobody opened: scripts/workout/revise-all
+ *     -plans.ts runs this same revision over every WorkoutPlan row (dry run first; the main session runs it at deploy).
+ *   - #23: no refund. The note says what changed and that the new training plans are free for them when they ship (no
+ *     date: P8 has none).
  *
- *   - Surgical, not a regeneration from scratch: in weeks 1-4 only, each depth drop is replaced by the lowest-landing
- *     exercise of the same pool not already on that day (plan-generator.ts earlyWeekSwap). A depth drop whose pool
- *     cannot be found is removed without a replacement. Everything else in the plan is left exactly as it was: every
- *     other exercise, every dose, weeks 5 and on, the tier and the focus.
- *   - Idempotent: a revised plan has no depth drop left in weeks 1-4, so a second read changes nothing and writes
- *     nothing. Two reads racing write the same weeks.
- *   - Marked once: each week the revision changed carries `revision: PLAN_REVISION`, and each replacement names what it
- *     replaced (`replaced`). The note comes from that mark, so it is on the plan from then on.
- *   - Only this buyer's rows: the write is by the plan's id AND the reader's user id.
- *   - Writes `weeks` and nothing else. dead-buys.ts matches a store charge to a plan by its tier and createdAt, and
- *     neither moves.
+ * What stays from P1:
+ *   - Surgical, not a regeneration from scratch: each depth drop is replaced in its slot; every other exercise, every
+ *     dose, the themes, the tier and the focus are left exactly as they were.
+ *   - Marked once: each week the revision changed carries `revision`, and each replacement names what it replaced
+ *     (`replaced`). The note comes from those marks, so it is on the plan from then on.
+ *   - Idempotent: a week this revision marked is never revised by it again (it has no depth drop left, and its swaps
+ *     are only re-picked in a week P1 marked), so a second pass changes nothing and writes nothing. Two passes racing
+ *     compute the same weeks from the same row.
+ *   - For WHO the plan belongs to (owner decision #6, #20): YOUTH — under 18, or a birth year the account never gave —
+ *     gets no jump, bound, skip or landing drill in any week (reviseForYouth). Since the P2 review (2026-09-26) that is
+ *     a READ-TIME view, never stored: stored, it outlived an adult birth year (undoYouthRevision).
+ *   - Only this buyer's rows, and `weeks` only: the write is by the plan's id AND its owner's user id, and never moves
+ *     tier or createdAt (dead-buys.ts matches a store charge to a plan by those two).
  *   - Never breaks the read: if the write fails, the reader still gets the revised plan and the note, and the next read
  *     tries the write again.
- *
- * FOUND IN THE P1 REVIEW, SAME DAY — the revision above stopped at week 4, and owner decision #6 does not:
- *   - Under-18s get no depth drops or plyometric primers unless a coach assigns them. A 12-week plan kept "Depth Drop to
- *     Vertical" 4x4 in weeks 5-12 (18 of them across the six foci; a mobility focus in weeks 6 and 11), and the week 1-4
- *     swap put a Trap-Bar Jump or a bound in its place. Buying needed only an "I am 13 or older" tick, and the GET route
- *     served these plans with no age check although User.dobYear exists. So the revision now knows who is reading
- *     (planAudience): for YOUTH — under 18, or an age the account never gave — every jump, bound, skip and landing drill
- *     in EVERY week is replaced by an exercise with no flight phase (reviseForYouth). For an ADULT the early depth drops
- *     are swapped as before, and each later one is HELD — kept, marked, and said to wait for the depth-drop protocol
- *     (holdLateDepthDrops) — rather than shipped with no gate.
- *   - The note's words are FEL's draft, not the owner's: decision #3 asked for "an in-app note" and gave no wording
- *     (DECISIONS.md has none), so these lines are for the owner to approve.
- *   - Every plan the buyer holds is revised on read, not the newest ten (the route read `take: 10`).
  * The data export (lib/prq-data-rights.ts) carries no WorkoutPlan rows, so there is no unrevised copy to reach there.
  */
 
 import type { Prisma, PrismaClient } from '@/public/_prisma/client';
-import { EARLY_WEEKS, PLAN_POOLS, earlyWeekSwap, isDepthDrop, landingOf, poolOf, type PlanExercise } from './plan-generator';
+import { NO_FLIGHT_FALLBACK, PLAN_POOLS, isDepthDrop, landingOf, poolOf, swapInWeek, type PlanExercise } from './plan-generator';
 import type { Pillar } from './movement-screen';
+import { RELAUNCH_FREE_LINE } from './plan-sale';
 
-/** The mark a week the adult revision changed carries. A later revision would take a new id, so this one is never re-applied by it. */
+/**
+ * P1's mark (2026-09-25) on a week whose early depth drops it swapped, or whose later ones it held. Still recognised:
+ * its swaps are picked again by the week rule, and its note is the P2 note once no depth drop is left.
+ */
 export const PLAN_REVISION = 'early-weeks-no-depth-drops-2026-09-25';
+/** The mark a week the P2 revision changed carries (owner decision #22). A week with it is never revised by it again. */
+export const PLAN_REVISION_ALL_WEEKS = 'every-week-no-depth-drops-p2-2026-09-25';
 /** The mark a week the youth revision changed carries. */
 export const PLAN_REVISION_YOUTH = 'youth-no-jumps-2026-09-25';
 
 /**
- * The in-app notes. FEL's draft wording, pending the owner's approval: decision #3 asked for an in-app note and gave no
- * words (MIRROR-COACH P1 review, 2026-09-25 — this used to say "word for word (owner decision #3)", which was not so).
+ * The in-app notes. FEL's draft wording, for the owner to approve: decisions #3 and #22 asked for "an in-app note" and
+ * gave no words. #23 (MIRROR-COACH P2, 2026-09-25): no refund, so none is offered; the corrected plan, and free access
+ * to the relaunched plans "when they ship" — no date, because P8 has none (plan-sale.ts RELAUNCH_FREE_LINE).
  */
-export const PLAN_REVISED_NOTE = 'We changed your plan: early weeks no longer include depth drops. Nothing to do.';
-export const PLAN_REVISED_NOTE_HELD =
-  'We changed your plan: early weeks no longer include depth drops, and the later ones are held until the depth-drop protocol opens for you. Nothing to do.';
+export const PLAN_REVISED_NOTE =
+  `We changed your plan: every depth drop, in every week, is swapped for a move with a softer landing or none. ${RELAUNCH_FREE_LINE} Nothing to do.`;
 export const PLAN_REVISED_NOTE_YOUTH =
-  'We changed your plan: it no longer includes depth drops or jumps unless a coach assigns them. Nothing to do.';
+  `We changed your plan: it no longer includes depth drops or jumps unless a coach assigns them. ${RELAUNCH_FREE_LINE} Nothing to do.`;
 
-/** What a later-week depth drop on an adult's plan is marked with, and what the page says beside it. */
+/**
+ * P1's held mark and the line the page showed beside it. MIRROR-COACH P2: no revision makes the mark any more, and the
+ * revision swaps out every depth drop that has it, so a plan read through the plan route never carries one. Both stay
+ * exported only because components/workout-view.tsx (not this lane's file this phase) still renders them; delete them
+ * with that line.
+ */
 export const HELD_FOR_PROTOCOL = 'depth-drop-protocol';
 export const HELD_LINE = 'Held: wait until the depth-drop protocol opens for you.';
 
@@ -83,12 +94,8 @@ export function isPlyometric(ex: { name?: unknown } | null | undefined): boolean
   return isDepthDrop(ex) || landingOf(ex.name) > 0 || /\b(jumps?|bounds?|hops?|skips?|plyo\w*)\b/i.test(ex.name);
 }
 
-/**
- * When a pool has nothing without a landing (the power pool is all jumps), these stand in, first one not already on
- * the day. assumption: chosen as the no-flight exercises nearest a jump's intent (drive, hip strength, single-leg
- * control), not measured.
- */
-export const YOUTH_FALLBACK: readonly string[] = ['Wall Drive March', 'Banded Monster Walk', 'Single-Leg RDL', 'Deadbug w/ Reach'];
+/** P1's name for the no-flight stand-ins; since P2 the list lives in plan-generator.ts, where the depth-drop swap uses it too. */
+export const YOUTH_FALLBACK: readonly string[] = NO_FLIGHT_FALLBACK;
 
 /** A no-flight replacement for a plyometric exercise: the same pool first (pool order), then YOUTH_FALLBACK. Null when none is left. */
 export function youthSwap(pool: Pillar | null, notOnDay: readonly string[] = []): PlanExercise | null {
@@ -105,62 +112,38 @@ const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !
 const nameOf = (v: unknown): string | null => (isObj(v) && typeof v.name === 'string' ? v.name : null);
 
 /**
- * The plan's weeks without a depth drop in weeks 1-4. `changed` is false when there was nothing to take out, and then
- * `weeks` is the very value passed in. Never throws: a shape it does not recognise is left as it is.
+ * The plan's weeks with no depth drop in ANY week (owner decision #22; MIRROR-COACH P2, 2026-09-25). In every week,
+ * each depth drop — P1's held ones included — is swapped by plan-generator.ts swapInWeek (lowest landing from the same
+ * pool not already in the week, else the first no-flight stand-in not in the week), and in a week P1 marked, each swap
+ * P1 made for a depth drop that repeats something else in the week is picked again by that rule. A week this changed carries
+ * PLAN_REVISION_ALL_WEEKS; a week it already marked is never revised again. `changed` is false when there was nothing
+ * to do, and then `weeks` is the very value passed in. Never throws: a shape it does not recognise is left as it is.
  */
-export function reviseEarlyDepthDrops(weeks: unknown): { weeks: unknown; changed: boolean } {
+export function reviseDepthDrops(weeks: unknown): { weeks: unknown; changed: boolean } {
   if (!Array.isArray(weeks)) return { weeks, changed: false };
   let changed = false;
-  const out = weeks.map((wk: unknown, i: number) => {
+  const out = weeks.map((wk: unknown) => {
     if (!isObj(wk) || !Array.isArray(wk.days)) return wk;
-    const n = typeof wk.week === 'number' && Number.isFinite(wk.week) ? wk.week : i + 1;
-    if (n > EARLY_WEEKS) return wk;
-    let weekChanged = false;
-    const days = wk.days.map((day: unknown) => {
-      if (!isObj(day) || !Array.isArray(day.exercises) || !day.exercises.some(isDepthDrop)) return day;
-      weekChanged = true;
-      const exercises: unknown[] = [];
-      day.exercises.forEach((ex: unknown, j: number) => {
-        if (!isDepthDrop(ex as Obj)) { exercises.push(ex); return; }
-        // what else is on the day: what is already kept or swapped in, and what is still to come
-        const onDay = [...exercises, ...(day.exercises as unknown[]).slice(j + 1)].map(nameOf).filter((s): s is string => !!s);
-        const pool = poolOf(ex as Obj);
-        const swap = pool ? earlyWeekSwap(pool, onDay) : null;
-        if (swap) exercises.push({ ...swap, replaced: nameOf(ex) ?? 'Depth drop' });
-      });
-      return { ...day, exercises };
-    });
-    if (!weekChanged) return wk;
+    // In a week P1 marked, P1's swap for a depth drop is picked again only when it repeats something else in the week
+    // (P1's wart; measured on P1's own output, all 18 of its swaps did). One that does not repeat is left as it is.
+    const p1Week = wk.revision === PLAN_REVISION;
+    const names = p1Week ? wk.days.flatMap((d: unknown) => (isObj(d) && Array.isArray(d.exercises) ? d.exercises.map(nameOf) : [])) : [];
+    const repeatsInWeek = (ex: Obj) => names.filter((n) => n !== null && n === nameOf(ex)).length > 1;
+    const repick = (ex: Obj) => isDepthDrop(ex)
+      || (p1Week && typeof ex.replaced === 'string' && isDepthDrop({ name: ex.replaced }) && repeatsInWeek(ex));
+    const r = swapInWeek(wk.days, repick, true);
+    if (!r.changed) return wk;
     changed = true;
-    return { ...wk, days, revision: PLAN_REVISION };
+    return { ...wk, days: r.days, revision: PLAN_REVISION_ALL_WEEKS };
   });
   return changed ? { weeks: out, changed } : { weeks, changed };
 }
 
 /**
- * An adult's weeks after week 4: each depth drop is kept and marked `held` (HELD_FOR_PROTOCOL), so the page says to
- * wait for the depth-drop protocol instead of prescribing it ungated. Idempotent; never throws.
+ * @deprecated P1's name, from when the adult revision stopped at week 4. It is reviseDepthDrops now (every week), kept
+ * only so scripts/probes/_mirror-baseline.mts (P1's recorded baseline, not type-checked) still runs.
  */
-export function holdLateDepthDrops(weeks: unknown): { weeks: unknown; changed: boolean } {
-  if (!Array.isArray(weeks)) return { weeks, changed: false };
-  let changed = false;
-  const out = weeks.map((wk: unknown, i: number) => {
-    if (!isObj(wk) || !Array.isArray(wk.days)) return wk;
-    const n = typeof wk.week === 'number' && Number.isFinite(wk.week) ? wk.week : i + 1;
-    if (n <= EARLY_WEEKS) return wk;
-    let weekChanged = false;
-    const days = wk.days.map((day: unknown) => {
-      if (!isObj(day) || !Array.isArray(day.exercises)) return day;
-      if (!day.exercises.some((ex: unknown) => isDepthDrop(ex as Obj) && (ex as Obj).held !== HELD_FOR_PROTOCOL)) return day;
-      weekChanged = true;
-      return { ...day, exercises: day.exercises.map((ex: unknown) => (isDepthDrop(ex as Obj) ? { ...(ex as Obj), held: HELD_FOR_PROTOCOL } : ex)) };
-    });
-    if (!weekChanged) return wk;
-    changed = true;
-    return { ...wk, days, revision: PLAN_REVISION };
-  });
-  return changed ? { weeks: out, changed } : { weeks, changed };
-}
+export const reviseEarlyDepthDrops = reviseDepthDrops;
 
 /**
  * A YOUTH reader's plan: in every week, every plyometric exercise (isPlyometric) is replaced by one with no flight
@@ -194,14 +177,64 @@ export function reviseForYouth(weeks: unknown): { weeks: unknown; changed: boole
 }
 
 /**
- * The whole revision for one reader. ADULT: no depth drop in weeks 1-4 (swapped), later ones held. YOUTH: no jump of
- * any kind in any week. `weeks` is the very value passed in when nothing changed.
+ * Undo a STORED youth revision (MIRROR-COACH P2 review, 2026-09-26). In every week reviseForYouth marked, each exercise
+ * that names what it replaced goes back to that exercise as the pool lists it (a stored plan's exercises are pool
+ * entries copied whole — plan-generator.ts rotatedWeek), and the youth mark comes off. An exercise whose `replaced`
+ * name is in no pool is left as it is. `changed` is false, and `weeks` the very value, when no week carried the mark.
+ *
+ * WHY. P1's read path, and P2's backfill as first written, STORED the youth revision for every owner with no birth
+ * year (decision #20: blank = youth rules until answered), and nothing ever undid it: the depth-drop revision had
+ * nothing left to swap, and the note preferred the youth line. Measured on legacyWeeks(·, 'program_12w') for all six
+ * focuses, revised as youth and then as adult: 0 jumps left, against the 30 (power), 22 (stability, cadence, posture)
+ * and 12 (mobility, symmetry) an adult-only revision keeps — an adult who answered their birth year after that kept a
+ * youth plan and the youth note for good. Youth rules are now a READ-TIME view (revisePlan); only the depth-drop
+ * revision, which #22 requires for everyone, is ever stored, and a youth revision already stored is undone here.
+ */
+export function undoYouthRevision(weeks: unknown): { weeks: unknown; changed: boolean } {
+  if (!Array.isArray(weeks)) return { weeks, changed: false };
+  const byName = new Map(Object.values(PLAN_POOLS).flat().map((e) => [e.name, e]));
+  let changed = false;
+  const out = weeks.map((wk: unknown) => {
+    if (!isObj(wk) || wk.revision !== PLAN_REVISION_YOUTH || !Array.isArray(wk.days)) return wk;
+    changed = true;
+    const { revision: _youth, ...rest } = wk;
+    return {
+      ...rest,
+      days: wk.days.map((day: unknown) => (!isObj(day) || !Array.isArray(day.exercises) ? day : {
+        ...day,
+        exercises: day.exercises.map((ex: unknown) => {
+          const was = isObj(ex) && typeof ex.replaced === 'string' ? byName.get(ex.replaced) : undefined;
+          return was ? { ...was } : ex;
+        }),
+      })),
+    };
+  });
+  return changed ? { weeks: out, changed } : { weeks, changed };
+}
+
+/**
+ * What is STORED for a plan, whoever owns it: any stored youth revision undone, then no depth drop in any week
+ * (decision #22, for everyone). Idempotent: its output carries no youth mark and no depth drop, so a second pass
+ * changes nothing. The plan route's read and the backfill (lib/workout/plan-backfill.ts) both write exactly this, so
+ * a row revised by both at once gets the same weeks from each — the stored weeks no longer depend on the reader.
+ */
+export function revisePlanForStorage(weeks: unknown): { weeks: unknown; changed: boolean } {
+  const undone = undoYouthRevision(weeks);
+  const adult = reviseDepthDrops(undone.weeks);
+  return { weeks: adult.weeks, changed: undone.changed || adult.changed };
+}
+
+/**
+ * The plan AS A READER SEES IT. ADULT: the stored revision (no depth drop in any week). YOUTH — under 18, or no birth
+ * year (decisions #6, #20): no jump of any kind in any week (reviseForYouth over the stored revision), computed on
+ * every read and NEVER stored (P2 review: stored, it could not be undone when an adult birth year arrived). `changed`
+ * says whether the view differs from what was passed in.
  */
 export function revisePlan(weeks: unknown, audience: PlanAudience): { weeks: unknown; changed: boolean } {
-  if (audience === 'youth') return reviseForYouth(weeks);
-  const early = reviseEarlyDepthDrops(weeks);
-  const late = holdLateDepthDrops(early.weeks);
-  return { weeks: late.weeks, changed: early.changed || late.changed };
+  const stored = revisePlanForStorage(weeks);
+  if (audience !== 'youth') return stored;
+  const youth = reviseForYouth(stored.weeks);
+  return { weeks: youth.weeks, changed: stored.changed || youth.changed };
 }
 
 /** The note to show on this plan, or null when no revision changed it. */
@@ -209,19 +242,19 @@ export function planRevisionNote(weeks: unknown): string | null {
   if (!Array.isArray(weeks)) return null;
   const wks = weeks.filter(isObj);
   if (wks.some((w) => w.revision === PLAN_REVISION_YOUTH)) return PLAN_REVISED_NOTE_YOUTH;
-  const exercises = wks.flatMap((w) => (Array.isArray(w.days) ? w.days : [])).filter(isObj)
-    .flatMap((d) => (Array.isArray(d.exercises) ? d.exercises : [])).filter(isObj);
-  if (exercises.some((e) => e.held === HELD_FOR_PROTOCOL)) return PLAN_REVISED_NOTE_HELD;
-  return wks.some((w) => w.revision === PLAN_REVISION) ? PLAN_REVISED_NOTE : null;
+  return wks.some((w) => w.revision === PLAN_REVISION_ALL_WEEKS || w.revision === PLAN_REVISION) ? PLAN_REVISED_NOTE : null;
 }
 
 /** A stored plan as the reader sees it once revised. */
 export type RevisedPlanRow<T> = T & { revisionNote: string | null };
 
 /**
- * Revise each of this buyer's plans on read, for who they are (planAudience), and store what changed. `rows` are the
- * reader's own WorkoutPlan rows (the caller queried them by userId); the write is scoped by userId again, so a row that
- * is not theirs is never written.
+ * Revise each of this buyer's plans on read, for who they are (planAudience), and store the STORAGE revision when it
+ * changed (revisePlanForStorage: depth drops swapped, a stored youth revision undone — never a youth revision; P2
+ * review, 2026-09-26). The reader gets their view: a youth reader the youth revision over it, on every read. So a
+ * failed birth-year read (the route treats it as youth) shows a youth plan once and stores nothing that depends on it.
+ * `rows` are the reader's own WorkoutPlan rows (the caller queried them by userId, all of them); the write is scoped by
+ * userId again, so a row that is not theirs is never written.
  */
 export async function revisePlansOnRead<T extends { id: string; weeks: unknown }>(
   db: Pick<PrismaClient, 'workoutPlan'>,
@@ -231,15 +264,16 @@ export async function revisePlansOnRead<T extends { id: string; weeks: unknown }
 ): Promise<RevisedPlanRow<T>[]> {
   const out: RevisedPlanRow<T>[] = [];
   for (const row of rows) {
-    const r = revisePlan(row.weeks, audience);
-    if (r.changed) {
+    const stored = revisePlanForStorage(row.weeks);
+    if (stored.changed) {
       try {
-        await db.workoutPlan.updateMany({ where: { id: row.id, userId }, data: { weeks: r.weeks as Prisma.InputJsonValue } });
+        await db.workoutPlan.updateMany({ where: { id: row.id, userId }, data: { weeks: stored.weeks as Prisma.InputJsonValue } });
       } catch (e) {
         console.error('[workout/plan-revision] the revised plan was not stored; it is shown revised anyway and the next read tries again', e);
       }
     }
-    out.push({ ...row, weeks: r.weeks, revisionNote: planRevisionNote(r.weeks) });
+    const view = audience === 'youth' ? reviseForYouth(stored.weeks).weeks : stored.weeks;
+    out.push({ ...row, weeks: view, revisionNote: planRevisionNote(view) });
   }
   return out;
 }

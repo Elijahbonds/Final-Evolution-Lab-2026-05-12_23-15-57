@@ -18,6 +18,7 @@ import { PRQ_ATTRS } from '../prq';
 import { emptyProfile, type PRQSnapshot, type SharedProfile } from '../profile/sharedProfile';
 import { driftBoard, driftHeadline, type ClientActivity, type DriftRow } from './compliance';
 import { triageRoster, type AthleteRow, type TriageBoard } from './triage';
+import { readStoredScreen } from '../mirror/screenStore';
 
 const DAY = 86_400_000;
 
@@ -31,12 +32,24 @@ export interface ClientFacts {
   joinedAtMs: number | null;
   hasProgram: boolean;
   /**
-   * Every session as epoch ms, any order: GameSession.createdAt AND completed ClientSession.completedAt (coached work
-   * counts — MIRROR-COACH P1, 2026-09-25; the board used to read games only).
+   * COACHED sessions completed (ClientSession.completedAt, this coach's programs), epoch ms, any order.
+   *
+   * MIRROR-COACH P1 (2026-09-25) put games AND coached sessions in this one list, which fixed a client doing every
+   * coached session reading "stalled" — and made a client who only played games read "steady". MIRROR-COACH P2
+   * (2026-09-25) split them: this is coached sessions only, and games are `gameTimesMs`, a separate signal.
    */
   sessionTimesMs: readonly number[];
+  /** Coached work saved on a session not yet marked complete: ExerciseLog / SetLog createdAt, epoch ms. P2. */
+  loggedTimesMs?: readonly number[];
+  /** GameSession.createdAt, epoch ms — shown beside the coached count, never inside it. P2. */
+  gameTimesMs?: readonly number[];
+  /**
+   * GRADED Mirror movement screens (WorkoutScan kind mirror_screen that readStoredScreen can read), epoch ms: current
+   * data for triage's stale-scan. P2; GRADED since the P2 review (2026-09-26) — see gradedScreenTimes.
+   */
+  screenTimesMs?: readonly number[];
   prq: readonly PrqFact[];
-  /** The most recent activity of ANY kind, epoch ms — a session, a scan, a logged set. */
+  /** The most recent activity of ANY kind, epoch ms — a session, a game, a scan, a logged set. */
   lastActiveMs: number | null;
   expectedPerWeek?: number;
 }
@@ -83,7 +96,21 @@ export function prqSnapshots(entries: readonly PrqFact[]): PRQSnapshot[] {
     });
 }
 
-/** The shape compliance.ts reads. */
+/**
+ * The Mirror screens that are something to program from: the GRADED ones (MIRROR-COACH P2 review, 2026-09-26).
+ *
+ * P2 counted every mirror_screen row as current data. But every screen stored so far is UNGRADED — nothing calls
+ * ScreenRunner.record until P3 (app/api/mirror/screen/route.ts), /api/coach/prescribe answers such a row with reason
+ * 'ungraded_screen' and no prescriptions, and P1's Mirror-truth fix exists so an ungraded screen never reads as a result.
+ * Counted, the day after a client ran one the coach's "Needs you today" dropped "nothing current to program from" while
+ * the same client's prescriptions panel said the screen was not graded. Only a row readStoredScreen can read (graded
+ * results, lib/mirror/screenStore.ts) counts; an ungraded or unreadable row is not data.
+ */
+export function gradedScreenTimes(rows: readonly { createdAt: Date; metrics: unknown }[]): number[] {
+  return rows.filter((r) => readStoredScreen(r.metrics) !== null).map((r) => r.createdAt.getTime());
+}
+
+/** The shape compliance.ts reads: coached sessions, logged coached work and games, kept apart. */
 export function toClientActivity(f: ClientFacts): ClientActivity {
   return {
     clientId: f.clientId,
@@ -91,11 +118,22 @@ export function toClientActivity(f: ClientFacts): ClientActivity {
     joinedAtMs: f.joinedAtMs,
     hasProgram: f.hasProgram,
     completedAtMs: [...f.sessionTimesMs].sort((a, b) => b - a),
+    ...(f.loggedTimesMs ? { loggedAtMs: [...f.loggedTimesMs] } : {}),
+    ...(f.gameTimesMs ? { gameAtMs: [...f.gameTimesMs] } : {}),
     ...(f.expectedPerWeek != null ? { expectedPerWeek: f.expectedPerWeek } : {}),
   };
 }
 
-/** The shape triage.ts reads. Only `prq` is populated on the profile — it is all triage looks at. */
+const newestIso = (times: readonly number[]): string | null => {
+  const t = times.length ? Math.max(...times) : null;
+  return t == null ? null : new Date(t).toISOString();
+};
+
+/**
+ * The shape triage.ts reads. Only `prq` is populated on the profile — it is all triage looks at. The coached and
+ * screen dates are passed only when the caller read them (a fact left undefined stays undefined, so triage does not
+ * mistake "not read" for "none").
+ */
 export function toAthleteRow(f: ClientFacts, nowMs: number): AthleteRow {
   const profile: SharedProfile = { ...emptyProfile(f.clientId, f.name), prq: prqSnapshots(f.prq) };
   return {
@@ -105,6 +143,8 @@ export function toAthleteRow(f: ClientFacts, nowMs: number): AthleteRow {
     sessions7d: f.sessionTimesMs.filter((t) => t > nowMs - 7 * DAY).length,
     sessions24h: f.sessionTimesMs.filter((t) => t > nowMs - DAY).length,
     lastActiveAt: f.lastActiveMs == null ? null : new Date(f.lastActiveMs).toISOString(),
+    ...(f.loggedTimesMs !== undefined ? { lastCoachedAt: newestIso([...f.sessionTimesMs, ...f.loggedTimesMs]) } : {}),
+    ...(f.screenTimesMs !== undefined ? { lastScreenAt: newestIso(f.screenTimesMs) } : {}),
   };
 }
 

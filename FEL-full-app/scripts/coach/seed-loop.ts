@@ -54,7 +54,16 @@ async function main(): Promise<void> {
     { name: 'Free Throws (ones)', category: 'skill', primaryCues: ['same routine every rep', 'eyes on the back of the rim', 'hold the follow-through'], defaultTempo: '0-0-0-0' },
   ];
   const ex: { id: string }[] = [];
-  for (const e of EXERCISES) ex.push(await prisma.programExercise.upsert({ where: { name: e.name }, update: {}, create: { coachId: coach.id, ...e } }));
+  // MIRROR-COACH P2 (2026-09-25): the seed coach's OWN row by name. This upserted by `name` alone while the name was
+  // unique across FEL, so on a database where another coach already had "Goblet Squat" the seed coach's program was
+  // built on THAT coach's row. P2 review (2026-09-26): the per-coach key (@@unique([coachId, name])) is held for the
+  // owner's go (prisma/schema.prisma ProgramExercise.name), so this looks the row up by (coachId, name) with findFirst
+  // and creates it when missing — it works under either key. Under today's FEL-wide key, another coach's row by the
+  // same name makes the create throw: the seed says so rather than borrow that row.
+  for (const e of EXERCISES) {
+    const mine = await prisma.programExercise.findFirst({ where: { coachId: coach.id, name: e.name }, select: { id: true } });
+    ex.push(mine ?? await prisma.programExercise.create({ data: { coachId: coach.id, ...e }, select: { id: true } }));
+  }
 
   let program = await prisma.coachingProgram.findFirst({ where: { coachId: coach.id, clientId: client.id, name: 'Seed: Vertical block' } });
   if (!program) {

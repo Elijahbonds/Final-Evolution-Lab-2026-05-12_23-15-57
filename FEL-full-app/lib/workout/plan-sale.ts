@@ -20,3 +20,12 @@ export const WORKOUT_PLAN_SKUS = ['workout_plan_4w', 'workout_program_12w'] as c
  * decision #3 pulled the sale and gave no wording, so this line is for the owner to approve.
  */
 export const PLAN_SALE_PAUSED = 'The training plan is being rebuilt; it will be back with real programs.';
+
+/**
+ * MIRROR-COACH P2 (2026-09-25), owner decisions #23 and #24 (painfree/DECISIONS-2.md): NO REFUND for a /workout plan.
+ * Its buyer keeps the corrected plan and gets the relaunched plans free when they ship (the relaunch is P8, at the same
+ * shard price as before for everyone else). Every revised plan's in-app note ends with this line (plan-revision.ts), so
+ * it is a promise P8 must keep for every WorkoutPlan owner. "When they ship", no date: P8 has none. FEL's wording, for
+ * the owner to approve.
+ */
+export const RELAUNCH_FREE_LINE = 'When our new training plans ship, you get them free.';

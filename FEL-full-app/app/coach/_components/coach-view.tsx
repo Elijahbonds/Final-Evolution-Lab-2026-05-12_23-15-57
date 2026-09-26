@@ -66,7 +66,8 @@ export function CoachView() {
         ? <SendView me={me} />
         : <div className="py-16 text-center text-sm text-white/40">Loading your details…</div>)}
       {tab === 'chat' && <CoachChat />}
-      {tab === 'catalogue' && <ExerciseCatalogue />}
+      {/* MIRROR-COACH P2: a coach's Exercises tab also holds their prescribable catalogue + "Add to my catalogue" */}
+      {tab === 'catalogue' && <ExerciseCatalogue coach={coach} />}
       {tab === 'form' && <FormFeedback />}
     </main>
   );

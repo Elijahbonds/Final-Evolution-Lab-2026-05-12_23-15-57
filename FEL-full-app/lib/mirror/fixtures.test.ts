@@ -10,7 +10,8 @@
 //      the framing check in all three views, and both movement screens walked end to end, compared with what was
 //      recorded in lib/mirror/fixtures/baseline.json. A change in what the Mirror says about any fixture fails here with
 //      the fixture's name; re-record with the probe (below) and say in your report what changed and why.
-//   4. INVARIANTS A RE-RECORD MUST NEVER ACCEPT. The knee read's sign on both legs, the silent knee cue, and an
+//   4. INVARIANTS A RE-RECORD MUST NEVER ACCEPT. The knee read's sign on both legs, a knee cue only where a knee caves
+//      (it was "the silent knee cue" until MIRROR-COACH P2 switched it on, 2026-09-26), and an
 //      ungraded screen that never scores, pays or reads as clear — asserted directly, so re-recording cannot launder a
 //      regression into the baseline.
 //
@@ -124,12 +125,24 @@ describe('4. invariants a re-record must never accept', () => {
     expect(got.faultFrames.kneeValgus).toBe(was.faultFrames.kneeValgus);
   });
 
-  it('while the knee is unverified, the coach never says a word about it — on any fixture', () => {
-    expect(VALGUS_CUE_VERIFIED).toBe(false);
+  // MIRROR-COACH P2 (2026-09-26): P1's invariant here was "while the knee is unverified, the coach never says a word about
+  // it". The owner switched the cue on from the synthetic proof (DECISIONS-2 #19); the invariant a re-record must never
+  // accept is now the one that matters with it on — the coach speaks about the knee ONLY on a squat whose knee caves.
+  // (The lunge fixtures go through the squat audit too, as a measurement — the lunge is not mounted; the one whose front
+  // knee caves is flagged and cued there as well, which the baseline records.)
+  it('the knee cue speaks only where a squat\'s knee really caves — never on a knee pushed out, a clean squat, or a stance', () => {
+    expect(VALGUS_CUE_VERIFIED).toBe(true);
     for (const name of FIXTURE_NAMES) {
-      const s = now.fixtures[name].squat;
-      expect(s.coach.filter((c) => c.fault === 'kneeValgus'), name).toEqual([]);
-      expect(s.shown, name).not.toContain('kneeValgus');
+      const t = load(name).truth, s = now.fixtures[name].squat;
+      const said = s.coach.filter((c) => c.fault === 'kneeValgus');
+      if (squats.includes(name) && t.kneeCaves === true) {
+        expect(said.length, name).toBeGreaterThan(0);
+        expect(said[0].text, name).toMatch(/^Knees out/);
+        expect(s.shown, name).toContain('kneeValgus');
+      } else if (squats.includes(name) || /^(stand|single_leg|seated|hinge|pushup)/.test(name)) {
+        expect(said, name).toEqual([]);
+        expect(s.shown, name).not.toContain('kneeValgus');
+      }
     }
   });
 

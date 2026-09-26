@@ -146,11 +146,20 @@
         },
         "maxValgusRatio": 0.84,
         "maxLateralDrift": 0,
-        "shown": [],
+        "shown": [
+          "kneeValgus"
+        ],
         "checkFindings": [
           "kneeValgus"
         ],
-        "coach": []
+        "coach": [
+          {
+            "atFrame": 49,
+            "fault": "kneeValgus",
+            "level": "cue",
+            "text": "Knees out over your second toes — press the floor apart."
+          }
+        ]
       },
       "lunge": {
         "present": 120,
@@ -250,11 +259,20 @@
         },
         "maxValgusRatio": 0.84,
         "maxLateralDrift": 0,
-        "shown": [],
+        "shown": [
+          "kneeValgus"
+        ],
         "checkFindings": [
           "kneeValgus"
         ],
-        "coach": []
+        "coach": [
+          {
+            "atFrame": 49,
+            "fault": "kneeValgus",
+            "level": "cue",
+            "text": "Knees out over your second toes — press the floor apart."
+          }
+        ]
       },
       "lunge": {
         "present": 120,
@@ -354,11 +372,20 @@
         },
         "maxValgusRatio": 0.84,
         "maxLateralDrift": 0,
-        "shown": [],
+        "shown": [
+          "kneeValgus"
+        ],
         "checkFindings": [
           "kneeValgus"
         ],
-        "coach": []
+        "coach": [
+          {
+            "atFrame": 49,
+            "fault": "kneeValgus",
+            "level": "cue",
+            "text": "Knees out over your second toes — press the floor apart."
+          }
+        ]
       },
       "lunge": {
         "present": 120,
@@ -828,11 +855,20 @@
         },
         "maxValgusRatio": 0.77,
         "maxLateralDrift": 0,
-        "shown": [],
+        "shown": [
+          "kneeValgus"
+        ],
         "checkFindings": [
           "kneeValgus"
         ],
-        "coach": []
+        "coach": [
+          {
+            "atFrame": 49,
+            "fault": "kneeValgus",
+            "level": "cue",
+            "text": "Knees out over your second toes — press the floor apart."
+          }
+        ]
       },
       "lunge": {
         "present": 120,

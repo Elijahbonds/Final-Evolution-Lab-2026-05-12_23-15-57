@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { draftCopy, draftSquad, rebaseTargetDate } from './duplicate';
 import type { ProgramTree } from './loop';
+import { STRUCTURE_DEFAULTS } from './structure';
 
 const SRC: ProgramTree = {
   id: 'p1', name: 'Vertical block', coachId: 'coach', clientId: 'ama',
@@ -9,8 +10,10 @@ const SRC: ProgramTree = {
       id: 'b1', order: 1, label: 'Week 1', targetDate: '2026-03-02T00:00:00.000Z',
       sessions: [{
         id: 's1', order: 1, label: 'Lower', exercises: [
-          { id: 'x1', order: 1, name: 'Trap bar jump', sets: 4, reps: '3', load: '30%', tempo: 'X', restSeconds: 120, coachNote: 'fast off the floor' },
-          { id: 'x2', order: 2, name: 'Split squat', sets: 3, reps: '8', load: 'BW', tempo: '31X1', restSeconds: 90, coachNote: null },
+          // (+ exerciseId and the P2 structure columns: TreeExercise grew them in MIRROR-COACH P2, and this fixture no
+          // longer type-checked — P2 review, 2026-09-26)
+          { id: 'x1', order: 1, exerciseId: 'pe-tbj', name: 'Trap bar jump', sets: 4, reps: '3', load: '30%', tempo: 'X', restSeconds: 120, coachNote: 'fast off the floor', ...STRUCTURE_DEFAULTS },
+          { id: 'x2', order: 2, exerciseId: 'pe-split', name: 'Split squat', sets: 3, reps: '8', load: 'BW', tempo: '31X1', restSeconds: 90, coachNote: null, ...STRUCTURE_DEFAULTS },
         ],
       }],
     },

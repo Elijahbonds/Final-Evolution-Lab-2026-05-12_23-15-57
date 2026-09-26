@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { SavedPlans, WorkoutView } from '@/components/workout-view';
-import { analyzeMovement, defaultMetrics } from '@/lib/workout/movement-screen';
-import { generatePlan } from '@/lib/workout/plan-generator';
+import { legacyWeeks } from '@/lib/workout/plan-generator';
 import { planRevisionNote, revisePlan } from '@/lib/workout/plan-revision';
 
 export const dynamic = 'force-dynamic';
@@ -11,15 +10,17 @@ export const dynamic = 'force-dynamic';
  * plan bought before today as a buyer now sees it: revised on read (no depth drop in weeks 1-4) with its note. /workout
  * itself needs a session and this lane's database is offline, so the live page here answers its plans read with an
  * error line; the fixture below is the plan the route would return. Hard 404 outside `next dev`.
+ *
+ * MIRROR-COACH P2 (2026-09-25), owner decision #22: the fixture is now the plan as bought (plan-generator.ts
+ * legacyWeeks: depth drops in weeks 1, 6 and 11), and the adult reading has no depth drop in any week and nothing held.
  */
 export default function DevWorkoutPlansPage() {
   if (process.env.NODE_ENV !== 'development') notFound();
-  // A 12-week Mobility plan as the route saved it before today: week 1 Friday's second exercise was the depth drop.
-  const legacy = JSON.parse(JSON.stringify(generatePlan(analyzeMovement(defaultMetrics()), 'program_12w').weeks));
-  legacy[0].days[2].exercises[1] = { name: 'Depth Drop to Vertical', sets: 4, reps: '4', cue: 'Absorb soft, explode tall', targets: 'power' };
-  // as an adult reads it (early depth drops swapped, later ones held) and as a youth reads it (no jumps in any week)
+  // The 12-week Mobility plan every buyer got (the page planned from defaultMetrics), as the route saved it.
+  const legacy = legacyWeeks('mobility', 'program_12w');
+  // as an adult reads it (every depth drop swapped) and as a youth reads it (no jumps in any week)
   const revised = revisePlan(legacy, 'adult').weeks;
-  const youth = revisePlan(JSON.parse(JSON.stringify(legacy)), 'youth').weeks;
+  const youth = revisePlan(legacyWeeks('mobility', 'program_12w'), 'youth').weeks;
   return (
     <div className="min-h-screen bg-[#050505] pb-24">
       <WorkoutView />

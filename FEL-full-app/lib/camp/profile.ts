@@ -17,12 +17,18 @@ function safeAnalyze(metrics: unknown): unknown {
   try { return analyzeMovement(metrics as never); } catch { return null; }
 }
 
+/**
+ * The most games composeProfile reads. `history.sessions` is a count of THESE rows, so it stops at this number: a
+ * reader that shows it as a total says "60+" at the cap (the coach's roster does, MIRROR-COACH P2, 2026-09-25).
+ */
+export const HISTORY_GAMES_TAKE = 60;
+
 export async function composeProfile(userId: string, since: Date | null = null) {
   const [profile, entries, scans, games, creds, fac] = await Promise.all([
     prisma.playerProfile.findUnique({ where: { userId } }),
     prisma.prqEntry.findMany({ where: { userId }, orderBy: { measuredAt: 'asc' } }),
     prisma.workoutScan.findMany({ where: { userId, kind: 'movement_screen' }, orderBy: { createdAt: 'desc' }, take: 2 }),
-    prisma.gameSession.findMany({ where: { userId, ...(since ? { createdAt: { gte: since } } : {}) }, orderBy: { createdAt: 'desc' }, take: 60 }),
+    prisma.gameSession.findMany({ where: { userId, ...(since ? { createdAt: { gte: since } } : {}) }, orderBy: { createdAt: 'desc' }, take: HISTORY_GAMES_TAKE }),
     prisma.credential.findMany({ where: { userId } }),
     prisma.facilitatorProfile.findUnique({ where: { userId } }),
   ]);

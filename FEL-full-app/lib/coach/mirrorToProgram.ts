@@ -36,6 +36,12 @@ export interface Prescription {
   exercise: CatalogueExercise | null;
   sets: number;
   reps: string;
+  /**
+   * Seconds per set when the dose is timed, else null (MIRROR-COACH P2, 2026-09-25). The single-leg dose was the
+   * string "30 seconds each side" in `reps`, because a prescription had nowhere else to put a time; SessionExercise
+   * has workSeconds now, so the builder can run a timer on it.
+   */
+  workSeconds: number | null;
   /** What to search for if there is no match — so an empty slot is actionable, not a shrug. */
   wanted: string[];
 }
@@ -59,7 +65,7 @@ const WANTED: Record<string, string[]> = {
 };
 
 /** How the corrective is dosed. Low and daily beats heavy and occasional for this work. */
-const DOSE: Record<string, { sets: number; reps: string }> = {
+const DOSE: Record<string, { sets: number; reps: string; workSeconds?: number }> = {
   heelLine: { sets: 3, reps: '12 slow' },
   kneeWindow: { sets: 3, reps: '12 each side' },
   kneeTrackingL: { sets: 3, reps: '12 left' },
@@ -71,7 +77,7 @@ const DOSE: Record<string, { sets: number; reps: string }> = {
   headFloat: { sets: 2, reps: '10' },
   trunk: { sets: 3, reps: '8' },
   depth: { sets: 3, reps: '10' },
-  singleLeg: { sets: 3, reps: '30 seconds each side' },
+  singleLeg: { sets: 3, reps: '30 s each side', workSeconds: 30 },
   pelvicTilt: { sets: 2, reps: '10' },
   thoracicRotation: { sets: 2, reps: '8 each side' },
 };
@@ -127,6 +133,7 @@ export function prescribeFromScreen(
       exercise: match,
       sets: dose.sets,
       reps: dose.reps,
+      workSeconds: dose.workSeconds ?? null,
       wanted,
     });
   }

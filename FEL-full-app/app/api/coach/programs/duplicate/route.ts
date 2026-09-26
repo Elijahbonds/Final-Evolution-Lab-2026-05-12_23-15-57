@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { isCertifiedCoach } from '@/lib/coach/server';
 import { draftSquad, rebaseTargetDate } from '@/lib/coach/duplicate';
+import { prescriptionCopy } from '@/lib/coach/structure';
+import type { Prisma } from '@/public/_prisma/client';
 import type { ProgramTree } from '@/lib/coach/loop';
 
 /**
@@ -83,12 +85,12 @@ export async function POST(req: NextRequest) {
               create: b.sessions.map((s) => ({
                 order: s.order,
                 label: s.label,
+                // every prescription column, structure included (MIRROR-COACH P2, 2026-09-25): this listed seven
+                // columns by hand, so a copied program would have lost its sections, key set, supersets, timers,
+                // set-up cues and effort bands. lib/coach/structure.ts PRESCRIPTION_COLUMNS is checked against the
+                // schema by its test, so a column added later cannot be dropped here the same way.
                 exercises: {
-                  create: s.exercises.map((e) => ({
-                    exerciseId: e.exerciseId,
-                    order: e.order, sets: e.sets, reps: e.reps, load: e.load,
-                    tempo: e.tempo, restSeconds: e.restSeconds, coachNote: e.coachNote,
-                  })),
+                  create: s.exercises.map((e) => prescriptionCopy(e) as Omit<Prisma.SessionExerciseUncheckedCreateWithoutSessionInput, 'id'>),
                 },
               })),
             },

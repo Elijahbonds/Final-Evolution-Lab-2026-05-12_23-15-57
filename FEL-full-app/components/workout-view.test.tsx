@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { analyzeMovement, defaultMetrics } from '@/lib/workout/movement-screen';
-import { generatePlan } from '@/lib/workout/plan-generator';
-import { HELD_LINE, PLAN_REVISED_NOTE_HELD, PLAN_REVISED_NOTE_YOUTH, planRevisionNote, reviseEarlyDepthDrops, revisePlan } from '@/lib/workout/plan-revision';
+import { generatePlan, legacyWeeks } from '@/lib/workout/plan-generator';
+import { HELD_LINE, PLAN_REVISED_NOTE, PLAN_REVISED_NOTE_YOUTH, planRevisionNote, reviseDepthDrops, revisePlan } from '@/lib/workout/plan-revision';
 import { PLAN_SALE_PAUSED } from '@/lib/workout/plan-sale';
 import { screenText } from '@/lib/share/screen';
 import { DEMO_CONSENT, demoScan, SavedPlans, WorkoutView, type SavedPlan } from './workout-view';
@@ -105,14 +105,15 @@ describe('WorkoutView, the sale pulled', () => {
 });
 
 describe('SavedPlans, a buyer\'s plans', () => {
-  const revised = reviseEarlyDepthDrops(JSON.parse(JSON.stringify(legacyWeek1())));
+  const revised = reviseDepthDrops(JSON.parse(JSON.stringify(legacyWeek1())));
   const plan = (weeks: unknown, revisionNote: string | null): SavedPlan => ({ id: 'p1', tier: 'plan_4w', focus: 'Mobility & Range', weeks, revisionNote });
 
   it('shows a revised plan with the note on it, and names what the swap replaced', () => {
     const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [plan(revised.weeks, planRevisionNote(revised.weeks))] }));
     expect(html).toContain('Your plans');
-    expect(html).toContain('We changed your plan: early weeks no longer include depth drops. Nothing to do.');
-    expect(html).toContain('Trap-Bar Jump');
+    expect(html).toContain(PLAN_REVISED_NOTE);
+    // MIRROR-COACH P2 (2026-09-25): the swap no longer repeats the Trap-Bar Jump already on Monday (P1's wart)
+    expect(html).toContain('Wall Drive March · 3×10 ea');
     expect(html).toContain('in place of Depth Drop to Vertical');
     expect(html).not.toMatch(/Depth Drop to Vertical ·/);                    // not prescribed, only named as replaced
     expect(html).toContain('4-Week Plan — Focus: Mobility &amp; Range');
@@ -130,14 +131,16 @@ describe('SavedPlans, a buyer\'s plans', () => {
     expect(renderToStaticMarkup(createElement(SavedPlans, { saved: 'error' }))).toMatch(/could not be loaded/);
   });
 
-  // MIRROR-COACH P1 review (2026-09-25): an adult's later depth drops are HELD for the protocol, and the page says so
-  // beside each one; a youth reader's plan has no jumps and says that.
-  it('an adult\'s 12-week plan: the later depth drop says it is held, and the note says so', () => {
-    const weeks = JSON.parse(JSON.stringify(generatePlan(analyzeMovement(defaultMetrics()), 'program_12w').weeks));
-    const adult = revisePlan(weeks, 'adult').weeks;
+  // MIRROR-COACH P1 review (2026-09-25) held an adult's later depth drops for the protocol and said so beside each one.
+  // MIRROR-COACH P2 (2026-09-25), owner decision #22: every depth drop in every week is swapped, so nothing is held and
+  // no depth drop is prescribed anywhere on the page; a youth reader's plan has no jumps and says that.
+  it('an adult\'s 12-week plan as bought (depth drops in weeks 1, 6 and 11): none prescribed, none held, the note', () => {
+    const adult = revisePlan(legacyWeeks('mobility', 'program_12w'), 'adult').weeks;
     const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [plan(adult, planRevisionNote(adult))] }));
-    expect(html).toContain(HELD_LINE);
-    expect(html).toContain(PLAN_REVISED_NOTE_HELD);
+    expect(html).not.toMatch(/Depth Drop to Vertical ·/);
+    expect(html.match(/in place of Depth Drop to Vertical/g)).toHaveLength(3);
+    expect(html).not.toContain(HELD_LINE);
+    expect(html).toContain(PLAN_REVISED_NOTE);
   });
 
   it('a youth reader\'s plan: no jump on the page, and the youth note', () => {

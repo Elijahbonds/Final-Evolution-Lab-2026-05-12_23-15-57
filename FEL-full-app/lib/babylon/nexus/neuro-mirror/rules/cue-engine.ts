@@ -14,7 +14,8 @@
 //   · The trunkOffset escalation said "Your ribs are flaring off the pelvis". The pose model has no rib landmark;
 //     that fault is a shoulder-midpoint vs hip-midpoint offset. Reworded to what is measured. (It is not fed today.)
 //   · The armFall card coached a forward fall; the audit reads the shoulders drifting sideways. Reworded to that.
-// And the knee is SILENT until a real recording confirms the read: see VALGUS_CUE_VERIFIED below.
+// And the knee was SILENT until its read was confirmed: see VALGUS_CUE_VERIFIED below — switched on by the owner on
+// 2026-09-26 (MIRROR-COACH P2) from the synthetic proof, with a squareness gate in front of it.
 //
 // Cue language follows the Playbook's coaching voice (short imperative
 // external cues — "press the floor apart", not "contract your glutes").
@@ -79,29 +80,29 @@ const CUES: Record<FaultId, CueCard> = {
 };
 
 /**
- * THE KNEE STAYS SILENT UNTIL A REAL RECORDING CONFIRMS IT (MIRROR-COACH P1, 2026-09-25).
+ * THE KNEE CUE — ON SINCE 2026-09-26, VERIFIED ON SYNTHETIC GEOMETRY ONLY (NO REAL CAPTURE).
  *
- * squat-audit.ts's knee read was backwards until today (it fired on knees pushed OUT on the app's non-mirrored
- * stream). The fix is proven on synthetic geometry only — lib/pose/synth.ts's virtual webcam, squat-audit.test.ts —
- * and measured there, the same straight-tracking squat under the synth's default landmark jitter still trips a
- * single-frame kneeValgus in 26 of 50 squats (40 of 2,547 non-standing frames; scripts/probes/_mirror-valgus-jitter-p1.ts),
- * and a single frame is enough for this engine to speak. So the audit keeps MEASURING the knee (squat.faults,
- * squat.valgusBySide, the harness review), and the coach says nothing about it — no voice, no cue card, no overlay.
- *
- * FLIP IT HERE AND NOWHERE ELSE, and only when ALL of these hold (cue-engine.test.ts holds the ones code can):
- *   1. A real, non-mirrored capture of knees going in and out confirms the sign on real geometry. (Not done: P1
- *      verified it on lib/pose/synth.ts only.)
- *   2. A jittered straight squat does not cue the knee. Done in the review of P1: squat-audit.ts's persistence gate
- *      (valgusPersistFrames 3) — 0 of 50 jittered straight squats flagged, against 26 of 50 at one frame; 50 of 50
- *      caving squats still caught. Held by cue-engine.test.ts with the engine VERIFIED.
- *   3. A side-on or turned squat does not cue the knee. Done in the review of P1: squat-audit.ts frontalReadable (the
- *      forward knee travel of a side-on squat read as 58 hip half-widths "inward"). Held by cue-engine.test.ts.
- *   4. A squat a few degrees off square does not cue the knee. NOT done: from ~8° off square a straight squat's
- *      forward knee travel crosses the warn line (squat-audit.ts frontalReadable, "what it cannot catch"), and z cannot
- *      resolve a turn that small. It needs the squat framed square before the set, or a real capture showing a
- *      phone's z resolves it. cue-engine.test.ts carries it as a known failure, so fixing it has to flip that test.
+ * MIRROR-COACH P1 (2026-09-25) kept it silent: squat-audit.ts's knee read had been backwards (it fired on knees pushed
+ * OUT on the app's non-mirrored stream), and the fix was proven only on lib/pose/synth.ts's virtual webcam
+ * (squat-audit.test.ts). The owner switched it on from that proof (painfree/DECISIONS-2.md #19, 2026-09-25: "turn it on
+ * from the synthetic proof ... documented as verified on synthetic geometry, not a real capture") — MIRROR-COACH P2,
+ * 2026-09-26. What stands behind it, every item measured on the synth under its default landmark jitter, none on a
+ * person (cue-engine.test.ts holds each with the production engine):
+ *   1. The SIGN, on real geometry: NOT DONE. No real, non-mirrored recording of knees going in and out exists yet; the
+ *      owner's decision overrides this for switching the cue on, and it is still the only way to confirm the left and
+ *      right labels (P1 report, "Owner action").
+ *   2. A jittered straight squat does not cue the knee: squat-audit.ts's persistence gate (valgusPersistFrames 3, now
+ *      counted in POSE frames — a repeated camera frame returns the audit's cached read; P2) — 0 of 50 flagged, against
+ *      26 of 50 at one frame; caving squats still caught 50 of 50.
+ *   3. A side-on or turned squat does not cue the knee: squat-audit.ts frontalReadable (P1 review).
+ *   4. A squat a few degrees off square does not cue the knee: squat-audit.ts squareOn (P2) — the shoulder and hip
+ *      lines' depth order, averaged over 20 pose frames, within 4°. Straight squats 5°, 6°, 8°, 10° and 20° off square:
+ *      0 of 20 seeds cued (before the gate the audit flagged 8, 15, 20, 20 and 19 of 20). assumption: a phone's
+ *      MediaPipe z resolves a turn this small when averaged — unchecked on a recording; if it does not, the cost is
+ *      the knee "not read" (said once, "square up to the camera"), never a cue about a knee that was not there.
+ * Switch it off HERE AND NOWHERE ELSE: every visual and spoken knee cue reads this flag through cueableFaults.
  */
-export const VALGUS_CUE_VERIFIED = false;
+export const VALGUS_CUE_VERIFIED = true;
 
 /**
  * The faults the coach may speak about. Everything the audit measures, minus the knee while VALGUS_CUE_VERIFIED is
@@ -112,7 +113,7 @@ export function cueableFaults<F extends string>(faults: readonly F[], valgusVeri
 }
 
 export interface CueEngineOptions {
-  /** Defaults to VALGUS_CUE_VERIFIED. Tests of the engine's discipline pass true; production never does. */
+  /** Defaults to VALGUS_CUE_VERIFIED (true since 2026-09-26). Tests of the silent path pass false. */
   valgusVerified?: boolean;
 }
 

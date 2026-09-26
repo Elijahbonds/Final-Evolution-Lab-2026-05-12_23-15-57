@@ -13,7 +13,11 @@
 // recording, which is why the COACH stays silent on it (VALGUS_CUE_VERIFIED in cue-engine.ts).
 import { describe, expect, it } from 'vitest';
 import { LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_KNEE, LEFT_ANKLE, RIGHT_KNEE, RIGHT_ANKLE } from '@/lib/pose/landmarks';
-import { MIN_HIP_HALF, SQUAT_THRESHOLDS, SquatAudit, frontalReadable, kneeInwardRatio, type SquatFrameResult } from './squat-audit';
+import {
+  MIN_HIP_HALF, SQUAT_THRESHOLDS, SquatAudit, frontalReadable, kneeInwardRatio, squareOn, torsoTurnSample, yawFromSamples,
+  type SquatFrameResult,
+} from './squat-audit';
+import { SIDE_WIDTH_MAX } from '@/lib/mirror/framing';
 import type { PoseFrame } from '../pose/mediapipe-adapter';
 import { filmSquat, type SquatShape } from './__fixtures__/synthSquat';
 
@@ -221,5 +225,161 @@ describe('the knee fault needs the read to hold', () => {
   it('a caving squat under jitter is still caught on every take', () => {
     expect(flaggedSquats({ shiftL: -0.06, shiftR: -0.06 })).toBe(20);
     expect(flaggedSquats({ shiftL: -0.06 })).toBe(20);
+  });
+});
+
+// MIRROR-COACH P2 (2026-09-26) — THE SAME CAMERA FRAME TWICE. The compositor's render loop runs at the display's rate and
+// the adapter hands back its previous frame, unchanged, until the camera delivers the next. Every repeat was a fresh
+// read: 1 ms and no hip travel, so a hip near the top read 'standing' — the live proof counted all 11 reps of the guided
+// squat inside ONE squat — and the knee's "3 frames running" was ~1.5 camera frames. No test fed a frame twice, which
+// is why node passed while live failed. These do.
+describe('a repeated camera frame gets the same read back, and moves nothing', () => {
+  const twice = <T,>(xs: T[]) => xs.flatMap((x) => [x, x]);
+
+  it('every frame fed twice: the same phases, faults and knee numbers, frame for frame', () => {
+    for (const shape of [{}, { shiftL: -0.06, shiftR: -0.06 }, { shiftL: -0.06 }, { shiftL: 0.05, shiftR: 0.05 }] as SquatShape[]) {
+      for (const seed of [1, 2, 3]) {
+        const frames = filmSquat(shape, { seed });
+        const once = new SquatAudit(), rep = new SquatAudit();
+        const a = frames.map((f) => once.evaluate(f));
+        const b = twice(frames).map((f) => rep.evaluate(f));
+        const firstOfEach = b.filter((_, i) => i % 2 === 0), secondOfEach = b.filter((_, i) => i % 2 === 1);
+        expect(firstOfEach, JSON.stringify(shape)).toEqual(a);
+        expect(secondOfEach, JSON.stringify(shape)).toEqual(a);
+      }
+    }
+  });
+
+  it('a copy of the frame (same clock, new object) is the same camera frame too', () => {
+    const frames = filmSquat({ shiftL: -0.06, shiftR: -0.06 });
+    const once = new SquatAudit(), rep = new SquatAudit();
+    const a = frames.map((f) => once.evaluate(f));
+    const b = frames.flatMap((f) => [rep.evaluate(f), rep.evaluate({ ...f, landmarks: f.landmarks.map((l) => ({ ...l })) })]);
+    expect(b.filter((_, i) => i % 2 === 1)).toEqual(a);
+  });
+
+  it('the knee persistence gate counts POSE frames: two over the line, each seen twice, is still two', () => {
+    // hold the knee over the warn line for exactly (valgusPersistFrames − 1) pose frames at the bottom
+    const n = SQUAT_THRESHOLDS.valgusPersistFrames;
+    const clean = filmSquat({});
+    const caving = filmSquat({ shiftL: -0.06, shiftR: -0.06 });
+    const probe = new SquatAudit();
+    const bottom = caving.findIndex((f) => { const r = probe.evaluate(f); return r.valgusRatio >= SQUAT_THRESHOLDS.valgusWarn && r.phase !== 'standing'; });
+    expect(bottom).toBeGreaterThan(30);
+    const spliced = [...clean.slice(0, bottom), ...caving.slice(bottom, bottom + n - 1), ...clean.slice(bottom + n - 1)];
+    const flaggedIn = (frames: PoseFrame[]) => { const a = new SquatAudit(); return frames.map((f) => a.evaluate(f)).some((r) => r.faults.includes('kneeValgus')); };
+    expect(flaggedIn(spliced)).toBe(false);
+    expect(flaggedIn(twice(spliced))).toBe(false);          // P1 live: the repeats made n − 1 camera frames look like 2(n − 1)
+    // …and n pose frames is a knee, fed once or twice
+    const held = [...clean.slice(0, bottom), ...caving.slice(bottom, bottom + n), ...clean.slice(bottom + n)];
+    expect(flaggedIn(held)).toBe(true);
+    expect(flaggedIn(twice(held))).toBe(true);
+  });
+
+  it('calibration counts pose frames too (20 camera frames, not 10 fed twice)', () => {
+    const frames = filmSquat({});
+    const a = new SquatAudit();
+    const reads = twice(frames.slice(0, 20)).map((f) => a.evaluate(f));
+    expect(reads.every((r) => /Calibrating/.test(r.note))).toBe(true);
+    expect(a.evaluate(frames[20]).note).not.toMatch(/Calibrating/);
+  });
+
+  it('reset() forgets the cached read (a new set re-reads the same clock)', () => {
+    const frames = filmSquat({});
+    const a = new SquatAudit();
+    frames.slice(0, 25).forEach((f) => a.evaluate(f));
+    a.reset();
+    expect(a.evaluate(frames[24]).note).toMatch(/Calibrating/);
+  });
+});
+
+// MIRROR-COACH P2 (2026-09-26) — THE KNEE IS READ ONLY SQUARE TO THE CAMERA (squareOn). P1 measured the one known false
+// positive of the knee read: a straight squat 8° off square reads as caving on 20 of 20 jittered squats (5°: 8 of 20),
+// because both knees' forward travel crosses the image the same way. The knee cue is on now, so off square is "not
+// square — not read". Synthetic: the synth writes z on the x scale with 2× the x jitter; a phone's z is unverified.
+describe('the squareness gate', () => {
+  const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1);
+  const flaggedSquats = (shape: SquatShape) =>
+    SEEDS.filter((seed) => { const a = new SquatAudit(); return filmSquat(shape, { seed }).some((f) => a.evaluate(f).faults.includes('kneeValgus')); }).length;
+  const moving = (shape: SquatShape, seed?: number) => {
+    const a = new SquatAudit();
+    return filmSquat(shape, seed === undefined ? undefined : { seed }).map((f) => a.evaluate(f)).filter((r) => r.present && r.phase !== 'standing');
+  };
+
+  it('a straight squat 8° off square never flags the knee under jitter (20 of 20 did before the gate)', () => {
+    const ungated = { ...SQUAT_THRESHOLDS, squareMaxYawDeg: 90, squareMinWidth: 0 };
+    const before = SEEDS.filter((seed) => { const a = new SquatAudit(ungated); return filmSquat({ turnDeg: 8 }, { seed }).some((f) => a.evaluate(f).faults.includes('kneeValgus')); }).length;
+    expect(before).toBeGreaterThanOrEqual(19);            // the false positive is real on this geometry…
+    expect(flaggedSquats({ turnDeg: 8 })).toBe(0);         // …and the gate removes it
+    expect(flaggedSquats({ turnDeg: -8 })).toBe(0);
+    expect(flaggedSquats({ turnDeg: 5 })).toBe(0);
+  });
+
+  it('off square, every knee frame says so: square false, the turn estimated, the note says the knees are not read', () => {
+    const rs = moving({ turnDeg: 8 }, 3);
+    expect(rs.length).toBeGreaterThan(20);
+    for (const r of rs) {
+      expect(r.frontal).toBe(true);                       // still a frontal body (20° is frontalReadable's line)…
+      expect(r.square).toBe(false);                       // …but not square enough to read a knee
+      expect(r.yawDeg!).toBeGreaterThan(SQUAT_THRESHOLDS.squareMaxYawDeg);
+      expect(r.note).toMatch(/off square to the camera, so the knees are not read/);
+      expect(r.faults).not.toContain('kneeValgus');
+    }
+  });
+
+  it('square on, the gate stays open under jitter, and a caving knee is still caught on every take', () => {
+    for (const seed of SEEDS.slice(0, 5)) expect(moving({}, seed).every((r) => r.square === true), `seed ${seed}`).toBe(true);
+    expect(flaggedSquats({ shiftL: -0.06, shiftR: -0.06 })).toBe(20);
+    expect(flaggedSquats({ shiftL: -0.06 })).toBe(20);
+    expect(flaggedSquats({ shiftR: -0.06 })).toBe(20);
+    expect(flaggedSquats({ shiftL: 0.05, shiftR: 0.05 })).toBe(0);   // knees pushed out: never
+  });
+
+  it('a caving knee off square is not read either way (the cost of the gate: quiet, never a wrong cue)', () => {
+    expect(flaggedSquats({ shiftL: -0.06, shiftR: -0.06, turnDeg: 8 })).toBe(0);
+  });
+
+  // MIRROR-COACH P2 review (2026-09-26): the sideways reads (lateralShift, armFall) are gated on square as well. Before,
+  // a straight squat 8° off square was cued "Stay centred" on 20 of 20 jittered takes while the Mirror asked the
+  // athlete to square up.
+  it('a straight squat 8° off square: no lateralShift and no armFall under jitter (the ungated audit flags the shift)', () => {
+    const faulted = (shape: SquatShape, fault: 'lateralShift' | 'armFall', t = SQUAT_THRESHOLDS) =>
+      SEEDS.filter((seed) => { const a = new SquatAudit(t); return filmSquat(shape, { seed }).some((f) => a.evaluate(f).faults.includes(fault)); }).length;
+    const ungated = { ...SQUAT_THRESHOLDS, squareMaxYawDeg: 90, squareMinWidth: 0 };
+    expect(faulted({ turnDeg: 8 }, 'lateralShift', ungated)).toBeGreaterThanOrEqual(15);  // the false read is real here…
+    for (const turnDeg of [8, -8]) {
+      expect(faulted({ turnDeg }, 'lateralShift'), `${turnDeg}°`).toBe(0);               // …and the gate removes it
+      expect(faulted({ turnDeg }, 'armFall'), `${turnDeg}°`).toBe(0);
+    }
+    // square on, a real sideways drift of the upper body is still caught
+    expect(faulted({ drop: 0.55, sideways: 0.1 }, 'armFall')).toBeGreaterThan(0);
+  });
+
+  it('torsoTurnSample / yawFromSamples: depth apart over width apart is tan θ; mirrored and back-on read the same |θ|', () => {
+    const at = (deg: number) => {
+      const t = (deg * Math.PI) / 180, w = 0.1;
+      return { ls: { x: 0.5 + w * Math.cos(t), y: 0.3, z: w * Math.sin(t) }, rs: { x: 0.5 - w * Math.cos(t), y: 0.3, z: -w * Math.sin(t) } };
+    };
+    for (const deg of [0, 3, 8, 20]) {
+      const { ls, rs } = at(deg);
+      const hips = { lh: { ...ls, y: 0.5, x: 0.5 + (ls.x - 0.5) / 2, z: ls.z / 2 }, rh: { ...rs, y: 0.5, x: 0.5 + (rs.x - 0.5) / 2, z: rs.z / 2 } };
+      const s = torsoTurnSample(ls, rs, hips.lh, hips.rh);
+      expect(yawFromSamples([s]), `${deg}°`).toBeCloseTo(deg, 6);
+      // a selfie stream: x flipped, labels swapped
+      const m = torsoTurnSample({ ...rs, x: 1 - rs.x }, { ...ls, x: 1 - ls.x }, { ...hips.rh, x: 1 - hips.rh.x }, { ...hips.lh, x: 1 - hips.lh.x });
+      expect(yawFromSamples([m]), `${deg}° mirrored`).toBeCloseTo(deg, 6);
+    }
+    // no z at all (a hand-built frame) reads square; an empty window reads 0
+    expect(yawFromSamples([torsoTurnSample({ x: 0.6, y: 0.3 }, { x: 0.4, y: 0.3 }, { x: 0.55, y: 0.5 }, { x: 0.45, y: 0.5 })])).toBe(0);
+    expect(yawFromSamples([])).toBe(0);
+  });
+
+  it('squareOn: frontal, not collapsed (framing.ts side-width, reused), and within the yaw line', () => {
+    expect(squareOn(true, 0.57, 1)).toBe(true);
+    expect(squareOn(true, 0.57, SQUAT_THRESHOLDS.squareMaxYawDeg + 0.1)).toBe(false);
+    expect(squareOn(false, 0.57, 0)).toBe(false);                             // turned (frontalReadable)
+    expect(squareOn(true, SQUAT_THRESHOLDS.squareMinWidth - 0.01, 0)).toBe(false); // shoulders collapsed: side-on
+    expect(squareOn(true, null, 0)).toBe(true);                               // no torso to measure: the yaw read decides
+    expect(SQUAT_THRESHOLDS.squareMinWidth).toBe(SIDE_WIDTH_MAX);
   });
 });

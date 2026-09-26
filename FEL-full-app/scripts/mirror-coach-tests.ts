@@ -114,13 +114,15 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
 }
 
 // ── B. the coach's discipline ───────────────────────────────────────────────
-// The knee is silent in production until a real recording confirms the read (VALGUS_CUE_VERIFIED); the engine's
-// discipline is exercised on a verified engine so the rules it will run by are still held.
+// MIRROR-COACH P2 (2026-09-26): the knee cue is ON (owner decision #19, verified on synthetic geometry only, behind the
+// audit's squareness gate — squat-audit.ts squareOn). Switched off, the engine still says nothing about the knee.
 {
-  ok(VALGUS_CUE_VERIFIED === false, 'the knee cue ships silent (VALGUS_CUE_VERIFIED=false)');
+  ok(VALGUS_CUE_VERIFIED === true, 'the knee cue is on (VALGUS_CUE_VERIFIED=true, synthetic proof)');
   const prod = new CueEngine();
-  ok(prod.decide(1000, ['kneeValgus']) === null, 'production engine: no knee cue');
-  ok(prod.decide(1000, ['kneeValgus', 'heelRise'])?.fault === 'heelRise', 'production engine: the next fault still gets the voice');
+  ok(prod.decide(1000, ['kneeValgus'])?.fault === 'kneeValgus', 'production engine: the knee is cued');
+  const off = new CueEngine({ valgusVerified: false });
+  ok(off.decide(1000, ['kneeValgus']) === null, 'switched off: no knee cue');
+  ok(new CueEngine({ valgusVerified: false }).decide(1000, ['kneeValgus', 'heelRise'])?.fault === 'heelRise', 'switched off: the next fault still gets the voice');
 
   const ce = new CueEngine({ valgusVerified: true });
   const first = ce.decide(1000, ['kneeValgus']);
@@ -160,7 +162,7 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   const code = h.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   // MIRROR-COACH P1 (2026-09-25): there is no band, and an unverified knee read is never painted as a correction
   ok(!/MY BAND|band pulls/i.test(code), 'no overlay claims a band');
-  ok(h.includes('paintSkeleton(pose, p, cueableFaults(squat.faults))'), 'the knee overlay only paints a CUEABLE knee fault');
+  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)))'), 'the knee overlay only paints a CUEABLE knee fault');
   ok(/VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)/.test(h), 'the knee overlay is behind VALGUS_CUE_VERIFIED');
   // MIRROR-COACH P1 review (2026-09-25): "Recording" on a live camera page reads as the video being recorded, and
   // nothing is — the row says the knee is MEASURED, and no knee copy the athlete sees says "record".

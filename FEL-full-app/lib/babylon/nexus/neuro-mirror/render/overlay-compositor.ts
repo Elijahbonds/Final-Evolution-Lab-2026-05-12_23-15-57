@@ -18,6 +18,7 @@ import { MediaPipePoseAdapter, type PoseFrame } from '../pose/mediapipe-adapter'
 import { KinematicEngine } from '../rules/kinematic-engine';
 import { RepCounter, type RepState } from '../rules/rep-counter';
 import { SquatAudit, type SquatFrameResult } from '../rules/squat-audit';
+import { PoseFrameGate } from './pose-frame-gate';
 import { applyZoneState, bindHighlightZones, disposeZones, type BoundZone } from '../rig/zone-binding';
 import { SPLIT_STANCE_PRESS_ROW, PATTERN_ZONES, type PatternConfig, type ZoneId } from '../patterns/split-stance-press-row';
 import type { ZoneState } from '../rules/config';
@@ -129,10 +130,18 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
   adapter.init().then(() => { ready = true; opts.onReady?.(); })
     .catch((e) => console.error('[FEL-MIRROR] pose init failed', e));
 
+  // MIRROR-COACH P2 (2026-09-26): one camera frame, one evaluation. This loop runs at the display's rate and the adapter
+  // returns its previous frame, unchanged, until the camera delivers the next — and every one of those used to be
+  // evaluated again: the squat audit read a repeat as 1 ms of zero hip travel, so a hip near the top read 'standing'
+  // and the harness counted a rep (P1's live proof: all 11 reps of the guided squat inside ONE squat). Only a frame
+  // whose timestamp has advanced is analysed and handed to onFrame (render/pose-frame-gate.ts); the scene still renders.
+  const poseGate = new PoseFrameGate();
+
   engine.runRenderLoop(() => {
     if (ready && opts.video.readyState >= 2) {
       const t0 = performance.now();
       const frame = adapter.detect(opts.video, t0);
+      if (!poseGate.admit(frame)) { scene.render(); return; }
       const result = kin.evaluate(frame);
       const zoneStates = {} as Record<ZoneId, ZoneState>;
       for (const z of zones) {

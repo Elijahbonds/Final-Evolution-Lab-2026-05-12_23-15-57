@@ -1,8 +1,12 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { Loader2, Search, ChevronDown, ChevronRight, Play, Dumbbell, Target, Zap, Info, X } from 'lucide-react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { toast } from 'sonner';
+import { Loader2, Search, ChevronRight, Play, Dumbbell, Target, Zap, X, Check, Plus } from 'lucide-react';
 import { ExerciseDemo } from '@/components/coach/exercise-demo';
+import { CATALOGUE_ERROR_COPY, PATTERN_INFO, nameKey } from '@/lib/coach/catalogue';
+import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import { MyCatalogue, TagRow } from './my-catalogue';
 
 interface Category { id: string; name: string }
 interface Exercise {
@@ -11,7 +15,15 @@ interface Exercise {
   regressions: string; prerequisites: string; targetPrqStat: string; dosage: string;
   videoUrl: string; thumbnailUrl: string; sortOrder: number;
   category?: { id: string; name: string };
+  /** MIRROR-COACH P2: FEL's tags for this KB item (lib/coach/kbTags.ts), added by GET /api/coach/catalogue. */
+  tags?: { pattern: MovementPattern | null; braceMode: BraceMode | null; skillLayer: string | null; prescribable: boolean; why: string; copyName?: string };
 }
+
+/**
+ * The name this KB item takes in a coach's catalogue: FEL's name where the KB uses another method's label (owner
+ * decision #8, MIRROR-COACH P2 review, 2026-09-26: "Hip CARs (90/90)" is copied as "Hip Circles (90/90)"), else its own.
+ */
+const copyNameOf = (ex: Exercise): string => ex.tags?.copyName ?? ex.name;
 
 const PHASE_LABELS: Record<number, string> = {
   1: 'System Scan', 2: 'Hardware Calibration', 3: 'Physics of Flight',
@@ -21,7 +33,17 @@ const LEVEL_COLORS: Record<string, string> = {
   foundation: '#00FF9D', intermediate: '#00E5FF', advanced: '#A855F7', elite: '#FFD700',
 };
 
-export function ExerciseCatalogue() {
+/**
+ * The Exercises tab. Everyone gets the Blueprint knowledge base (read-only). A coach (certified, or coaching a program —
+ * the same test coach-view uses for the Clients tab) also gets "My catalogue", the prescribable library the builder
+ * draws from, and an "Add to my catalogue" button on every KB exercise (MIRROR-COACH P2, 2026-09-25: before this the
+ * two libraries had no path between them, and the catalogue could not be filled from any served page at all).
+ */
+export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
+  const [view, setView] = useState<'kb' | 'mine'>('kb');
+  const [mineKeys, setMineKeys] = useState<Set<string>>(new Set());   // names already in my catalogue, as nameKey()
+  const [mineCount, setMineCount] = useState<number | null>(null);
+  const [refreshMine, setRefreshMine] = useState(0);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +64,24 @@ export function ExerciseCatalogue() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const takeMine = useCallback((rows: readonly { name: string }[]) => {
+    setMineKeys(new Set(rows.map((x) => nameKey(x.name)))); setMineCount(rows.length);
+  }, []);
+  const loadMine = useCallback(() => {
+    if (!coach) return;
+    fetch('/api/coach/programs/exercises').then((r) => (r.ok ? r.json() : [])).then((j) => takeMine(Array.isArray(j) ? j : [])).catch(() => {});
+  }, [coach, takeMine]);
+  useEffect(() => { loadMine(); }, [loadMine]);
+
+  const addToMine = async (ex: Exercise) => {
+    const r = await fetch('/api/coach/programs/exercises/from-kb', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kbExerciseId: ex.id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { toast.error(CATALOGUE_ERROR_COPY[j.error as keyof typeof CATALOGUE_ERROR_COPY] ?? 'Could not add that. Try again.'); return; }
+    const as = copyNameOf(ex);
+    toast.success(j.already ? `${as} is already in your catalogue` : as === ex.name ? `${ex.name} added to your catalogue` : `${ex.name} added to your catalogue as ${as}`);
+    loadMine(); setRefreshMine((n) => n + 1);
+  };
 
   const filtered = useMemo(() => {
     return exercises.filter((e) => {
@@ -65,6 +105,19 @@ export function ExerciseCatalogue() {
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [filtered]);
 
+  const switcher = coach && (
+    <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-3 border border-white/6" role="tablist" aria-label="Exercise library">
+      {([['kb', 'Knowledge base'], ['mine', `My catalogue${mineCount !== null ? ` (${mineCount})` : ''}`]] as const).map(([k, label]) => (
+        <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
+          className={`flex-1 rounded-lg py-2 text-xs font-medium ${view === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/40 hover:text-white/70'}`}>{label}</button>
+      ))}
+    </div>
+  );
+
+  if (coach && view === 'mine') {
+    return <div>{switcher}<MyCatalogue refreshKey={refreshMine} onChange={takeMine} onBrowseKb={() => setView('kb')} /></div>;
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -75,6 +128,7 @@ export function ExerciseCatalogue() {
 
   return (
     <div>
+      {switcher}
       {/* Search and filters */}
       <div className="space-y-3 mb-4">
         <div className="relative">
@@ -159,9 +213,11 @@ export function ExerciseCatalogue() {
                             <Target className="h-3 w-3" />{ex.targetPrqStat}
                           </span>
                         )}
+                        {ex.tags?.pattern && <span className="text-[10px] text-[#00E5FF]/60">{PATTERN_INFO[ex.tags.pattern].label}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {coach && mineKeys.has(nameKey(copyNameOf(ex))) && <Check className="h-4 w-4 text-[#7BD389]" aria-label="in your catalogue" />}
                       {ex.videoUrl && <Play className="h-4 w-4 text-[#FF3366]/60" />}
                       <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
                     </div>
@@ -180,12 +236,21 @@ export function ExerciseCatalogue() {
       )}
 
       {/* Exercise detail modal */}
-      {selected && <ExerciseDetail exercise={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ExerciseDetail
+          exercise={selected}
+          onClose={() => setSelected(null)}
+          catalogue={coach ? { inMine: mineKeys.has(nameKey(copyNameOf(selected))), add: () => addToMine(selected), open: () => { setSelected(null); setView('mine'); } } : null}
+        />
+      )}
     </div>
   );
 }
 
-function ExerciseDetail({ exercise: ex, onClose }: { exercise: Exercise; onClose: () => void }) {
+interface CatalogueHook { inMine: boolean; add: () => Promise<void>; open: () => void }
+
+function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exercise; onClose: () => void; catalogue: CatalogueHook | null }) {
+  const [adding, setAdding] = useState(false);
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -209,6 +274,26 @@ function ExerciseDetail({ exercise: ex, onClose }: { exercise: Exercise; onClose
               <span className="text-xs text-[#A855F7]/60">{ex.category.name}</span>
             )}
           </div>
+          {ex.tags && (
+            <div className="mt-2 space-y-1">
+              <TagRow pattern={ex.tags.pattern} braceMode={ex.tags.braceMode} layer={ex.tags.skillLayer} />
+              <p className="text-[11px] text-white/35">Why these tags: {ex.tags.why}</p>
+            </div>
+          )}
+          {catalogue && (
+            <div className="mt-3">
+              {catalogue.inMine ? (
+                <button onClick={catalogue.open} className="inline-flex items-center gap-1.5 rounded-lg border border-[#7BD389]/40 px-3 py-1.5 text-xs text-[#7BD389]"><Check className="h-3.5 w-3.5" /> In your catalogue · open it</button>
+              ) : ex.tags && !ex.tags.prescribable ? (
+                <p className="text-xs text-white/40">{CATALOGUE_ERROR_COPY.not_prescribable}</p>
+              ) : (
+                <button disabled={adding} onClick={async () => { setAdding(true); try { await catalogue.add(); } finally { setAdding(false); } }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs text-[#00E5FF] disabled:opacity-50">
+                  {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add to my catalogue
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Demo — YOUR AVATAR / COACH VIDEO tabs (never blank) */}
