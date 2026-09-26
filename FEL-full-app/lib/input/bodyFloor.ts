@@ -29,6 +29,9 @@
 // that. Pure: no DOM, no bus.
 import type { BodyOut, BodyPacket, FelButton } from '@/lib/babylon/core/InputBus';
 import type { BodyBinding, BodyProfile } from './bodyProfiles';
+// MOVEMENT PLAY P7 (2026-09-25): the strike vetoes live in lib/pose/strikeVeto.ts now, shared with the fight reader;
+// the numbers below are re-exported from there (their measurements stay documented here, where they were set).
+import { StrikeVeto, CROUCH_DEAD, STRIKE_LOOKBACK_MS, STRIKE_SQUAT_MOVE, OVERHEAD_STRIKE_MS } from '@/lib/pose/strikeVeto';
 
 /** The lean engages past LEAN_ON_SW shoulder widths off the calibrated centre and lets go under LEAN_OFF_SW, reaching
  *  full stick at LEAN_FULL_SW (the ramp runs from the OFF line, so the hysteresis never jumps the value). Rest reads
@@ -38,7 +41,7 @@ export const LEAN_OFF_SW = 0.28;
 export const LEAN_FULL_SW = 1.1;
 /** The crouch pulls nothing under CROUCH_DEAD squat (a 10 cm duck reads 0.26–0.29) and full trigger at CROUCH_FULL
  *  (a 20 cm duck reads 0.51–0.55, a gather 0.43–1.0). */
-export const CROUCH_DEAD = 0.35;
+export { CROUCH_DEAD };
 export const CROUCH_FULL = 0.9;
 /** The crouch's peak is let go after this long (ms) under the dead band on the floor when no hop took it: it covers
  *  the extension and a take-off told up to 267 ms after the real one. */
@@ -56,15 +59,15 @@ export const FLOOR_RELEASE_MS = 100;
 export const PULSE_MS = 60;
 /** How far back (ms) from a strike's own instant the floor looks at the squat: a punch or a kick is told ~1–3 frames
  *  after it (BodyReader's VEL_HALF_MS look-ahead), so the floor keeps twice this. */
-export const STRIKE_LOOKBACK_MS = 300;
+export { STRIKE_LOOKBACK_MS };
 /** A crouch that is MOVING: the squat's range over the lookback (from STRIKE_LOOKBACK_MS before the strike to the
  *  frame that told it) at least this. A jump's gather moves 0.36–0.55 there; a fighting stance held 13–25 cm down
  *  (squat 0.33–0.66) moves 0.01–0.06 while it throws (the gate's stance streams, three seeds). */
-export const STRIKE_SQUAT_MOVE = 0.15;
+export { STRIKE_SQUAT_MOVE };
 /** No strike this soon (ms) after both wrists were overhead: the arms coming down out of a hands-up read as a punch
  *  69–103 ms after they left it (the gate's hands-up hold dropped at once and lowered over 0.5 s), and both hands up
  *  while playing does nothing (owner call 3) — not even a jab on the way down. */
-export const OVERHEAD_STRIKE_MS = 300;
+export { OVERHEAD_STRIKE_MS };
 /** Every analog value goes out on this grid, so the reader's jitter is not a stream of one-hundredth changes. */
 export const QUANTUM = 0.05;
 
@@ -106,12 +109,11 @@ export class BodyFloor {
   private wasCalibrated = false;
   private latchSent = false;
   private pulses = new Map<string, Pulse>();
-  /** The tracked frames' squat over the last 2 × STRIKE_LOOKBACK_MS: a strike is judged at its own instant, told late. */
-  private squats: { t: number; squat: number | null }[] = [];
+  /** The strike vetoes (lib/pose/strikeVeto): the squat over the last 2 × STRIKE_LOOKBACK_MS and when both wrists were
+   *  last overhead — a strike is judged at its own instant, told late. */
+  private readonly veto = new StrikeVeto();
   /** When each foot was last seen off the floor on the ground (capture ms). */
   private liftAt: Record<'L' | 'R', number> = { L: -Infinity, R: -Infinity };
-  /** The last tracked frame with both wrists overhead (capture ms). */
-  private bothUpT = -Infinity;
 
   constructor(profile: BodyProfile) {          // already minus claims
     const b = profile.bindings;
@@ -196,21 +198,11 @@ export class BodyFloor {
     // MOVEMENT PLAY P3 (2026-09-24, the step-2 review): nor out of both hands coming down from overhead. The START
     // latch covers that pose in READY and PAUSED; while playing a hands-up does nothing (owner call 3), and the gate's
     // every-press-is-explained row found its way down read as two jabs (seed 23; a 0.5 s lowering, seed 41).
-    if (r.wrist?.L.overhead && r.wrist.R.overhead) this.bothUpT = r.t;
     // a foot off the floor on the ground (a stride's swing; a jump's are the jump's)
     if (r.feet && !ch.inJump) for (const f of ['L', 'R'] as const) if (!r.feet[f].contact) this.liftAt[f] = r.t;
-    this.squats.push({ t: r.t, squat: r.squat });
-    while (this.squats.length > 2 && r.t - this.squats[0].t > 2 * STRIKE_LOOKBACK_MS) this.squats.shift();
-    const inGather = (t: number): boolean => {
-      let at: number | null = r.squat;
-      for (const x of this.squats) { if (x.t > t) break; at = x.squat; }
-      if (!((at !== null && at >= CROUCH_DEAD) || (r.squat !== null && r.squat >= CROUCH_DEAD))) return false;
-      let lo = Infinity, hi = -Infinity;
-      for (const x of this.squats) if (x.t >= t - STRIKE_LOOKBACK_MS && x.squat !== null) { lo = Math.min(lo, x.squat); hi = Math.max(hi, x.squat); }
-      return hi - lo >= STRIKE_SQUAT_MOVE;
-    };
+    this.veto.push(r.t, r.squat, !!(r.wrist?.L.overhead && r.wrist.R.overhead));
     /** A strike the floor presses: on the ground, not out of a gather, not both arms coming down from overhead. */
-    const struck = (t: number): boolean => !ch.inJump && t - this.bothUpT > OVERHEAD_STRIKE_MS && !inGather(t);
+    const struck = (t: number): boolean => this.veto.ok(t, r.squat, ch.inJump);
     let hopped = false;
     for (const ev of p.events) {
       switch (ev.kind) {
@@ -266,7 +258,7 @@ export class BodyFloor {
     // crouched), a crouch counts from a stand
     this.clearCrouch();
     this.standFirst = true;
-    this.squats = [];
+    this.veto.clearSquats();   // (the overhead instant is kept, as it always was)
     this.liftAt = { L: -Infinity, R: -Infinity };
     return out;
   }

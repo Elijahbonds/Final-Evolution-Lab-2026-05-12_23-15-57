@@ -31,6 +31,17 @@ export const ROLL_IFRAMES_SEC = 0.26;
 export const ROLL_RECOVER_SEC = 0.18;
 export const ROLL_COOLDOWN_SEC = 0.75;
 
+/**
+ * MOVEMENT PLAY P7 (2026-09-25): the SLIP — the body's head off the line (a slip) or under it (a duck). Short and cheap
+ * like the dash, but only ever the body's (no button makes one): SLIP_M across in SLIP_SEC (0 = in place: the duck),
+ * SLIP_IFRAMES_SEC of i-frames from its start, SLIP_COOLDOWN_SEC before the next. It leaves the fighter free to strike
+ * (a slip and a counter is the move), unlike the roll's committed recovery. [est.: PLAN-P7 §4.1]
+ */
+export const SLIP_M = 0.45;
+export const SLIP_SEC = 0.22;
+export const SLIP_IFRAMES_SEC = 0.2;
+export const SLIP_COOLDOWN_SEC = 0.5;
+
 /** Take-off speed, m/s. ~0.95 m of clearance: over a sweep, under a high kick. */
 export const JUMP_V = 4.3;
 /** Combat gravity. Heavier than the world's, so a jump is a beat rather than a float. */
@@ -44,8 +55,15 @@ export class EvadeMoves {
   private dir = new Vector3(0, 0, 1);
   private airY = 0;
   private airVy = 0;
+  private slipTimer = 0;
+  private slipIframe = 0;
+  private slipCooldown = 0;
+  private slipDir = new Vector3(0, 0, 0);
 
   get rolling(): boolean { return this.rollTimer > 0; }
+  /** MOVEMENT PLAY P7: a slip / duck is under way, and its i-frames. */
+  get slipping(): boolean { return this.slipTimer > 0; }
+  get slipIFrames(): boolean { return this.slipIframe > 0; }
   get rollIFrames(): boolean { return this.rollIframe > 0; }
   get airborne(): boolean { return this.airY > 0.001 || this.airVy > 0; }
   /** Metres above the floor. The mode adds this to the root's y; nothing here touches a transform. */
@@ -75,6 +93,20 @@ export class EvadeMoves {
     return true;
   }
 
+  /**
+   * MOVEMENT PLAY P7: slip along (dirX, dirZ) — a unit direction in the world, or (0, 0) for the duck in place. Refused on
+   * its cooldown, mid-roll and in the air.
+   */
+  slip(dirX: number, dirZ: number): boolean {
+    if (this.slipCooldown > 0 || this.rollTimer > 0 || this.airborne) return false;
+    const d = new Vector3(dirX, 0, dirZ);
+    this.slipDir = d.lengthSquared() > 1e-4 ? d.normalize() : Vector3.Zero();
+    this.slipTimer = SLIP_SEC;
+    this.slipIframe = SLIP_IFRAMES_SEC;
+    this.slipCooldown = SLIP_COOLDOWN_SEC;
+    return true;
+  }
+
   /** Leave the floor. Refused mid-air and mid-roll: no double jumps, no roll-cancel into one. */
   jump(): boolean {
     if (this.airborne || !this.canAct) return false;
@@ -93,6 +125,8 @@ export class EvadeMoves {
     if (!(dt > 0)) return this.rolling ? this.dir.scale(ROLL_SPEED) : null;
     this.rollCooldown = Math.max(0, this.rollCooldown - dt);
     this.rollIframe = Math.max(0, this.rollIframe - dt);
+    this.slipCooldown = Math.max(0, this.slipCooldown - dt);
+    this.slipIframe = Math.max(0, this.slipIframe - dt);
 
     if (this.airborne) {
       this.airVy += JUMP_G * dt;
@@ -109,6 +143,10 @@ export class EvadeMoves {
       this.rollRecover = Math.max(0, this.rollRecover - dt);
       return Vector3.Zero();            // planted through the recovery: the stick does nothing
     }
+    if (this.slipTimer > 0) {
+      this.slipTimer = Math.max(0, this.slipTimer - dt);
+      return this.slipDir.scale(SLIP_M / SLIP_SEC);
+    }
     return null;
   }
 
@@ -116,5 +154,6 @@ export class EvadeMoves {
   reset(): void {
     this.rollTimer = 0; this.rollRecover = 0; this.rollCooldown = 0; this.rollIframe = 0;
     this.airY = 0; this.airVy = 0;
+    this.slipTimer = 0; this.slipIframe = 0; this.slipCooldown = 0;
   }
 }

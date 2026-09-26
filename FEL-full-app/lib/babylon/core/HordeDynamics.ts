@@ -50,6 +50,9 @@ export interface HordeMove {
   /** thrown while I am AIRBORNE (a jump attack: it reuses a grounded capture), / an AUTHORED pose clip (no capture behind it) */
   aerial?: boolean;
   authored?: boolean;
+  /** MOVEMENT PLAY P7 (2026-09-25): this move is another weight of the named move — it plays that move's capture (the body's
+   *  uppercut thrown as a LINK is the RISING DRAGON's clip without the launch). */
+  variantOf?: string;
 }
 
 // ── cancel + buffer ─────────────────────────────────────────────────────────
@@ -118,6 +121,10 @@ export const MOVES = {
   jumpKick:  M({ id: 'jumpKick', label: 'JUMP KICK', clip: 'high_kick', weight: 'medium', speed: 1.35, range: 2.1, arcDeg: 140, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.6, aerial: true, slam: true }),
   jumpSpinKick: M({ id: 'jumpSpinKick', label: 'JUMPING SPIN KICK', clip: 'karate_typhoon', weight: 'finisher', speed: 1.2, range: 2.3, arcDeg: 360, launch: true, stunRadius: 3.0, stunSec: 1.0, lunge: 1.4, ender: true, aerial: true, spinDeg: 320, spinSec: 0.45 }),
   backSpin:  M({ id: 'backSpin', label: 'SPIN BACK KICK', clip: 'karate_backspin', weight: 'medium', speed: 1.4, range: 2.1, arcDeg: 260, launch: false, stunRadius: 2.0, stunSec: 0.6, lunge: 0.4, spinDeg: 360, spinSec: 0.36 }),
+  // MOVEMENT PLAY P7 (2026-09-25): the body's uppercut as a LINK — the RISING DRAGON's capture, a medium blow with no launch
+  // and no crowd stun, so a real uppercut early in a string is a punch and not the finisher. As a string's third link the
+  // book promotes it to the RISING DRAGON (StringBook.pressMove). Pads never reach it: no button sequence resolves to it.
+  uppercutLink: M({ id: 'uppercutLink', label: 'UPPERCUT', clip: 'uppercut', weight: 'medium', speed: 1.3, range: 1.7, arcDeg: 130, launch: false, stunRadius: 0, stunSec: 0, lunge: 1.2, variantOf: 'uppercut' }),
 } as const satisfies Record<string, HordeMove>;
 export type MoveId = keyof typeof MOVES;
 
@@ -169,10 +176,39 @@ export class StringBook {
     if (move.ender || this.hist.length >= STRING_MAX) this.hist = [];
     return move;
   }
+  /**
+   * MOVEMENT PLAY P7 (2026-09-25): a BODY strike — its move is the one the body threw (a real hook is the HOOK whatever the
+   * string says), and it advances the same string as a press would, under `token` (straights and hooks A, kicks B, the
+   * uppercut Y: a string that mixes pad and body presses still reads). `now` is the strike's ONSET (s): links are timed
+   * onset to onset, so the camera's latency cancels out of the string window. The uppercut as the string's STRING_MAX-th link
+   * is promoted to the RISING DRAGON. press() is untouched. (The reader tells body blows in onset order; a link that still
+   * arrives with an earlier onset never moves the string's clock back — the review, 2026-09-26.)
+   */
+  pressMove(move: HordeMove, token: StrikeBtn, now: number): HordeMove {
+    if (now - this.lastAt > STRING_WINDOW_SEC) this.hist = [];
+    this.lastAt = Math.max(this.lastAt, now);
+    this.hist.push(token);
+    const m = move.id === 'uppercutLink' && this.hist.length >= STRING_MAX ? MOVES.uppercut : move;
+    if (m.ender || this.hist.length >= STRING_MAX) this.hist = [];
+    return m;
+  }
   /** The string so far (for the HUD / telemetry). */
   get history(): readonly StrikeBtn[] { return this.hist; }
   reset(): void { this.hist = []; this.lastAt = -Infinity; }
 }
+
+/**
+ * MOVEMENT PLAY P7 (2026-09-25): what each strike the body reads (lib/pose/fightReader) plays, and the string token it
+ * advances the book with. A spin kick and a jump kick exist only behind the READY screen's opt-in (the body's
+ * space check first).
+ */
+export type BodyStrike = 'jab' | 'cross' | 'hook' | 'uppercut' | 'front' | 'round' | 'spin' | 'jump';
+export const BODY_MOVE_OF: Readonly<Record<BodyStrike, { move: MoveId; token: StrikeBtn }>> = {
+  jab: { move: 'jab', token: 'A' }, cross: { move: 'cross', token: 'A' }, hook: { move: 'hook', token: 'A' },
+  uppercut: { move: 'uppercutLink', token: 'Y' },
+  front: { move: 'kick', token: 'B' }, round: { move: 'roundhouse', token: 'B' },
+  spin: { move: 'backSpin', token: 'B' }, jump: { move: 'jumpKick', token: 'B' },
+};
 
 /** The move for a button sequence (the last token is the press) and the stick direction on the press. Pure. */
 /** STORM COMBOS: the situation a press is read in — a launched body in front (AIR links), a dash just thrown (the RUSH). */

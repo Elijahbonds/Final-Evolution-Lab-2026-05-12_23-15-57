@@ -184,9 +184,10 @@ export interface ModeDefinition {
   /** MOVEMENT PLAY P3 (2026-09-24): the mode's own say in its body play (none in P3: every mode runs its table row in
    *  lib/input/bodyProfiles). `claims` takes a move off the floor and hands it to onBody instead (P5+). */
   body?: ModeBodySpec;
-  /** The CLAIMED event kinds only, in 'playing' only, on the capture clock (ev.t / ev.seen). Never re-entered by
-   *  DunkMode's aiFeed. */
-  onBody?(ctx: ModeContext, ev: BodyEvent, view: BodyView): void;
+  /** The CLAIMED event kinds only, in 'playing' only, past the START latch, on the capture clock (ev.t / ev.seen). Never
+   *  re-entered by DunkMode's aiFeed. MOVEMENT PLAY P7: return false for an event the mode did not act on (a menu phase, a
+   *  round break) — it is then not counted as input the game received. */
+  onBody?(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean | void;
 }
 
 export interface HarnessOpts {
@@ -645,9 +646,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       for (const e of floor.step(p, now, s.latched)) input.emitBody(e);
       for (const ev of p.events) {
         qa?.body(ev.kind, now - ev.t);
-        if (def.onBody && claimed.has(ev.kind)) {
-          qa?.press(`body:${ev.kind}`); store.count('body'); session.noteInput('body', now);
-          def.onBody(ctx, ev, viewOf(p));
+        // MOVEMENT PLAY P7 (2026-09-25): a claimed kind reaches the mode only past the START latch (the floor presses nothing
+        // there either: the START pose is not a strike), and it is play the game RECEIVED only if the mode took it — a mode
+        // returns false for an event it does not act on (a menu, a round break), which is then no evidence and no press
+        if (def.onBody && claimed.has(ev.kind) && !s.latched) {
+          if (def.onBody(ctx, ev, viewOf(p)) !== false) { qa?.press(`body:${ev.kind}`); store.count('body'); session.noteInput('body', now); }
         }
       }
     }

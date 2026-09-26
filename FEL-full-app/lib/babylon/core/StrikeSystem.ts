@@ -59,12 +59,22 @@ export function validateMoveset(moves: Record<string, CombatMove>): string[] {
 // ── Strike instance state machine ──────────────────────────────────────────
 export type StrikePhase = 'startup' | 'active' | 'recovery' | 'done';
 
+/** MOVEMENT PLAY P7 (2026-09-25): a BODY strike reaches the game after the camera's latency and the reader's own delay,
+ *  so it starts part-way through its startup (StrikeController.request's `elapsedMs`) — but never with less than this left
+ *  to run (s): the rival's one read per wind-up needs the swing in 'startup' for at least a frame (≥ 20 fps render). */
+export const BODY_WINDUP_FLOOR_SEC = 0.05;
+
 export class StrikeInstance {
   phase: StrikePhase = 'startup';
   private t = 0;
   private hitRegistered = false;
 
-  constructor(public move: CombatMove) {}
+  /** `startT` (s): how far into the swing it begins — 0 for every press; a body strike's elapsed time (see request).
+   *  `contactSec`: the clip's contact frame — what is left of the startup never runs shorter than it either, so the
+   *  rival's reaction never plays before the avatar's fist arrives. */
+  constructor(public move: CombatMove, startT = 0, contactSec = 0) {
+    if (startT > 0) this.t = Math.min(startT, Math.max(0, move.startupSec - Math.max(BODY_WINDUP_FLOOR_SEC, contactSec)));
+  }
 
   /** Advance; returns true on the frame the ACTIVE window opens (the
    *  impact-check moment for the mode). */
@@ -116,6 +126,9 @@ export class StrikeController {
   current: StrikeInstance | null = null;
   private buffered: string | null = null;
   private bufferUntil = 0;
+  /** MOVEMENT PLAY P7: the queued BODY strike's onset on the page clock (null = a press, which starts at 0) and contact. */
+  private bufferedOnset: number | null = null;
+  private bufferedContact = 0;
 
   constructor(private moveset: Record<string, CombatMove>) {}
 
@@ -132,21 +145,34 @@ export class StrikeController {
    * The queue now lives as long as the horde's (QUEUE_MS, the number that mode already measured its way to) and is
    * taken at the CANCEL POINT as well as at the end of the swing — see `update`.
    */
-  request(moveId: string, nowMs: number): boolean {
+  request(moveId: string, nowMs: number, opts?: { elapsedMs?: number; contactMs?: number }): boolean {
     if (!this.moveset[moveId]) return false;
+    // MOVEMENT PLAY P7 (2026-09-25): a BODY strike says how long ago it began (its onset, backdated through the camera's
+    // latency) and where its clip makes contact: it starts that far into its startup, the floors above kept. No opts
+    // (every press) = exactly as before.
+    const startT = opts?.elapsedMs !== undefined ? Math.max(0, opts.elapsedMs) / 1000 : 0;
+    const contact = Math.max(0, opts?.contactMs ?? 0) / 1000;
     if (!this.current || this.current.phase === 'done') {
-      this.current = new StrikeInstance(this.moveset[moveId]);
+      this.current = new StrikeInstance(this.moveset[moveId], startT, contact);
       return true;
     }
     if (this.current.canCancelInto(moveId)) {
-      this.current = new StrikeInstance(this.moveset[moveId]);
+      this.current = new StrikeInstance(this.moveset[moveId], startT, contact);
       return true;
     }
     this.buffered = moveId;
+    this.bufferedOnset = opts?.elapsedMs !== undefined ? nowMs - Math.max(0, opts.elapsedMs) : null;
+    this.bufferedContact = contact;
     // the queue outlives the swing it was pressed in (the horde's rule): a press at the start of a heavy used to die 280 ms
     // before anything could take it
     this.bufferUntil = nowMs + Math.max(QUEUE_MS, this.current.remainingMs + 60);
     return false;
+  }
+  /** A queued strike, started now: a body one as far in as its onset says (its wind-up floor kept), a press at 0. */
+  private startBuffered(nowMs: number): void {
+    const next = this.buffered!, onset = this.bufferedOnset;
+    this.buffered = null; this.bufferedOnset = null;
+    this.current = new StrikeInstance(this.moveset[next], onset !== null ? Math.max(0, nowMs - onset) / 1000 : 0, this.bufferedContact);
   }
 
   update(dt: number, nowMs: number): { startedActive: boolean } {
@@ -154,20 +180,16 @@ export class StrikeController {
     // nulled `current` and never touched `buffered`, so a press could outlive the swing it was meant for by minutes.
     // Nothing fired it — every consumer re-checks the deadline — but a dead command left lying in a state machine is
     // a bug waiting for its second reader.
-    if (this.buffered && nowMs > this.bufferUntil) this.buffered = null;
+    if (this.buffered && nowMs > this.bufferUntil) { this.buffered = null; this.bufferedOnset = null; }
     if (!this.current) return { startedActive: false };
     const opened = this.current.update(dt);
     // TAKE THE QUEUED PRESS AT THE CANCEL POINT, not only at the end of the swing. A press made before the window
     // opens is the player asking to chain; holding it until the chain is legal is the whole point of a queue.
     if (this.buffered && nowMs <= this.bufferUntil && this.current.canCancelInto(this.buffered)) {
-      const next = this.buffered; this.buffered = null;
-      this.current = new StrikeInstance(this.moveset[next]);
+      this.startBuffered(nowMs);
       return { startedActive: opened };
     }
-    if (this.current.phase === 'done' && this.buffered && nowMs <= this.bufferUntil) {
-      const next = this.buffered; this.buffered = null;
-      this.current = new StrikeInstance(this.moveset[next]);
-    }
+    if (this.current.phase === 'done' && this.buffered && nowMs <= this.bufferUntil) this.startBuffered(nowMs);
     if (this.current.phase === 'done' && (!this.buffered || nowMs > this.bufferUntil)) {
       this.current = null;
     }
@@ -177,7 +199,7 @@ export class StrikeController {
   get busy(): boolean { return this.current !== null; }
   swapMoveset(moveset: Record<string, CombatMove>): void {
     this.moveset = moveset;
-    this.current = null; this.buffered = null;
+    this.current = null; this.buffered = null; this.bufferedOnset = null;
   }
 }
 

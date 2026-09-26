@@ -48,6 +48,8 @@
 import {
   NOSE, LEFT_EAR, RIGHT_EAR, LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, CORE_POINTS, type Wm, type PoseFrame,
 } from './landmarks';
+// MOVEMENT PLAY P7 (2026-09-25): the fight read — owned and fed here, the way arms() and kicks() are (lib/pose/fightReader)
+import { FightReader, type FightEvent, type FightFrame, type Hand as FightHand } from './fightReader';
 import { OneEuro, PoseFilter, type OneEuroParams, IMAGE_EURO, WORLD_EURO } from './oneEuro';
 import {
   StillnessGate, calibrate, footDropW, footInFrame, footLowImg, hipMidImg, shoulderMidImg, median, sd, rulerY, downW,
@@ -279,6 +281,13 @@ export const KICK_TOP_M = 0.5;
 export const KICK_MIN = 2.0;
 export const KICK_STRAIGHT = 0.85;
 
+/** MOVEMENT PLAY P7: a jog, for the fight read — steps at this cadence (Hz) or faster, the last this recent (ms). A fight
+ *  stance's footwork steps at ~1 Hz; the P1 jog reads 2.68 Hz. */
+export const FIGHT_STRIDE_HZ = 1.6;
+export const FIGHT_STRIDE_MS = 700;
+/** …and a landing's absorb (ms) is still the jump's, for the fight read's vetoes (bodyChannels.ABSORB_MS). */
+const STRIDE_JUMP_ABSORB_MS = 250;
+
 /** How much history the reader keeps (ms): the longest look-back (the cadence window). */
 const HISTORY_MS = 3000;
 
@@ -351,6 +360,12 @@ export interface BodyRead {
    * edge-on, ±180 back to the camera; + = turned to the player's left).
    */
   yaw: { widthRatio: number; nearSide: Hand | null; deg: number } | null;
+  /** MOVEMENT PLAY P7: the fighter's stance lead, whether the guard is up, and the capture instant up to which the body's
+   *  defence is decided (the fight read's state, FightReader.state); null while the fight read has nothing (no body
+   *  calibrated, or just reset: lost, found, recalibrated). A present frame that fails `tracking` for a moment keeps the
+   *  last state: the fight read was neither fed nor reset by it (the review, 2026-09-26: a one-frame hip dip reported null,
+   *  and the modes let a guard go that the player still held). */
+  fight?: { lead: FightHand; guard: boolean; decidedUntil: number } | null;
 }
 
 interface Ev { t: number; /** capture time of the frame that produced the event */ seen: number }
@@ -377,7 +392,13 @@ export type BodyEvent =
   | (Ev & { kind: 'punch'; hand: Hand; speed: number })
   | (Ev & { kind: 'kick'; foot: FootSide; speed: number })
   | (Ev & { kind: 'lost'; lastSeen: number })
-  | (Ev & { kind: 'found'; goneMs: number });
+  | (Ev & { kind: 'found'; goneMs: number })
+  /**
+   * MOVEMENT PLAY P7 (2026-09-25): the fight read (lib/pose/fightReader) — blow (jab / cross / hook / uppercut), legKick
+   * (front / round), guard (up / down, raise, push), evade (slip / duck), fightStep, turn. Their `t` is the motion's
+   * ONSET (a punch / kick above stays at its peak, so the P2 and P3 gates hold). Only a mode that claims them sees them.
+   */
+  | FightEvent;
 export type BodyEventKind = BodyEvent['kind'];
 
 export interface BodyReaderOptions {
@@ -387,6 +408,8 @@ export interface BodyReaderOptions {
   autoCalibrate?: boolean;
   /** One Euro parameters; false = read the raw landmarks. */
   filter?: { image?: OneEuroParams; world?: OneEuroParams } | false;
+  /** MOVEMENT PLAY P7: the fight read's tuning tap (scripts/body/fight.mts); never set in play. */
+  fightDebug?: (msg: string) => void;
 }
 
 // ── internals ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -526,6 +549,9 @@ export class BodyReader {
   private mLive = 0;
   private mBuf: number[] = [];
   private lensH = 0;
+  /** MOVEMENT PLAY P7: the lens height as calibrated — the camera does not move, so the floor plane's rows are read with
+   *  this (the running lensH follows the hips' read, and a stretch's tilted pelvis moved the floor 0.2 m). */
+  private lensH0 = 0;
   private tilt: Tilt = LEVEL;
   private horizonY = HORIZON_Y;
   /** The standing hip height (m): the calibration's, lifted by a taller stand held still (STAND_HOLD_MS). */
@@ -548,8 +574,11 @@ export class BodyReader {
   private punch: ({ bestV: number; bestT: number; emitted: boolean } | null)[] = [null, null];
   private kick: ({ bestV: number; bestT: number; straight: number; top: number; emitted: boolean } | null)[] = [null, null];
   private footEuro: [OneEuro, OneEuro] = [new OneEuro(WORLD_EURO), new OneEuro(WORLD_EURO)];
+  /** MOVEMENT PLAY P7: the fight read, fed one FightFrame per tracked frame (reset with the motion: one body at a time). */
+  private readonly fight: FightReader;
 
   constructor(readonly opts: BodyReaderOptions = {}) {
+    this.fight = new FightReader(opts.fightDebug);
     this.auto = opts.autoCalibrate ?? true;
     this.filt = opts.filter === false ? null : new PoseFilter(opts.filter?.image ?? IMAGE_EURO, opts.filter?.world ?? WORLD_EURO);
     if (opts.calibration) this.setCalibration(opts.calibration);
@@ -572,6 +601,7 @@ export class BodyReader {
     this.tilt = tiltOf(cal.pitchDeg);
     this.horizonY = HORIZON_Y - FOCAL_Y * (this.tilt.s / this.tilt.c);
     this.lensH = cal.hipHeightM + (cal.hipY - this.horizonY) * cal.mPerY * this.tilt.c;
+    this.lensH0 = this.lensH;
     this.standH = cal.hipHeightM;
     this.resetMotion();
   }
@@ -593,6 +623,7 @@ export class BodyReader {
     this.flight = null; this.lastLand = -Infinity; this.steps = []; this.dip = null; this.dipArmed = true; this.resumed = false; this.blind = false;
     this.vRun = [null, null]; this.highRun = [null, null]; this.punch = [null, null]; this.kick = [null, null];
     this.footEuro[0].reset(); this.footEuro[1].reset();
+    this.fight.reset();
   }
 
   read(frame: PoseFrame): { read: BodyRead; events: BodyEvent[] } {
@@ -642,8 +673,57 @@ export class BodyReader {
     } else if (this.flight?.confirmed && !this.flight.downDet) this.blind = true;
     this.arms(ev);
     if (this.cal) this.kicks(ev);
+    const read = this.buildRead(frame, f, s);
+    // MOVEMENT PLAY P7: the fight read, on the raw points of a tracked, calibrated frame
+    const ff = read.tracking ? this.fightFrame(frame, s, read) : null;
+    if (ff) ev.push(...this.fight.push(ff));
+    read.fight = this.cal ? this.fight.state : null;
     ev.sort((a, b) => a.t - b.t);
-    return { read: (this.lastRead = this.buildRead(frame, f, s)), events: ev };
+    return { read: (this.lastRead = read), events: ev };
+  }
+
+  /**
+   * The fight read's frame: the RAW world points levelled (a strike leaves from rest, where the One Euro lags), the hips
+   * across the room (the image offset through the live ruler) and toward the camera (the live ruler's change: depth is
+   * the ruler × FOCAL_Y), and what the reader already knows (contact, the flight, the squat, running in place).
+   */
+  private fightFrame(raw: PoseFrame, s: Sample, read: BodyRead): FightFrame | null {
+    const c = this.cal, w = raw.world;
+    if (!c || !w) return null;
+    const tl = this.tilt;
+    const P = (i: number): { x: number; y: number; z: number } => lev(w[i], tl);
+    const pair = (l: number, r: number): [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] => [P(l), P(r)];
+    const ears = [LEFT_EAR, RIGHT_EAR].filter((i) => raw.image[i].v >= SEEN_VIS);
+    const earY = ears.length ? ears.reduce((a, i) => a + P(i).y, 0) / ears.length : P(NOSE).y;
+    const hm = hipMidImg(raw.image);
+    const hipRoom = s.hip !== null
+      ? { x: (hm.x - c.centreX) * this.mLive * (c.mPerX / c.mPerY), y: s.hip, z: (c.mPerY - this.mLive) * FOCAL_Y }
+      : null;
+    const last = this.steps[this.steps.length - 1];
+    const hz = this.cadence();
+    // each foot on the floor plane: its lowest image point's row gives its depth (the floor's rows run toward the horizon
+    // with distance: d = lens height × FOCAL_Y / (row − horizon)), its column its place across — a step toward the camera
+    // moves a foot ~5 % of the picture down at 3 m, where the torso ruler reads the same step through a bend as well
+    const dCal = c.mPerY * FOCAL_Y;
+    const feetRoom = (['L', 'R'] as const).map((sd) => {
+      const y = footLowImg(raw.image, sd) - this.horizonY;
+      if (!(y > 0.05) || !footInFrame(raw.image, sd)) return null;
+      const d = (this.lensH0 * FOCAL_Y) / (y * this.tilt.c);
+      const ix = (raw.image[FOOT[sd].heel].x + raw.image[FOOT[sd].toe].x) / 2;
+      return { x: (ix - c.centreX) * c.mPerX * (d / dCal), y: 0, z: dCal - d };
+    });
+    return {
+      t: raw.t,
+      shoulder: pair(ARM.L.shoulder, ARM.R.shoulder), elbow: pair(ARM.L.elbow, ARM.R.elbow), wrist: pair(ARM.L.wrist, ARM.R.wrist),
+      nose: P(NOSE), crownY: earY + HEAD_LINE_ABOVE_EARS_M,
+      hip: pair(FOOT.L.hip, FOOT.R.hip), knee: pair(FOOT.L.knee, FOOT.R.knee), ankle: pair(FOOT.L.ankle, FOOT.R.ankle),
+      hipH: s.hip, hipRoom, feetRoom: feetRoom[0] && feetRoom[1] ? [feetRoom[0], feetRoom[1]] : null, contact: s.contact, airborne: read.airborne,
+      inJump: !!this.flight || raw.t - this.lastLand < STRIDE_JUMP_ABSORB_MS,
+      squat: read.squat, bothOverhead: !!(read.wrist?.L.overhead && read.wrist.R.overhead),
+      inStride: !!last && hz !== null && hz >= FIGHT_STRIDE_HZ && raw.t - last.tDown <= FIGHT_STRIDE_MS,
+      wristSeen: [raw.image[ARM.L.wrist].v >= SEEN_VIS, raw.image[ARM.R.wrist].v >= SEEN_VIS],
+      armM: [c.armM.L, c.armM.R], legM: c.legLengthM, yawDeg: read.yaw?.deg ?? null,
+    };
   }
 
   private markLost(at: number, seen: number, ev: BodyEvent[]): void {
@@ -653,6 +733,7 @@ export class BodyReader {
     if (this.flight?.confirmed && this.flight.downDet !== null) this.landingDue(seen, ev, true);
     ev.push({ kind: 'lost', t: at, seen, lastSeen: this.lastSeen ?? at });
     this.lost = true;
+    this.fight.reset();
     this.filt?.reset();
     this.footEuro[0].reset(); this.footEuro[1].reset();
     // a jump in the air is held (a big jump out of the top of the frame comes back down into it); anything else in

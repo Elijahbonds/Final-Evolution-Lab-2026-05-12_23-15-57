@@ -359,7 +359,7 @@ describe('G6: nothing reaches a game before the check has passed', () => {
     expect(used.size).toBe(jumps.length);
   });
 
-  it('given the check\'s calibration, karate VS jabs three times and kicks once (punch_kick)', () => {
+  it('given the check\'s calibration, karate VS jabs three times and kicks once (punch_kick) (the floor row; the harness claims these in P7)', () => {
     const { cal, packets } = calibrated('punch_kick');
     expect(cal).not.toBeNull();
     const r = seamReplay(packets, { profile: BODY_PROFILES['karate-vs'], start: 'playing' });

@@ -1,0 +1,213 @@
+[
+ {
+  "name": "boxing_80_10",
+  "role": "positive",
+  "source": "cmu/80/80_10.bvh [1.7, 5.9] s",
+  "seconds": 4.2,
+  "lead": null,
+  "stanceDepthM": -0.01,
+  "counts": {
+   "blow:jabL": 8,
+   "blow:crossR": 8
+  },
+  "kb": 87
+ },
+ {
+  "name": "cross_144_20",
+  "role": "positive",
+  "source": "cmu/144/144_20.bvh [1.2, 9] s",
+  "seconds": 7.8,
+  "lead": "L",
+  "stanceDepthM": 0.485,
+  "counts": {
+   "blow:crossR": 14
+  },
+  "kb": 157
+ },
+ {
+  "name": "cross_144_13",
+  "role": "positive",
+  "source": "cmu/144/144_13.bvh [1.4, 9] s",
+  "seconds": 7.6,
+  "lead": "R",
+  "stanceDepthM": -0.563,
+  "counts": {
+   "blow:crossL": 13
+  },
+  "kb": 152
+ },
+ {
+  "name": "straight_113_13",
+  "role": "positive",
+  "source": "cmu/113/113_13.bvh [1.2, 5.7] s",
+  "seconds": 4.5,
+  "lead": null,
+  "stanceDepthM": 0.01,
+  "counts": {
+   "blow:crossR": 2
+  },
+  "kb": 93
+ },
+ {
+  "name": "punches_86_01",
+  "role": "positive",
+  "source": "cmu/86/86_01.bvh [33.9, 38.1] s",
+  "seconds": 4.2,
+  "lead": null,
+  "stanceDepthM": 0.131,
+  "counts": {
+   "blow:jabL": 3,
+   "blow:crossR": 2
+  },
+  "kb": 86
+ },
+ {
+  "name": "punch_kick_141_14",
+  "role": "positive",
+  "source": "cmu/141/141_14.bvh [1.4, 5.4] s",
+  "seconds": 4,
+  "lead": null,
+  "stanceDepthM": -0.043,
+  "counts": {
+   "blow:crossR": 2,
+   "blow:jabL": 1,
+   "legKick:frontR": 1
+  },
+  "kb": 82
+ },
+ {
+  "name": "hooks_143_23",
+  "role": "positive",
+  "source": "cmu/143/143_23.bvh [0.5, 11.8] s",
+  "seconds": 11.3,
+  "lead": null,
+  "stanceDepthM": -0.028,
+  "counts": {
+   "blow:hookL": 4,
+   "blow:hookR": 4
+  },
+  "kb": 228
+ },
+ {
+  "name": "front_kicks_144_05",
+  "role": "positive",
+  "source": "cmu/144/144_05.bvh [0.3, 12.5] s",
+  "seconds": 12.2,
+  "lead": "L",
+  "stanceDepthM": 0.359,
+  "counts": {
+   "legKick:frontR": 7
+  },
+  "kb": 237
+ },
+ {
+  "name": "front_kicks_135_04",
+  "role": "positive",
+  "source": "cmu/135/135_04.bvh [2.3, 7.4] s",
+  "seconds": 5.1,
+  "lead": null,
+  "stanceDepthM": -0.042,
+  "counts": {
+   "legKick:frontR": 2,
+   "legKick:frontL": 1
+  },
+  "kb": 103
+ },
+ {
+  "name": "round_kicks_135_07",
+  "role": "positive",
+  "source": "cmu/135/135_07.bvh [0.3, 10] s",
+  "seconds": 9.7,
+  "lead": null,
+  "stanceDepthM": -0.419,
+  "counts": {
+   "legKick:roundR": 2,
+   "legKick:roundL": 2
+  },
+  "kb": 196
+ },
+ {
+  "name": "guard_76_04",
+  "role": "positive",
+  "source": "cmu/76/76_04.bvh [0.1, 1.6] s",
+  "seconds": 1.5,
+  "lead": null,
+  "stanceDepthM": 0.022,
+  "counts": {
+   "guard:raise": 1
+  },
+  "kb": 31
+ },
+ {
+  "name": "duck_77_09",
+  "role": "positive",
+  "source": "cmu/77/77_09.bvh [0.2, 8.1] s",
+  "seconds": 7.9,
+  "lead": null,
+  "stanceDepthM": -0.032,
+  "counts": {
+   "evade:duck": 2
+  },
+  "kb": 156
+ },
+ {
+  "name": "neg_stand_owner",
+  "role": "negative",
+  "source": "deepmotion/IMG_2138.bvh [4, 7] s",
+  "seconds": 3,
+  "lead": null,
+  "stanceDepthM": -0.049,
+  "counts": {},
+  "kb": 32
+ },
+ {
+  "name": "neg_jog",
+  "role": "negative",
+  "source": "cmu/143/143_04.bvh [3.5, 7.5] s",
+  "seconds": 4,
+  "lead": null,
+  "stanceDepthM": -0.012,
+  "counts": {},
+  "kb": 80
+ },
+ {
+  "name": "neg_wave_143_25",
+  "role": "negative",
+  "source": "cmu/143/143_25.bvh [0.2, 10.9] s",
+  "seconds": 10.7,
+  "lead": null,
+  "stanceDepthM": -0.019,
+  "counts": {},
+  "kb": 215
+ },
+ {
+  "name": "neg_wave_141_16",
+  "role": "negative",
+  "source": "cmu/141/141_16.bvh [0.2, 5] s",
+  "seconds": 4.8,
+  "lead": null,
+  "stanceDepthM": 0.167,
+  "counts": {},
+  "kb": 95
+ },
+ {
+  "name": "neg_stretch_141_13",
+  "role": "negative",
+  "source": "cmu/141/141_13.bvh [0.2, 6] s",
+  "seconds": 5.8,
+  "lead": null,
+  "stanceDepthM": -0.051,
+  "counts": {},
+  "kb": 120
+ },
+ {
+  "name": "neg_stretch_143_30",
+  "role": "negative",
+  "source": "cmu/143/143_30.bvh [0.2, 6.2] s",
+  "seconds": 5.983,
+  "lead": null,
+  "stanceDepthM": -0.024,
+  "counts": {},
+  "kb": 121
+ }
+]

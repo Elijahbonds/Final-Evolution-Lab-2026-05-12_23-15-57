@@ -113,6 +113,13 @@ import {
   pickTarget, stickDirTo, lungeFor, crowdStun, pathHits, pickGrab,
   type HordeMove, type StrikeBtn,
 } from '../core/HordeDynamics';
+// MOVEMENT PLAY P7 (2026-09-25): the body's own strikes, guard and dodges — behind its flag until the live probe measures 0
+// misfires (bodyFightFlags; READY says "coming" meanwhile)
+import { BodyFightDriver, DefenseLedger, DeferredHits, BodyDriveTracker, PadBlock, BODY_HORDE_PERFECT_SEC, FIGHT_CLAIMS, FIGHT_CARD_LINES } from '../combat/bodyFight';
+import { bodyFightOn } from '../combat/bodyFightFlags';
+import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import type { BodyView } from '../core/ModeHarness';
 import { readBlend, blendTraits, blendName, SCHOOLS } from '../combat/schools';
 import { hordeStyle, type HordeStyle } from '../combat/loadout';
 import { styleVariant, styleLabel, hasRootTrack, styleMotionOf } from '../anim/styleMotion';   // the picked style's own moves (2026-09-15)
@@ -340,6 +347,17 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let shopOpen = false, shopUntil = 0;
   let clockSec = 0;
   let striking = false, blocking = false, dodging = false, bursting = false;
+  // MOVEMENT PLAY P7: the body's fight read. A body strike is the move the body threw (the book advanced by pressMove, its
+  // onset on the game clock); it waits in its own queue slot for the cancel point, as a press waits in the StrikeQueue
+  // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
+  // check over a pause), so a value read in load() would miss the player's tick for this match
+  const bodyDriver = new BodyFightDriver({ kicksOptIn: () => readBodyKicks('karate') });
+  const ledger = new DefenseLedger(), deferred = new DeferredHits(), drive = new BodyDriveTracker();
+  const padBlock = new PadBlock();   // P7 (the review, 2026-09-26): the pad's X hold apart from the body's guard — a deferred hit meets both
+  let bodyGuard = false;   // P7: the block is the body's (its guard up), to let go when the reader loses the guard
+  let bodyQueued: { key: StrikeBtn; move: HordeMove; onsetSec: number; at: number } | null = null;
+  let ctxRef: ModeContext | null = null;
+  const bodyDriven = (): boolean => drive.driven(!!ctxRef?.body?.()?.read.tracking);
   let dodgeClip = DODGE_SLIP;
   // THE ONE VERB THIS MODE DID NOT HAVE (2026-09-14). Endless already owns the most developed dodge in the
   // game -- a directional roll with i-frames, the lean-vs-slip clips and a perfect read -- so it does NOT
@@ -760,7 +778,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
   /** A strike button. Carrying a body: the weapon verbs. Mid-swing before the cancel point: QUEUED (fires the frame it
    *  opens). Otherwise the string book names the move, the redirect picks its target, and the swing starts NOW. */
-  function strike(ctx: ModeContext, key: StrikeBtn): void {
+  function strike(ctx: ModeContext, key: StrikeBtn, body?: { move: HordeMove; onsetSec: number }): void {
+    // P7: a BODY strike thrown out of the guard drops the guard first, then swings (the pad's rule is "let go to swing")
+    if (body && blocking && !dodging && !myDown.downed && !shopOpen) { blocking = false; xHoldSec = -1; padBlock.release(now()); }
     if (blocking || dodging || myDown.downed || shopOpen) {
       // A swing thrown from the floor, out of a block, or mid-dodge is a RULE, and the rule used to be enforced in
       // silence (1 of 9 X and 2 of 9 Y presses in the rc19 capture answered nothing). Refusal throttles the line, so
@@ -769,7 +789,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       return;   // a downed fighter cannot swing (the tree holds the floor)
     }
     if (carry) { if (key === 'Y') throwCarried(ctx); else swingCarried(ctx); return; }
-    if (striking && !swingCancelable()) { queue.push(key, 'n', gameSec); grabQueuedAt = -Infinity; dyn.queued++; return; }
+    if (striking && !swingCancelable()) { if (body) bodyQueued = { key, ...body, at: gameSec }; else queue.push(key, 'n', gameSec); grabQueuedAt = -Infinity; dyn.queued++; return; }
     if (striking) dyn.cancels++;
     const origin = player.root.position;
     const stick = stickWorld(ctx);
@@ -779,7 +799,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // the stick variant reads against the FACING before the turn: pulled back + B is the spin kick that hits behind
     const dir = stickDirTo(stick, player.root.rotation.y);
     const tpC = target ? target.mob.char.root.position : null;
-    const move = book.press(key, dir, gameSec, { afterDash: gameSec - lastDashSec < 0.3, airborne: meAir.airborne, close: !!tpC && Math.hypot(tpC.x - origin.x, tpC.z - origin.z) < 1.35 });   // STORM: the rush out of a dash, the jump attacks in the air, the elbow chest to chest
+    const move = body ? book.pressMove(body.move, key, body.onsetSec)   // P7: the body's own move, timed onset to onset
+      : book.press(key, dir, gameSec, { afterDash: gameSec - lastDashSec < 0.3, airborne: meAir.airborne, close: !!tpC && Math.hypot(tpC.x - origin.x, tpC.z - origin.z) < 1.35 });   // STORM: the rush out of a dash, the jump attacks in the air, the elbow chest to chest
+    if (body) console.info(`[KE-STORM] body link ${move.id} string ${book.history.length}`);
     const reachMult = perks.reach * style.reachMult;
     // REDIRECT: every press re-aims — onto the target, or down the stick's line when nobody is in its cone. The turn
     // arrives inside the hit beat (never a one-frame pop: G1/G4 still hold, it is just a faster pivot).
@@ -1260,11 +1282,17 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
   /** An agent's strike reaches the player: dodge i-frames (a late one = the perfect read), then the core's vitals —
    *  the post-hit window, the guard's chip (never a drop), or a clean hit on the pool. DOWN only at zero. */
-  function agentHitsPlayer(ctx: ModeContext, e: Enemy): void {
+  function agentHitsPlayer(ctx: ModeContext, e: Enemy, bodyImpact?: number): void {
     if (myDown.downed) return;
-    if (iframeSec > 0) {
+    // P7: a strike on a BODY player waits for the body's frames to cover its impact, then meets the body's state THEN
+    // (the ledger: its guard, its dodge — a perfect read inside BODY_HORDE_PERFECT_SEC of the dodge's onset)
+    if (bodyImpact === undefined && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => { if (enemies.includes(e)) agentHitsPlayer(ctx, e, at); }); return; }
+    const bs = bodyImpact !== undefined ? ledger.at(bodyImpact) : null;
+    if (bs ? bs.evadeOnset !== null : iframeSec > 0) {
       stats.dodged++; focus.gain(FOCUS.dodgeGain);   // MATRIX: a dodge refills Focus
-      if (iframeSec > DODGE_IFRAME_SEC + perks.iframeBonus - PERFECT_WINDOW_SEC && matrix(ctx, 'perfectDodge')) {
+      const perfect = bs ? bodyImpact! - bs.evadeOnset! <= BODY_HORDE_PERFECT_SEC * 1000 : iframeSec > DODGE_IFRAME_SEC + perks.iframeBonus - PERFECT_WINDOW_SEC;
+      if (bs) console.info(`[KE-DEF] body dodge ${perfect ? 'PERFECT' : ''} (${Math.round(bodyImpact! - bs.evadeOnset!)} ms before impact)`);
+      if (perfect && matrix(ctx, 'perfectDodge')) {
         stats.perfect++;
         gainChi(ctx, 12);
         // FREEFLOW COUNTER: the perfect read strikes back. The attacker in reach takes a cross it walked into, the flow
@@ -1282,7 +1310,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       } else gainChi(ctx, 5);
       return;
     }
-    const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking, blockChipMult: style.blockChipMult });
+    // (a pad's X hold counts too, as it stood AT the impact — the review, 2026-09-26)
+    const outcome = vitals.takeHit(enemyHitDamage(wave, e.brain.strike), { blocking: bs ? bs.guardHeld || padBlock.heldAt(bodyImpact!) : blocking, blockChipMult: style.blockChipMult });
+    if (bs) console.info(`[KE-DEF] body ${outcome} (${Math.round(now() - bodyImpact!)} ms late)`);
     if (outcome === 'iframe') return;                          // still reeling from the last one — no double-tap
     lastHurtAt = clockSec; book.reset(); queue.clear(); landed = [];   // a route dies when you do
     if (outcome === 'blocked') {
@@ -1321,7 +1351,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
   function downPlayer(ctx: ModeContext): void {
     vitals.hp = 0; publishHp(ctx); stats.downs++; book.reset(); queue.clear(); landed = []; hitUntil = 0;   // the knockdown, not a flinch first
-    dropCarried(ctx); endSwing(); blocking = false;
+    dropCarried(ctx); endSwing(); blocking = false; padBlock.release(now());
     // THE RUN ENDS (MECHANICS PASS, 2026-09-15). The partner revived every knockdown, so a fighter who stopped fighting sat in
     // an endless run that could never end (the release gauntlet: 90 s mashing + 60 s hands-off, no card). Arcade lives: the
     // partner can pick you up MAX_REVIVES times; the knockdown after that is the end of the run, and the HUD says how many are left.
@@ -1369,12 +1399,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     });
   }
 
-  function tryDodge(ctx: ModeContext, kind: 'dash' | 'homing' = 'dash'): void {   // STORM: the dodge IS the dash (i-frames, the perfect read); the chakra dash homes on the target
-    if (myDown.downed || shopOpen) return;
-    if (dodging && kind !== 'homing') return;   // the double tap lands mid-dash by definition: the chakra dash takes the running dash over
+  function tryDodge(ctx: ModeContext, kind: 'dash' | 'homing' | 'lean' = 'dash'): boolean {   // STORM: the dodge IS the dash (i-frames, the perfect read); the chakra dash homes on the target (P7: 'lean' = the body's slip / duck, the lean in place; true when the dodge was taken — the review, 2026-09-26)
+    if (myDown.downed || shopOpen) return false;
+    if (dodging && kind !== 'homing') return false;   // the double tap lands mid-dash by definition: the chakra dash takes the running dash over
     if (dodging) { dodging = false; dyn.cancels++; }
-    if (carry?.swinging) return;
-    if (striking && !swingCancelable()) return;
+    if (carry?.swinging) return false;
+    if (striking && !swingCancelable()) return false;
     if (striking) { dyn.cancels++; endSwing(); }        // THE-HUNDRED: dodge-cancel — the beat-em-up's signature move
     dropCarried(ctx); queue.clear();
     dodging = true;
@@ -1383,7 +1413,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // into the next link is the signature move of every beat-em-up worth playing, and a route that a dodge
     // killed would punish the exact thing the mode should reward.
     book.reset();
-    const steered = Math.hypot(stickX, stickY) > 0.2;
+    const steered = kind !== 'lean' && Math.hypot(stickX, stickY) > 0.2;
     // STORM: the chakra dash homes on the target the stick (or the facing) picks — a rush in, stopping a reach short
     const bodiesD = liveBodies(); const tiD = kind === 'homing' ? pickTarget({ x: player.root.position.x, z: player.root.position.z }, stickWorld(ctx), bodiesD.map((e) => ({ x: e.mob.char.root.position.x, z: e.mob.char.root.position.z, threat: e.brain.attacking }))) : -1;
     const homeTo = tiD >= 0 ? bodiesD[tiD].mob.char.root.position : null;
@@ -1396,7 +1426,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     lastDashSec = gameSec;
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.4 });
     const from = player.root.position.clone();
-    const dashM = homeTo ? Math.max(0.5, Math.min(6.5, Math.hypot(homeTo.x - from.x, homeTo.z - from.z) - 1.4)) : kind === 'homing' ? 6.0 : DODGE_DISTANCE * perks.dodgeMult;   // STORM: the chakra dash covers the gap
+    const dashM = kind === 'lean' ? 0 : homeTo ? Math.max(0.5, Math.min(6.5, Math.hypot(homeTo.x - from.x, homeTo.z - from.z) - 1.4)) : kind === 'homing' ? 6.0 : DODGE_DISTANCE * perks.dodgeMult;   // STORM: the chakra dash covers the gap
     let to = from.add(dir.scale(dashM)); clampDisc(to);
     let slideSec = kind === 'homing' ? Math.max(0.22, Math.min(0.5, dashM / 13)) : DODGE_SLIDE_SEC;
     // PARKOUR IN THE HUNDRED (2026-09-15, owner decision): the dodge reads the ring. Steered OUT at the edge it is a WALL
@@ -1429,6 +1459,51 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     iframeSec = Math.max(iframeSec, slideSec);
     // on the GAME clock: a perfect read's slow-mo stretches the slide with the lean
     tween(slideSec, (k) => { player.root.position = Vector3.Lerp(from, to, 1 - (1 - k) * (1 - k)); }, () => { dodging = false; });   // the tree's dodge settles on its own
+    return true;
+  }
+
+  /** P7: the ledger follows the body's own guard, per packet and per frame: 'down' lets a body guard go (a pad's X hold keeps
+   *  its own); a guard the ledger holds that the fighter has not taken up — held through a wave's start, a dodge, or its up
+   *  refused in the shop — is taken up as soon as the fighter can (the review, 2026-09-26). What a waiting hit needs is
+   *  kept (deferred.oldest). */
+  function bodyLedgerFrame(view: BodyView, t: number): void {
+    const g = ledger.frame(view, t, deferred.oldest);
+    if (g === 'down' && bodyGuard) { bodyGuard = false; if (!padBlock.held) blocking = false; }
+    else if (ledger.guardUp && !bodyGuard && !shopOpen && !myDown.downed && !dodging) { drive.body(t); bodyGuard = true; blocking = true; }
+  }
+
+  /** P7: one fight-read event from the body — taken only in the fight (the shop and the floor take nothing: the shop's A / B
+   *  are the pad's), never refused out loud. A step is not taken: the next strike re-targets and closes (lungeFor). */
+  function onBodyEvent(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+    const t = now();
+    ctxRef = ctx;
+    bodyLedgerFrame(view, t);
+    if (shopOpen || myDown.downed) return false;
+    if (ev.kind !== 'blow' && ev.kind !== 'legKick' && ev.kind !== 'guard' && ev.kind !== 'evade') return false;
+    const it = bodyDriver.intent(ev, view, t);
+    if (!it) return false;
+    if (it.kind === 'guard') ledger.guard(it);
+    switch (it.kind) {
+      case 'guard':
+        drive.body(t);
+        if (it.up) { if (!dodging) blocking = true; } else if (!padBlock.held) blocking = false;
+        bodyGuard = it.up && blocking;
+        console.info(`[KE-BODY] guard ${it.up ? 'up' : 'down'}`);
+        return true;
+      case 'strike':
+        if (dodging) return false;
+        drive.body(t);
+        strike(ctx, it.token, { move: MOVES[it.move], onsetSec: gameSec - (t - it.onsetPage) / 1000 });
+        return true;
+      case 'evade':
+        drive.body(t);
+        // (the i-frames only with the dodge itself: refused — mid-dodge, mid-swing, carrying — it whiffs nothing: the review)
+        if (!tryDodge(ctx, 'lean')) return false;
+        ledger.evade(it, (DODGE_IFRAME_SEC + perks.iframeBonus) * 1000);
+        console.info(`[KE-BODY] ${it.form}${it.side ?? ''}`);
+        return true;
+      default: return false;
+    }
   }
 
   const nextLandIn = (): number => {
@@ -1460,6 +1535,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
   return {
     modeId: 'karate', mood: 'dojoWarm', camPreset: 'overShoulder',
+    // MOVEMENT PLAY P7: the body plays The Hundred only behind its flag (read at mount — the dev probe's ?bodyfight=karate)
+    get body() { return bodyFightOn('karate') ? { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES } : undefined; },
+    get onBody() { return bodyFightOn('karate') ? onBodyEvent : undefined; },
 
     async load(ctx) {
       sceneRef = ctx.scene;
@@ -1559,7 +1637,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       perks = shop.state(); vitals.setMax(perks.maxHp, true); vitals.iframeSec = 0; hpShown = -1; lastHurtAt = -1e9;
       flow.reset(); hitCount = 0;
       book.reset(); queue.clear(); carry = null; gameSec = 0; strikeSeq = 0; strikeMove = null; strikeHitDone = true; landed = []; shopOpen = false;
-      striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; lastXTapSec = -1e9; lastDashSec = -1e9; endSlowMo(ctx);
+      deferred.clear(); ledger.reset(); bodyQueued = null; ctxRef = ctx;   // P7
+      striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; lastXTapSec = -1e9; lastDashSec = -1e9; endSlowMo(ctx); padBlock.reset();
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
@@ -1571,6 +1650,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     onInput(ctx, e: FelInput) {
       SoundKit.unlock();
       localSource.feed(e);
+      // P7: who is driving — a real press or push is the pad's
+      if (e.src !== 'body' && ((e.t === 'button' && e.pressed) || (e.t === 'stick' && Math.hypot(e.x, e.y) > 0.35))) drive.pad(now());
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // MATRIX FOCUS: the right trigger holds bullet time
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
@@ -1582,7 +1663,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         }
         if (e.t === 'button' && e.pressed && e.btn === 'A') buySelected(ctx);
         if (e.t === 'button' && e.pressed && e.btn === 'B') closeShop(ctx);
-        if (e.t === 'button' && e.btn === 'X') { xHoldSec = -1; blocking = false; }
+        if (e.t === 'button' && e.btn === 'X') { xHoldSec = -1; blocking = false; padBlock.release(now()); }
         return;
       }
       if (e.t === 'button' && e.pressed) {
@@ -1605,13 +1686,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         const held = xHoldSec;
         xHoldSec = -1;
         if (held >= 0 && held * 1000 < DODGE_TAP_MS) { const dbl = gameSec - lastXTapSec < 0.32; console.info(`[KE-STORM] x tap held ${(held * 1000).toFixed(0)} ms dbl ${dbl} (since ${(gameSec - lastXTapSec).toFixed(2)} s) dodging ${dodging}`); lastXTapSec = dbl ? -1e9 : gameSec; tryDodge(ctx, dbl ? 'homing' : 'dash'); }   // STORM: a tap is the DASH, a double tap the CHAKRA DASH at the target
-        blocking = false;
+        padBlock.release(now());
+        if (!bodyGuard) blocking = false;   // (P7: a body guard still up keeps the block)
       }
     },
 
     update(ctx, dtReal) {
       if (spinApplied) { player.root.rotation.y -= spinApplied; spinApplied = 0; }   // the spin layer: back to the real facing first
       clockSec += dtReal;
+      ctxRef = ctx;
+      { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       ring?.set(Math.max(0, Math.min(1, vitals.hp / Math.max(1, vitals.maxHp))));   // PLAYER RING: hp as the gauge
       { const br = flow.update(gameSec); if (br) onFlowBroken(ctx, br); else if (flow.count > 0) ctx.setHud({ flowDrop: Math.round(flow.drop01(gameSec) * 100) }); }
       // Phase 8: down/revive tick
@@ -1668,7 +1752,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
 
       if (xHoldSec >= 0) {
         xHoldSec += dtReal;
-        if (xHoldSec * 1000 >= DODGE_TAP_MS && !blocking && !dodging) blocking = true;   // the tree shows the block
+        if (xHoldSec * 1000 >= DODGE_TAP_MS && !padBlock.held && !dodging) { blocking = true; padBlock.press(now()); }   // the tree shows the block (P7: the pad's hold, apart from a body guard)
       }
       iframeSec = Math.max(0, iframeSec - dtReal);
       vitals.tick(dtReal);
@@ -1685,6 +1769,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       tickShock(dt);
       // THE-HUNDRED: a queued press fires the frame its swing's cancel point opens (or the moment the swing is over)
       if (queue.pending && swingCancelable() && !dodging && !blocking) { const q = queue.take(gameSec); if (q) strike(ctx, q.btn); }
+      if (bodyQueued && swingCancelable() && !dodging) { const q = bodyQueued; bodyQueued = null; if (gameSec - q.at <= QUEUE_SEC) strike(ctx, q.key, q); }   // P7: the queued body strike
       if (grabQueuedAt > -Infinity && (strikeHitDone || !striking)) { const fresh = gameSec - grabQueuedAt <= QUEUE_SEC; grabQueuedAt = -Infinity; if (fresh) tryGrab(ctx); }
 
       playerSlot.poll(dt);

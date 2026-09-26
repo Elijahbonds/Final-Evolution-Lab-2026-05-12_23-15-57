@@ -130,7 +130,7 @@ export const STEP_EVADE_M = 0.32;
  *  reward (Soul Calibur pays initiative for a good step). */
 export const STEP_CHI_GAIN = 8;
 
-/** One authoritative answer for a swing landing at `dist` right now.
+/** One authoritative answer for a swing landing at `dist` right now (`nowMs`: the impact instant).
  *  Mutates the DEFENDER's guard/stagger state for blocked/broken/parried
  *  outcomes; 'hit' damage is applied by the caller via applyHit (so the
  *  attacker's combo scaling stays with the attacker).
@@ -138,10 +138,12 @@ export const STEP_CHI_GAIN = 8;
  *  `lateralOffsetM` = the defender's sideways distance from the attacker's
  *  facing line at impact. Only vertical attacks check it (a stepped
  *  vertical whiffs past); horizontals ignore it — that's their job. */
-export function resolveStrike(atk: AttackDef, dist: number, defender: FighterState, nowMs: number, lateralOffsetM?: number): StrikeOutcome {
+export function resolveStrike(atk: AttackDef, dist: number, defender: FighterState, nowMs: number, lateralOffsetM?: number, parryWindowMs = PARRY_WINDOW_MS): StrikeOutcome {
   if (dist > atk.range) return 'whiff';
   if (!defender.controllable) return 'hit';                 // stunned/staggered = defenseless
-  if (nowMs - defender.lastBlockPressMs <= PARRY_WINDOW_MS) return 'parried';
+  // MOVEMENT PLAY P7 (2026-09-25): `parryWindowMs` is a BODY defender's widened window (bodyFight.BODY_PARRY_WINDOW_MS);
+  // every pad defender keeps the default
+  if (nowMs - defender.lastBlockPressMs <= parryWindowMs) return 'parried';
   if (defender.blockHeld) {
     defender.guard -= atk.guardDmg;
     if (defender.guard <= 0) {
