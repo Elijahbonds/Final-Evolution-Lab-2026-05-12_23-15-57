@@ -14,13 +14,27 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // ── The Flip (Music Academy, lane 2 M1b) ─────────────────────────────────
   // The phone IS the pad controller: sixteen pads in a 4×4 grid, actions pad_0…pad_15 (row-major, same order as the
   // keyboard map 1234 / qwer / asdf / zxcv). Colours rotate per row so a bank reads at a glance.
+  //
+  // MUSIC-SUITE P5 (2026-09-25), phone-mpc — owner decision #16, "MPC-style": the phone is the Academy's pad controller
+  // on EVERY tab now (the room mounts it at room level: lib/babylon/music/StudioMode.tsx), so it grew what an MPC has
+  // beside its pads — BANK A–D above them (the four Flip banks: the pads play the bank picked here, on any tab) and
+  // PLAY / STOP / REC below (the room's transport; REC arms the Flip's ARM REC, so taps write into the grid). The 16 pads
+  // are unchanged (pad_0…pad_15). Two OPT-IN hints only this entry sets (types.ts ButtonSchemaHints, padFeel.ts): the
+  // pads buzz and carry a MEASURED velocity; the transport and bank rows buzz and are compact. Actions are parsed on the
+  // host by lib/babylon/music/phonePad.ts phoneCommand (phonePad.test pins that every action here parses).
   music_flip: {
     modeId: 'music_flip',
     title: 'The Flip',
     maxPlayers: 1,
     askName: false,
     schemas: [
-      { kind: 'button', columns: 4, buttons: Array.from({ length: 16 }, (_, i) => ({ action: `pad_${i}`, label: String(i + 1), color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][Math.floor(i / 4)] })) },
+      { kind: 'button', columns: 4, compact: true, haptics: true, buttons: (['A', 'B', 'C', 'D'] as const).map((b) => ({ action: `bank_${b}`, label: `BANK ${b}`, color: '#e8d9c2' })) },
+      { kind: 'button', columns: 4, haptics: true, velocity: true, buttons: Array.from({ length: 16 }, (_, i) => ({ action: `pad_${i}`, label: String(i + 1), color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][Math.floor(i / 4)] })) },
+      { kind: 'button', columns: 3, compact: true, haptics: true, buttons: [
+        { action: 'play', label: '▶ PLAY', color: '#4ade80' },
+        { action: 'stop', label: '■ STOP', color: '#e8d9c2' },
+        { action: 'rec', label: '● REC', color: '#ff5c5c' },
+      ] },
     ],
   },
 

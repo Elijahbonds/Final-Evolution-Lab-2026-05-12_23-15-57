@@ -37,6 +37,7 @@ import type { KitId } from './SynthKit';
 import type { StreamingLink } from './StreamingBridge';
 import { WALKOUT_KEY, makeWalkOut, parseWalkOut, type WalkOut } from './WalkOut';
 import { readKey, type SongKey } from './scales';
+import { LIBRARY_UPLOAD_LINE, UPLOAD_DOORS, WALKOUT_UPLOAD_LINE, tracksHaveUpload, type UploadDoors } from './uploadPrivacy';
 
 // ── shapes ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -95,7 +96,8 @@ export type PublishDraft = Pick<TrackIndexEntry,
   'title' | 'authorId' | 'authorName' | 'kit' | 'bpm' | 'swing' | 'polished' | 'sequencer' | 'remixOf'>
   & { streamingLinks?: StreamingLink[]; key?: SongKey };
 
-export type LibraryFailure = 'full' | 'device-full' | 'unavailable' | 'newer' | 'missing' | 'no-audio' | 'storage';
+/** MUSIC-SUITE P5: 'upload-private' — the song uses a YOUR FILE upload, which stays on the device (decision #15). */
+export type LibraryFailure = 'full' | 'device-full' | 'unavailable' | 'newer' | 'missing' | 'no-audio' | 'storage' | 'upload-private';
 
 export type PublishResult =
   | { ok: true; rec: TrackRecord; /** said to the player when not null (e.g. kept for this visit only) */ line: string | null }
@@ -310,6 +312,8 @@ export interface StudioLibraryDeps {
   random?: () => number;
   createObjectUrl?: (b: Blob) => string;
   revokeObjectUrl?: (u: string) => void;
+  /** MUSIC-SUITE P5 FIX PASS: decision #15's doors (uploadPrivacy.UPLOAD_DOORS; a test passes the stricter reading). */
+  uploadDoors?: UploadDoors;
 }
 
 interface IndexState { raw: string | null; entries: TrackIndexEntry[]; newer: boolean }
@@ -319,6 +323,7 @@ type Wrote = { ok: true } | { ok: false; error: unknown };
 export function createStudioLibrary(deps: StudioLibraryDeps) {
   const now = deps.now ?? Date.now;
   const random = deps.random ?? Math.random;
+  const doors = deps.uploadDoors ?? UPLOAD_DOORS;
   const mkUrl = deps.createObjectUrl ?? ((b: Blob) => URL.createObjectURL(b));
   const rmUrl = deps.revokeObjectUrl ?? ((u: string) => { try { URL.revokeObjectURL(u); } catch { /* not a blob URL */ } });
 
@@ -649,6 +654,11 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
      * Never throws; a failure comes back as the line to show ('Your library is full — delete a song to publish').
      */
     async publishWithAudio(draft: PublishDraft, audio: Blob): Promise<PublishResult> {
+      // MUSIC-SUITE P5 (2026-09-25), decision #15: a song with a YOUR FILE upload stays on the device (uploadPrivacy.ts).
+      // MUSIC-SUITE P5 FIX PASS: this library IS on the device (its server calls are the SYNC SEAMs below, unimplemented),
+      // so the door is open unless the switch shuts it (UPLOAD_DOORS.library); the record keeps the mark
+      // (publishedHasUpload) the sharing pass will refuse on. The room refuses first when shut; this is the library's own.
+      if (!doors.library && tracksHaveUpload(draft.sequencer?.tracks ?? [])) return { ok: false, reason: 'upload-private', line: LIBRARY_UPLOAD_LINE };
       if (indexState().newer) return { ok: false, reason: 'newer', line: NEWER_LIBRARY_LINE };
       if (view().length >= LIBRARY_MAX) return { ok: false, reason: 'full', line: LIBRARY_FULL_LINE };
       const store = deps.store();
@@ -668,6 +678,8 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
         return { ok: false, ...saveFailureLine(w.error, 'index') };
       }
       // SYNC SEAM: POST /api/studio/tracks { entry } + the audio to object storage — the server assigns the id.
+      // MUSIC-SUITE P5 FIX PASS (decision #15): never for a song with an upload while UPLOAD_DOORS.offDevice is shut —
+      // `if (!doors.offDevice && tracksHaveUpload(entry.sequencer.tracks)) keep it local`.
       return { ok: true, rec: toRecord(entry, walkId()), line: persistent ? null : VISIT_ONLY_LINE };
     },
 
@@ -678,6 +690,8 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
      * background, and a failed copy is reported through `problems()`.
      */
     publish(rec: PublishDraft & { mixdownDataUrl: string }): TrackRecord {
+      // MUSIC-SUITE P5: decision #15's guard, as publishWithAudio's (this path throws its failures)
+      if (!doors.library && tracksHaveUpload(rec.sequencer?.tracks ?? [])) throw Object.assign(new Error(LIBRARY_UPLOAD_LINE), { name: 'UploadPrivate' });
       if (view().length >= LIBRARY_MAX) throw Object.assign(new Error(LIBRARY_FULL_LINE), { name: 'LibraryFull' });
       const id = newId();
       const store = deps.store();
@@ -719,7 +733,16 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
      */
     get(id: string): TrackRecord | null {
       const e = view().find((t) => t.id === id);
-      return e ? toRecord(e, walkId()) : null;
+      if (!e) return null;
+      // MUSIC-SUITE P5 FIX PASS (2026-09-25): with the walk-out door shut (UPLOAD_DOORS.walkOut false), a walk-out chosen
+      // before the rule existed (P3 took YOUR FILE with no tick and could make it the walk-out) is let go here — DunkMode
+      // resolves the walk-out through this `get` — the same way delete lets go of one, and said once (problems()).
+      if (!doors.walkOut && walkId() === id && tracksHaveUpload(e.sequencer?.tracks ?? [])) {
+        sdel(WALKOUT_KEY);
+        dropWalkAudio();
+        note(WALKOUT_UPLOAD_LINE);
+      }
+      return toRecord(e, walkId());
     },
 
     /** A playable src for the LIBRARY's ▶ PLAY: a sync data URL when there is one, else an object URL of the stored WAV. */
@@ -834,6 +857,10 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
     async setWalkOut(id: string, opts: { bars?: number } = {}): Promise<WalkOutResult> {
       const e = view().find((x) => x.id === id);
       if (!e) return { ok: false, reason: 'missing', line: MISSING_LINE };
+      // MUSIC-SUITE P5 (2026-09-25), decision #15: a song with an upload was never the walk-out. MUSIC-SUITE P5 FIX PASS:
+      // the walk-out plays on this device only (DunkMode reads it from localStorage; the "crowd" is the game's), so the door
+      // is open unless the switch shuts it (UPLOAD_DOORS.walkOut) — then `get` also lets go of one chosen before P5.
+      if (!doors.walkOut && tracksHaveUpload(e.sequencer?.tracks ?? [])) return { ok: false, reason: 'upload-private', line: WALKOUT_UPLOAD_LINE };
       const url = await dataUrlOf(e);
       if (!url) return { ok: false, reason: 'no-audio', line: e.audio === 'visit' ? VISIT_AUDIO_GONE_LINE : NO_AUDIO_LINE };
       let wo: WalkOut;
@@ -884,7 +911,9 @@ export interface AcademyAudioStore {
   readonly persistent: boolean;
   getAudio(key: string): Promise<{ data: ArrayBuffer; mime: string } | null>;
   putAudio(key: string, data: ArrayBuffer, mime: string): Promise<void>;
-  readonly kv: { delete(table: 'audio', key: string): Promise<void>; keys(table: 'audio'): Promise<string[]> };
+  /** MUSIC-SUITE P5 FIX PASS: the store's QUEUED delete (studioStore.ts, P4) — in order with every write before it. */
+  deleteAudio(key: string): Promise<void>;
+  readonly kv: { keys(table: 'audio'): Promise<string[]> };
 }
 
 /**
@@ -894,17 +923,29 @@ export interface AcademyAudioStore {
  *   · Blobs go in as ArrayBuffer + mime: studioStore's own rule ("Safari has refused Blobs in IndexedDB before").
  *   · Keys are `library/<id>`. studioStore.sweepAudio deletes only keys it minted (`aud_<time><rand>`, audioKeyTime),
  *     so the sweep never takes a published song's audio.
- *   · Delete goes through `kv.delete('audio', key)`: StudioStore has no single-audio delete (its deleteProject frees a
- *     project's audio). Assumption: fine outside its write queue, because nothing else writes `library/` keys.
+ *   · MUSIC-SUITE P5 FIX PASS (2026-09-25; P4 deferred it here): DELETE GOES THROUGH THE STORE'S QUEUE. It was a raw
+ *     `kv.delete('audio', key)` ("assumption: fine outside its write queue"), which runs at once — ahead of a put of the
+ *     same key still queued, so the "deleted" audio landed after it and came back (studioStore.test.ts shows it; the compat
+ *     publish() copies its audio in the background, so deleting a song right after it could leave 1.5 MB behind as an
+ *     orphan). It is studioStore's deleteAudio now; and this adapter keeps its OWN writes in call order too, because a put
+ *     reaches the store's queue only after reading its Blob (an await), so a delete called after it could still be queued
+ *     first.
  */
 export function libraryStoreOver(open: () => Promise<AcademyAudioStore>): LibraryBlobStore {
+  let tail: Promise<unknown> = Promise.resolve();
+  /** This adapter's writes, one after another in the order they were called (a failure does not stop the next). */
+  const inOrder = <T>(op: () => Promise<T>): Promise<T> => {
+    const p = tail.then(op, op);
+    tail = p.catch(() => undefined);
+    return p;
+  };
   return {
     async get(key) {
       const rec = await (await open()).getAudio(key);
       return rec ? new Blob([rec.data], { type: rec.mime || 'audio/wav' }) : null;
     },
-    async put(key, blob) { await (await open()).putAudio(key, await blob.arrayBuffer(), blob.type || 'audio/wav'); },
-    async delete(key) { await (await open()).kv.delete('audio', key); },
+    put: (key, blob) => inOrder(async () => { const s = await open(); await s.putAudio(key, await blob.arrayBuffer(), blob.type || 'audio/wav'); }),
+    delete: (key) => inOrder(async () => { await (await open()).deleteAudio(key); }),
     async list(prefix = '') { return (await (await open()).kv.keys('audio')).filter((k) => k.startsWith(prefix)); },
     persistent: async () => (await open()).persistent,
   };

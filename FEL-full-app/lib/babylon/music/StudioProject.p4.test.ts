@@ -28,7 +28,7 @@ describe('a new project (v2)', () => {
   it('is in A minor, its note rows hold the key\'s tonic in their register, the drums hold no notes, the desk is untouched', () => {
     const p = newProject({ now: NOW });
     expect(p.v).toBe(STUDIO_PROJECT_VERSION);
-    expect(STUDIO_PROJECT_VERSION).toBe(2);
+    expect(STUDIO_PROJECT_VERSION).toBe(3);   // MUSIC-SUITE P5: v3 (banks, chop kits, baked rows, section chops)
     expect(p.key).toEqual(DEFAULT_KEY);
     expect(byId(p, 'bass').notes).toEqual(new Array(16).fill(33));   // A1
     expect(byId(p, 'lead').notes).toEqual(new Array(16).fill(69));   // A4
@@ -48,7 +48,7 @@ describe('migrate v1 → v2: old boolean grids get their notes (the sound they a
     if (!m.ok) return;
     expect(m.from).toBe(1);
     expect(m.issues).toEqual([]);
-    expect(m.project.v).toBe(2);
+    expect(m.project.v).toBe(STUDIO_PROJECT_VERSION);   // MUSIC-SUITE P5: read up to the current version (v3)
     expect(m.project.key).toEqual(DEFAULT_KEY);
     expect(byId(m.project, 'bass').notes).toEqual(new Array(16).fill(VOICE_ROOTS.neon.bass));
     expect(byId(m.project, 'lead').notes).toEqual(new Array(16).fill(VOICE_ROOTS.neon.lead));
@@ -253,22 +253,30 @@ describe('P4 FIX PASS: Flip rows follow a SCALE change by degree; a root change 
   });
 });
 
-describe('P4 FIX PASS: a pitched pad\'s pitch rides into the grid (padNote)', () => {
+// MUSIC-SUITE P5 (2026-09-25): P4 put a pad's pitch on the steps' notes (60 + pitch) and loaded the RAW chop, so REPLACE
+// ROW with another pitch kept the old notes — the old pitch. v3 bakes pitch / gate / reverse into the chop (chopEdit
+// bakeChop), so a step at FLIP_ROOT_MIDI is the pad as tuned and a note is an interval from it. padNote stays for reading
+// v2 records (StudioProject.p5.test.ts: the migration).
+describe('P4 FIX PASS → P5: a pitched pad\'s pitch is baked into its row\'s chop, not written on the steps', () => {
   const row = (pitch: number): ProjectFlipRow => ({ sampleId: 'flip_3', pad: 3, label: 'FLIP 4', source: { id: 'f', label: 'f', kind: 'fel', note: '', url: '/audio/x.wav' }, slice: { start: 0, end: 10 }, reverse: false, pitch, gate: true });
-  it('a +5 pad: its new row plays +5 on every step, and a recorded hit lands on 65 — not the chop as sliced (60)', () => {
-    expect(padNote(5)).toBe(65);
+  it('a +5 pad: its new row writes no notes (the chop plays +5), and a recorded hit just lights its step', () => {
+    expect(padNote(5)).toBe(65);                                                // the v2 reading, kept for the migration
     expect(padNote(0)).toBeNull();
     const p = withFlipRow(newProject({ now: NOW }), row(5));
-    expect(byId(p, 'flip_3').notes).toEqual(new Array(16).fill(65));
+    expect(byId(p, 'flip_3').notes).toBeUndefined();
+    expect(p.flipRows[0].pitch).toBe(5);                                        // the pitch rides on the row's chop
     const hit = withFlipHit(p, 'flip_3', 6);
-    expect(stepAt(byId(hit, 'flip_3'), 6)).toEqual({ on: true, note: 65 });
+    expect(stepAt(byId(hit, 'flip_3'), 6)).toEqual({ on: true });
   });
-  it('a pitch-0 pad writes no notes (the row stays as it was); a row whose chop changed pitch takes the new pitch on its next hit', () => {
+  it('REPLACE ROW at another pitch is heard: the row\'s notes stay intervals from the pad as tuned (a hit is FLIP_ROOT_MIDI)', () => {
     const p = withFlipRow(newProject({ now: NOW }), row(0));
     expect(byId(p, 'flip_3').notes).toBeUndefined();
     expect(byId(withFlipHit(p, 'flip_3', 2), 'flip_3').notes).toBeUndefined();
-    const q = withFlipHit(withFlipRow(p, row(-3)), 'flip_3', 4);                // the existing row keeps its notes; the hit is -3
-    expect(stepAt(byId(q, 'flip_3'), 4)).toEqual({ on: true, note: 57 });
+    const noted = { ...p, tracks: withTrackStep(p.tracks, 'flip_3', 0, { on: true, note: 62 }) };
+    const q = withFlipHit(withFlipRow(noted, row(-3)), 'flip_3', 4);
+    expect(q.flipRows[0].pitch).toBe(-3);                                       // the new chop (baked −3) replaced the old
+    expect(stepAt(byId(q, 'flip_3'), 0)).toEqual({ on: true, note: 62 });     // the player's +2 above the pad, kept
+    expect(stepAt(byId(q, 'flip_3'), 4)).toEqual({ on: true, note: 60 });     // the hit: the pad as tuned
     expect(withFlipHit(p, 'kick', 1).tracks.find((t) => t.sampleId === 'kick')!.notes).toBeUndefined();
   });
 });

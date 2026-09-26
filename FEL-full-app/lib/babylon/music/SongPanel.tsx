@@ -48,7 +48,7 @@
 // STOP), with gain / trim / mute / delete and best of N. This panel keeps the decoded takes (useTakeBuffers) because
 // RENDER SONG + STEMS uses them: each group's pick, trims as silence, muted takes left out (engineTakeList + gatePcm).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { AudioEngine, TrackState } from './AudioEngine';
+import type { AudioEngine, RenderSounds, TrackState } from './AudioEngine';
 import { MAX_SONG_BARS, SECTION_NAMES, expandChain, newSectionId, normalizeChain, renderLengthSec, snapshotTracks, songBars, type Section, type SongChain } from './Song';
 import type { AudioRef, ProjectSection, ProjectTake, SongSlice } from './StudioProject';
 import RecordBooth, { useTakeBuffers } from './ui/RecordBooth';
@@ -113,9 +113,14 @@ export interface SongPanelProps {
   stopRef?: React.MutableRefObject<(() => void) | null>;
   /** MUSIC-SUITE P4: start/stop the room's transport (RECORD from a stop counts in and starts the song through it). */
   onTransport?: (play: boolean) => void;
+  /**
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): what each of the song's first `bars` bars plays on its Flip rows — its section's
+   * own chops (StudioMode, studioEdit.songBarSounds). Absent = the engine's sounds (as before).
+   */
+  barSounds?: (bars: number) => Promise<readonly (RenderSounds | null)[]>;
 }
 
-export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S, onSectionSaved, onChained, swing, song, onSongChange, saveAudio, loadAudio, onRendered, onRecording, songMode, onSongMode, onSongNow, caps, onTake, stopRef, onTransport }: SongPanelProps) {
+export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S, onSectionSaved, onChained, swing, song, onSongChange, saveAudio, loadAudio, onRendered, onRecording, songMode, onSongMode, onSongNow, caps, onTake, stopRef, onTransport, barSounds }: SongPanelProps) {
   const { sections, chain, takes } = song;
   const swingRef = useRef(swing); useEffect(() => { swingRef.current = swing; }, [swing]);
   const [bar, setBar] = useState(0);
@@ -233,8 +238,11 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
       }));
       const len = renderLengthSec(bars.length, bpm, steps, heard.map((t) => ({ id: t.id, atBar: t.startBar, gain: t.gain, durationSec: t.trimEnd })));
       const barSwing = expandChainSwing(chain, sections, swing);   // MUSIC-SUITE P2: each bar at its section's swing
-      const mix = await engine.renderSong(bars, shots, len, barSwing);
-      const st = await engine.renderSongStems(bars, shots, len, barSwing);
+      // MUSIC-SUITE P5 FIX PASS (2026-09-25): …and each bar's Flip rows play its section's own chops, as live song mode does
+      // (the renders read the engine's sounds: the last section song mode swapped in, for every bar)
+      const sounds = barSounds ? await barSounds(bars.length) : undefined;
+      const mix = await engine.renderSong(bars, shots, len, barSwing, sounds);
+      const st = await engine.renderSongStems(bars, shots, len, barSwing, sounds);
       if (mixUrl) URL.revokeObjectURL(mixUrl); for (const s of stems) URL.revokeObjectURL(s.url);
       setMixUrl(URL.createObjectURL(mix)); setStems(st.map((s) => ({ name: s.name, url: URL.createObjectURL(s.blob) })));
       const gone = takes.length - playable.length;

@@ -118,7 +118,8 @@ describe('the room keeps its work in the project (source pins)', () => {
     expect(hook).toMatch(/if \(s\.phase === 'saved'\) \{[^}]*creationRef\.current\?\.note\(\)/);
     expect(studio).toContain('onRendered={room.noteCreation}');
     // P3: the working grid — P3 FIX PASS: at the project's swing (studioEdit.publishRender)
-    expect(studio).toMatch(/const render = publishRender\(project\);\s*const blob = await eng\.renderMixdown\(2, render\.tracks, render\.swing\);\s*room\.noteCreation\(\);/);
+    // MUSIC-SUITE P5 FIX PASS: + the working grid's own Flip sounds (song mode swaps a section's into the engine)
+    expect(studio).toMatch(/const render = publishRender\(project\);[\s\S]{0,900}?const blob = await eng\.renderMixdown\(2, render\.tracks, render\.swing, sounds\);\s*room\.noteCreation\(\);/);
     expect(songPanel).toMatch(/say\(`Rendered[\s\S]*?onRendered\?\.\(\);/);
   });
 

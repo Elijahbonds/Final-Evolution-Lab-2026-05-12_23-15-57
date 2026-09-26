@@ -10,7 +10,10 @@ function burstSignal(sr: number, hits: number[], seconds: number): Float32Array 
 describe('sources are the rule', () => {
   it('only FEL, own and public-domain sources are allowed; the shipped library is FEL-owned with a note', () => {
     expect(isAllowedSource('fel')).toBe(true); expect(isAllowedSource('third-party')).toBe(false); expect(isAllowedSource('spotify')).toBe(false);
-    expect(FEL_SOURCES.length).toBe(8); for (const s of FEL_SOURCES) { expect(s.kind).toBe('fel'); expect(s.note.length).toBeGreaterThan(10); expect(s.url).toMatch(/^\/audio\/kits\/808\//); }
+    // MUSIC-SUITE P5 (2026-09-25): the shelf is FEL's Flip pack now (22 sources: 3 themes, 10 loops, 3 vox sheets, 6 kits
+    // with the 808 kit among them) — flipPack.test.ts pins it to public/audio/flip/pack.json item for item
+    expect(FEL_SOURCES.length).toBe(22);
+    for (const s of FEL_SOURCES) { expect(s.kind).toBe('fel'); expect(s.note.length).toBeGreaterThan(10); expect(s.url).toMatch(/^\/audio\/flip\/(audio\/[a-z0-9_]+\.mp3|banks\/bank_[a-z0-9_]+)$/); expect(s.group).toBeTruthy(); }
   });
 });
 
@@ -35,6 +38,15 @@ describe('slicing', () => {
   });
   it('energy envelope is per window', () => {
     expect(energyEnvelope(new Float32Array([0, 0, 1, 1]), 2)).toEqual(new Float32Array([0, 1]));
+  });
+  // MUSIC-SUITE P5 (2026-09-25), flippack CONTRACT 12.1: the finder never marks window 0, so a file that starts ON its
+  // transient put pad 1 at 10 ms and cut the downbeat's attack off (the old line was a no-op). A first onset within two
+  // windows of the head is the head now; leading silence longer than that is still skipped (the 0.1 s case above).
+  it('a file that starts on its transient: pad 1 starts at sample 0, not 10 ms in', () => {
+    const sr = 8000; const sig = burstSignal(sr, [0, 0.4, 0.7], 1.0);
+    const s = onsetSlices(sig, sr);
+    expect(s[0].start).toBe(0);
+    expect(s.map((x) => Math.round(x.start / sr * 10) / 10)).toEqual([0, 0.4, 0.7]);
   });
 });
 

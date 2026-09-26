@@ -312,6 +312,6 @@ describe('sections keep their own swing (SongPanel)', () => {
     const src = readFileSync(join(__dirname, 'SongPanel.tsx'), 'utf8');
     expect(src).not.toMatch(/setState\(\{[^}]*swing: 0\.15/);
     expect(src).toContain('const sw = sec.swing ?? swingRef.current;');
-    expect(src).toContain('engine.renderSong(bars, shots, len, barSwing)');
+    expect(src).toContain('engine.renderSong(bars, shots, len, barSwing, sounds)');   // MUSIC-SUITE P5 FIX PASS: + each bar's Flip sounds
   });
 });

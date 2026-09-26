@@ -120,6 +120,13 @@ export interface SequencerState {
 export interface EngineTake {
   id: string; buffer: AudioBuffer; startBar: number; loopBars?: number; gain: number; trimStart: number; trimEnd: number; muted: boolean;
 }
+/**
+ * MUSIC-SUITE P5 FIX PASS (2026-09-25): the sounds one render plays, by row id, over the engine's loaded ones — a buffer
+ * (played as a Flip row plays its chop: no rootMidi, so a note moves it by rate from FLIP_ROOT_MIDI) or null (silent in
+ * this render). A row not in the map plays the engine's sound, as before.
+ */
+export type RenderSounds = ReadonlyMap<string, AudioBuffer | null>;
+
 /** A one-shot as SongPanel (M3) hands it: a take by its old name. renderSong / renderSongStems take these. */
 export interface SongShot { id?: string; buffer: AudioBuffer; atBar: number; gain: number; trimStart?: number; trimEnd?: number; muted?: boolean }
 /** MUSIC-SUITE P4: a click on the audio clock. */
@@ -653,16 +660,21 @@ export class AudioEngine {
    *  MUSIC-SUITE P3: `tracks` renders that list instead of the one playing (publish renders the working grid while song
    *  mode plays a section); either way only the selected rows sound. MUSIC-SUITE P3 FIX PASS: `swing` places them (the
    *  project's, from PUBLISH — the playing state's is a section's in song mode). */
-  async renderMixdown(bars = 2, tracks: TrackState[] = this.state.tracks, swing: number = this.state.swing): Promise<Blob> {
-    return encodeWav(await this.renderMixBuffer(bars, tracks, swing));
+  async renderMixdown(bars = 2, tracks: TrackState[] = this.state.tracks, swing: number = this.state.swing, sounds?: RenderSounds): Promise<Blob> {
+    return encodeWav(await this.renderMixBuffer(bars, tracks, swing, sounds));
   }
-  /** MUSIC-SUITE P4: renderMixdown's audio before it is encoded (the peak probe reads it; nothing is clipped by a WAV). */
-  async renderMixBuffer(bars = 2, tracks: TrackState[] = this.state.tracks, swing: number = this.state.swing): Promise<AudioBuffer> {
+  /**
+   * MUSIC-SUITE P4: renderMixdown's audio before it is encoded (the peak probe reads it; nothing is clipped by a WAV).
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): `sounds` — what these rows play in this render, by id (null = silent), over the
+   * engine's loaded sounds. PUBLISH passes the WORKING grid's Flip chops: song mode swaps a section's own chops into the
+   * engine under the same ids (StudioMode swapSectionChops), and the mixdown played those while the record named the grid's.
+   */
+  async renderMixBuffer(bars = 2, tracks: TrackState[] = this.state.tracks, swing: number = this.state.swing, sounds?: RenderSounds): Promise<AudioBuffer> {
     const stepDur = this.secondsPerStep();
     const totalDur = stepDur * this.state.steps * bars + 1.2;
     const offline = new OfflineAudioContext(2, Math.ceil(this.renderRate * totalDur), this.renderRate);
     const graph = this.offlineGraph(offline);
-    for (let bar = 0; bar < bars; bar++) this.placeBar(offline, graph, tracks, bar, swing);
+    for (let bar = 0; bar < bars; bar++) this.placeBar(offline, graph, tracks, bar, swing, sounds);
     return offline.startRendering();
   }
 
@@ -687,24 +699,31 @@ export class AudioEngine {
    * MUSIC-SUITE P2: `barSwing[b]` is bar b's swing (a section keeps its own); absent = the engine's swing.
    * MUSIC-SUITE P4: one pass of the song — each take once, on its bar, trimmed, through the takes strip.
    */
-  async renderSong(bars: TrackState[][], oneShots: SongShot[], lengthSec: number, barSwing?: number[]): Promise<Blob> {
+  async renderSong(bars: TrackState[][], oneShots: SongShot[], lengthSec: number, barSwing?: number[], barSounds?: readonly (RenderSounds | null | undefined)[]): Promise<Blob> {
     const offline = new OfflineAudioContext(2, Math.ceil(this.renderRate * Math.max(1, lengthSec)), this.renderRate);
     const graph = this.offlineGraph(offline);
-    bars.forEach((tracks, bar) => this.placeBar(offline, graph, tracks, bar, barSwing?.[bar] ?? this.state.swing));
+    bars.forEach((tracks, bar) => this.placeBar(offline, graph, tracks, bar, barSwing?.[bar] ?? this.state.swing, barSounds?.[bar] ?? undefined));
     oneShots.forEach((o, i) => this.placeOneShot(offline, graph, o, i));
     return encodeWav(await offline.startRendering());
   }
 
-  /** M4: one WAV per track over the whole song, plus each take as its own stem — each through the song's desk. */
-  async renderSongStems(bars: TrackState[][], oneShots: SongShot[], lengthSec: number, barSwing?: number[]): Promise<{ name: string; blob: Blob }[]> {
+  /**
+   * M4: one WAV per track over the whole song, plus each take as its own stem — each through the song's desk.
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): `barSounds[b]` = what bar b's rows play (a section's own Flip chops — studioEdit
+   * songBarSounds), over the engine's loaded sounds: both renders took every bar from whatever section song mode swapped
+   * into the engine last, while live song mode plays each section's own.
+   */
+  async renderSongStems(bars: TrackState[][], oneShots: SongShot[], lengthSec: number, barSwing?: number[], barSounds?: readonly (RenderSounds | null | undefined)[]): Promise<{ name: string; blob: Blob }[]> {
     const ids = [...new Set(bars.flatMap((b) => b.filter((t) => this.hears(t)).map((t) => t.sampleId)))];
     const out: { name: string; blob: Blob }[] = [];
     for (const id of ids) {
-      const sample = this.samples.get(id); if (!sample) continue;
+      const sample = this.samples.get(id);
+      const anyBar = barSounds?.some((m) => !!m?.get(id)) ?? false;
+      if (!sample && !anyBar) continue;
       const offline = new OfflineAudioContext(2, Math.ceil(this.renderRate * Math.max(1, lengthSec)), this.renderRate);
       const graph = this.offlineGraph(offline);
-      bars.forEach((tracks, bar) => this.placeBar(offline, graph, tracks.filter((t) => t.sampleId === id), bar, barSwing?.[bar] ?? this.state.swing));
-      out.push({ name: sample.name, blob: encodeWav(await offline.startRendering()) });
+      bars.forEach((tracks, bar) => this.placeBar(offline, graph, tracks.filter((t) => t.sampleId === id), bar, barSwing?.[bar] ?? this.state.swing, barSounds?.[bar] ?? undefined));
+      out.push({ name: sample?.name ?? id, blob: encodeWav(await offline.startRendering()) });
     }
     // MUSIC-SUITE P4 FIX PASS: a take stem crosses the TAKES strip, so with the takes muted or soloed out it would be a file
     // of silence ('take N' written empty) — it is left out, as a muted row's stem is (hears())
@@ -726,14 +745,18 @@ export class AudioEngine {
     playTake(offline, graph, take, songStepTime(o.atBar, 0, this.state.steps, this.state.bpm, 0), null);   // trims gate it, as live
   }
 
-  private placeBar(offline: OfflineAudioContext, graph: MixGraph, tracks: TrackState[], bar: number, swing: number): void {
+  private placeBar(offline: OfflineAudioContext, graph: MixGraph, tracks: TrackState[], bar: number, swing: number, sounds?: RenderSounds): void {
     for (const track of tracks) {
-      const sample = this.samples.get(track.sampleId);
+      // MUSIC-SUITE P5 FIX PASS: a sound given for this render wins (null = silent here); its note renders are not this
+      // sound's, so a given buffer plays at a rate like any row without one
+      const given = sounds?.has(track.sampleId) ? sounds.get(track.sampleId) ?? null : undefined;
+      if (given === null) continue;
+      const sample = given ? { id: track.sampleId, buffer: given } : this.samples.get(track.sampleId);
       if (!sample || !this.hears(track)) continue;
       for (let step = 0; step < this.state.steps; step++) {
         if (!track.pattern[step]) continue;
         const at = songStepTime(bar, step, this.state.steps, this.state.bpm, swing);   // the live loop's time, exactly
-        playHit(offline, graph, voiceFor(sample, track, step, this.notes), track, step, at);
+        playHit(offline, graph, voiceFor(sample, track, step, given ? undefined : this.notes), track, step, at);
       }
     }
   }

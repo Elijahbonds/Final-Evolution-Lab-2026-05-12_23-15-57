@@ -31,19 +31,43 @@
 //   * THE MIXER (P3 left `mixer.channels` as a placeholder of { solo?, room?, delay? }): per strip gain / pan / mute / solo
 //     / sendA (room) / sendB (slap), full records, only for strips moved off their defaults, and a `master` fader. A P3
 //     placeholder's room / delay migrate to sendA / sendB. mixerOf(p) is what AudioEngine.setMixer takes.
+//
+// MUSIC-SUITE P5 (2026-09-25), "The Flip, for real" — v3:
+//   * FOUR BANKS. The FLIP tab held one source and its 16 chops. A bank (ProjectFlipBank) is that — a source, how it is
+//     sliced, 16 chops — and there are four (A–D). Bank A is still the top-level fields of `flip` (the shape every P3/P4
+//     reader and test knows); B, C and D are `flip.otherBanks`, written only once one of them holds something. A bank may
+//     be sliced on the source's own cuts ('cuts' — the FEL pack's "FEL cuts" and its kits' file boundaries, flipPack.ts).
+//   * CHOP KITS. A bank saved under a name in the project (`flip.kits`), loaded into any bank later.
+//   * BAKED ROWS: WHAT YOU TUNE IS WHAT YOU SEQUENCE. A Flip row played the RAW slice at rate 1 (reversed when asked):
+//     the pad's gate never reached the grid (P3/P4: "gate is pad only"), and its pitch reached it only as the steps' notes
+//     (P4 padNote) — so REPLACE ROW with a new pitch kept the old notes and played the old pitch (p4/REPORT.md deferred:
+//     "a Flip pad's own pitch is not applied"). A v3 row's chop is BAKED (chopEdit.bakeChop): pitch, gate, reverse and the
+//     edge fades are in the buffer, so a step at FLIP_ROOT_MIDI plays exactly what the pad played, and a step's note is an
+//     interval from the pad AS TUNED. A v2 record migrates so it sounds the same: each row's notes move down by its
+//     pitch (none = every step at 60 − pitch, the raw chop), and its gate goes off (a v2 row played the full chop).
+//   * A SECTION KEEPS ITS OWN CHOPS (P3 deferred: "a section snapshot keeps its Flip rows but not its own chop, so
+//     re-sending a pad changes an older section's sound"): `section.chops` = the rows' chops when it was saved or updated.
+//   * A ROW KNOWS WHICH PAD IT CAME FROM (`origin`, bank + pad): with four banks, pad 3 of bank B must not replace the row
+//     pad 3 of bank A sent. Absent = bank A, the row's own number (every row before banks).
 import type { TrackState } from './AudioEngine';
 import { MAX_SONG_BARS, normalizeChain, songBars, type Section, type SongChain, type Take } from './Song';
 import { PAD_COUNT, isAllowedSource, padsFromSlices, type Pad, type Slice, type SourceKind } from './Flip';
 import { KIT_SLOTS, VOICE_ROOTS, isPitchedSlot, type KitId } from './SynthKit';
 import { DEFAULT_KIT, isKitId } from './purchases';
+import { pdAudioAllowed } from './pdShelf';
 import {
   DEFAULT_KEY, FLIP_ROOT_MIDI, defaultRowNote, inScale, isNoteRow, isPitchedRow, lockNote, pitchClass, readKey, rowRange, sameKey, transposeNote,
   type SongKey,
 } from './scales';
 import { CHANNEL_GAIN_MAX, DEFAULT_CHANNEL, MASTER_FADER_MAX, TAKES_CHANNEL, type ChannelMix, type MixerState } from './mixGraph';
 
-/** Bump when the shape changes, and teach migrateProject the step from the old one. MUSIC-SUITE P4: 2 (notes, key, mixer, takes). */
-export const STUDIO_PROJECT_VERSION = 2;
+/**
+ * Bump when the shape changes, and teach migrateProject the step from the old one. MUSIC-SUITE P4: 2 (notes, key, mixer,
+ * takes). MUSIC-SUITE P5: 3 (banks, chop kits, baked rows, section chops, row origins) — an older FEL refuses a v3 record
+ * instead of opening it and saving it back without banks B–D, the kits and the sections' chops, or playing a baked row's
+ * notes on its raw chop.
+ */
+export const STUDIO_PROJECT_VERSION = 3;
 /** The grid's steps (performSet PERFORM_STEPS_PER_BAR — a test pins them equal). */
 export const PROJECT_STEPS = 16;
 /** The room's sliders (StudioMode: BPM 60–160, SWING 0–40 %). A stored value outside them is clamped, and said. */
@@ -65,7 +89,14 @@ export interface AudioRef { key: string; mime: string; bytes: number }
  * it was saved at, but the swing lived in a SongPanel-local type (SwungSection, optional) and Song.ts Section had none, so
  * nothing could keep it. Here it is required; a v0 record's section without one takes the record's swing (migrate).
  */
-export interface ProjectSection extends Section { swing: number }
+export interface ProjectSection extends Section {
+  swing: number;
+  /**
+   * MUSIC-SUITE P5: the chops this section's Flip rows played when it was saved or updated from the grid (absent = the
+   * working rows' chops — every section before P5). Song mode plays them (StudioMode's section swap on the bar line).
+   */
+  chops?: ProjectFlipRow[];
+}
 /**
  * A recorded take: where it starts and how loud (Song.Take), and its audio.
  *
@@ -120,7 +151,15 @@ export function readTakeRegion(v: Record<string, unknown>, base: Take & { audio:
  * published chop and remix made from it (the source is copied whole), and studioEdit.publishedHasUpload reads it — the
  * key the sharing pass keeps a song private on.
  */
-export interface ProjectFlipSource { id: string; label: string; kind: SourceKind; note: string; url?: string; audio?: AudioRef; upload?: true }
+export interface ProjectFlipSource {
+  id: string; label: string; kind: SourceKind; note: string; url?: string; audio?: AudioRef; upload?: true;
+  /**
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25; P4 deferred "a chop's own key" here): the key the source is in, as FEL's pack
+   * says it — a theme's or loop's key ('Eb major', 'D dorian') or a pitched one-shot's root ('C4'). Absent = not known (the
+   * player's own sound, a kit). A chop's key is this moved by the pad's pitch (chopEdit.chopKeyText); the FLIP tab shows it.
+   */
+  key?: string;
+}
 /**
  * The FLIP tab: the loaded source, how it is sliced, and the sixteen chops (slice points + pitch / gate / reverse).
  * MUSIC-SUITE P3 FIX PASS: `rate` = the sample rate the slice points count in (the rate the source was decoded at). Slices
@@ -128,13 +167,35 @@ export interface ProjectFlipSource { id: string; label: string; kind: SourceKind
  * (assumption: 48 kHz speakers, 44.1 kHz on some headsets) — a chop saved at one rate cut ~8.8 % late and long at the
  * other. FlipPad.chopBuffer rescales by it. Absent (saved before this field) = the reader's rate.
  */
-export interface ProjectFlip { source: ProjectFlipSource | null; slicing: 'transient' | 'grid'; gridN: number; chops: Pad[]; rate?: number }
+export interface ProjectFlip extends ProjectFlipBank {
+  /**
+   * MUSIC-SUITE P5: banks B, C and D (index 0 = B), null = empty; trailing empties are dropped and an all-empty list is
+   * omitted, so a project that never used them is the P4 shape (and autosave sees no edit). Use bankOf / withBank.
+   */
+  otherBanks?: (ProjectFlipBank | null)[];
+  /** MUSIC-SUITE P5: chop kits — banks saved under a name (absent = none). */
+  kits?: ChopKit[];
+}
+/**
+ * MUSIC-SUITE P5: one bank — a source, how it is sliced, and its 16 chops (the FLIP tab's whole state before banks).
+ * `rate` = the sample rate the slice points count in (P3 FIX PASS; the rate the source was decoded at). `slicing` 'cuts'
+ * = the source's own cut points (the decoded source carries them: FEL pack items and kits — FlipPad DecodedSource.cuts).
+ */
+export interface ProjectFlipBank { source: ProjectFlipSource | null; slicing: FlipSlicing; gridN: number; chops: Pad[]; rate?: number }
+export type FlipSlicing = 'transient' | 'grid' | 'cuts';
+/** MUSIC-SUITE P5: a bank kept under a name in the project, loaded into any bank (a deep copy each way). */
+export interface ChopKit { id: string; name: string; savedAt: number; bank: ProjectFlipBank }
 /**
  * A pad sent to the groovebox: the grid row `flip_<pad>` and the exact chop it plays, with its own copy of the source —
  * reslicing the FLIP tab or loading another source later must not change what an already-written row sounds like.
- * `pitch` and `gate` are kept for P5 (baked chops); today the row plays the slice (reversed when asked) at rate 1.
+ * MUSIC-SUITE P5: the row's chop is BAKED — pitch, gate and reverse are in the buffer the row plays (chopEdit.bakeChop),
+ * so a step at FLIP_ROOT_MIDI is the pad as tuned. `pad` is the ROW's number (sampleId = flip_<pad>); `origin` = the bank
+ * and pad it was sent from, when that is not bank A's pad of the same number.
  */
-export interface ProjectFlipRow { sampleId: string; pad: number; label: string; source: ProjectFlipSource; slice: Slice; reverse: boolean; pitch: number; gate: boolean; rate?: number }
+export interface ProjectFlipRow {
+  sampleId: string; pad: number; label: string; source: ProjectFlipSource; slice: Slice; reverse: boolean; pitch: number; gate: boolean; rate?: number;
+  origin?: { bank: number; pad: number };
+}
 
 /**
  * The desk. MUSIC-SUITE P4: `channels` holds a FULL strip (mixGraph ChannelMix) for every row (or TAKES_CHANNEL) moved off
@@ -217,6 +278,87 @@ export function emptyKitTracks(key: SongKey = DEFAULT_KEY): TrackState[] {
 }
 export function emptyFlip(): ProjectFlip { return { source: null, slicing: 'transient', gridN: 8, chops: padsFromSlices([]) }; }
 
+// ── MUSIC-SUITE P5 (2026-09-25): four banks and chop kits ──────────────────────────────────────────────────────────────
+
+/** Banks A–D. */
+export const BANK_COUNT = 4;
+export const BANK_LETTERS = ['A', 'B', 'C', 'D'] as const;
+/** Kits a project keeps (a damaged record past it is cut, and said). */
+export const MAX_CHOP_KITS = 24;
+export const MAX_KIT_NAME = 32;
+
+/** An empty bank (a fresh chop set, sliced on transients). */
+export function emptyBank(): ProjectFlipBank { return { source: null, slicing: 'transient', gridN: 8, chops: padsFromSlices([]) }; }
+/** Does this bank hold anything to play (a source)? */
+export function bankHasSound(b: ProjectFlipBank | null | undefined): boolean { return !!b?.source; }
+const clampBank = (b: number): number => (Number.isInteger(b) && b >= 0 && b < BANK_COUNT ? b : 0);
+/** Bank `b` (0 = A) of the FLIP tab. */
+export function bankOf(f: ProjectFlip, b: number): ProjectFlipBank {
+  const i = clampBank(b);
+  if (i === 0) {
+    const { source, slicing, gridN, chops, rate } = f;
+    return { source, slicing, gridN, chops, ...(rate !== undefined ? { rate } : {}) };
+  }
+  return f.otherBanks?.[i - 1] ?? emptyBank();
+}
+/** All four banks, A first. */
+export function flipBanks(f: ProjectFlip): ProjectFlipBank[] { return Array.from({ length: BANK_COUNT }, (_, i) => bankOf(f, i)); }
+/** The FLIP tab with bank `b` replaced. B–D stay normalized (an empty bank is null, trailing nulls dropped). */
+export function withBank(f: ProjectFlip, b: number, bank: ProjectFlipBank): ProjectFlip {
+  const i = clampBank(b);
+  if (i === 0) {
+    const { rate: _r, ...rest } = f;
+    return { ...rest, source: bank.source, slicing: bank.slicing, gridN: bank.gridN, chops: bank.chops, ...(bank.rate !== undefined ? { rate: bank.rate } : {}) };
+  }
+  const others: (ProjectFlipBank | null)[] = Array.from({ length: BANK_COUNT - 1 }, (_, k) => f.otherBanks?.[k] ?? null);
+  others[i - 1] = bankHasSound(bank) ? bank : null;
+  while (others.length && others[others.length - 1] === null) others.pop();
+  const { otherBanks: _o, ...rest } = f;
+  return others.length ? { ...rest, otherBanks: others } : rest;
+}
+
+const copyOf = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+/** A kit name: one line, at most MAX_KIT_NAME characters, unique among the project's kits (" (2)"…); blank = none. */
+function kitName(name: string, taken: readonly ChopKit[]): string | null {
+  const t = name.replace(/\s+/g, ' ').trim().slice(0, MAX_KIT_NAME);
+  if (!t) return null;
+  const used = new Set(taken.map((k) => k.name.toLowerCase()));
+  if (!used.has(t.toLowerCase())) return t;
+  for (let n = 2; n < 1000; n++) {
+    const c = `${t.slice(0, MAX_KIT_NAME - ` (${n})`.length).trimEnd()} (${n})`;
+    if (!used.has(c.toLowerCase())) return c;
+  }
+  return null;
+}
+/**
+ * Save bank `b` as a named kit (a deep copy — later edits to the bank never change the kit). Null when the bank holds
+ * nothing to play, the name is blank, or the project already keeps MAX_CHOP_KITS.
+ */
+export function saveChopKit(f: ProjectFlip, b: number, name: string, opts: { now: number; id?: string }): { flip: ProjectFlip; kit: ChopKit } | null {
+  const bank = bankOf(f, b);
+  const kits = f.kits ?? [];
+  const n = kitName(name, kits);
+  if (!bankHasSound(bank) || !n || kits.length >= MAX_CHOP_KITS) return null;
+  const kit: ChopKit = { id: opts.id ?? `kit_${opts.now.toString(36)}${Math.floor(Math.random() * 36 ** 3).toString(36)}`, name: n, savedAt: opts.now, bank: copyOf(bank) };
+  return { flip: { ...f, kits: [...kits, kit] }, kit };
+}
+/** Load a kit into bank `b` (a deep copy); the FLIP tab unchanged when there is no such kit. */
+export function loadChopKit(f: ProjectFlip, kitId: string, b: number): ProjectFlip {
+  const kit = f.kits?.find((k) => k.id === kitId);
+  return kit ? withBank(f, b, copyOf(kit.bank)) : f;
+}
+/** Forget a kit (its audio stays while anything else uses it — projectAudioKeys). */
+export function deleteChopKit(f: ProjectFlip, kitId: string): ProjectFlip {
+  if (!f.kits?.some((k) => k.id === kitId)) return f;
+  const kits = f.kits.filter((k) => k.id !== kitId);
+  const { kits: _k, ...rest } = f;
+  return kits.length ? { ...rest, kits } : rest;
+}
+/** MUSIC-SUITE P5: the bank + pad a row was sent from (absent = bank A, the row's own number). */
+export function rowOrigin(r: Pick<ProjectFlipRow, 'pad' | 'origin'>): { bank: number; pad: number } {
+  return r.origin ?? { bank: 0, pad: r.pad };
+}
+
 export function newProject(opts: { now: number; id?: string; title?: string; kit?: KitId; bpm?: number; swing?: number; polish?: boolean; key?: SongKey } = { now: Date.now() }): StudioProject {
   const now = opts.now;
   const key = readKey(opts.key) ?? { ...DEFAULT_KEY };
@@ -274,12 +416,19 @@ export function duplicateProject(p: StudioProject, opts: { now: number; id?: str
   return { ...copy, id: opts.id ?? newProjectId(opts.now), title, createdAt: opts.now, updatedAt: opts.now };
 }
 
-/** Every audio key the project references — what the store must keep. */
-export function projectAudioKeys(p: Pick<StudioProject, 'takes' | 'flip' | 'flipRows'>): Set<string> {
+/**
+ * Every audio key the project references — what the store must keep.
+ * MUSIC-SUITE P5: every bank's source, every chop kit's, every section's own chops' — a parked
+ * bank or a kit made from a mic take must not lose its bytes to the store's sweep an hour later.
+ */
+export function projectAudioKeys(p: Pick<StudioProject, 'takes' | 'flip' | 'flipRows'> & { sections?: readonly ProjectSection[] }): Set<string> {
   const keys = new Set<string>();
+  const addBank = (b: ProjectFlipBank): void => { if (b.source?.audio) keys.add(b.source.audio.key); };
   for (const t of p.takes) keys.add(t.audio.key);
-  if (p.flip.source?.audio) keys.add(p.flip.source.audio.key);
+  for (const b of flipBanks(p.flip)) addBank(b);
+  for (const k of p.flip.kits ?? []) addBank(k.bank);
   for (const r of p.flipRows) if (r.source.audio) keys.add(r.source.audio.key);
+  for (const s of p.sections ?? []) for (const r of s.chops ?? []) if (r.source.audio) keys.add(r.source.audio.key);
   return keys;
 }
 
@@ -303,7 +452,7 @@ export function projectSignature(p: StudioProject): string {
 export function projectSummary(p: StudioProject): { hits: number; sections: number; bars: number; takes: number; flip: boolean } {
   return {
     hits: p.tracks.reduce((n, t) => n + t.pattern.filter(Boolean).length, 0),
-    sections: p.sections.length, bars: songBars(p.chain), takes: p.takes.length, flip: !!p.flip.source,
+    sections: p.sections.length, bars: songBars(p.chain), takes: p.takes.length, flip: flipBanks(p.flip).some(bankHasSound),
   };
 }
 
@@ -318,6 +467,8 @@ export function flipSampleId(pad: number): string { return `flip_${pad}`; }
  * MUSIC-SUITE P4 FIX PASS (2026-09-25): a pad plays at rateForPitch(pitch) (FlipPad), but its hits went into the grid as
  * `pattern` only, and the row's chop loads as root 60 — so a +5 pad replayed at 0. Contract (2) names the Flip pads' pitch
  * as a note the row plays, so the pitch rides on the step's note now.
+ * MUSIC-SUITE P5 (2026-09-25): v2 only. A v3 row's chop is baked (its pitch is in the buffer), so a new row writes no
+ * notes and a recorded hit plays the pad as tuned; this is how a v2 record's notes are read (rebaseLegacyFlip).
  */
 export function padNote(pitch: number): number | null {
   return Number.isFinite(pitch) && Math.round(pitch) !== 0 ? FLIP_ROOT_MIDI + Math.max(-24, Math.min(24, Math.round(pitch))) : null;
@@ -327,33 +478,107 @@ export function padNote(pitch: number): number | null {
  * A pad sent (or first recorded) to the grid: its row exists, and the row remembers the exact chop it plays.
  * MUSIC-SUITE P4 FIX PASS: a NEW row of a pitched pad has every step on the pad's pitch (padNote), so the steps lit in the
  * grid play what the pad played; an existing row keeps its notes (they are the player's).
+ * MUSIC-SUITE P5 (2026-09-25): the chop is BAKED (pitch, gate, reverse in the buffer), so a new row needs no notes — its
+ * steps play the pad as tuned — and REPLACE ROW with another pitch is heard (the old notes are intervals from the pad as
+ * tuned, and still are). P4 wrote 60 + pitch on every step and loaded the raw chop, so a replaced row kept the old pitch.
  */
 export function withFlipRow(p: StudioProject, row: ProjectFlipRow): StudioProject {
-  const pn = padNote(row.pitch);
   const tracks = p.tracks.some((t) => t.sampleId === row.sampleId)
     ? p.tracks
-    : [...p.tracks, { sampleId: row.sampleId, pattern: emptyPattern(), volume: 0.9, muted: false, pan: 0, ...(pn !== null ? { notes: new Array<number>(PROJECT_STEPS).fill(pn) } : {}) }];
+    : [...p.tracks, { sampleId: row.sampleId, pattern: emptyPattern(), volume: 0.9, muted: false, pan: 0 }];
   const flipRows = [...p.flipRows.filter((r) => r.sampleId !== row.sampleId), row];
   return { ...p, tracks, flipRows };
 }
 
 /**
- * A live pad tap while REC is armed: the step under the playhead lights on that pad's row.
+ * A live pad tap while REC is armed: the step (chopEdit.recordStep) lights on that pad's row.
  * MUSIC-SUITE P4 FIX PASS: at the pad's pitch (padNote) — when the pad is pitched, or the row already carries notes.
+ * MUSIC-SUITE P5: at the pad AS TUNED (FLIP_ROOT_MIDI — the pitch is baked into the row's chop), and only when the row
+ * already carries notes; a row without notes just lights (it plays the pad as tuned).
  */
 export function withFlipHit(p: StudioProject, sampleId: string, step: number): StudioProject {
   if (step < 0 || step >= PROJECT_STEPS) return p;
   const row = p.flipRows.find((r) => r.sampleId === sampleId);
-  const pn = row ? padNote(row.pitch) : null;
   return {
     ...p,
     tracks: p.tracks.map((t) => {
       if (t.sampleId !== sampleId) return t;
       const lit = { ...t, pattern: t.pattern.map((v, j) => (j === step ? true : v)) };
-      if (!row || (pn === null && !t.notes)) return lit;
-      return withStep(lit, step, { note: pn ?? FLIP_ROOT_MIDI }, p.key);
+      if (!row || !t.notes) return lit;
+      return withStep(lit, step, { note: FLIP_ROOT_MIDI }, p.key);
     }),
   };
+}
+
+// ── MUSIC-SUITE P5 (2026-09-25): a section keeps its own chops; a v2 row reads as a baked one ──────────────────────────
+
+const flipIdsOf = (tracks: readonly TrackState[]): string[] => tracks.filter((t) => flipIndex(t.sampleId) >= 0).map((t) => t.sampleId);
+/**
+ * Sections after a song edit, with their chops: a section that is NEW, or whose snapshot was retaken (UPDATE FROM GRID —
+ * its `tracks` are not the ones it had), keeps a copy of the rows' chops for the Flip rows it holds. Every other section
+ * is handed back as it was (a rename, the chain, a take never restamp one).
+ */
+export function stampSectionChops(before: readonly ProjectSection[], after: ProjectSection[], rows: readonly ProjectFlipRow[]): ProjectSection[] {
+  const was = new Map(before.map((s) => [s.id, s]));
+  let changed = false;
+  const out = after.map((s) => {
+    const old = was.get(s.id);
+    if (old && old.tracks === s.tracks) return s;
+    const ids = new Set(flipIdsOf(s.tracks));
+    const chops = rows.filter((r) => ids.has(r.sampleId)).map((r) => copyOf(r));
+    const { chops: _c, ...rest } = s;
+    changed = true;
+    return chops.length ? { ...rest, chops } : rest;
+  });
+  return changed ? out : after;
+}
+/** The chop each of a section's Flip rows plays: its own (saved with it), else the working row's; none = silent. */
+export function sectionChopsFor(section: Pick<ProjectSection, 'tracks' | 'chops'> | null, rows: readonly ProjectFlipRow[]): ProjectFlipRow[] {
+  if (!section) return [...rows];
+  const own = new Map((section.chops ?? []).map((r) => [r.sampleId, r]));
+  const out: ProjectFlipRow[] = [];
+  for (const id of flipIdsOf(section.tracks)) {
+    const r = own.get(id) ?? rows.find((x) => x.sampleId === id);
+    if (r) out.push(r);
+  }
+  return out;
+}
+/**
+ * A v2 grid read as v3: a v2 row played its RAW chop at rate 1 with the pitch on the steps' notes (P4 padNote; none = the
+ * raw chop at FLIP_ROOT_MIDI), for its full length. Its chop is baked now, so each Flip track's notes move down by its
+ * row's pitch (so every step sounds as it did) — folded into the row's range by octaves when a note would leave it.
+ */
+export function rebaseLegacyFlip(tracks: TrackState[], rows: readonly ProjectFlipRow[]): TrackState[] {
+  return tracks.map((t) => {
+    const r = rows.find((x) => x.sampleId === t.sampleId);
+    if (!r || !r.pitch) return t;
+    const notes = Array.from({ length: PROJECT_STEPS }, (_, i) => foldNote(t.sampleId, (t.notes?.[i] ?? FLIP_ROOT_MIDI) - r.pitch));
+    return { ...t, notes };
+  });
+}
+
+/**
+ * MUSIC-SUITE P5 FIX PASS (2026-09-25): the v2 → v3 migration turned every ROW's gate off (a v2 row played its whole
+ * chop) but left bank A's PADS gated (gate: true, the default the player never touched). P5's recordFlipHit treats a gate
+ * difference as another chop, so on an old project the first ARM REC hit on any row REPLACED it with the pad's gated
+ * chop — every earlier hit on that row now cut at 1.2 s, the toast saying the row "now plays pad N's chop (it replaced the
+ * row's old one…)" — and the pad showed REPLACE ROW for a row it made. A v2 row is bank A's pad of its own number (there
+ * were no banks, no origin); when that pad still holds the row's chop (same source, slice, reverse, pitch and rate), the
+ * pad's gate goes off with the row's, so pad and row stay one chop. A pad re-cut or retuned since keeps its gate.
+ */
+function legacyPadGates(flip: ProjectFlip, rows: readonly ProjectFlipRow[]): ProjectFlip {
+  const a = bankOf(flip, 0);
+  if (!a.source) return flip;
+  const key = (s: ProjectFlipSource): string => s.audio?.key ?? s.url ?? s.id;
+  let chops = a.chops;
+  for (const r of rows) {
+    const pad = chops[r.pad];
+    if (!pad?.slice || !pad.gate || r.origin) continue;
+    const same = key(a.source) === key(r.source) && pad.slice.start === r.slice.start && pad.slice.end === r.slice.end
+      && pad.reverse === r.reverse && pad.pitch === r.pitch && (a.rate ?? null) === (r.rate ?? null);
+    if (same) chops = chops.map((c, i) => (i === r.pad ? { ...c, gate: false } : c));
+  }
+  return chops === a.chops ? flip : withBank(flip, 0, { ...a, chops });
 }
 
 // ── MUSIC-SUITE P4: steps as the contract says them — { on, note?, vel? } ────────────────────────────────────────────
@@ -539,14 +764,19 @@ function readSource(v: unknown): ProjectFlipSource | null {
   if (!isObj(v)) return null;
   const id = str(v.id, 96), label = str(v.label, 96);
   if (!id || !label || !isAllowedSource(v.kind)) return null;
-  const url = typeof v.url === 'string' && /^\/audio\/[A-Za-z0-9/_.-]{1,200}$/.test(v.url) && !v.url.includes('..') ? v.url : undefined;
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): …and a public-domain file only while the owner's signed entry names it (pdShelf)
+  const url = typeof v.url === 'string' && /^\/audio\/[A-Za-z0-9/_.-]{1,200}$/.test(v.url) && !v.url.includes('..') && pdAudioAllowed(v.url) ? v.url : undefined;
   const audio = readAudioRef(v.audio) ?? undefined;
   if (!url && !audio) return null;                       // nothing to play it from
   return {
     id, label, kind: v.kind, note: typeof v.note === 'string' ? v.note.slice(0, 240) : '', ...(url ? { url } : {}), ...(audio ? { audio } : {}),
     ...(v.upload === true ? { upload: true as const } : {}),   // MUSIC-SUITE P3 FIX PASS: decision #15's mark, never dropped
+    ...(typeof v.key === 'string' && SOURCE_KEY.test(v.key) ? { key: v.key } : {}),   // MUSIC-SUITE P5 FIX PASS: the source's key
   };
 }
+
+/** MUSIC-SUITE P5 FIX PASS: a source's key as the pack writes it — 'Eb major', 'G mixolydian', or a root note 'C4'. */
+const SOURCE_KEY = /^[A-G][b#]?(-?\d| [a-z]{3,12})$/;
 
 /** A sample rate the slice points count in (8–384 kHz), or undefined. */
 const readRate = (v: unknown): number | undefined => (finite(v) && v >= 8000 && v <= 384000 ? Math.round(v) : undefined);
@@ -564,6 +794,37 @@ function readPad(v: unknown): Pad {
     pitch: finite(v.pitch) ? clamp(Math.round(v.pitch), -12, 12) : 0,
     reverse: v.reverse === true,
     gate: v.gate !== false,
+  };
+}
+
+/** MUSIC-SUITE P5: one bank as stored (bank A is the FLIP tab's top-level fields; `where` names B–D and kits in an issue). */
+function readBank(v: Obj, where: string, issues: string[]): ProjectFlipBank {
+  const source = v.source == null ? null : readSource(v.source);
+  if (v.source != null && !source) issues.push(`${where ? `${where}: ` : ''}the Flip source was unreadable (unloaded)`);
+  const chopsIn = Array.isArray(v.chops) ? v.chops : [];
+  const rate = source ? readRate(v.rate) : undefined;
+  const chops = Array.from({ length: PAD_COUNT }, (_, i) => readPad(source ? chopsIn[i] : null));
+  return {
+    source,
+    slicing: v.slicing === 'grid' ? 'grid' : v.slicing === 'cuts' ? 'cuts' : 'transient',
+    gridN: finite(v.gridN) ? clamp(Math.round(v.gridN), 2, PAD_COUNT) : 8,
+    chops,
+    ...(rate ? { rate } : {}),
+  };
+}
+
+/** MUSIC-SUITE P5: one Flip row as stored (the grid's, or a section's own chop); null = unreadable. */
+function readFlipRow(r: unknown): ProjectFlipRow | null {
+  const source = isObj(r) ? readSource(r.source) : null;
+  const slice = isObj(r) ? readSlice(r.slice) : null;
+  const pad = isObj(r) && finite(r.pad) ? Math.floor(r.pad) : -1;
+  if (!isObj(r) || !source || !slice || pad < 0 || pad >= PAD_COUNT || r.sampleId !== flipSampleId(pad)) return null;
+  const rate = readRate(r.rate);
+  const o = isObj(r.origin) && finite(r.origin.bank) && finite(r.origin.pad) ? { bank: Math.floor(r.origin.bank), pad: Math.floor(r.origin.pad) } : null;
+  const origin = o && o.bank >= 0 && o.bank < BANK_COUNT && o.pad >= 0 && o.pad < PAD_COUNT && !(o.bank === 0 && o.pad === pad) ? o : null;
+  return {
+    sampleId: flipSampleId(pad), pad, label: str(r.label, 32) ?? `FLIP ${pad + 1}`, source, slice, reverse: r.reverse === true,
+    pitch: finite(r.pitch) ? clamp(Math.round(r.pitch), -12, 12) : 0, gate: r.gate !== false, ...(rate ? { rate } : {}), ...(origin ? { origin } : {}),
   };
 }
 
@@ -739,7 +1000,18 @@ export function migrateProject(raw: unknown, ctx: { now: number; newId?: () => s
     let sw = swing;
     if (finite(s.swing)) sw = clamp(s.swing, SWING_RANGE[0], SWING_RANGE[1]);
     else if (s.swing !== undefined) issues.push(`section ${i + 1}: swing unreadable (the project's)`);
-    sections.push({ id: sid, name: str(s.name, 24) ?? 'section', tracks: readTracks(s.tracks, `section ${i + 1}`, issues, false, rc), swing: sw });
+    // MUSIC-SUITE P5: the section's own chops (v3), one per Flip row it holds
+    const chops: ProjectFlipRow[] = [];
+    if (Array.isArray(s.chops)) {
+      let bad = 0;
+      for (const c of s.chops) {
+        const row = readFlipRow(c);
+        if (!row || chops.some((x) => x.sampleId === row.sampleId) || chops.length >= MAX_FLIP_ROWS) { bad++; continue; }
+        chops.push(row);
+      }
+      if (bad) issues.push(`section ${i + 1}: ${bad} of its own chop${bad === 1 ? '' : 's'} unreadable (it plays the grid's)`);
+    } else if (s.chops !== undefined) issues.push(`section ${i + 1}: its own chops were unreadable (it plays the grid's)`);
+    sections.push({ id: sid, name: str(s.name, 24) ?? 'section', tracks: readTracks(s.tracks, `section ${i + 1}`, issues, false, rc), swing: sw, ...(chops.length ? { chops } : {}) });
   });
   if (sectionsCut) issues.push(`${sectionsCut} section${sectionsCut === 1 ? '' : 's'} past the ${MAX_SECTIONS} cap (dropped)`);
 
@@ -770,36 +1042,54 @@ export function migrateProject(raw: unknown, ctx: { now: number; newId?: () => s
   if (takesCut) issues.push(`${takesCut} take${takesCut === 1 ? '' : 's'} past the ${MAX_TAKES} cap (dropped)`);
   if (raw.takes !== undefined && !Array.isArray(raw.takes)) issues.push('takes unreadable (none kept)');
 
-  // the FLIP tab: source + slicing + 16 chops
+  // the FLIP tab: source + slicing + 16 chops (bank A). MUSIC-SUITE P5: + banks B–D and the chop kits (v3)
   let flip = emptyFlip();
   if (isObj(raw.flip)) {
-    const source = raw.flip.source == null ? null : readSource(raw.flip.source);
-    if (raw.flip.source != null && !source) issues.push('the Flip source was unreadable (unloaded)');
-    const chopsIn = Array.isArray(raw.flip.chops) ? raw.flip.chops : [];
-    const rate = source ? readRate(raw.flip.rate) : undefined;
-    flip = {
-      source,
-      slicing: raw.flip.slicing === 'grid' ? 'grid' : 'transient',
-      gridN: finite(raw.flip.gridN) ? clamp(Math.round(raw.flip.gridN), 2, PAD_COUNT) : 8,
-      chops: Array.from({ length: PAD_COUNT }, (_, i) => readPad(source ? chopsIn[i] : null)),
-      ...(rate ? { rate } : {}),
-    };
+    const a = readBank(raw.flip, '', issues);
+    flip = withBank(flip, 0, a);
+    if (Array.isArray(raw.flip.otherBanks)) {
+      raw.flip.otherBanks.slice(0, BANK_COUNT - 1).forEach((b, k) => {
+        if (b === null) return;
+        if (!isObj(b)) { issues.push(`bank ${BANK_LETTERS[k + 1]} unreadable (emptied)`); return; }
+        flip = withBank(flip, k + 1, readBank(b, `bank ${BANK_LETTERS[k + 1]}`, issues));
+      });
+      if (raw.flip.otherBanks.length > BANK_COUNT - 1) issues.push(`${raw.flip.otherBanks.length - (BANK_COUNT - 1)} bank(s) past D (dropped)`);
+    } else if (raw.flip.otherBanks !== undefined) issues.push('banks B–D unreadable (emptied)');
+    if (Array.isArray(raw.flip.kits)) {
+      const kits: ChopKit[] = [];
+      let bad = 0;
+      for (const k of raw.flip.kits) {
+        const name = isObj(k) ? str(k.name, MAX_KIT_NAME) : null;
+        const id = isObj(k) ? str(k.id, 64) : null;
+        const bank = isObj(k) && isObj(k.bank) ? readBank(k.bank, `kit "${name ?? '?'}"`, issues) : null;
+        if (!name || !id || !bank || !bankHasSound(bank) || kits.some((x) => x.id === id) || kits.length >= MAX_CHOP_KITS) { bad++; continue; }
+        kits.push({ id, name, savedAt: finite(k.savedAt) && k.savedAt > 0 ? k.savedAt : createdAt, bank });
+      }
+      if (bad) issues.push(`${bad} chop kit${bad === 1 ? '' : 's'} unreadable or past the ${MAX_CHOP_KITS} cap (dropped)`);
+      if (kits.length) flip = { ...flip, kits };
+    } else if (raw.flip.kits !== undefined) issues.push('chop kits unreadable (none kept)');
   } else if (raw.flip !== undefined) issues.push('the Flip tab was unreadable (emptied)');
 
-  const flipRows: ProjectFlipRow[] = [];
+  let flipRows: ProjectFlipRow[] = [];
   (Array.isArray(raw.flipRows) ? raw.flipRows : []).forEach((r, i) => {
     if (flipRows.length >= MAX_FLIP_ROWS) { issues.push(`Flip row ${i + 1}: past the ${MAX_FLIP_ROWS} pads (dropped)`); return; }
-    const source = isObj(r) ? readSource(r.source) : null;
-    const slice = isObj(r) ? readSlice(r.slice) : null;
-    const pad = isObj(r) && finite(r.pad) ? Math.floor(r.pad) : -1;
-    const sampleId = flipSampleId(pad);
-    if (!isObj(r) || !source || !slice || pad < 0 || pad >= PAD_COUNT || r.sampleId !== sampleId || flipRows.some((x) => x.sampleId === sampleId)) {
+    const row = readFlipRow(r);
+    if (!row || flipRows.some((x) => x.sampleId === row.sampleId)) {
       issues.push(`Flip row ${i + 1}: its chop was unreadable (the row plays nothing until a pad is sent again)`);
       return;
     }
-    const rate = readRate(r.rate);
-    flipRows.push({ sampleId, pad, label: str(r.label, 32) ?? `FLIP ${pad + 1}`, source, slice, reverse: r.reverse === true, pitch: finite(r.pitch) ? clamp(Math.round(r.pitch), -12, 12) : 0, gate: r.gate !== false, ...(rate ? { rate } : {}) });
+    flipRows.push(row);
   });
+
+  // MUSIC-SUITE P5: a v2 (or older) grid sounds as it did with its chops baked — the notes move down by each row's pitch
+  // (grid and sections), and a row's gate goes off (a v2 row played its whole chop). A migration, not a repair.
+  let grid = tracks;
+  if (from < 3 && flipRows.length) {
+    grid = rebaseLegacyFlip(tracks, flipRows);
+    for (let i = 0; i < sections.length; i++) sections[i] = { ...sections[i], tracks: rebaseLegacyFlip(sections[i].tracks, flipRows) };
+    flipRows = flipRows.map((r) => ({ ...r, gate: false }));
+    flip = legacyPadGates(flip, flipRows);
+  }
 
   // MUSIC-SUITE P4: the desk — the master fader and full strips (a P3 placeholder's room / delay are sendA / sendB)
   const rawMixer = isObj(raw.mixer) ? raw.mixer : null;
@@ -830,7 +1120,7 @@ export function migrateProject(raw: unknown, ctx: { now: number; newId?: () => s
     v: STUDIO_PROJECT_VERSION,
     id: id ?? (ctx.newId ? ctx.newId() : newProjectId(now)),
     title: cleanTitle(raw.title) ?? defaultProjectTitle(createdAt),
-    createdAt, updatedAt, bpm, swing, kit, key, tracks, flipRows, sections, chain, takes, flip, mixer, remixOf,
+    createdAt, updatedAt, bpm, swing, kit, key, tracks: grid, flipRows, sections, chain, takes, flip, mixer, remixOf,
   };
   return { ok: true, project, from, issues };
 }

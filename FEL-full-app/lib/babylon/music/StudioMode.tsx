@@ -114,7 +114,7 @@
 //     the key in words ('A minor' — the Cypher's chip upper-cased 'Am' into 'AM').
 
 import React, { useEffect, useMemo, useRef, useState, useCallback, useReducer } from 'react';
-import { AudioEngine, type TrackState } from './AudioEngine';
+import { AudioEngine, type RenderSounds, type TrackState } from './AudioEngine';
 import { synthesizeKit, synthesizeNote, isPitchedSlot, KIT_SLOTS, KIT_META, VOICE_ROOTS, type KitId, type PitchedSlot } from './SynthKit';
 // MUSIC-SUITE P3 (2026-09-25): the library's audio lives in the Academy's IndexedDB store now (StudioLibrary.ts header);
 // publish hands it the rendered Blob, PLAY asks it for a source, and every failure comes back as a line to say.
@@ -129,6 +129,11 @@ import SongPanel from './SongPanel';   // lane 2 M2–M4 — sections, chain, ta
 import { useStudioProject } from './useStudioProject';
 import MyProjects from './MyProjects';
 import { withFlipHit, withFlipRow, type ProjectFlip, type ProjectFlipRow, type ProjectFlipSource, type ProjectTake, type SongSlice, type StudioProject } from './StudioProject';
+// MUSIC-SUITE P5 (2026-09-25), "The Flip, for real": baked chops, a section's own chops, ARM REC on the audio clock, and
+// decoded sources let go when the project no longer plays them (chopEdit.ts).
+import { sectionChopsFor, stampSectionChops } from './StudioProject';
+import { bakeKey, liveSourceKeys, planChopSwap, pruneMap, type StepMark } from './chopEdit';
+import { stepDurSec } from './stepTime';
 // MUSIC-SUITE P4 (2026-09-25): the contract's step / key / desk edits (StudioProject.ts) — every note is locked there
 import { mixerOf, setProjectKey, withChannel, withMaster, withTrackStep } from './StudioProject';
 // MUSIC-SUITE P3 FIX PASS (2026-09-25): which sound each Flip row plays — the open project's, and only its.
@@ -139,9 +144,21 @@ import {
   EditHistory, applyFoundation, cellFoundation, chopSignature, clearGrid, foundationPreview, gridHitCount, historyAudioKeys, playbackSource,
   previewTracks, publishRender, publishTracks, publishedAudioKeys, remixSeed, sameSlice, shownSection, toggleStep, undoSlice, type UndoSlice,
 } from './studioEdit';
+// MUSIC-SUITE P5 FIX PASS (2026-09-25): a render's Flip rows play the sounds handed to it (the working grid's for PUBLISH,
+// each bar's section's for RENDER SONG / STEMS) — never whatever song mode swapped into the engine last
+import { flipSoundMap, songBarSounds, songChops } from './studioEdit';
 import { danceSongAtTier, exportSongToDance, saveExportedTrack } from './DanceExport';
-import { chopBuffer, monoOf, sourceKey, type DecodedSource } from './FlipPad';
-import { padFromAction } from './Flip';
+import { bakedBuffer, monoOf, sourceKey, type DecodedSource, type StepClock } from './FlipPad';
+// MUSIC-SUITE P5 (2026-09-25), phone-mpc: the phone's room lives at ROOM level, its pads play the room's bank on any tab
+// (the pad_N parse moved from Flip.padFromAction to phonePad.phoneCommand, which also reads PLAY / STOP / REC / BANK A–D)
+import { padRowFor, readBankView, readQuantize, tapStep, writeBankView, type PadHit } from './FlipPad';
+import { medianRtt, padGain, phoneBadgeShown, phoneCommand, phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, PHONE_BANKS, PHONE_LATE_S } from './phonePad';
+import { bankOf, flipSampleId } from './StudioProject';
+import { rowSlotFor } from './chopEdit';
+import type { ControlEvent, LobbyPeer, PeerId } from '@/lib/controller-link/types';
+import { decodeFlipPackSource } from './flipPack';            // MUSIC-SUITE P5: FEL's Flip pack items and kits
+import { projectUploadPrivacy, tracksHaveUpload, uploadDoorOpen, uploadNeedsTick, UPLOAD_DOORS } from './uploadPrivacy';   // MUSIC-SUITE P5: decision #15
+import { judgesPhoneTap } from './phonePad';
 import { HostLobby } from '@/components/controller-link/host-lobby';   // M1b — the phone is the pad controller
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 import { BootSplash } from '@/components/games/boot-splash';
@@ -247,6 +264,12 @@ declare global {
       keysLive?: boolean;
       /** MUSIC-SUITE P4 FIX PASS: the desk's delay the room reads latencies with (engine.graphLatencySec, s). */
       graphLatencySec?: number;
+    };
+    /** MUSIC-SUITE P5 dev/probe hook: ARM REC's audio clock, the decoded sources and baked chops the room holds. */
+    __FEL_FLIP_ROOM__?: {
+      clock: () => StepClock | null; sources: () => string[]; chops: () => number; loaded: (id: string) => boolean;
+      /** the decoded source's samples [at − n, at + n) (a probe checks a cut is on a zero crossing) */
+      peek: (key: string, at: number, n: number) => Promise<number[] | null>;
     };
   }
 }
@@ -357,9 +380,14 @@ export default function StudioMode({
    *  section, chain or take change is an undo step (MUSIC-SUITE P3 FIX PASS: the takes too), and so is the FLIP tab's. */
   // MUSIC-SUITE P4 FIX PASS (2026-09-25): the LAST take removed takes the TAKES strip's mute / solo with it (the same undo
   // step) — its strip is only drawn while there are takes, and a solo left on it silenced every row (decision #11)
+  // MUSIC-SUITE P5 (2026-09-25), P3 deferred: A SECTION KEEPS ITS OWN CHOPS. A section snapshot kept its Flip rows' steps
+  // but not their chops, so re-sending a pad changed how every older section sounded. A section saved (or retaken with
+  // UPDATE FROM GRID) now keeps a copy of the chops its Flip rows play (StudioProject.stampSectionChops), and song mode
+  // plays them (swapSectionChops, on the bar line).
   const songChange = useCallback((fn: (s: SongSlice) => SongSlice) =>
     edit((p) => {
       const next = { ...p, ...fn({ sections: p.sections, chain: p.chain, takes: p.takes }) };
+      next.sections = stampSectionChops(p.sections, next.sections, p.flipRows);   // MUSIC-SUITE P5 (a fresh object: safe to set)
       return p.takes.length && !next.takes.length ? withChannel(next, TAKES_CHANNEL, { mute: false, solo: false }) : next;
     }), [edit]);
   /**
@@ -479,7 +507,48 @@ export default function StudioMode({
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  const flipTrigger = useRef<((pad: number) => void) | null>(null);   // filled by FlipPad; hit by paired phones
+  const flipTrigger = useRef<((pad: number, hit?: PadHit) => void) | null>(null);   // filled by FlipPad; hit by paired phones
+
+  // ── MUSIC-SUITE P5 (2026-09-25), phone-mpc: THE PHONE'S ROOM IS THE ROOM'S ─────────────────────────────────────────
+  // Owner decision #16 ("stays connected across tabs, transport, banks"). <HostLobby> was mounted inside the FLIP tab, and
+  // its unmount disposes the HostSession (host-lobby.tsx :102-118): every tab switch closed the phone's data channel and
+  // the next FLIP visit opened a new room with a new code. It is mounted beside the tabs now, from the first FLIP visit
+  // (phonePad.phoneRoomOpen) until the Academy unmounts; the bank on the pads and ARM REC moved up here with it, so the
+  // phone's BANK A–D and REC work on every tab and FLIP shows what the phone picked.
+  const [phoneRoom, setPhoneRoom] = useState(false);
+  useEffect(() => { setPhoneRoom((on) => phoneRoomOpen(on, view)); }, [view]);
+  /** Phones connected now (the badge stays on screen on every tab while one is). */
+  const [phones, setPhones] = useState(0);
+  /** Each phone's recent round trips, ms (the lobby's rttMs — host.ts:149), for moving its taps back (phonePad.phoneTapSec). */
+  const rttRef = useRef(new Map<PeerId, number[]>());
+  /** The Flip bank on the pads (FlipPad's view, held here): per project for this browser tab, as FlipPad kept it. */
+  const [flipBank, setFlipBankState] = useState(() => readBankView(project.id));
+  const flipBankRef = useRef(flipBank); flipBankRef.current = flipBank;
+  useEffect(() => { const b = readBankView(project.id); flipBankRef.current = b; setFlipBankState(b); }, [project.id]);
+  const setFlipBank = useCallback((b: number): void => { flipBankRef.current = b; setFlipBankState(b); writeBankView(projectRef.current.id, b); }, []);
+  /** ARM REC (FlipPad's, held here): a phone's REC arms it from any tab, and a phone hit on any tab records. */
+  const [flipRecArm, setFlipRecArmState] = useState(false);
+  const flipRecArmRef = useRef(flipRecArm); flipRecArmRef.current = flipRecArm;
+  const setFlipRecArm = useCallback((on: boolean): void => { flipRecArmRef.current = on; setFlipRecArmState(on); }, []);
+  /** MUSIC-SUITE P5: the steps the engine scheduled lately, with their audio-clock times (onStepScheduled). */
+  const stepMarksRef = useRef<StepMark[]>([]);
+  /**
+   * MUSIC-SUITE P5 (2026-09-25): ARM REC's clock. FlipPad wrote a tap to quantizeTap(playhead) — the step that had already
+   * SOUNDED (onStep fires after a step's time), so a tap 20 ms before a beat landed on the beat before it. It reads the
+   * audio clock now: the time of the tap, minus the player's delay (the saved calibration, else the device's output delay,
+   * plus the desk's — the same performLatencySec PERFORM judges with), against the steps actually scheduled.
+   */
+  const flipClock = useCallback((): StepClock | null => {
+    const eng = engineRef.current;
+    if (!eng || !eng.isRunning) return null;
+    return {
+      now: eng.context.currentTime,
+      latencySec: performLatencySec({ savedOffsetMs: savedAudioOffsetMs(), outputLatency: eng.context.outputLatency, baseLatency: eng.context.baseLatency, graphLatencySec: eng.graphLatencySec }),
+      marks: stepMarksRef.current, stepSec: stepDurSec(projectRef.current.bpm), startSec: eng.songStartSec,
+    };
+  }, []);
+  /** MUSIC-SUITE P5: the grid's row ids — a Flip row whose chop was lost still holds its number (chopEdit.rowSlotFor). */
+  const flipTrackIds = useMemo(() => new Set(tracks.map((t) => t.sampleId)), [tracks]);
 
   // ── MUSIC-SUITE P4 (2026-09-25), grid-ui: the pocket studio's own state ────────────────────────────────────────────
   /** The viewport's width: under 640 px the grid is the phone grid, pages of 8 (ui/gridMath gridLayout). */
@@ -589,6 +658,11 @@ export default function StudioMode({
     // nothing open and scored EARLY in 25 of 25 timer phases). The judge listens where the player does: the saved
     // calibration, else the device's output delay (performLatencySec). An empty grid offers no notes (performNoteAt).
     eng.onStepScheduled = (s, t, sound) => {
+      // MUSIC-SUITE P5 (2026-09-25): the FLIP's ARM REC places a tap by these (chopEdit.recordStep — the nearest step on
+      // the audio clock, swing included); the last three bars are plenty
+      const marks = stepMarksRef.current;
+      marks.push({ step: s, time: t });
+      if (marks.length > 48) marks.splice(0, marks.length - 48);
       if (modeRef.current !== 'perform') return;
       const set = setRef.current;
       set.latencySec = performLatencySec({
@@ -726,6 +800,9 @@ export default function StudioMode({
     const p = (async (): Promise<DecodedSource> => {
       const eng = engineRef.current;
       if (!eng) throw new Error('the studio is still starting');
+      // MUSIC-SUITE P5 (2026-09-25): a FEL Flip pack item comes back gapless with FEL's cuts, a kit as its files joined one
+      // per pad (flipPack.ts); null = not a pack source (or pack.json unreachable), decoded the plain way below
+      if (!src.audio && src.url) { const packed = await decodeFlipPackSource(eng.context, src.url); if (packed) return packed; }
       let bytes: ArrayBuffer | null = null;
       if (src.audio) bytes = await room.loadAudio(src.audio);
       else if (src.url) { const r = await fetch(src.url); if (!r.ok) throw new Error(String(r.status)); bytes = await r.arrayBuffer(); }
@@ -738,16 +815,195 @@ export default function StudioMode({
     return p;
   }, [room.loadAudio]);
 
-  /** One Flip row's chop, decoded from its source and cut at the rate it was sliced at. */
+  /**
+   * One Flip row's chop, decoded from its source and cut at the rate it was sliced at.
+   * MUSIC-SUITE P5 (2026-09-25): BAKED — the pad's pitch, gate and reverse and the edge fades are in the buffer
+   * (FlipPad.bakedBuffer, the same one the pad plays). It was the raw slice (chopBuffer), so a row never had the pad's
+   * gate, and its pitch only as the steps' notes. Kept by bakeKey (chopCache) so song mode can swap a section's own
+   * chops in on the bar line without waiting for a decode.
+   */
+  const chopCache = useRef(new Map<string, AudioBuffer>());
   const chopFor = useCallback(async (row: ProjectFlipRow): Promise<AudioBuffer> => {
+    const key = bakeKey(row);
+    const hit = chopCache.current.get(key);
+    if (hit) return hit;
     const d = await loadFlipSource(row.source);
     const eng = engineRef.current;
     if (!eng) throw new Error('the studio is still starting');
-    return chopBuffer(eng.context, d, row.slice, row.reverse, row.rate);
+    const b = bakedBuffer(eng.context, d, row);
+    chopCache.current.set(key, b);
+    return b;
   }, [loadFlipSource]);
   const sayGone = useCallback((gone: readonly string[]): void => {
     if (gone.length) say(`${gone.join(', ')}: the sound isn't on this device any more — the row is silent until you send a pad to ${gone.length === 1 ? 'it' : 'them'} again`);
   }, [say]);
+
+  // MUSIC-SUITE P5 (2026-09-25), P3 deferred: "decoded Flip sources stay in memory for the room's life (large uploads)".
+  // sourceCache only ever grew — every source ever opened, in every project, until the room closed. Now whatever the open
+  // project no longer plays (a cleared bank, a replaced source, the last project's sources after another opens) is let go
+  // (chopEdit.liveSourceKeys); an UNDO that brings one back decodes it again. The baked chops follow the same rule.
+  useEffect(() => {
+    pruneMap(sourceCache.current, liveSourceKeys(project));
+    const rows = [...project.flipRows, ...project.sections.flatMap((s) => s.chops ?? [])];
+    pruneMap(chopCache.current, new Set(rows.map(bakeKey)));
+    // song mode: every section's own chops ready before its bar line comes (a decode can't wait for the bar)
+    if (ready && room.restored) for (const r of rows) if (!chopCache.current.has(bakeKey(r))) void chopFor(r).catch(() => undefined);
+  }, [project.flip, project.flipRows, project.sections, ready, room.restored, chopFor]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { sourceCache.current.clear(); chopCache.current.clear(); }, []);
+
+  /**
+   * MUSIC-SUITE P5: SONG MODE PLAYS A SECTION'S OWN CHOPS. SongPanel tells the room which section a bar plays (onSongNow,
+   * from engine.onBar — before that bar's steps are scheduled); the section's Flip rows get the chops it was saved with
+   * (StudioProject.sectionChopsFor; the grid's chops when it has none, and when song mode ends). Loaded only when they
+   * change.
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): a chop not baked yet was SKIPPED and retried only on the next bar line — which
+   * song mode off never has — so (a) a section chop that could not be decoded (a mic take swept from the store) left the
+   * row playing the GRID's chop, with no line; (b) after song mode ended, a grid row whose chop had failed kept the last
+   * SECTION's chop instead of going silent; (c) an undo, a SEND or a recorded hit during song mode loaded the WORKING
+   * chops over the playing section's until the next bar. Now a missing chop is baked and the swap runs again the moment
+   * it is ready (no bar line needed); one that can't be had leaves its row SILENT and says so once (swapFailed); and the
+   * working-chop loads re-apply the playing section's own (resyncSection). `p` = the project to read (an undo's target).
+   */
+  const swapSig = useRef('');
+  /** MUSIC-SUITE P5 FIX PASS: the section song mode is playing (null = the grid), and the chops that could not be had. */
+  const swapNow = useRef<string | null>(null);
+  const swapFailed = useRef(new Set<string>());
+  const swapRef = useRef<(id: string | null, p?: Pick<StudioProject, 'sections' | 'flipRows'>) => void>(() => undefined);
+  const swapSectionChops = useCallback((sectionId: string | null, p: Pick<StudioProject, 'sections' | 'flipRows'> = projectRef.current): void => {
+    const eng = engineRef.current;
+    if (!eng) return;
+    swapNow.current = sectionId;
+    const want = sectionChopsFor(sectionId ? p.sections.find((s) => s.id === sectionId) ?? null : null, p.flipRows);
+    const sig = JSON.stringify([sectionId, want.map(bakeKey)]);
+    if (sig === swapSig.current) return;
+    const plan = planChopSwap(want, (k) => chopCache.current.get(k), swapFailed.current);
+    for (const { row, buffer } of plan.load) eng.loadBuffer(row.sampleId, row.label, buffer, 'melody');
+    for (const id of plan.silence) eng.unloadSample(id);   // a chop that can't be had: silent, never another chop
+    for (const r of plan.pending) {
+      const key = bakeKey(r);
+      void chopFor(r).then(
+        () => { if (swapNow.current === sectionId) { swapSig.current = ''; swapRef.current(sectionId); } },
+        () => {
+          const first = !swapFailed.current.has(key);
+          swapFailed.current.add(key);
+          if (swapNow.current !== sectionId) return;
+          eng.unloadSample(r.sampleId);
+          if (first) sayGone([r.label]);
+        },
+      );
+    }
+    swapSig.current = plan.done ? sig : '';
+  }, [chopFor, sayGone]);
+  swapRef.current = swapSectionChops;
+  /**
+   * MUSIC-SUITE P5 FIX PASS: the engine was just given WORKING chops (an undo, a SEND, a recorded hit); while song mode
+   * plays a section, its own chops go back at once — read from `p`, the project as the edit leaves it.
+   */
+  const resyncSection = useCallback((p: Pick<StudioProject, 'sections' | 'flipRows'>): void => {
+    swapSig.current = '';
+    if (swapNow.current !== null) swapRef.current(swapNow.current, p);
+  }, []);
+  const songNowChanged = useCallback((id: string | null): void => { setSongNow(id); swapSectionChops(id); }, [swapSectionChops]);
+  /**
+   * MUSIC-SUITE P5 FIX PASS (2026-09-25): RENDER SONG and STEMS — what each bar's Flip rows play: its section's own chops
+   * (else the grid's), every one baked first (studioEdit.songBarSounds). The renders read the engine's sounds, i.e. the
+   * last section song mode swapped in, for every bar.
+   */
+  const songRenderSounds = useCallback(async (bars: number): Promise<RenderSounds[]> => {
+    const p = projectRef.current;
+    await Promise.allSettled(songChops(p.flipRows, p.sections, bakeKey).map((r) => chopFor(r)));
+    return songBarSounds(p.chain, p.sections, p.flipRows, bars, (r) => chopCache.current.get(bakeKey(r)) ?? null);
+  }, [chopFor]);
+  // MUSIC-SUITE P5: the dev/probe hook (scripts/probes/_music-p5-flip-editor.mts)
+  useEffect(() => {
+    window.__FEL_FLIP_ROOM__ = {
+      clock: flipClock, sources: () => [...sourceCache.current.keys()], chops: () => chopCache.current.size,
+      loaded: (id) => engineRef.current?.hasSample(id) ?? false,
+      peek: async (key, at, n) => { const d = await sourceCache.current.get(key)?.catch(() => null); return d ? Array.from(d.mono.slice(Math.max(0, at - n), at + n)) : null; },
+    };
+    return () => { delete window.__FEL_FLIP_ROOM__; };
+  }, [flipClock]);
+
+  /**
+   * A live pad hit written into the grid (FlipPad's ARM REC, and a phone hit on any tab). MUSIC-SUITE P5 (phone-mpc): this
+   * was FlipPad's inline onRecordHit; it is the room's now so a phone hit on the STUDIO tab records by the same rule, and
+   * a MEASURED velocity (a paired phone's) is written into the step (StudioProject.withTrackStep — the grid plays a step at
+   * volume × vel). A hit with no velocity leaves the step's velocity as it was (a screen tap never had one).
+   */
+  const recordFlipHit = useCallback((pad: number, step: number, chop: { buffer: AudioBuffer; row: ProjectFlipRow }, velocity?: number | null): void => {
+    // MUSIC-SUITE P3 FIX PASS: a row that holds ANOTHER chop (sent from an earlier source, or one that failed to
+    // load after a reload) takes the pad's chop on the first recorded hit — what the taps sound like is what the
+    // row plays. One undo step with the burst.
+    // MUSIC-SUITE P5: pitch and gate are baked into the chop — a retuned pad is another chop (MUSIC-SUITE P5 FIX PASS:
+    // chopSignature carries both now)
+    const differs = (p: StudioProject): boolean => {
+      const r = p.flipRows.find((x) => x.sampleId === chop.row.sampleId);
+      return !r || chopSignature(r) !== chopSignature(chop.row);
+    };
+    const had = projectRef.current.flipRows.some((r) => r.sampleId === chop.row.sampleId);
+    if (differs(projectRef.current)) {
+      engineRef.current?.loadBuffer(chop.row.sampleId, chop.row.label, chop.buffer, 'melody');
+      chopCache.current.set(bakeKey(chop.row), chop.buffer);
+      resyncSection(withFlipRow(projectRef.current, chop.row));   // MUSIC-SUITE P5 FIX PASS: a playing section keeps its own
+      if (had) say(`${chop.row.label} now plays pad ${pad + 1}'s chop (it replaced the row's old one — UNDO puts it back)`);
+    }
+    edit((p) => withFlipHit(differs(p) ? withFlipRow(p, chop.row) : p, chop.row.sampleId, step), 'flip-rec');
+    // …and the phone's measured velocity on that step (the same 'flip-rec' undo step as the hit)
+    if (typeof velocity === 'number' && Number.isFinite(velocity)) edit((p) => ({ ...p, tracks: withTrackStep(p.tracks, chop.row.sampleId, step, { vel: velocity }, p.key) }), 'flip-rec');
+  }, [edit, say, resyncSection]);
+
+  // ── MUSIC-SUITE P5 (2026-09-25), phone-mpc: a phone hit on a tab where FlipPad is not mounted ─────────────────────
+  // The room plays the bank's pad itself: the same baked chop FlipPad plays (padRowFor → chopFor → FlipPad.bakedBuffer),
+  // through the strip of the row it goes to, at the phone's velocity; with ARM REC on and the transport running it lands
+  // on the step tapStep picks (the same rule as FLIP's ARM REC) at the tap's own time. A chop still decoding when the hit
+  // comes (the first hit after a reload) is NOT played late: a pad that sounds 300 ms after the finger is worse than one
+  // that says it is loading — the bank's pads are baked ahead while a phone is connected (below) so this is rare.
+  const phoneSaid = useRef({ full: false, loading: false, tick: false });
+  const playPhonePad = (pad: number, hit: PadHit): 'played' | 'loading' | 'empty' => {
+    const eng = engineRef.current;
+    if (!eng) return 'empty';
+    const p = projectRef.current;
+    const bk = flipBankRef.current;
+    const b = bankOf(p.flip, bk);
+    if (!b.source || !b.chops[pad]?.slice) return 'empty';
+    const slot = rowSlotFor(p.flipRows, p.tracks.map((t) => t.sampleId), bk, pad);
+    const row = padRowFor(b, bk, pad, slot, null);                  // null when all 16 rows are taken: it still plays
+    const spec = row ?? padRowFor(b, bk, pad, { slot: pad }, null);
+    if (!spec) return 'empty';
+    const go = (buffer: AudioBuffer): void => {
+      const ctx = eng.context;
+      if (ctx.state === 'suspended') void ctx.resume();
+      const node = ctx.createBufferSource(); node.buffer = buffer;
+      const g = ctx.createGain(); g.gain.value = padGain(hit.velocity);
+      node.connect(g).connect(eng.channelInput(flipSampleId(slot?.slot ?? pad))); node.start();
+      if (!flipRecArmRef.current || !eng.isRunning) return;
+      // MUSIC-SUITE P5 FIX PASS (decision #15): an upload from before the tick is not recorded until it is ticked (FLIP tab)
+      if (uploadNeedsTick(b.source)) { if (!phoneSaid.current.tick) { phoneSaid.current.tick = true; say(`Tick "I made this or I own the rights" for ${b.source?.label} on the FLIP tab to record it`); } return; }
+      const step = tapStep(flipClock(), STEPS, readQuantize(), playhead, hit.atSec);
+      if (!row) { if (!phoneSaid.current.full) { phoneSaid.current.full = true; say('All 16 Flip rows are taken — this pad has no row to record into (clear a row in STUDIO first)'); } return; }
+      if (step !== null) recordFlipHit(pad, step, { buffer, row }, hit.velocity ?? null);
+    };
+    const cached = chopCache.current.get(bakeKey(spec));
+    if (cached) { go(cached); return 'played'; }
+    // not baked yet: a decoded source bakes in a microtask (played at once); a source still decoding may miss the hit
+    const t0 = eng.context.currentTime;
+    void chopFor(spec).then(
+      (buffer) => {
+        if (eng.context.currentTime - t0 <= PHONE_LATE_S) { go(buffer); return; }
+        if (!phoneSaid.current.loading) { phoneSaid.current.loading = true; say(`Phone: bank ${PHONE_BANKS[bk]} was still loading — that hit came too late to play`); }
+      },
+      () => undefined,
+    );
+    return 'loading';
+  };
+  // while a phone is connected, the bank on its pads is baked ahead (a hit then never waits for a decode) — again after
+  // every change that lets the room's chop cache go (the prune above runs on the same changes, before this)
+  useEffect(() => {
+    if (!phones || !ready || !room.restored) return;
+    const b = bankOf(project.flip, flipBank);
+    if (!b.source) return;
+    b.chops.forEach((_c, i) => { const r = padRowFor(b, flipBank, i, { slot: i }, null); if (r && !chopCache.current.has(bakeKey(r))) void chopFor(r).catch(() => undefined); });
+  }, [phones, flipBank, project.flip, project.flipRows, project.sections, ready, room.restored, chopFor]);
 
   // MUSIC-SUITE P3 FIX PASS: a project opened — the engine forgets every Flip sound first (flipRowSounds.openFlipRowSounds),
   // so a row whose chop can't be had plays nothing instead of the last project's chop. The kit and MASTER follow their
@@ -757,6 +1013,8 @@ export default function StudioMode({
     const eng = engineRef.current;
     if (!eng) return;
     let alive = true;
+    swapSig.current = '';   // MUSIC-SUITE P5: the engine's Flip sounds are the new project's now
+    swapNow.current = null; swapFailed.current.clear();   // MUSIC-SUITE P5 FIX PASS: song mode is off in a newly opened project
     void openFlipRowSounds(eng, projectRef.current.flipRows, chopFor, () => alive).then((gone) => { if (alive) sayGone(gone); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -920,7 +1178,15 @@ export default function StudioMode({
     update((p) => ({ ...p, ...to }));
     const eng = engineRef.current;
     const gen = genRef.current;
-    if (eng) void reloadFlipRowSounds(eng, cur.flipRows, to.flipRows, chopFor, () => genRef.current === gen).then((gone) => { if (genRef.current === gen) sayGone(gone); });
+    // MUSIC-SUITE P5 FIX PASS: …and then, under song mode, the playing section's own chops go back over the working ones
+    if (eng) void reloadFlipRowSounds(eng, cur.flipRows, to.flipRows, chopFor, () => genRef.current === gen).then((gone) => {
+      if (genRef.current !== gen) return;
+      sayGone(gone);
+      resyncSection({ sections: to.sections, flipRows: to.flipRows });
+    });
+    // (MUSIC-SUITE P5 FIX PASS: a row whose pitch or gate the step moved reloads through the same call — studioEdit
+    // chopSignature carries both now; P5 had a second pass here, chopEdit.retunedRows)
+    resyncSection({ sections: to.sections, flipRows: to.flipRows });
     const done = dir === 'undo' ? 'Undone' : 'Redone';
     say(gridLock === 'song' ? `${done} (your own grid, hidden under SONG MODE)` : done);
   };
@@ -968,8 +1234,18 @@ export default function StudioMode({
     heard: (t) => shownIds.has(t.sampleId) && gateOpen(deskHeard, t.sampleId),
   }), [caps.danceExport, caps.arrangement, project.chain, project.sections, tracks, shownIds, deskHeard]);
   const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong, project.key]);
+  // MUSIC-SUITE P5 (2026-09-25), owner decision #15: a song that plays a YOUR FILE upload stays on this device; the line
+  // says why. Before, the P3 mark (ProjectFlipSource.upload) was carried everywhere and read nowhere (uploadPrivacy.ts).
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): "on this device" = never shared off it. P5 closed PUBLISH and SEND TO THE DANCE
+  // FLOOR for any project with an upload ANYWHERE (an idle bank D, a saved kit) — both stay on the device (the library's
+  // server calls are unimplemented seams; the dance export is an audio-free chart), so decision #7 went for nothing. The
+  // doors are uploadPrivacy.UPLOAD_DOORS (one switch back to the stricter reading); the rule counts what the SONG plays.
+  const privacy = useMemo(() => projectUploadPrivacy(project), [project]);
+  const danceOpen = uploadDoorOpen('danceFloor', privacy);
+  const libraryOpen = uploadDoorOpen('library', privacy);
   const sendToDance = (): void => {
     if (!danceSong) return;
+    if (!danceOpen) { setLibraryLine(privacy.line); return; }
     // MUSIC-SUITE P4: the song's key rides on the dance floor's card ('Your song · Am · 64 hits')
     // MUSIC-SUITE P4 FIX PASS: the key in words ('A minor') — the Cypher's chip upper-cases the blurb ('Am' read 'AM')
     const out = exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) });
@@ -985,12 +1261,14 @@ export default function StudioMode({
    * PLAY / STOP. MUSIC-SUITE P4: with COUNT-IN on, PLAY counts the bars in on the audio clock first (engine.countIn — the
    * count's own click, its downbeats accented) and the song starts on bar 0; `countIn` false starts at once (HEAR IT). A
    * running timing check is called off by either.
+   * MUSIC-SUITE P5 (phone-mpc): `want` = a paired phone's PLAY or STOP, decided on the ENGINE's state (phonePad
+   * transportEffect) — two phone presses can land before a render, when `playing` here still says what it was.
    */
-  const playOrStop = (countIn: boolean): void => {
+  const playOrStop = (countIn: boolean, want?: 'start' | 'stop'): void => {
     const eng = engineRef.current;
     if (!eng) return;
     if (checkRef.current) finishCheckRef.current(true);
-    if (playing) { eng.stop(); setPlaying(false); setPlayhead(-1); }
+    if (want ? want === 'stop' : playing) { eng.stop(); setPlaying(false); setPlayhead(-1); }
     else {
       // MUSIC-SUITE P4 FIX PASS (2026-09-25), decision #13: a PERFORM set starts on the press, never after the studio's
       // COUNT-IN (its clicks were tapped and scored as EXTRAs)
@@ -1079,13 +1357,19 @@ export default function StudioMode({
 
   // MUSIC-SUITE P2: one tap, from the TAP button's pointerdown or the keyboard's Space / J. The judge takes the nearest
   // note by signed error, so the line says which side it landed on (GOOD · EARLY 112ms), not just that it landed.
-  const performTap = useCallback((): void => {
+  // MUSIC-SUITE P5 (phone-mpc): `at` = a paired phone's tap time (the arrival moved back by half the round trip —
+  // phonePad.phoneTapSec); a screen or key tap is judged at now, as before. NOT in an Arena (staked) set: the round trip
+  // is measured by pings the PHONE answers, so a phone that held its pongs back would buy its late taps an earlier time
+  // (up to MAX_ONE_WAY_MS), and the server cannot check a round trip — a staked set judges a phone tap as it arrives, as
+  // it did before this pass (lib/arena-score-integrity.test.ts pins the judge to the audio clock). Free play corrects.
+  const performTapAt = useCallback((at?: number): void => {
     const eng = engineRef.current;
     if (!eng || modeRef.current !== 'perform') return;
     const set = setRef.current;
-    set.tap(eng.context.currentTime);
+    if (at === undefined || arenaSet) set.tap(eng.context.currentTime); else set.tap(at);
     showTally(set, 0);   // a tap that must WAIT for its note (not scheduled yet) shows when it settles
-  }, [showTally]);
+  }, [showTally, arenaSet]);
+  const performTap = useCallback((): void => { performTapAt(); }, [performTapAt]);
 
   // MUSIC-SUITE P2: PERFORM on the keyboard — Space and J, judged on keydown (a held key is one tap, e.repeat is
   // ignored). Neither is a Flip pad key (Flip.ts PAD_KEYS: 1-4 / q-r / a-f / z-v), and the Flip's own listener only exists
@@ -1110,9 +1394,62 @@ export default function StudioMode({
     return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
   }, [mode, view, performTap, roomShown]);
 
+  // ── MUSIC-SUITE P5 (2026-09-25), phone-mpc: WHAT THE PHONE'S BUTTONS DO (phonePad.phoneCommand) ──────────────────────
+  // A pad: the tap's time is the arrival moved back by half the phone's measured round trip (the median of its last 8
+  // pings, capped — phonePad.phoneTapSec); a free-play PERFORM set JUDGES it at that time (an Arena set at its arrival:
+  // performTapAt), and it plays the bank's pad — through
+  // FlipPad on the FLIP tab (the pad lights; ARM REC as a screen tap), else the room plays and records it (playPhonePad).
+  // BANK A–D picks the bank on the pads; PLAY / STOP drive the room's transport (the same count-in rule as the PLAY
+  // button); REC arms or disarms ARM REC. HostLobby calls the latest render's handler (its inputRef), so this reads the
+  // room as it is now; the bank / REC / transport decisions read refs and the engine, never a render behind.
+  const phoneInput = (ev: ControlEvent, _slot: number, peerId: PeerId): void => {
+    const cmd = phoneCommand(ev);
+    if (!cmd) return;
+    const eng = engineRef.current;
+    if (cmd.kind === 'pad') {
+      const arrivedAt = Date.now();   // (the probe's readout: the phone stamps ev.t on the same wall clock when both are one machine)
+      const rttMs = medianRtt(rttRef.current.get(peerId) ?? []);
+      const arrival = eng?.context.currentTime;
+      const hit: PadHit = { velocity: cmd.velocity, ...(arrival !== undefined ? { atSec: phoneTapSec(arrival, rttMs) } : {}) };
+      // judged at the finger's time — MUSIC-SUITE P5 FIX PASS: only where a screen tap or Space counts (PERFORM on the
+      // STUDIO view; phonePad.judgesPhoneTap). A pad played as an instrument on FLIP scored EXTRA misses against the set.
+      if (judgesPhoneTap({ mode: modeRef.current, view }) && hit.atSec !== undefined) performTapAt(hit.atSec);
+      const trigger = flipTrigger.current;
+      const how = trigger ? (trigger(cmd.pad, hit), 'flippad') : playPhonePad(cmd.pad, hit);
+      const w = window.__FEL_PHONE__;
+      window.__FEL_PHONE__ = {
+        hits: (w?.hits ?? 0) + 1, bank: PHONE_BANKS[flipBankRef.current], recArm: flipRecArmRef.current, phones,
+        last: { pad: cmd.pad, velocity: cmd.velocity, arrivalSec: arrival ?? null, atSec: hit.atSec ?? null, rttMs, view, how, sentAt: ev.t, arrivedAt },
+      };
+      return;
+    }
+    if (cmd.kind === 'bank') {
+      if (cmd.bank === flipBankRef.current) return;
+      setFlipBank(cmd.bank);
+      phoneSaid.current.loading = false;
+      const src = bankOf(projectRef.current.flip, cmd.bank).source;
+      say(`Phone: bank ${PHONE_BANKS[cmd.bank]} — ${src ? src.label : 'empty (load a sound into it on the FLIP tab)'}`);
+      if (window.__FEL_PHONE__) window.__FEL_PHONE__ = { ...window.__FEL_PHONE__, bank: PHONE_BANKS[cmd.bank] };
+      return;
+    }
+    const fx = transportEffect(cmd.op, { running: eng ? eng.isRunning : playing, recArm: flipRecArmRef.current });
+    if (fx === 'start' || fx === 'stop') playOrStop(true, fx);
+    else if (fx === 'arm' || fx === 'disarm') {
+      setFlipRecArm(fx === 'arm');
+      say(fx === 'arm' ? `Phone: REC armed — ${eng?.isRunning ? 'your pad hits' : 'press PLAY, then your pad hits'} write into the grid` : 'Phone: REC off');
+    }
+  };
+  /** The lobby's peers (every pong, ~1/s): each phone's round trip, and how many are connected (a render only on a change). */
+  const phonePeers = (ps: LobbyPeer[]): void => {
+    for (const p of ps) if (p.connected) rttRef.current.set(p.peerId, pushRtt(rttRef.current.get(p.peerId) ?? [], p.rttMs));
+    const n = ps.filter((p) => p.connected).length;
+    setPhones((was) => (was === n ? was : n));
+  };
+
   const publishTrack = async (): Promise<void> => {
     const eng = engineRef.current;
     if (!eng || saving) return;
+    if (!libraryOpen) { setLibraryLine(privacy.line); return; }   // MUSIC-SUITE P5: decision #15 (the switch shut this door)
     if (!title.trim()) { say('Name your track first'); return; }
     setSaving(true);
     // MUSIC-SUITE P3 (2026-09-25): this was try/finally with no catch around a publish that threw QuotaExceededError on
@@ -1129,7 +1466,12 @@ export default function StudioMode({
       // remix plays the same sounds (the record kept flip_N rows with no sound, and a remix's Flip rows were silent).
       // MUSIC-SUITE P3 FIX PASS: at the PROJECT's swing (in song mode the engine's is the playing section's)
       const render = publishRender(project);
-      const blob = await eng.renderMixdown(2, render.tracks, render.swing);
+      // MUSIC-SUITE P5 FIX PASS (2026-09-25): …with the WORKING grid's own Flip chops handed to the render. It read the
+      // engine's, and song mode swaps a section's chops in under the same ids (turning SONG MODE on does it even while
+      // stopped): the library audio played the section's old chop while the record, a remix and the card named the grid's.
+      await Promise.allSettled(project.flipRows.map((r) => chopFor(r)));
+      const sounds = flipSoundMap(render.tracks, project.flipRows, (r) => chopCache.current.get(bakeKey(r)) ?? null);
+      const blob = await eng.renderMixdown(2, render.tracks, render.swing, sounds);
       room.noteCreation();   // MUSIC-SUITE P3: a render counts toward the day's creation session (the streak)
       // MUSIC-SUITE P4 FIX PASS: the record keeps the rows the render PLAYED — a row the desk mutes or solos out is left out
       // of both (the library audio was bass-only under a solo while the record, a remix and the dance floor had every row)
@@ -1149,7 +1491,9 @@ export default function StudioMode({
       // MUSIC-SUITE P4 (P3's open item): a library failure stays on screen (the lasting line), not a 2.2 s toast
       if (!res.ok) { setLibraryLine(res.line); return; }
       setLibraryLine(res.line);   // "kept for this visit only" and the like last too; a clean publish clears the line
-      onPublish?.(res.rec);                   // Creator Card pipeline hook (M28 contract)
+      // Creator Card pipeline hook (M28 contract). MUSIC-SUITE P5 FIX PASS (decision #15): this is the door OFF the device
+      // (UPLOAD_DOORS.offDevice) — a song that plays an upload never goes through it until FEL can review uploads online
+      if (UPLOAD_DOORS.offDevice || !tracksHaveUpload(res.rec.sequencer.tracks)) onPublish?.(res.rec);
       setLibraryRev((r) => r + 1);
       const left = (pub.silent.length ? ` · ${pub.silent.length} Flip row${pub.silent.length === 1 ? '' : 's'} with no sound left out` : '')
         + (deskCut ? ` · as you hear it: ${deskCut} row${deskCut === 1 ? '' : 's'} muted or soloed out on the mixer left out` : '');
@@ -1512,6 +1856,22 @@ export default function StudioMode({
         </div>
       )}
 
+      {/* MUSIC-SUITE P5 (2026-09-25), phone-mpc: THE PHONE'S ROOM, at ROOM level — opened the first time FLIP shows and
+          kept until the Academy closes (it was inside the FLIP tab, and every tab switch disposed it: phonePad.ts). Its
+          badge shows on FLIP, and on the other tabs while a phone is connected (hidden, not unmounted, otherwise). */}
+      {phoneRoom && (
+        <div data-qa="phone-room" data-phones={phones} style={phoneBadgeShown(view, phones) ? undefined : { display: 'none' }}>
+          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={phoneInput} onPeers={phonePeers} />
+        </div>
+      )}
+      {/* …and a phone's REC armed from another tab says so where the player is (the ARM REC button is on FLIP) */}
+      {flipRecArm && view !== 'flip' && (
+        <div data-qa="phone-rec-chip" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0' }}>
+          <button style={{ ...S.btn, background: '#ff5c5c', color: '#fff' }} onClick={() => setFlipRecArm(false)}>● FLIP REC ARMED — DISARM</button>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>{playing ? `pad hits on bank ${PHONE_BANKS[flipBank]} write into the grid` : `press PLAY — pad hits on bank ${PHONE_BANKS[flipBank]} then write into the grid`}</span>
+        </div>
+      )}
+
       <div style={S.tabs}>
         {(['studio', 'flip', 'library', 'listen'] as View[]).map((v) => (
           <button key={v} style={{ ...S.tab, ...(view === v ? S.tabOn : {}) }}
@@ -1532,9 +1892,11 @@ export default function StudioMode({
 
       {view === 'flip' && (
         <>
-          {/* M1b: pair a phone — its 4×4 pad bank hits these pads (controller link, room code + QR in the badge) */}
-          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={(ev) => { const i = padFromAction(ev.a); if (i >= 0) flipTrigger.current?.(i); }} />
+          {/* M1b: pair a phone — its pad bank hits these pads. MUSIC-SUITE P5 (phone-mpc): the phone's room is mounted at
+              ROOM level now (above the tabs), so leaving FLIP no longer closes it */}
           <FlipPad engine={engineRef.current} playing={playing} playhead={playhead} steps={STEPS} say={say} triggerRef={flipTrigger}
+            /* MUSIC-SUITE P5 (phone-mpc): the bank on the pads and ARM REC are the room's (a phone's BANK / REC, any tab) */
+            bank={flipBank} onBank={setFlipBank} recArm={flipRecArm} onRecArm={setFlipRecArm}
             /* MUSIC-SUITE P3 (2026-09-25): the FLIP tab's source + chops are the project's (FlipPad remounts on every tab
                switch and restores from here); a pad sent or recorded to the grid brings its exact chop, so the row keeps
                sounding after a reload — and a recorded pad now loads its buffer (P1: flip_1 written but silent). */
@@ -1542,26 +1904,18 @@ export default function StudioMode({
             projectId={project.id} rowSourceKeys={new Set(project.flipRows.map((r) => sourceKey(r.source)))}
             /* MUSIC-SUITE P3 (tier-honesty-editing): the row a pad lands on is DRAWN now (the Flip section under the kit
                rows, every tier), the pad shows it has one, and a send or a burst of recorded hits is one undo step. */
-            rowPads={new Set(project.flipRows.map((r) => r.pad))}
+            /* MUSIC-SUITE P5: the rows (each knows the bank + pad it came from — bank B's pad 3 gets its own row) and the
+               audio clock ARM REC places a tap by (flipClock) */
+            flipRows={project.flipRows} trackIds={flipTrackIds} stepClock={flipClock}
+            playerId={me}   /* MUSIC-SUITE P5: the FEL-theme lesson is remembered per player */
             onAssign={(_pad, buffer, row) => {
               engineRef.current?.loadBuffer(row.sampleId, row.label, buffer, 'melody');
+              chopCache.current.set(bakeKey(row), buffer);   // MUSIC-SUITE P5: the baked chop the pad played
+              resyncSection(withFlipRow(projectRef.current, row));   // MUSIC-SUITE P5 FIX PASS: a playing section keeps its own
               edit((p) => withFlipRow(p, row));
             }}
-            onRecordHit={(pad, step, chop) => {
-              // MUSIC-SUITE P3 FIX PASS: a row that holds ANOTHER chop (sent from an earlier source, or one that failed to
-              // load after a reload) takes the pad's chop on the first recorded hit — what the taps sound like is what the
-              // row plays. One undo step with the burst.
-              const differs = (p: StudioProject): boolean => {
-                const r = p.flipRows.find((x) => x.sampleId === chop.row.sampleId);
-                return !r || chopSignature(r) !== chopSignature(chop.row);
-              };
-              const had = projectRef.current.flipRows.some((r) => r.sampleId === chop.row.sampleId);
-              if (differs(projectRef.current)) {
-                engineRef.current?.loadBuffer(chop.row.sampleId, chop.row.label, chop.buffer, 'melody');
-                if (had) say(`${chop.row.label} now plays pad ${pad + 1}'s chop (it replaced the row's old one — UNDO puts it back)`);
-              }
-              edit((p) => withFlipHit(differs(p) ? withFlipRow(p, chop.row) : p, chop.row.sampleId, step), 'flip-rec');
-            }} />
+            /* MUSIC-SUITE P5 (phone-mpc): the room's recordFlipHit (a phone hit on another tab records by the same rule) */
+            onRecordHit={recordFlipHit} />
           <div style={S.row}>
             <button style={S.btn} onClick={togglePlay}>{playing ? 'STOP' : 'PLAY'}</button>
             <span style={{ fontSize: 12, opacity: 0.75 }}>the groovebox runs under the pads — arm REC and your taps land in the STUDIO grid</span>
@@ -1827,10 +2181,12 @@ export default function StudioMode({
               style={{ padding: 8, borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9' }} />
             <input placeholder="your Spotify/Apple link (optional)…" value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)}
               style={{ padding: 8, borderRadius: 8, border: '1px solid #7a5c9e', background: '#241736', color: '#f5ead9', minWidth: 220 }} />
-            <button style={S.btn} disabled={saving} onClick={() => void publishTrack()}>
+            <button style={{ ...S.btn, ...(!libraryOpen ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }} disabled={saving || !libraryOpen} onClick={() => void publishTrack()}>
               {saving ? 'RENDERING…' : 'PUBLISH TO LIBRARY'}
             </button>
           </div>
+          {/* MUSIC-SUITE P5 (decision #15): a song with an upload stays on this device — the room says why, in one line */}
+          {privacy.private && <div data-qa="upload-private" role="note" style={{ fontSize: 12, color: '#ffd75e', marginTop: 6 }}>{privacy.line}</div>}
 
           {/* DANCE RHYTHM EXPORT. The chart is built from the song's own drums (music/DanceExport.ts), not from a seed, so the
               routine lands on the hits the player wrote. MUSIC-SUITE P3 (2026-09-25): at the tier the ladder names — THE
@@ -1838,8 +2194,8 @@ export default function StudioMode({
               only the rows the room draws and plays; under the project's own id and title. */}
           {caps.danceExport && danceSong && (
             <div style={S.row}>
-              <button data-qa="dance-export"
-                style={{ ...S.btnAlt, ...(dancedSig === danceSig ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}) }}
+              <button data-qa="dance-export" disabled={!danceOpen}
+                style={{ ...S.btnAlt, ...(dancedSig === danceSig ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}), ...(!danceOpen ? { opacity: 0.45 } : {}) }}
                 onClick={sendToDance}>
                 {dancedSig === danceSig ? '✓ ON THE DANCE FLOOR' : '♪ SEND TO THE DANCE FLOOR'}
               </button>
@@ -1868,8 +2224,9 @@ export default function StudioMode({
             onSongChange={songChange} saveAudio={room.saveAudio} loadAudio={room.loadAudio}
             onRendered={room.noteCreation} onRecording={(on, what) => { setTakeRec(on); setTakeWhat(what ?? 'take'); }} onTake={takeRecorded} stopRef={takeStopRef}
             onTransport={boothTransport}
-            songMode={songMode} onSongMode={(on) => { if (on) setHearPreview(false); setSongMode(on); }} onSongNow={setSongNow}
+            songMode={songMode} onSongMode={(on) => { if (on) setHearPreview(false); setSongMode(on); }} onSongNow={songNowChanged}
             caps={{ takes: caps.takes, mixdown: caps.mixdown }}
+            barSounds={songRenderSounds}
           />
         </div>
       ) : null}

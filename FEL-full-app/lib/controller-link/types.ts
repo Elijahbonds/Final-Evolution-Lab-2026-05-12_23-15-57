@@ -44,8 +44,21 @@ export interface DpadSpec {
   diagonals?: boolean;
 }
 
+/**
+ * OPT-IN hints a button schema may carry (MUSIC-SUITE P5 phone-mpc, 2026-09-25 — schemas/padFeel.ts has the rules). Every
+ * mode that sets none gets exactly the buttons it always got: same markup, same bare `send(action)`.
+ */
+export interface ButtonSchemaHints {
+  /** A short buzz (navigator.vibrate, ~12 ms) on each press, where the phone has a vibrator (not iOS Safari). */
+  haptics?: boolean;
+  /** Each press carries a MEASURED velocity { v, via } when the phone reports one (padFeel.readVelocity); never invented. */
+  velocity?: boolean;
+  /** Shorter buttons (a transport / bank row beside a pad bank). */
+  compact?: boolean;
+}
+
 export type SchemaSpec =
-  | { kind: 'button'; buttons: ButtonSpec[]; /** grid columns on the phone (default 2) — a pad bank asks for 4 */ columns?: number }
+  | ({ kind: 'button'; buttons: ButtonSpec[]; /** grid columns on the phone (default 2) — a pad bank asks for 4 */ columns?: number } & ButtonSchemaHints)
   | { kind: 'motion'; motion: MotionSpec }
   | { kind: 'dpad'; dpad: DpadSpec };
 
