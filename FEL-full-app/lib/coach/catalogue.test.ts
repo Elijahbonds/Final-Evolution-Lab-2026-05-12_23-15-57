@@ -15,23 +15,23 @@ const model = (name: string) => { const m = new RegExp(`model ${name} \\{([\\s\\
 const enumValues = (name: string) => (new RegExp(`enum ${name} \\{([\\s\\S]*?)\\}`).exec(schema)?.[1] ?? '').split('\n').map((l) => l.trim()).filter((l) => /^[a-z]+$/.test(l));
 
 describe('the schema the catalogue is written against', () => {
-  // P2 review (2026-09-26): the per-coach key (@@unique([coachId, name])) drops the FEL-wide `name @unique` index, and
-  // owner decision #16's standing GO covers additive-only pushes, so the swap is HELD for the owner's explicit go. This
-  // pins the schema as it ships in P2 — FEL-wide names, no compound key — so the P2 push is additive only; the day the
-  // owner says go, these two expectations flip with the schema (painfree/p2/schema-structure/held-unique-swap.sql).
-  it('ProgramExercise names stay unique across FEL in P2 (the per-coach swap is HELD); both schema copies agree', () => {
+  // P2 review (2026-09-26): the per-coach key (@@unique([coachId, name])) drops the FEL-wide `name @unique` index, which
+  // owner decision #16's additive-only GO did not cover; it waited for an explicit go and got it (owner decision #28,
+  // 2026-09-26; painfree/p2/schema-structure/held-unique-swap.sql). Names are unique PER COACH now.
+  it('ProgramExercise names are unique per coach (owner #28), not across FEL; both schema copies agree', () => {
     const pe = model('ProgramExercise');
-    expect(pe).toMatch(/^\s*name\s+String\s+@unique/m);
-    expect(pe).not.toMatch(/^\s*@@unique\(\[coachId, name\]\)/m);          // (the comments above the field name it)
+    expect(pe).not.toMatch(/^\s*name\s+String\s+@unique/m);
+    expect(pe).toMatch(/^\s*@@unique\(\[coachId, name\]\)/m);
     // both copies of the schema say the same (the generator line is the only allowed difference)
     const pub = readFileSync(`${ROOT}/public/_prisma/schema.prisma`, 'utf8');
     expect(/model ProgramExercise \{[\s\S]*?\n\}/.exec(pub)?.[0]).toBe(/model ProgramExercise \{[\s\S]*?\n\}/.exec(schema)?.[0]);
   });
 
-  it('the generated client matches: `name` is a unique key, and there is no compound key for code to lean on', () => {
+  it('the generated client matches: the compound coachId_name key exists and `name` alone is no longer a unique key', () => {
     const dts = readFileSync(`${ROOT}/public/_prisma/client/index.d.ts`, 'utf8');
-    expect(dts).not.toMatch(/coachId_name\?: ProgramExerciseCoachIdNameCompoundUniqueInput/);
-    expect(/export type ProgramExerciseWhereUniqueInput = [\s\S]*?\n\s*name\?: string/.test(dts)).toBe(true);
+    expect(dts).toMatch(/coachId_name\?: ProgramExerciseCoachIdNameCompoundUniqueInput/);
+    const unique = /export type ProgramExerciseWhereUniqueInput = [\s\S]*?\n\s*\}/.exec(dts)?.[0] ?? '';
+    expect(unique).not.toMatch(/\n\s*name\?: string/);
   });
 
   it('PATTERNS and BRACE_MODES are exactly the enums, and every value has FEL copy', () => {

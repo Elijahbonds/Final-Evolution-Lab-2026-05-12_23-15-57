@@ -17,13 +17,13 @@ export type Row = Record<string, unknown>;
 
 export interface CatalogueMemoryStore {
   tables: Record<string, Row[]>;
-  /** ProgramExercise's unique key: ['name'] is the schema today; ['coachId', 'name'] is the swap held for the owner's go. */
+  /** ProgramExercise's unique key: ['coachId', 'name'] is the schema (owner #28); ['name'] is the legacy FEL-wide key. */
   uniqueKey: string[];
   seq: number;
 }
 
 export function newCatalogueStore(tables: Record<string, Row[]> = {}): CatalogueMemoryStore {
-  return { tables: { programExercise: [], sessionExercise: [], exercise: [], exerciseCategory: [], ...tables }, uniqueKey: ['name'], seq: 0 };
+  return { tables: { programExercise: [], sessionExercise: [], exercise: [], exerciseCategory: [], ...tables }, uniqueKey: ['coachId', 'name'], seq: 0 };
 }
 
 const err = (code: string) => Object.assign(new Error(code), { code });

@@ -1451,17 +1451,13 @@ model CrmNote {
 model ProgramExercise {
   id       String @id @default(cuid())
   coachId  String // Coach who created this exercise
-  // MIRROR-COACH P2 (2026-09-25) wanted NAMES UNIQUE PER COACH: this `@unique` on its own means the second coach to type
-  // "Goblet Squat" is refused (it was a unique-constraint 500; lib/coach/catalogueServer.ts now answers 409
-  // name_taken_fel), and the key should be @@unique([coachId, name]).
-  //
-  // HELD, P2 review (2026-09-26): that swap DROPS the index "ProgramExercise_name_key", and owner decision #16's standing
-  // GO covers a push only "after checking the diff adds only columns/tables". So this phase's push stays purely additive
-  // and the swap waits for the owner's explicit go — the exact statements and the schema edit are in the outbox,
-  // painfree/p2/schema-structure/held-unique-swap.sql. It is strictly looser than today's key (a NOT NULL name unique
-  // across FEL is unique per coach), so it cannot fail on data. The code works under both keys (catalogueServer.ts looks
-  // a coach's own row up with findFirst, never by the compound key).
-  name     String @unique
+  // MIRROR-COACH P2 (2026-09-25/26): NAMES ARE UNIQUE PER COACH. The old FEL-wide `name @unique` meant the second coach to
+  // type "Goblet Squat" was refused (first a unique-constraint 500, then an honest 409 name_taken_fel). The swap to
+  // @@unique([coachId, name]) drops the index "ProgramExercise_name_key", which is outside the owner's additive-only GO
+  // (#16), so it waited for an explicit go: owner decision #28 (2026-09-26), applied with
+  // painfree/p2/schema-structure/held-unique-swap.sql. It is strictly looser than the old key, so it cannot fail on data.
+  // catalogueServer.ts looks a coach's own row up with findFirst and still answers name_taken_fel if a legacy key is met.
+  name     String
   category String @default("general") // lower-body, upper-push, upper-pull, core, mobility, etc.
 
   // Demo & cues
@@ -1494,6 +1490,7 @@ model ProgramExercise {
   // Relations
   sessionExercises SessionExercise[]
 
+  @@unique([coachId, name])
   @@index([coachId])
   @@index([category])
 }

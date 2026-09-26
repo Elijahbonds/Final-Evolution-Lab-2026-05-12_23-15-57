@@ -2,17 +2,18 @@
 // and the database enforces ProgramExercise's unique key the way Postgres does: P2002 on a byte-equal match, nothing
 // else.
 //
-// P2 review (2026-09-26): the key swap from `name @unique` (FEL-wide) to @@unique([coachId, name]) DROPS an index, which
-// owner decision #16's standing GO does not cover, so it is HELD and the schema keeps the FEL-wide key. The routes run
-// under BOTH: today's key (the default here) refuses a second coach's same name with an honest name_taken_fel, and the
-// held key lets two coaches each own "Goblet Squat" — so the day the owner says go, only the schema changes.
+// P2 review (2026-09-26): the key swap from `name @unique` (FEL-wide) to @@unique([coachId, name]) drops an index, which
+// the additive-only GO (#16) did not cover; the owner approved it separately (#28, 2026-09-26). The per-coach key is the
+// default here now. The routes still run under BOTH keys: the legacy FEL-wide key refuses a second coach's same name
+// with an honest name_taken_fel (a database that has not had the swap), and the per-coach key lets two coaches each own
+// "Goblet Squat".
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Row = Record<string, unknown>;
 const m = vi.hoisted(() => ({
   session: { user: { id: 'coach-1' } } as unknown,
   // the store the shared stand-in (lib/coach/catalogueMemoryDb.ts) reads; beforeEach replaces its contents
-  store: { tables: {} as Record<string, Row[]>, uniqueKey: ['name'] as string[], seq: 0 },
+  store: { tables: {} as Record<string, Row[]>, uniqueKey: ['coachId', 'name'] as string[], seq: 0 },
 }));
 
 vi.mock('next-auth', () => ({ getServerSession: async () => m.session }));
@@ -55,15 +56,17 @@ const KB = {
 
 beforeEach(() => {
   m.store.tables = { programExercise: [], sessionExercise: [], exercise: KB.exercises.map((e) => ({ ...e })), exerciseCategory: KB.categories.map((c) => ({ ...c })) };
-  m.store.uniqueKey = ['name'];            // the schema as it is: FEL-wide names (the per-coach swap is held)
+  m.store.uniqueKey = ['coachId', 'name']; // the schema as it is: names unique per coach (owner #28)
   m.store.seq = 0;
   as('coach-1');
 });
 
-describe('two coaches and one name: FEL-wide today, per coach once the held swap lands', () => {
+describe('two coaches and one name: per coach (owner #28), and honest under the legacy FEL-wide key', () => {
   const heldSwap = () => { m.store.uniqueKey = ['coachId', 'name']; };
+  const legacyKey = () => { m.store.uniqueKey = ['name']; };
 
-  it('TODAY (FEL-wide key): the second coach is refused with name_taken_fel — not "You already have one" — and nothing is written', async () => {
+  it('LEGACY (FEL-wide key, a database before the swap): the second coach is refused with name_taken_fel — not "You already have one" — and nothing is written', async () => {
+    legacyKey();
     await create({ name: 'Goblet Squat' });
     as('coach-2');
     expect(await create({ name: 'Goblet Squat' })).toEqual({ status: 409, body: { error: 'name_taken_fel', field: 'name' } });
@@ -78,7 +81,7 @@ describe('two coaches and one name: FEL-wide today, per coach once the held swap
     expect(await put(String(mine.body.id), { name: 'Goblet Squat' })).toEqual({ status: 409, body: { error: 'name_taken_fel', field: 'name' } });
   });
 
-  it('HELD SWAP: coach-1 and coach-2 both create "Goblet Squat"; each lists only their own', async () => {
+  it('PER COACH (the schema now): coach-1 and coach-2 both create "Goblet Squat"; each lists only their own', async () => {
     heldSwap();
     const a = await create({ name: 'Goblet Squat', pattern: 'squat', braceMode: 'set' });
     as('coach-2');

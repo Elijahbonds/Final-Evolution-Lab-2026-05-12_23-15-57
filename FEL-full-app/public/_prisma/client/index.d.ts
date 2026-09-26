@@ -116684,11 +116684,12 @@ export namespace Prisma {
 
   export type ProgramExerciseWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    name?: string
+    coachId_name?: ProgramExerciseCoachIdNameCompoundUniqueInput
     AND?: ProgramExerciseWhereInput | ProgramExerciseWhereInput[]
     OR?: ProgramExerciseWhereInput[]
     NOT?: ProgramExerciseWhereInput | ProgramExerciseWhereInput[]
     coachId?: StringFilter<"ProgramExercise"> | string
+    name?: StringFilter<"ProgramExercise"> | string
     category?: StringFilter<"ProgramExercise"> | string
     demoVideoUrl?: StringNullableFilter<"ProgramExercise"> | string | null
     primaryCues?: StringNullableListFilter<"ProgramExercise">
@@ -116703,7 +116704,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"ProgramExercise"> | Date | string
     updatedAt?: DateTimeFilter<"ProgramExercise"> | Date | string
     sessionExercises?: SessionExerciseListRelationFilter
-  }, "id" | "name">
+  }, "id" | "coachId_name">
 
   export type ProgramExerciseOrderByWithAggregationInput = {
     id?: SortOrder
@@ -130197,6 +130198,11 @@ export namespace Prisma {
 
   export type SessionExerciseOrderByRelationAggregateInput = {
     _count?: SortOrder
+  }
+
+  export type ProgramExerciseCoachIdNameCompoundUniqueInput = {
+    coachId: string
+    name: string
   }
 
   export type ProgramExerciseCountOrderByAggregateInput = {
