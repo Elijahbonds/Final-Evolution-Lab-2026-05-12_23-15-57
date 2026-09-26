@@ -58,6 +58,14 @@
  *      what the ceiling's own basis (a flawless training MINUTE) pays. The ceiling is now that minute's pay prorated by
  *      the session's length (endlessCeilingFor). OWNER CALL: decision #14 said "per-session"; proration keeps that letter
  *      and closes the farm — flagged in the phase report for confirmation.
+ *
+ * MUSIC-SUITE P3 (2026-09-25) — "Keep my work": STUDIO time counts toward the daily streak (PLAN.md, defaults taken: "a
+ * save or render logs a no-score creation session, no XP"). A CREATION session is POST /api/sessions with a music mode,
+ * score 0 and metadata.kind 'creation' (section 4 below). Measured against the rules above before this change, such a
+ * post did nothing at all — sessionHasPlay() refused it as idle (score 0, no win, no tally: session-evidence.ts:26-30) —
+ * and had it got past that, the P2 endless floor would have paid it (endlessCeilingFor never pays under sessionXp(0) =
+ * 10 XP and sessionShards(0) = 1 shard; music free play is endless). The daily streak itself was computed inline in
+ * the route (route.ts:135-146, moved to streakStep() below unchanged for every play session).
  */
 
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
@@ -398,11 +406,130 @@ export interface SessionPayout {
 /**
  * What the session pays: the old formula, and for an endless run at most ENDLESS_SESSION_CEILING — prorated by the
  * session's length when `durationSec` is given (P2 FIX PASS E, endlessCeilingFor). Without it, the flat ceiling.
+ * MUSIC-SUITE P3: a CREATION session pays CREATION_PAYOUT (nothing) whatever else it says — the endless floor
+ * (endlessCeilingFor pays at least a no-score session's 10 XP / 1 shard) is for a set that was PLAYED, not a save.
  */
-export function sessionPayout(o: { score: number; won: boolean; endless: boolean; durationSec?: number }): SessionPayout {
+export function sessionPayout(o: { score: number; won: boolean; endless: boolean; durationSec?: number; kind?: SessionKind }): SessionPayout {
+  if (o.kind === 'creation') return { ...CREATION_PAYOUT };
   const xpRaw = sessionXp(o.score, o.won), shardsRaw = sessionShards(o.score, o.won);
   const cap = o.durationSec === undefined ? ENDLESS_SESSION_CEILING : endlessCeilingFor(o.durationSec, o.won);
   const xp = o.endless ? Math.min(xpRaw, cap.xp) : xpRaw;
   const shards = o.endless ? Math.min(shardsRaw, cap.shards) : shardsRaw;
   return { xp, shards, winCredits: o.won ? SESSION_WIN_LC : 0, capped: xp < xpRaw || shards < shardsRaw };
+}
+
+// ---------------------------------------------------------------------------
+// 4. The daily streak, and the CREATION session (MUSIC-SUITE P3, 2026-09-25)
+// ---------------------------------------------------------------------------
+
+/**
+ * The daily streak, moved here UNCHANGED from app/api/sessions/route.ts:135-146 ("daily streak +5*day (cap day 7)"):
+ * a session 24 h or more after the profile's lastStreakAt opens the next streak day — day + 1 if it came within 48 h,
+ * back to day 1 otherwise — and pays STREAK_LC_PER_DAY × that day in Lab Credits. The "day" is this rolling 24 h window
+ * from lastStreakAt, not a calendar day (a later reader must not assume UTC midnight).
+ */
+export const STREAK_DAY_MS = 24 * 60 * 60 * 1000;
+export const STREAK_LC_PER_DAY = 5;
+export const STREAK_CAP_DAYS = 7;
+
+/** 'play' is every session this route has always taken; 'creation' is a Studio save / render (isCreationSession). */
+export type SessionKind = 'play' | 'creation';
+
+/** The metadata.kind a creation session carries (the P3 client contract). */
+export const CREATION_SESSION_KIND = 'creation';
+
+/** What a creation session pays: nothing — no XP, no profile shards, no Lab Credits (and it is never a win). */
+export const CREATION_PAYOUT: Readonly<SessionPayout> = { xp: 0, shards: 0, winCredits: 0, capped: false };
+
+/**
+ * Is this POST a CREATION session — a Studio save or render, not a set? A music mode (after canonicalModeKey, so the old
+ * 'musicAcademy' key too), a score of exactly 0, and metadata.kind === 'creation' (stats.kind is read the same way,
+ * because roomStats() treats `stats` and `metadata` as one bag). Anything else — another kind, a non-zero score, any
+ * other mode — is a play session under today's rules. Believing the label can only lower what a session pays (a
+ * creation pays nothing), so it is safe to believe; what it can buy is the streak day, which is the feature.
+ * assumption: the server cannot see studio time, so a client that posts one creation a day keeps a streak alive with
+ * no play at all — bounded to one streak day a day, and the streak's Lab Credits are still only paid on a day with play.
+ */
+export function isCreationSession(mode: string, score: number, body: unknown): boolean {
+  if (canonicalModeKey(mode) !== 'music' || score !== 0) return false;
+  const b = body as { metadata?: unknown; stats?: unknown } | null | undefined;
+  const kindOf = (bag: unknown): unknown => (bag && typeof bag === 'object' && !Array.isArray(bag) ? (bag as { kind?: unknown }).kind : undefined);
+  return (kindOf(b?.metadata) ?? kindOf(b?.stats)) === CREATION_SESSION_KIND;
+}
+
+/** The profile fields the streak reads (PlayerProfile.streakDays / lastStreakAt / lastActiveAt). */
+export interface StreakProfile {
+  streakDays?: number | null;
+  lastStreakAt?: Date | string | number | null;
+  lastActiveAt?: Date | string | number | null;
+}
+
+export interface StreakStep {
+  /** 24 h or more since lastStreakAt: this session opens the next streak day (the profile's lastStreakAt moves to now). */
+  due: boolean;
+  /** The profile's streakDays after this session. */
+  streakDays: number;
+  /** Lab Credits this session pays for the streak. Always 0 for a creation session. */
+  streakBonus: number;
+  /** A play session paying the streak day a creation session opened without paying (see streakStep). */
+  owed: boolean;
+}
+
+const timeOf = (v: Date | string | number | null | undefined): number => (v === null || v === undefined ? NaN : new Date(v).getTime());
+
+/**
+ * Did a creation session open the current streak day, with no play since? Every play session writes lastActiveAt and
+ * lastStreakAt from ONE timestamp (route.ts), so after any play lastActiveAt >= lastStreakAt; a creation session moves
+ * lastStreakAt and leaves lastActiveAt alone, so lastActiveAt < lastStreakAt says exactly "creation opened this day,
+ * nobody has played in it yet". (A new profile has both at its insert's now(): equal, not owed. The only other writer
+ * of lastActiveAt — a finished lesson, app/api/education/complete/route.ts:45 — moves it forward, which ends the debt:
+ * that day then pays no streak Lab Credits, which is what today's rules paid a creation-first day anyway.)
+ */
+export function creationOpenedStreakDay(p: StreakProfile | null | undefined): boolean {
+  const active = timeOf(p?.lastActiveAt), streak = timeOf(p?.lastStreakAt);
+  return Number.isFinite(active) && Number.isFinite(streak) && active < streak && (p?.streakDays ?? 0) >= 1;
+}
+
+/**
+ * One session's step of the daily streak.
+ *
+ *   play      exactly today's rule (route.ts:135-146) — plus one case that cannot arise without creation sessions: the
+ *             first play inside a streak day a creation session opened pays that day's STREAK_LC_PER_DAY × day. Without
+ *             it, making music first would cost the player the day's streak Lab Credits (the creation paid none, and
+ *             the day was no longer due for the play) — a Studio that COST Lab Credits. With it, a creation never
+ *             changes what any play session pays: the play pays what it would have paid had the creation not come
+ *             first (same streak day, same bonus).
+ *   creation  counts toward the streak exactly as a play would (due → day + 1, or day 1 after a gap) and pays nothing.
+ *             Not due (the day already counts — a play or an earlier creation) → nothing at all: the route answers 200
+ *             and writes nothing, so a Studio that posts on every save is accepted once a streak day.
+ */
+export function streakStep(p: StreakProfile | null | undefined, nowMs: number, kind: SessionKind = 'play'): StreakStep {
+  const days = p?.streakDays ?? 0;
+  // route.ts's own expressions: a missing lastStreakAt is the epoch (due, a restart), an unreadable one is never due
+  const lastStreak = new Date(p?.lastStreakAt ?? 0).getTime();
+  const daysSince = Math.floor((nowMs - lastStreak) / STREAK_DAY_MS);
+  if (daysSince >= 1) {
+    const streakDays = daysSince === 1 ? Math.min(days + 1, STREAK_CAP_DAYS) : 1;
+    return { due: true, streakDays, streakBonus: kind === 'creation' ? 0 : STREAK_LC_PER_DAY * streakDays, owed: false };
+  }
+  if (kind === 'play' && creationOpenedStreakDay(p)) {
+    const streakDays = Math.min(days, STREAK_CAP_DAYS);
+    return { due: false, streakDays: days, streakBonus: STREAK_LC_PER_DAY * streakDays, owed: true };
+  }
+  return { due: false, streakDays: days, streakBonus: 0, owed: false };
+}
+
+/**
+ * MUSIC-SUITE P3 FIX PASS (2026-09-25): when a creation session that did NOT count may next count — the streak day opens
+ * STREAK_DAY_MS after lastStreakAt (streakStep's rolling window). The Academy used to take any 200 as "today is done" and
+ * stopped posting for the rest of the local day, so a creation answered "not yet" at 10:00 was never tried again at
+ * 22:00, when the day had opened (a Studio-only player lost streak days). The route returns this with every no-op; the
+ * client waits until then. `lostRace` = the day was due but another request counted it a moment ago (so it is a day from
+ * now). null = it counted.
+ */
+export function creationNextDueAt(p: StreakProfile | null | undefined, nowMs: number, o: { counted: boolean; due: boolean }): number | null {
+  if (o.counted) return null;
+  if (o.due) return nowMs + STREAK_DAY_MS;                                     // lost the race to a post that just counted
+  const last = new Date(p?.lastStreakAt ?? 0).getTime();
+  return Number.isFinite(last) ? last + STREAK_DAY_MS : nowMs + STREAK_DAY_MS;
 }

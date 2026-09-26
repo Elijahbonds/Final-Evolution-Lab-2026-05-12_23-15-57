@@ -175,15 +175,41 @@ export function checkFraming(frame: FramingFrame, view: FramingView = 'front'): 
   };
 }
 
-/** Steady framing: the shot has to be good for a beat, not for one lucky frame, before a rep is allowed. */
+/**
+ * Steady framing: the shot has to be good for a beat, not for one lucky frame, before a rep is allowed.
+ *
+ * MOVEMENT PLAY P4 (2026-09-25): an opt-in COUNTED hold, for the space check (lib/move/spaceCheck.ts), which used to
+ * keep two private copies of it. The default is a wall-clock hold that a bad frame restarts: right for a rep, which
+ * a missed frame should not start. Counted, only the time between two consecutive passing frames adds to the hold,
+ * and a failing (or missing) frame PAUSES it: a body the model finds one frame in four never holds anything, while
+ * one missed frame costs a frame's time, not the whole hold. reset() is what restarts it.
+ */
 export class FramingGate {
   private goodSince: number | null = null;
-  constructor(private readonly holdMs = 700) {}
+  private heldMs = 0;
+  private lastOkT: number | null = null;
+  private readonly counted: boolean;
+  constructor(private readonly holdMs = 700, opts: { counted?: boolean } = {}) {
+    this.counted = !!opts.counted;
+  }
   /** True once the shot has been good for `holdMs`. */
   ready(check: FramingCheck, nowMs: number): boolean {
+    if (this.counted) return this.step(check.ok, nowMs) >= 1;
     if (!check.ok) { this.goodSince = null; return false; }
     if (this.goodSince == null) this.goodSince = nowMs;
     return nowMs - this.goodSince >= this.holdMs;
   }
-  reset(): void { this.goodSince = null; }
+  /**
+   * The counted hold, one frame: a passing frame adds the time since the passing frame before it (none after a pause
+   * or a reset), a failing one pauses. Returns the progress, 0..1.
+   */
+  step(ok: boolean, nowMs: number): number {
+    if (!ok) { this.lastOkT = null; return this.progress; }
+    if (this.lastOkT !== null && nowMs > this.lastOkT) this.heldMs += nowMs - this.lastOkT;
+    this.lastOkT = nowMs;
+    return this.progress;
+  }
+  /** How far through the hold, 0..1 (the counted hold; the wall-clock one reports 0 until it is read with ready()). */
+  get progress(): number { return this.holdMs > 0 ? Math.min(1, this.heldMs / this.holdMs) : 1; }
+  reset(): void { this.goodSince = null; this.heldMs = 0; this.lastOkT = null; }
 }

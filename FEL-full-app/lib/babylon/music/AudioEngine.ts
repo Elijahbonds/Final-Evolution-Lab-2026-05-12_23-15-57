@@ -33,6 +33,28 @@
 //     the playhead still moves, and PERFORM is told it is a rest (`skipped: true`). `skippedSteps` counts them.
 //   * THE AUDIO SESSION. The engine claims 'playback' before it builds its context (lib/audio/session.ts: on an iPhone
 //     the default session obeys the silent switch — assumption, not tried on a device) and gives it back on dispose.
+//
+// MUSIC-SUITE P3 (2026-09-25), "Keep my work" — WHAT YOU HEAR IS WHAT YOU SEE (track selection only):
+//   * The engine played EVERY track it was handed, and the room handed it the project's whole list: 8 kit rows + every
+//     Flip row, while the grid drew the tier's 4 / 6 / 8 kit rows (P1, BASELINE.md 2b: 10 tracks, 6 rows drawn; flip_0
+//     played 8 times in 2 bars and was never drawn; CELL's lead played 4 times on the 4-row grid). `setAudible(ids)` is
+//     the room's drawn-rows rule (MusicTiers.shownRowIds) and every path that starts a sound reads it through `hears()`:
+//     the live scheduler, gridLive (PERFORM's "is there anything to play"), renderStems, renderMixdown, renderSong and
+//     renderSongStems. A rule by id, so a section swapped in on a bar line is filtered in the same instant. null = all
+//     (the default; nothing else changes for a caller that never selects).
+//   * `renderMixdown(bars, tracks)` renders a given track list (still through the selection): PUBLISH renders the working
+//     grid even while song mode or a CELL preview is what the engine is playing.
+//
+// MUSIC-SUITE P3 FIX PASS (2026-09-25):
+//   * renderMixdown(bars, tracks, SWING). The list was the working grid but the swing was this.state's — the SECTION's,
+//     while song mode played one (SongPanel.playSection sets it). Measured on fakeWebAudio: a hat on step 1 at 120 BPM
+//     rendered at 0.1250 s with song mode off and 0.1500 s under a 40 % section, while the published record said the
+//     project's swing — the library audio was swung, the card, a remix and the dance export were not.
+//   * unloadSample / dropSamples. loadBuffer only ever SET samples[id]; nothing removed one. Opening another project
+//     loaded that project's Flip chops over the old ones, and a chop that failed to load left the previous project's
+//     sound under that row id — project B's "FLIP 1" played project A's 808 kick (and PUBLISH rendered it) while the room
+//     said the sound was gone. The room drops every flip_* sample when another project opens, and a row whose chop can't
+//     load is unloaded, so a row that "plays nothing" is silent.
 
 import { gridStepTime, retempoGrid, songStepTime, stepDurSec, stepIsPast, type StepGrid } from './stepTime';
 import { claimPlaybackSession } from '@/lib/audio/session';
@@ -103,6 +125,8 @@ export class AudioEngine {
   public skippedSteps = 0;
   /** MUSIC-SUITE P2 FIX PASS: gives back the 'playback' audio session this engine claimed (lib/audio/session.ts). */
   private releaseSession: () => void;
+  /** MUSIC-SUITE P3: the rows the room draws (MusicTiers.shownRowIds) — the only rows that sound. null = every row. */
+  private audible: ReadonlySet<string> | null = null;
 
   constructor(initial: SequencerState) {
     this.releaseSession = claimPlaybackSession();
@@ -124,6 +148,17 @@ export class AudioEngine {
     this.samples.set(id, { id, name, buffer, category });
   }
 
+  /** MUSIC-SUITE P3 FIX PASS: forget one sound — its row plays nothing until a buffer is loaded again. */
+  unloadSample(id: string): void { this.samples.delete(id); }
+  /** MUSIC-SUITE P3 FIX PASS: forget every sound whose id matches (another project opened: every flip_* row). */
+  dropSamples(match: (id: string) => boolean): string[] {
+    const gone = [...this.samples.keys()].filter(match);
+    for (const id of gone) this.samples.delete(id);
+    return gone;
+  }
+  /** MUSIC-SUITE P3 FIX PASS: is a sound loaded under this id (the dev probe and the tests read it)? */
+  hasSample(id: string): boolean { return this.samples.has(id); }
+
   /** Swap the whole kit in place (kit picker) — patterns/volumes untouched. */
   swapKit(buffers: Map<string, AudioBuffer>): void {
     for (const [id, buffer] of buffers) {
@@ -137,6 +172,13 @@ export class AudioEngine {
   get isPolished(): boolean { return this.polished; }
   setState(s: SequencerState): void { this.state = s; }
   setBpm(bpm: number): void { this.state.bpm = Math.max(40, Math.min(220, bpm)); }
+
+  /** MUSIC-SUITE P3: sound only these rows (the drawn ones), live and in every render; null = every row. */
+  setAudible(ids: Iterable<string> | null): void { this.audible = ids === null ? null : new Set(ids); }
+  /** MUSIC-SUITE P3: the selection in force (null = every row) — for the dev probe. */
+  get audibleIds(): ReadonlySet<string> | null { return this.audible; }
+  /** MUSIC-SUITE P3: does this row sound? Unmuted and drawn. The one check every path that starts a sound makes. */
+  hears(t: Pick<TrackState, 'sampleId' | 'muted'>): boolean { return !t.muted && (this.audible === null || this.audible.has(t.sampleId)); }
 
   /** One-tap master: gentle glue compression + shelf sweetening. */
   masterPolish(on: boolean): void {
@@ -201,7 +243,7 @@ export class AudioEngine {
   }
   /** Does the pattern the scheduler reads have any hit that would sound? (An empty grid offers PERFORM nothing.) */
   private gridLive(): boolean {
-    return this.state.tracks.some((t) => !t.muted && this.samples.has(t.sampleId) && t.pattern.some(Boolean));
+    return this.state.tracks.some((t) => this.hears(t) && this.samples.has(t.sampleId) && t.pattern.some(Boolean));
   }
   private scheduleStep(step: number, time: number): void {
     if (stepIsPast(time, this.ctx.currentTime)) {
@@ -213,7 +255,7 @@ export class AudioEngine {
     }
     let hits = 0;
     for (const track of this.state.tracks) {
-      if (track.muted || !track.pattern[step]) continue;
+      if (!this.hears(track) || !track.pattern[step]) continue;
       const sample = this.samples.get(track.sampleId);
       if (!sample) continue;
       const src = this.ctx.createBufferSource();
@@ -248,7 +290,7 @@ export class AudioEngine {
     const blobs: Blob[] = [];
     for (const track of this.state.tracks) {
       const sample = this.samples.get(track.sampleId);
-      if (!sample || track.muted) continue;
+      if (!sample || !this.hears(track)) continue;
       const offline = new OfflineAudioContext(2, Math.ceil(44100 * totalDur), 44100);
       const bus = this.offlineBus(offline);
       for (let bar = 0; bar < bars; bar++) this.placeBar(offline, bus, [track], bar, this.state.swing);
@@ -258,13 +300,16 @@ export class AudioEngine {
   }
 
   /** Offline-render the FULL MIX (all unmuted tracks, swing, pan, and the
-   *  polish chain if enabled) — what the library saves and replays. */
-  async renderMixdown(bars = 2): Promise<Blob> {
+   *  polish chain if enabled) — what the library saves and replays.
+   *  MUSIC-SUITE P3: `tracks` renders that list instead of the one playing (publish renders the working grid while song
+   *  mode plays a section); either way only the selected rows sound. MUSIC-SUITE P3 FIX PASS: `swing` places them (the
+   *  project's, from PUBLISH — the playing state's is a section's in song mode). */
+  async renderMixdown(bars = 2, tracks: TrackState[] = this.state.tracks, swing: number = this.state.swing): Promise<Blob> {
     const stepDur = this.secondsPerStep();
     const totalDur = stepDur * this.state.steps * bars + 1.2;
     const offline = new OfflineAudioContext(2, Math.ceil(44100 * totalDur), 44100);
     const bus = this.offlineBus(offline);
-    for (let bar = 0; bar < bars; bar++) this.placeBar(offline, bus, this.state.tracks, bar, this.state.swing);
+    for (let bar = 0; bar < bars; bar++) this.placeBar(offline, bus, tracks, bar, swing);
     return encodeWav(await offline.startRendering());
   }
 
@@ -291,7 +336,7 @@ export class AudioEngine {
 
   /** M4: one WAV per track over the whole song, plus each take as its own stem — each through the song's bus. */
   async renderSongStems(bars: TrackState[][], oneShots: { id: string; buffer: AudioBuffer; atBar: number; gain: number }[], lengthSec: number, barSwing?: number[]): Promise<{ name: string; blob: Blob }[]> {
-    const ids = [...new Set(bars.flatMap((b) => b.map((t) => t.sampleId)))];
+    const ids = [...new Set(bars.flatMap((b) => b.filter((t) => this.hears(t)).map((t) => t.sampleId)))];
     const out: { name: string; blob: Blob }[] = [];
     for (const id of ids) {
       const sample = this.samples.get(id); if (!sample) continue;
@@ -319,7 +364,7 @@ export class AudioEngine {
   private placeBar(offline: OfflineAudioContext, dest: AudioNode, tracks: TrackState[], bar: number, swing: number): void {
     for (const track of tracks) {
       const sample = this.samples.get(track.sampleId);
-      if (!sample || track.muted) continue;
+      if (!sample || !this.hears(track)) continue;
       for (let step = 0; step < this.state.steps; step++) {
         if (!track.pattern[step]) continue;
         const at = songStepTime(bar, step, this.state.steps, this.state.bpm, swing);   // the live loop's time, exactly

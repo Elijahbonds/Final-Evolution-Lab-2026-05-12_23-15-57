@@ -118,3 +118,48 @@ describe('side-on, read from the width against the torso', () => {
     expect(sideWidth({ landmarks: [] })).toBeNull();
   });
 });
+
+// MOVEMENT PLAY P4 (2026-09-25): the counted hold the space check uses (lib/move/spaceCheck.ts), opt-in.
+describe('the counted hold (the space check\'s)', () => {
+  it('a failing frame pauses the hold, it does not restart it', () => {
+    const gate = new FramingGate(700, { counted: true });
+    expect(gate.step(true, 0)).toBe(0);                  // the first passing frame starts the clock, adds nothing
+    expect(gate.step(true, 400)).toBeCloseTo(400 / 700, 9);
+    expect(gate.step(false, 433)).toBeCloseTo(400 / 700, 9);   // paused, kept
+    expect(gate.step(true, 466)).toBeCloseTo(400 / 700, 9);    // the gap across the miss does not count
+    expect(gate.step(true, 766)).toBe(1);
+  });
+
+  it('reset() restarts it, and progress reads where it is', () => {
+    const gate = new FramingGate(300, { counted: true });
+    gate.step(true, 0); gate.step(true, 150);
+    expect(gate.progress).toBeCloseTo(0.5, 9);
+    gate.reset();
+    expect(gate.progress).toBe(0);
+    expect(gate.step(true, 200)).toBe(0);                // after a reset the next frame only starts the clock
+    expect(gate.step(true, 500)).toBe(1);
+    expect(gate.progress).toBe(1);
+  });
+
+  it('ready() on a counted gate is the counted hold', () => {
+    const gate = new FramingGate(700, { counted: true });
+    const good = checkFraming(shot()), bad = checkFraming(shot({ ankleY: 0.99 }));
+    expect(gate.ready(good, 1000)).toBe(false);
+    expect(gate.ready(good, 1500)).toBe(false);
+    expect(gate.ready(bad, 1600)).toBe(false);           // paused at 500 ms held
+    expect(gate.ready(good, 1700)).toBe(false);
+    expect(gate.ready(good, 1900)).toBe(true);           // 500 + 200
+  });
+
+  it('the default gate is unchanged: a wall-clock hold a bad frame restarts', () => {
+    const gate = new FramingGate();
+    const good = checkFraming(shot()), bad = checkFraming(shot({ ankleY: 0.99 }));
+    expect(gate.ready(good, 0)).toBe(false);
+    expect(gate.ready(good, 699)).toBe(false);
+    expect(gate.ready(good, 700)).toBe(true);
+    expect(gate.ready(bad, 710)).toBe(false);
+    expect(gate.ready(good, 720)).toBe(false);
+    expect(gate.ready(good, 1419)).toBe(false);
+    expect(gate.ready(good, 1420)).toBe(true);
+  });
+});

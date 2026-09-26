@@ -21,6 +21,9 @@
 //     (game-shell.tsx bumps gameKey), so "does my beat survive a PERFORM card" can be driven here;
 //   * ?stage=studio|perform is read by StudioMode itself (musicStage.ts readMusicStage, `?stage=` wins over the saved
 //     pick) — this route only shows which one the URL asked for; ?arena=1 makes the run a staked 32-bar set.
+//   * MUSIC-SUITE P3 (2026-09-25): the player is a fixed dev id (DEV_PLAYER_ID) — the real route passes the signed-in
+//     player's, which keys the owned-kits cache. ?player=<id> plays as someone else, so a probe can show two players on
+//     one device never see each other's kits.
 //
 // THE DEV HOOK (window.__FEL_STUDIO__). The engine keeps its track list private and StudioMode keeps it in React state,
 // so "which tracks are AUDIBLE but not DRAWN" (the hidden-rows finding) had no reader. This route wraps three
@@ -45,7 +48,8 @@ export interface StudioProbe {
   /** The track list the scheduler reads right now, as it reads it (null before the room mounts an engine). */
   engine(): {
     running: boolean; bpm: number; swing: number; steps: number;
-    tracks: { sampleId: string; hits: number; muted: boolean; loaded: boolean }[];
+    /** MUSIC-SUITE P3: `heard` = the room's selection lets this row sound (the grid draws it). */
+    tracks: { sampleId: string; hits: number; muted: boolean; loaded: boolean; heard: boolean }[];
   } | null;
   /** Hits the scheduler actually started since the last reset(), by sampleId (muted, empty and unloaded rows excluded). */
   audible: Record<string, number>;
@@ -66,6 +70,8 @@ declare global { interface Window { __FEL_STUDIO__?: StudioProbe } }
 
 type EngineGuts = {
   ctx: AudioContext;
+  /** MUSIC-SUITE P3: the rows the room lets sound (AudioEngine.setAudible); null = all. */
+  audible: ReadonlySet<string> | null;
   state: SequencerState;
   samples: Map<string, unknown>;
   timerId: number | null;
@@ -88,6 +94,7 @@ function installStudioProbe(): void {
         running: live.timerId !== null, bpm: s.bpm, swing: s.swing, steps: s.steps,
         tracks: s.tracks.map((t) => ({
           sampleId: t.sampleId, hits: t.pattern.filter(Boolean).length, muted: t.muted, loaded: live!.samples.has(t.sampleId),
+          heard: !live!.audible || live!.audible.has(t.sampleId),
         })),
       };
     },
@@ -109,6 +116,7 @@ function installStudioProbe(): void {
     adopt(this);
     for (const t of this.state.tracks) {
       if (t.muted || !t.pattern[step] || !this.samples.has(t.sampleId)) continue;   // the same skips scheduleStep makes
+      if (this.audible && !this.audible.has(t.sampleId)) continue;                  // MUSIC-SUITE P3: …and the selection
       probe.audible[t.sampleId] = (probe.audible[t.sampleId] ?? 0) + 1;
     }
     probe.steps.push({ step, time });
@@ -123,18 +131,23 @@ installStudioProbe();
 
 /** The kit SKUs this page load approved: the dev account's purchases, so a remount (REPLAY) still owns them. */
 const DEV_BOUGHT = new Set<string>();
+/** MUSIC-SUITE P3: the dev player's fixed id (the real route passes the signed-in player's). */
+export const DEV_PLAYER_ID = 'dev-player';
 
 export function DevMusicLoader() {
   const [ended, setEnded] = useState<GameResult | null>(null);
   const [remounts, setRemounts] = useState(0);
   const [asked, setAsked] = useState<string>('');
   const [arenaSet, setArenaSet] = useState(false);
+  const [playerId, setPlayerId] = useState<string | null>(null);
   // Read on the client only: the query is not known to the server render, and a mismatch would warn on hydration.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const s = q.get('stage');
     setAsked(isMusicStageId(s) ? s : s ? `${s} (not a stage: the saved pick or STUDIO)` : 'none (the saved pick or STUDIO)');
     setArenaSet(Boolean(q.get('arena')));
+    const who = q.get('player');
+    setPlayerId(who && /^[A-Za-z0-9_-]{1,64}$/.test(who) ? who : DEV_PLAYER_ID);
   }, []);
 
   // No wallet here: every spend is approved (unless ?shop= says otherwise), and written down so a probe can count what
@@ -170,12 +183,13 @@ export function DevMusicLoader() {
     // StudioMode's own — the best case for the real route, which can only add a shell around it.
     <div className="min-h-screen bg-[#07090d]">
       <p className="px-2 py-1 font-mono text-[10px] text-white/40">
-        DEV · real StudioMode (no GameShell) · ?stage= {asked || '…'}{arenaSet ? ' · ARENA SET' : ''} · shards approved (?shop= to fail them)
+        DEV · real StudioMode (no GameShell) · ?stage= {asked || '…'}{arenaSet ? ' · ARENA SET' : ''} · player {playerId ?? '…'} · shards approved (?shop= to fail them)
       </p>
       <div className="relative min-h-[80vh]">
-        {arenaSet
-          ? <StudioMode key={`a${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} arenaSet />
-          : <StudioMode key={`f${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} />}
+        {/* the room mounts once the player is known (read from the URL on the client), as the real route's does */}
+        {playerId === null ? null : arenaSet
+          ? <StudioMode key={`a${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} arenaSet playerId={playerId} />
+          : <StudioMode key={`f${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} playerId={playerId} />}
         {ended && (
           <div data-dev="end-card" className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 font-mono">
             <div className="rounded-xl border border-white/20 bg-[#0b0d14] px-6 py-4 text-center text-white">

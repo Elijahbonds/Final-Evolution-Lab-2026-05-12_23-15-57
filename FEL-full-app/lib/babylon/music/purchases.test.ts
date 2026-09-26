@@ -18,7 +18,7 @@ import {
   CELL_ASSIST_REASON, CELL_ASSIST_SHARDS, CELL_ASSIST_SKU, DEFAULT_KIT, KIT_CACHE_KEY, MUSIC_PURCHASES, MUSIC_SKU_PREFIX,
   SPEND_FAILURE_TEXT, assistSpend, cleanKitCache, confirmCopy, freeKits, initialShop, isKitId, kitForSku, kitSkuId,
   kitSpend, kitSpendReason, kitsAfterRead, kitsFromOwned, musicPurchase, newSpendNonce, ownedReadFromResponse,
-  readKitCache, remixKit, remixKitNote, shopReducer, skuForSpend, spendReason, spendResultFromStatus, writeKitCache,
+  readKitCache, remixKit, remixKitNote, shopReducer, skuForSpend, spendReason, spendResultFromStatus, writeKitCache, kitCacheKey,
   type ReadOwnedKits, type ShardSpend, type ShopAction, type ShopState,
 } from './purchases';
 import { KIT_META, type KitId } from './SynthKit';
@@ -279,17 +279,34 @@ describe('the kits the account owns', () => {
     expect(kitsAfterRead(['street', 'neon'], { ok: false, reason: 'unreachable' })).toEqual(['street', 'neon']);
   });
 
-  it('reads and writes the cache under the room\'s old key, and survives a storage that throws', () => {
+  it('reads and writes THIS PLAYER\'s cache, and survives a storage that throws', () => {
     const mem = new Map<string, string>();
-    const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); } };
-    expect(readKitCache(store)).toEqual(['street']);
-    writeKitCache(store, ['dust', 'street']);
-    expect(mem.get(KIT_CACHE_KEY)).toBe('["street","dust"]');
-    expect(readKitCache(store)).toEqual(['street', 'dust']);
+    const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); }, removeItem: (k: string) => { mem.delete(k); } };
+    expect(readKitCache(store, 'u_ana')).toEqual(['street']);
+    writeKitCache(store, ['dust', 'street'], 'u_ana');
+    expect(mem.get(kitCacheKey('u_ana'))).toBe('["street","dust"]');
+    expect(kitCacheKey('u_ana')).toBe(`${KIT_CACHE_KEY}:u_ana`);
+    expect(readKitCache(store, 'u_ana')).toEqual(['street', 'dust']);
     const blocked = { getItem: () => { throw new Error('SecurityError'); }, setItem: () => { throw new Error('SecurityError'); } };
-    expect(readKitCache(blocked)).toEqual(['street']);
-    expect(() => writeKitCache(blocked, ['street'])).not.toThrow();
-    expect(readKitCache(null)).toEqual(['street']);
+    expect(readKitCache(blocked, 'u_ana')).toEqual(['street']);
+    expect(() => writeKitCache(blocked, ['street'], 'u_ana')).not.toThrow();
+    expect(readKitCache(null, 'u_ana')).toEqual(['street']);
+  });
+
+  // MUSIC-SUITE P3 (2026-09-25), P2's open item: one shared key meant the next player on a shared device saw the last
+  // player's kits as owned until the server read landed (and for good if it never did).
+  it('A SHARED DEVICE: one player\'s kits never show as another\'s; an unknown player reads no cache', () => {
+    const mem = new Map<string, string>([[KIT_CACHE_KEY, '["street","neon","dust"]']]);   // the old shared value
+    const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); }, removeItem: (k: string) => { mem.delete(k); } };
+    expect(readKitCache(store, 'u_ana')).toEqual(['street']);             // the old shared cache is never adopted
+    writeKitCache(store, ['street', 'neon', 'dust'], 'u_ana');
+    expect(mem.has(KIT_CACHE_KEY)).toBe(false);                           // and it is dropped on the first keyed write
+    expect(readKitCache(store, 'u_ana')).toEqual(['street', 'neon', 'dust']);
+    expect(readKitCache(store, 'u_ben')).toEqual(['street']);              // Ben, same device: only the free kit
+    expect(readKitCache(store, null)).toEqual(['street']);                 // a room that doesn't know who is playing
+    expect(readKitCache(store, '')).toEqual(['street']);
+    writeKitCache(store, ['neon'], undefined);                             // …writes nothing
+    expect([...mem.keys()]).toEqual([kitCacheKey('u_ana')]);
   });
 });
 
@@ -405,7 +422,8 @@ describe('StudioMode wires it (source pins; the room is Web Audio + React and is
   it('owned kits come from the account at mount; localStorage is read only through the cleaned cache', () => {
     const src = studioSrc();
     expect(src).toContain('useEffect(() => { refreshOwned(); }, [refreshOwned]);');
-    expect(src).toContain('initialShop(readKitCache(kitStorage()))');
+    expect(src).toContain('initialShop(readKitCache(kitStorage(), playerId))');   // MUSIC-SUITE P3: this player's cache
+    expect(src).toContain('writeKitCache(kitStorage(), shop.owned, playerId)');
     expect(src).not.toContain("localStorage.getItem('fel_studio_kits_v1')");
     expect(src).not.toContain("localStorage.setItem('fel_studio_kits_v1'");
   });

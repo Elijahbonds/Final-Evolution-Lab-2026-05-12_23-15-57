@@ -11,6 +11,11 @@ import {
   SESSION_WIN_LC, sessionXp, sessionShards, setGrade, musicAccuracy, readMusicSet, musicSetWon, readDanceAccuracy,
   sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, roomStats,
   ROOM_STATS_FORWARDED, ENDLESS_CEILING_BASIS_SEC, endlessCeilingFor, isCatalogueMode, sessionScoreCap,
+  // MUSIC-SUITE P3
+  streakStep, creationOpenedStreakDay, isCreationSession, CREATION_PAYOUT, CREATION_SESSION_KIND,
+  STREAK_DAY_MS, STREAK_LC_PER_DAY, STREAK_CAP_DAYS, type StreakProfile,
+  // MUSIC-SUITE P3 FIX PASS
+  creationNextDueAt,
 } from './session-payout';
 import { SCORE_CEILINGS } from './arena-score-integrity';
 import { gradeFor } from './babylon/core/danceTracks';
@@ -402,5 +407,154 @@ describe('P2 fix pass: the endless ceiling is a minute\'s pay, prorated (owner c
 
   it('The Hundred\'s strong real run is still under it (a minute or more of play)', () => {
     expect(sessionPayout({ score: 4000, won: false, endless: true, durationSec: 300 })).toEqual({ xp: 6010, shards: 200, winCredits: 0, capped: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MUSIC-SUITE P3 (2026-09-25): the daily streak (moved out of the route) and the creation session
+// ---------------------------------------------------------------------------
+
+/** app/api/sessions/route.ts:135-146 at 8346808f, verbatim but for the profile argument: the rule streakStep replaced. */
+function routeStreakAt8346808f(profile: StreakProfile, now: number) {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  let streakDays = profile?.streakDays ?? 0;
+  const lastStreak = new Date(profile?.lastStreakAt ?? 0).getTime();
+  const daysSince = Math.floor((now - lastStreak) / DAY_MS);
+  let streakBonus = 0;
+  if (daysSince >= 1) {
+    streakDays = daysSince === 1 ? Math.min(streakDays + 1, 7) : 1;
+    streakBonus = 5 * streakDays;
+  }
+  return { due: daysSince >= 1, streakDays, streakBonus };
+}
+
+describe('MUSIC-SUITE P3: the daily streak, moved to streakStep unchanged', () => {
+  const NOW = Date.UTC(2026, 8, 25, 12);
+  const H = 60 * 60 * 1000;
+
+  it('its constants are the route\'s (and the economy config\'s) numbers', () => {
+    expect(STREAK_DAY_MS).toBe(86_400_000);
+    expect(STREAK_LC_PER_DAY).toBe(5);
+    expect(STREAK_CAP_DAYS).toBe(7);
+  });
+
+  it('a play session gets exactly what the route computed, over every streak day and gap (and a missing or bad date)', () => {
+    let n = 0;
+    for (const days of [undefined, null, 0, 1, 3, 6, 7, 8]) {
+      for (const lastStreakAt of [
+        NOW, NOW - 1, NOW - 23.99 * H, NOW - 24 * H, NOW - 47.99 * H, NOW - 48 * H, NOW - 1000 * H, NOW + 5 * H,
+        new Date(NOW - 30 * H), new Date(NOW - 30 * H).toISOString(), undefined, null, 'not a date',
+      ]) {
+        // after any play lastActiveAt >= lastStreakAt (one stamp): the debt case cannot arise
+        const p = { streakDays: days, lastStreakAt, lastActiveAt: lastStreakAt } as StreakProfile;
+        const old = routeStreakAt8346808f(p, NOW);
+        expect(streakStep(p, NOW, 'play'), JSON.stringify(p)).toEqual({ ...old, owed: false });
+        expect(streakStep({ streakDays: days, lastStreakAt } as StreakProfile, NOW), 'no lastActiveAt').toEqual({ ...old, owed: false });
+        n++;
+      }
+    }
+    expect(n).toBe(104);
+  });
+
+  it('a creation session steps the streak exactly as a play would, and pays nothing for it', () => {
+    for (const [hours, days, next] of [[25, 3, 4], [30, 7, 7], [49, 5, 1], [24 * 30, 2, 1]] as const) {
+      const p = { streakDays: days, lastStreakAt: NOW - hours * H, lastActiveAt: NOW - hours * H };
+      expect(streakStep(p, NOW, 'creation')).toEqual({ due: true, streakDays: next, streakBonus: 0, owed: false });
+      expect(streakStep(p, NOW, 'play')).toMatchObject({ due: true, streakDays: next, streakBonus: 5 * next });
+    }
+  });
+
+  it('a creation inside a streak day that already counts is nothing at all (the route answers 200 and writes nothing)', () => {
+    for (const p of [
+      { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: NOW - H },          // a set opened the day
+      { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: NOW - 30 * H },     // a creation opened it
+    ]) expect(streakStep(p, NOW, 'creation')).toEqual({ due: false, streakDays: 4, streakBonus: 0, owed: false });
+  });
+
+  it('the first play inside a creation-opened day pays that day\'s streak LC, and says so', () => {
+    const p = { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: NOW - 30 * H };
+    expect(creationOpenedStreakDay(p)).toBe(true);
+    expect(streakStep(p, NOW, 'play')).toEqual({ due: false, streakDays: 4, streakBonus: 20, owed: true });
+    // … which is what that play would have been paid had the creation not come first (day 4 opened by the play itself)
+    expect(routeStreakAt8346808f({ streakDays: 3, lastStreakAt: NOW - 30 * H }, NOW)).toMatchObject({ streakDays: 4, streakBonus: 20 });
+  });
+
+  it('no debt without a creation: equal or later lastActiveAt, a missing or bad one, or no streak day', () => {
+    for (const p of [
+      { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: NOW - H },
+      { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: NOW - 0.5 * H },
+      { streakDays: 4, lastStreakAt: NOW - H },
+      { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: null },
+      { streakDays: 4, lastStreakAt: NOW - H, lastActiveAt: 'not a date' },
+      { streakDays: 0, lastStreakAt: NOW - H, lastActiveAt: NOW - 30 * H },
+      { streakDays: 4, lastStreakAt: 'not a date', lastActiveAt: NOW - 30 * H },
+    ] as StreakProfile[]) {
+      expect(creationOpenedStreakDay(p), JSON.stringify(p)).toBe(false);
+      expect(streakStep(p, NOW, 'play'), JSON.stringify(p)).toMatchObject({ streakBonus: 0, owed: false });
+    }
+  });
+});
+
+describe('MUSIC-SUITE P3: what a creation session is, and what it pays', () => {
+  it('a music mode (either key), a score of exactly 0 and kind \'creation\' in metadata (or the stats bag)', () => {
+    expect(CREATION_SESSION_KIND).toBe('creation');
+    const m = { kind: 'creation' };
+    expect(isCreationSession('music', 0, { metadata: m })).toBe(true);
+    expect(isCreationSession('musicAcademy', 0, { metadata: m })).toBe(true);
+    expect(isCreationSession('music', 0, { stats: m })).toBe(true);
+    expect(isCreationSession('music', 0, { stats: { bars: 0 }, metadata: m })).toBe(true);
+  });
+
+  it('anything else is a play session: another kind, a score, another mode, a non-catalogue spelling, no bag', () => {
+    const m = { kind: 'creation' };
+    for (const [mode, score, body] of [
+      ['music', 0, { metadata: { kind: 'perform' } }],
+      ['music', 0, { metadata: { kind: 'Creation' } }],
+      ['music', 0, { metadata: { kind: ['creation'] } }],
+      ['music', 0, { metadata: ['creation'] }],
+      ['music', 0, { kind: 'creation' }],
+      ['music', 0, {}],
+      ['music', 0, null],
+      ['music', 1, { metadata: m }],
+      ['music', 9000, { metadata: m }],
+      ['music', NaN, { metadata: m }],
+      ['Music', 0, { metadata: m }],
+      ['dance', 0, { metadata: m }],
+      ['dunkContest', 0, { metadata: m }],
+    ] as const) expect(isCreationSession(mode, score, body), `${mode} ${score} ${JSON.stringify(body)}`).toBe(false);
+  });
+
+  it('pays nothing — where the endless floor would have paid a score-0 music session 10 XP and a shard', () => {
+    expect(CREATION_PAYOUT).toEqual({ xp: 0, shards: 0, winCredits: 0, capped: false });
+    // the misread this guards: a PLAYED score-0 free-play set is paid the no-score floor, whatever its length
+    expect(sessionPayout({ score: 0, won: false, endless: true, durationSec: 420 })).toMatchObject({ xp: 10, shards: 1 });
+    for (const durationSec of [undefined, 0, 5, 420, 3600]) {
+      for (const o of [{ score: 0, won: false, endless: true }, { score: 0, won: true, endless: false }, { score: 5000, won: true, endless: true }]) {
+        expect(sessionPayout({ ...o, durationSec, kind: 'creation' })).toEqual(CREATION_PAYOUT);
+      }
+    }
+    // a copy, so a caller cannot move the rule
+    const got = sessionPayout({ score: 0, won: false, endless: true, kind: 'creation' });
+    got.xp = 99;
+    expect(CREATION_PAYOUT.xp).toBe(0);
+    expect(sessionPayout({ score: 0, won: false, endless: true, kind: 'play' })).toMatchObject({ xp: 10, shards: 1 });
+  });
+});
+
+// MUSIC-SUITE P3 FIX PASS (2026-09-25): a creation that did not count says when it can — the Academy took any 200 as
+// "today is done" and stopped posting for the local day, so a Studio-only player lost streak days.
+describe('MUSIC-SUITE P3 FIX PASS: when a creation that did not count may count', () => {
+  const H = 3600_000;
+  it('the streak day opens STREAK_DAY_MS after lastStreakAt; a counted post has no next time; a lost race is a day on', () => {
+    const now = Date.UTC(2026, 8, 26, 10);
+    const last = now - 13 * H;
+    expect(creationNextDueAt({ streakDays: 3, lastStreakAt: new Date(last) }, now, { counted: false, due: false })).toBe(last + STREAK_DAY_MS);
+    expect(creationNextDueAt({ streakDays: 3, lastStreakAt: new Date(last) }, now, { counted: true, due: true })).toBeNull();
+    expect(creationNextDueAt({ streakDays: 3, lastStreakAt: new Date(now - 30 * H) }, now, { counted: false, due: true })).toBe(now + STREAK_DAY_MS);
+    // and it is exactly when streakStep first says due
+    const p = { streakDays: 3, lastStreakAt: new Date(last), lastActiveAt: new Date(last) };
+    const at = creationNextDueAt(p, now, { counted: false, due: false })!;
+    expect(streakStep(p, at - 1, 'creation').due).toBe(false);
+    expect(streakStep(p, at, 'creation').due).toBe(true);
   });
 });
