@@ -52,7 +52,19 @@ describe('the harness', () => {
   it('a finished screen lets go of the camera: stop() in the effect that submits it', () => {
     const effect = h.slice(h.indexOf("if (pattern !== 'screen' || runner?.phase !== 'complete') return;"));
     const body = effect.slice(0, effect.indexOf('}, [pattern, runner, submitScreen, stop]);'));
-    expect(body).toContain('void submitScreen(runner.results, runner.screen);');
+    // MIRROR-COACH P3 (2026-09-26): the grades ride with the results, for the server's regrade
+    expect(body).toContain('void submitScreen(runner.results, runner.screen, runner.grades);');
     expect(body).toMatch(/stop\(\);\s*setStatus\('idle'\);/);
+  });
+
+  // MIRROR-COACH P3 (2026-09-26): the screen grades — the wiring the graders depend on, as served
+  it('the runner gets the whole pose frame and the camera\'s aspect; the retest line is protected; the card is mounted', () => {
+    expect(h).toContain('runnerRef.current.tick(pose, pose.timestampMs)');       // z and visibility reach the graders
+    expect(h).not.toContain('{ landmarks: pose.landmarks, present: pose.present },');
+    expect(h).toMatch(/runnerRef\.current\?\.setAspect\(v\.videoWidth \/ v\.videoHeight\)/);
+    expect(h).toContain("speak(st.say, { protect: st.phase === 'retest' })");
+    expect(h).toContain('<StationResults screen={runner.screen} stations={runner.stations} />');
+    expect(h).toContain('runnerRef.current?.skipRetest()');
+    expect(h).toMatch(/grades,\s*\}\),/);                                        // the post carries the grades
   });
 });

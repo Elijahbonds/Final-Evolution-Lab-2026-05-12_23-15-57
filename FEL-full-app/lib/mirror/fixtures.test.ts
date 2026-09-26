@@ -191,4 +191,21 @@ describe('4. invariants a re-record must never accept', () => {
       expect(o.athletePanel).toBe(NOT_GRADED_LINE);
     }
   });
+
+  // MIRROR-COACH P3 (2026-09-26): the stations are graded now (lib/mirror/stationGraders.ts, fed by the runner from each
+  // hold's good frames). An athlete standing as each cue says, with nothing wrong in the body, is read on every camera
+  // check and flagged on none — and the checks the camera cannot see are never among the results.
+  it('the clean walk: every camera check read, none flagged, nothing but camera results', () => {
+    for (const screen of ['modified', 'full'] as const) {
+      const r = now.screens[screen];
+      expect(r.resultsRecorded, screen).toBe(7);                     // heel, knee, hips, shoulders, head, one leg × 2
+      const res = r.onComplete.stored.results;
+      expect(res.every((x) => x.grade === 'stable' && x.source === 'camera'), screen).toBe(true);
+      expect(res.map((x) => x.checkId)).not.toContain('ribAngle');
+      expect(r.onComplete.summary.graded).toBe(true);
+      expect(r.onComplete.summary.movementFlags).toBe(0);
+      expect(r.onComplete.summary.notMeasured).toEqual([]);
+      for (const x of res) expect(x.detail, x.checkId).toMatch(/estimated/);
+    }
+  });
 });

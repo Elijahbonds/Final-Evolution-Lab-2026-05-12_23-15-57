@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { decideScreenReward } from '@/lib/mirror/screenReward';
-import { distinctChecks, resultsForScreen, scoreScreen, screenFor, screenVariantFor, type ScreenId } from '@/lib/mirror/screen';
+import { screenFor } from '@/lib/mirror/screen';
+import { decideScreenPost } from '@/lib/mirror/screenClaims';
 import { isUngradedStoredScreen, readStoredScreen, storedScreen } from '@/lib/mirror/screenStore';
 import { analyzeMovement, defaultMetrics } from '@/lib/workout/movement-screen';
 import { EARLY_WEEKS, generatePlan, isDepthDrop, type PlanWeek } from '@/lib/workout/plan-generator';
@@ -19,8 +19,8 @@ import { spend, WalletError } from '@/lib/wallet/wallet-service';
  * route runs the SAME library code those routes run, in the same order, with only the session and the database
  * replaced — nothing here is a second implementation of a rule:
  *
- *   POST                  → app/api/mirror/screen/route.ts:56-70 (resultsForScreen → screenVariantFor → scoreScreen →
- *                           decideScreenReward → storedScreen) for a fixture athlete, plus what
+ *   POST                  → app/api/mirror/screen/route.ts (since MIRROR-COACH P3: decideScreenPost → storedScreen; it was
+ *                           resultsForScreen → screenVariantFor → scoreScreen → decideScreenReward) for a fixture athlete, plus what
  *                           app/api/coach/prescribe/route.ts:43-47 would tell the coach about that stored row. The
  *                           probe routes the Mirror harness's own POST here, so the harness renders the server's answer.
  *   GET ?check=plans      → app/api/v1/workout/plan/route.ts GET: revisePlansOnRead over a plan stored before today
@@ -39,24 +39,23 @@ export async function POST(req: NextRequest) {
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
   // — app/api/mirror/screen/route.ts, the body onwards —
-  const b = body as { screenId?: unknown; screen?: unknown; results?: unknown; provisional?: unknown };
-  const screenId = String(b?.screenId ?? '').slice(0, 64).replace(/[^A-Za-z0-9_:-]/g, '');
-  const claimed: ScreenId = b?.screen === 'full' ? 'full' : 'modified';
-  const results = resultsForScreen(claimed, Array.isArray(b?.results) ? b.results : []);
-  const screen = screenVariantFor(claimed, results);
-  if (!screenId) return NextResponse.json({ error: 'missing_screen_id' }, { status: 400 });
-  const summary = scoreScreen(screen, results);
-  const decision = decideScreenReward({ screenId, athleteId, provisional: Boolean(b?.provisional), checksTaken: distinctChecks(results) });
-  const stored = storedScreen(screenId, screen, results, summary);
+  // MIRROR-COACH P3 (2026-09-25): the route's pipeline is decideScreenPost now (the server re-decides every grade from
+  // the grader's numbers; a client's bare grade is dropped), so this proof route runs it too rather than keeping the P1
+  // steps the route no longer runs. The answer's shape is unchanged; /dev/mirror-coach-p3-screen has the P3 detail.
+  const b = body as { screen?: unknown };
+  const d = decideScreenPost(body, athleteId);
+  if (!d.ok) return NextResponse.json(d.status === 400 ? d.body : { response: d.body, status: d.status }, { status: d.status === 400 ? 400 : 200 });
+  const { screenId, screen, outcome, summary, reward: decision } = d;
+  const stored = storedScreen(screenId, screen, outcome.results, summary, { camera: outcome.camera, provisional: outcome.provisional, selfReport: d.answers });
   // — app/api/coach/prescribe/route.ts, for this row as the newest (and only) screen on file —
   const graded = readStoredScreen(stored);
   const coachReason = graded ? '(graded: the route drafts from it)' : isUngradedStoredScreen(stored) ? 'ungraded_screen' : 'unreadable_screen';
   return NextResponse.json({
     // what the real route answers (awarded is 0 unless decision.pay, when the grant would run)
-    response: { summary, graded: summary.graded, paid: decision.pay, awarded: 0, message: decision.message },
+    response: { summary, graded: summary.graded, paid: decision.pay, awarded: 0, message: decision.message, provisional: outcome.provisional, screenId },
     dev: {
-      claimed, storedAs: screen, stationsInVariant: screenFor(screen).map((s) => s.id),
-      resultsKept: results.length, wouldCallGrant: decision.pay, stored, coachReason,
+      claimed: b?.screen === 'full' ? 'full' : 'modified', storedAs: screen, stationsInVariant: screenFor(screen).map((s) => s.id),
+      resultsKept: outcome.results.length, wouldCallGrant: decision.pay, stored, coachReason,
     },
   });
 }

@@ -11,6 +11,9 @@
 import {
   MIRROR_SCREEN_KIND, isGraded, resultsForScreen, scoreScreen, type CheckResult, type ScreenId, type ScreenResultSummary,
 } from './screen';
+import { selfReportAnswersFor, type SelfReportEntry } from './selfReport';
+import type { RegradedCheck } from './screenClaims';
+import { toCheckResult, type StationGrade } from './stationGraders';
 
 export interface StoredScreen {
   screenId: string;
@@ -22,11 +25,73 @@ export interface StoredScreen {
   graded: boolean;
   results: CheckResult[];
   summary: ScreenResultSummary;
+  /**
+   * MIRROR-COACH P3 (2026-09-25): every camera check the server re-checked, readable or not, with the grader's numbers
+   * (value, unit, readable frames, view) and the status the SERVER worked out — the evidence behind `results`, kept so
+   * a coach (and a later phase's personal baselines) can see what the camera saw, and so "the camera could not read
+   * the heel line" is a stored fact rather than a missing row. Absent on rows stored before today.
+   */
+  camera?: RegradedCheck[];
+  /**
+   * Fewer than MIN_READABLE_CAMERA_CHECKS camera checks were readable: stored, never paid (MIRROR-COACH P3). Absent on
+   * rows stored before today.
+   */
+  provisional?: boolean;
+  /**
+   * The athlete's own answers to the self-report questions (lib/mirror/selfReport.ts), kept as given. Never graded,
+   * never scored, never paid; written by POST (if answered by then) or PATCH /api/mirror/screen. Absent = not answered.
+   */
+  selfReport?: SelfReportEntry[];
+  /**
+   * Who worked out `results`: 'server' on every row written since MIRROR-COACH P3, from grader summaries it re-checked
+   * (lib/mirror/screenClaims.ts). Absent on older rows — whose grades, if any, were the posting client's own word.
+   */
+  gradedBy?: 'server';
 }
 
-/** The `metrics` payload for a WorkoutScan of kind MIRROR_SCREEN_KIND. */
-export function storedScreen(screenId: string, screen: ScreenId, results: readonly CheckResult[], summary: ScreenResultSummary): StoredScreen {
-  return { screenId, screen, graded: isGraded(results), results: [...results], summary };
+/** What a stored row carries beyond the scored screen (MIRROR-COACH P3). */
+export interface StoredScreenExtras {
+  camera?: readonly RegradedCheck[];
+  provisional?: boolean;
+  selfReport?: readonly SelfReportEntry[];
+}
+
+/**
+ * The `metrics` payload for a WorkoutScan of kind MIRROR_SCREEN_KIND. The route passes `extras` (MIRROR-COACH P3); a
+ * caller without them (the tests' fixtures of older rows, the P1 dev route) writes the pre-P3 shape.
+ */
+export function storedScreen(
+  screenId: string, screen: ScreenId, results: readonly CheckResult[], summary: ScreenResultSummary, extras?: StoredScreenExtras,
+): StoredScreen {
+  const row: StoredScreen = { screenId, screen, graded: isGraded(results), results: [...results], summary };
+  if (!extras) return row;
+  row.gradedBy = 'server';
+  row.camera = [...(extras.camera ?? [])];
+  row.provisional = Boolean(extras.provisional);
+  if (extras.selfReport?.length) row.selfReport = [...extras.selfReport];
+  return row;
+}
+
+/**
+ * A stored row with the athlete's answers merged in (MIRROR-COACH P3, 2026-09-25): an answer given now replaces an
+ * earlier answer to the SAME question, other answers stay, and nothing else on the row changes — not the results, not
+ * the summary, not `graded` or `provisional`. That is the whole contract of an answer: kept, never scored. Null for a
+ * row that is not a screen (the route answers 404 rather than writing answers onto junk). Pure.
+ */
+export function withSelfReport(metrics: unknown, answers: readonly SelfReportEntry[]): StoredScreen | null {
+  if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) return null;
+  const m = metrics as Partial<StoredScreen>;
+  if (typeof m.screenId !== 'string' || !m.summary || typeof m.summary !== 'object' || !Array.isArray(m.results)) return null;
+  const screen: ScreenId = m.screen === 'full' ? 'full' : 'modified';
+  const merged = selfReportAnswersFor(screen, [...storedSelfReport(metrics), ...answers]);
+  return { ...(m as StoredScreen), selfReport: merged };
+}
+
+/** The answers a stored row carries, cleaned; [] for a row without any (every row stored before 2026-09-25). */
+export function storedSelfReport(metrics: unknown): SelfReportEntry[] {
+  if (!metrics || typeof metrics !== 'object') return [];
+  const m = metrics as { screen?: unknown; selfReport?: unknown };
+  return selfReportAnswersFor(m.screen === 'full' ? 'full' : 'modified', m.selfReport);
 }
 
 /**
@@ -66,6 +131,12 @@ function storedVariant(m: { screen?: unknown }, legacy: boolean): ScreenId {
  * not read from the row. A row stored before today carries the old scoring — one stable check out of eight stored as
  * score 100, "Nothing flagged", "Train normally" — and a reader that trusted it would repeat that to a coach. And a
  * legacy row's variant is 'modified' whatever its label (isLegacyStoredScreen).
+ *
+ * MIRROR-COACH P3 (2026-09-25): re-scored under today's rules, a result for a self-report or coach check on an older row
+ * is dropped (resultsForScreen keeps camera checks only), so a row whose only "result" was the breath station reads as
+ * not graded. The athlete's answers, the camera evidence and `gradedBy` ride through as stored; `gradedBy: 'server'`
+ * is what says the grades were re-checked by the server (isServerGradedScreen) — anything that UNLOCKS load from a
+ * screen must ask for it, because an older row's grades were whatever the posting client said.
  */
 export function readStoredScreen(metrics: unknown): StoredScreen | null {
   if (!metrics || typeof metrics !== 'object') return null;
@@ -78,7 +149,41 @@ export function readStoredScreen(metrics: unknown): StoredScreen | null {
   const screen = storedVariant(m, isLegacyStoredScreen(metrics));
   const results = resultsForScreen(screen, m.results);
   if (!results.length) return null;
-  return { screenId: String(m.screenId ?? ''), screen, graded: true, results, summary: scoreScreen(screen, results) };
+  const out: StoredScreen = { screenId: String(m.screenId ?? ''), screen, graded: true, results, summary: scoreScreen(screen, results) };
+  if (m.gradedBy === 'server') out.gradedBy = 'server';
+  if (Array.isArray(m.camera)) out.camera = m.camera;
+  if (typeof m.provisional === 'boolean') out.provisional = m.provisional;
+  const answers = storedSelfReport(metrics);
+  if (answers.length) out.selfReport = answers;
+  return out;
+}
+
+/**
+ * True for a row whose grades the SERVER worked out from grader summaries it re-checked (MIRROR-COACH P3, 2026-09-25).
+ * Every row written before today is false: the app had no grader, so any grade on one was the posting client's word.
+ *
+ * NOT THE MARKER ALONE (MIRROR-COACH P3 review, 2026-09-26): `gradedBy` is a field in a JSON row, and POST
+ * /api/v1/workout/scan stored any kind with the client's metrics — a `mirror_screen` row with `gradedBy: 'server'` and
+ * seven clean results read as a clean, server-checked screen. That route now writes only its own kind
+ * (lib/workout/movement-screen.ts SCAN_ROUTE_KINDS); and here the row must also carry the server's evidence (`camera`, the
+ * re-checked grades) and its results must be exactly what that evidence gives — which the screen route always stores.
+ * A row copied whole from a real screen still passes: this checks consistency, and only the write paths can check origin.
+ */
+export function isServerGradedScreen(metrics: unknown): boolean {
+  if (!metrics || typeof metrics !== 'object') return false;
+  const m = metrics as { gradedBy?: unknown; camera?: unknown; results?: unknown; screen?: unknown };
+  if (m.gradedBy !== 'server' || !Array.isArray(m.camera) || !Array.isArray(m.results)) return false;
+  const screen: ScreenId = m.screen === 'full' ? 'full' : 'modified';
+  const key = (r: CheckResult) => `${r.checkId}|${r.side ?? ''}|${r.grade}`;
+  try {
+    const fromEvidence = resultsForScreen(screen, m.camera
+      .map((c) => (c && typeof c === 'object' ? toCheckResult(c as StationGrade) : null))
+      .filter((r): r is CheckResult => r !== null)).map(key).sort();
+    const stored = resultsForScreen(screen, m.results).map(key).sort();
+    return fromEvidence.length === stored.length && fromEvidence.every((k, i) => k === stored[i]);
+  } catch {
+    return false;                                            // evidence that is not grades is no evidence
+  }
 }
 
 /**

@@ -16,7 +16,9 @@
 // provisional, and the athlete was told "Not enough of that was in frame to grade … Step back and run it again": a
 // retry loop that could never succeed, blaming their framing for a grader that does not exist. Zero checks is now its
 // own answer, decided FIRST — no pay, no score, no retry prompt — and the framing message is kept for a screen the
-// camera genuinely could not see.
+// camera genuinely could not see. (MIRROR-COACH P3 review, 2026-09-26: that framing message was the retry loop again
+// once P3's graders made "provisional" reachable; it is gone — PROVISIONAL_LINE, or the camera's own reasons via
+// ScreenRewardInput.readLine.)
 import { REASON } from '@/lib/wallet/reward-rules';
 import { NOT_GRADED_LINE } from './screen';
 
@@ -37,7 +39,22 @@ export interface ScreenRewardInput {
   provisional: boolean;
   /** How many checks actually came back. A screen that measured nothing is not a screen. */
   checksTaken: number;
+  /**
+   * What the camera read and why the rest was not read, in the athlete's words (lib/mirror/screenClaims.ts
+   * screenReadLine) — said instead of the fixed lines below for a provisional or unread screen (MIRROR-COACH P3 review,
+   * 2026-09-26).
+   */
+  readLine?: string;
 }
+
+/**
+ * A provisional screen, when no line from the camera's own reasons came with it. MIRROR-COACH P3 review (2026-09-26): it
+ * was "Not enough of that was in frame to grade, so it does not count yet. Step back and run it again." — P1 made that
+ * unreachable, P3 made it reachable again (provisional = under three checks read), and it was said aloud after a screen
+ * whose reasons were "come a little closer" or "more light": the same phone gives the same screen, so it sent the
+ * athlete round the whole screen again — the loop P1 removed. No retry prompt, no framing advice it cannot back.
+ */
+export const PROVISIONAL_LINE = 'Too little of that screen was read to count as a screen, so it pays nothing this time.';
 
 /** A screen has to have actually measured something. One station does not make a screen. */
 export const MIN_CHECKS_FOR_REWARD = 3;
@@ -49,13 +66,10 @@ export function decideScreenReward(input: ScreenRewardInput): ScreenRewardDecisi
   // on this input and went unused, which is what that field was always for.
   const key = `screen:${input.athleteId}:${input.screenId}`;
   if (input.checksTaken <= 0) {
-    return { pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key, message: NOT_GRADED_LINE };
+    return { pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key, message: input.readLine || NOT_GRADED_LINE };
   }
   if (input.provisional) {
-    return {
-      pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key,
-      message: 'Not enough of that was in frame to grade, so it does not count yet. Step back and run it again.',
-    };
+    return { pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key, message: input.readLine || PROVISIONAL_LINE };
   }
   if (input.checksTaken < MIN_CHECKS_FOR_REWARD) {
     return {

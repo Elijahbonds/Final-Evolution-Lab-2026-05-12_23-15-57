@@ -28,6 +28,9 @@ const NOT_IMPORTED: Record<string, string> = {
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.
   'lib/testing/sourceScan.ts': 'test support — imported by the rule tests that scan source, and tests are not counted as consumers',
+  // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
+  // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
+  'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */

@@ -130,6 +130,8 @@ export const BUILDER_ERROR_COPY: Record<string, string> = {
   exercise_not_found: 'That exercise is not in your catalogue.',
   exercise_logged: 'Your athlete has already logged this one, so it stays: their log and your review hang off it.',
   effort_band_adults_only: 'Full throttle is for adults. This athlete is under 18, or their birth year is not on file yet, so pick Surge or lower.',
+  // MIRROR-COACH P3 review (2026-09-26): owner decision #6 (builderServer.ts pinRefused)
+  pin_not_for_youth: 'Pin-and-stretch work is for adults. This athlete is under 18, or their birth year is not on file yet, so pick something that does not pin.',
   session_not_found: 'That session is not in this program.',
   tempo_format: 'Tempo is four numbers like 3-1-1-0.',
   direction_required: 'Move it up or down.',

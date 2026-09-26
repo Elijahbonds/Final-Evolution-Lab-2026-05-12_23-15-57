@@ -39,10 +39,12 @@ export function ClientsView() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (!selected) return; fetch(`/api/coach/messages?programId=${selected}`).then((r) => r.json()).then((j) => setThread(j.messages ?? [])); }, [selected]);
 
-  const builder = async (programId: string, body: Record<string, unknown>) => {
+  // true when the builder saved it (MIRROR-COACH P3: the screen panel marks a corrective "In Prep" only then)
+  const builder = async (programId: string, body: Record<string, unknown>): Promise<boolean> => {
     const r = await fetch(`/api/coach/programs/${programId}/exercises`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    if (!r.ok) { toast.error(`Builder: ${(await r.json()).error ?? r.status}`); return; }
+    if (!r.ok) { toast.error(`Builder: ${(await r.json().catch(() => ({}))).error ?? r.status}`); return false; }
     const j = await r.json(); setPrograms((ps) => ps?.map((p) => p.tree.id === programId ? { ...p, tree: j.tree } : p) ?? null);
+    return true;
   };
   const review = async (logId: string) => {
     const comment = comments[logId]?.trim(); if (!comment) return;

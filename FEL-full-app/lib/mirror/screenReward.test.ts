@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_CHECKS_FOR_REWARD, decideScreenReward } from './screenReward';
+import { MIN_CHECKS_FOR_REWARD, PROVISIONAL_LINE, decideScreenReward } from './screenReward';
 import { NOT_GRADED_LINE } from './screen';
 
 const base = { screenId: 's1', athleteId: 'a1', provisional: false, checksTaken: 6 };
@@ -12,11 +12,19 @@ describe('what a screen pays', () => {
     expect(decideScreenReward(base).idempotencyKey).toBe(d.idempotencyKey);   // a retry cannot pay twice
   });
 
-  it('a screen the camera could not grade pays NOTHING, and says why', () => {
+  // MIRROR-COACH P3 review (2026-09-26): this line was "Not enough of that was in frame to grade … Step back and run it
+  // again." — reachable again since P3 (provisional = under three checks read) and said aloud after a screen whose
+  // reasons were "come closer" or "more light". It now says what the camera read and why the rest was not
+  // (screenClaims.ts screenReadLine), or, with no such line, that it pays nothing — never a retry prompt.
+  it('a screen the camera could not grade pays NOTHING, says why, and never sends the athlete round again', () => {
     const d = decideScreenReward({ ...base, provisional: true });
     expect(d.pay).toBe(false);
-    expect(d.message).toMatch(/in frame/i);
-    expect(d.message).toMatch(/run it again/i);
+    expect(d.message).toBe(PROVISIONAL_LINE);
+    expect(d.message).not.toMatch(/step back|run it again|in frame/i);
+    const said = 'The camera read 2 checks (Hip level, Shoulder height). Most of the rest: x. Come a little closer to the phone.';
+    expect(decideScreenReward({ ...base, provisional: true, readLine: said }).message).toBe(said);
+    expect(decideScreenReward({ ...base, provisional: true, checksTaken: 0, readLine: said }).message).toBe(said);
+    expect(decideScreenReward({ ...base, provisional: true, checksTaken: 0 }).message).toBe(NOT_GRADED_LINE);
   });
 
   it('a couple of stations is not a screen', () => {

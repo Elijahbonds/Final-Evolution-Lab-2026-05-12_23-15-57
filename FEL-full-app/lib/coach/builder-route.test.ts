@@ -283,3 +283,30 @@ describe('the youth gate on adults-only bands', () => {
     expect((await build({ action: 'update', sessionExerciseId: id, sets: 4 })).status).toBe(200);
   });
 });
+
+// MIRROR-COACH P3 review (2026-09-26), owner decisions #6 and #20: no pin-and-stretch under 18 (and no birth year is youth
+// rules). The Mirror draft's one-tap add comes through this path, and a coach's "Calf pin and stretch" could reach a
+// youth client's Prep for a heel-line flag.
+describe('the youth gate on pin rows', () => {
+  beforeEach(() => {
+    h.store.pe.push({ id: 'pe-pin', coachId: 'coach-1', name: 'Calf pin and stretch', category: 'mobility' });
+  });
+
+  it('a pin row is refused for a client with no birth year or under 18, and allowed for an adult', async () => {
+    const add = () => build({ action: 'add', sessionId: SID, exerciseId: 'pe-pin', section: 'prep' });
+    expect(await add()).toEqual({ status: 400, json: { error: 'pin_not_for_youth' } });              // no birth year
+    h.store.user = [{ id: 'client-1', dobYear: new Date().getFullYear() - 15 }];
+    expect((await add()).json).toEqual({ error: 'pin_not_for_youth' });
+    h.store.user = [{ id: 'client-1', dobYear: 1990 }];
+    expect((await add()).status).toBe(200);
+    // a row that does not pin is fine for a youth client
+    h.store.user = [];
+    expect((await build({ action: 'add', sessionId: SID, exerciseId: 'pe-row', section: 'prep' })).status).toBe(200);
+  });
+
+  it('an edit that swaps a youth client\'s exercise for a pin row is refused', async () => {
+    await build({ action: 'add', sessionId: SID, exerciseId: 'pe-row', section: 'prep' });
+    const id = h.store.se[0].id;
+    expect((await build({ action: 'update', sessionExerciseId: id, exerciseId: 'pe-pin' })).json).toEqual({ error: 'pin_not_for_youth' });
+  });
+});

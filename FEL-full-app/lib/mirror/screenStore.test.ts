@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LEGACY_SCREEN_NOTE, RESCORED_SCREEN_NOTE, isLegacyStoredScreen, readStoredScreen, screenRowForExport, storedScreen, storedScreenId,
+  LEGACY_SCREEN_NOTE, RESCORED_SCREEN_NOTE, isLegacyStoredScreen, isServerGradedScreen, isUngradedStoredScreen, readStoredScreen,
+  screenRowForExport, storedScreen, storedScreenId, storedSelfReport, withSelfReport,
 } from './screenStore';
 import { MIRROR_SCREEN_KIND, NOT_GRADED_LINE, scoreScreen, type CheckResult } from './screen';
 import { prescribeFromScreen } from '../coach/mirrorToProgram';
+import type { RegradedCheck } from './screenClaims';
 
 const results: CheckResult[] = [
   { checkId: 'kneeWindow', grade: 'fail', side: 'left', source: 'camera' },
@@ -134,5 +136,73 @@ describe('rows stored before 2026-09-25', () => {
     expect(screenRowForExport(dunk)).toBe(dunk);
     const broken = { kind: MIRROR_SCREEN_KIND, metrics: { screenId: 's' } };
     expect(screenRowForExport(broken)).toBe(broken);
+  });
+});
+
+// MIRROR-COACH P3 (2026-09-25): rows carry the server's evidence and the athlete's answers; an answer is kept, never scored.
+describe('the P3 row: camera evidence, answers, and who graded it', () => {
+  const camera: RegradedCheck[] = [
+    { checkId: 'hipLevel', view: 'front', value: 0.01, unit: 'ratio', frames: 300, readableFrames: 300, note: 'Hips read level.', claimed: 'pass', status: 'pass' },
+    { checkId: 'heelLine', view: 'back', value: null, unit: 'deg', frames: 360, readableFrames: 2, note: 'Not read.', claimed: 'unreadable', status: 'unreadable', reason: 'tooFewFrames' },
+  ];
+  const cam: CheckResult[] = [{ checkId: 'hipLevel', grade: 'stable', source: 'camera' }];
+  const row = storedScreen('p3', 'full', cam, scoreScreen('full', cam), {
+    camera, provisional: true, selfReport: [{ questionId: 'lowerRibsWiden', checkId: 'ribAngle', answer: 'notSure' }],
+  });
+
+  it('the route\'s row says the server graded it, keeps every regraded claim (unreadable too) and the answers', () => {
+    expect(row).toMatchObject({ gradedBy: 'server', provisional: true, graded: true, screen: 'full' });
+    expect(row.camera).toEqual(camera);
+    expect(row.selfReport).toEqual([{ questionId: 'lowerRibsWiden', checkId: 'ribAngle', answer: 'notSure' }]);
+    expect(isServerGradedScreen(row)).toBe(true);
+    // a row written without extras (every row before today) is not server graded
+    expect(isServerGradedScreen(storedScreen('old', 'modified', cam, scoreScreen('modified', cam)))).toBe(false);
+    expect(storedScreen('old', 'modified', cam, scoreScreen('modified', cam))).not.toHaveProperty('gradedBy');
+  });
+
+  it('reads back through the JSON column with the answers, the evidence and gradedBy', () => {
+    const back = readStoredScreen(JSON.parse(JSON.stringify(row)))!;
+    expect(back.gradedBy).toBe('server');
+    expect(back.camera).toEqual(camera);
+    expect(back.provisional).toBe(true);
+    expect(storedSelfReport(back)).toEqual(row.selfReport);
+  });
+
+  it('withSelfReport: a new answer replaces the same question\'s, others stay, and NOTHING scored changes', () => {
+    const json = JSON.parse(JSON.stringify(row));
+    const next = withSelfReport(json, [
+      { questionId: 'lowerRibsWiden', checkId: 'ribAngle', answer: 'yes' },
+      { questionId: 'neckShouldersLift', checkId: 'ribAngle', answer: 'no' },
+    ])!;
+    expect(next.selfReport).toEqual([
+      { questionId: 'lowerRibsWiden', checkId: 'ribAngle', answer: 'yes' },
+      { questionId: 'neckShouldersLift', checkId: 'ribAngle', answer: 'no' },
+    ]);
+    const { selfReport: _a, ...restNext } = next; const { selfReport: _b, ...restBefore } = json;
+    void _a; void _b;
+    expect(restNext).toEqual(restBefore);                   // results, summary, graded, provisional, camera: untouched
+    expect(json.selfReport).toEqual(row.selfReport);         // and the stored object itself was not changed
+  });
+
+  it('withSelfReport refuses a row that is not a screen, and answers the row\'s screen never asked', () => {
+    for (const junk of [null, undefined, 'x', [], {}, { screenId: 's' }, { screenId: 's', summary: {} }]) {
+      expect(withSelfReport(junk, [{ questionId: 'lowerRibsWiden', checkId: 'ribAngle', answer: 'yes' }])).toBeNull();
+    }
+    const next = withSelfReport(JSON.parse(JSON.stringify(row)), [{ questionId: 'pelvicTilt', checkId: 'pelvicTilt', answer: 'yes' } as never])!;
+    expect(next.selfReport).toEqual(row.selfReport);
+  });
+
+  it('an older row whose only "result" was the breath station reads as NOT graded now (answers are never results)', () => {
+    const breathOnly = [{ checkId: 'ribAngle', grade: 'fail', source: 'camera' }] as CheckResult[];
+    const old = JSON.parse(JSON.stringify(storedScreen('b1', 'modified', breathOnly, scoreScreen('modified', breathOnly))));
+    expect(readStoredScreen(old)).toBeNull();
+  });
+
+  it('a past row stored with EMPTY results stays readable as "not graded" — P1\'s copy, no score', () => {
+    const empty = JSON.parse(JSON.stringify(storedScreen('e1', 'modified', [], scoreScreen('modified', []))));
+    expect(isUngradedStoredScreen(empty)).toBe(true);
+    expect(readStoredScreen(empty)).toBeNull();
+    expect(empty.summary).toMatchObject({ graded: false, score: null, triage: 'notGraded', headline: NOT_GRADED_LINE });
+    expect(storedSelfReport(empty)).toEqual([]);
   });
 });
