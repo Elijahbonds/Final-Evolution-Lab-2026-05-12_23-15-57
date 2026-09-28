@@ -32,22 +32,95 @@ async function api<T>(path: string, init?: RequestInit): Promise<T & { error?: s
 
 const STATUS_LABEL: Record<string, string> = { none: 'Not started', in_progress: 'In progress', certified: 'Certified facilitator', revoked: 'Revoked' };
 
+// ── The page's first load (QA P0-05, 2026-09-27) ─────────────────────────────
+// GET /api/v1/camp/assess and /plans answer 402 on purpose for an account without FEL Coach (lib/camp/server.ts
+// requirePaidFacilitator: the b2bPaywall body). The page read every failure as "no data yet", so Certify sat on
+// Loading… forever. A 402 now renders the paywall the server sent (what is gated, what stays free); any other failure
+// renders an error line and Retry. The gate itself is unchanged.
+
+/** The fields of the server's 402 body this page shows (lib/pro-guard b2bPaywall). */
+export interface CampPaywallBody { error: string; feature?: string; message?: string; free?: string }
+export interface CampLoad {
+  assess: AssessState | null; plans: Plan[] | null; templates: Template[] | null; me: string | null;
+  /** The paywall body when Camp's gated reads answered 402. */
+  gate: CampPaywallBody | null;
+  /** A failure that is not the paywall (a 500, the network): said, with Retry. */
+  error: string | null;
+}
+
+async function read(path: string): Promise<{ ok: boolean; status: number; body: unknown }> {
+  try {
+    const r = await fetch(path, { headers: { 'content-type': 'application/json' } });
+    const t = await r.text();
+    let body: unknown = null;
+    try { body = JSON.parse(t); } catch { /* a non-JSON answer is still an answer with a status */ }
+    return { ok: r.ok, status: r.status, body };
+  } catch {
+    return { ok: false, status: 0, body: null };
+  }
+}
+
+/** One load of the page's reads, with the paywall and any other failure told apart. */
+export async function loadCamp(): Promise<CampLoad> {
+  const [a, p, t, s] = await Promise.all([
+    read('/api/v1/camp/assess'), read('/api/v1/camp/plans'), read('/api/v1/camp/templates'), read('/api/auth/session'),
+  ]);
+  const walled = [a, p].find((r) => r.status === 402);
+  const failed = [a, p, t].find((r) => !r.ok && r.status !== 402);
+  return {
+    assess: a.ok ? (a.body as AssessState) : null,
+    plans: p.ok ? ((p.body as { plans?: Plan[] } | null)?.plans ?? []) : null,
+    templates: t.ok ? ((t.body as { templates?: Template[] } | null)?.templates ?? []) : null,
+    me: (s.body as { user?: { id?: string } } | null)?.user?.id ?? null,
+    gate: walled ? ({ error: 'pro_required', ...(walled.body && typeof walled.body === 'object' ? walled.body : {}) } as CampPaywallBody) : null,
+    error: failed ? `Camp could not load (${failed.status ? `error ${failed.status}` : 'no connection'}).` : null,
+  };
+}
+
+/** The paywall, from the server's own body. Its CTA never opens a checkout (Publish HOLD): there is no FEL Coach
+ *  upgrade page in the app yet, so it says so. */
+export function CampPaywall({ body }: { body: CampPaywallBody }) {
+  return (
+    <section data-testid="camp-paywall" className="rounded-xl border border-amber-300/30 bg-amber-300/[0.06] p-5">
+      <p className="flex items-center gap-2 text-sm font-bold text-amber-200"><Lock className="h-4 w-4" /> {body.feature ?? 'Camp'} is part of FEL Coach</p>
+      {body.message && <p className="mt-2 text-sm text-white/80">{body.message}</p>}
+      {body.free && <p className="mt-2 text-xs text-white/60">{body.free}</p>}
+      <span className="mt-4 inline-flex rounded-lg border border-amber-300/40 px-3 py-1.5 text-xs font-bold text-amber-200">FEL Coach · coming soon</span>
+    </section>
+  );
+}
+
+/** What a gated tab shows: the paywall, the error with Retry, or the tab. */
+export function CampGate({ gate, error, onRetry, children }: { gate: CampPaywallBody | null; error: string | null; onRetry: () => void; children: React.ReactNode }) {
+  if (gate) return <CampPaywall body={gate} />;
+  if (error) {
+    return (
+      <div data-testid="camp-error" className="flex items-center gap-3 text-xs text-white/70">
+        <span>{error}</span>
+        <button onClick={onRetry} className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300">Retry</button>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 export function CampView() {
   const [tab, setTab] = useState<Tab>('certify');
   const [assess, setAssess] = useState<AssessState | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [me, setMe] = useState<string | null>(null);
+  const [gate, setGate] = useState<CampPaywallBody | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [a, p, t, s] = await Promise.all([
-      api<AssessState>('/api/v1/camp/assess'), api<{ plans: Plan[] }>('/api/v1/camp/plans'),
-      api<{ templates: Template[] }>('/api/v1/camp/templates'), api<{ user?: { id?: string } }>('/api/auth/session'),
-    ]);
-    if (!a.error) setAssess(a);
-    if (!p.error) setPlans(p.plans ?? []);
-    if (!t.error) setTemplates(t.templates ?? []);
-    setMe(s.user?.id ?? null);
+    const l = await loadCamp();
+    if (l.assess) setAssess(l.assess);
+    if (l.plans) setPlans(l.plans);
+    if (l.templates) setTemplates(l.templates);
+    setMe(l.me);
+    setGate(l.gate);
+    setLoadError(l.error);
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -71,9 +144,9 @@ export function CampView() {
           </button>
         ))}
       </div>
-      {tab === 'certify' && <Certify state={assess} onDone={refresh} />}
-      {tab === 'plans' && <Plans plans={plans} me={me} certified={certified} onChange={refresh} />}
-      {tab === 'session' && <SessionTab plans={plans.filter((p) => p.status === 'active' && p.facilitatorUserId === me)} onChange={refresh} />}
+      {tab === 'certify' && <CampGate gate={gate} error={assess ? null : loadError} onRetry={() => void refresh()}><Certify state={assess} onDone={refresh} /></CampGate>}
+      {tab === 'plans' && <CampGate gate={gate} error={loadError} onRetry={() => void refresh()}><Plans plans={plans} me={me} certified={certified} onChange={refresh} /></CampGate>}
+      {tab === 'session' && <CampGate gate={gate} error={loadError} onRetry={() => void refresh()}><SessionTab plans={plans.filter((p) => p.status === 'active' && p.facilitatorUserId === me)} onChange={refresh} /></CampGate>}
       {tab === 'templates' && <Templates templates={templates} plans={plans.filter((p) => p.facilitatorUserId === me)} certified={certified} onChange={refresh} />}
       {tab === 'curriculum' && <Curriculum plans={plans} onChange={refresh} />}
     </main>
