@@ -13,6 +13,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
+import { CombatHudBand } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
 
 type Hud = Record<string, HudValue>;
 
@@ -91,7 +92,8 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {showHud && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between px-4 py-3 text-sm font-mono text-white">
+        <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''}>
+        <div className="flex justify-between px-4 py-3 text-sm font-mono text-white">
           <div className="flex flex-col gap-1">
             <span className="fel-panel px-2 py-0.5 text-cyan-300">HP {hnum(hud.hp, 100)}</span>
             <span className="fel-panel px-2 py-0.5 text-yellow-400">GUARD {hnum(hud.guard, 100)}</span>
@@ -108,13 +110,9 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
             <span className="fel-panel px-2 py-0.5 text-purple-400">FOE CHI {hnum(hud.foeChi, 0)}</span>
           </div>
         </div>
+        </CombatHudBand>
       )}
 
-      {typeof hud.banner === 'string' && hud.banner && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
-        </div>
-      )}
 
       <BootSplash
         modeId="showdown"
