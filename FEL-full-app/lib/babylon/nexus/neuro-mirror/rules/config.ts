@@ -32,10 +32,10 @@ export const ZONE_STATE_LABEL: Record<ZoneState, string> = {
 };
 
 export interface KinematicThresholds {
-  // ── Canister / core (rib-flare & lumbar-extension proxy) ──────────────────
-  // Horizontal (x) offset between the thoracic (shoulder-midpoint) and pelvic
-  // (hip-midpoint) points, expressed as a fraction of torso length. Larger =
-  // more lateral trunk shift / estimated canister drift.
+  // ── Trunk offset (sideways shoulder-over-hip proxy) ───────────────────────
+  // Horizontal (x) offset between the shoulder midpoint and the hip midpoint,
+  // expressed as a fraction of torso length. Larger = more lateral trunk shift.
+  // Not a rib or lumbar read: there is no rib or abdominal landmark to read.
   trunkLateralOffsetWarnRatio: number;   // //TUNE(elijah)
   trunkLateralOffsetFaultRatio: number;  // //TUNE(elijah)
 
@@ -69,34 +69,40 @@ export interface KinematicThresholds {
   minLandmarkVisibility: number;         // //TUNE(elijah)
 }
 
-// Production v1 thresholds. Calibrated from biomechanical literature + field testing.
-// (See lib/babylon/nexus/neuro-mirror/TUNING_LOG.md for rationale)
+// v1 thresholds — PLACEHOLDER THRESHOLDS, TO BE TUNED ON RECORDED FIXTURES. Nothing here has been calibrated yet.
+//
+// MIRROR-COACH P1 (2026-09-25). This block used to claim its numbers came out of the biomechanics
+// literature and field testing, sent the reader to a tuning-log markdown file beside this one for the rationale (no
+// such file has ever existed in this repo), and credited the 15% trunk-offset number to a named author group with no
+// source attached. It also dressed several numbers as findings (a "safe" depth, a muscle "shutting down", "trap
+// dominance", an earlier value "increased for stability") with no recording or log behind any of them. The VALUES are
+// unchanged — changing them without footage would be the same mistake the other way — but every comment now says
+// only what the number is compared against. Each one is a starting guess until it is tuned against recorded,
+// labelled fixtures, and the header's //TUNE(elijah) marks stand. config.test.ts keeps this block honest.
 export const DEFAULT_THRESHOLDS: KinematicThresholds = {
-  // ─── Core / canister (rib-flare & lumbar extension) ───────────────────────
-  // Trunk lateral offset is a proxy for spinal neutral loss. Ratio > 15% = drift warning.
-  trunkLateralOffsetWarnRatio: 0.15,   // 15% lateral shift = drift warning (Neumann et al.)
-  trunkLateralOffsetFaultRatio: 0.25,  // 25% = fault (out-of-band trunk control)
+  // ─── Trunk offset: shoulder-midpoint vs hip-midpoint, sideways (x), as a fraction of torso length ──────────
+  // A 2-D offset between two landmark midpoints. It is NOT a rib, rib-flare or lumbar measurement: the pose model
+  // has no rib or abdominal landmark.
+  trunkLateralOffsetWarnRatio: 0.15,   // placeholder
+  trunkLateralOffsetFaultRatio: 0.25,  // placeholder
 
-  // ─── Upper trap (shoulder elevation / shrug) ─────────────────────────────
-  // Shoulder elevation during PULL phase indicates trap dominance. Clean rows keep shoulders depressed.
-  shoulderElevationWarnDeg: 8,         // 8° = early fatigue/compensation warning
-  shoulderElevationFaultDeg: 15,       // 15° = excessive shrug (lat non-engagement)
+  // ─── Shoulder elevation (shrug proxy) during the PULL phase, degrees ───────────────────────────────────
+  shoulderElevationWarnDeg: 8,         // placeholder
+  shoulderElevationFaultDeg: 15,       // placeholder
 
-  // ─── Posterior chain / lat-rhomboid (elbow-path reference band) ──────────
-  // Elbow flexion angle stable band: 80–150° for clean press-row (shoulder height ≈ 90°).
-  elbowFlexStableMinDeg: 80,           // minimum safe depth (avoids hyperextension)
-  elbowFlexStableMaxDeg: 150,          // maximum safe lockout approach (avoids overextension)
-  // Elbow flare: how far the elbow rises off the ribcage (as fraction of torso length).
-  elbowFlareWarnRatio: 0.18,           // 18% flare = drift from tight elbow path
-  elbowFlareFaultRatio: 0.32,          // 32% flare = loss of tension, lat/rhomboid shutdown
+  // ─── Elbow flexion band for a press/row rep, degrees ──────────────────────────────────────────────────
+  elbowFlexStableMinDeg: 80,           // placeholder
+  elbowFlexStableMaxDeg: 150,          // placeholder
+  // Elbow flare: how far the elbow rises toward the shoulder line, as a fraction of torso length.
+  elbowFlareWarnRatio: 0.18,           // placeholder
+  elbowFlareFaultRatio: 0.32,          // placeholder
 
-  // ─── Phase detection ──────────────────────────────────────────────────────
-  // Elbow angular velocity threshold for phase classification (pull vs press).
-  pullPhaseElbowVelDegPerSec: 30,      // 30°/s = clear pull phase (was 25; increased for stability)
+  // ─── Phase detection: elbow angular speed (deg/s) that counts as a pull or a press ─────────────────────
+  pullPhaseElbowVelDegPerSec: 30,      // placeholder
 
-  // ─── Signal conditioning ──────────────────────────────────────────────────
-  // EMA smoothing: higher alpha = more responsive to real movement (less lag).
-  angleSmoothingAlpha: 0.42,           // 0.42 = good balance (responsive, not jittery)
-  // MediaPipe visibility floor: landmarks below this are "not seen" (avoid phantom data).
-  minLandmarkVisibility: 0.55,         // 0.55 = high confidence (was 0.5; increased for robustness)
+  // ─── Signal conditioning ──────────────────────────────────────────────────────────────────────────────
+  // EMA smoothing: higher alpha follows movement faster and passes more landmark jitter.
+  angleSmoothingAlpha: 0.42,           // placeholder
+  // MediaPipe visibility floor: a landmark below this is treated as not seen.
+  minLandmarkVisibility: 0.55,         // placeholder
 };

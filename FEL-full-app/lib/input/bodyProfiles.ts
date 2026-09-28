@@ -56,6 +56,9 @@ export interface ModeBodySpec {
   /** The floor drops every binding whose `from` is claimed; onBody receives the claimed EVENT kinds. 'overhead' ⇒ overheadIsPlay. */
   claims?: readonly BodyClaim[];
   overheadIsPlay?: boolean;
+  /** MOVEMENT PLAY P7 (2026-09-25): the card's move → verb lines when the mode reads the body itself (its claims press
+   *  nothing on the floor, so cardLines(profile) would show none). */
+  lines?: readonly CardLine[];
 }
 
 export const MOVE_LABEL: Record<BodyBinding['from'], string> =
@@ -81,6 +84,10 @@ const ROWS: readonly BodyProfile[] = [
   //    BLADE (:430-434): session-only. VS and Showdown gate input to `fighting` (:683, :431); Mixed's loadout only
   //    STARTS the round on A / B / Y with the current pick (:751-754), and its resting-stick STAFF pick (:743) cannot
   //    fire (the floor never writes y). R1 and SELECT are never bound.
+  //    P7 (2026-09-25): VS, Mixed and Showdown read the body's OWN strikes, guard, slips and steps (their onBody claims
+  //    FIGHT_CLAIMS, punch and kick included, so these three rows press nothing while the mode's flag is on — they are
+  //    what the game falls back to if its flag goes off: lib/babylon/combat/bodyFightFlags). Duel and The Hundred stay
+  //    session-only ("coming") until the live probe measures 0 misfires in them.
   none('karate', 'karate', 'combat', 'P7', false),
   row({ key: 'karate_vs', modeId: 'karate-vs', family: 'combat', later: 'P7', overheadIsPlay: false, bindings: [
     { from: 'punch', to: 'A', verb: 'JAB' }, { from: 'kick', to: 'B', verb: 'KICK' },
@@ -189,5 +196,13 @@ export const SESSION_LINES: readonly CardLine[] = [
   { move: 'Step out of frame', verb: 'Pause' },
 ];
 export const PAUSE_NOTE = 'Stepping out pauses only while your body is playing, never while you play with a controller.';
-export const SESSION_ONLY_COPY = "This game doesn't read your moves yet. Raise both hands to start it or bring it back from a pause; play with your controller or touch.";
+/**
+ * MOVEMENT PLAY P4 (2026-09-25): a game the body does not drive yet does not offer body play (the owner's call: its
+ * READY screen says it is coming, and the Body button never starts the camera there), so its card no longer promises
+ * the hands-up START P3 gave it. COMING_COPY is the READY screen's line; the card adds what to play with meanwhile.
+ */
+export const COMING_COPY = 'Body play is coming to this game.';
+export const SESSION_ONLY_COPY = `${COMING_COPY} For now, play with your controller or touch.`;
+/** A game with no body-play phase (a quiz, a game with no plan yet): the Body card says how it is played. */
+export const UNAVAILABLE_COPY = 'This game is played with your controller or touch.';
 export const NO_MODE_COPY = 'Open a game to see its moves.';

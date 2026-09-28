@@ -12,9 +12,16 @@
 // its body play later reads the packet itself (ctx.body, onBody).
 //
 // Driven by the frames themselves (PoseService.onFrame), not a render loop: a packet per camera frame, stamped with the
-// frame's arrival. The reader calibrates itself on a still stand; the Body card says "Stand still, whole body in frame"
-// until it has. Whenever the source stops being this body — switched off, re-centred, the camera refused or gone — a
+// frame's arrival. Whenever the source stops being this body — switched off, re-centred, the camera refused or gone — a
 // FINAL packet goes out: every running mode lets go of whatever the body held, and nothing pauses.
+//
+// MOVEMENT PLAY P4 (2026-09-25): THE SPACE CHECK GATES THE SOURCE. The reader used to calibrate itself on any still
+// stand, so a player standing still beside the laptop took the rulers there (the map's "calibration is not a space
+// check, and a bad calibration starts the game"). It no longer calibrates itself: its rulers come only from the space
+// check (lib/move/bodyPlay → setCalibration), and until then every read is uncalibrated — the floor presses nothing and
+// the hands-up START cannot fire (the session wakes a calibrated body only), so nothing reaches a game before the check
+// passes. start({ autoCalibrate: true }) keeps the old self-calibrating reader for the dev probe (__FEL_BODY__) and
+// tests alone; no player path passes it (poseSource.test scans for it).
 //
 // It stays code-split where it matters: PoseService imports the adapter, and the adapter imports the MediaPipe package
 // (and the wasm and model download) only when a camera actually starts.
@@ -22,6 +29,7 @@
 import { publishBodyToLive, type BodyPacket } from '../babylon/core/InputBus';
 import { agentEnabled } from '../babylon/core/AgentBridge';
 import { BodyReader, type BodyRead } from '../pose/BodyReader';
+import type { Calibration } from '../pose/calibrate';
 import { ChannelReader, type BodyChannels } from '../pose/bodyChannels';
 import { feedHookAllowed } from '../pose/feed';
 import { poseService, type PoseService, type PoseStatus } from '../pose/PoseService';
@@ -54,9 +62,12 @@ function absentRead(t: number): BodyRead {
   };
 }
 
+/** How the source reads: the check-gated reader (the default), or one that calibrates itself (the dev probe, tests). */
+export interface PoseSourceStartOptions { autoCalibrate?: boolean }
+
 export class PoseSource {
   private active = false;
-  private readonly reader = new BodyReader();
+  private reader = new BodyReader({ autoCalibrate: false });
   private readonly channels = new ChannelReader();
   /** A packet has gone out since the last final one: a stop or a re-centre must tell the running mode to let go. */
   private published = false;
@@ -79,6 +90,8 @@ export class PoseSource {
 
   get snapshot(): PoseSourceSnapshot { return this.snap; }
   get state(): PoseSourceState { return this.snap.state; }
+  /** The rulers the reader reads with now (the space check's), or null until it has them. */
+  get calibration(): Calibration | null { return this.reader.calibration; }
 
   /** Every change of state or body, for as many views as want it (GameShell shows two Body buttons). */
   listen = (fn: (s: PoseSourceSnapshot) => void): (() => void) => {
@@ -86,10 +99,14 @@ export class PoseSource {
     return () => { this.listeners.delete(fn); };
   };
 
-  /** Start the camera (PoseService) and read every frame it gives into the body channel. */
-  async start(): Promise<boolean> {
+  /**
+   * Start the camera (PoseService) and read every frame it gives into the body channel. The reader waits for the space
+   * check's rulers (setCalibration) unless `autoCalibrate` (the dev probe, tests): a fresh one each start.
+   */
+  async start(opts: PoseSourceStartOptions = {}): Promise<boolean> {
     if (this.active) return true;
     this.active = true;
+    this.reader = new BodyReader({ autoCalibrate: opts.autoCalibrate ?? false });
     this.offStatus = this.service.onStatus(this.onStatus);
     this.offFrame = this.service.onFrame(this.onFrame);
     const ok = await this.service.start();
@@ -97,6 +114,16 @@ export class PoseSource {
     // The feed can take over a start still in flight; that start says false, but frames are coming.
     this.onStatus(this.service.status);
     return ok || this.service.status.state === 'live';
+  }
+
+  /**
+   * The space check passed: read with its rulers from the next frame (the stand's floor line, hip height, metre rulers
+   * and lens pitch). The channels start clean, so a hold counted before is not carried into the calibrated body.
+   */
+  setCalibration(cal: Calibration): void {
+    this.reader.setCalibration(cal);
+    this.channels.reset();
+    if (this.active && this.service.status.state === 'live') this.update({ state: 'live' });
   }
 
   /** Retake the stand — people move, and they move the phone. The running mode lets go first (a final packet). */
@@ -237,7 +264,9 @@ export function holdSharedPoseSource(): () => void {
  * build on this machine with ?agent=1 — never the deployed site, where scripted frames would make body play nobody did.
  */
 export interface BodyHook {
-  start(): Promise<boolean>;
+  /** The probe's Body button. MOVEMENT PLAY P4: `{ autoCalibrate: true }` keeps P3's self-calibrating reader for the
+   *  seam probe; without it the source waits for the space check, as the player's does. */
+  start(opts?: PoseSourceStartOptions): Promise<boolean>;
   stop(): void;
   snapshot(): PoseSourceSnapshot;
 }
@@ -248,7 +277,7 @@ declare global {
 
 if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
   window.__FEL_BODY__ = {
-    start: () => sharedPoseSource().start(),
+    start: (opts?: PoseSourceStartOptions) => sharedPoseSource().start(opts),
     stop: () => sharedPoseSource().stop(),
     snapshot: () => sharedPoseSource().snapshot,
   };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { accessRole, leadingNumber, needsReview, nextSession, orderedSessions, progressSeries, validateExerciseSpec, validateLog, validateMessage, type ProgramTree } from './loop';
+import { accessRole, leadingNumber, mergeSpecUpdate, needsReview, nextSession, orderedSessions, progressSeries, specInputFromRow, validateExerciseSpec, validateLog, validateMessage, type CleanExerciseSpec, type ProgramTree } from './loop';
+import { STRUCTURE_DEFAULTS } from './structure';
 
 const tree: ProgramTree = {
   id: 'p1', name: 'Vertical block', coachId: 'coach', clientId: 'client',
@@ -36,9 +37,48 @@ describe('logs and prescriptions are clamped, never trusted', () => {
   });
   it('a prescription needs its exercise, defaults sensibly and checks the tempo format', () => {
     expect(validateExerciseSpec({})).toEqual({ ok: false, error: 'exercise_required' });
-    expect(validateExerciseSpec({ exerciseId: 'e1' })).toEqual({ ok: true, spec: { exerciseId: 'e1', sets: 3, reps: '8-10', load: 'RPE7', tempo: '3-1-1-0', restSeconds: 90, coachNote: null } });
+    // MIRROR-COACH P2: the structure fields ride along at their schema defaults when nothing is sent
+    expect(validateExerciseSpec({ exerciseId: 'e1' })).toEqual({ ok: true, spec: { exerciseId: 'e1', sets: 3, reps: '8-10', load: 'RPE7', tempo: '3-1-1-0', restSeconds: 90, coachNote: null, ...STRUCTURE_DEFAULTS } });
     expect(validateExerciseSpec({ exerciseId: 'e1', tempo: 'slow' })).toEqual({ ok: false, error: 'tempo_format' });
     expect(validateExerciseSpec({ exerciseId: 'e1', sets: 0, restSeconds: 9999 })).toMatchObject({ ok: true, spec: { sets: 1, restSeconds: 600 } });
+  });
+  it('a prescription carries its structure, refuses a bad structure value, and gives a timed dose its seconds as reps', () => {
+    const r = validateExerciseSpec({ exerciseId: 'e1', section: 'finish', supersetGroup: 'b', workSeconds: 40, holdSeconds: 5, setupCues: ['crush-handle'], effortBand: 'drive' });
+    expect(r).toMatchObject({ ok: true, spec: { section: 'finish', isKeySet: false, supersetGroup: 'B', workSeconds: 40, holdSeconds: 5, setupCues: ['crush-handle'], effortBand: 'drive', reps: '40 s' } });
+    expect(validateExerciseSpec({ exerciseId: 'e1', workSeconds: 40, reps: '40 s each side' })).toMatchObject({ ok: true, spec: { reps: '40 s each side' } });
+    // a reps text that does not state the timer's seconds is replaced, so no reader shows "3×8-10" for a 40 s carry
+    expect(validateExerciseSpec({ exerciseId: 'e1', workSeconds: 40, reps: '8-10' })).toMatchObject({ ok: true, spec: { reps: '40 s' } });
+    // FLIPPED IN THE P2 REVIEW (2026-09-26): the text after the seconds survives a new timer ("each side" is half the
+    // work per set if it is lost); only the seconds are re-stated
+    expect(validateExerciseSpec({ exerciseId: 'e1', workSeconds: 40, reps: '30 s each side' })).toMatchObject({ ok: true, spec: { reps: '40 s each side' } });
+    expect(validateExerciseSpec({ exerciseId: 'e1', workSeconds: 40, reps: '30s per arm' })).toMatchObject({ ok: true, spec: { reps: '40 s per arm' } });
+    // a load the coach cleared is no load; one never sent is still the schema's default
+    expect(validateExerciseSpec({ exerciseId: 'e1', load: '' })).toMatchObject({ ok: true, spec: { load: '' } });
+    expect(validateExerciseSpec({ exerciseId: 'e1', load: null })).toMatchObject({ ok: true, spec: { load: '' } });
+    expect(validateExerciseSpec({ exerciseId: 'e1' })).toMatchObject({ ok: true, spec: { load: 'RPE7' } });
+    expect(validateExerciseSpec({ exerciseId: 'e1', section: 'warmup' })).toEqual({ ok: false, error: 'section_unknown' });
+    expect(validateExerciseSpec({ exerciseId: 'e1', section: 'prep', isKeySet: true })).toEqual({ ok: false, error: 'key_set_outside_key' });
+    expect(validateExerciseSpec({ exerciseId: 'e1', effortBand: 'max' })).toEqual({ ok: false, error: 'effort_band_unknown' });
+  });
+  it('an edit changes only what it sends (it used to reset every field it left out to the default)', () => {
+    const row: CleanExerciseSpec = { exerciseId: 'e1', sets: 4, reps: '5', load: '100kg', tempo: '2-0-1-0', restSeconds: 150, coachNote: 'Own the bottom.',
+      section: 'key', isKeySet: true, supersetGroup: null, workSeconds: null, holdSeconds: 2, setupCues: ['wall-behind'], effortBand: 'surge' };
+    expect(validateExerciseSpec(specInputFromRow(row))).toEqual({ ok: true, spec: row });
+    const v = validateExerciseSpec(mergeSpecUpdate(row, { action: 'update', sessionExerciseId: 'se1', sets: 5 }));
+    expect(v).toEqual({ ok: true, spec: { ...row, sets: 5 } });
+    // the old behaviour, for the record: the body alone loses the reps, load, tempo, rest, note and all structure
+    expect(validateExerciseSpec({ exerciseId: 'e1', sets: 5 })).toMatchObject({ ok: true, spec: { reps: '8-10', load: 'RPE7', coachNote: null, isKeySet: false } });
+  });
+  it('an edit that moves the key set out of Key clears the flag; turning a timer on or off re-derives untyped reps', () => {
+    const row: CleanExerciseSpec = { exerciseId: 'e1', sets: 3, reps: '8', load: 'RPE7', tempo: '3-1-1-0', restSeconds: 90, coachNote: null, ...STRUCTURE_DEFAULTS, isKeySet: true };
+    expect(validateExerciseSpec(mergeSpecUpdate(row, { section: 'assist' }))).toMatchObject({ ok: true, spec: { section: 'assist', isKeySet: false } });
+    expect(validateExerciseSpec(mergeSpecUpdate(row, { section: 'assist', isKeySet: true }))).toEqual({ ok: false, error: 'key_set_outside_key' });
+    const timed = validateExerciseSpec(mergeSpecUpdate(row, { workSeconds: 45 }));
+    expect(timed).toMatchObject({ ok: true, spec: { workSeconds: 45, reps: '45 s' } });
+    const back = validateExerciseSpec(mergeSpecUpdate({ ...row, workSeconds: 45, reps: '45 s' }, { workSeconds: null }));
+    expect(back).toMatchObject({ ok: true, spec: { workSeconds: null, reps: '8-10' } });
+    // a coach's own reps text on a timed row is theirs: turning the timer off keeps it
+    expect(validateExerciseSpec(mergeSpecUpdate({ ...row, workSeconds: 30, reps: '30 s each side' }, { workSeconds: null }))).toMatchObject({ ok: true, spec: { reps: '30 s each side' } });
   });
   it('messages are trimmed and bounded', () => {
     expect(validateMessage('  hi ')).toBe('hi'); expect(validateMessage('')).toBeNull(); expect(validateMessage('a'.repeat(3000))?.length).toBe(2000);

@@ -1,0 +1,5475 @@
+{
+ "pack": "fel_flip",
+ "version": "1.0.0",
+ "date": "2026-09-25",
+ "sampleRate": 44100,
+ "statement": "100% original, generated from code by FEL (fel_synth + flip_* modules). No samples, no third-party audio, no recognisable melodies. Spoken chops are Kokoro-82M synthetic voices rendered locally; no real person.",
+ "licence": "FEL original, generated",
+ "themeCandidates": [
+  "theme_a_sunday_tape",
+  "theme_b_skyline",
+  "theme_c_dust_strings"
+ ],
+ "themeDefault": "theme_a_sunday_tape",
+ "finder": {
+  "windowMs": 10,
+  "minGapMs": 80,
+  "ratio": 2.2,
+  "gate": 0.02,
+  "maxSlices": 16,
+  "note": "onsets = Flip.ts onsetSlices on the decoded file at 44.1 kHz (identical at 48 kHz)"
+ },
+ "decoding": {
+  "lengthField": "samples",
+  "decoderDelayConvention": 529,
+  "note": "a decoder that returns more than `samples` added LAME priming at the START: trim encoderDelay + 529 samples there, then cut to `samples`"
+ },
+ "banks": [
+  {
+   "id": "bank_kit_fel",
+   "title": "FEL Kit",
+   "pads": [
+    "hit_kick_dusty",
+    "hit_snare_crack",
+    "hit_rim_wood",
+    "hit_conga_slap",
+    "hit_bass_pluck_a",
+    "hit_bass_slap_e",
+    "stab_ep_cm9",
+    "stab_saw_dm7",
+    "stab_organ_g7",
+    "stab_strings_ebmaj7",
+    "stab_clav_am7",
+    "hit_horn_bap",
+    "hit_horn_fall",
+    "hit_orch",
+    null,
+    null
+   ]
+  },
+  {
+   "id": "bank_vox_bright",
+   "title": "Vox Chops (bright)",
+   "pads": [
+    "chop_hey_bright",
+    "chop_uh_bright",
+    "chop_yeah_bright",
+    "chop_go_bright",
+    "chop_letsgo_bright",
+    "chop_one_bright",
+    "chop_two_bright",
+    "chop_checkit_bright",
+    "chop_fel_bright",
+    "chop_ooh_bright",
+    "chop_go_stutter",
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  },
+  {
+   "id": "bank_vox_deep",
+   "title": "Vox Chops (deep)",
+   "pads": [
+    "chop_hey_deep",
+    "chop_uh_deep",
+    "chop_yeah_deep",
+    "chop_go_deep",
+    "chop_letsgo_deep",
+    "chop_one_deep",
+    "chop_two_deep",
+    "chop_checkit_deep",
+    "chop_fel_deep",
+    "chop_ooh_deep",
+    "chop_yeah_low",
+    "chop_fel_radio",
+    null,
+    null,
+    null,
+    null
+   ]
+  },
+  {
+   "id": "bank_vox_warm",
+   "title": "Vox Chops (warm)",
+   "pads": [
+    "chop_hey_warm",
+    "chop_uh_warm",
+    "chop_yeah_warm",
+    "chop_go_warm",
+    "chop_letsgo_warm",
+    "chop_one_warm",
+    "chop_two_warm",
+    "chop_checkit_warm",
+    "chop_fel_warm",
+    "chop_ooh_warm",
+    "chop_hey_high",
+    "chop_ooh_tuned",
+    "chop_ooh_swell",
+    null,
+    null,
+    null
+   ]
+  }
+ ],
+ "items": [
+  {
+   "id": "theme_a_sunday_tape",
+   "file": "audio/theme_a_sunday_tape.mp3",
+   "kind": "theme",
+   "title": "Sunday Tape",
+   "bpm": 90,
+   "key": "Eb major",
+   "bars": 4,
+   "loop": true,
+   "swing": 0.54,
+   "candidate": "a",
+   "character": "Soulful Eb: warm electric-piano chords, a two-horn section answering, late-night and hopeful.",
+   "lesson": {
+    "playInOrder": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "flipPattern": [
+     0,
+     null,
+     null,
+     11,
+     null,
+     null,
+     7,
+     null,
+     null,
+     null,
+     3,
+     null,
+     4,
+     null,
+     null,
+     null
+    ],
+    "tip": "Pads 1 to 16 in order play the theme. Flip it: 1, 12 and 8 on a 3-3-2, then let the horns on 4 and 5 answer."
+   },
+   "durationSec": 10.666667,
+   "samples": 470400,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.51,
+    1,
+    1.67,
+    2,
+    2.67,
+    3.33,
+    3.85,
+    4.33,
+    5.33,
+    5.85,
+    6.33,
+    7,
+    7.33,
+    8,
+    9
+   ],
+   "suggestedPads": [
+    0,
+    0.51,
+    1,
+    1.67,
+    2,
+    2.67,
+    3.33,
+    3.85,
+    4.33,
+    5.33,
+    5.85,
+    6.33,
+    7,
+    7.33,
+    8,
+    9
+   ],
+   "tags": [
+    "theme",
+    "soul",
+    "keys",
+    "horns",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2496
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_themes.py",
+    "seed": 32266,
+    "sha256": "cea48d7cfdc382fa414c652eedf10b70874bb4245a977b1ee41ea3f4e593b2e9",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "31dcd6b72aaed21b950d2be93068c48f011f5bbf39400cab415c79cd8c0440d7",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "theme_b_skyline",
+   "file": "audio/theme_b_skyline.mp3",
+   "kind": "theme",
+   "title": "Skyline Anthem",
+   "bpm": 100,
+   "key": "D major",
+   "bars": 4,
+   "loop": true,
+   "candidate": "b",
+   "character": "Bright D-major synth-brass anthem: stacked brass stabs under a heroic lead that climbs to bar 4.",
+   "lesson": {
+    "playInOrder": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14
+    ],
+    "flipPattern": [
+     0,
+     null,
+     null,
+     12,
+     null,
+     null,
+     11,
+     null,
+     null,
+     7,
+     null,
+     null,
+     14,
+     null,
+     null,
+     null
+    ],
+    "tip": "Pads 1 to 15 in order play the anthem. Flip it: 1, jump to the peak on 13, fall through 12 and 8, then land on 15."
+   },
+   "durationSec": 9.6,
+   "samples": 423360,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.45,
+    0.9,
+    1.5,
+    2.4,
+    2.85,
+    3.3,
+    3.9,
+    4.8,
+    5.25,
+    5.7,
+    6.3,
+    7.2,
+    7.8,
+    8.4
+   ],
+   "suggestedPads": [
+    0,
+    0.45,
+    0.9,
+    1.5,
+    2.4,
+    2.85,
+    3.3,
+    3.9,
+    4.8,
+    5.25,
+    5.7,
+    6.3,
+    7.2,
+    7.8,
+    8.4
+   ],
+   "tags": [
+    "theme",
+    "anthem",
+    "brass",
+    "synth",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2304
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_themes.py",
+    "seed": 32267,
+    "sha256": "3442b3368ff618e100e54df5dc466228a19e003cea4b58602e81a4ab5078a076",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "31dcd6b72aaed21b950d2be93068c48f011f5bbf39400cab415c79cd8c0440d7",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "theme_c_dust_strings",
+   "file": "audio/theme_c_dust_strings.mp3",
+   "kind": "theme",
+   "title": "Dust & Strings",
+   "bpm": 96,
+   "key": "A minor",
+   "bars": 4,
+   "loop": true,
+   "swing": 0.56,
+   "candidate": "c",
+   "character": "Dusty A-minor flute over plucked strings: cinematic, a little wistful, like an old film reel.",
+   "lesson": {
+    "playInOrder": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15
+    ],
+    "flipPattern": [
+     0,
+     null,
+     null,
+     5,
+     null,
+     null,
+     10,
+     null,
+     null,
+     null,
+     7,
+     null,
+     null,
+     15,
+     null,
+     null
+    ],
+    "tip": "Pads 1 to 16 in order play the theme. Flip it: 1, 6, 11, the pizz on 8, then 16 leads you back to 1."
+   },
+   "durationSec": 10,
+   "samples": 441000,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.49,
+    0.94,
+    1.56,
+    2.5,
+    2.99,
+    3.44,
+    4.06,
+    5,
+    5.49,
+    5.94,
+    6.56,
+    7.5,
+    8.12,
+    8.75,
+    9.37
+   ],
+   "suggestedPads": [
+    0,
+    0.49,
+    0.94,
+    1.56,
+    2.5,
+    2.99,
+    3.44,
+    4.06,
+    5,
+    5.49,
+    5.94,
+    6.56,
+    7.5,
+    8.12,
+    8.75,
+    9.37
+   ],
+   "tags": [
+    "theme",
+    "cinematic",
+    "flute",
+    "strings",
+    "dusty"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 1944
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_themes.py",
+    "seed": 32268,
+    "sha256": "c4601cc2912b9e0a3c66e7f344900d5b427fd6243db27e30a8fcd91581105775",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "31dcd6b72aaed21b950d2be93068c48f011f5bbf39400cab415c79cd8c0440d7",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_arp_pluck",
+   "file": "audio/loop_arp_pluck.mp3",
+   "kind": "loop",
+   "title": "Night Arp",
+   "bpm": 120,
+   "key": "A minor",
+   "bars": 2,
+   "loop": true,
+   "durationSec": 4,
+   "samples": 176400,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.25,
+    0.5,
+    0.75,
+    1,
+    1.25,
+    1.5,
+    1.75,
+    2,
+    2.25,
+    2.5,
+    2.75,
+    3,
+    3.25,
+    3.5,
+    3.75
+   ],
+   "suggestedPads": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1,
+    1.25,
+    1.5,
+    1.75,
+    2,
+    2.25,
+    2.5,
+    2.75,
+    3,
+    3.25,
+    3.5,
+    3.75
+   ],
+   "tags": [
+    "arp",
+    "synth",
+    "pluck",
+    "night"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2736
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4104,
+    "sha256": "f215af2c5a045a008b021a21c1598648cc9c2292a66996096fa8d84cc6d4234a",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_bass_riff",
+   "file": "audio/loop_bass_riff.mp3",
+   "kind": "loop",
+   "title": "Pocket Bass",
+   "bpm": 98,
+   "key": "Bb minor",
+   "bars": 2,
+   "loop": true,
+   "durationSec": 4.897959,
+   "samples": 216000,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.46,
+    1.22,
+    1.53,
+    2.14,
+    2.45,
+    2.91,
+    3.67,
+    3.98,
+    4.28
+   ],
+   "suggestedPads": [
+    0,
+    0.46,
+    1.22,
+    1.53,
+    2.14,
+    2.45,
+    2.91,
+    3.67,
+    3.98,
+    4.28
+   ],
+   "tags": [
+    "bass",
+    "slap",
+    "funk",
+    "groove"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2304
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4102,
+    "sha256": "e8fce92ed535c2d77976eca8d35e30b4ecd9e77e7f02cf4d952fb6159da88ae6",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_ep_soul",
+   "file": "audio/loop_ep_soul.mp3",
+   "kind": "loop",
+   "title": "Velvet Keys",
+   "bpm": 90,
+   "key": "F minor",
+   "bars": 4,
+   "loop": true,
+   "swing": 0.56,
+   "durationSec": 10.666667,
+   "samples": 470400,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    1,
+    1.67,
+    2.19,
+    3,
+    3.67,
+    4.67,
+    5.33,
+    6.33,
+    7,
+    7.52,
+    8,
+    8.67,
+    9.67
+   ],
+   "suggestedPads": [
+    0,
+    1,
+    1.67,
+    2.19,
+    3,
+    3.67,
+    4.67,
+    5.33,
+    6.33,
+    7,
+    7.52,
+    8,
+    8.67,
+    9.67
+   ],
+   "tags": [
+    "keys",
+    "ep",
+    "soul",
+    "warm",
+    "chords"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2496
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4097,
+    "sha256": "f47f84afe52b48700035cf955a1c1719321b43e9fec03530e9a461e4bbc0e9cb",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_flute_riff",
+   "file": "audio/loop_flute_riff.mp3",
+   "kind": "loop",
+   "title": "Rooftop Flute",
+   "bpm": 96,
+   "key": "D dorian",
+   "bars": 2,
+   "loop": true,
+   "swing": 0.56,
+   "durationSec": 5,
+   "samples": 220500,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.49,
+    0.94,
+    1.56,
+    2.05,
+    2.5,
+    3.12,
+    3.61,
+    4.24
+   ],
+   "suggestedPads": [
+    0,
+    0.49,
+    0.94,
+    1.56,
+    2.05,
+    2.5,
+    3.12,
+    3.61,
+    4.24
+   ],
+   "tags": [
+    "flute",
+    "dorian",
+    "breezy",
+    "strings"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2412
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4101,
+    "sha256": "f8d451878979147457488d55b04ed0e6d1ba0df20f4029b1887e2ab593a42d15",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_gtr_pluck",
+   "file": "audio/loop_gtr_pluck.mp3",
+   "kind": "loop",
+   "title": "Nylon Pluck",
+   "bpm": 100,
+   "key": "E minor",
+   "bars": 2,
+   "loop": true,
+   "durationSec": 4.8,
+   "samples": 211680,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.3,
+    0.6,
+    0.9,
+    1.2,
+    1.5,
+    1.8,
+    2.1,
+    2.4,
+    2.7,
+    3,
+    3.3,
+    3.6,
+    3.9,
+    4.2,
+    4.5
+   ],
+   "suggestedPads": [
+    0,
+    0.3,
+    0.6,
+    0.9,
+    1.2,
+    1.5,
+    1.8,
+    2.1,
+    2.4,
+    2.7,
+    3,
+    3.3,
+    3.6,
+    3.9,
+    4.2,
+    4.5
+   ],
+   "tags": [
+    "guitar",
+    "nylon",
+    "pluck",
+    "mellow"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2016
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4099,
+    "sha256": "6a2424b5c92ab29399da290aa080134effd9448cac804ae5f049b8f47af745c8",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_horn_riff",
+   "file": "audio/loop_horn_riff.mp3",
+   "kind": "loop",
+   "title": "Horn Section",
+   "bpm": 108,
+   "key": "Ab major",
+   "bars": 2,
+   "loop": true,
+   "durationSec": 4.444444,
+   "samples": 196000,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.42,
+    0.83,
+    1.39,
+    1.67,
+    2.22,
+    2.64,
+    2.92,
+    3.33
+   ],
+   "suggestedPads": [
+    0,
+    0.42,
+    0.83,
+    1.39,
+    1.67,
+    2.22,
+    2.64,
+    2.92,
+    3.33
+   ],
+   "tags": [
+    "horns",
+    "brass",
+    "funk",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2720
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4103,
+    "sha256": "353e0c5d4fba39bc9bd42db7a867532ebf64705df258195aca995433b861a813",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_kalimba_steps",
+   "file": "audio/loop_kalimba_steps.mp3",
+   "kind": "loop",
+   "title": "Kalimba Steps",
+   "bpm": 125,
+   "key": "F major",
+   "bars": 2,
+   "loop": true,
+   "durationSec": 3.84,
+   "samples": 169344,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.24,
+    0.48,
+    0.72,
+    0.96,
+    1.2,
+    1.44,
+    1.68,
+    1.92,
+    2.16,
+    2.4,
+    2.64,
+    2.88,
+    3.12,
+    3.36,
+    3.6
+   ],
+   "suggestedPads": [
+    0,
+    0.24,
+    0.48,
+    0.72,
+    0.96,
+    1.2,
+    1.44,
+    1.68,
+    1.92,
+    2.16,
+    2.4,
+    2.64,
+    2.88,
+    3.12,
+    3.36,
+    3.6
+   ],
+   "tags": [
+    "kalimba",
+    "mallet",
+    "bright",
+    "playful"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 1728
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4106,
+    "sha256": "2e1cb7b6501e239d4431bd0bb72e20b4c1b38e3c64c9303b4299099731763dfb",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_organ_gospel",
+   "file": "audio/loop_organ_gospel.mp3",
+   "kind": "loop",
+   "title": "Church Stabs",
+   "bpm": 105,
+   "key": "G mixolydian",
+   "bars": 2,
+   "loop": true,
+   "swing": 0.54,
+   "durationSec": 4.571429,
+   "samples": 201600,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.28,
+    0.86,
+    1.3,
+    1.71,
+    2.28,
+    2.86,
+    3.14,
+    3.71,
+    4.28
+   ],
+   "suggestedPads": [
+    0,
+    0.28,
+    0.86,
+    1.3,
+    1.71,
+    2.28,
+    2.86,
+    3.14,
+    3.71,
+    4.28
+   ],
+   "tags": [
+    "organ",
+    "gospel",
+    "keys",
+    "stabs",
+    "church"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 1728
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4098,
+    "sha256": "0540ded534543aa114a76507329c94c021e0cc6f8936674a21ffbddd0caa7aba",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_string_stabs",
+   "file": "audio/loop_string_stabs.mp3",
+   "kind": "loop",
+   "title": "String Stabs",
+   "bpm": 112,
+   "key": "C minor",
+   "bars": 2,
+   "loop": true,
+   "durationSec": 4.285714,
+   "samples": 189000,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.4,
+    1.07,
+    1.47,
+    1.87,
+    2.14,
+    2.68,
+    3.21,
+    3.48,
+    3.88
+   ],
+   "suggestedPads": [
+    0,
+    0.4,
+    1.07,
+    1.47,
+    1.87,
+    2.14,
+    2.68,
+    3.21,
+    3.48,
+    3.88
+   ],
+   "tags": [
+    "strings",
+    "stabs",
+    "cinematic",
+    "dark"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2808
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4100,
+    "sha256": "e0454accae68e99a6a99870b17a38efe760c402756166a72716cd2108b2f8cbe",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "loop_vox_choir",
+   "file": "audio/loop_vox_choir.mp3",
+   "kind": "loop",
+   "title": "Choir Hits",
+   "bpm": 96,
+   "key": "Bb major",
+   "bars": 4,
+   "loop": true,
+   "durationSec": 10,
+   "samples": 441000,
+   "channels": 2,
+   "onsets": [
+    0.01,
+    0.47,
+    0.94,
+    1.56,
+    2.5,
+    3.12,
+    4.06,
+    5,
+    5.47,
+    5.94,
+    6.56,
+    7.5,
+    8.44,
+    9.22
+   ],
+   "suggestedPads": [
+    0,
+    0.47,
+    0.94,
+    1.56,
+    2.5,
+    3.12,
+    4.06,
+    5,
+    5.47,
+    5.94,
+    6.56,
+    7.5,
+    8.44,
+    9.22
+   ],
+   "tags": [
+    "vocal",
+    "choir",
+    "wordless",
+    "hits",
+    "soul"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 1944
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_loops.py",
+    "seed": 4105,
+    "sha256": "b656174f0346482dd7382a991dc5ce91a4118a4aa953861bfed9c67ef52023f4",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "9c18d85577cba13c97f9f22ce46d1c729ce6eaaf584d4e9a526fab44d5d46204",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "stab_clav_am7",
+   "file": "audio/stab_clav_am7.mp3",
+   "kind": "stab",
+   "title": "Clav Am7",
+   "root": "A3",
+   "chord": "Am7",
+   "durationSec": 0.401791,
+   "samples": 17719,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "keys",
+    "clav",
+    "funk",
+    "stab"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1289
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8197,
+    "sha256": "41a08db14c1a30a543c07d4b34805e099a35d768210c9ce3c78963ea463b6e89",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "stab_ep_cm9",
+   "file": "audio/stab_ep_cm9.mp3",
+   "kind": "stab",
+   "title": "EP Cm9",
+   "root": "C4",
+   "chord": "Cm9",
+   "durationSec": 1.091655,
+   "samples": 48142,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "keys",
+    "ep",
+    "stab",
+    "soul"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 818
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8193,
+    "sha256": "2013343aad9867a1a9597ca21f33ba1340b1fe7c217adf274d67192c748c6951",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "stab_organ_g7",
+   "file": "audio/stab_organ_g7.mp3",
+   "kind": "stab",
+   "title": "Organ G7",
+   "root": "G3",
+   "chord": "G7",
+   "durationSec": 0.6139,
+   "samples": 27073,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "keys",
+    "organ",
+    "gospel",
+    "stab"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1151
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8195,
+    "sha256": "1b7ae3d861143f2e1e5d6893ab0d1b76f014615e083b2c4757d42d9081fd29d2",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "stab_saw_dm7",
+   "file": "audio/stab_saw_dm7.mp3",
+   "kind": "stab",
+   "title": "Saw Stab Dm7",
+   "root": "D4",
+   "chord": "Dm7",
+   "durationSec": 0.882245,
+   "samples": 38907,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "synth",
+    "saw",
+    "stab"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 837
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8194,
+    "sha256": "6a10180a2ad5ceedc22aa66e87e5ebc1ffaa574fe75f8be4a2ca205e4c419f5c",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "stab_strings_ebmaj7",
+   "file": "audio/stab_strings_ebmaj7.mp3",
+   "kind": "stab",
+   "title": "Strings Ebmaj7",
+   "root": "Eb4",
+   "chord": "Ebmaj7",
+   "durationSec": 1.268141,
+   "samples": 55925,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "strings",
+    "orchestral",
+    "stab"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1099
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8196,
+    "sha256": "7138c77027fbc7b2ae2423813b33c083ea6817262d873403de9d9b718f04eaca",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_bass_pluck_a",
+   "file": "audio/hit_bass_pluck_a.mp3",
+   "kind": "hit",
+   "title": "Bass Pluck A",
+   "root": "A1",
+   "durationSec": 0.69229,
+   "samples": 30530,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "bass",
+    "synth",
+    "pluck"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1150
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8201,
+    "sha256": "1c43dd49c63d0bffc09fc335b294773b8d3e163850411886f89fc24eb4b2e06e",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_bass_slap_e",
+   "file": "audio/hit_bass_slap_e.mp3",
+   "kind": "hit",
+   "title": "Bass Slap E",
+   "root": "E2",
+   "durationSec": 0.471451,
+   "samples": 20791,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "bass",
+    "slap",
+    "funk"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1673
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8202,
+    "sha256": "04a8bfdae3bc93409f14fc33ce7a6dea50674b910687f3e7edf4608ca698e417",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_conga_slap",
+   "file": "audio/hit_conga_slap.mp3",
+   "kind": "hit",
+   "title": "Conga Slap",
+   "durationSec": 0.37034,
+   "samples": 16332,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "perc",
+    "conga",
+    "slap"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1524
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8206,
+    "sha256": "b02f42968ee437b00fcefa44cd8141bc59cf7300c79132105b247216bd803dc9",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_horn_bap",
+   "file": "audio/hit_horn_bap.mp3",
+   "kind": "hit",
+   "title": "Horn Bap",
+   "root": "F4",
+   "durationSec": 0.484308,
+   "samples": 21358,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "horns",
+    "brass",
+    "short"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1106
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8199,
+    "sha256": "f0a846d72319c7229e2c8e5db6d697a3322f1d3c7382d7f40653aaa0d9263165",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_horn_fall",
+   "file": "audio/hit_horn_fall.mp3",
+   "kind": "hit",
+   "title": "Horn Fall",
+   "root": "Bb4",
+   "chord": "Bb6",
+   "durationSec": 0.842177,
+   "samples": 37140,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "horns",
+    "brass",
+    "fall",
+    "section"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1452
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8198,
+    "sha256": "3236bf2632723d7a155f2f059f9feef5160c0d1694dfc1ffbe07f90009d4f956",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_kick_dusty",
+   "file": "audio/hit_kick_dusty.mp3",
+   "kind": "hit",
+   "title": "Dusty Kick",
+   "durationSec": 0.35,
+   "samples": 15435,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "drum",
+    "kick",
+    "acoustic",
+    "dusty"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1269
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8203,
+    "sha256": "011ecc424c9a52f49206b4447e5742c8926dc16eddb9915a9036616217b3c51e",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_orch",
+   "file": "audio/hit_orch.mp3",
+   "kind": "hit",
+   "title": "Orchestra Hit",
+   "root": "C4",
+   "chord": "C5add9",
+   "durationSec": 1.557143,
+   "samples": 68670,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "orchestral",
+    "hit",
+    "strings",
+    "brass"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1026
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8200,
+    "sha256": "035ccb7a1e87886b35ef658cdba0b703ebc0310963c7ab322e0d75a88ccc1f14",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_rim_wood",
+   "file": "audio/hit_rim_wood.mp3",
+   "kind": "hit",
+   "title": "Wood Rim",
+   "durationSec": 0.270703,
+   "samples": 11938,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "drum",
+    "rim",
+    "wood"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1310
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8205,
+    "sha256": "a96ca87dbc588f00947d99ef8f9fc95b86f6ced89d0e6440601a8d61253502c7",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "hit_snare_crack",
+   "file": "audio/hit_snare_crack.mp3",
+   "kind": "hit",
+   "title": "Crack Snare",
+   "durationSec": 0.434966,
+   "samples": 19182,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "drum",
+    "snare",
+    "lofi"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 978
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 8204,
+    "sha256": "0958ff1998d1d0caa89ece09fb76eae04593cb3aa992bacc52168770847c873f",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "chop_checkit_bright",
+   "file": "audio/chop_checkit_bright.mp3",
+   "kind": "chop",
+   "title": "Check It (bright)",
+   "text": "check it",
+   "voice": "bright",
+   "durationSec": 0.740635,
+   "samples": 32662,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "check-it",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1322
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16412,
+    "sha256": "648aa10be595b492e83637c3ab6d11b5059f46c1a1c5199e83ba9af972c86fed",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Check it.",
+     "phonemes": "tʃˈɛk ɪt."
+    },
+    "takesTried": [
+     {
+      "text": "Check it!",
+      "phonemes": "tʃˈɛk ɪt!",
+      "score": 0.4515
+     },
+     {
+      "text": "Check it.",
+      "phonemes": "tʃˈɛk ɪt.",
+      "score": 0.4968
+     },
+     {
+      "text": "Check it!!",
+      "phonemes": "tʃˈɛk ɪt!!",
+      "score": 0.4533
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_checkit_deep",
+   "file": "audio/chop_checkit_deep.mp3",
+   "kind": "chop",
+   "title": "Check It (deep)",
+   "text": "check it",
+   "voice": "deep",
+   "durationSec": 0.594127,
+   "samples": 26201,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "check-it",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 871
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16402,
+    "sha256": "c3808f59908203df8425bc4173a458d019b6bcc06bcd665c070b6a70d30d99ba",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Check it.",
+     "phonemes": "tʃˈɛk ɪt."
+    },
+    "takesTried": [
+     {
+      "text": "Check it!",
+      "phonemes": "tʃˈɛk ɪt!",
+      "score": 0.3929
+     },
+     {
+      "text": "Check it.",
+      "phonemes": "tʃˈɛk ɪt.",
+      "score": 0.4003
+     },
+     {
+      "text": "Check it!!",
+      "phonemes": "tʃˈɛk ɪt!!",
+      "score": 0.3834
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_checkit_warm",
+   "file": "audio/chop_checkit_warm.mp3",
+   "kind": "chop",
+   "title": "Check It (warm)",
+   "text": "check it",
+   "voice": "warm",
+   "durationSec": 0.555079,
+   "samples": 24479,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "check-it",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1441
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16392,
+    "sha256": "f5494de810a305860514e847800dd4c2884a8ee43d954a72ce91f5a10caf2b9e",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Check it!",
+     "phonemes": "tʃˈɛk ɪt!"
+    },
+    "takesTried": [
+     {
+      "text": "Check it!",
+      "phonemes": "tʃˈɛk ɪt!",
+      "score": 0.413
+     },
+     {
+      "text": "Check it.",
+      "phonemes": "tʃˈɛk ɪt.",
+      "score": 0.4058
+     },
+     {
+      "text": "Check it!!",
+      "phonemes": "tʃˈɛk ɪt!!",
+      "score": 0.3777
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_fel_bright",
+   "file": "audio/chop_fel_bright.mp3",
+   "kind": "chop",
+   "title": "F-E-L (bright)",
+   "text": "F-E-L",
+   "voice": "bright",
+   "durationSec": 1,
+   "samples": 44100,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "fel",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1404
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16413,
+    "sha256": "18c7351228fb82bed801136e06b48017ce7634ec31d21f336d22328e8d8057f5",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "F. E. L!",
+     "phonemes": "ˈɛf. ˈiː. ˈɛl!"
+    },
+    "takesTried": [
+     {
+      "text": "F. E. L.",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl.",
+      "score": 0.7922
+     },
+     {
+      "text": "F. E. L!",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl!",
+      "score": 0.8428
+     },
+     {
+      "text": "F, E, L!",
+      "phonemes": "ˈɛf, ˈiː, ˈɛl!",
+      "score": 0.8076
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_fel_deep",
+   "file": "audio/chop_fel_deep.mp3",
+   "kind": "chop",
+   "title": "F-E-L (deep)",
+   "text": "F-E-L",
+   "voice": "deep",
+   "durationSec": 0.835306,
+   "samples": 36837,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "fel",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 603
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16403,
+    "sha256": "40dc2238def13d845646a91e25ae08b194b6843744b61916dc4e2afe7dfd7e42",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "F. E. L!",
+     "phonemes": "ˈɛf. ˈiː. ˈɛl!"
+    },
+    "takesTried": [
+     {
+      "text": "F. E. L.",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl.",
+      "score": 0.6355
+     },
+     {
+      "text": "F. E. L!",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl!",
+      "score": 0.7029
+     },
+     {
+      "text": "F, E, L!",
+      "phonemes": "ˈɛf, ˈiː, ˈɛl!",
+      "score": 0.5692
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_fel_radio",
+   "file": "audio/chop_fel_radio.mp3",
+   "kind": "chop",
+   "title": "F-E-L (radio)",
+   "text": "F-E-L",
+   "voice": "deep",
+   "durationSec": 0.96517,
+   "samples": 42564,
+   "channels": 1,
+   "onsets": [
+    0.01,
+    0.42
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "fel",
+    "deep",
+    "radio",
+    "lofi"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 636
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16420,
+    "sha256": "617e1c65a3bc1e87a18c0c902e9435b579f51786a3fb15a7b3a9bccc205572c3",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "F. E. L!",
+     "phonemes": "ˈɛf. ˈiː. ˈɛl!"
+    },
+    "takesTried": [
+     {
+      "text": "F. E. L.",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl.",
+      "score": 0.6355
+     },
+     {
+      "text": "F. E. L!",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl!",
+      "score": 0.7029
+     },
+     {
+      "text": "F, E, L!",
+      "phonemes": "ˈɛf, ˈiː, ˈɛl!",
+      "score": 0.5692
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "derivedFrom": "chop_fel_deep",
+    "process": "band-pass 400 Hz-3.2 kHz (+3 dB at 1.5 kHz), drive 0.3, slap echo 92 ms -9 dB",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_fel_warm",
+   "file": "audio/chop_fel_warm.mp3",
+   "kind": "chop",
+   "title": "F-E-L (warm)",
+   "text": "F-E-L",
+   "voice": "warm",
+   "durationSec": 0.837324,
+   "samples": 36926,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "fel",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1666
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16393,
+    "sha256": "17433c6e123682a4595d40a411bc605e890b0cef8920635a667ad64b0116c4a0",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "F, E, L!",
+     "phonemes": "ˈɛf, ˈiː, ˈɛl!"
+    },
+    "takesTried": [
+     {
+      "text": "F. E. L.",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl.",
+      "score": 0.8048
+     },
+     {
+      "text": "F. E. L!",
+      "phonemes": "ˈɛf. ˈiː. ˈɛl!",
+      "score": 0.8409
+     },
+     {
+      "text": "F, E, L!",
+      "phonemes": "ˈɛf, ˈiː, ˈɛl!",
+      "score": 0.8741
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_go_bright",
+   "file": "audio/chop_go_bright.mp3",
+   "kind": "chop",
+   "title": "Go (bright)",
+   "text": "go",
+   "voice": "bright",
+   "durationSec": 0.491859,
+   "samples": 21691,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "go",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 773
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16408,
+    "sha256": "c0b7db226dd65202a5fd430cd9deb3071eaa16507d6e5a1745b8b0acc8f8521a",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Go!",
+     "phonemes": "ɡˈoʊ!"
+    },
+    "takesTried": [
+     {
+      "text": "Go!",
+      "phonemes": "ɡˈoʊ!",
+      "score": 0.7493
+     },
+     {
+      "text": "Go.",
+      "phonemes": "ɡˈoʊ.",
+      "score": 0.4352
+     },
+     {
+      "text": "Go!!",
+      "phonemes": "ɡˈoʊ!!",
+      "score": 0.7353
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_go_deep",
+   "file": "audio/chop_go_deep.mp3",
+   "kind": "chop",
+   "title": "Go (deep)",
+   "text": "go",
+   "voice": "deep",
+   "durationSec": 0.504218,
+   "samples": 22236,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "go",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1380
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16398,
+    "sha256": "522f5b65c95c9f31242158378f3792dbaac19e31d58876b23859786cd6682841",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Go!",
+     "phonemes": "ɡˈoʊ!"
+    },
+    "takesTried": [
+     {
+      "text": "Go!",
+      "phonemes": "ɡˈoʊ!",
+      "score": 0.6364
+     },
+     {
+      "text": "Go.",
+      "phonemes": "ɡˈoʊ.",
+      "score": 0.6337
+     },
+     {
+      "text": "Go!!",
+      "phonemes": "ɡˈoʊ!!",
+      "score": 0.6154
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_go_stutter",
+   "file": "audio/chop_go_stutter.mp3",
+   "kind": "chop",
+   "title": "Go Go Go",
+   "text": "go go go",
+   "voice": "bright",
+   "durationSec": 0.792789,
+   "samples": 34962,
+   "channels": 1,
+   "onsets": [
+    0.01,
+    0.17,
+    0.32
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "go",
+    "bright",
+    "stutter"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1326
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16417,
+    "sha256": "d6ec5798ef3b506433f70528485ff6b4696d6923bfd0bdba741b299bd39c10a4",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Go!",
+     "phonemes": "ɡˈoʊ!"
+    },
+    "takesTried": [
+     {
+      "text": "Go!",
+      "phonemes": "ɡˈoʊ!",
+      "score": 0.7493
+     },
+     {
+      "text": "Go.",
+      "phonemes": "ɡˈoʊ.",
+      "score": 0.4352
+     },
+     {
+      "text": "Go!!",
+      "phonemes": "ɡˈoʊ!!",
+      "score": 0.7353
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "derivedFrom": "chop_go_bright",
+    "process": "three hits on 16ths at 100 BPM, first two gated to 70 % (105 ms)",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_go_warm",
+   "file": "audio/chop_go_warm.mp3",
+   "kind": "chop",
+   "title": "Go (warm)",
+   "text": "go",
+   "voice": "warm",
+   "durationSec": 0.530227,
+   "samples": 23383,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "go",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1385
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16388,
+    "sha256": "03790904112165b09b87da47ee6bc19b9a3ea24f26ba67d0505a7d84460d35d8",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Go.",
+     "phonemes": "ɡˈoʊ."
+    },
+    "takesTried": [
+     {
+      "text": "Go!",
+      "phonemes": "ɡˈoʊ!",
+      "score": 0.457
+     },
+     {
+      "text": "Go.",
+      "phonemes": "ɡˈoʊ.",
+      "score": 0.4869
+     },
+     {
+      "text": "Go!!",
+      "phonemes": "ɡˈoʊ!!",
+      "score": 0.458
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_hey_bright",
+   "file": "audio/chop_hey_bright.mp3",
+   "kind": "chop",
+   "title": "Hey (bright)",
+   "text": "hey",
+   "voice": "bright",
+   "durationSec": 0.542268,
+   "samples": 23914,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "hey",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 854
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16405,
+    "sha256": "9f6888305a43d88ce09e3be72a08c7cefa928cbaf10ab44b37a1568a76b83897",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Hey.",
+     "phonemes": "hˈeɪ."
+    },
+    "takesTried": [
+     {
+      "text": "Hey!",
+      "phonemes": "hˈeɪ!",
+      "score": 0.4234
+     },
+     {
+      "text": "Hey.",
+      "phonemes": "hˈeɪ.",
+      "score": 0.4436
+     },
+     {
+      "text": "Hey!!",
+      "phonemes": "hˈeɪ!!",
+      "score": 0.3904
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_hey_deep",
+   "file": "audio/chop_hey_deep.mp3",
+   "kind": "chop",
+   "title": "Hey (deep)",
+   "text": "hey",
+   "voice": "deep",
+   "durationSec": 0.480431,
+   "samples": 21187,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "hey",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1277
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16395,
+    "sha256": "61731d077e6d028704cb755b3a42e3de5e887941cdef8e45ce702fd0747a857d",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Hey.",
+     "phonemes": "hˈeɪ."
+    },
+    "takesTried": [
+     {
+      "text": "Hey!",
+      "phonemes": "hˈeɪ!",
+      "score": 0.558
+     },
+     {
+      "text": "Hey.",
+      "phonemes": "hˈeɪ.",
+      "score": 0.6079
+     },
+     {
+      "text": "Hey!!",
+      "phonemes": "hˈeɪ!!",
+      "score": 0.5357
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_hey_high",
+   "file": "audio/chop_hey_high.mp3",
+   "kind": "chop",
+   "title": "Hey (chipmunk)",
+   "text": "hey",
+   "voice": "warm",
+   "durationSec": 0.408549,
+   "samples": 18017,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "hey",
+    "warm",
+    "pitched"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 991
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16416,
+    "sha256": "868fd9b8f6b1c0048b403b59d81f9783ca69a81c7fe5f8347c97d73cd343ea84",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Hey!",
+     "phonemes": "hˈeɪ!"
+    },
+    "takesTried": [
+     {
+      "text": "Hey!",
+      "phonemes": "hˈeɪ!",
+      "score": 0.4091
+     },
+     {
+      "text": "Hey.",
+      "phonemes": "hˈeɪ.",
+      "score": 0.4015
+     },
+     {
+      "text": "Hey!!",
+      "phonemes": "hˈeɪ!!",
+      "score": 0.4012
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "derivedFrom": "chop_hey_warm",
+    "process": "varispeed +5 st, then the base light processing",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_hey_warm",
+   "file": "audio/chop_hey_warm.mp3",
+   "kind": "chop",
+   "title": "Hey (warm)",
+   "text": "hey",
+   "voice": "warm",
+   "durationSec": 0.484399,
+   "samples": 21362,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "hey",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1102
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16385,
+    "sha256": "7e32fbd85d36ae2f2b048072c3a9ff7d44aaf79eb5e651f1771beb9b45589724",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Hey!",
+     "phonemes": "hˈeɪ!"
+    },
+    "takesTried": [
+     {
+      "text": "Hey!",
+      "phonemes": "hˈeɪ!",
+      "score": 0.4091
+     },
+     {
+      "text": "Hey.",
+      "phonemes": "hˈeɪ.",
+      "score": 0.4015
+     },
+     {
+      "text": "Hey!!",
+      "phonemes": "hˈeɪ!!",
+      "score": 0.4012
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_letsgo_bright",
+   "file": "audio/chop_letsgo_bright.mp3",
+   "kind": "chop",
+   "title": "Let's Go (bright)",
+   "text": "let's go",
+   "voice": "bright",
+   "durationSec": 0.884535,
+   "samples": 39008,
+   "channels": 1,
+   "onsets": [
+    0.02
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "lets-go",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 736
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16409,
+    "sha256": "6d792beb7e05b9c333b810998de7c8f150775a7a680c7912038fffc53743b6d2",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Let's go!",
+     "phonemes": "lˈɛts ɡˈoʊ!"
+    },
+    "takesTried": [
+     {
+      "text": "Let's go!",
+      "phonemes": "lˈɛts ɡˈoʊ!",
+      "score": 0.5076
+     },
+     {
+      "text": "Let's go.",
+      "phonemes": "lˈɛts ɡˈoʊ.",
+      "score": 0.4652
+     },
+     {
+      "text": "Let's go!!",
+      "phonemes": "lˈɛts ɡˈoʊ!!",
+      "score": 0.494
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_letsgo_deep",
+   "file": "audio/chop_letsgo_deep.mp3",
+   "kind": "chop",
+   "title": "Let's Go (deep)",
+   "text": "let's go",
+   "voice": "deep",
+   "durationSec": 0.71483,
+   "samples": 31524,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "lets-go",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1308
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16399,
+    "sha256": "bcdfe258bc72ee6ae2164cbee3f3ec851309d9f62e3aeba7f1ea6bfc54713d2b",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Let's go.",
+     "phonemes": "lˈɛts ɡˈoʊ."
+    },
+    "takesTried": [
+     {
+      "text": "Let's go!",
+      "phonemes": "lˈɛts ɡˈoʊ!",
+      "score": 0.5404
+     },
+     {
+      "text": "Let's go.",
+      "phonemes": "lˈɛts ɡˈoʊ.",
+      "score": 0.6002
+     },
+     {
+      "text": "Let's go!!",
+      "phonemes": "lˈɛts ɡˈoʊ!!",
+      "score": 0.5586
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 1
+   }
+  },
+  {
+   "id": "chop_letsgo_warm",
+   "file": "audio/chop_letsgo_warm.mp3",
+   "kind": "chop",
+   "title": "Let's Go (warm)",
+   "text": "let's go",
+   "voice": "warm",
+   "durationSec": 0.797279,
+   "samples": 35160,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "lets-go",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1128
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16389,
+    "sha256": "f97c3331b889c78511543a057da65599f50327fef6c932985e5de7f5eb1b49db",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Let's go!!",
+     "phonemes": "lˈɛts ɡˈoʊ!!"
+    },
+    "takesTried": [
+     {
+      "text": "Let's go!",
+      "phonemes": "lˈɛts ɡˈoʊ!",
+      "score": 0.7585
+     },
+     {
+      "text": "Let's go.",
+      "phonemes": "lˈɛts ɡˈoʊ.",
+      "score": 0.7763
+     },
+     {
+      "text": "Let's go!!",
+      "phonemes": "lˈɛts ɡˈoʊ!!",
+      "score": 0.7926
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_one_bright",
+   "file": "audio/chop_one_bright.mp3",
+   "kind": "chop",
+   "title": "One (bright)",
+   "text": "one",
+   "voice": "bright",
+   "durationSec": 0.526372,
+   "samples": 23213,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "one",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1555
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16410,
+    "sha256": "0217dba2891efab5647f9d5a2cff99582f421c6b11a58d0127a053c926c532d5",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "One!",
+     "phonemes": "wˌʌn!"
+    },
+    "takesTried": [
+     {
+      "text": "One!",
+      "phonemes": "wˌʌn!",
+      "score": 0.5343
+     },
+     {
+      "text": "One.",
+      "phonemes": "wˌʌn.",
+      "score": 0.5171
+     },
+     {
+      "text": "One!!",
+      "phonemes": "wˌʌn!!",
+      "score": 0.4757
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_one_deep",
+   "file": "audio/chop_one_deep.mp3",
+   "kind": "chop",
+   "title": "One (deep)",
+   "text": "one",
+   "voice": "deep",
+   "durationSec": 0.485034,
+   "samples": 21390,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "one",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1074
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16400,
+    "sha256": "ea31756a84e8372cded84c59990f12e1cdd2e6a3adbad1bc8b7a90a124a50d79",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "One.",
+     "phonemes": "wˌʌn."
+    },
+    "takesTried": [
+     {
+      "text": "One!",
+      "phonemes": "wˌʌn!",
+      "score": 0.5206
+     },
+     {
+      "text": "One.",
+      "phonemes": "wˌʌn.",
+      "score": 0.546
+     },
+     {
+      "text": "One!!",
+      "phonemes": "wˌʌn!!",
+      "score": 0.527
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_one_warm",
+   "file": "audio/chop_one_warm.mp3",
+   "kind": "chop",
+   "title": "One (warm)",
+   "text": "one",
+   "voice": "warm",
+   "durationSec": 0.483855,
+   "samples": 21338,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "one",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1126
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16390,
+    "sha256": "ec0472ad645ccd92286ddd4ae3ae194b161408b47eb401b3118876c4d5a48aad",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "One!",
+     "phonemes": "wˌʌn!"
+    },
+    "takesTried": [
+     {
+      "text": "One!",
+      "phonemes": "wˌʌn!",
+      "score": 0.6445
+     },
+     {
+      "text": "One.",
+      "phonemes": "wˌʌn.",
+      "score": 0.6265
+     },
+     {
+      "text": "One!!",
+      "phonemes": "wˌʌn!!",
+      "score": 0.5929
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_ooh_bright",
+   "file": "audio/chop_ooh_bright.mp3",
+   "kind": "chop",
+   "title": "Ooh (bright)",
+   "text": "ooh",
+   "voice": "bright",
+   "durationSec": 0.5539,
+   "samples": 24427,
+   "channels": 1,
+   "onsets": [
+    0.02
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "ooh",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1493
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16414,
+    "sha256": "f4f9be729f27aeda6c868266dbb40fe719ef53bcd7eb39fd9636f2ff6e92bf8e",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Ooh!",
+     "phonemes": "ˈuː!"
+    },
+    "takesTried": [
+     {
+      "text": "Ooh.",
+      "phonemes": "ˈuː.",
+      "score": 0.5456
+     },
+     {
+      "text": "Ooh!",
+      "phonemes": "ˈuː!",
+      "score": 0.566
+     },
+     {
+      "text": "Ooh!!",
+      "phonemes": "ˈuː!!",
+      "score": 0.5035
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_ooh_deep",
+   "file": "audio/chop_ooh_deep.mp3",
+   "kind": "chop",
+   "title": "Ooh (deep)",
+   "text": "ooh",
+   "voice": "deep",
+   "durationSec": 0.473537,
+   "samples": 20883,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "ooh",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1581
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16404,
+    "sha256": "e8d80880ffc1113ad4336fdca736f73b3d6f25ac04ebcfa18ed04b380ef3b9d4",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Ooh!",
+     "phonemes": "ˈuː!"
+    },
+    "takesTried": [
+     {
+      "text": "Ooh.",
+      "phonemes": "ˈuː.",
+      "score": 0.5497
+     },
+     {
+      "text": "Ooh!",
+      "phonemes": "ˈuː!",
+      "score": 0.6386
+     },
+     {
+      "text": "Ooh!!",
+      "phonemes": "ˈuː!!",
+      "score": 0.5672
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_ooh_swell",
+   "file": "audio/chop_ooh_swell.mp3",
+   "kind": "chop",
+   "title": "Ooh (reverse)",
+   "root": "C5",
+   "text": "ooh",
+   "voice": "warm",
+   "durationSec": 1.503424,
+   "samples": 66301,
+   "channels": 1,
+   "onsets": [
+    0.18,
+    0.45,
+    0.61,
+    0.81
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "ooh",
+    "warm",
+    "reverse",
+    "swell"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1091
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16419,
+    "sha256": "65c02b8b9230cfee7b6ad7b855fea8fdf45454576654309defd03fb0d69bb0cc",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Ooh!!",
+     "phonemes": "ˈuː!!"
+    },
+    "takesTried": [
+     {
+      "text": "Ooh.",
+      "phonemes": "ˈuː.",
+      "score": 0.74
+     },
+     {
+      "text": "Ooh!",
+      "phonemes": "ˈuː!",
+      "score": 0.7252
+     },
+     {
+      "text": "Ooh!!",
+      "phonemes": "ˈuː!!",
+      "score": 0.7722
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "derivedFrom": "chop_ooh_tuned",
+    "tuning": {
+     "f0SourceHz": 210.2,
+     "varispeedSemis": 3.786,
+     "f0TunedHz": 523.5,
+     "stretch": "TD-PSOLA to 1.0 s at C5 (formants kept), levelled, vibrato 5.2 Hz +-18 cents after 0.3 s, plate 0.14"
+    },
+    "process": "chop_ooh_tuned through a plate (0.35), reversed",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_ooh_tuned",
+   "file": "audio/chop_ooh_tuned.mp3",
+   "kind": "chop",
+   "title": "Ooh (tuned C)",
+   "root": "C5",
+   "text": "ooh",
+   "voice": "warm",
+   "durationSec": 1.882812,
+   "samples": 83032,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "ooh",
+    "warm",
+    "tuned",
+    "pitched"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1640
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16418,
+    "sha256": "deba2d3d1de538c94c53afee1d77175c179ae13e3860ac153f3e2f34bb9f159f",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Ooh!!",
+     "phonemes": "ˈuː!!"
+    },
+    "takesTried": [
+     {
+      "text": "Ooh.",
+      "phonemes": "ˈuː.",
+      "score": 0.74
+     },
+     {
+      "text": "Ooh!",
+      "phonemes": "ˈuː!",
+      "score": 0.7252
+     },
+     {
+      "text": "Ooh!!",
+      "phonemes": "ˈuː!!",
+      "score": 0.7722
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "derivedFrom": "chop_ooh_warm",
+    "tuning": {
+     "f0SourceHz": 210.2,
+     "varispeedSemis": 3.786,
+     "f0TunedHz": 523.5,
+     "stretch": "TD-PSOLA to 1.0 s at C5 (formants kept), levelled, vibrato 5.2 Hz +-18 cents after 0.3 s, plate 0.14"
+    },
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_ooh_warm",
+   "file": "audio/chop_ooh_warm.mp3",
+   "kind": "chop",
+   "title": "Ooh (warm)",
+   "text": "ooh",
+   "voice": "warm",
+   "durationSec": 0.550771,
+   "samples": 24289,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "ooh",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1631
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16394,
+    "sha256": "fe5d2cf802dcc7e16971029b33c28339011514c87081fce1b26c004ce9e4d54c",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Ooh!!",
+     "phonemes": "ˈuː!!"
+    },
+    "takesTried": [
+     {
+      "text": "Ooh.",
+      "phonemes": "ˈuː.",
+      "score": 0.74
+     },
+     {
+      "text": "Ooh!",
+      "phonemes": "ˈuː!",
+      "score": 0.7252
+     },
+     {
+      "text": "Ooh!!",
+      "phonemes": "ˈuː!!",
+      "score": 0.7722
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_sheet_bright",
+   "file": "audio/chop_sheet_bright.mp3",
+   "kind": "chop",
+   "title": "Vox Sheet (bright)",
+   "bpm": 100,
+   "bars": 4,
+   "loop": true,
+   "sheet": true,
+   "text": "hey uh yeah go let's go one two check it F E L ooh yeah hey",
+   "voice": "bright",
+   "durationSec": 9.6,
+   "samples": 423360,
+   "channels": 1,
+   "onsets": [
+    0.01,
+    0.6,
+    1.2,
+    1.8,
+    2.41,
+    3,
+    3.6,
+    4.2,
+    4.8,
+    5.4,
+    6,
+    6.6,
+    7.2,
+    7.81,
+    8.4,
+    9
+   ],
+   "suggestedPads": [
+    0,
+    0.6,
+    1.2,
+    1.8,
+    2.4,
+    3,
+    3.6,
+    4.2,
+    4.8,
+    5.4,
+    6,
+    6.6,
+    7.2,
+    7.8,
+    8.4,
+    9
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "sheet",
+    "bright",
+    "words"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2304
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16643,
+    "sha256": "92e46316de9515d468fc1c72f65ae0fc77da8da515ab0517784a1778a51f3248",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Hey. | Uh! | Yeah!! | Go! | Let's go! | One! | Two! | Check it. | F... E... L. | Ooh!",
+     "phonemes": "hˈeɪ. | ˈʌ! | jˈɛh!! | ɡˈoʊ! | lˈɛts ɡˈoʊ! | wˌʌn! | tˈuː! | tʃˈɛk ɪt. | ˈɛf... ˈiː... ˈɛl. | ˈuː!"
+    },
+    "declickedPoints": 0,
+    "unvoicedTrimMs": {
+     "fel[1]": {
+      "leadMs": 0,
+      "tailMs": 12.2
+     },
+     "fel[2]": {
+      "leadMs": 67.8,
+      "tailMs": 0
+     }
+    },
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "16 syllables (multi-syllable takes split at their energy dips; the F-E-L letters lose any breath hiss at their edges), each shape_chop(lead_ms=20), HP + air +1.5 dB, trim_oneshot(max_sec=0.4, cut fade 120 ms), placed at pad_time(beat) at 100 BPM"
+   }
+  },
+  {
+   "id": "chop_sheet_deep",
+   "file": "audio/chop_sheet_deep.mp3",
+   "kind": "chop",
+   "title": "Vox Sheet (deep)",
+   "bpm": 96,
+   "bars": 4,
+   "loop": true,
+   "sheet": true,
+   "text": "hey uh yeah go let's go one two check it F E L ooh yeah hey",
+   "voice": "deep",
+   "durationSec": 10,
+   "samples": 441000,
+   "channels": 1,
+   "onsets": [
+    0.01,
+    0.62,
+    1.25,
+    1.88,
+    2.5,
+    3.12,
+    3.75,
+    4.37,
+    5,
+    5.62,
+    6.25,
+    6.87,
+    7.5,
+    8.12,
+    8.75,
+    9.38
+   ],
+   "suggestedPads": [
+    0,
+    0.62,
+    1.25,
+    1.87,
+    2.5,
+    3.12,
+    3.75,
+    4.37,
+    5,
+    5.62,
+    6.25,
+    6.87,
+    7.5,
+    8.12,
+    8.75,
+    9.37
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "sheet",
+    "deep",
+    "words"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 1944
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16642,
+    "sha256": "e1b7173a49169ceb9c1d7de91da56f9632af8c54b32e993a52611c88a3202838",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Hey. | Uh!! | Yeah. | Go! | Let's go. | One. | Two!! | Check it. | F... E... L. | Ooh!",
+     "phonemes": "hˈeɪ. | ˈʌ!! | jˈɛh. | ɡˈoʊ! | lˈɛts ɡˈoʊ. | wˌʌn. | tˈuː!! | tʃˈɛk ɪt. | ˈɛf... ˈiː... ˈɛl. | ˈuː!"
+    },
+    "declickedPoints": 1,
+    "unvoicedTrimMs": {
+     "fel[2]": {
+      "leadMs": 42.9,
+      "tailMs": 0
+     }
+    },
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "16 syllables (multi-syllable takes split at their energy dips; the F-E-L letters lose any breath hiss at their edges), each shape_chop(lead_ms=20), HP + air +1.5 dB, trim_oneshot(max_sec=0.38, cut fade 120 ms), placed at pad_time(beat) at 96 BPM"
+   }
+  },
+  {
+   "id": "chop_sheet_warm",
+   "file": "audio/chop_sheet_warm.mp3",
+   "kind": "chop",
+   "title": "Vox Sheet (warm)",
+   "bpm": 90,
+   "bars": 4,
+   "loop": true,
+   "sheet": true,
+   "text": "hey uh yeah go let's go one two check it F E L ooh yeah hey",
+   "voice": "warm",
+   "durationSec": 10.666667,
+   "samples": 470400,
+   "channels": 1,
+   "onsets": [
+    0.01,
+    0.67,
+    1.33,
+    2,
+    2.67,
+    3.33,
+    4,
+    4.67,
+    5.33,
+    6,
+    6.67,
+    7.33,
+    8,
+    8.67,
+    9.33,
+    10
+   ],
+   "suggestedPads": [
+    0,
+    0.67,
+    1.33,
+    2,
+    2.67,
+    3.33,
+    4,
+    4.67,
+    5.33,
+    6,
+    6.67,
+    7.33,
+    8,
+    8.67,
+    9.33,
+    10
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "sheet",
+    "warm",
+    "words"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2496
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16641,
+    "sha256": "c6c96648b930a9f862e46658feb31c773de2cf3bfe7703a2e64db23a68307445",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Hey! | Uh!! | Yeah!! | Go. | Let's go!! | One! | Two! | Check it! | F... E... L. | Ooh!!",
+     "phonemes": "hˈeɪ! | ˈʌ!! | jˈɛh!! | ɡˈoʊ. | lˈɛts ɡˈoʊ!! | wˌʌn! | tˈuː! | tʃˈɛk ɪt! | ˈɛf... ˈiː... ˈɛl. | ˈuː!!"
+    },
+    "declickedPoints": 0,
+    "unvoicedTrimMs": {},
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "16 syllables (multi-syllable takes split at their energy dips; the F-E-L letters lose any breath hiss at their edges), each shape_chop(lead_ms=20), HP + air +1.5 dB, trim_oneshot(max_sec=0.45, cut fade 120 ms), placed at pad_time(beat) at 90 BPM"
+   }
+  },
+  {
+   "id": "chop_two_bright",
+   "file": "audio/chop_two_bright.mp3",
+   "kind": "chop",
+   "title": "Two (bright)",
+   "text": "two",
+   "voice": "bright",
+   "durationSec": 0.470635,
+   "samples": 20755,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "two",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1709
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16411,
+    "sha256": "3b99cd18c24e444ae678079f43c8f1e7ba9d1f8783c6e7b30306518b5ea2a629",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Two!",
+     "phonemes": "tˈuː!"
+    },
+    "takesTried": [
+     {
+      "text": "Two!",
+      "phonemes": "tˈuː!",
+      "score": 0.5851
+     },
+     {
+      "text": "Two.",
+      "phonemes": "tˈuː.",
+      "score": 0.5533
+     },
+     {
+      "text": "Two!!",
+      "phonemes": "tˈuː!!",
+      "score": 0.5434
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_two_deep",
+   "file": "audio/chop_two_deep.mp3",
+   "kind": "chop",
+   "title": "Two (deep)",
+   "text": "two",
+   "voice": "deep",
+   "durationSec": 0.559206,
+   "samples": 24661,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "two",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1259
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16401,
+    "sha256": "4b7248eb4ed0c2d85c6ef5efd58b01af2a683c7d2d044bf8826eccbcb05adb96",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Two!!",
+     "phonemes": "tˈuː!!"
+    },
+    "takesTried": [
+     {
+      "text": "Two!",
+      "phonemes": "tˈuː!",
+      "score": 0.3902
+     },
+     {
+      "text": "Two.",
+      "phonemes": "tˈuː.",
+      "score": 0.4504
+     },
+     {
+      "text": "Two!!",
+      "phonemes": "tˈuː!!",
+      "score": 0.453
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_two_warm",
+   "file": "audio/chop_two_warm.mp3",
+   "kind": "chop",
+   "title": "Two (warm)",
+   "text": "two",
+   "voice": "warm",
+   "durationSec": 0.474649,
+   "samples": 20932,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "two",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1532
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16391,
+    "sha256": "95f5efab16cf91413146d7d4a7ada7040a8715c3b8a50a2f622c188646258008",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Two!",
+     "phonemes": "tˈuː!"
+    },
+    "takesTried": [
+     {
+      "text": "Two!",
+      "phonemes": "tˈuː!",
+      "score": 0.4793
+     },
+     {
+      "text": "Two.",
+      "phonemes": "tˈuː.",
+      "score": 0.4122
+     },
+     {
+      "text": "Two!!",
+      "phonemes": "tˈuː!!",
+      "score": 0.3834
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_uh_bright",
+   "file": "audio/chop_uh_bright.mp3",
+   "kind": "chop",
+   "title": "Uh (bright)",
+   "text": "uh",
+   "voice": "bright",
+   "durationSec": 0.470023,
+   "samples": 20728,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "uh",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 584
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16406,
+    "sha256": "0950c5e8b4c7f80101f20c36b059ab077f67f1c72bf810d50f5aef3b6e2ecb3b",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Uh!",
+     "phonemes": "ˈʌ!"
+    },
+    "takesTried": [
+     {
+      "text": "Uh!",
+      "phonemes": "ˈʌ!",
+      "score": 0.6782
+     },
+     {
+      "text": "Uh.",
+      "phonemes": "ˈʌ.",
+      "score": 0.6509
+     },
+     {
+      "text": "Uh!!",
+      "phonemes": "ˈʌ!!",
+      "score": 0.6134
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_uh_deep",
+   "file": "audio/chop_uh_deep.mp3",
+   "kind": "chop",
+   "title": "Uh (deep)",
+   "text": "uh",
+   "voice": "deep",
+   "durationSec": 0.544014,
+   "samples": 23991,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "uh",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 777
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16396,
+    "sha256": "7ca25d775414e6d774c5e155aca843280785f2e78c73a731f7a942a57e054885",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Uh!!",
+     "phonemes": "ˈʌ!!"
+    },
+    "takesTried": [
+     {
+      "text": "Uh!",
+      "phonemes": "ˈʌ!",
+      "score": 0.6014
+     },
+     {
+      "text": "Uh.",
+      "phonemes": "ˈʌ.",
+      "score": 0.5906
+     },
+     {
+      "text": "Uh!!",
+      "phonemes": "ˈʌ!!",
+      "score": 0.6305
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_uh_warm",
+   "file": "audio/chop_uh_warm.mp3",
+   "kind": "chop",
+   "title": "Uh (warm)",
+   "text": "uh",
+   "voice": "warm",
+   "durationSec": 0.509615,
+   "samples": 22474,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "uh",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1142
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16386,
+    "sha256": "541e4843e362c93aa7f1e8a345b2a32704000650ac8bb30df4fdc55cbdd3e5c4",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Uh!!",
+     "phonemes": "ˈʌ!!"
+    },
+    "takesTried": [
+     {
+      "text": "Uh!",
+      "phonemes": "ˈʌ!",
+      "score": 0.6643
+     },
+     {
+      "text": "Uh.",
+      "phonemes": "ˈʌ.",
+      "score": 0.7341
+     },
+     {
+      "text": "Uh!!",
+      "phonemes": "ˈʌ!!",
+      "score": 0.7957
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_yeah_bright",
+   "file": "audio/chop_yeah_bright.mp3",
+   "kind": "chop",
+   "title": "Yeah (bright)",
+   "text": "yeah",
+   "voice": "bright",
+   "durationSec": 0.533832,
+   "samples": 23542,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "yeah",
+    "bright"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1226
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16407,
+    "sha256": "2b1c39cc999932143a30aa9a81db8b8b51861eb86a8407da1cab44d353a8fe06",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "bf_emma",
+       0.6
+      ],
+      [
+       "bf_isabella",
+       0.4
+      ]
+     ],
+     "speed": 1.05,
+     "lang": "en-us",
+     "text": "Yeah!!",
+     "phonemes": "jˈɛh!!"
+    },
+    "takesTried": [
+     {
+      "text": "Yeah.",
+      "phonemes": "jˈɛh.",
+      "score": 0.537
+     },
+     {
+      "text": "Yeah!",
+      "phonemes": "jˈɛh!",
+      "score": 0.5263
+     },
+     {
+      "text": "Yeah!!",
+      "phonemes": "jˈɛh!!",
+      "score": 0.6404
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_yeah_deep",
+   "file": "audio/chop_yeah_deep.mp3",
+   "kind": "chop",
+   "title": "Yeah (deep)",
+   "text": "yeah",
+   "voice": "deep",
+   "durationSec": 0.55195,
+   "samples": 24341,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "yeah",
+    "deep"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1579
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16397,
+    "sha256": "b1ebe60b1a9c6e58317fb47946e793a804834bc38fb53daa2faffb64816fafc7",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Yeah.",
+     "phonemes": "jˈɛh."
+    },
+    "takesTried": [
+     {
+      "text": "Yeah.",
+      "phonemes": "jˈɛh.",
+      "score": 0.6163
+     },
+     {
+      "text": "Yeah!",
+      "phonemes": "jˈɛh!",
+      "score": 0.5457
+     },
+     {
+      "text": "Yeah!!",
+      "phonemes": "jˈɛh!!",
+      "score": 0.4915
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_yeah_low",
+   "file": "audio/chop_yeah_low.mp3",
+   "kind": "chop",
+   "title": "Yeah (slowed)",
+   "text": "yeah",
+   "voice": "deep",
+   "durationSec": 0.729501,
+   "samples": 32171,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "yeah",
+    "deep",
+    "slowed"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 661
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16415,
+    "sha256": "4efe768dfe044dabd898d8210290daa89f355e3db4c386cd9158f8b1ea22dde7",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "am_fenrir",
+       0.6
+      ],
+      [
+       "am_puck",
+       0.4
+      ]
+     ],
+     "speed": 0.95,
+     "lang": "en-us",
+     "text": "Yeah.",
+     "phonemes": "jˈɛh."
+    },
+    "takesTried": [
+     {
+      "text": "Yeah.",
+      "phonemes": "jˈɛh.",
+      "score": 0.6163
+     },
+     {
+      "text": "Yeah!",
+      "phonemes": "jˈɛh!",
+      "score": 0.5457
+     },
+     {
+      "text": "Yeah!!",
+      "phonemes": "jˈɛh!!",
+      "score": 0.4915
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "derivedFrom": "chop_yeah_deep",
+    "process": "varispeed -5 st, drive 0.2, LP 6 kHz, room 0.05",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "chop_yeah_warm",
+   "file": "audio/chop_yeah_warm.mp3",
+   "kind": "chop",
+   "title": "Yeah (warm)",
+   "text": "yeah",
+   "voice": "warm",
+   "durationSec": 0.561043,
+   "samples": 24742,
+   "channels": 1,
+   "onsets": [
+    0.01
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "vocal",
+    "chop",
+    "yeah",
+    "warm"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1178
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_chops.py",
+    "seed": 16387,
+    "sha256": "7e285572c024cc2d9e8e10035dfb963b758b3ba0f172e4954a36d67515a4b420",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "802971ee56eb80fb89b9cee07ec6b07c58130a756236b263024dfbb62dfa98b9",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    },
+    "kokoro": {
+     "package": "kokoro-onnx 0.6.1",
+     "model": "Kokoro-82M v1.0 ONNX (Apache-2.0)",
+     "modelSha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb",
+     "voicesSha256": "4b4fa06e0f62b3418bc105cf4d43a611cc8c3a0aa4210c756778335de0fa20fd",
+     "voice": [
+      [
+       "af_bella",
+       0.6
+      ],
+      [
+       "af_sky",
+       0.4
+      ]
+     ],
+     "speed": 1,
+     "lang": "en-us",
+     "text": "Yeah!!",
+     "phonemes": "jˈɛh!!"
+    },
+    "takesTried": [
+     {
+      "text": "Yeah.",
+      "phonemes": "jˈɛh.",
+      "score": 0.6767
+     },
+     {
+      "text": "Yeah!",
+      "phonemes": "jˈɛh!",
+      "score": 0.6764
+     },
+     {
+      "text": "Yeah!!",
+      "phonemes": "jˈɛh!!",
+      "score": 0.6889
+     }
+    ],
+    "dsp": {
+     "script": "scripts/music/flip-pack/songgen/flip_chops_dsp.py",
+     "sha256": "5fd0880f25f83d2b30405912c616e3e70634d76515ad7441b262e2b582015c1f"
+    },
+    "process": "shape_chop, drive 0.08, air +1.5 dB, room 0.06",
+    "declickedPoints": 0
+   }
+  },
+  {
+   "id": "tex_riser",
+   "file": "audio/tex_riser.mp3",
+   "kind": "texture",
+   "title": "Riser 2 Bars",
+   "loop": false,
+   "bpm": 100,
+   "bars": 2,
+   "durationSec": 4.8,
+   "samples": 211680,
+   "channels": 2,
+   "onsets": [],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "texture",
+    "riser",
+    "fx",
+    "build"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 864
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 12291,
+    "sha256": "dbd8662e59a0e9498b3cfa86b5a36779c22629f4e749441022e20a2d6eb4f8e0",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "tex_tape_swell",
+   "file": "audio/tex_tape_swell.mp3",
+   "kind": "texture",
+   "title": "Tape Swell",
+   "loop": false,
+   "durationSec": 4,
+   "samples": 176400,
+   "channels": 2,
+   "onsets": [],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "texture",
+    "tape",
+    "hiss",
+    "swell"
+   ],
+   "lame": {
+    "encoderDelay": 576,
+    "padding": 1584
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 12290,
+    "sha256": "27aff66efe1d8f3908b8ace26b7e1b51cad30d365e2970b5f1eacc58213ee4cc",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  },
+  {
+   "id": "tex_vinyl_crackle",
+   "file": "audio/tex_vinyl_crackle.mp3",
+   "kind": "texture",
+   "title": "Vinyl Crackle",
+   "loop": true,
+   "bpm": 100,
+   "bars": 2,
+   "clicksByDesign": true,
+   "durationSec": 4.8,
+   "samples": 211680,
+   "channels": 2,
+   "onsets": [
+    0.02,
+    0.11,
+    0.19,
+    0.3,
+    0.49,
+    0.65,
+    0.78,
+    0.96,
+    1.04,
+    1.37,
+    1.46,
+    1.54,
+    1.77,
+    1.86,
+    1.94,
+    2.1
+   ],
+   "suggestedPads": [
+    0
+   ],
+   "tags": [
+    "texture",
+    "vinyl",
+    "crackle",
+    "lofi"
+   ],
+   "lame": {
+    "encoderDelay": 1728,
+    "padding": 2016
+   },
+   "provenance": {
+    "script": "scripts/music/flip-pack/songgen/flip_oneshots.py",
+    "seed": 12289,
+    "sha256": "7099689e3dbafec102a862a02accccf9ee24a386dca4ba119d1badabe2d6445c",
+    "date": "2026-09-25",
+    "licence": "FEL original, generated",
+    "scriptSha256": "d7160abfbcbb985eff977d16a6c97bfd5324408b511d076466c45357c0a4d252",
+    "library": "fel_synth 1.0.0",
+    "librarySha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+    "finisher": "flip_pack 1.0.0",
+    "finisherSha256": "6d61be62f8d4f6e012b481bb7c2a1b832a9eddaf112aa469f1075ec7dfc3e977",
+    "tools": {
+     "python": "3.12.13",
+     "numpy": "2.5.3",
+     "soundfile": "0.14.0",
+     "libsndfile": "1.2.2"
+    }
+   }
+  }
+ ]
+}

@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
 import { decideScreenReward } from '@/lib/mirror/screenReward';
-import { MIRROR_SCREEN_KIND, scoreScreen, type CheckResult, type ScreenId } from '@/lib/mirror/screen';
+import { MIRROR_SCREEN_KIND, distinctChecks, resultsForScreen, scoreScreen, screenVariantFor, type ScreenId } from '@/lib/mirror/screen';
 import { storedScreen, storedScreenId } from '@/lib/mirror/screenStore';
 
 /**
@@ -29,6 +29,21 @@ import { storedScreen, storedScreenId } from '@/lib/mirror/screenStore';
  *
  * It is stored the same way the dunk log is — WorkoutScan with its own `kind`, numbers only, no video, no
  * keypoints — and a failed write never costs the athlete their reward.
+ *
+ * MIRROR-COACH P1 (2026-09-25). Two things this route stored that were not true:
+ *   · A screen with NO graded station (every screen so far — nothing calls ScreenRunner.record until phase 3's
+ *     graders) was scored 100 with 0 flags and stored like a clean result. It is now stored as UNGRADED
+ *     (graded: false, score: null), pays nothing, and answers with the not-graded line — no retry prompt.
+ *   · `screen` came from the picker while the stations came from a runner always built as 'modified', so a "full"
+ *     screen was kept over modified stations. The harness now posts the variant that ran, and results for checks the
+ *     claimed variant does not have are dropped here (resultsForScreen) before anything is scored, paid or kept.
+ *     That filter only stops a MODIFIED claim carrying full-only checks; a 'full' claim over the modified stations
+ *     passes it (every modified check is a full check), so a 'full' claim with none of its own stations is stored as
+ *     'modified' (screenVariantFor).
+ *   · Found in review the same day: the results were counted raw — three copies of one check with a made-up grade
+ *     were 3 checks, scored 100 and paid. resultsForScreen now keeps only real grades, one per check per side, and
+ *     the reward counts DIFFERENT checks (distinctChecks). And a partly graded screen has no score and is not "clear"
+ *     (scoreScreen). lib/mirror/screen-route.test.ts runs this route for real.
  */
 
 export async function POST(req: NextRequest) {
@@ -41,8 +56,9 @@ export async function POST(req: NextRequest) {
 
   const b = body as { screenId?: unknown; screen?: unknown; results?: unknown; provisional?: unknown };
   const screenId = String(b?.screenId ?? '').slice(0, 64).replace(/[^A-Za-z0-9_:-]/g, '');
-  const screen: ScreenId = b?.screen === 'full' ? 'full' : 'modified';
-  const results = Array.isArray(b?.results) ? (b.results as CheckResult[]) : [];
+  const claimed: ScreenId = b?.screen === 'full' ? 'full' : 'modified';
+  const results = resultsForScreen(claimed, Array.isArray(b?.results) ? b.results : []);
+  const screen = screenVariantFor(claimed, results);
   if (!screenId) return NextResponse.json({ error: 'missing_screen_id' }, { status: 400 });
 
   // Recomputed, not trusted. The client renders this summary too, but what gets paid for is what the server works out.
@@ -52,7 +68,7 @@ export async function POST(req: NextRequest) {
     screenId,
     athleteId,
     provisional: Boolean(b?.provisional),
-    checksTaken: results.length,
+    checksTaken: distinctChecks(results),
   });
 
   let awarded = 0;
@@ -61,7 +77,8 @@ export async function POST(req: NextRequest) {
       playerId: athleteId,
       reasonCode: decision.reasonCode,
       idempotencyKey: decision.idempotencyKey,
-      metadata: { screen, screenId, redFlags: summary.redFlags, asymmetries: summary.asymmetries },
+      // movementFlags is the name from 2026-09-25; redFlags stays beside it so ledger readers of older rows still agree
+      metadata: { screen, screenId, movementFlags: summary.movementFlags, redFlags: summary.movementFlags, asymmetries: summary.asymmetries },
     }).catch(() => null);
     awarded = granted?.granted.shards ?? 0;
   }
@@ -81,6 +98,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     summary,
+    graded: summary.graded,
     paid: decision.pay,
     awarded,
     message: decision.message,

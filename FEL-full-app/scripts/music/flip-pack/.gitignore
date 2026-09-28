@@ -1,0 +1,9 @@
+# MUSIC-SUITE P5: renders go to $FLIPPACK_DIR (outside the repo); Python leaves bytecode beside the producers
+__pycache__/
+*.pyc
+flippack/audio/
+flippack/items/
+flippack/banks/
+flippack/themes/
+flippack/pack.json
+flippack/PROVENANCE.md

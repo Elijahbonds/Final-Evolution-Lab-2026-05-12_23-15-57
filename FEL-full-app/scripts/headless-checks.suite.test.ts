@@ -64,7 +64,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'net-anim-tests.ts', guards: 'tennis / volleyball / golf / derby / penalty — one owner per body: the net tree settles onto the shuffle, the beats land on their loops, the ball leaves on the contact key' },
   { script: 'prove-it-tests.ts', guards: 'prove it — synthetic pose streams produce measured flight physics; families separate; PRQ-relative scoring' },
   { script: 'mirror-v2-tests.ts', guards: 'mirror v2 — reps count with tempo, flicker never counts, the jump pattern runs the Prove It tracker, the skeleton paints' },
-  { script: 'mirror-coach-tests.ts', guards: "mirror coach — the squat audit measures the book's four faults; the cue engine holds down, escalates, confirms once; the guided flow wires it" },
+  { script: 'mirror-coach-tests.ts', guards: "mirror coach — the squat audit measures its four faults per side; the cue engine holds down, escalates, confirms once; the guided flow wires it" },
   { script: 'closet-jersey-tests.ts', guards: 'jersey id — number clamps 0–99, name plate is charset-safe and length-capped, garbage never throws' },
   { script: 'avatar-pipeline-tests.ts', guards: 'shipped avatar GLBs — spec bones, float32 skins, no draco, meter-scale tracks, manifest coverage' },
   { script: 'perf-budget-tests.ts', guards: 'mobile-tier texture memory stays within 2x the median (textureBudget.json, measured)' },

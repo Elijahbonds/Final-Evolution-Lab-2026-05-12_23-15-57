@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ABANDON_MS, ScreenRunner } from './screenRunner';
+import { FULL_SCREEN, MODIFIED_SCREEN } from './screen';
 import type { FramingFrame, FramingPoint } from './framing';
 
 /** A shot. `facing` decides whether the face is visible, which is how back-on is told from square-on. */
@@ -77,5 +78,36 @@ describe('running the screen', () => {
     const end = r.tick(shot('front'), t);
     expect(end.phase).toBe('complete');
     expect(end.say).toMatch(/screen done/i);
+  });
+});
+
+// MIRROR-COACH P1 (2026-09-25): the harness built every runner as 'modified' and posted the picker's value, so a
+// "Full" screen was stored over modified stations. The runner now says which screen it is running, and that is what
+// gets posted.
+describe('the runner carries the screen it runs', () => {
+  it('a full runner says full and walks the full screen\'s stations', () => {
+    const r = new ScreenRunner('full');
+    expect(r.screen).toBe('full');
+    expect(r.tick(shot('back'), 0).screen).toBe('full');
+    const seen = new Set<string>();
+    let t = 0;
+    for (let i = 0; i < 4000 && !seen.has('done'); i++) {
+      const st = r.tick(shot(r.station?.view ?? 'front'), (t += 250));
+      if (st.station) seen.add(st.station.id);
+      if (st.phase === 'complete') { seen.add('done'); expect(st.screen).toBe('full'); }
+    }
+    for (const s of FULL_SCREEN) expect(seen.has(s.id)).toBe(true);
+  });
+
+  it('a modified runner says modified and never visits a full-only station', () => {
+    const r = new ScreenRunner('modified');
+    expect(r.tick(shot('back'), 0).screen).toBe('modified');
+    const ids = new Set(MODIFIED_SCREEN.map((s) => s.id));
+    let t = 0;
+    for (let i = 0; i < 4000; i++) {
+      const st = r.tick(shot(r.station?.view ?? 'front'), (t += 250));
+      if (st.station) expect(ids.has(st.station.id)).toBe(true);
+      if (st.phase === 'complete') { expect(st.screen).toBe('modified'); break; }
+    }
   });
 });

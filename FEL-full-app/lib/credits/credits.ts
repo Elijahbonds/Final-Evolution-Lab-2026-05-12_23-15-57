@@ -15,6 +15,8 @@
 // source's own terms that were read and pinned in REVIEWED_TERMS. Anything else counts as unlabeled. PENDING_OWNER is
 // an exact list: a new unlabeled entry fails the test, and so does a pending entry whose licence has been recorded.
 
+import { signedPdEntries, type PdEntry } from '../babylon/music/pdShelf';
+
 /** CMU's required acknowledgement, word for word. The test fails if a character of it changes. */
 export const CMU_ACKNOWLEDGEMENT =
   'The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217.';
@@ -77,7 +79,11 @@ export const OPEN_LICENCES: Record<string, string> = {
   ISC: 'https://opensource.org/license/isc-license-txt',
   Unlicense: 'https://unlicense.org/',
   'OFL-1.1': 'https://openfontlicense.org/',
+  // MUSIC-SUITE P5 FIX PASS: not a licence — no copyright is left (a US sound recording published before 1925; the
+  // Music Modernization Act's schedule for pre-1972 recordings). Only an owner-signed pdShelf entry carries it.
+  'Public domain (US)': 'https://www.copyright.gov/music-modernization/pre1972-soundrecordings/',
 };
+const PD_LICENCE = 'Public domain (US)';
 
 /** The first-party statements that may ship. */
 export const FIRST_PARTY_LICENCES: readonly string[] = [
@@ -265,7 +271,7 @@ export const CREDITS: Credit[] = [
     section: 'sound',
     title: 'Kokoro-82M',
     by: 'hexgrad; ONNX export by onnx-community',
-    used: 'The voices of the MC, the crowd, the players, the coach and the quiz host. The words are our own scripts, rendered offline on our own machine.',
+    used: 'The voices of the MC, the crowd, the players, the coach and the quiz host, and the Flip pack’s vocal chops. The words are our own scripts, rendered offline on our own machine.',
     licence: 'Apache-2.0',
     licenceUrl: OPEN_LICENCES['Apache-2.0'],
     status: 'open',
@@ -285,6 +291,20 @@ export const CREDITS: Credit[] = [
     recordedIn: ['scripts/gen-808-kit.py'],
     covers: ['audio/kits/'],
     manifestLicences: [],
+  },
+  // MUSIC-SUITE P5 (2026-09-25): the Flip's own pack. Every file's record (script, seed, sha256) is
+  // public/audio/flip/PROVENANCE.json, held to the bytes by lib/babylon/music/provenance.test.ts.
+  {
+    id: 'fel-flip-pack',
+    section: 'sound',
+    title: 'The FEL Flip pack',
+    by: 'Final Evolution Lab',
+    used: 'The Flip’s built-in sounds in the Groove Academy: three FEL themes, ten melodic loops, chord stabs, horn and orchestra hits, drums, textures and vocal chops. All generated from our own code; the chops’ voices are Kokoro-82M, run on our own machine, saying our own words.',
+    licence: 'Our own work',
+    status: 'first-party',
+    recordedIn: ['public/audio/flip/PROVENANCE.json', 'scripts/music/flip-pack/README.md', 'lib/babylon/music/provenance.test.ts'],
+    covers: ['audio/flip/'],
+    manifestLicences: ['FEL original, generated'],
   },
 
   // ── software the browser runs ───────────────────────────────────────────────────────────────────────────────────
@@ -441,7 +461,29 @@ export const CREDITS: Credit[] = [
     ],
     manifestLicences: [],
   },
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): one entry per public-domain recording the owner has signed on the Flip shelf
+  // (lib/babylon/music/pdShelf.ts — none today, decision #28), crediting the performer by name and year with the reason
+  // it is free. PD-CANDIDATES.md's publicity-rights assumption rests on the app naming them; the FLIP tab shows the same.
+  ...pdCredits(),
 ];
+
+/** The signed public-domain recordings as credits (each covers its own /audio/pd/<id>.mp3). */
+export function pdCredits(entries: readonly PdEntry[] = signedPdEntries()): Credit[] {
+  return entries.map((e) => ({
+    id: `pd-${e.id}`,
+    section: 'sound' as const,
+    title: e.title,
+    by: `${e.performer} (${e.year})`,
+    used: `A public-domain recording on the Flip's shelf in the Groove Academy. ${e.whyFree}`,
+    licence: PD_LICENCE,
+    licenceUrl: OPEN_LICENCES[PD_LICENCE],
+    status: 'open' as const,
+    link: e.sourceUrl,
+    recordedIn: ['lib/babylon/music/pdShelf.ts'],
+    covers: [`audio/pd/${e.id}.mp3`],
+    manifestLicences: [],
+  }));
+}
 
 /** Files under public/ that are not assets, each with the reason. */
 export const NOT_ASSETS: Record<string, string> = {

@@ -10,6 +10,7 @@ import { ChannelReader } from '../pose/bodyChannels';
 import type { PoseFrame } from '../pose/landmarks';
 import type { PoseFixture } from '../pose/synth';
 import { InputBus, liveInputBuses, type BodyPacket } from '../babylon/core/InputBus';
+import { stripComments } from '../testing/sourceScan';
 
 // MOVEMENT PLAY P3 (2026-09-24): body control is the body channel now. The source reads every camera frame PoseService
 // hands it (BodyReader, then ChannelReader) and publishes the packet to the running modes; it presses nothing itself.
@@ -17,6 +18,8 @@ import { InputBus, liveInputBuses, type BodyPacket } from '../babylon/core/Input
 // failures. What is pinned: the frames drive it (no render loop), one packet per frame carrying exactly what the readers
 // say, 'calibrating' until the reader has its stand, and a FINAL packet whenever the body stops being this one —
 // re-centred, switched off, the camera refused or gone, the feed ended — so a running mode always lets go.
+// MOVEMENT PLAY P4 (2026-09-25): the reader takes its stand from the space check now (setCalibration), never by
+// itself; the P3 tests above run the old self-calibrating reader (AUTO), which only the dev probe keeps.
 
 const g = globalThis as unknown as Record<string, unknown>;
 
@@ -67,6 +70,10 @@ const stand = fx.frames;
 const later = (frames: readonly PoseFrame[], ms: number): PoseFrame[] =>
   frames.map((f) => ({ ...f, t: f.t + ms, arrive: (f.arrive ?? f.t) + ms }));
 
+/** P3's self-calibrating reader: the dev probe's (__FEL_BODY__) and these tests'. The player's source waits for the
+ *  space check's rulers instead (movement play P4; the tests of that are below). */
+const AUTO = { autoCalibrate: true } as const;
+
 /** A source publishing into a list. */
 function rig(svc: PoseServiceLike) {
   const packets: BodyPacket[] = [];
@@ -86,7 +93,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const { svc } = service();
     svc.beginFeed();
     const { src, packets } = rig(svc);
-    expect(await src.start()).toBe(true);
+    expect(await src.start(AUTO)).toBe(true);
     expect(packets).toEqual([]);                        // nothing until a frame comes
 
     const reader = new BodyReader(), channels = new ChannelReader();
@@ -104,7 +111,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const { svc } = service();
     svc.beginFeed();
     const { src, packets } = rig(svc);
-    await src.start();
+    await src.start(AUTO);
     expect(src.snapshot).toEqual({ state: 'calibrating', detail: '', body: false });
     const seen: string[] = [];
     src.listen((s) => seen.push(`${s.state}:${s.body}`));
@@ -124,7 +131,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const { svc } = service();
     svc.beginFeed();
     const src = new PoseSource({}, svc, () => { throw new Error('a running mode blew up on this packet'); });
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand) svc.pushFeed(f);            // PoseService reports each throw (deps.warn) and carries on
     expect(src.snapshot).toEqual({ state: 'live', detail: '', body: true });
     // and switching off still switches off: the final packet's throw is reported, the camera stopped, the button off
@@ -140,7 +147,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const { svc } = service();
     svc.beginFeed();
     const { src, packets } = rig(svc);
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand) svc.pushFeed(f);
     expect(src.state).toBe('live');
     const before = packets.length;
@@ -168,7 +175,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const { svc } = service();
     svc.beginFeed();
     const { src, packets } = rig(svc);
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand.slice(0, 30)) svc.pushFeed(f);
     src.stop();
     expect(packets[packets.length - 1].final).toBe(true);
@@ -179,7 +186,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     svc.pushFeed(stand[40]);                            // the feed again, with the source off
     expect(packets).toHaveLength(n);
     // on again: a new reader from scratch (calibrating on the next stand)
-    await src.start();
+    await src.start(AUTO);
     for (const f of later(stand, 5000)) svc.pushFeed(f);
     expect(packets.slice(n).findIndex((p) => p.read.calibrated)).toBeGreaterThan(0);
     src.stop();
@@ -189,7 +196,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const { svc } = service();
     svc.beginFeed();
     const { src, packets } = rig(svc);
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand.slice(0, 30)) svc.pushFeed(f);
     svc.endFeed();
     expect(src.state).toBe('idle');
@@ -200,7 +207,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
   it('a camera that fails after frames sends the final packet and shows why; the reader starts over', async () => {
     const svc = camera();
     const { src, packets } = rig(svc);
-    await src.start();
+    await src.start(AUTO);
     expect(src.state).toBe('calibrating');
     for (const f of stand) svc.frame(f);
     expect(src.state).toBe('live');
@@ -210,7 +217,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     const n = packets.length;
     svc.frame(later(stand, 4000)[0]);                   // stragglers after the failure are not read
     expect(packets).toHaveLength(n);
-    await src.start();                                  // the next click: a fresh reader, calibrating again
+    await src.start(AUTO);                                  // the next click: a fresh reader, calibrating again
     const again = later(stand, 8000);
     svc.frame(again[0]);
     expect(packets[packets.length - 1].read.calibrated).toBe(false);
@@ -220,7 +227,7 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
   it('the feed taking the camera\'s place is a new body: a final packet, and a new stand', async () => {
     const svc = camera();
     const { src, packets } = rig(svc);
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand) svc.frame(f);
     expect(src.state).toBe('live');
     svc.set({ source: 'feed', model: null });
@@ -268,6 +275,116 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
   });
 });
 
+describe('the space check gates the source (movement play P4)', () => {
+  beforeEach(() => {
+    g.requestAnimationFrame = () => { throw new Error('poseSource must not run on requestAnimationFrame'); };
+    g.cancelAnimationFrame = () => {};
+  });
+  afterEach(() => { delete g.requestAnimationFrame; delete g.cancelAnimationFrame; });
+
+  /** The rulers the space check hands over: here, the reader's own on the same stand (calibrate.ts either way). */
+  function checkRulers() {
+    const r = new BodyReader();
+    for (const f of stand) r.read(f);
+    return r.calibration!;
+  }
+
+  it('by default the reader never calibrates itself: a still stand stays uncalibrated, and the button says so', async () => {
+    const { svc } = service();
+    svc.beginFeed();
+    const { src, packets } = rig(svc);
+    await src.start();
+    for (const f of stand) svc.pushFeed(f);
+    expect(packets).toHaveLength(stand.length);
+    expect(packets.filter((p) => p.read.calibrated)).toEqual([]);
+    expect(packets.every((p) => p.channels.handsUpMs === 0)).toBe(true);   // the START hold counts only a calibrated body
+    expect(src.calibration).toBeNull();
+    expect(src.state).toBe('calibrating');
+    src.stop();
+  });
+
+  it('the check\'s rulers: the next packet is calibrated with them, and the button goes live', async () => {
+    const { svc } = service();
+    svc.beginFeed();
+    const { src, packets } = rig(svc);
+    await src.start();
+    for (const f of stand.slice(0, 30)) svc.pushFeed(f);
+    const cal = checkRulers();
+    const seen: string[] = [];
+    src.listen((x) => seen.push(x.state));
+    src.setCalibration(cal);
+    expect(src.calibration).toBe(cal);
+    expect(src.state).toBe('live');
+    expect(seen).toEqual(['live']);
+    svc.pushFeed(later(stand, 3000)[0]);
+    const p = packets[packets.length - 1];
+    expect(p.read.calibrated).toBe(true);
+    expect(p.read.rulers!.floorY).toEqual(cal.floorY);
+    src.stop();
+  });
+
+  it('re-centred after it: a final packet, calibrating again, and the stand does not calibrate it — the check must', async () => {
+    const { svc } = service();
+    svc.beginFeed();
+    const { src, packets } = rig(svc);
+    await src.start();
+    for (const f of stand.slice(0, 10)) svc.pushFeed(f);
+    src.setCalibration(checkRulers());
+    svc.pushFeed(stand[10]);
+    const before = packets.length;
+    src.recalibrate();
+    expect(packets[before].final).toBe(true);
+    expect(src.state).toBe('calibrating');
+    for (const f of later(stand, 4000)) svc.pushFeed(f);
+    expect(packets.slice(before + 1).filter((p) => p.read.calibrated)).toEqual([]);
+    expect(src.calibration).toBeNull();
+    src.stop();
+  });
+
+  it('a new start is a fresh reader: the last session\'s rulers do not carry over', async () => {
+    const { svc } = service();
+    svc.beginFeed();
+    const { src, packets } = rig(svc);
+    await src.start();
+    svc.pushFeed(stand[0]);
+    src.setCalibration(checkRulers());
+    src.stop();
+    svc.beginFeed();
+    await src.start();
+    expect(src.calibration).toBeNull();
+    svc.pushFeed(later(stand, 5000)[0]);
+    expect(packets[packets.length - 1].read.calibrated).toBe(false);
+    src.stop();
+    // …and the dev probe's start still calibrates itself, as P3's did
+    svc.beginFeed();
+    await src.start(AUTO);
+    for (const f of later(stand, 9000)) svc.pushFeed(f);
+    expect(packets[packets.length - 1].read.calibrated).toBe(true);
+    src.stop();
+  });
+
+  it('no player path starts a self-calibrating reader: `autoCalibrate: true` lives in tests and the dev probe alone', () => {
+    const ROOT = join(__dirname, '..', '..');
+    const hits: string[] = [];
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+        if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+        const rel = join(dir, e.name);
+        if (e.isDirectory()) walk(rel);
+        else if (/\.(ts|tsx|mts)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
+          const src = stripComments(readFileSync(join(ROOT, rel), 'utf8'));
+          if (/autoCalibrate\s*:\s*true/.test(src)) hits.push(rel);
+        }
+      }
+    };
+    for (const d of ['lib', 'components', 'app', 'hooks', 'scripts']) if (existsSync(join(ROOT, d))) walk(d);
+    expect(hits.filter((f) => !f.startsWith(join('scripts', 'probes')))).toEqual([]);
+    // the source's own default is the gated reader
+    const own = stripComments(readFileSync(join(__dirname, 'poseSource.ts'), 'utf8'));
+    expect(own).toContain('new BodyReader({ autoCalibrate: opts.autoCalibrate ?? false })');
+  });
+});
+
 describe('the packets reach the running mode', () => {
   // node, not jsdom: somewhere for a bus's listeners and poll loop to attach (as poseControl.bus.test.ts)
   const nav = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
@@ -294,7 +411,7 @@ describe('the packets reach the running mode', () => {
     running.start();
     gone.start(); gone.stop();
     const src = new PoseSource({}, svc);                // the real publisher: publishBodyToLive
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand.slice(0, 25)) svc.pushFeed(f);
     expect(got).toHaveLength(25);
     expect(never).toEqual([]);
@@ -315,7 +432,7 @@ describe('the packets reach the running mode', () => {
     fine.onBody((p) => got.push(p));
     broken.start(); fine.start();
     const src = new PoseSource({}, svc);                // the real publisher: publishBodyToLive
-    await src.start();
+    await src.start(AUTO);
     for (const f of stand) svc.pushFeed(f);
     expect(got).toHaveLength(stand.length);
     expect(src.snapshot).toEqual({ state: 'live', detail: '', body: true });
@@ -373,5 +490,15 @@ describe('the probe hook', () => {
     const dev = await load('development', 'fel.example');
     expect(typeof dev?.start).toBe('function');
     expect(dev?.snapshot()).toEqual({ state: 'idle', detail: '', body: false });
+  });
+
+  it('__FEL_BODY__.start hands its options to the source (the seam probe keeps P3\'s self-calibrating reader)', async () => {
+    const hook = await load('development', 'fel.example');
+    const mod = await import('./poseSource');
+    const spy = vi.spyOn(mod.PoseSource.prototype, 'start').mockResolvedValue(true);
+    await hook!.start({ autoCalibrate: true });
+    await hook!.start();
+    expect(spy.mock.calls).toEqual([[{ autoCalibrate: true }], [undefined]]);
+    spy.mockRestore();
   });
 });

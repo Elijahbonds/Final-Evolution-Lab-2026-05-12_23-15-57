@@ -14,7 +14,10 @@
 //                               image + world landmarks.
 //   latest                      the newest frame, for a reader that polls on its own clock
 //   state / why / status        idle | requesting | loading | live | error (+ why); onStatus(cb) for React
-//   video / showIn(el)          the <video>, for a self-view. Never mirrored here: the view flips it.
+//   video / showIn(el)          the <video>, for a self-view. Never mirrored here: the view flips it. MOVEMENT PLAY P4
+//                               (2026-09-25): the space check's panel and the corner during play both show it, so the
+//                               hosts STACK — the last one shown wins, and an undo hands the picture back to the one
+//                               under it (or parks it), never taking it from a host shown since.
 //   stats / model               fps, detect ms, capture→result latency; which model and why
 //
 // The model: full on a desktop, lite on a phone or tablet, and full drops to lite when its first seconds of body frames
@@ -92,6 +95,8 @@ export interface PoseDeps {
   /** Start it. Rejects when it cannot play, and when releaseVideo() runs first (a pause or a cleared source rejects a pending play()). */
   playVideo(video: HTMLVideoElement): Promise<void>;
   releaseVideo(video: HTMLVideoElement): void;
+  /** Park it out of sight again, still in the page (requestVideoFrameCallback wants it there). Default: document.body. */
+  parkVideo?(video: HTMLVideoElement): void;
   loadDetector(model: PoseModel): Promise<PoseDetector>;
   onVideoFrames(video: HTMLVideoElement, onFrame: (tick: VideoFrameTick) => void): () => void;
   /** performance.now(): the clock capture times are on. */
@@ -172,6 +177,8 @@ export class PoseService {
   private count = 0;
 
   private feed: { schedule: FeedSchedule; resolve: (n: number) => void; timer: unknown } | null = null;
+  /** The self-views showing the <video>, oldest first: the last one has it (showIn). */
+  private hosts: { el: HTMLElement; video: HTMLVideoElement }[] = [];
   private fed = 0;
 
   constructor(private readonly deps: PoseDeps) {}
@@ -204,18 +211,27 @@ export class PoseService {
   }
 
   /**
-   * Show the camera picture inside `el` (a self-view: size it, and flip it with CSS to mirror). Returns the undo, which
-   * parks it out of sight again. Call again after a restart: every start makes a new <video>.
+   * Show the camera picture inside `el` (a self-view: size it, and flip it with CSS to mirror). Returns the undo. The
+   * hosts stack: the last one shown has the picture, and an undo takes only its own place — the picture goes back to
+   * the host under it, or is parked out of sight when none is left. Call again after a restart: every start makes a new
+   * <video>, and an undo from before it does nothing.
    */
   showIn(el: HTMLElement): () => void {
     const v = this._video;
     if (!v) return () => {};
-    v.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover';
-    el.appendChild(v);
+    const entry = { el, video: v };
+    this.hosts.push(entry);
+    placeVideo(v, el);
     return () => {
-      if (this._video !== v) return;
-      v.style.cssText = PARK_STYLE;
-      document.body.appendChild(v);
+      const i = this.hosts.indexOf(entry);
+      if (i < 0) return;                         // undone already, or the camera stopped since
+      const top = i === this.hosts.length - 1;
+      this.hosts.splice(i, 1);
+      if (!top || this._video !== v) return;     // another host has it; or a restart made a new <video>
+      const under = this.hosts[this.hosts.length - 1];
+      if (under) placeVideo(v, under.el);
+      else if (this.deps.parkVideo) this.deps.parkVideo(v);
+      else parkVideo(v);
     };
   }
 
@@ -380,6 +396,7 @@ export class PoseService {
   }
 
   private teardown(): void {
+    this.hosts = [];   // the <video> is released below: no self-view shows it any more, and their undos do nothing
     this.stopFrames?.(); this.stopFrames = null;
     this.detector?.dispose(); this.detector = null;
     if (this.stream) { stopTracks(this.stream); this.stream = null; }
@@ -489,6 +506,17 @@ export class PoseService {
 
 /** Where the <video> waits when no self-view shows it: in the page (for requestVideoFrameCallback), but invisible. */
 const PARK_STYLE = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1';
+/** In a self-view: the host's box, covered (the host sizes itself to the picture's shape, so nothing is cropped). */
+const SHOW_STYLE = 'display:block;width:100%;height:100%;object-fit:cover';
+
+function placeVideo(v: HTMLVideoElement, el: HTMLElement): void {
+  v.style.cssText = SHOW_STYLE;
+  el.appendChild(v);
+}
+function parkVideo(v: HTMLVideoElement): void {
+  v.style.cssText = PARK_STYLE;
+  document.body.appendChild(v);
+}
 
 function browserDeps(): PoseDeps {
   return {

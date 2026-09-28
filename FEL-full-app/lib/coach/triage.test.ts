@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  flagsFor, triageRoster, progressionsOnly,
+  flagsFor, triageRoster, progressionsOnly, dataOnFile,
   TOP_N, STALE_SCAN_DAYS, QUIET_DAYS, OFF_BASELINE_DROP, PROGRESSION_COMPOSITE,
   type AthleteRow,
 } from './triage';
@@ -178,6 +178,51 @@ describe('the problem flags', () => {
   });
 });
 
+// MIRROR-COACH P2 (2026-09-25), F7 of the P1 baseline: the day after a Mirror movement screen — or after two weeks of
+// logged coached sessions — stale-scan told the coach "No PRQ System Scan on file. Ask for a System Scan — there is
+// nothing current to program from." A Mirror screen and coached work are current data too.
+describe('CURRENT DATA IS ANY OF THREE: a PRQ System Scan, a Mirror screen, coached work', () => {
+  const noPrq = (over: Partial<AthleteRow>) => row({ profile: emptyProfile('x'), ...over });
+
+  // (MIRROR-COACH P2 review, 2026-09-26: lastScreenAt is the newest GRADED screen — the route drops ungraded ones,
+  // lib/coach/attention.ts gradedScreenTimes — so the lines say "graded", and the action asks for a System Scan only
+  // until the P3 graders land.)
+  it('a graded Mirror screen yesterday is current data: no stale-scan the next day', () => {
+    expect(flagsFor(noPrq({ lastScreenAt: ago(1), lastCoachedAt: null }), NOW)).toEqual([]);
+  });
+
+  it('coached work inside the window is current data too', () => {
+    expect(flagsFor(noPrq({ lastScreenAt: null, lastCoachedAt: ago(2) }), NOW)).toEqual([]);
+    // …and an old PRQ scan does not matter while it is
+    const oldPrq = row({ profile: profile([{ composite: 60, daysAgo: 40 }]), lastScreenAt: null, lastCoachedAt: ago(3) });
+    expect(flagsFor(oldPrq, NOW).map((f) => f.kind)).not.toContain('stale-scan');
+  });
+
+  it('when nothing is current, the flag says what IS on file, source by source', () => {
+    const f = flagsFor(noPrq({ lastScreenAt: ago(STALE_SCAN_DAYS + 6), lastCoachedAt: null }), NOW).find((x) => x.kind === 'stale-scan')!;
+    expect(f.observed).toBe('No PRQ System Scan on file; last graded Mirror screen 20 days ago; no coached work logged.');
+    expect(f.action).toBe('Ask for a System Scan — there is nothing current to program from.');
+    expect(f.action).not.toMatch(/Mirror screen/);          // no screen can be graded before P3
+    const g = flagsFor(row({ profile: profile([{ composite: 60, daysAgo: 30 }]), lastScreenAt: null, lastCoachedAt: ago(16) }), NOW).find((x) => x.kind === 'stale-scan')!;
+    expect(g.observed).toBe('Last PRQ System Scan 30 days ago; no graded Mirror screen; last coached work 16 days ago.');
+  });
+
+  it('a source the caller did not read is left out, not reported as missing (not read is not none)', () => {
+    expect(dataOnFile(noPrq({}), NOW)).toEqual({ current: false, parts: ['No PRQ System Scan on file'] });
+    expect(dataOnFile(noPrq({ lastScreenAt: null }), NOW).parts).toEqual(['No PRQ System Scan on file', 'no graded Mirror screen']);
+  });
+
+  it('the screen window is STALE_SCAN_DAYS, the same as the PRQ scan', () => {
+    expect(dataOnFile(noPrq({ lastScreenAt: ago(STALE_SCAN_DAYS - 0.5) }), NOW).current).toBe(true);
+    expect(dataOnFile(noPrq({ lastScreenAt: ago(STALE_SCAN_DAYS) }), NOW).current).toBe(false);
+  });
+
+  it('still never stacked on silence: gone-quiet alone, whatever is on file', () => {
+    const f = flagsFor(noPrq({ lastActiveAt: ago(QUIET_DAYS + 1), lastScreenAt: null, lastCoachedAt: null }), NOW);
+    expect(f.map((x) => x.kind)).toEqual(['gone-quiet']);
+  });
+});
+
 describe('a flag states an observation and an action, never a condition', () => {
   const CLINICAL = ['injur', 'diagnos', 'symptom', 'patholog', 'risk of', 'unsafe', 'damage', 'overtrain', 'burnout'];
 
@@ -188,6 +233,7 @@ describe('a flag states an observation and an action, never a condition', () => 
       row({ profile: profile([{ composite: 80, daysAgo: 30 }, { composite: 50, daysAgo: 1 }]) }),
       row({ profile: profile([{ composite: 88, daysAgo: 1 }]) }),
       row({ profile: emptyProfile('x') }),
+      row({ profile: emptyProfile('x'), lastScreenAt: ago(30), lastCoachedAt: ago(20) }),
     ];
     const offenders: string[] = [];
     for (const r of rows) {

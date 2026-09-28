@@ -176,7 +176,7 @@ export function confirmCopy(p: PendingSpend, shards: number | null = null): { qu
 
 // ── what the account owns ────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The device cache of owned kits (the key the room has always used, so old devices keep their cache). */
+/** The device cache of owned kits: the prefix of each player's key (kitCacheKey), and the old shared key (P3: never read). */
 export const KIT_CACHE_KEY = 'fel_studio_kits_v1';
 /** The kit everybody owns; a remix of a locked kit opens on it. */
 export const DEFAULT_KIT: KitId = 'street';
@@ -210,14 +210,30 @@ export function kitsAfterRead(cache: readonly KitId[], read: OwnedKitsRead): Kit
   return read.ok ? kitsFromOwned(read.owned) : kitList(cache);
 }
 
-type KitStore = { getItem(k: string): string | null; setItem(k: string, v: string): void };
-/** Read the cache. A storage that throws (blocked site data, a private window) reads as the free kits only. */
-export function readKitCache(storage: KitStore | null | undefined): KitId[] {
-  try { return cleanKitCache(storage?.getItem(KIT_CACHE_KEY) ?? null); } catch { return kitList([]); }
+type KitStore = { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem?(k: string): void };
+
+/**
+ * MUSIC-SUITE P3 (2026-09-25), from P2's open item: THE CACHE IS THE PLAYER'S, not the device's. It was one key for
+ * everybody ('fel_studio_kits_v1'), and the room never knew who was playing, so on a shared device (a family laptop, a
+ * school tablet) the next player saw the last player's NEON and DUST as owned until GET /api/music/unlock answered — and
+ * kept seeing them if it never did (the cache stands when the read fails). The key now carries the signed-in player's id
+ * (app/play/music passes it down; /dev/music a fixed dev id), and a room that doesn't know who is playing reads no cache at
+ * all: the old unkeyed value could be anyone's, so it is never adopted, and it is removed on the first keyed write. The
+ * server read stays the truth either way.
+ */
+export function kitCacheKey(playerId: string): string { return `${KIT_CACHE_KEY}:${playerId}`; }
+const knownPlayer = (id: string | null | undefined): id is string => typeof id === 'string' && id.length > 0 && id.length <= 128;
+
+/** Read this player's cache. No player, or a storage that throws (blocked site data, a private window): free kits only. */
+export function readKitCache(storage: KitStore | null | undefined, playerId: string | null | undefined): KitId[] {
+  if (!knownPlayer(playerId)) return kitList([]);
+  try { return cleanKitCache(storage?.getItem(kitCacheKey(playerId)) ?? null); } catch { return kitList([]); }
 }
-/** Write the cache; a storage that throws is ignored (the server is the truth, the cache only saves a round trip). */
-export function writeKitCache(storage: KitStore | null | undefined, kits: readonly KitId[]): void {
-  try { storage?.setItem(KIT_CACHE_KEY, JSON.stringify(kitList(kits))); } catch { /* cache only */ }
+/** Write this player's cache (and drop the old shared key); no player or a storage that throws is ignored. */
+export function writeKitCache(storage: KitStore | null | undefined, kits: readonly KitId[], playerId: string | null | undefined): void {
+  if (!knownPlayer(playerId)) return;
+  try { storage?.setItem(kitCacheKey(playerId), JSON.stringify(kitList(kits))); } catch { /* cache only */ }
+  try { storage?.removeItem?.(KIT_CACHE_KEY); } catch { /* cache only */ }
 }
 
 // ── remix ────────────────────────────────────────────────────────────────────────────────────────────────────────────

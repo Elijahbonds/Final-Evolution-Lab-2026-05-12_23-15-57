@@ -24,6 +24,14 @@ export type RunnerPhase =
   | 'complete';
 
 export interface RunnerState {
+  /**
+   * Which screen this runner is running — the variant whose stations it walks, and so the ONLY variant its results
+   * may be stored as. MIRROR-COACH P1 (2026-09-25): the harness built every runner as 'modified' (start() closed over
+   * the picker's first value with [] deps, mirror-harness.tsx:208,337) but posted the picker's CURRENT value
+   * (:430,:442), so a "Full" screen was stored and scored as full over the modified screen's six stations. The post
+   * now reads the variant from here.
+   */
+  screen: ScreenId;
   phase: RunnerPhase;
   stationIndex: number;
   station: ScreenStation | null;
@@ -49,7 +57,7 @@ export class ScreenRunner {
   private readonly results: CheckResult[] = [];
   private done = false;
 
-  constructor(private readonly screen: ScreenId) {
+  constructor(readonly screen: ScreenId) {
     this.stations = screenFor(screen);
   }
 
@@ -76,7 +84,7 @@ export class ScreenRunner {
     this.lastTickMs = nowMs;
 
     if (this.done || !st) {
-      return { phase: 'complete', stationIndex: this.index, station: null, remainingSec: 0,
+      return { screen: this.screen, phase: 'complete', stationIndex: this.index, station: null, remainingSec: 0,
         say: 'That is the screen done.', framing, results: [...this.results] };
     }
 
@@ -87,9 +95,14 @@ export class ScreenRunner {
       this.badSinceMs ??= nowMs;
       if (nowMs - this.badSinceMs >= ABANDON_MS) this.heldMs = 0;   // gone long enough that the station restarts
       return {
-        phase: 'positioning', stationIndex: this.index, station: st,
+        screen: this.screen, phase: 'positioning', stationIndex: this.index, station: st,
         remainingSec: Math.max(0, st.holdSec - this.heldMs / 1000),
-        say: mustTurn ? `${TURN_CUE[st.view]} ${framing.instruction}` : framing.instruction,
+        // When the thing to fix IS the turn, the turn cue says it once. MIRROR-COACH P1 (2026-09-25): it used to be
+        // followed by the framing check's own turn line, so a side station said "Turn side-on — left shoulder to the
+        // camera. Turn side-on to the camera — I read a hinge from the side." (and the station reads no hinge).
+        say: !mustTurn ? framing.instruction
+          : framing.worst === 'turned' ? TURN_CUE[st.view]
+          : `${TURN_CUE[st.view]} ${framing.instruction}`,
         framing, results: [...this.results],
       };
     }
@@ -103,7 +116,7 @@ export class ScreenRunner {
     this.heldMs += dt;
     const remainingSec = Math.max(0, st.holdSec - this.heldMs / 1000);
     if (remainingSec > 0) {
-      return { phase: 'holding', stationIndex: this.index, station: st, remainingSec, say: st.cue, framing, results: [...this.results] };
+      return { screen: this.screen, phase: 'holding', stationIndex: this.index, station: st, remainingSec, say: st.cue, framing, results: [...this.results] };
     }
 
     // station complete — move on, or finish
@@ -112,7 +125,7 @@ export class ScreenRunner {
     this.heldMs = 0;
     if (this.index >= this.stations.length) this.done = true;
     return {
-      phase: this.done ? 'complete' : 'stationDone',
+      screen: this.screen, phase: this.done ? 'complete' : 'stationDone',
       stationIndex: finishedIndex, station: st, remainingSec: 0,
       say: this.done ? 'That is the screen done.' : 'Good. Next one.',
       framing, results: [...this.results],

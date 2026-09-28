@@ -18,7 +18,8 @@ const spinner = () => (
 
 const StudioMode = dynamic(() => import('@/lib/babylon/music/StudioMode'), { ssr: false, loading: spinner });
 
-export function MusicLoader() {
+/** MUSIC-SUITE P3 (2026-09-25): `playerId` = the signed-in player's id from the server page (the owned-kits cache key). */
+export function MusicLoader({ playerId = null }: { playerId?: string | null } = {}) {
   // THE SHARDS SEAM, CLOSED (2026-09-20). StudioMode has always taken a `spendShards` prop and fallen back to
   // ALLOWING the spend when it is missing — logging "SHARDS SEAM not wired — allowing ... for free" as it did
   // so. Nothing ever passed it, so both kits and every Cell assist have been free since the day the room
@@ -78,7 +79,7 @@ export function MusicLoader() {
       venue="The Academy"
       Game={StudioMode}
       ownControls
-      gameProps={{ spendShards, readOwnedKits, arenaSet }}
+      gameProps={{ spendShards, readOwnedKits, arenaSet, playerId }}
     />
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MIN_CHECKS_FOR_REWARD, decideScreenReward } from './screenReward';
+import { NOT_GRADED_LINE } from './screen';
 
 const base = { screenId: 's1', athleteId: 'a1', provisional: false, checksTaken: 6 };
 
@@ -41,5 +42,23 @@ describe('the key cannot collide between two athletes', () => {
   it('still pays one athlete only once for one screen', () => {
     const once = { screenId: 's9', athleteId: 'alice', provisional: false, checksTaken: 6 };
     expect(decideScreenReward(once).idempotencyKey).toBe(decideScreenReward(once).idempotencyKey);
+  });
+});
+
+// MIRROR-COACH P1 (2026-09-25): every screen so far arrived with zero checks (no grader exists yet), was marked
+// provisional, and was told "Not enough of that was in frame … Step back and run it again" — a retry that can never
+// succeed. Zero checks is its own answer now, decided before the framing one.
+describe('a screen nothing graded', () => {
+  it('pays nothing and says it was not graded — no retry prompt', () => {
+    const d = decideScreenReward({ ...base, checksTaken: 0 });
+    expect(d.pay).toBe(false);
+    expect(d.message).toBe(NOT_GRADED_LINE);
+    expect(d.message).not.toMatch(/step back|run it again|in frame/i);
+  });
+
+  it('is answered as ungraded even when the client also marked it provisional', () => {
+    const d = decideScreenReward({ ...base, checksTaken: 0, provisional: true });
+    expect(d.message).toBe(NOT_GRADED_LINE);
+    expect(d.pay).toBe(false);
   });
 });

@@ -19,6 +19,10 @@
 //      only ever wanted to print a name. The contest re-renders from the pattern, which it can, because the
 //      instruments are synthesised (SynthKit) rather than sampled — so there is nothing to license and
 //      nothing to ship.
+//      MUSIC-SUITE P3 (2026-09-25): still true of THIS record. The library moved song audio off localStorage
+//      into the device's file store (async), and DunkMode reads the walk-out synchronously — so the chosen
+//      song's mixdown is kept in the LIBRARY's own walk-out keys (StudioLibrary KEY_WALKOUT_SRC/AUDIO), never
+//      in here. This record stays a pointer that is safe to copy into a card or a ghost-duel link.
 //
 //   2. PLAYS ARE COUNTED WHERE THEY HAPPEN, AND ARE NOT A SCORE. The brief asks the card to show "plays
 //      received". That is an engagement count, so it is labelled as one and it never feeds a rating, a
@@ -101,9 +105,15 @@ export function parseWalkOut(raw: unknown): WalkOut | null {
   };
 }
 
-export function saveWalkOut(w: WalkOut): void {
-  if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(WALKOUT_KEY, JSON.stringify(w)); } catch { /* private mode: it just does not persist */ }
+/**
+ * MUSIC-SUITE P3 (2026-09-25): returns whether the record was actually kept. It returned nothing and swallowed the
+ * failure, so a caller could not tell the player "that did not save" — the phase's rule is that no save fails
+ * silently. DunkMode.ts:812 ignores the value (a play count), which stays correct; a caller that CHOOSES a walk-out
+ * goes through StudioLibrary.setWalkOut, which also keeps the song's audio where DunkMode can read it synchronously.
+ */
+export function saveWalkOut(w: WalkOut): boolean {
+  if (typeof window === 'undefined') return false;
+  try { window.localStorage.setItem(WALKOUT_KEY, JSON.stringify(w)); return true; } catch { return false; /* private mode or full */ }
 }
 
 export function readWalkOut(): WalkOut | null {

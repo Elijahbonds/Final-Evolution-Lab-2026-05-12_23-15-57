@@ -86,9 +86,11 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
 
   // PACK THE FIVE #2 (2026-09-04): the first-session faucet. DAILY_FIRST_SESSION existed as a rule with no client
   // fire. The chip is auth-aware (its wallet fetch is 401 when logged out), so once the wallet reads it fires
-  // ONE earn per calendar day: the idempotency key is the day plus the player's wallet identity, so the ledger
-  // returns the original grant on any replay (a second tab, a reload) and a per-day localStorage mark keeps the
-  // toast to the first fire. Wallet chip only — PlayerProfile.shards is not touched.
+  // ONE earn per calendar day: the idempotency key is the day plus the player's wallet identity, so a replay (a second
+  // tab, a reload, a fresh browser) credits nothing — the server answers it already_claimed with granted 0
+  // (ECONOMY-SESSIONS-HARDEN, QA acceptance #5; it used to echo the original "granted 100" on an unchanged balance) and
+  // nothing is toasted. A per-day localStorage mark keeps it to one request. Wallet chip only — PlayerProfile.shards is
+  // not touched.
   const fireDailyFirstSession = useCallback(async () => {
     if (typeof window === 'undefined') return;
     // the PLAYER's calendar day, not UTC — a 6 pm Pacific login is still today

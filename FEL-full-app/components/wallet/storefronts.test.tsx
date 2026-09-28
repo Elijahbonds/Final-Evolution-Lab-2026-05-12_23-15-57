@@ -44,7 +44,7 @@ describe('the copy that tells people what Shards buy', () => {
   it('the wallet Get Shards widget promises neither class passes nor scans', () => {
     const html = renderToStaticMarkup(createElement(ExchangeWidget));
     expect(html).toContain('Get Shards');
-    expect(html).toContain('Shards unlock personalized plans and live sessions.');
+    expect(html).toContain('Shards unlock group workouts and 1-on-1 sessions.');
     expect(html).not.toMatch(/class pass|scans/i);
   });
 
@@ -53,5 +53,18 @@ describe('the copy that tells people what Shards buy', () => {
     for (const state of [true, false, null] as const) {
       for (const line of Object.values(shardSaleCopy(state))) expect(line, String(state)).not.toMatch(/class pass|scans|seminar/i);
     }
+  });
+
+  // MIRROR-COACH P1 (2026-09-25), owner decision #3: /workout's plans are off sale, so nothing that tells people what
+  // shards buy may still sell them: not the Get Shards widget, not the Shard Store, not /store's Spend Your Balance.
+  it('no longer promises workout plans anywhere, and /store no longer points at /workout', () => {
+    const plans = /\bplans?\b/i;
+    expect(renderToStaticMarkup(createElement(ExchangeWidget))).not.toMatch(plans);
+    expect(renderToStaticMarkup(createElement(ShardStore))).not.toMatch(/personali[sz]ed plan|training plan|workout plan/i);
+    for (const state of [true, false, null] as const) {
+      for (const line of Object.values(shardSaleCopy(state))) expect(line, String(state)).not.toMatch(plans);
+    }
+    expect(WHERE_TO_SPEND.map((w) => w.href)).not.toContain('/workout');
+    expect(renderToStaticMarkup(createElement(CoinStore))).not.toMatch(/training plan/i);
   });
 });

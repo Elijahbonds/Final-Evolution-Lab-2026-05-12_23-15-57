@@ -9,16 +9,22 @@
 //
 // BRAINBRAWL-RESIDUAL (2026-09-24): it also stands in for the shell's end card — the same ReplayInPlaceContext GameShell
 // provides, and a REPLAY button that calls it the way GameShell.replay() does — so GO AGAIN in place can be driven here.
+//
+// BRAINBRAWL-POLISH-2 (2026-09-24): `?shell=1` mounts the REAL shell instead — BrainBrawlLoader, exactly what /play/brain-brawl
+// renders (GameShell and its results card) — for looking at the end card's rewards. The shell's own fetches (/api/profile,
+// /api/sessions, /api/v1/wallet/earn) go to this server as they would on /play; without a signed-in session they need the probe
+// to answer them.
 
 import { useCallback, useRef, useState } from 'react';
 import dynamicImport from 'next/dynamic';
 import { prqGrade } from '@/lib/prq';
 import type { GameResult } from '@/components/games/game-shell';
 import { ReplayInPlaceContext } from '@/components/games/replay-in-place';
+import { BrainBrawlLoader } from '@/app/play/brain-brawl/_components/loader';
 
 const BrainBrawl = dynamicImport(() => import('@/components/games/brainbrawl-babylon'), { ssr: false });
 
-export function DevBrainBrawlLoader() {
+export function DevBrainBrawlLoader({ shell = false }: { shell?: boolean }) {
   const inPlace = useRef<(() => boolean) | null>(null);
   const register = useCallback((fn: (() => boolean) | null) => { inPlace.current = fn; }, []);
   const [ended, setEnded] = useState<GameResult | null>(null);
@@ -29,6 +35,7 @@ export function DevBrainBrawlLoader() {
     if (inPlace.current?.()) { console.log('[dev] replay in place'); return; }
     console.log('[dev] replay by remount'); setRemounts((k) => k + 1);
   };
+  if (shell) return <BrainBrawlLoader />;
   return (
     <div className="min-h-screen bg-[#07090d] p-4">
       <p className="mb-3 font-mono text-xs text-white/40">

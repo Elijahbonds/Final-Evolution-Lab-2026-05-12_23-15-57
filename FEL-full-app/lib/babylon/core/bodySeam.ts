@@ -52,6 +52,7 @@ export function bodySeamFor(def: Pick<ModeDefinition, 'modeId' | 'body' | 'onBod
     floor: new BodyFloor(profile),
     session: new BodySession({ drives, overheadIsPlay }),
     evidence: new EvidenceCounter(),
-    card: { modeId: def.modeId, key: profile.key, lines: cardLines(profile), drives, later: profile.later },
+    // MOVEMENT PLAY P7: a mode that reads the body itself says its own lines (a combat mode's strikes, guard, slip, step)
+    card: { modeId: def.modeId, key: profile.key, lines: def.body?.lines ? [...def.body.lines] : cardLines(profile), drives, later: profile.later },
   };
 }

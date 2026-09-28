@@ -2,8 +2,15 @@
 
 // The phone controller. Renders whatever schemas the host's mode declared —
 // this file has no per-mode knowledge and should never gain any.
+//
+// MUSIC-SUITE P5 (2026-09-25), phone-mpc: a button schema may carry OPT-IN hints (types.ts ButtonSchemaHints —
+// haptics / velocity / compact; the rules are schemas/padFeel.ts). Still no per-mode knowledge: the page reads the hint,
+// never the mode. A schema without hints renders and sends exactly what it did before — the schema list moved into
+// SchemaControls (exported so padFeel.test.ts can render it) and its markup for every mode that sets no hint is pinned
+// byte-for-byte against this page as it was, and a hint-less press still calls the bare `client.send(action)`.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { ControllerClient } from '@/lib/controller-link/client';
 import { usePadRelay } from './use-pad-relay';
 import type { TouchState } from '@/lib/controller-link/padSampler';
@@ -12,6 +19,10 @@ import {
 } from '@/lib/controller-link/schemas/motion';
 import { colorFor, holdActions } from '@/lib/controller-link/schemas/button';
 import { DPAD_LAYOUT, dpadPayload } from '@/lib/controller-link/schemas/dpad';
+import {
+  buzz, canBuzz, feelLine, freshVelocityState, hasHints, hintsOf, pressMessage, readVelocity, sampleOf,
+  type PadHints, type VelocityReading, type VelocityVia,
+} from '@/lib/controller-link/schemas/padFeel';
 import type { LinkState, ModeControllerConfig } from '@/lib/controller-link/types';
 
 const STATE_LABEL: Record<LinkState, string> = {
@@ -83,23 +94,60 @@ export default function ControllerPage({ code }: { code: string }) {
         {!config && (
           <p className="text-center text-sm text-white/40">Waiting for the host…</p>
         )}
-        {config?.schemas.map((s, i) => {
-          if (s.kind === 'motion') {
-            return <MotionPad key={i} spec={s.motion} client={clientRef.current} />;
-          }
-          if (s.kind === 'button') {
-            return (
-              <div key={i} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(6, s.columns ?? 2))}, minmax(0, 1fr))` }}>
-                {s.buttons.map((b, bi) => (
-                  <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={clientRef.current} />
-                ))}
-              </div>
-            );
-          }
-          return <DpadPad key={i} action={s.dpad.action} client={clientRef.current} />;
-        })}
+        {config && <SchemaControls config={config} client={clientRef.current} />}
       </main>
     </div>
+  );
+}
+
+/** A pad bank's feel: reads each press's velocity by the padFeel rule, remembering what this phone has shown so far. */
+export interface PadFeel { read: (e: ReactPointerEvent<HTMLButtonElement>) => VelocityReading }
+
+/**
+ * The mode's schemas, in order (the body of the page once the host has said what it wants). MUSIC-SUITE P5: moved out of
+ * ControllerPage unchanged; the only additions are for a schema that asked for a hint — and the one feel line after the
+ * list, said only when some schema asked for haptics or velocity.
+ */
+export function SchemaControls({ config, client }: { config: ModeControllerConfig; client: ControllerClient | null }) {
+  const hints = hintsOf(config.schemas);
+  // null until the page has looked (a server render never claims a buzz either way)
+  const [vibrates, setVibrates] = useState<boolean | null>(null);
+  useEffect(() => { setVibrates(canBuzz(typeof navigator === 'undefined' ? null : navigator)); }, []);
+  // one velocity state for the whole controller: the rule learns this phone's readings across every pad
+  const velRef = useRef(freshVelocityState());
+  const [via, setVia] = useState<VelocityVia | null>(null);
+  const viaRef = useRef<VelocityVia | null>(null);
+  const feel = useRef<PadFeel>({
+    read: (e) => {
+      const r = readVelocity(velRef.current, sampleOf(e));
+      velRef.current = r.state;
+      if (r.via !== viaRef.current) { viaRef.current = r.via; setVia(r.via); }
+      return r;
+    },
+  }).current;
+  const line = hasHints(hints) ? feelLine(hints, { buzz: vibrates }, via) : null;
+  return (
+    <>
+      {config.schemas.map((s, i) => {
+        if (s.kind === 'motion') {
+          return <MotionPad key={i} spec={s.motion} client={client} />;
+        }
+        if (s.kind === 'button') {
+          const h: PadHints | undefined = hasHints(s) ? { haptics: s.haptics, velocity: s.velocity, compact: s.compact } : undefined;
+          return (
+            <div key={i} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(6, s.columns ?? 2))}, minmax(0, 1fr))` }}>
+              {s.buttons.map((b, bi) => (
+                h
+                  ? <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={client} hints={h} feel={h.velocity ? feel : undefined} />
+                  : <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={client} />
+              ))}
+            </div>
+          );
+        }
+        return <DpadPad key={i} action={s.dpad.action} client={client} />;
+      })}
+      {line && <p data-testid="pad-feel" className="text-center font-mono text-[11px] text-white/45">{line}</p>}
+    </>
   );
 }
 
@@ -195,11 +243,31 @@ function MotionPad({
 }
 
 function ActionButton({
-  spec, color, client,
-}: { spec: { action: string; label: string; hold?: boolean }; color: string; client: ControllerClient | null }) {
+  spec, color, client, hints, feel,
+}: { spec: { action: string; label: string; hold?: boolean }; color: string; client: ControllerClient | null; hints?: PadHints; feel?: PadFeel }) {
   const acts = holdActions(spec);
-  const down = (): void => { client?.send(spec.hold ? acts.down : spec.action); };
+  const down = (e: ReactPointerEvent<HTMLButtonElement>): void => {
+    if (!hints) { client?.send(spec.hold ? acts.down : spec.action); return; }   // every mode without a hint: as it always was
+    // MUSIC-SUITE P5 (phone-mpc): the hit goes first (it is the latency-critical part), then the buzz
+    const [a, p] = pressMessage(spec, hints, feel ? feel.read(e) : null);
+    if (p === undefined) client?.send(a); else client?.send(a, p);
+    if (hints.haptics) buzz(typeof navigator === 'undefined' ? null : navigator);
+  };
   const up = (): void => { if (spec.hold) client?.send(acts.up); };
+  if (hints) {
+    // a hinted pad: no double-tap zoom / long-press callout between fast hits (touch-action), and a compact row is shorter
+    return (
+      <button
+        onPointerDown={down}
+        onPointerUp={up}
+        onPointerCancel={up}
+        className={`select-none rounded-xl ${hints.compact ? 'py-3 text-sm' : 'py-8 text-lg'} font-bold active:brightness-125`}
+        style={{ background: `${color}33`, color, border: `1px solid ${color}66`, touchAction: 'manipulation' }}
+      >
+        {spec.label}
+      </button>
+    );
+  }
   return (
     <button
       onPointerDown={down}

@@ -156,8 +156,8 @@ export function routineFromGroove(hits: GrooveHit[], totalBeats: number, difficu
 export interface ExportedTrack {
   track: DanceTrack;
   steps: DanceStep[];
-  /** What the chart was built from, for the card that explains the export. */
-  summary: { hits: number; density: number; bars: number; beats: number };
+  /** What the chart was built from, for the card that explains the export. MUSIC-SUITE P4: + the song's key ('Am'). */
+  summary: { hits: number; density: number; bars: number; beats: number; key?: string };
 }
 
 /** A song id that is stable for the same song, so re-exporting overwrites rather than piling up. */
@@ -180,7 +180,7 @@ export function seedFrom(songId: string): number {
  * without a store, a scene or an audio context in the room.
  */
 export function exportSongToDance(
-  song: { id: string; name: string; bpm: number; steps: number; chain: SongChain; sections: Section[] },
+  song: { id: string; name: string; bpm: number; steps: number; chain: SongChain; sections: Section[]; key?: string },
 ): ExportedTrack | null {
   const bars = expandChain(song.chain, song.sections);
   if (!bars.length) return null;                  // an empty arrangement is not a track
@@ -200,10 +200,43 @@ export function exportSongToDance(
       bars: bars.length,
       difficulty,
       seed,
-      blurb: `Your song · ${hits.length} hits · ${'●'.repeat(difficulty)}${'○'.repeat(3 - difficulty)}`,
+      // MUSIC-SUITE P4 (2026-09-25), grid-ui: the song's key rides on the card ('Your song · A minor · 64 hits') — the project
+      // has one now (StudioProject.key), and the dance floor's pick card is where the player sees it. MUSIC-SUITE P4 FIX
+      // PASS: in words (scales.ts keyCardText) — the Cypher's chip upper-cases the blurb, and 'Am' read 'AM'
+      blurb: `Your song · ${song.key ? `${song.key} · ` : ''}${hits.length} hits · ${'●'.repeat(difficulty)}${'○'.repeat(3 - difficulty)}`,
     },
     steps,
-    summary: { hits: hits.length, density: +d.toFixed(3), bars: bars.length, beats: totalBeats },
+    summary: { hits: hits.length, density: +d.toFixed(3), bars: bars.length, beats: totalBeats, ...(song.key ? { key: song.key } : {}) },
+  };
+}
+
+// ── MUSIC-SUITE P3 (2026-09-25), "Keep my work": THE TIER GATE ───────────────────────────────────────────────────────
+//
+// The ladder opens the dance export AT THE GRID (MusicTiers TIERS.grid.danceExport, "one bar of drums is already a
+// chart"), but the only SEND TO THE DANCE FLOOR button lived in SongPanel, which mounts at the CHAIN, and it exported the
+// CHAIN — disabled while the chain was empty. So the grid tier never had it. Now the song the dance floor gets is decided
+// here, from the tier's own flags: with the arrangement open and a chain built, the chain; otherwise the grid itself,
+// looped. Either way only the rows the room draws and plays go in (`heard`: MusicTiers.shownRowIds) — a chart that
+// dances to a hidden row dances to something nobody can hear, the rule grooveOf already applies to a muted row.
+
+/** How long the grid alone plays on the dance floor (assumption: 8 bars — the PERFORM win's minimum, near the Cypher's
+ *  shipped 13–17-bar songs; one bar would be a 2.5-second dance). */
+export const GRID_DANCE_BARS = 8;
+export const GRID_SECTION_ID = 'grid';
+
+/** The song the dance floor gets at this tier, or null when the tier has no dance export. */
+export function danceSongAtTier(input: {
+  danceExport: boolean; arrangement: boolean; chain: SongChain; sections: Section[]; grid: TrackState[]; heard: (t: TrackState) => boolean;
+}): { chain: SongChain; sections: Section[]; from: 'chain' | 'grid' } | null {
+  if (!input.danceExport) return null;
+  const only = (ts: TrackState[]): TrackState[] => ts.filter(input.heard);
+  if (input.arrangement && input.chain.length) {
+    return { chain: input.chain, sections: input.sections.map((s) => ({ ...s, tracks: only(s.tracks) })), from: 'chain' };
+  }
+  return {
+    chain: [{ sectionId: GRID_SECTION_ID, bars: GRID_DANCE_BARS }],
+    sections: [{ id: GRID_SECTION_ID, name: 'grid', tracks: only(input.grid) }],
+    from: 'grid',
   };
 }
 
@@ -215,8 +248,17 @@ export function exportSongToDance(
 
 export const EXPORTED_TRACK_KEY = 'fel-dance-exported';
 
-export function saveExportedTrack(out: ExportedTrack): void {
-  try { window.localStorage.setItem(EXPORTED_TRACK_KEY, JSON.stringify(out)); } catch { /* private mode: the export just does not persist */ }
+/**
+ * Keep the export for the Cypher. MUSIC-SUITE P3 FIX PASS (2026-09-25): true when it was kept. It swallowed every failure
+ * and the room always said "sent to the dance floor" — with localStorage full (the pre-P3 library still in it, the
+ * walk-out's 1.5 M-character copy) or in private mode the Cypher found nothing. The room says the failure now.
+ */
+export function saveExportedTrack(out: ExportedTrack): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    window.localStorage.setItem(EXPORTED_TRACK_KEY, JSON.stringify(out));
+    return true;
+  } catch { return false; /* private mode or full: not kept — the caller says so */ }
 }
 
 /** The player's exported chart, or null. Never throws — a corrupt value is the same as no export. */

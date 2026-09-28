@@ -52,7 +52,7 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { Onlookers } from '../visual/Onlookers';
 import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
-  KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC, type AttackDef,
+  KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC, PARRY_WINDOW_MS, type AttackDef,
 } from '../core/FightCore';
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
 import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
@@ -71,6 +71,16 @@ import { KARATE_CONFIG as CFG } from './modeConfigs';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleAttacks } from '../combat/loadout';
 import { MIN_STARTUP_SEC } from '../core/StrikeSystem';
+// MOVEMENT PLAY P7 (2026-09-25): the body's own strikes, guard, slips and steps (lib/babylon/combat/bodyFight)
+import { MOVES, type HordeMove } from '../core/HordeDynamics';
+import {
+  BodyFightDriver, DefenseLedger, DeferredHits, BodyDriveTracker, PadBlock, bodyDefenseAt, hitDelayMs, contactMsOf, bodyCancelAt, bodyLunge, stepSpace,
+  BODY_PARRY_WINDOW_MS, FIGHT_CLAIMS, FIGHT_CARD_LINES, type BodyFightIntent,
+} from '../combat/bodyFight';
+import { BODY_FIGHT } from '../combat/bodyFightFlags';
+import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import type { BodyView } from '../core/ModeHarness';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlookers on the gravel, as the endless gauntlet has
@@ -111,6 +121,8 @@ const newFighterAnim = (tree: CombatAnimTree): FighterAnim => ({ tree, strike: n
 const WEIGHT_OF: Record<'jab' | 'kick' | 'heavy', StrikeWeight> = { jab: 'light', kick: 'medium', heavy: 'heavy' };
 
 const BUDGET_SEC: Record<Phase, number> = { intro: 4, fighting: 120, roundOver: 4, matchOver: 999 };
+/** MOVEMENT PLAY P7: a body strike handed to swing(): its move, its onset on the page clock, what the body threw. */
+interface BodyStrikeArg { move: HordeMove; onsetPage: number; body: string }
 
 export const KarateVSMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
@@ -273,7 +285,18 @@ export const KarateVSMode: ModeDefinition = (() => {
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
   const book = new StringBook(); const xBtn = new XButtonReader();
   let ring: PlayerRingHandle | null = null; const stringLabels: string[] = [];   // PLAYER RING + the combo callout (the string's links, named on the finisher)
-  let queuedKey: { key: 'jab' | 'kick' | 'heavy'; at: number } | null = null;   // STORM: the press waiting for the cancel point
+  let queuedKey: { key: 'jab' | 'kick' | 'heavy'; at: number; body?: BodyStrikeArg } | null = null;   // STORM: the press waiting for the cancel point (P7: or a body strike, its onset kept)
+  // MOVEMENT PLAY P7: the body's fight read — the driver, the defensive ledger the rival's hits on a body player resolve
+  // against (deferred until the body's frames cover the impact), who is driving, the kicks opt-in, and auto-spacing
+  // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
+  // check over a pause), so a value read in load() would miss the player's tick for this match
+  const bodyDriver = new BodyFightDriver({ kicksOptIn: () => readBodyKicks('karate_vs') });
+  const ledger = new DefenseLedger(), deferred = new DeferredHits(), drive = new BodyDriveTracker();
+  const padBlock = new PadBlock();   // P7 (the review, 2026-09-26): the pad's X apart from the body's guard — a deferred hit meets both
+  let bodyGuard = false;   // P7: the block is the body's (its guard up), to let go when the reader loses the guard
+  let bodyShift: { v: Vector3; left: number } | null = null;
+  const TOKEN_KEY: Record<StrikeBtn, 'jab' | 'kick' | 'heavy'> = { A: 'jab', B: 'kick', Y: 'heavy' };
+  const bodyDriven = (): boolean => drive.driven(!!ctx0?.body?.()?.read.tracking);
   let lastDashSec = -1e9, meDash: { dir: Vector3; left: number; homing: boolean } | null = null, meDashIframeSec = 0, meDashUntil = 0, foeLaunchedSec = 0;
   const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };
   const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = ctx0.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx0.camDirector.rightFlat().scale(stickX)).normalize(); const to = rival.root.position.subtract(player.root.position); to.y = 0; to.normalize(); const d = w.x * to.x + w.z * to.z; return d > 0.5 ? 'f' : d < -0.5 ? 'b' : 'n'; };
@@ -388,8 +411,9 @@ export const KarateVSMode: ModeDefinition = (() => {
   }
   function resetAnim(f: FighterAnim): void { f.strike = null; f.hitBy = null; f.hitUntil = 0; f.parryUntil = 0; f.impactUntil = 0; f.downUntil = 0; f.celebrateUntil = 0; f.out = false; f.tree.reset(); }
 
-  /** One swing, either direction. `mine` = the player is the attacker. */
-  function swing(ctx: ModeContext, mine: boolean, key: 'jab' | 'kick' | 'heavy'): void {
+  /** One swing, either direction. `mine` = the player is the attacker. `body` (P7): the player's BODY strike — its own move and
+   *  its onset on the page clock (the book reads the move, not the button; the hit beat comes from the onset). */
+  function swing(ctx: ModeContext, mine: boolean, key: 'jab' | 'kick' | 'heavy', body?: BodyStrikeArg): void {
     const atkState = mine ? meState : foeState;
     const defState = mine ? foeState : meState;
     const atkChar = mine ? player : rival;
@@ -400,13 +424,13 @@ export const KarateVSMode: ModeDefinition = (() => {
     if (mine && striking) {
       const st = animOf(true).strike;
       if (st && st.cancelFrom !== undefined && now() >= st.cancelFrom) endStrike(true);
-      else { queuedKey = { key, at: now() }; return; }
+      else { queuedKey = { key, at: now(), body }; return; }
     }
 
     // The DRAGON is EARNED as well as charged: full chi is the cost, FORCE is the licence. A baseline body
     // can fill the gauge and still not throw it, which is what makes upgrading the scan visible in a fight.
     const canDragon = hasFightMove('dragon', mine ? myRatings : foeRatings);
-    const special = key === 'heavy' && atkState.chi >= CHI_MAX && canDragon;
+    const special = !body && key === 'heavy' && atkState.chi >= CHI_MAX && canDragon;
     // THE PLAYER'S SCHOOL applies to the player's strikes and to nobody else's (2026-09-13). The rival
     // fights the unstyled table, so a school is a thing YOU brought rather than a global difficulty dial —
     // picking ANCHORED must not also make the opponent hit harder. The finisher is deliberately unstyled
@@ -414,7 +438,8 @@ export const KarateVSMode: ModeDefinition = (() => {
     // pre-game screen buy part of something the scan is supposed to be the only route to.
     const baseAtk = (mine ? myAttacks : KARATE_ATTACKS)[key];
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
-    const move = mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
+    const move = mine && body ? book.pressMove(body.move, BTN_OF[key], body.onsetPage / 1000)   // P7: the body's own move, timed onset to onset
+      : mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
     const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
     if (mine) striking = true; else foeStriking = true;
     if (special) {
@@ -425,9 +450,14 @@ export const KarateVSMode: ModeDefinition = (() => {
       setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.1 });
-    if (move) console.info(`[KVS-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}`);
+    if (move) console.info(`[KVS-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}${body ? ` body ${body.body} age ${Math.round(now() - body.onsetPage)}` : ''}`);
+    if (move && body && book.history.length === 1) stringLabels.length = 0;   // P7: a body strike that starts a string starts its call (a lapsed string's links are not this one's)
     if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) { ctx.setHud({ banner: `COMBO: ${call}` }); setTimeout(() => ctx.setHud({ banner: '' }), 900); } } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
-    animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
+    // P7: a body strike's hit beat is its contact frame (its startup is already spent in the camera's latency), never under
+    // the wind-up floor; its cancel point runs from its onset, after that beat
+    const hitDelay = body && move ? hitDelayMs(atk.startupMs, contactMsOf(move), now() - body.onsetPage) : atk.startupMs;
+    if (body && move) { const d = Vector3.Distance(player.root.position, rival.root.position), lunge = bodyLunge(d, atk.range); if (lunge > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(lunge / 0.15), left: 0.15 }; } }
+    animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? (body ? bodyCancelAt(now() + hitDelay, body.onsetPage, move) : now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000) : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     // WHAT MAKES A DODGE "WELL TIMED" MEASURABLE. The window is read against the moment this strike would
     // CONNECT, so the player is rewarded for reacting to THIS attack rather than to a cooldown. Only the
@@ -435,11 +465,14 @@ export const KarateVSMode: ModeDefinition = (() => {
     // MATRIX FOCUS: the rival's swing lands on the ROOM clock (inside Focus it takes 1/worldScale longer in real time, and the
     // dodge read is told so); mine stays on the wall clock
     if (!mine) foeImpactAt = now() + atk.startupMs / focus.worldScale;
-    const onHitBeat = () => {
+    const onHitBeat = (impactAt?: number) => {
       if (phase !== 'fighting') { endStrike(mine); return; }
+      // P7: the rival's fist on a BODY player waits for the body's frames to cover the impact (DefenseLedger), then resolves
+      // against the body's guard and slips AT the impact — at most bodyFight.DEFER_CAP_MS late. A pad player: never.
+      if (!mine && impactAt === undefined && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => onHitBeat(at)); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
       if (!mine) foeImpactAt = null;   // it landed or it did not; either way nothing is incoming now
-      let outcome = resolveStrike(atk, dist, defState, now());
+      let outcome = impactAt !== undefined ? bodyOutcome(atk, dist, impactAt) : resolveStrike(atk, dist, defState, now());
       if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';
       if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
         // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
@@ -544,7 +577,85 @@ export const KarateVSMode: ModeDefinition = (() => {
         }
       }
     };
-    if (mine) setTimeout(onHitBeat, atk.startupMs); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
+    if (mine) setTimeout(onHitBeat, hitDelay); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
+  }
+
+  /** P7: the rival's hit on a BODY player, resolved at its impact against the body's state then (DefenseLedger): a slip's
+   *  i-frames whiff it (a read: the perfect dodge's pay), a raise inside the body's parry window parries it, a guard held
+   *  blocks it (the guard gauge as ever), else it lands. The live guard is restored after (a break keeps it down). */
+  function bodyOutcome(atk: AttackDef, dist: number, impactAt: number): ReturnType<typeof resolveStrike> {
+    const bd = bodyDefenseAt(ledger, impactAt);
+    if (bd.d === 'evaded' && dist <= atk.range && meState.controllable) {
+      const r = dodgeReward(Math.max(0, (impactAt - bd.evadeOnset!) / 1000));
+      if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx0.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx0.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx0.setHud({ banner: '' }), 600); }
+      console.info('[KVS-DEF] body slip — whiff');
+      return 'whiff';
+    }
+    // (the pad's block counts too, as it stood AT the impact: held then, or pressed inside the pad's parry window before it —
+    // a pad in hand while the body drives; the review, 2026-09-26)
+    const held = meState.blockHeld, press = meState.lastBlockPressMs, padPress = padBlock.pressWithin(impactAt, PARRY_WINDOW_MS);
+    meState.blockHeld = bd.d === 'blocked' || padBlock.heldAt(impactAt);
+    meState.lastBlockPressMs = bd.d === 'parried' || bd.d === 'guardImpact' ? impactAt : padPress ?? -1e9;
+    const out = resolveStrike(atk, dist, meState, impactAt, undefined, BODY_PARRY_WINDOW_MS);
+    meState.blockHeld = out === 'guardBreak' ? false : held;
+    meState.lastBlockPressMs = press;
+    console.info(`[KVS-DEF] body ${bd.d} → ${out} (${Math.round(now() - impactAt)} ms late)`);
+    return out;
+  }
+
+  /** P7: the ledger follows the body's own guard, per packet and per frame: 'down' lets a body block go (a pad's X held keeps
+   *  its own); a guard the ledger holds that the fighter has not taken up — held through the round's start, through a
+   *  stagger, or its up refused in the intro — is taken up as soon as the fighter can (the body is the one playing then:
+   *  the review, 2026-09-26). What a waiting hit needs is kept (deferred.oldest). */
+  function bodyLedgerFrame(view: BodyView, t: number): void {
+    const g = ledger.frame(view, t, deferred.oldest);
+    if (g === 'down' && bodyGuard) { bodyGuard = false; if (!padBlock.held) meState.releaseBlock(); }
+    else if (ledger.guardUp && !bodyGuard && phase === 'fighting' && meState.controllable) { drive.body(t); bodyGuard = true; meState.blockHeld = true; }
+  }
+
+  /** P7: one fight-read event from the body. Taken (true) only in the fight, with the player free to act; everything else
+   *  (the intro, a round's end, a stagger) is refused silently — false, so the harness counts no input (a shadow-boxer
+   *  between rounds gets no banner storm). */
+
+  function onBodyEvent(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+    const t = now();
+    bodyLedgerFrame(view, t);
+    if (phase !== 'fighting') return false;
+    if (ev.kind !== 'blow' && ev.kind !== 'legKick' && ev.kind !== 'guard' && ev.kind !== 'evade' && ev.kind !== 'fightStep') return false;
+    const it: BodyFightIntent | null = bodyDriver.intent(ev, view, t);
+    if (!it) return false;
+    if (it.kind === 'guard') ledger.guard(it);
+    if (!meState.controllable) return false;
+    drive.body(t);
+    switch (it.kind) {
+      case 'guard':
+        if (it.up) { meState.blockHeld = true; if (it.raise) meState.lastBlockPressMs = it.onsetPage; } else if (!padBlock.held) meState.releaseBlock();
+        bodyGuard = it.up;
+        console.info(`[KVS-BODY] guard ${it.up ? (it.raise ? 'raise' : 'up') : 'down'}`);
+        return true;
+      case 'strike':
+        swing(ctx, true, TOKEN_KEY[it.token], { move: MOVES[it.move], onsetPage: it.onsetPage, body: it.body });
+        return true;
+      case 'evade': {
+        const r = ctx.camDirector.rightFlat();
+        const d = it.side === null ? Vector3.Zero() : r.scale(it.side === 'L' ? -1 : 1);   // the player's own left is the screen's left (the camera is behind)
+        // (the i-frames only with the slip itself: refused on its cooldown, the slip whiffs nothing — the review, 2026-09-26:
+        // a bob every 250 ms was invulnerable ~75 % of the time)
+        if (!meEvade.slip(d.x, d.z)) return false;
+        ledger.evade(it);
+        console.info(`[KVS-BODY] ${it.form}${it.side ?? ''}`);
+        return true;
+      }
+      case 'step': {
+        const sp = stepSpace(it.dir);
+        const to = rival.root.position.subtract(player.root.position); to.y = 0;
+        const along = to.lengthSquared() > 1e-4 ? to.normalize() : ctx.camDirector.forwardFlat();
+        const v = along.scale(sp.along).addInPlace(ctx.camDirector.rightFlat().scale(-sp.across));
+        bodyShift = { v: v.scale(1 / 0.25), left: 0.25 };
+        console.info(`[KVS-BODY] step ${it.dir}`);
+        return true;
+      }
+    }
   }
 
   function endRound(ctx: ModeContext, playerWon: boolean): void {
@@ -586,7 +697,8 @@ export const KarateVSMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
+    meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
+    deferred.clear(); ledger.reset(); bodyShift = null;   // P7
     player.root.position.set(0, 0, 2.2);
     rival.root.position.set(0, 0, -2.2);
     player.root.rotation.y = Math.atan2(rival.root.position.x - player.root.position.x, rival.root.position.z - player.root.position.z);
@@ -603,6 +715,8 @@ export const KarateVSMode: ModeDefinition = (() => {
 
   return {
     modeId: 'karate-vs', mood: 'dojoWarm', camPreset: 'fight',
+    // MOVEMENT PLAY P7: the body's own strikes, guard, slips and steps (the cut line's switch: bodyFightFlags)
+    ...(BODY_FIGHT.karate_vs ? { body: { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES }, onBody: onBodyEvent } : {}),
 
     async load(ctx: ModeContext) {
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
@@ -678,6 +792,8 @@ export const KarateVSMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      // P7: who is driving — a real press or push is the pad's (the body's own outputs carry src 'body')
+      if (e.src !== 'body' && ((e.t === 'button' && e.pressed) || (e.t === 'stick' && Math.hypot(e.x, e.y) > 0.35))) drive.pad(now());
       if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // MATRIX FOCUS
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (phase !== 'fighting' || !meState.controllable) return;
@@ -686,7 +802,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         if (e.btn === 'A') swing(ctx, true, 'jab');
         if (e.btn === 'B') swing(ctx, true, 'kick');
         if (e.btn === 'Y') swing(ctx, true, 'heavy');
-        if (e.btn === 'X') { meState.pressBlock(now()); xBtn.press(now() / 1000); }   // STORM: the press arms the parry AND starts the tap clock   // the tree shows the block (blockHeld → block_hold)
+        if (e.btn === 'X') { meState.pressBlock(now()); padBlock.press(now()); xBtn.press(now() / 1000); }   // STORM: the press arms the parry AND starts the tap clock   // the tree shows the block (blockHeld → block_hold)
         // L1 ROLLS and R1 JUMPS. The four face buttons are spoken for (A jab, B kick, Y heavy, X guard), so
         // the new verbs go on the shoulders rather than overloading a strike -- the same reasoning the dunk
         // contest's CALL went to L1 for. A neutral stick rolls BACKWARDS: the panic input should be the
@@ -720,12 +836,13 @@ export const KarateVSMode: ModeDefinition = (() => {
           if (meEvade.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
         }
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') { meState.releaseBlock(); const g = xBtn.release(now() / 1000); if (g === 'tap' || g === 'double') tryDash(ctx, g === 'double'); }   // STORM: a tap is the dash, a double the chakra dash, a hold was the guard
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { padBlock.release(now()); if (!bodyGuard) meState.releaseBlock(); const g = xBtn.release(now() / 1000); if (g === 'tap' || g === 'double') tryDash(ctx, g === 'double'); }   // STORM: a tap is the dash, a double the chakra dash, a hold was the guard (P7: a body guard still up keeps the block)
     },
 
     update(ctx: ModeContext, dt: number) {
       ctx0 = ctx;
       phaseSec += dt;
+      { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       crowd?.update(dt);
       if (phaseSec > BUDGET_SEC[phase]) {
         console.warn(`[FEL-WATCHDOG] karate-vs stuck in "${phase}" — auto-advancing`);
@@ -783,13 +900,19 @@ export const KarateVSMode: ModeDefinition = (() => {
         arenaClamp(player.root.position, arena);
         if (sdtHero > 0 && Vector3.Distance(before, player.root.position) / sdtHero < 0.3) mySpeed01 = 0;   // pinned on the boundary: no stepping on the spot
       }
+      // P7 AUTO-SPACING: a body player has no stick — a strike out of range closes a little, a step in / out / across moves
+      // the fighter; a stick past its dead zone always wins
+      if (bodyShift) {
+        if (Math.hypot(stickX, stickY) > 0.35 || !meState.controllable) bodyShift = null;
+        else { const step = Math.min(sdtHero, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); arenaClamp(player.root.position, arena); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
+      }
 
       ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
       meDashIframeSec = Math.max(0, meDashIframeSec - sdtHero);   // STORM ticks
       if (queuedKey) {   // STORM: the queued link fires at the cancel point (or the settle), and goes stale after 0.4 s
         const st = animOf(true).strike;
         if (now() - queuedKey.at > 400) queuedKey = null;
-        else if (!striking || (st && st.cancelFrom !== undefined && now() >= st.cancelFrom)) { const k = queuedKey.key; queuedKey = null; swing(ctx, true, k); }
+        else if (!striking || (st && st.cancelFrom !== undefined && now() >= st.cancelFrom)) { const k = queuedKey.key, b = queuedKey.body; queuedKey = null; swing(ctx, true, k, b); }
       }
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - sdtRoom); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }
       // rival AI

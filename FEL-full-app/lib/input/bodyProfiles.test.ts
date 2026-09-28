@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BODY_PROFILES, FREE_VERBS, MOVE_LABEL, PAUSE_NOTE, SESSION_LINES, SESSION_ONLY_COPY, cardLines, resolveBodyProfile,
-  sessionOnly, type BodyBinding, type BodyProfile,
+  sessionOnly, type BodyBinding, type BodyProfile, COMING_COPY, UNAVAILABLE_COPY,
 } from './bodyProfiles';
 import { MODE_VERBS } from '@/lib/babylon/ui/modeVerbs';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
@@ -148,8 +148,12 @@ describe('the card', () => {
   });
   it('promises only what the session does (the step-3 review): a session-only card never promises a pause', () => {
     // BodySession arms the lost pause only where the body drives the mode, and both hands up while playing do nothing
-    // (owner call 3): in a session-only game the camera starts it and brings it back from a pause, and that is all
-    expect(SESSION_ONLY_COPY).toMatch(/raise both hands/i);
+    // (owner call 3). MOVEMENT PLAY P4: and a game the body does not drive does not offer body play at all (its READY
+    // says it is coming; the Body button never starts the camera there), so its card says that, not the hands-up START
+    expect(SESSION_ONLY_COPY).toBe('Body play is coming to this game. For now, play with your controller or touch.');
+    expect(SESSION_ONLY_COPY.startsWith(COMING_COPY)).toBe(true);
+    expect(SESSION_ONLY_COPY).not.toMatch(/raise both hands/i);
+    expect(UNAVAILABLE_COPY).toMatch(/controller or touch/);
     expect(SESSION_ONLY_COPY).not.toMatch(/start and pause|\bpauses? (it|the game)\b/i);
     // a bound card's pause line holds only while the body is the one playing (Z5): the note says so
     expect(PAUSE_NOTE).toMatch(/only while your body is playing/);

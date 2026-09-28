@@ -8,6 +8,22 @@ import type { Scene, TransformNode } from '@babylonjs/core';
 
 export type ContactShadowOpts = { diameter?: number; strength?: number };
 
+/** The disc's floor, frame to frame. Pure so the rule is testable (lib/babylon/visual/contactShadow.test.ts). */
+export interface FloorState { floorY: number; awaySince: number }
+/**
+ * A body ABOVE its floor is jumping: the disc stays on the floor and fades; after 1.6 s at a new height it re-anchors (a
+ * body that climbed onto a platform). A body BELOW its floor is on a floor that went down — a disc must never float over
+ * the feet, so the floor follows it at once. GATE-CRASHER-MAJOR (2026-09-28): the snow rider descends the piste at
+ * ~2.5 m/s of drop, so the 1.6 s rule hung his disc up to 4 m ABOVE him at full strength and popped it down every 1.6 s
+ * — the "dark disc at head height" in every snowboard frame.
+ */
+export function followFloor(st: FloorState, y: number, t: number): void {
+  const rise = y - st.floorY;
+  if (rise < -0.02) { st.floorY = y; st.awaySince = -1; return; }
+  if (Math.abs(rise) > 0.45) { if (st.awaySince < 0) st.awaySince = t; else if (t - st.awaySince > 1.6) { st.floorY = y; st.awaySince = -1; } }
+  else { st.awaySince = -1; if (Math.abs(rise) < 0.12) st.floorY += (y - st.floorY) * 0.2; }   // ride the floor's small changes (steps, ramps)
+}
+
 /** Attach a contact disc to a body root; it disposes with the root. Returns the disc. */
 export function attachContactShadow(scene: Scene, root: TransformNode, opts: ContactShadowOpts = {}): Mesh {
   // EYE SORES (2026-09-17): at 1.2 m / 0.6 the discs under a crowd of fighters merged into one huge dark smudge — a tighter, lighter, softer disc
@@ -28,12 +44,11 @@ export function attachContactShadow(scene: Scene, root: TransformNode, opts: Con
   mat.disableLighting = true; mat.emissiveColor = Color3.Black(); mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black();
   mat.backFaceCulling = false; mat.alpha = strength;
   disc.material = mat;
-  let floorY = root.position.y; let awaySince = -1;
+  const st: FloorState = { floorY: root.position.y, awaySince: -1 };
   const obs = scene.onBeforeRenderObservable.add(() => {
-    const p = root.position; const rise = p.y - floorY;
-    const t = performance.now() / 1000;
-    if (Math.abs(rise) > 0.45) { if (awaySince < 0) awaySince = t; else if (t - awaySince > 1.6) { floorY = p.y; awaySince = -1; } }
-    else { awaySince = -1; if (Math.abs(rise) < 0.12) floorY += (p.y - floorY) * 0.2; }   // ride the floor's small changes (steps, ramps)
+    const p = root.position;
+    followFloor(st, p.y, performance.now() / 1000);
+    const floorY = st.floorY;
     const h = Math.max(0, p.y - floorY);
     const k = Math.max(0, 1 - h / 2.6);
     disc.position.set(p.x, floorY + 0.02, p.z);

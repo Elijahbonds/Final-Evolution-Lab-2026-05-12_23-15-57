@@ -3,9 +3,9 @@
 // Twenty hosts drew their own "PAUSED — TAP TO RESUME" (BACKLOG B16), and one (who-scene-it) drew none. Step 4a draws
 // it once — PausedLayer, rendered by BootSplash on 'paused' and mounted by the one host without a splash — and this
 // pins that it STAYS once:
-//   the headline is drawn in one file, and the layer is rendered by two (BootSplash, who-scene-it). Brain Brawl keeps
-//   its copy until step 5 (the Brain Brawl session owns that file), and BootSplash draws nothing for it on 'paused'
-//   until then: two layers stacked doubled the headline (the step-4a review), so the two go together;
+//   the headline is drawn in one file, and the layer is rendered by two (BootSplash, who-scene-it). Brain Brawl kept
+//   its copy until step 5 (2026-09-26), with BootSplash drawing nothing for it on 'paused' — two layers stacked doubled
+//   the headline (the step-4a review) — and the two went together: no copy, and the shared layer for Brain Brawl too;
 //   every host that runs a mode shows the layer, and the layer's tap is that host's own START (the harness's paused
 //   branch resumes on it) — the splash rendered ALWAYS, with the host's own phase: a splash behind a condition, or
 //   handed a phase that is never 'paused', loses the pause with it (the review's M2 and M7);
@@ -21,6 +21,10 @@
 //   card never jumps on a missed detection (the review).
 // The markup is React's own (renderToStaticMarkup), not a reading of the JSX: vitest runs in node, with no DOM. The
 // hosts' JSX is read from the TypeScript syntax tree, so a condition around the splash is found wherever it sits.
+//
+// MOVEMENT PLAY P4 (2026-09-25): BootSplash is the card (SplashCard) plus body play beside it (BodyPlayLayer). The pins
+// on what the splash RETURNS — the pause layer on 'paused', nothing while playing — are the card's now; and with body
+// play off the layer adds nothing, so BootSplash draws exactly the card in every phase (Z-P4-1).
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,15 +36,18 @@ import { sessionStore, type BodyPresence, type PauseReason, type SessionWriter }
 import {
   PausedLayer, BodyReadyLine, pausedLine, readyLine, PAUSED_HEADLINE, RAISE_HANDS_LINE, STEP_BACK_LINE, CALIBRATING_LINE,
 } from './paused-layer';
-import { BootSplash } from './boot-splash';
+import { BootSplash, SplashCard } from './boot-splash';
+import { BodyPlayLayer, BodyPlayReady, SpaceCheckPanel, PLAY_WITH_BODY, CAMERA_NOTE } from './body-play';
+import { COMING_COPY } from '@/lib/input/bodyProfiles';
+import { bodySeamFor } from '@/lib/babylon/core/bodySeam';
 
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string): string => stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 /** The old copy's classes, verbatim: the layer must stack exactly where the twenty copies did. */
 const OLD_COPY_CLASSES = 'absolute inset-0 flex items-center justify-center bg-black/60';
 const GAMES = path.join('components', 'games');
-/** Until step 5 (after the Brain Brawl session commits): the one host allowed to keep its own copy. */
-const ALLOWED_COPY = path.join(GAMES, 'brainbrawl-babylon.tsx');
+/** Brain Brawl: the last host with its own copy, deleted in step 5 (2026-09-26). */
+const BRAINBRAWL = path.join(GAMES, 'brainbrawl-babylon.tsx');
 
 /** The game hosts: every components/games file that runs a mode (the dev runner under app/ prints its phase instead). */
 const hosts = (): string[] =>
@@ -97,22 +104,27 @@ type SplashProps = Parameters<typeof BootSplash>[0];
 const splashProps = (phase: SplashProps['phase'], modeId = 'dunk', onStart = () => {}): SplashProps =>
   ({ modeId, title: 'FLIGHT NIGHT', phase, onStart, onRetry: () => {} });
 const splash = (phase: SplashProps['phase']): string => renderToStaticMarkup(createElement(BootSplash, splashProps(phase)));
+const card = (phase: SplashProps['phase'], modeId = 'dunk'): string => renderToStaticMarkup(createElement(SplashCard, splashProps(phase, modeId)));
 
 describe('one paused layer (plan step 4a)', () => {
-  it('"TAP TO RESUME" is drawn in one file, and the layer rendered by two (brainbrawl allow-listed until step 5)', () => {
+  it('"TAP TO RESUME" is drawn in one file, and the layer rendered by two (Brain Brawl\'s copy gone in step 5)', () => {
     expect(PAUSED_HEADLINE).toBe('PAUSED — TAP TO RESUME');   // the pinned text (Z8; scripts/probes/_miss-retry.mts reads it)
     const files = sourceFiles(ROOT, ['components', 'app', 'lib'], fs, path);
     const drawers = files.filter((f) => read(f).includes('TAP TO RESUME')).sort();
-    // exact, so the allow-list cannot go stale: step 5 deletes brainbrawl's copy and this entry with it
-    expect(drawers).toEqual([ALLOWED_COPY, path.join(GAMES, 'paused-layer.tsx')]);
+    // exact: step 5 deleted Brain Brawl's copy, the last one, and the allow-list with it
+    expect(drawers).toEqual([path.join(GAMES, 'paused-layer.tsx')]);
     // nor a copy that borrows the headline (the review: `{PAUSED_HEADLINE}` in a host passed the text scan)…
     expect(files.filter((f) => /\bPAUSED_HEADLINE\b/.test(read(f)))).toEqual([path.join(GAMES, 'paused-layer.tsx')]);
     // …nor a second layer beside the splash's own (a double dim): BootSplash renders it, and the host without a splash
     expect(files.filter((f) => /<PausedLayer\b/.test(read(f))).sort()).toEqual([path.join(GAMES, 'boot-splash.tsx'), path.join(GAMES, 'who-scene-it-babylon.tsx')]);
-    // Brain Brawl: BootSplash draws nothing on its pause exactly while it draws its own copy. Step 5 deletes both
-    // together — one without the other is a Brain Brawl with two pauses stacked, or with none
-    const ownCopy = read(ALLOWED_COPY).includes('TAP TO RESUME');
-    expect(returned(BootSplash, splashProps('paused', 'brainbrawl')) === null, 'BootSplash skips brainbrawl\'s pause').toBe(ownCopy);
+    // Brain Brawl: no copy of its own, so BootSplash draws its pause like every host's — one without the other is a
+    // Brain Brawl with two pauses stacked, or with none (step 5 deleted the two together)
+    expect(read(BRAINBRAWL)).not.toMatch(/phase === 'paused' &&/);
+    const onStart = (): void => {};
+    const bb = returned(SplashCard, splashProps('paused', 'brainbrawl', onStart));
+    expect(bb?.type, 'BootSplash draws Brain Brawl\'s pause').toBe(PausedLayer);
+    expect((bb?.props as { onResume?: unknown }).onResume).toBe(onStart);
+    expect(read(path.join(GAMES, 'boot-splash.tsx'))).not.toContain("'brainbrawl'");
   });
 
   it('every host that runs a mode shows the layer — its splash always rendered, with its own phase — and its tap is the host\'s START', () => {
@@ -152,8 +164,9 @@ describe('one paused layer (plan step 4a)', () => {
   });
 
   it('BootSplash returns the layer on paused (the host\'s START its tap, every hook above the early returns), and nothing while playing or ended', () => {
+    // MOVEMENT PLAY P4: the card's own returns (BootSplash = SplashCard + BodyPlayLayer, which draws nothing here)
     const src = read(path.join(GAMES, 'boot-splash.tsx'));
-    const body = src.slice(src.indexOf('export function BootSplash('), src.indexOf('export function ejectTransition('));
+    const body = src.slice(src.indexOf('export function SplashCard('), src.indexOf('export function ejectTransition('));
     const firstReturn = body.search(/\n\s*if \(props\.phase === 'paused'\) return /);
     expect(firstReturn).toBeGreaterThan(0);
     // every hook call sits above the first early return (a hook under it changes the hook count between phases)
@@ -163,7 +176,7 @@ describe('one paused layer (plan step 4a)', () => {
 
     // the element React is given: the layer, and its tap is the host's START itself (not RETRY, not a wrapper)
     const onStart = (): void => {};
-    const el = returned(BootSplash, splashProps('paused', 'dunk', onStart));
+    const el = returned(SplashCard, splashProps('paused', 'dunk', onStart));
     expect(el?.type).toBe(PausedLayer);
     expect((el?.props as { onResume?: unknown }).onResume).toBe(onStart);
 
@@ -268,3 +281,78 @@ describe('one paused layer (plan step 4a)', () => {
     expect(renderToStaticMarkup(createElement(BodyReadyLine, { className: 'mt-3' }))).toContain(' mt-3');
   });
 });
+
+// ── movement play P4: body play beside the card ──────────────────────────────────────────────────────────────────
+
+describe('body play beside the splash (movement play P4)', () => {
+  const PHASES: SplashProps['phase'][] = ['loading', 'ready', 'countdown', 'playing', 'paused', 'ended', 'error'];
+
+  it('with body play off, BootSplash draws exactly the card, in every phase, for every host (Z-P4-1)', () => {
+    const modeIds = new Set<string>(['dunk', 'brainbrawl']);
+    for (const f of hosts()) for (const sp of splashes(f)) if (/^"[\w-]+"$/.test(sp.attrs.modeId ?? '')) modeIds.add(sp.attrs.modeId.slice(1, -1));
+    expect(modeIds.size).toBeGreaterThan(8);
+    for (const game of ['skateboard', 'dunk', 'football']) {
+      session('off');
+      writer?.unmount();
+      writer = sessionStore.mount(bodySeamFor({ modeId: game }).card);
+      for (const modeId of modeIds) for (const phase of PHASES) {
+        const props = splashProps(phase, modeId);
+        expect(renderToStaticMarkup(createElement(BootSplash, props)), `${game} card, ${modeId} ${phase}`)
+          .toBe(renderToStaticMarkup(createElement(SplashCard, props)));
+      }
+    }
+    // and the layer itself: nothing with the camera off, in any phase
+    for (const phase of PHASES) expect(renderToStaticMarkup(createElement(BodyPlayLayer, { phase, onStart: () => {} }))).toBe('');
+  });
+
+  it('READY says what the running game offers: the choice, "coming", or nothing at all (P3\'s card)', () => {
+    const readyFor = (modeId: string) => {
+      writer?.unmount();
+      writer = sessionStore.mount(bodySeamFor({ modeId }).card);
+      return card('ready', modeId);
+    };
+    const skate = readyFor('skateboard');
+    expect(skate).toContain(PLAY_WITH_BODY);
+    expect(skate).toContain(CAMERA_NOTE);
+    expect(skate.indexOf(PLAY_WITH_BODY)).toBeGreaterThan(skate.indexOf('TAP TO START'));
+    const dunk = readyFor('dunk');
+    expect(dunk).toContain(COMING_COPY);
+    expect(dunk).not.toContain(PLAY_WITH_BODY);
+    for (const none of ['football', 'brainbrawl']) {
+      const html = readyFor(none);
+      expect(html, none).not.toContain(PLAY_WITH_BODY);
+      expect(html, none).not.toContain(COMING_COPY);
+      expect(renderToStaticMarkup(createElement(BodyPlayReady, { tint: '#fff', onStart: () => {} })), none).toBe('');
+    }
+    // the choice is a button, so the card's start-anywhere skips it (a tap on it chooses body play, it does not start)
+    expect(skate).toMatch(new RegExp(`<button[^>]*>${PLAY_WITH_BODY}</button>`));
+  });
+
+  it('the layer comes after the card, and nothing in it carries a z-index (it sits where the pause does: under the shell\'s corner)', () => {
+    const src = read(path.join(GAMES, 'boot-splash.tsx'));
+    const boot = src.slice(src.indexOf('export function BootSplash('), src.indexOf('export function SplashCard('));
+    expect(boot).toMatch(/<SplashCard \{\.\.\.props\} \/>\s*<BodyPlayLayer phase=\{props\.phase\} onStart=\{props\.onStart\} \/>/);
+    const bp = read(path.join(GAMES, 'body-play.tsx'));
+    const layer = bp.slice(bp.indexOf('export function BodyPlayLayer('));
+    for (const m of layer.matchAll(/className=\{?[`"]([^`"]*)[`"]/g)) expect(m[1], m[1]).not.toMatch(/(^|\s)-?z-/);
+    for (const m of Object.values(CORNER_CLASSES(bp))) expect(m).not.toMatch(/(^|\s)-?z-/);
+    // the panel over a pause takes no z-index either (only the READY one does, inside the card's own z-40)
+    expect(bp).toMatch(/\$\{variant === 'ready' \? 'z-20' : ''\}/);
+  });
+
+  it('the READY panel keeps its taps to itself: the card behind it does not start on them', () => {
+    const el = returned(SpaceCheckPanel, { onStart: () => {}, variant: 'ready' });
+    const onPointerDown = (el?.props as { onPointerDown?: (e: { stopPropagation(): void }) => void }).onPointerDown;
+    expect(onPointerDown).toBeInstanceOf(Function);
+    let stopped = false;
+    onPointerDown!({ stopPropagation: () => { stopped = true; } });
+    expect(stopped).toBe(true);
+  });
+});
+
+/** body-play.tsx's CORNER_CLASS table, read from the source. */
+function CORNER_CLASSES(src: string): Record<string, string> {
+  const m = /const CORNER_CLASS[^{]*\{([^}]*)\}/.exec(src);
+  expect(m, 'CORNER_CLASS').not.toBeNull();
+  return Object.fromEntries([...m![1].matchAll(/(\w+): '([^']*)'/g)].map((x) => [x[1], x[2]]));
+}

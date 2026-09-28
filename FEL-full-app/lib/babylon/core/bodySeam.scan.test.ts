@@ -71,8 +71,9 @@ describe('the harness reads the body (plan §4.4)', () => {
     const on = harness.slice(harness.indexOf('input.onBody('));
     expect(on.length).toBeGreaterThan(0);
     expect(on).toMatch(/^input\.onBody\(\(p\) => \{\s*const now = performance\.now\(\);\s*const s = session\.step\(phase, p, now\);\s*applyBody\(s\);\s*if \(p\.final\) releaseBody\(\);\s*if \(phase === 'playing'\) \{\s*for \(const e of floor\.step\(p, now, s\.latched\)\) input\.emitBody\(e\);/);
-    // the raw events go to QA's bodyLog; a claimed kind goes to the mode's onBody and counts as play
-    expect(on).toMatch(/qa\?\.body\(ev\.kind, now - ev\.t\);\s*if \(def\.onBody && claimed\.has\(ev\.kind\)\) \{\s*qa\?\.press\(`body:\$\{ev\.kind\}`\); store\.count\('body'\); session\.noteInput\('body', now\);\s*def\.onBody\(ctx, ev, viewOf\(p\)\);/);
+    // the raw events go to QA's bodyLog; a claimed kind goes to the mode's onBody — never while the START latch holds
+    // (P7) — and counts as play only when the mode took it (onBody did not return false: a menu is not play)
+    expect(on).toMatch(/qa\?\.body\(ev\.kind, now - ev\.t\);\s*if \(def\.onBody && claimed\.has\(ev\.kind\) && !s\.latched\) \{\s*if \(def\.onBody\(ctx, ev, viewOf\(p\)\) !== false\) \{ qa\?\.press\(`body:\$\{ev\.kind\}`\); store\.count\('body'\); session\.noteInput\('body', now\); \}/);
     expect(on).toMatch(/store\.setBody\(s\.presence, s\.handsUp01\);\s*\}\);/);
     // the render loop ticks the session and the floor's pulses in every phase, before the mode's update — and writes the
     // tick's presence (the step-4a review: a stalled camera's last 'present' stayed on the pause line and the Body card)
@@ -90,6 +91,17 @@ describe('the harness reads the body (plan §4.4)', () => {
     // the READY gate is the pinned line (StartWake.test), and isWakeInput refuses every body event
     expect(harness).toMatch(/phase === 'ready' && isWakeInput\(e\)/);
     expect(read('lib/babylon/core/StartWake.ts')).toMatch(/if \(e\.src === 'body'\) return false;/);
+  });
+
+  it('every phase is written to the session store (movement play P4: the body-play store and the Body button read it)', () => {
+    const at = harness.indexOf('const setPhase = (p: ModePhase');
+    expect(at).toBeGreaterThan(0);
+    const body = harness.slice(at, harness.indexOf('\n  };', at));
+    expect(body).toMatch(/\n\s*store\.setPhase\(p\);/);
+    // before the host hears it (onPhase), so a host re-rendering on the phase reads the store already moved
+    expect(body.indexOf('store.setPhase(p)')).toBeLessThan(body.indexOf('opts.onPhase?.(p, detail)'));
+    // and nothing else writes the phase
+    expect([...harness.matchAll(/store\.setPhase\(/g)]).toHaveLength(1);
   });
 
   it('releaseBody() comes before every setPhase(\'paused\'): the mode sees its axes at 0 while it is still playing', () => {

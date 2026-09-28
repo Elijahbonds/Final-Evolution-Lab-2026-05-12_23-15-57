@@ -28,6 +28,10 @@ const NOT_IMPORTED: Record<string, string> = {
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.
   'lib/testing/sourceScan.ts': 'test support — imported by the rule tests that scan source, and tests are not counted as consumers',
+  // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
+  // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
+  // without that GO; wiring it is two lines per sessions route, then this line goes.
+  'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */
@@ -49,8 +53,9 @@ const DYNAMIC_TREES = [
  */
 const KNOWN_ORPHANS: readonly string[] = [
   // The movement screen's own machinery. screenRunner and screenReward were wired into the Mirror on
-  // 2026-09-20 and came off this list, which is the ratchet doing its job. These two are still waiting.
-  'lib/mirror/lungeAudit.ts',
+  // 2026-09-20 and came off this list, which is the ratchet doing its job. lungeAudit.ts came off on 2026-09-25
+  // (MIRROR-COACH P1 baseline): lib/mirror/fixtures/measure.ts runs it on every landmark fixture, so it is MEASURED
+  // now — but it is still not mounted in the Mirror; that is phase 4. This one is still waiting.
   'lib/kitchens/fromScreen.ts',
   // The coach layer — written, tested, unreachable.
   'lib/coach-interfaces.ts',

@@ -12,13 +12,25 @@
 //
 // GameShell mounts it twice (the header, and a compact copy in full-bleed). Both drive and show ONE shared source and
 // one camera (poseSource's sharedPoseSource, on PoseService); the camera stops when the last of them unmounts.
+//
+// MOVEMENT PLAY P4 (2026-09-25): the button is a SHORTCUT to the READY screen's "Play with your body" (the owner's
+// call). It runs the same choice (lib/move/bodyPlay's button(): bodyButtonAction): at READY it starts the camera and the
+// space check runs on the game screen; mid-play it pauses the game first and the check runs over the pause; on a game
+// where body play is coming, or that has none, it only opens the card — it never starts the camera there. The card's
+// "Stand still to re-centre" is "Check my space again" now (the same body, a new stand, through the check).
+//
+// Every button here lets go of the keyboard focus when clicked (the review): Space is a game key (A), and a focused
+// button is also clicked by Space's keyup, so a kept focus turned the player's next jump into this button's action —
+// "Check my space again" paused the game and dropped the rulers, the Body button turned the camera off. TAP TO START
+// and PLAY WITH YOUR BODY blur themselves for the same reason.
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { PersonStanding, X } from 'lucide-react';
 import { holdSharedPoseSource, sharedPoseSource, type PoseSourceSnapshot } from '@/lib/input/poseSource';
 import { sessionStore, type SessionView } from '@/lib/babylon/core/sessionStore';
-import { MOVE_LABEL, NO_MODE_COPY, PAUSE_NOTE, SESSION_LINES, SESSION_ONLY_COPY } from '@/lib/input/bodyProfiles';
-import { SoundKit } from '@/lib/babylon/audio/SoundKit';
+import { MOVE_LABEL, NO_MODE_COPY, PAUSE_NOTE, SESSION_LINES, SESSION_ONLY_COPY, UNAVAILABLE_COPY } from '@/lib/input/bodyProfiles';
+import { bodyPlay, BODY_PLAY_OFF } from '@/lib/move/bodyPlay';
+import { bodyButtonAction, bodyPlayOffer, type BodyButtonAction } from '@/lib/move/bodyPlayChoice';
 
 /** Before the page is live (server render, hydration) every Body button reads off. */
 const OFF: PoseSourceSnapshot = { state: 'idle', detail: '', body: false };
@@ -36,10 +48,17 @@ function costNotes(view: SessionView): string[] {
   return notes;
 }
 
+/** Why a game has no moves to list: none running, body play coming to it, or none for it (MOVEMENT PLAY P4). */
+export function noMovesCopy(view: Pick<SessionView, 'modeId' | 'drives' | 'later'>): string | null {
+  if (view.modeId === null) return NO_MODE_COPY;
+  if (view.drives) return null;
+  return bodyPlayOffer(view) === 'coming' ? SESSION_ONLY_COPY : UNAVAILABLE_COPY;
+}
+
 /** The card's list: this game's moves and the session's two, or why there are none (plan §2.2). */
 function Moves({ view }: { view: SessionView }) {
-  if (view.modeId === null) return <p className="mt-3 text-[12.5px] leading-snug text-white/60">{NO_MODE_COPY}</p>;
-  if (!view.drives) return <p className="mt-3 text-[12.5px] leading-snug text-white/60">{SESSION_ONLY_COPY}</p>;
+  const none = noMovesCopy(view);
+  if (none) return <p className="mt-3 text-[12.5px] leading-snug text-white/60">{none}</p>;
   // the pause's one condition first (a controller player is never paused for walking off camera), then the costs
   const notes = [PAUSE_NOTE, ...costNotes(view)];
   return (
@@ -68,29 +87,33 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
   );
   // what the running game reads from the body (nothing mounted = the "open a game" line)
   const view = useSyncExternalStore(sessionStore.subscribe, sessionStore.view, sessionStore.view);
+  const play = useSyncExternalStore(src ? bodyPlay.subscribe : noSubscribe, src ? bodyPlay.view : () => BODY_PLAY_OFF, () => BODY_PLAY_OFF);
   const [showCard, setShowCard] = useState(false);
+  /** The card opened without a camera (body play coming, none, no game): what it says. */
+  const [cardOnly, setCardOnly] = useState<BodyButtonAction | null>(null);
 
   useEffect(() => holdSharedPoseSource(), []);
 
   const on = state !== 'idle' && state !== 'error';
 
-  const toggle = useCallback(async () => {
+  const toggle = useCallback(() => {
     if (!src) return;
-    if (on) { src.stop(); setShowCard(false); return; }
-    // MOVEMENT PLAY P3 (2026-09-24): this click is the one user gesture a body-played game gets — the hands-up START
-    // presses nothing — so the audio unlocks here, and the harness starts the ambient bed when the body wakes the game.
-    SoundKit.unlock();
-    setShowCard(true);
-    await src.start();
+    // MOVEMENT PLAY P4: the READY choice's shortcut (bodyPlay.button runs the same action). The sound unlocks inside it,
+    // before anything awaits: this click is the one user gesture a body-played game gets (the hands-up START presses
+    // nothing). The card opens at once, not after the camera's permission prompt.
+    const action = bodyButtonAction(sessionStore.view(), on);
+    setCardOnly(action === 'coming' || action === 'unavailable' || action === 'none' ? action : null);
+    setShowCard(action !== 'end');
+    void bodyPlay.button();
   }, [src, on]);
 
   return (
     <>
       <button
         type="button"
-        onClick={toggle}
+        onClick={(e) => { e.currentTarget.blur(); toggle(); }}
         aria-pressed={on}
-        aria-label={on ? 'Turn body control off' : 'Play with your body as the controller'}
+        aria-label={on ? 'Turn body play off' : 'Play with your body'}
         className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 font-mono text-[10.5px]
                     font-bold uppercase tracking-[0.12em] transition-colors ${compact ? '' : 'sm:px-3'}`}
         style={{
@@ -110,7 +133,7 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
         )}
       </button>
 
-      {showCard && on && (
+      {showCard && (on || cardOnly) && (
         <div className="pointer-events-auto fixed inset-x-3 bottom-3 z-[60] mx-auto max-w-md rounded-2xl border
                         border-white/12 bg-black/85 p-4 backdrop-blur-xl sm:inset-x-auto sm:right-4 sm:w-[340px]">
           <div className="flex items-start justify-between gap-3">
@@ -119,8 +142,10 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
                 Body control
               </p>
               <p className="mt-1 text-[13px] font-semibold leading-tight text-white">
-                {state === 'requesting' ? 'Asking for the camera…'
+                {!on ? (cardOnly === 'none' ? 'No game running' : cardOnly === 'coming' ? 'Not in this game yet' : 'Not in this game')
+                  : state === 'requesting' ? 'Asking for the camera…'
                   : state === 'loading' ? 'Loading the tracker…'
+                  : play.stage === 'checking' ? 'Set up your space on the game screen.'
                   : state === 'calibrating' ? 'Stand still, whole body in frame'
                   : body ? 'You are in.'
                   : 'Step back — I cannot see you'}
@@ -136,17 +161,27 @@ export function BodyControl({ compact = false }: { compact?: boolean }) {
             </button>
           </div>
 
-          {(state === 'calibrating' || state === 'live') && <Moves view={view} />}
+          {(!on || state === 'calibrating' || state === 'live') && <Moves view={view} />}
 
-          {state === 'live' && (
-            <button
-              type="button"
-              onClick={() => src?.recalibrate()}
-              className="mt-3 w-full rounded-lg border border-white/12 py-2 font-mono text-[10px] font-bold
-                         uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
-            >
-              Stand still to re-centre
-            </button>
+          {(state === 'calibrating' || state === 'live') && play.stage !== 'off' && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={(e) => { e.currentTarget.blur(); bodyPlay.again(); }}
+                className="rounded-lg border border-white/12 py-2 font-mono text-[10px] font-bold
+                           uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
+              >
+                Check my space again
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.currentTarget.blur(); bodyPlay.end(view.key ?? play.key); setShowCard(false); }}
+                className="rounded-lg border border-white/12 py-2 font-mono text-[10px] font-bold
+                           uppercase tracking-[0.14em] text-white/50 transition-colors hover:text-white"
+              >
+                Camera off
+              </button>
+            </div>
           )}
         </div>
       )}
