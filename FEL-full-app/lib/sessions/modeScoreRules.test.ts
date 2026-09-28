@@ -8,9 +8,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import {
-  MAX_DURATION_FLOOR_MS, MEASURED_RUNS, MIN_DURATION_FLOOR_MS, MODE_SCORE_RULES, RATE_HEADROOM, SCORE_HEADROOM,
-  checkRunScore, deriveRule, rulesMaxFor, unmeasuredModes, type MeasuredRun,
+  MAX_DURATION_FLOOR_MS, MEASURED_RUNS, MIN_DURATION_FLOOR_MS, MODE_SCORE_RULES, RATE_HEADROOM, SCORE_COLUMN_MAX, SCORE_HEADROOM, STORY_MIRRORED,
+  checkRunScore, checkUnruledScore, deriveRule, derivedBounds, derivedRule, rulesMaxFor, storyBossBound, storyRailBound, unmeasuredModes, type MeasuredRun,
 } from './modeScoreRules';
+import { DUNK_ATTEMPT_MAX } from '@/lib/arena-score-integrity';
 import { MODE_INFO } from '@/lib/game-data';
 
 const run = (score: number | null, sec: number | null, secIs: MeasuredRun['secIs'] = 'posted'): MeasuredRun => ({ score, sec, secIs, source: 'test' });
@@ -74,8 +75,14 @@ describe('deriveRule: one arithmetic for every mode', () => {
 });
 
 describe('MODE_SCORE_RULES: every row comes from measured TRUE :3000 runs', () => {
-  it('each row is exactly what deriveRule makes of its runs (no hand-tuned number)', () => {
-    for (const [mode, rule] of Object.entries(MODE_SCORE_RULES)) expect(rule, mode).toEqual(deriveRule(mode, MEASURED_RUNS[mode]));
+  it('each row is exactly what deriveRule makes of its runs, or derivedRule of its derived bound (no hand-tuned number)', () => {
+    const derived = derivedBounds();
+    for (const [mode, rule] of Object.entries(MODE_SCORE_RULES)) {
+      if (rule.maxScoreFrom === 'derived') expect(rule, mode).toEqual(derivedRule(derived[mode]));
+      else expect(rule, mode).toEqual(deriveRule(mode, MEASURED_RUNS[mode]));
+    }
+    // no mode is both measured and derived: one source per row
+    expect(Object.keys(MEASURED_RUNS).filter((m) => m in derived)).toEqual([]);
   });
 
   it('each row names at least one run, each run names its capture', () => {
@@ -171,16 +178,93 @@ describe('checkRunScore: every refusal is SCORE_INVALID with the rule it broke',
 });
 
 describe('fail closed: the session keys with no measured TRUE :3000 run pay nothing until one is measured', () => {
-  it('the list, pinned (the land report prints it; measuring a mode moves it out of here and into MEASURED_RUNS)', () => {
+  it('the list, pinned (measuring a mode moves it out of here and into MEASURED_RUNS)', () => {
+    // OWNER DECISION (2026-09-28): the endless four and the four that should pay have derived rows now; a result in any
+    // mode still listed here is RECORDED unpaid (NO_RULES), not refused
     const keys = sessionKeys();
     expect(keys.length).toBeGreaterThanOrEqual(34);
     expect(unmeasuredModes(keys)).toEqual([
-      'acting', 'aeroAces', 'carnival', 'duel', 'dunkduel', 'golf', 'hoops3v3', 'irl', 'karateEndless', 'karateVersus',
-      'mixedcombat', 'music', 'showdown', 'skateboarding', 'sprint', 'storyMode', 'surfing', 'tennis', 'tiebreak', 'training',
-      'velocityKart', 'volleyball',
+      'aeroAces', 'carnival', 'duel', 'golf', 'hoops3v3', 'karateVersus', 'mixedcombat', 'showdown', 'sprint', 'tennis',
+      'tiebreak', 'training', 'velocityKart', 'volleyball',
     ]);
-    expect(keys.filter((k) => !unmeasuredModes([k]).length)).toEqual([
+    const ruled = keys.filter((k) => !unmeasuredModes([k]).length);
+    expect(ruled.filter((k) => MODE_SCORE_RULES[k].maxScoreFrom !== 'derived')).toEqual([
       'baseball', 'bigAir', 'brainBrawl', 'dance', 'dunkContest', 'football', 'freerun', 'hoops1v1', 'snowboarding', 'soccer', 'threePoint', 'whoSceneIt',
     ]);
+    expect(ruled.filter((k) => MODE_SCORE_RULES[k].maxScoreFrom === 'derived')).toEqual([
+      'acting', 'dunkduel', 'irl', 'karateEndless', 'music', 'skateboarding', 'storyMode', 'surfing',
+    ]);
+  });
+});
+
+describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
+  const b = derivedBounds({ killSwitch: false });
+  it('the endless / combo four: the Arena\'s modelled per-run bounds, and music\'s own per-hits bound (the row adds only the column limit)', () => {
+    expect(b.skateboarding.maxScore).toBe(435_544_000);
+    expect(b.surfing.maxScore).toBe(5_866_322);
+    expect(b.karateEndless.maxScore).toBe(136_807_600);
+    expect(b.music.maxScore).toBe(SCORE_COLUMN_MAX);
+    for (const m of ['skateboarding', 'surfing', 'karateEndless', 'music']) expect(b[m].maxScore, m).toBeLessThanOrEqual(SCORE_COLUMN_MAX);
+  });
+
+  it('the four that should pay, from their own code', () => {
+    expect(b.acting.maxScore).toBe(100);
+    expect(b.irl.maxScore).toBe(177);                                   // g × 1.2² / 8 = 1.77 m
+    expect(storyBossBound()).toBe(950);
+    expect(storyRailBound()).toBe(2196);
+    expect(b.storyMode.maxScore).toBe(2196);
+    expect(b.dunkduel.maxScore).toBe(2 * DUNK_ATTEMPT_MAX);
+    expect(b.dunkduel.payFloorOnly).toBe(true);
+    expect(Object.entries(b).filter(([, v]) => v.payFloorOnly).map(([k]) => k)).toEqual(['dunkduel']);
+  });
+
+  it('under the kill switch a modelled bound whose game swaps falls back to the column limit', () => {
+    const ks = derivedBounds({ killSwitch: true });
+    expect(ks.skateboarding.maxScore).toBe(SCORE_COLUMN_MAX);
+    expect(ks.surfing.maxScore).toBe(SCORE_COLUMN_MAX);
+    expect(ks.karateEndless.maxScore).toBe(SCORE_COLUMN_MAX);
+    expect(ks.acting.maxScore).toBe(100);
+  });
+
+  it('a derived row: pace = the bound over its modelled run (else the shortest run), the duration floors, no measured runs', () => {
+    expect(derivedRule(b.skateboarding)).toMatchObject({ maxScoreFrom: 'derived', maxScorePerSecond: Math.ceil((435_544_000 / 90) * 100) / 100, minDurationMs: MIN_DURATION_FLOOR_MS, maxDurationMs: MAX_DURATION_FLOOR_MS, measured: [] });
+    expect(derivedRule(b.acting).maxScorePerSecond).toBe(50);
+    // a real strong skate run (the rc gauntlet's 80,832 over its 90 s) is inside
+    expect(checkRunScore({ mode: 'skateboarding', score: 80_832, durationMs: 90_000 }, { skateboarding: derivedRule(b.skateboarding) })).toMatchObject({ ok: true });
+  });
+
+  it('DRIFT: the story, acting and Prove It constants are still what their code says', () => {
+    const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
+    const boss = src('components/games/glitch-boss-game.tsx');
+    expect(boss).toContain(`bHp: ${STORY_MIRRORED.bossHp},`);
+    expect(boss).toContain(`hp: ${STORY_MIRRORED.bossPlayerHp},`);
+    expect(boss).toContain(`st.score += dmg * ${STORY_MIRRORED.bossPtsPerDmg};`);
+    expect(boss).toContain(`Math.round(st.hp * ${STORY_MIRRORED.bossWinHpMult})`);
+    expect(Math.max(...[...boss.matchAll(/hitBoss\((\d+)\)/g)].map((m) => Number(m[1])))).toBe(STORY_MIRRORED.bossMaxHit);
+    const rail = src('components/games/rail-grind-game.tsx');
+    expect(rail).toContain(`const TARGET_DIST = ${STORY_MIRRORED.railTargetDist};`);
+    expect(rail).toContain(`st.speed = (${STORY_MIRRORED.railBaseSpeed} + st.dist * 0.02) * speedMult;`);
+    expect(rail).toContain(`st.orbT = ${STORY_MIRRORED.railOrbEverySec} + Math.random() * 0.4;`);
+    expect(rail).toContain(`const pts = o.type === 'shard' ? ${STORY_MIRRORED.railOrbMaxPts} : 20;`);
+    expect(rail).toContain(`if (st.airTime > ${STORY_MIRRORED.railMinAirSec}) {`);
+    expect(rail).toContain(`const pts = Math.round(${STORY_MIRRORED.railLandBase} * (1 + st.combo * ${STORY_MIRRORED.railLandComboStep}));`);
+    expect(rail).toContain(`Math.round(st.hp * ${STORY_MIRRORED.railFinishHpMult})`);
+    expect(rail).toContain(`hp: ${STORY_MIRRORED.railPlayerHp},`);
+    // the slowest grade (lib/prq.ts prqGrade)
+    const speedMults = [...src('lib/prq.ts').matchAll(/speedMult: ([\d.]+)/g)].map((m) => Number(m[1]));
+    expect(Math.min(...speedMults)).toBe(STORY_MIRRORED.railMinSpeedMult);
+    expect(src('components/games/acting-game.tsx')).toContain('score: Math.round(res.average * 100),');
+    expect(src('lib/babylon/core/ActingCore.ts')).toContain('const adjusted = clamp01(average * coverage);');
+    expect(src('lib/babylon/modes/DunkDuelMode.ts')).toContain(`const DUNKS_EACH = ${STORY_MIRRORED.dunkDuelDunksEach};`);
+  });
+});
+
+describe('OWNER DECISION: a result in a mode with no row is recorded unpaid — after these checks', () => {
+  it('a storable whole number, not negative', () => {
+    expect(checkUnruledScore(12)).toEqual({ ok: true, score: 12 });
+    expect(checkUnruledScore(0)).toEqual({ ok: true, score: 0 });
+    for (const bad of [1.5, '10', null, Number.NaN]) expect(checkUnruledScore(bad), String(bad)).toMatchObject({ ok: false, detail: 'score_not_integer' });
+    expect(checkUnruledScore(-1)).toMatchObject({ ok: false, detail: 'score_negative' });
+    expect(checkUnruledScore(SCORE_COLUMN_MAX + 1)).toMatchObject({ ok: false, detail: 'above_max_score', limit: SCORE_COLUMN_MAX });
   });
 });

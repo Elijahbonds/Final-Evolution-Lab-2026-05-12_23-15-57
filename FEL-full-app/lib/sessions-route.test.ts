@@ -1085,3 +1085,70 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     expect(h.matchEvents.filter(PAID)).toEqual([]);
   });
 });
+
+describe('OWNER DECISION (2026-09-28): a mode with no rules row is recorded unpaid; Prove It pays the played floor', () => {
+  it('NO_RULES: ok, paid: false, the score recorded on the run — nothing paid, nothing filed, no session row', async () => {
+    rules('volleyball', {});                                          // tennis has no row in this table
+    const r = await post({ mode: 'tennis', score: 3, won: true, duration: 60 });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'NO_RULES', score: 3, won: true, sessionId: null, xp: 0, coins: 0 });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'recorded', score: 3 });
+    expectNothingPaid('NO_RULES');
+    expect(h.events).toContainEqual(expect.objectContaining({ name: 'session_unpaid', props: expect.objectContaining({ reason: 'NO_RULES' }) }));
+  });
+
+  it('NO_RULES still checks what it can: a whole number, not negative — and its own per-run cap', async () => {
+    rules('volleyball', {});
+    for (const [score, detail] of [[2.5, 'score_not_integer'], [-4, 'score_negative']] as const) {
+      const r = await post({ mode: 'tennis', score, won: true, duration: 60 });
+      expect(r.status, String(score)).toBe(422);
+      expect(r.body, String(score)).toMatchObject({ reason: 'SCORE_INVALID', detail });
+    }
+    const capped = await post({ mode: 'tennis', score: 5, won: true, duration: 60 });   // tennis: 4 games at most (the rules)
+    expect(capped.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 4 });
+    expectNothingPaid();
+  });
+
+  it('a key the catalogue does not know is still refused (it is not NO_RULES)', async () => {
+    rules('volleyball', {});
+    expect((await post({ mode: 'notAMode', score: 1, duration: 60 })).body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'unknown_mode' });
+  });
+
+  it('payFloorOnly (Prove It): paid as a score of 0 and no win — 10 XP, 1 shard, the streak — no coins, won shards, season XP or mastery; the score stays on the history row', async () => {
+    rules('dunkduel', { maxScore: 120, payFloorOnly: true, minDurationMs: 2_000 });
+    const r = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: false, xp: 10, shards: 1, credits: 0, coins: 0, walletShards: 0, season: null, mastery: null });
+    expect(h.sessions[0]).toMatchObject({ mode: 'dunkduel', score: 96, won: false, xp: 10, shards: 1 });
+    expect(h.wallet).toEqual([]);
+    expect(h.season).toEqual([]);
+    expect(h.mastery).toEqual([]);
+    expect(h.grants.map((g) => g.grantType).sort()).toEqual(['prq', 'shards', 'xp']);
+    // its streak day still counts and pays its Lab Credits
+    for (const k of ['sessions', 'grants', 'lc'] as const) h[k] = [];
+    h.profile.lastStreakAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const next = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
+    expect(next.body).toMatchObject({ won: false, xp: 10, streakDays: 4, streakBonus: 20, credits: 20 });
+    expect(h.lc[0]).toMatchObject({ delta: 20 });
+  });
+
+  it('rebased onto MUSIC-SUITE P6: a NO_RULES Arena music set is recorded unpaid and never makes the duel\'s pay-once claim — the honest paid post still gets it', async () => {
+    rules('volleyball', {});                                          // music has no row in this table
+    h.matches.m1 = musicDuel();
+    const house = finishedSet('m1');
+    const body = { mode: 'music', score: house, won: true, duration: 66, arenaMatchId: 'm1', stats: musicSet({ bars: 32, notes: 192, arena: true }) };
+    const r = await post(body);
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'NO_RULES', score: house, sessionId: null, xp: 0 });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'recorded', score: house });
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toEqual([]);
+    expect(h.writes.filter((w) => w.startsWith('duel:') || w.startsWith('event:'))).toEqual([]);
+    expectNothingPaid('NO_RULES arena set');
+    // the duel's one Arena pay is still there for the paid post (open rules: music has its row)
+    h.rules = null;
+    const paid = await post(body);
+    expect(paid.body).toMatchObject({ paid: true, capped: false, xp: 567_500 });
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toHaveLength(1);
+  });
+});
