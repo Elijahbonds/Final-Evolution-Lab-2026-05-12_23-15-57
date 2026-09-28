@@ -14,6 +14,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { timingWon } from './timing-won';
+import { timingMaxCombo } from './timing-combo';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
@@ -85,7 +86,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
           won,
           duration: r.durationSec,
           headline,
-          maxCombo: n('hits'),
+          maxCombo: timingMaxCombo(st),   // MUSIC-SUITE P6: the mode's own best streak (dance), else clean hits as before
         };
         onEnd(result);
       };

@@ -141,8 +141,12 @@ const START_LEAD_S = 0.05;
  * What a scheduled step will play: `hits` sources start on it; `gridLive` = the pattern has any audible hit at all.
  * MUSIC-SUITE P2 FIX PASS: `skipped` = the step's time had already gone by when the scheduler reached it (a stall), so
  * nothing was started and `hits` is 0 — PERFORM offers it as a rest.
+ * MUSIC-SUITE P6 (2026-09-25): `rows` = the ids of the rows that started a sound on it (one per hit, in track order) — so
+ * PERFORM can put each note in its part's lane (performSet.performLanesOf). A row the desk mutes or solos out, or the tier
+ * hides, starts nothing and is not in it; a row the PERFORM band has taken out still starts (its gate is closed: mixGraph
+ * setBand) and IS in it — the lane keeps its notes while the part is silent.
  */
-export interface StepSound { hits: number; gridLive: boolean; skipped?: boolean }
+export interface StepSound { hits: number; gridLive: boolean; skipped?: boolean; rows?: readonly string[] }
 
 // ── pure helpers (MUSIC-SUITE P4: the rules, tested without a clock) ───────────────────────────────────────────────
 
@@ -495,6 +499,15 @@ export class AudioEngine {
 
   start(): void { this.begin(0); }
   /**
+   * MUSIC-SUITE P6 FIX PASS (2026-09-26): start the song at the top of bar `bar` (PERFORM's resume after PAUSE). start()
+   * always began at bar 0 (begin: currentStep = 0, bar = 0, onBar(0)), so a paused song-mode arrangement resumed from its
+   * FIRST section. Bar `bar`'s patterns are swapped in by onBar(bar) exactly as a bar line does; songStartSec is then the
+   * time bar `bar` begins. A no-op while running.
+   */
+  startAt(bar: number): void { this.begin(0, Math.max(0, Math.floor(Number.isFinite(bar) ? bar : 0))); }
+  /** MUSIC-SUITE P6 FIX PASS: how many steps of the current bar have been scheduled (0 at a bar line) — what PAUSE rewinds. */
+  get stepsIntoBar(): number { return this.currentStep; }
+  /**
    * MUSIC-SUITE P4: start after `bars` bars of count-in clicks (a distinct click, each bar's first accented), all placed on
    * the audio clock now. Returns when bar 0 begins and the clicks; a no-op (nothing new) when already running.
    */
@@ -521,17 +534,17 @@ export class AudioEngine {
     for (const c of clicks) this.playClick(c.kind, c.at);
     return clicks;
   }
-  private begin(countBars: number): { startAt: number; clicks: ScheduledClick[] } {
+  private begin(countBars: number, fromBar = 0): { startAt: number; clicks: ScheduledClick[] } {
     if (this.timerId !== null) return { startAt: this.startedAt, clicks: [] };
     if (this.ctx.state === 'suspended') void this.ctx.resume();
-    this.currentStep = 0; this.bar = 0; this.stepIndex = 0;
-    this.onBar?.(0);   // M2: bar 0's patterns (and tempo) are swapped in before the grid is anchored
+    this.currentStep = 0; this.bar = fromBar; this.stepIndex = 0;
+    this.onBar?.(fromBar);   // M2: the first bar's patterns (and tempo) are swapped in before the grid is anchored
     const t0 = this.ctx.currentTime + START_LEAD_S;
     const clicks = countInClicks(t0, countBars, this.state.bpm);
     this.startedAt = t0 + countBars * barSec(this.state.bpm, this.state.steps);
     this.grid = { originSec: this.startedAt, originIndex: 0, bpm: this.state.bpm };
     for (const c of clicks) this.playClick(c.kind, c.at);
-    this.fireTakes(0, this.startedAt);
+    this.fireTakes(fromBar, this.startedAt);
     this.timerId = window.setInterval(() => this.scheduler(), LOOKAHEAD_MS);
     return { startAt: this.startedAt, clicks };
   }
@@ -609,10 +622,11 @@ export class AudioEngine {
       // MUSIC-SUITE P2 FIX PASS: already gone by (a stall) — start nothing; the playhead still moves over it
       this.skippedSteps++;
       this.scheduledSteps.push({ step, time });
-      this.onStepScheduled?.(step, time, { hits: 0, gridLive: this.gridLive(), skipped: true });
+      this.onStepScheduled?.(step, time, { hits: 0, gridLive: this.gridLive(), skipped: true, rows: [] });
       return;
     }
     let hits = 0;
+    const rows: string[] = [];   // MUSIC-SUITE P6: which rows started a sound (PERFORM's lanes)
     for (const track of this.state.tracks) {
       if (!this.hears(track) || !track.pattern[step]) continue;
       const sample = this.samples.get(track.sampleId);
@@ -620,11 +634,12 @@ export class AudioEngine {
       const voice = voiceFor(sample, track, step, this.notes);
       this.track(playHit(this.ctx, this.graph, voice, track, step, time), time, voice.buffer.duration / voice.rate, 'hit');
       hits++;
+      rows.push(track.sampleId);
     }
     // MUSIC-SUITE P4: the metronome, on the song's own quarter notes (never swung: they are even steps)
     if (this.metronome) { const k = metronomeClick(step, this.state.steps); if (k) this.playClick(k, time); }
     this.scheduledSteps.push({ step, time });
-    this.onStepScheduled?.(step, time, { hits, gridLive: hits > 0 || this.gridLive() });
+    this.onStepScheduled?.(step, time, { hits, gridLive: hits > 0 || this.gridLive(), rows });
   }
   private drainPlayhead(): void {
     const now = this.ctx.currentTime;

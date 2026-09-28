@@ -5,9 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { spend, readWallet, WalletError } from '@/lib/wallet/wallet-service';
-import { MUSIC_PURCHASES, MUSIC_SKU_PREFIX, kitForSku, musicPurchase } from '@/lib/babylon/music/purchases';
-import { backedEntitlements, type DeadBuyRow } from '@/lib/wallet/dead-buys';
-import { REASON } from '@/lib/wallet/reward-rules';
+import { MUSIC_SKU_PREFIX, kitForSku, musicPurchase } from '@/lib/babylon/music/purchases';
+import { ownedMusicKits } from '@/lib/wallet/kit-grandfather';
 
 /**
  * Buy something in the Music Room.
@@ -54,9 +53,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** The kit SKUs the room sells (a free kit has none: everybody owns it). */
-const KIT_SKUS = MUSIC_PURCHASES.map((p) => p.id).filter((id) => kitForSku(id) !== null);
-
 /**
  * What this player owns, so the room does not offer to sell it again — and so a kit bought on one device is there on
  * every other.
@@ -74,6 +70,10 @@ const KIT_SKUS = MUSIC_PURCHASES.map((p) => p.id).filter((id) => kitForSku(id) !
  *     empty list; the room now removes a kit the server does not list, so a database hiccup would have locked every
  *     player's kits. Any failure is a 503 and the room keeps its cache.
  * Only kit SKUs are listed: the Cell assist is consumable, and a /store-bought one was never a foundation to use.
+ *
+ * MUSIC-SUITE P6 (2026-09-25): the read itself moved to lib/wallet/kit-grandfather.ts ownedMusicKits, unchanged but for
+ * one reason more in its ledger read — a kit granted under owner decision #23 (KIT_GRANDFATHER_2026_09, a zero-delta row)
+ * backs its row like a charge — so POST /api/music/grandfather decides "a kit you don't own" by this very rule.
  */
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -81,21 +81,7 @@ export async function GET() {
   if (!playerId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   try {
-    const wallet = await readWallet(prisma, playerId);   // pays back dead buys first
-    const w = await prisma.wallet.findUnique({ where: { playerId }, select: { id: true } });
-    const [ents, raw] = await Promise.all([
-      prisma.playerEntitlement.findMany({ where: { playerId, skuId: { in: KIT_SKUS } }, select: { skuId: true } }),
-      w
-        ? prisma.walletLedgerEntry.findMany({
-          where: { walletId: w.id, reasonCode: { in: [REASON.SPEND_CATALOG_ITEM, REASON.DEAD_BUY_REFUND] } },
-          select: { id: true, currency: true, delta: true, reasonCode: true, idempotencyKey: true, metadata: true, createdAt: true },
-        })
-        : Promise.resolve([]),
-    ]);
-    const rows: DeadBuyRow[] = raw.map((r) => ({ ...r, currency: String(r.currency), delta: Number(r.delta) }));
-    const backed = backedEntitlements(KIT_SKUS, rows, playerId);
-    const owned = [...new Set(ents.map((e) => e.skuId))].filter((sku) => backed.has(sku)).sort();
-    return NextResponse.json({ owned, shards: wallet.shards });
+    return NextResponse.json(await ownedMusicKits(prisma, playerId));
   } catch (e) {
     console.error('[music/unlock] owned read failed', e);
     return NextResponse.json({ error: 'unavailable' }, { status: 503 });

@@ -118,7 +118,10 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
 
   const submit = readFileSync(new URL('../app/api/arena/submit-score/route.ts', import.meta.url), 'utf8');
   ok(submit.includes("matchType === 'GHOST_DUEL'"), 'submit-score detects ghost duels');
-  ok(submit.includes('createdAt: { lt: match.createdAt }'), 'the draw history strictly predates the match — the submitted score can\'t leak into the band');
+  // MUSIC-SUITE P6 FIX PASS (2026-09-26): the draw moved to lib/arena-ghost.ts (the expiry sweep makes the same one)
+  const ghost = readFileSync(new URL('../lib/arena-ghost.ts', import.meta.url), 'utf8');
+  ok(submit.includes('drawHouseScore(tx, match, userId,') && ghost.includes('const createdAt = new Date(match.createdAt);')
+    && (ghost.match(/createdAt: \{ lt: createdAt \}/g) ?? []).length === 3, 'the draw history strictly predates the match — the submitted score can\'t leak into the band');
   ok(submit.includes('GHOST_SCORED'), 'ghost draws are logged as match events (auditable)');
 
   const list = readFileSync(new URL('../app/api/arena/list/route.ts', import.meta.url), 'utf8');

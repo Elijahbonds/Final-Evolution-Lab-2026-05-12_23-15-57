@@ -68,6 +68,11 @@ export const REASON = {
   // Owner decision 2026-09-24: a purchase that took a balance and delivered nothing is paid back, in its own currency,
   // the next time the wallet is read (lib/wallet/dead-buys.ts). Not an earn: it never counts against a daily cap.
   DEAD_BUY_REFUND: 'DEAD_BUY_REFUND',
+  // MUSIC-SUITE P6 (2026-09-25), owner decision #23: a Music Room kit the room handed out for free before the shards seam
+  // was closed (4b766804, 2026-09-20) is granted to the account once, on a zero-delta row under this reason
+  // (lib/wallet/kit-grandfather.ts). Not a purchase and not an earn: no balance moves, the dead-buy sweep never reads it
+  // (dead-buys.ts DEAD_BUY_REASONS), and the owned-kits read counts it as backing the kit (dead-buys.ts backedEntitlements).
+  KIT_GRANDFATHER_2026_09: 'KIT_GRANDFATHER_2026_09',
 } as const;
 
 export type ReasonCode = (typeof REASON)[keyof typeof REASON];

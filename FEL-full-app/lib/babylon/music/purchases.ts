@@ -220,6 +220,11 @@ type KitStore = { getItem(k: string): string | null; setItem(k: string, v: strin
  * (app/play/music passes it down; /dev/music a fixed dev id), and a room that doesn't know who is playing reads no cache at
  * all: the old unkeyed value could be anyone's, so it is never adopted, and it is removed on the first keyed write. The
  * server read stays the truth either way.
+ *
+ * MUSIC-SUITE P6 (2026-09-25), owner decision #23: NO LONGER REMOVED ON THE FIRST KEYED WRITE. That old list is the only
+ * record of a kit the room handed out free before 4b766804 (kitGrandfather.ts), and the room's mount wrote the keyed cache
+ * — deleting it — before the owned-kits read could claim it. It is still never ADOPTED as a cache; it is now removed
+ * when the grandfather claim settles for an account old enough to have made it (kitGrandfather.ts settleGrandfatherClaim).
  */
 export function kitCacheKey(playerId: string): string { return `${KIT_CACHE_KEY}:${playerId}`; }
 const knownPlayer = (id: string | null | undefined): id is string => typeof id === 'string' && id.length > 0 && id.length <= 128;
@@ -229,11 +234,13 @@ export function readKitCache(storage: KitStore | null | undefined, playerId: str
   if (!knownPlayer(playerId)) return kitList([]);
   try { return cleanKitCache(storage?.getItem(kitCacheKey(playerId)) ?? null); } catch { return kitList([]); }
 }
-/** Write this player's cache (and drop the old shared key); no player or a storage that throws is ignored. */
+/**
+ * Write this player's cache; no player or a storage that throws is ignored. The old shared key is left alone (P6: the
+ * grandfather claim removes it once it has been claimed).
+ */
 export function writeKitCache(storage: KitStore | null | undefined, kits: readonly KitId[], playerId: string | null | undefined): void {
   if (!knownPlayer(playerId)) return;
   try { storage?.setItem(kitCacheKey(playerId), JSON.stringify(kitList(kits))); } catch { /* cache only */ }
-  try { storage?.removeItem?.(KIT_CACHE_KEY); } catch { /* cache only */ }
 }
 
 // ── remix ────────────────────────────────────────────────────────────────────────────────────────────────────────────

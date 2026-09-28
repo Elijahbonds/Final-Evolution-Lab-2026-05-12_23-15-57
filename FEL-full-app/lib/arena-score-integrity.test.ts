@@ -15,7 +15,7 @@ import {
   KARATE_SWING_SEC, FOOTBALL_EVENT_SEC, DUNK_ATTEMPT_MAX, DUNK_CONTEST_ATTEMPTS, DUNK_MAX_SCALE, BIG_AIR_MAX_TURNS,
   checkStakeScore, checkDunkCard, scoreCeilingFor, canonicalStakeMode, killSwitchOn, dunkAttemptCeiling, aboveCeilingDetail,
   whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, skateLinkMax, chainRunBound, frameRoundedRate,
-  carnivalEventBounds, STAKE_MODE_ALIASES, type ScoreCeiling,
+  carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, type ScoreCeiling,
 } from './arena-score-integrity';
 import { ARENA_MODES } from './arena';
 import { ARENA_SCORE_BASELINES } from './arena-rivals';
@@ -30,7 +30,8 @@ import { buildRounds, BuzzMatch, SCENE_CATEGORIES } from './babylon/core/SceneBu
 import { DancePerformance, DANCE_LIBRARY, type DanceStep } from './babylon/core/DanceCore';
 import { exportSongToDance } from './babylon/music/DanceExport';
 import { MAX_SONG_BARS, MAX_CHAIN_ENTRIES } from './babylon/music/Song';
-import { PerformSet, performHitPoints, PERFORM_SET_NOTES, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './babylon/music/performSet';
+import { PerformSet, performSetMax, PERFORM_SET_NOTES, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './babylon/music/performSet';
+import { houseBeatFor, judgeHouseSet, houseTap, HOUSE_SET_MAX, HOUSE_SET_NOTES, HOUSE_BPMS, HOUSE_SWINGS } from './babylon/music/houseBeat';
 import { TennisScore } from './babylon/core/RallyCore';
 import { buildResult } from './babylon/core/sessionResult';
 import { RINGS, BANK } from './babylon/core/ParkourGolf';
@@ -238,6 +239,20 @@ function performRun(bpm: number, arena = true): { score: number; notes: number; 
   return { score: set.score, notes: set.notes, overAt };
 }
 
+/**
+ * MUSIC-SUITE P6 (2026-09-26): an Arena music set is played on the duel's house beat, every charted note tapped dead on,
+ * through the real judge the room and the server share (judgeHouseSet → PerformSet({ arena: true })).
+ */
+function housePerfectRun(seed: string): { score: number; notes: number; bpm: number; swing: number } {
+  const beat = houseBeatFor(seed);
+  const r = judgeHouseSet(beat, beat.notes.map((n) => houseTap(n.lane, n.t)));
+  return { score: r.score, notes: r.perfects, bpm: beat.bpm, swing: beat.swing };
+}
+
+/** A stake check as the Arena route makes it: a music score arrives with the server's rejudge of it (here, itself). */
+const stake = (mode: string, score: unknown) =>
+  checkStakeScore({ mode, score, ...(REJUDGED_STAKE_MODES.has(canonicalStakeMode(mode)) && typeof score === 'number' ? { rejudged: score } : {}) });
+
 /** Big Air through the real AirSessionCore at full boost: the spin started at take-off, planted the moment it reaches
  *  `plantAt` turns (a whole half turn: clean), the landing stuck (tapped all the way down). `plantAt` null = never
  *  planted, to measure how far the air lets a spin turn. */
@@ -350,7 +365,7 @@ const PERFECT_RUNS: Record<string, () => number> = {
     }
     return score;
   },
-  music: () => performRun(160).score,
+  music: () => housePerfectRun('perfect-run').score,
   skateboarding: () => Math.max(...[60, 120, 144, 180, 240].map(skateRun)),
   surfing: () => {
     const m = MIRRORED;
@@ -386,7 +401,7 @@ describe('the ceiling table', () => {
     const want: Record<string, number> = {
       dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 4800, golf: 1310, baseball: 4422,
       soccer: 5560, tennis: 4, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
-      dance: 79680, training: 9400, music: 2_647_100,
+      dance: 79680, training: 9400, music: 378_300,
     };
     for (const [mode, max] of Object.entries(want)) {
       expect(SCORE_CEILINGS[mode].kind, mode).toBe('rules');
@@ -453,7 +468,7 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
       const c = SCORE_CEILINGS[mode];
       expect(run, `${mode}: perfect run ${run} vs ceiling ${c.max}`).toBeLessThanOrEqual(c.max);
       expect(run, mode).toBeGreaterThan(0);
-      expect(checkStakeScore({ mode, score: Math.round(run) }).ok, mode).toBe(true);
+      expect(stake(mode, Math.round(run)).ok, mode).toBe(true);
     }
   });
 
@@ -471,25 +486,49 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     }
   });
 
-  it('music (HIGH): an Arena set is PERFORM_SET_BARS long, ends itself, and a perfect set at 160 BPM scores exactly the ceiling', () => {
-    for (const bpm of [60, 92, 160]) {
-      const r = performRun(bpm);
-      expect(r.notes, `${bpm} BPM`).toBe(PERFORM_SET_NOTES);
-      expect(r.score, `${bpm} BPM`).toBe(SCORE_CEILINGS.music.max);           // the tempo changes the time, not the notes
-      expect(r.overAt, `${bpm} BPM`).toBeGreaterThanOrEqual(PERFORM_SET_NOTES);        // it ends after the last note, not before
+  // MUSIC-SUITE P6 (2026-09-26): the ceiling moved from performSetMax() = 2,647,100 (all 512 steps of an Arena set a note,
+  // the player's own grid) to the house beat's maximum: every house beat charts HOUSE_SET_NOTES = 192 notes.
+  it('music (HIGH): a perfect Arena set on ANY house beat — every tempo, every swing — scores exactly the ceiling', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 120; i++) {
+      const r = housePerfectRun(`seed-${i}`);
+      seen.add(`${r.bpm}|${r.swing}`);
+      expect(r.notes, `seed-${i}`).toBe(HOUSE_SET_NOTES);
+      expect(r.score, `seed-${i} at ${r.bpm} BPM, swing ${r.swing}`).toBe(SCORE_CEILINGS.music.max);   // the tempo changes the time, not the notes
     }
-    // the reviewer's probe: 222 perfect hits in a row (504,000) was refused under the old 500,000 — it is accepted now
-    let s = 0;
-    for (let i = 0; i < 222; i++) s += performHitPoints(true, i);
-    expect(s).toBe(504_000);
-    expect(checkStakeScore({ mode: 'music', score: s }).ok).toBe(true);
-    expect(checkStakeScore({ mode: 'musicAcademy', score: s }).ok).toBe(true);   // a duel stored under the old key
-    // one note past the set pays nothing: the note is never offered
-    const set = new PerformSet({ arena: true });
-    for (let i = 0; i < PERFORM_SET_NOTES + 40; i++) { const t = i * 0.1; expect(set.note(0, t, t).offered).toBe(i < PERFORM_SET_NOTES); set.tap(t); }
-    expect(set.score).toBe(SCORE_CEILINGS.music.max);
-    expect(checkStakeScore({ mode: 'music', score: set.score }).ok).toBe(true);        // the staked maximum is accepted
-    expect(checkStakeScore({ mode: 'music', score: set.score + 1 }).ok).toBe(false);   // and one point over it is not
+    expect(seen.size).toBe(HOUSE_BPMS.length * HOUSE_SWINGS.length);                // every tempo × swing was played
+    expect(SCORE_CEILINGS.music.max).toBe(HOUSE_SET_MAX);
+    expect(HOUSE_SET_MAX).toBe(performSetMax(HOUSE_SET_NOTES));
+    expect(stake('music', HOUSE_SET_MAX).ok).toBe(true);                            // the staked maximum is accepted
+    expect(stake('musicAcademy', HOUSE_SET_MAX).ok).toBe(true);                     // a duel stored under the old key
+    expect(stake('music', HOUSE_SET_MAX + 1).ok).toBe(false);                       // and one point over it is not
+    // the old ceiling's set — every one of the 512 steps a note — is no Arena set any more: refused
+    const everyStep = new PerformSet({ arena: true });
+    for (let i = 0; i < PERFORM_SET_NOTES; i++) { const t = i * 0.1; everyStep.note(0, t, t); everyStep.tap(t); }
+    expect(everyStep.score).toBe(2_647_100);
+    const old = stake('music', everyStep.score);
+    expect(old.ok).toBe(false);
+    if (!old.ok) expect(old.code).toBe('SCORE_ABOVE_CEILING');
+  });
+
+  it('music: the score must be the server\'s rejudge — none given is refused, a different one is refused, the same is taken', () => {
+    const none = checkStakeScore({ mode: 'music', score: 1000 });
+    expect(none.ok).toBe(false);
+    if (!none.ok) { expect(none.code).toBe('SCORE_NOT_REJUDGED'); expect(none.detail).toContain('not recorded'); }
+    const off = checkStakeScore({ mode: 'music', score: 1000, rejudged: 950 });
+    expect(off.ok).toBe(false);
+    if (!off.ok) { expect(off.code).toBe('SCORE_MISMATCH'); expect(off.detail).toContain('(950)'); }
+    expect(checkStakeScore({ mode: 'music', score: 950, rejudged: 950 }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'musicAcademy', score: 0, rejudged: 0 }).ok).toBe(true);   // a forfeit scores 0
+    for (const bad of [NaN, -1, 1.5]) expect(checkStakeScore({ mode: 'music', score: 0, rejudged: bad }).ok, String(bad)).toBe(false);
+    // the ceiling is checked first: an impossible score is SCORE_ABOVE_CEILING even when "rejudged" agrees
+    const over = checkStakeScore({ mode: 'music', score: HOUSE_SET_MAX + 1, rejudged: HOUSE_SET_MAX + 1 });
+    if (!over.ok) expect(over.code).toBe('SCORE_ABOVE_CEILING'); else throw new Error('accepted');
+    // every other mode ignores `rejudged` — its routes pass none, and nothing about them changed
+    expect([...REJUDGED_STAKE_MODES]).toEqual(['music']);
+    expect(checkStakeScore({ mode: 'hoops1v1', score: 11 }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'hoops1v1', score: 11, rejudged: 3 }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'dance', score: 4000 }).ok).toBe(true);
   });
 
   // Owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays endless". The ceiling
@@ -585,8 +624,8 @@ describe('checkStakeScore', () => {
   it('accepts every ceiling and refuses one more, for every stakeable mode', () => {
     for (const mode of ARENA_MODES) {
       const max = SCORE_CEILINGS[mode].max;
-      expect(checkStakeScore({ mode, score: max }).ok, `${mode} at ${max}`).toBe(true);
-      const over = checkStakeScore({ mode, score: max + 1 });
+      expect(stake(mode, max).ok, `${mode} at ${max}`).toBe(true);
+      const over = stake(mode, max + 1);
       expect(over.ok, mode).toBe(false);
       if (!over.ok) {
         expect(over.code).toBe('SCORE_ABOVE_CEILING');
@@ -628,8 +667,9 @@ describe('checkStakeScore', () => {
     for (const score of [INT4_MAX, Number.MAX_SAFE_INTEGER]) {
       for (const mode of ARENA_MODES) expect(checkStakeScore({ mode, score }).ok, `${mode} ${score}`).toBe(false);
     }
-    for (const mode of ARENA_MODES.filter((m) => SCORE_CEILINGS[m].kind === 'rules' && m !== 'music')) {
-      expect(checkStakeScore({ mode, score: 999_999 }).ok, mode).toBe(false);
+    // MUSIC-SUITE P6: music is in this list now — its ceiling is the house beat's 378,300, not 2,647,100
+    for (const mode of ARENA_MODES.filter((m) => SCORE_CEILINGS[m].kind === 'rules')) {
+      expect(stake(mode, 999_999).ok, mode).toBe(false);
     }
   });
 
@@ -855,21 +895,30 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(tr).toContain('const bonus = streak >= 3 ? 20 : 0');
   });
 
-  it('music: StudioMode scores PERFORM through PerformSet and nowhere else', () => {
+  // MUSIC-SUITE P6 (2026-09-26): the staked number is no longer the room's live PerformSet but the server's rejudge
+  // (houseBeat.judgeHouseSet on the recorded taps), so the ceiling rests on judgeHouseSet (pinned above) and this guard
+  // pins only what still matters in the room: PerformSet is its one scorer, an Arena set is built only on an Arena run,
+  // and the Arena set is played on the duel's house beat with the judge the server reruns. (The P2 guard pinned the live
+  // drive's exact lines — `set.tap(eng.context.currentTime)`, `set.note(s, t, now)` — which lane 1's four-lane PERFORM
+  // rewrites; the live number is display now.)
+  it('music: StudioMode scores PERFORM through PerformSet and nowhere else, and an Arena set on the house beat\'s judge', () => {
     const studio = src('lib/babylon/music/StudioMode.tsx');
-    expect(studio).toContain("import { PerformSet, PERFORM_STEPS_PER_BAR, ARENA_SET_NOTE, performStatusLine } from './performSet'");
+    expect(studio).toMatch(/import \{[^}]*\bPerformSet\b[^}]*\} from '\.\/performSet'/);
     expect(studio).toContain('const STEPS = PERFORM_STEPS_PER_BAR;');
-    expect(studio).toContain('set.note(s, t, now)');
-    expect(studio).toContain('set.tap(eng.context.currentTime)');
-    expect(studio).toContain('if (set.over(now)) endSetRef.current();');
-    // MUSIC-SUITE P2 (2026-09-25): the end card reads the set's own result (real best combo, the win rule, the shared
-    // stats contract) — it read `const { score, combo } = setRef.current;` and reported won = score > 0
-    expect(studio).toContain('const r = setRef.current.result(engineRef.current?.context.currentTime ?? 0);');
-    expect(studio).toContain('won: r.won,');
     expect(studio).toContain('setRef.current = new PerformSet({ arena: arenaSet });');   // an Arena set only on an Arena run
     expect(studio).not.toMatch(/new PerformSet\(\{ arena: true \}\)/);                  // never capped by default
     expect(studio).not.toMatch(/setScore\(\(s\) =>/);                            // no second tally beside the set's
-    expect(src('lib/babylon/music/AudioEngine.ts')).toMatch(/this\.onStepAudible\?\.\(s\.step, s\.time\)/);   // one note per step
+    expect(studio).toMatch(/import \{[^}]*\bjudgeHouseSet\b[^}]*\} from '\.\/houseBeat'/);   // the judge the server reruns
+    expect(studio).toMatch(/\bhouseBeatFor\(/);                                   // the duel's beat, from its id
+  });
+
+  // MUSIC-SUITE P6: INTEGRATION WITH THE ROOM (lane 1). Without its start and finish no music duel can be scored at all
+  // (submit-score answers 409 NO_ATTEMPT), and music staking is open again — so the room must post them.
+  it('music: the Groove Academy posts its one attempt to /api/arena/music-attempt', () => {
+    const room = ['lib/babylon/music', 'app/play/music']
+      .flatMap((d) => readdirSync(join(process.cwd(), d), { recursive: true }).map(String).map((f) => join(d, f)))
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f));
+    expect(room.filter((f) => src(f).includes('/api/arena/music-attempt'))).not.toEqual([]);
   });
 
   it('skate: the run, the held links, the coins and the plaza\'s awards', () => {
