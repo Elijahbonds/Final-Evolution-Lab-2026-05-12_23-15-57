@@ -19,6 +19,7 @@ import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarnGrant } from '@/lib/wallet/client';
 import { EndCardRewards, EndCardClaim, walletGrantsFrom, type WalletGrants, type ClaimRun } from './end-card-rewards';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
+import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
 import {
   type CarnivalStop, type CarnivalRunState,
@@ -245,7 +246,10 @@ function GameShellInner({
           // the only thing that makes a music set an Arena set there (route.ts verifiedMusicDuel)
           stats: res?.stats,
           ...(arenaMatchId ? { arenaMatchId } : {}),
-          played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,
+          // QA A1-02: a mode driven end to end through the agent bridge (M69's intent path — hoops3v3, onevone) leaves no
+          // DOM event and no InputBus crossing for the other two counters, so it posted played:false on a finished game.
+          // agentPlayEvidence() is 0 whenever the bridge is off or unused, so human play is unchanged.
+          played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3 || agentPlayEvidence() >= 3,
         }),
       })
         .then((r) => (r?.ok ? r.json() : null))

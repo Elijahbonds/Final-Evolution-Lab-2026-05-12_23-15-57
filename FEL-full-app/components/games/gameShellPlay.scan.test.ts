@@ -32,8 +32,12 @@ const sessionBody = (): string => between(shell, "fetch('/api/sessions'", '.then
 
 describe('what counts as played: input the game received, from any source (P3 step 5)', () => {
   it('handleEnd sends the shell\'s own count OR the game\'s record since the mark — read once, at the end', () => {
-    expect(sessionBody()).toContain('played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,');
+    expect(sessionBody()).toContain('played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3 || agentPlayEvidence() >= 3,');
     expect(shell).toMatch(/import \{ sessionStore, markRun, countedSince \} from '@\/lib\/babylon\/core\/sessionStore';/);
+  });
+
+  it('QA A1-02: a run played entirely through the agent bridge also counts — agentPlayEvidence() is a third source', () => {
+    expect(shell).toMatch(/import \{ agentPlayEvidence \} from '@\/lib\/babylon\/core\/AgentBridge';/);
   });
 
   it('the mark is taken when the game mounts (the run before is the old record) and before REPLAY restarts in place', () => {
