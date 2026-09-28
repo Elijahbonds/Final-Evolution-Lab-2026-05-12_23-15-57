@@ -231,7 +231,9 @@ export function kneeWallJoints(tested: Side, d: number, o: KneeWallOpts = {}): J
   const K = add(A, [0, SHIN * Math.cos(tau), SHIN * Math.sin(tau)]);
   const Hf = add(K, [-0.01 * f, THIGH * Math.cos(alpha), -THIGH * Math.sin(alpha)]);
   const Hb: V3 = [Hf[0] - 0.18 * f, Hf[1], Hf[2]];
-  const Ab: V3 = [-0.10 * f, 0.13, -0.30];
+  // the back foot stays where the leg can reach it (a front heel lifted raises the hips)
+  const dy = Hb[1] - 0.13, reach = 0.86;
+  const Ab: V3 = [-0.10 * f, 0.13, Math.max(-0.30, Hb[2] - Math.sqrt(Math.max(0, reach * reach - dy * dy)))];
   j[`${T}Foot`] = A; j[`${T}Toe`] = [0.10 * f, 0.02, 0.33]; j[`${T}Leg`] = K; j[`${T}UpLeg`] = Hf;
   j[`${B}Foot`] = Ab; j[`${B}Toe`] = [-0.10 * f, 0.02, -0.20]; j[`${B}UpLeg`] = Hb;
   j[`${B}Leg`] = solveMiddle(Hb, Ab, THIGH, SHIN, [0, -0.2, 1]);

@@ -93,7 +93,7 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
   const sSamples = cap.side.map((f, i) => ({ i, t: f.t, v: sOk[i] ? hipDrop(f.image, standHipY, floorY) : NaN }));
   const sReps = segment(sSamples, repThresholds());
   const heelLine = th('geom.heelRise');
-  const sScored: (Scored & { heelRose: Side | null; heelMax: number })[] = sReps.map((rep) => {
+  const sScored: (Scored & { heelRose: Side | 'both' | null; heelMax: number })[] = sReps.map((rep) => {
     const idx = inRep(rep, sOk);
     const img = (i: number) => cap.side[i].image;
     const kf = (i: number) => kneeFlexion(img(i), near, aspect);
@@ -101,15 +101,18 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
     const bottomWin = idx.filter((i) => sSamples[i].v >= 0.7 * rep.peak);
     const iArms = bottomWin.reduce((b, i) => (shoulderFlexion(img(i), near, aspect) < shoulderFlexion(img(b), near, aspect) ? i : b), bottomWin[0] ?? iBottom);
     const iCrease = idx.reduce((b, i) => (hipAboveKnee(img(i), near, aspect) < hipAboveKnee(img(b), near, aspect) ? i : b), idx[0] ?? iBottom);
-    // heels: each one the model sees, against its own standing line
-    let heelMax = 0, heelRose: Side | null = null, iHeel = iBottom;
+    // heels: each one the model sees, against its own standing line; a side is named only when one heel rose alone
+    let heelMax = 0, iHeel = iBottom;
+    const rose = { left: false, right: false };
     for (const i of idx) {
       for (const s of ['left', 'right'] as const) {
         if (img(i)[SIDE[s].heel].v < vis) continue;
         const h = heelHeight(img(i), s, heelRef[s], bodyH);
-        if (h > heelMax) { heelMax = h; iHeel = i; if (h > heelLine) heelRose = s; }
+        if (h > heelLine) rose[s] = true;
+        if (h > heelMax) { heelMax = h; iHeel = i; }
       }
     }
+    const heelRose: Side | 'both' | null = rose.left && rose.right ? 'both' : rose.left ? 'left' : rose.right ? 'right' : null;
     const read = idx.length > 0;
     const at = (c: number, f: (i: number) => number) => (read ? aroundPeak(cap.side, c, f, (i) => sOk[i]) : null);
     const metrics = [
@@ -143,12 +146,14 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
   };
 
   const heelReps = sScored.filter((s) => s.heelRose);
+  const oneSide = heelReps.length && heelReps.every((r) => r.heelRose === heelReps[0].heelRose) && heelReps[0].heelRose !== 'both'
+    ? heelReps[0].heelRose as Side : null;
   const heel = metric('heelRise', 'Heels stay down', 'reps with a heel up', sScored.length ? heelReps.length : null, 't1.heelRiseReps', bandOf('t1.heelRiseReps'), w.heelRise, {
-    ...(heelReps[0] ? { rep: heelReps[0].rep.index, side: heelReps[0].heelRose! } : {}), view: 'side',
+    ...(heelReps[0] ? { rep: heelReps[0].rep.index } : {}), ...(oneSide ? { side: oneSide } : {}), view: 'side',
   });
   if (heel.fault && heelReps[0]) {
     const s = heelReps.reduce((a, b) => (b.heelMax > a.heelMax ? b : a));
-    frozen.push({ metric: 'heelRise', side: s.heelRose!, rep: s.rep.index, image: cap.side[s.worstFrame.heelRise].image.map((l) => ({ ...l })), aspect });
+    frozen.push({ metric: 'heelRise', ...(oneSide ? { side: oneSide } : {}), rep: s.rep.index, image: cap.side[s.worstFrame.heelRise].image.map((l) => ({ ...l })), aspect });
   }
 
   const metrics = [
