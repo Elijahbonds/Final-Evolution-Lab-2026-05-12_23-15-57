@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_KIT, SPORT_KIT_DEFAULTS, catalogueKitIds, sportKitDefault } from './sportKitDefaults';
+import { BASEBALL_JERSEY, FALLBACK_KIT, SPORT_KIT_DEFAULTS, catalogueKitIds, sportKitDefault } from './sportKitDefaults';
 import { KIT_PACKS } from './kit';
 import { WEARABLES, wearablesForSlot } from '../../closet/wearable-catalog';
 import { KIT_SLOTS } from './kit';
@@ -49,5 +49,17 @@ describe('sportKitDefaults (owner decision 2026-09-05: per-sport defaults)', () 
       expect(wearablesForSlot(slot).length - packed).toBe(2);
     }
     for (const id of Object.keys(KIT_PACKS)) expect(WEARABLES.some((w) => w.itemId === id), `${id} is a pack without a catalogue entry`).toBe(true);
+  });
+});
+
+// QA P1-04 (2026-09-27): the batter's Meshy jersey tore in the batting stance (skin through the back and shoulder, shards
+// past the hip — lane capture of /dev/mode/derby). Data-only fallback: the derby's default top is the plain tee (captured
+// in the same stance, no tear); the jersey stays sellable and a Closet pick still wins.
+describe('QA P1-04: the derby default top', () => {
+  it('is not the tearing jersey, and is a garment the body carries', () => {
+    expect(sportKitDefault('baseball').tops).not.toBe(BASEBALL_JERSEY);
+    expect(sportKitDefault('baseball').tops).toBe('top_lab');
+    expect(catalogueKitIds().has(sportKitDefault('baseball').tops)).toBe(true);
+    expect(catalogueKitIds().has(BASEBALL_JERSEY)).toBe(true);   // still in the catalogue
   });
 });
