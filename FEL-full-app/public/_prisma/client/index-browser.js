@@ -180,6 +180,33 @@ exports.Prisma.GameSessionScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.SessionRunScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  mode: 'mode',
+  status: 'status',
+  payoutEligible: 'payoutEligible',
+  ineligibleReason: 'ineligibleReason',
+  startedAt: 'startedAt',
+  expiresAt: 'expiresAt',
+  finishedAt: 'finishedAt',
+  score: 'score',
+  durationMs: 'durationMs',
+  rejectReason: 'rejectReason',
+  sessionId: 'sessionId',
+  result: 'result'
+};
+
+exports.Prisma.SessionGrantScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  runId: 'runId',
+  grantType: 'grantType',
+  amount: 'amount',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.CreditLedgerScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -1377,6 +1404,8 @@ exports.Prisma.ModelName = {
   User: 'User',
   PlayerProfile: 'PlayerProfile',
   GameSession: 'GameSession',
+  SessionRun: 'SessionRun',
+  SessionGrant: 'SessionGrant',
   CreditLedger: 'CreditLedger',
   CardOwnership: 'CardOwnership',
   StoryNodeProgress: 'StoryNodeProgress',
