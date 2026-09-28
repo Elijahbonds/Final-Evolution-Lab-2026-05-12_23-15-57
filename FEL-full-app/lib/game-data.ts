@@ -209,7 +209,7 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
   duel: { name: 'Duel', venue: 'Shimogamo Dojo', href: '/play/duel' },
-  sprint: { name: 'Beach Sprint', venue: 'Muscle Beach Gym', href: '/play/sprint' },
+  sprint: { name: 'Beach Sprint', venue: 'Stadium Straight', href: '/play/sprint' },   // QA P1-19: its home place, not the gym
   // HOTFIX (2026-09-24): keyed 'music', the mode the Academy's GameShell saves the session under. The Arena and the
   // counsellor read sessions by this key; under 'musicAcademy' they matched none. See LEGACY_MODE_KEYS.
   music: { name: 'Groove Academy', venue: 'Studio', href: '/play/music' },
