@@ -65,7 +65,35 @@ A refund (`charge.refunded`) sets the row to `REVOKED`. Revoked rows do not get 
    - Put that endpoint's signing secret in `STRIPE_BOOKS_WEBHOOK_SECRET`.
 4. The existing `/api/stripe/webhook` also records a Checkout Session whose metadata `product` is `BOOK`, and it tries to revoke book rows on `charge.refunded`. Prefer the book endpoint: a failure there returns 500 so Stripe retries. The shared endpoint returns 500 for a book checkout that fails to record, and ignores a refund that matches no book purchase.
 
-Optional Price ids: create a Product and a one-time Price in test mode, and set `stripePriceId` on the offer in the catalog. Until that field is set, Checkout uses `price_data` and the catalog's `priceCents`.
+Optional Price ids: create a Product and a one-time Price in test mode, and set `stripePriceId` on the offer in the catalog. Until that field is set, Checkout uses `price_data` and the catalog's `priceCents`. The script below does the creating.
+
+### Creating test products
+
+`scripts/stripe-create-test-products.mjs` creates one Product and one Price per row of `scripts/stripe-prices.example.json`. That file lists every offer the catalog sells directly, at the catalog's **EXAMPLE** cents. The KDP-blocked ebooks and bundles are left out. The script refuses any key that is not `sk_test_`, and it refuses a row that disagrees with the catalog (amount, format, EXAMPLE flag, or direct sale).
+
+1. Export the test key in your own shell. Do not put it in a file in the repo.
+
+   ```bash
+   export STRIPE_BOOKS_SECRET_KEY=sk_test_...
+   ```
+
+2. Dry run from `FEL-full-app/`. It prints the plan and makes no Stripe calls. Without `--allow-example` it refuses every EXAMPLE row and exits 1.
+
+   ```bash
+   node scripts/stripe-create-test-products.mjs --allow-example
+   ```
+
+3. Create them in test mode:
+
+   ```bash
+   node scripts/stripe-create-test-products.mjs --apply --allow-example
+   ```
+
+   It finds a Product by `metadata.offerId` and a Price by lookup key `fel_book_<offerId>`, so running it again creates nothing new. If an amount changed, it creates a new Price and moves the lookup key to it.
+
+4. Paste each `price_...` from the printed `offerId -> priceId` table into `stripePriceId` on that offer in `lib/books/bookCatalog.ts`.
+
+Needs Node 22.18 or newer, because it imports the TypeScript catalog directly. Node prints a `MODULE_TYPELESS_PACKAGE_JSON` warning when it does; that warning is harmless. On an older Node, run it with `npx tsx` instead. When real prices are decided, change `priceCents` and `priceIsExample` in the catalog, copy the example file, set the new cents and `"EXAMPLE": false`, and pass it with `--file <path> --apply`. `npm test -- lib/books` checks that the example file still matches the catalog.
 
 Stripe Tax: activate Tax in the Dashboard (origin address, registrations), then set `STRIPE_BOOKS_TAX=1`. The session collects a billing address and sets `automatic_tax: { enabled: true }`.
 
