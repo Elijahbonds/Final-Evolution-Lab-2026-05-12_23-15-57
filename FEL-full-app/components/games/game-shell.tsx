@@ -17,7 +17,7 @@ import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarnGrant } from '@/lib/wallet/client';
-import { EndCardRewards, walletGrantsFrom, type WalletGrants } from './end-card-rewards';
+import { EndCardRewards, EndCardClaim, walletGrantsFrom, type WalletGrants, type ClaimRun } from './end-card-rewards';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
 import {
@@ -133,6 +133,8 @@ function GameShellInner({
   /** What this run's earn reports were granted, coins and shards (BRAINBRAWL-POLISH-2 N10; QA P0-02: the shards too, and
    *  "+0" when nothing was granted) — null until the reports answer, and for a run the shell does not report (dunk). */
   const [recapCoins, setRecapCoins] = useState<WalletGrants | null>(null);
+  /** QA P0-03: the run the card's CLAIM re-sends (same keys as the reports below); set with the grants it answers for. */
+  const [claimRun, setClaimRun] = useState<ClaimRun | null>(null);
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
@@ -284,6 +286,7 @@ function GameShellInner({
               void Promise.all(grants).then((gs) => {
                 if (!mine()) return;
                 setRecapCoins(walletGrantsFrom(gs));   // the completed earn pays coins, the won earn shards
+                setClaimRun({ sessionId: j.sessionId, mode, score: res?.score ?? 0, won: Boolean(j?.won) });
               });
             }
 
@@ -420,6 +423,7 @@ function GameShellInner({
     setResult(null);
     setRecap(null);
     setRecapCoins(null);
+    setClaimRun(null);
     setStoryReward(null);
     runSeq.current += 1;
     setArenaResult(null);
@@ -818,6 +822,7 @@ function GameShellInner({
                     >
                       <RotateCcw className="h-4 w-4" /> REPLAY
                     </button>
+                    {claimRun && recapCoins && (recapCoins.coins > 0 || recapCoins.shards > 0) && <EndCardClaim run={claimRun} />}
                     <Link
                       href={storyNodeId ? '/story' : '/'}
                       className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"

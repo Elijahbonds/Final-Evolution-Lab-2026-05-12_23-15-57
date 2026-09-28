@@ -8,8 +8,9 @@
 // granted for this run, coins and shards, from the earn reports' own answers: "+0" when nothing was granted. The
 // profile-shard tile is dropped ([DECISION-EJ] default); XP, Credits and PRQ Δ stay as the session reported them.
 
-import { Sparkles, Gem, Coins, TrendingUp, TrendingDown } from 'lucide-react';
-import type { EarnGrant } from '@/lib/wallet/client';
+import { useState } from 'react';
+import { Sparkles, Gem, Coins, TrendingUp, TrendingDown, Check, Loader2 } from 'lucide-react';
+import { claimEarnGrant, type EarnClaim, type EarnGrant, type EarnReport } from '@/lib/wallet/client';
 
 /** What the wallet granted this run: summed from the earn reports (the completed earn pays coins, the won earn shards). */
 export interface WalletGrants {
@@ -81,4 +82,84 @@ export function EndCardRewards({ recap, walletGrants }: { recap: EndCardRecap; w
       )}
     </>
   );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// CLAIM (QA P0-03, 2026-09-27): the card had REPLAY and HOME and nothing that said the run's rewards were yours. CLAIM sits
+// next to REPLAY whenever the run granted anything, and re-sends the run's earn reports under the SAME idempotency keys
+// (sess:<id>:complete / :won). The wallet answers a key it has paid with the original grant and changes nothing, so any
+// number of claims is one wallet change; the card then says "Claimed ✓" with the balances the server returned.
+// It never navigates, never remounts the game and never disables REPLAY. (A guest never reaches a GameShell card: the shell
+// sends a signed-out player to /login; the guest claim sheet is /try's, guest-dunk-shell.)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** The run a claim is for: what the shell's earn reports were built from. */
+export interface ClaimRun { sessionId: string; mode: string; score: number; won: boolean }
+
+/** The run's earn reports exactly as the shell sends them (the same keys, event types and payloads). */
+export function sessionEarnReports(run: ClaimRun): EarnReport[] {
+  const reports: EarnReport[] = [{
+    idempotency_key: `sess:${run.sessionId}:complete`,
+    event_type: 'mode_session_completed',
+    payload: { mode: run.mode, run_id: run.sessionId, score: run.score },
+  }];
+  if (run.won) {
+    reports.push({ idempotency_key: `sess:${run.sessionId}:won`, event_type: 'mode_session_won', payload: { mode: run.mode, run_id: run.sessionId } });
+  }
+  return reports;
+}
+
+/** Re-send the run's reports, one after another; the balances of the last answer, or null when none was answered. */
+export async function claimRunRewards(run: ClaimRun): Promise<EarnClaim['balances'] | null> {
+  let balances: EarnClaim['balances'] | null = null;
+  for (const report of sessionEarnReports(run)) {
+    const r = await claimEarnGrant(report);
+    if (r) balances = r.balances;
+  }
+  return balances;
+}
+
+export type ClaimPhase = 'idle' | 'claiming' | 'claimed' | 'failed';
+
+export function ClaimView({ phase, balances, onClaim }: {
+  phase: ClaimPhase; balances: EarnClaim['balances'] | null; onClaim: () => void;
+}) {
+  const busy = phase === 'claiming' || phase === 'claimed';
+  return (
+    <div className="flex flex-1 flex-col">
+      <button
+        type="button"
+        data-claim={phase}
+        onClick={onClaim}
+        disabled={busy}
+        className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-[#FFD700]/60 bg-[#FFD700]/10 py-3 text-base font-bold text-[#FFD700] transition-colors hover:bg-[#FFD700]/20 disabled:opacity-80"
+      >
+        {phase === 'claimed' ? <><Check className="h-4 w-4" /> Claimed ✓</>
+          : phase === 'claiming' ? <><Loader2 className="h-4 w-4 animate-spin" /> CLAIMING…</>
+          : phase === 'failed' ? <>CLAIM · TRY AGAIN</>
+          : <><Gem className="h-4 w-4" /> CLAIM</>}
+      </button>
+      {phase === 'claimed' && balances && (
+        <span data-claim-balances className="mt-1 font-mono text-[10px] text-white/50">
+          Wallet {balances.coins.toLocaleString('en-US')} coins · {balances.shards.toLocaleString('en-US')} shards
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** The CLAIM button for one run's card. Its state lives and dies with the card: REPLAY closes the card, so a claim answer
+ *  that lands after it writes to nothing (the wallet chip still gets the fresh balances). */
+export function EndCardClaim({ run }: { run: ClaimRun }) {
+  const [phase, setPhase] = useState<ClaimPhase>('idle');
+  const [balances, setBalances] = useState<EarnClaim['balances'] | null>(null);
+  const onClaim = () => {
+    if (phase === 'claiming' || phase === 'claimed') return;
+    setPhase('claiming');
+    void claimRunRewards(run).then((b) => {
+      setBalances(b);
+      setPhase(b ? 'claimed' : 'failed');
+    });
+  };
+  return <ClaimView phase={phase} balances={balances} onClaim={onClaim} />;
 }
