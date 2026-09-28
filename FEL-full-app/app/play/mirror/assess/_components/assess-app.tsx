@@ -1,7 +1,14 @@
 'use client';
 
-// Mirror Assess, the Quick Screen (lib/assess; spec §8). One camera owner (lib/pose/PoseService), a 2-D canvas over a
-// mirrored <video>, and the runner deciding what happens next. No Babylon anywhere on this route.
+// Mirror Assess, the Quick Screen (lib/assess; spec §8). One camera owner (lib/pose/PoseService), the camera picture and
+// a 2-D skeleton on two canvases flipped together as a mirror, and the runner deciding what happens next. No Babylon
+// anywhere on this route.
+//
+// THE PICTURE IS PAINTED, NOT PLACED. The app's rule (components/games/bodyPlay.scan.test.ts, Z-P4-4) is that
+// PoseService's <video> is placed in exactly one self-view, SelfView; that component lives in body-play.tsx, whose
+// imports reach the Babylon session store and sound kits, which this route must not load. So PoseService keeps its
+// <video> parked and this page paints its current frame into its own canvas each pose frame: the same pixels, local
+// to this page, never exported (no toDataURL, no toBlob, no stream capture: replay.test.ts scans for them).
 //
 // PRIVACY (spec §10), which the first screen says out loud: pose runs on this device; the picture, the landmarks and the
 // worst-rep skeletons never leave it; only the numbers are sent, only for a signed-in athlete, and the camera stops the
@@ -11,6 +18,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, Volume2, VolumeX } from 'lucide-react';
 import { poseService, type PoseStatus } from '@/lib/pose/PoseService';
 import { deviceClass, MIN_CAMERA_FPS } from '@/lib/pose/modelChoice';
+import { feedHookAllowed } from '@/lib/pose/feed';
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import { ASSESSMENT_DISCLAIMER } from '@/lib/mirror/assessment';
 import { AssessRunner, type RunnerView, type SessionResult } from '@/lib/assess/runner';
@@ -23,6 +31,15 @@ import { LiveHud } from './live-hud';
 import { ResultsView, type SaveState } from './results-view';
 
 type Phase = 'intro' | 'starting' | 'device' | 'running' | 'results' | 'cameraError';
+
+/** The QA handle (see the effect that installs it). */
+interface AssessProbe {
+  view(): { step: string; part: string | null; test: string | null; reps: number; target: number; mini: string | null } | null;
+  frames(part: string): Promise<PoseFrame[]>;
+}
+declare global {
+  interface Window { __FEL_ASSESS__?: AssessProbe }
+}
 
 const TAKEOFF_KEY = 'fel.assess.takeoffLeg';
 const readTakeoff = (): Side | null => {
@@ -39,8 +56,9 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const voice = useVoice();
 
-  const hostRef = useRef<HTMLDivElement | null>(null);
+  const pictureRef = useRef<HTMLCanvasElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const viewRef = useRef<RunnerView | null>(null);
   const runnerRef = useRef<AssessRunner | null>(null);
   const unsubRef = useRef<(() => void)[]>([]);
   const previewRef = useRef<(() => void) | null>(null);
@@ -59,6 +77,10 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
   useEffect(() => cleanup, [cleanup]);
 
   const draw = useCallback((f: PoseFrame, colour: string) => {
+    // the picture: the camera's current frame, painted (see the header)
+    const pic = pictureRef.current, video = poseService().video;
+    const pctx = pic?.getContext('2d');
+    if (pic && pctx && video && video.readyState >= 2) pctx.drawImage(video, 0, 0, pic.width, pic.height);
     const c = canvasRef.current;
     const ctx = c?.getContext('2d');
     if (!c || !ctx) return;
@@ -68,10 +90,8 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
 
   const attach = useCallback(() => {
     const svc = poseService();
-    const host = hostRef.current;
-    if (host) unsubRef.current.push(svc.showIn(host));
     const cam = svc.status.camera;
-    if (canvasRef.current && cam?.width && cam.height) { canvasRef.current.width = cam.width; canvasRef.current.height = cam.height; }
+    for (const c of [pictureRef.current, canvasRef.current]) if (c && cam?.width && cam.height) { c.width = cam.width; c.height = cam.height; }
     deviceRef.current = { model: svc.status.model, width: cam?.width ?? 0, height: cam?.height ?? 0 };
     cameraFpsRef.current = cam?.frameRate ?? null;
   }, []);
@@ -113,6 +133,7 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
         setCaption(v.say.text);
         voice.speak(v.say.text);
       }
+      viewRef.current = v;
       setView(v);
       if (v.step === 'done' || v.step === 'stopped') {
         setResult(v.result);
@@ -121,6 +142,22 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
       }
     }));
   }, [cleanup, draw, voice]);
+
+  // QA, with the pose feed's own gate (development, or ?agent=1 on this machine; never the deployed site): read the
+  // runner's state, and load the synthetic captures (lib/assess/replay, fetched only when asked) to play through
+  // window.__FEL_POSE_FEED__, so a probe can run the whole screen in a real browser without a camera.
+  useEffect(() => {
+    const agent = new URLSearchParams(window.location.search).get('agent') === '1';
+    if (!feedHookAllowed(process.env.NODE_ENV, agent, window.location.hostname)) return;
+    window.__FEL_ASSESS__ = {
+      view: () => {
+        const v = viewRef.current;
+        return v ? { step: v.step, part: v.part, test: v.test, reps: v.reps.count, target: v.reps.target, mini: v.mini?.text ?? null } : null;
+      },
+      frames: async (part: string) => (await import('@/lib/assess/replay')).partFrames(part),
+    };
+    return () => { delete window.__FEL_ASSESS__; };
+  }, []);
 
   // T5 asks the camera for 60 fps (spec §3.1), and records what it really delivers
   useEffect(() => {
@@ -207,7 +244,7 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
           <div className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect }}>
             {/* the picture and the skeleton, flipped together so the athlete sees a mirror */}
             <div className="absolute inset-0" style={{ transform: 'scaleX(-1)' }}>
-              <div ref={hostRef} className="absolute inset-0" />
+              <canvas ref={pictureRef} aria-hidden className="absolute inset-0 h-full w-full" />
               <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
             </div>
             {phase === 'device' ? (

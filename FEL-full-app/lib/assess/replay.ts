@@ -456,3 +456,24 @@ export function quickCapture(sc: QuickScenario = {}, fixture?: (name: string) =>
 export function replay(capture: SessionCapture): SessionResult {
   return gradeSession(capture);
 }
+
+/**
+ * One stretch of the synthetic Quick Screen, for the page's QA handle (window.__FEL_ASSESS__.frames): a stand to hold
+ * ('standFront', 'standLeft', 'standRight') or a part's movement ('T1-front' … 'T5'). Clean, with the left knee caving on
+ * T1's front reps and the right ankle a little restricted, so the results page has something to explain.
+ */
+export function partFrames(part: string): PoseFrame[] {
+  switch (part) {
+    case 'standFront': return standFront(1).frames;
+    case 'standLeft': return standSide('left', 1).frames;
+    case 'standRight': return standSide('right', 1).frames;
+    case 'T1-front': return ohsFront({ kneeInL: 0.06 }).frames;
+    case 'T1-side': return ohsSide().frames;
+    case 'T2-left': return kneeWall('left', { tibiaMax: 44 }).frames;
+    case 'T2-right': return kneeWall('right', { tibiaMax: 36 }).frames;
+    case 'T3-left': return singleLegSquat('left').frames;
+    case 'T3-right': return singleLegSquat('right').frames;
+    case 'T5': return cmj([{ heightM: 0.4 }, { heightM: 0.45 }, { heightM: 0.42 }]).frames;
+    default: throw new Error(`[assess] no synthetic part ${part}`);
+  }
+}

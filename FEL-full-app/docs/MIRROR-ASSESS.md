@@ -62,6 +62,11 @@ and nothing is saved.
 
 - Pose runs on the device (`lib/pose/PoseService`). No frame, image, video or landmark stream is uploaded or stored.
   The worst-rep skeletons on the results page are landmarks held in page memory, drawn on a blank canvas.
+- The camera picture is PAINTED into the page's own canvas from PoseService's parked `<video>`, not placed with
+  `showIn`: the app's rule (`components/games/bodyPlay.scan.test.ts`) keeps `SelfView` the only self-view, and SelfView's
+  module reaches the Babylon session store, which this route must not load. A source scan (`lib/assess/replay.test.ts`)
+  fails if the route ever exports a frame (`toDataURL`, `toBlob`, `getImageData`, `captureStream`, `MediaRecorder`) or
+  opens any channel but the one `postAssessment` call.
 - The camera stops when the screen ends and when the page unmounts.
 - `POST /api/mirror/assessment` takes a numbers-only record (`lib/assess/prqWrite.ts` `toRecord`), refuses anything
   media-shaped (400), anything over 32 kB (413), any unknown field (400), a pain stop (422), and — failing closed — an
@@ -113,3 +118,11 @@ and `assessment-route.test.ts` (the API run for real). `app/play/mirror/assess/`
 `app/api/mirror/assessment/route.ts`.
 
 Run the lane's tests: `npx vitest run lib/assess lib/profile/scanToSnapshot.test.ts`.
+
+## QA without a camera
+
+On a development server, or a local production build opened with `?agent=1`, the page installs `window.__FEL_ASSESS__`
+(the same gate as `window.__FEL_POSE_FEED__`): `view()` reads the runner's step, part and rep count, and
+`frames(part)` loads the synthetic captures (`lib/assess/replay.ts`, fetched only when asked) for
+`'standFront' | 'standLeft' | 'standRight' | 'T1-front' | … | 'T5'`. A probe plays them with
+`__FEL_POSE_FEED__.begin()` + `play(frames)`, taps the prompts, and runs the whole screen in a real browser.

@@ -86,11 +86,31 @@ describe('the route imports nothing from Babylon', () => {
     expect(bad).toEqual([]);
   });
 
-  it('the page and the route never pull in the synthetic-capture code (it is for tests and replay only)', () => {
+  it('the page and the route never load the synthetic-capture code up front (the QA handle loads it on demand)', () => {
     const page = all.filter((f) => !f.startsWith('lib/assess'));
     const runtime = all.filter((f) => f.startsWith('lib/assess') && !/replay\.ts$/.test(f));
-    const bad = [...page, ...runtime].flatMap((f) => imports(readFileSync(f, 'utf8'))
-      .filter((m) => /(^|\/)replay$|lib\/pose\/synth|lib\/mirror\/fixtures/.test(m)).map((m) => `${f} → ${m}`));
+    const synth = /(^|\/)replay$|lib\/pose\/synth|lib\/mirror\/fixtures/;
+    const staticImports = (src: string) => [...src.matchAll(/(?:import|export)[^'"`;]*?from\s*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+    const bad = [
+      ...page.flatMap((f) => staticImports(readFileSync(f, 'utf8')).filter((m) => synth.test(m)).map((m) => `${f} → ${m}`)),
+      ...runtime.flatMap((f) => imports(readFileSync(f, 'utf8')).filter((m) => synth.test(m)).map((m) => `${f} → ${m}`)),
+    ];
     expect(bad).toEqual([]);
+    // the one dynamic import is the QA handle's, behind the pose feed's gate
+    const app = readFileSync('app/play/mirror/assess/_components/assess-app.tsx', 'utf8');
+    expect(app).toMatch(/feedHookAllowed\(process\.env\.NODE_ENV, agent, window\.location\.hostname\)[\s\S]*import\('@\/lib\/assess\/replay'\)/);
+  });
+});
+
+describe('the picture never leaves the page', () => {
+  const page = ['app/play/mirror/assess', 'lib/assess'].flatMap(files);
+  it('no source on the route exports a frame, records the stream, or opens a channel', () => {
+    const EXPORT = /\.toDataURL\s*\(|\.toBlob\s*\(|getImageData\s*\(|captureStream\s*\(|MediaRecorder|sendBeacon|\bWebSocket\b|RTCPeerConnection|\bEventSource\b|XMLHttpRequest/;
+    expect(page.filter((f) => EXPORT.test(readFileSync(f, 'utf8')))).toEqual([]);
+  });
+  it('the page\'s one network call is postAssessment, which sends the numbers-only record to its own route', () => {
+    const calls = page.flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/\bfetch\s*\(/g)].map(() => f));
+    expect(calls).toEqual(['app/play/mirror/assess/_components/assess-app.tsx']);
+    expect(readFileSync('app/play/mirror/assess/_components/assess-app.tsx', 'utf8')).toMatch(/postAssessment\(record, \(u, i\) => fetch\(u, i\)\)/);
   });
 });
