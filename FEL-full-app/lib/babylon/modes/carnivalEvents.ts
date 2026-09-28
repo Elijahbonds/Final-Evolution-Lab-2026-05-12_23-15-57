@@ -250,6 +250,12 @@ export function trickGauntlet(): CarnivalEvent {
 }
 
 // ── HOT SHOT — quick-fire shots on goal, reusing aimSwingCore as-is ───────
+/** QA A1-01(b): launch speed at zero power (a player who just presses shoot) — tuned against the real Flight sim so
+ *  the untouched centre reticle clears the 11m goal line with room to spare. See the launch call in onInput. */
+export const HOT_SHOT_BASE_MPS = 26;
+/** QA A1-01(b): how much full power (meter value 1) adds on top of HOT_SHOT_BASE_MPS. */
+export const HOT_SHOT_POWER_MPS = 10;
+
 export function hotShot(): CarnivalEvent {
   let player: SpawnedCharacter, ball: AbstractMesh, reticle: Reticle, meter: PowerMeter, flight: Flight, body: BeatOwner;
   let goal: AbstractMesh[] = [];
@@ -282,7 +288,14 @@ export function hotShot(): CarnivalEvent {
           const p = meter.stop(); phase = 'flight';
           body.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
           const to = reticle.pos.subtract(ball.position).normalize();
-          flight.launch(ball.position, to.scale(13 + p * 7).add(new Vector3(0, 0, 0)));
+          // QA A1-01(b): the goal is 11m out and the reticle sits only ~1.1m above the ball, so `to` is a shallow
+          // ~5.6° line — gravity was curving the shot into the ground well short of the goal line at EVERY power
+          // (13-20 m/s), even dead centre. HOT_SHOT_BASE_MPS is tuned (measured against the real Flight sim, not
+          // hand math) so the untouched centre reticle clears the line with room at minimum power — the easy shot
+          // a player who just presses shoot should score — while HOT_SHOT_POWER_MPS still rewards a full-power hit
+          // (truer to the aimed spot) and a bad aim (low corners, where gravity has the least margin to work with)
+          // can still fall short: skill raises the score, it does not guarantee it.
+          flight.launch(ball.position, to.scale(HOT_SHOT_BASE_MPS + p * HOT_SHOT_POWER_MPS));
         }
       }
     },
