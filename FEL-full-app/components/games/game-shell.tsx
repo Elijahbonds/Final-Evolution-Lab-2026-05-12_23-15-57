@@ -25,6 +25,7 @@ import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionS
 import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
 import { isPlayedRun } from './played-evidence';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
+import { EndCardClaim } from './end-card-rewards';
 import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
 import {
   type CarnivalStop, type CarnivalRunState,
@@ -80,6 +81,9 @@ interface RecapData {
   /** ECONOMY-SESSIONS-HARDEN: the run was recorded but paid nothing (AGENT / PLAYTEST / TEST_ACCOUNT), or the server refused
    *  its result (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) — the reason the server gave. Absent on a paid run. */
   unpaid?: string;
+  /** QA (PM ruling, CLAIM redesign): this finish answered a runId already recorded (nothing moved) — the card shows
+   *  the original result, but CLAIM never offers to "claim" a grant that was never this call's to begin with. */
+  replayed?: boolean;
   xp: number;
   shards: number;
   credits: number;
@@ -295,6 +299,7 @@ function GameShellInner({
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
+              replayed: Boolean(j?.replayed),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
               credits: j?.credits ?? 0,
@@ -891,6 +896,12 @@ function GameShellInner({
                     >
                       <RotateCcw className="h-4 w-4" /> REPLAY
                     </button>
+                    {/* QA (PM ruling): no CLAIM on a paused mode (recap.unpaid — 422 no_rules), a replayed finish
+                        (the original result, not a fresh grant), or a practice run (agent / playtest / /dev) — and
+                        nothing to claim on an empty run either. */}
+                    {recap && !recap.unpaid && !recap.replayed && !agentRun && !playtestRun
+                      && (recap.xp > 0 || recap.shards > 0 || recap.credits > 0 || (recapCoins?.coins ?? 0) > 0)
+                      && <EndCardClaim />}
                     <Link
                       href={storyNodeId ? '/story' : '/'}
                       className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"

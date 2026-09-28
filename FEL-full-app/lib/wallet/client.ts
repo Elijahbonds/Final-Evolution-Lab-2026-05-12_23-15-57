@@ -95,33 +95,22 @@ export async function reportEarnGrant(report: EarnReport): Promise<EarnGrant | n
   return r && !r.rejected ? { ...r.granted, capped: r.capped } : null;
 }
 
-/** What a CLAIM re-send was answered: the grant under its key (the ORIGINAL grant on a replay) and the balances after it. */
-export interface EarnClaim { granted: { coins: number; shards: number }; balances: { coins: number; shards: number; lc: number } }
-
-/**
- * QA P0-03: the end card's CLAIM re-sends a run's reports under the SAME idempotency keys, so the server answers a key it has
- * already paid with the original grant and changes nothing (wallet-service earn step 0) — two claims are one wallet change.
- * Quiet: a replay must not pop a second "+N coins" toast, so it syncs the balances (WALLET_SYNC_EVENT) instead. Null on a
- * failure or a refusal (the run was never paid under that key: session_not_won, run_already_paid…).
- */
-export async function claimEarnGrant(report: EarnReport): Promise<EarnClaim | null> {
-  const r = await postEarn(report, { quiet: true });
-  return r && !r.rejected && r.balances ? { granted: r.granted, balances: r.balances } : null;
-}
-
 /**
  * One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws.
  *
  * ECONOMY-SESSIONS-HARDEN (2026-09-28, merged from origin/lane/finish-release 46a8dc6a): what it resolves to and
  * broadcasts is what was credited NOW. The server answers a key already in the ledger with that key's original
- * grant and `replayed: true` (nothing moved); that is reported here as a zero grant (below), so no HUD toasts it
- * and no card adds it — already this function's own behavior (the `replayed` check below), kept as-is through this
- * merge along with the P0-03 CLAIM feature (`opts.quiet` / `balances`), which origin's branch predates.
+ * grant and `replayed: true` (nothing moved); that is reported here as a zero grant, so no HUD toasts it and no
+ * card adds it. The eye saw exactly that answer at 46a8dc6a — the wallet chip's daily_first_session re-sent from a
+ * fresh browser, "granted 100 coins", balance unchanged — and a "+100" shown for it would be a reward the server
+ * correctly did not pay.
+ *
+ * QA merge note: this branch's own P0-03 CLAIM feature (claimEarnGrant / EarnClaim / opts.quiet, an end-card button
+ * that re-sent a run's reports) was removed in this merge along with its only caller, EndCardRewards / EndCardClaim
+ * (components/games/end-card-rewards.tsx, deleted) — the session-embedded payout above makes a separate earn
+ * report nothing is left to re-send or claim.
  */
-async function postEarn(
-  report: EarnReport,
-  opts: { quiet?: boolean } = {},
-): Promise<{ granted: { coins: number; shards: number }; balances: EarnClaim['balances'] | null; capped: boolean; rejected: string | null } | null> {
+async function postEarn(report: EarnReport): Promise<{ granted: { coins: number; shards: number }; capped: boolean; rejected: string | null } | null> {
   try {
     const res = await fetch('/api/v1/wallet/earn', {
       method: 'POST',
@@ -131,7 +120,7 @@ async function postEarn(
     });
     if (!res.ok) return null;
     // Best-effort: broadcast the grant so the HUD can react. Never throw.
-    const out = { granted: { coins: 0, shards: 0 }, balances: null as EarnClaim['balances'] | null, capped: false, rejected: null as string | null };
+    const out = { granted: { coins: 0, shards: 0 }, capped: false, rejected: null as string | null };
     try {
       const data = await res.json();
       const replayed = data?.replayed === true;
@@ -146,9 +135,7 @@ async function postEarn(
         shards: Number(data?.balances?.shards ?? 0),
         lc: Number(data?.balances?.lc ?? 0),
       };
-      out.balances = balances;
-      if (opts.quiet) syncWalletBalances(balances);
-      else if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent<WalletEarnDetail>(WALLET_EARN_EVENT, {
             detail: { granted: out.granted, balances, capped: out.capped },

@@ -160,3 +160,16 @@ describe('an answer that lands after REPLAY writes nothing to the next run\'s ca
     expect(between(h, 'if (j?.ok) {', "fetch('/api/story/complete'")).toMatch(/if \(mine\(\) && j\?\.paid === true\) \{[\s\S]*setRecapCoins\(\{ coins, capped \}\)/);
   });
 });
+
+describe('CLAIM (QA, PM ruling): a pure client-side reveal, never a second grant', () => {
+  it('EndCardClaim is gated off on a paused/refused run, a replayed finish, a practice run, and an empty run', () => {
+    expect(shell).toMatch(/import \{ EndCardClaim \} from '\.\/end-card-rewards';/);
+    expect(shell).toMatch(
+      /recap && !recap\.unpaid && !recap\.replayed && !agentRun && !playtestRun\s*\n\s*&& \(recap\.xp > 0 \|\| recap\.shards > 0 \|\| recap\.credits > 0 \|\| \(recapCoins\?\.coins \?\? 0\) > 0\)\s*\n\s*&& <EndCardClaim \/>/,
+    );
+  });
+
+  it('the replayed flag reaches the card from the session answer, for that gate', () => {
+    expect(shell).toContain('replayed: Boolean(j?.replayed),');
+  });
+});
