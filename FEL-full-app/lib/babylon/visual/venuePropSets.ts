@@ -20,6 +20,8 @@ const arc = (kit: string, model: string, centre: [number, number], radius: numbe
 
 /** owner call 2026-09-05: the nature kit's canopy is teal by palette; the slope's trees take a green multiply. */
 const GREEN = '#63D452';
+/** GATE-CRASHER-MAJOR: the slope's pines take a deep needle green, not the lime the broadleaf kit wore on the snow. */
+const CONIFER = '#5E9468';
 
 export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
   // Court locations (docs/SPEC-COURT-LOCATIONS.md) — placed for the dunk camera: sides at x ±11–13, a back row behind the
@@ -162,17 +164,26 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'meshy', model: 'hoopbus', at: [-46, 0, -10], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'store', at: [44, 0, 12], yaw: -Math.PI / 2, scale: 0.9 }, { kit: 'meshy', model: 'sedan', at: [-44, 0, 22], yaw: Math.PI / 2 },
     ...line('nature', 'tree_palmTall', [-52, -60], [52, -60], 8, 0, 5.2), ...line('nature', 'tree_palm', [-56, -40], [-56, 40], 5, 0.4, 4.8),
   ],
-  'slope': [   // owner call 2026-09-05: green trees (the kit's pines are teal by palette)
-    ...line('nature', 'tree_tall', [-22, -20], [-24, 240], 12, 0, 5.2, GREEN), ...line('nature', 'tree_default', [22, 0], [24, 250], 12, 0, 5.2, GREEN),
-    ...line('nature', 'tree_default', [-19, 30], [-20, 230], 8, 0, 3.6, GREEN), ...line('nature', 'tree_oak', [19, 40], [20, 240], 8, 0, 3.6, GREEN),
+  // GATE-CRASHER-MAJOR (2026-09-28): PINES, THE WHOLE WAY DOWN. The set was the kit's round broadleaf blobs (tree_default /
+  // tree_oak / tree_tall) under a lime multiply — the eye's "large light-green greybox shrub" — over the first 250 m of what is
+  // now a 678 m run (world z to ~600), and its silhouette wall was a row of nine trees authored ACROSS the run at z 300,
+  // back when the run ended before it: one of them stood on the racing line mid-run, with no collision. Conifers now
+  // (the kit's pines, a deep needle green), both banks to the bottom, and the wall stands behind the finish.
+  'slope': [
+    ...line('nature', 'tree_pineTallA', [-19.5, -10], [-20.5, 640], 34, 0, 4.6, CONIFER), ...line('nature', 'tree_pineTallB', [19.5, 0], [20.5, 650], 34, 0, 4.6, CONIFER),
+    ...line('nature', 'tree_pineSmallA', [-23, 10], [-24, 630], 24, 0.6, 4.0, CONIFER), ...line('nature', 'tree_pineSmallB', [23, 18], [24, 640], 24, 1.1, 4.0, CONIFER),
     { kit: 'nature', model: 'rock_tallA', at: [-21, 0, 120], scale: 2.8 }, { kit: 'nature', model: 'rock_largeD', at: [21, 0, 180], scale: 2.8 },
+    { kit: 'nature', model: 'rock_tallA', at: [-21.5, 0, 350], scale: 3.0 }, { kit: 'nature', model: 'rock_largeD', at: [21.5, 0, 470], scale: 3.0 },
     { kit: 'racing', model: 'tent', at: [-20, 0, 8], scale: 2.4 }, { kit: 'racing', model: 'flagRed', at: [20, 0, 8], scale: 2.4 },
     // props+depth pass 2026-09-05 — NEAR: a fence at the start gate · MID: a lodge tent and flags down the run · FAR: a silhouette tree wall
     // the start gate, at z −12: the snow begins at z −19.5 (buildSlopeRun centres the piste on the run) and this
     // fence was authored at z −32, which is 12 m off the back of it — the one thing the ground audit found
     // standing over nothing on this run.
-    ...line('nature', 'fence_simple', [-14, -12], [14, -12], 7, 0, 2.2), { kit: 'racing', model: 'tentRoof', at: [20, 0, 40], scale: 2.6 }, ...line('racing', 'flagRed', [-18, 60], [-18, 200], 4, 0, 2.2),
-    ...line('nature', 'tree_tall', [-60, 300], [60, 300], 9, 0, 8.5, GREEN), ...line('nature', 'tree_tall', [-40, 30], [-44, 260], 6, 0, 7.0, GREEN),
+    ...line('nature', 'fence_simple', [-14, -12], [14, -12], 7, 0, 2.2), { kit: 'racing', model: 'tentRoof', at: [20, 0, 40], scale: 2.6 }, ...line('racing', 'flagRed', [-18, 60], [-18, 560], 10, 0, 2.2),
+    // the finish: a crowd tent each side of the arch (buildSlopeRun puts the arch 14 m past the last gate, world z ~597)
+    { kit: 'racing', model: 'tentRoof', at: [-21, 0, 592], scale: 2.8 }, { kit: 'racing', model: 'tent', at: [21, 0, 604], scale: 2.6 },
+    ...line('nature', 'tree_pineTallA', [-40, 30], [-44, 640], 14, 0.3, 7.0, CONIFER), ...line('nature', 'tree_pineTallB', [40, 40], [44, 650], 14, 0.9, 7.0, CONIFER),
+    ...line('nature', 'tree_pineTallA', [-60, 668], [60, 668], 13, 0, 8.5, CONIFER),
   ],
   // ARENA-10PHASE P9 (2026-09-08): Big Air's run goes −z (the athlete runs from z 0 into the kicker at z −12 and lands out
   // to z −130); it borrowed 'slope', authored for the slalom's +z run, so every one of its trees stood BEHIND the athlete

@@ -5,7 +5,7 @@ import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
+import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
@@ -16,12 +16,16 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
-import { reportEarnGrant } from '@/lib/wallet/client';
-import { EndCardRewards, EndCardClaim, walletGrantsFrom, type WalletGrants, type ClaimRun } from './end-card-rewards';
+// QA merge note (feature/qa-fixes-0927 x origin/lane/finish-release 46a8dc6a): ECONOMY-SESSIONS-HARDEN removed
+// reportEarnGrant / EndCardRewards / EndCardClaim / walletGrantsFrom / the CLAIM feature entirely — coins now pay
+// once, in the session's own transaction (below), so there is no separate earn report left to claim or re-send.
+// Took origin's side throughout this cluster (payout is server-paired; the old client path would double-pay
+// against the new server).
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
 import { isPlayedRun } from './played-evidence';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
+import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
@@ -73,6 +77,9 @@ interface MasteryRecap {
 interface RecapData {
   /** FEATURES-UX-SHOP: the server recorded no session — the run ended with no evidence of play. */
   noPlay?: boolean;
+  /** ECONOMY-SESSIONS-HARDEN: the run was recorded but paid nothing (AGENT / PLAYTEST / TEST_ACCOUNT), or the server refused
+   *  its result (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) — the reason the server gave. Absent on a paid run. */
+  unpaid?: string;
   xp: number;
   shards: number;
   credits: number;
@@ -123,6 +130,11 @@ function GameShellInner({
   const arenaMatchId = searchParams.get('arena');
   const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
   const carnivalFlag = searchParams.get('carnival');
+  // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
+  const agentRun = searchParams.get('agent') === '1';
+  const playtestRun = searchParams.get('playtest') === '1';
+  // `display` (PRQ badge/display surfaces, qa-fixes-owned) kept from this branch — origin/lane/finish-release
+  // forked before that feature existed, so its own profile state never had the field to drop.
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
@@ -132,11 +144,9 @@ function GameShellInner({
   const [profileTry, setProfileTry] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [recap, setRecap] = useState<RecapData | null>(null);
-  /** What this run's earn reports were granted, coins and shards (BRAINBRAWL-POLISH-2 N10; QA P0-02: the shards too, and
-   *  "+0" when nothing was granted) — null until the reports answer, and for a run the shell does not report (dunk). */
-  const [recapCoins, setRecapCoins] = useState<WalletGrants | null>(null);
-  /** QA P0-03: the run the card's CLAIM re-sends (same keys as the reports below); set with the grants it answers for. */
-  const [claimRun, setClaimRun] = useState<ClaimRun | null>(null);
+  /** The wallet coins this run's earn reports were granted (BRAINBRAWL-POLISH-2 N10), and whether a cap cut the coin earn —
+   *  null until a grant lands, and left null for a refused earn or a zero grant nothing capped (no "+0" tile). */
+  const [recapCoins, setRecapCoins] = useState<{ coins: number; capped: boolean } | null>(null);
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
@@ -163,6 +173,18 @@ function GameShellInner({
   // came after the mark — never the run before (runId only grows). Read there once, not subscribed: a subscription would
   // re-render the shell, and the game under it, on every counted press.
   const runMark = useRef(markRun(null));
+  // ECONOMY-SESSIONS-HARDEN (2026-09-28): the run the SERVER started for this game (POST /api/sessions/start), asked for
+  // when the game mounts and on every REPLAY. Its runId is the one key the session's payouts are filed under, and the
+  // server times the run from its own start — the client's duration is not read. null = no run (signed out, offline):
+  // the finish then says RUN_MISSING and pays nothing.
+  const serverRun = useRef<Promise<string | null> | null>(null);
+  const startServerRun = useCallback((): Promise<string | null> => {
+    const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
+      .then((r) => (r?.ok ? r.json() : null))
+      .then((j) => (typeof j?.runId === 'string' ? j.runId : null))
+      .catch(() => null);
+  }, [mode, agentRun, playtestRun]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -193,6 +215,7 @@ function GameShellInner({
   useEffect(() => {
     inputCount.current = 0;
     runMark.current = markRun(sessionStore.record());
+    serverRun.current = startServerRun();
     const mark = () => { if (runLive.current) inputCount.current += 1; };
     window.addEventListener('keydown', mark);
     window.addEventListener('pointerdown', mark);
@@ -202,7 +225,7 @@ function GameShellInner({
       window.removeEventListener('pointerdown', mark);
       window.removeEventListener('touchstart', mark);
     };
-  }, [gameKey]);
+  }, [gameKey, startServerRun]);
 
   useEffect(() => {
     let live = true;
@@ -231,12 +254,18 @@ function GameShellInner({
       // 2's. Every answer below still does its work for this run (grants, Story, Arena); only the card is guarded.
       const run = runSeq.current;
       const mine = () => run === runSeq.current;
-      fetch('/api/sessions', {
+      // this run's server run, read now (a REPLAY swaps in the next one). Not cleared: a game that ends the same run twice
+      // finishes the same runId twice, and the server answers the second with the first's stored result (replayed)
+      const started = serverRun.current ?? Promise.resolve(null);
+      started.then((runId) => fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          score: res?.score ?? 0,
+          // ECONOMY-SESSIONS-HARDEN: the run the server started; the server checks the score as sent (a whole number >= 0,
+          // within the mode's rules) and times the run itself — `duration` is only the room's own figure now
+          runId,
+          score: Math.max(0, Math.round(res?.score ?? 0)),
           opponentScore: res?.opponentScore ?? 0,
           won: Boolean(res?.won),
           duration: res?.duration ?? 0,
@@ -258,12 +287,14 @@ function GameShellInner({
             agentEvidence: agentPlayEvidence(),
           }),
         }),
-      })
-        .then((r) => (r?.ok ? r.json() : null))
+      }))
+        // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
+        .then((r) => (r ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
+              ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
               credits: j?.credits ?? 0,
@@ -273,32 +304,15 @@ function GameShellInner({
               season: j?.season ?? null,
               mastery: j?.mastery ?? null,
             });
-            // FEL wallet (Phase 2): grant coins/shards for EVERY mode through
-            // this shared choke point. Dunk is skipped here because the dunk
-            // component self-reports richer per-attempt events. Keyed on the
-            // server sessionId so a retry is idempotent. Best-effort only.
-            // BRAINBRAWL-POLISH-2 N10: the card shows the coins those grants paid (the server's figure, summed) — the eye's paid
-            // Brain Brawl match landed +316 wallet coins and the card said nothing about them.
-            if (j?.sessionId && mode !== 'dunk') {
-              const grants = [reportEarnGrant({
-                idempotency_key: `sess:${j.sessionId}:complete`,
-                event_type: 'mode_session_completed',
-                payload: { mode, run_id: j.sessionId, score: res?.score ?? 0 },
-              })];
-              // the server's verdict, not the room's claim: a music set is won only by its counts (session-payout
-              // sessionWon), and a won earn the server refused was logged by the wallet as an anti-cheat refusal
-              if (j?.won) {
-                grants.push(reportEarnGrant({
-                  idempotency_key: `sess:${j.sessionId}:won`,
-                  event_type: 'mode_session_won',
-                  payload: { mode, run_id: j.sessionId },
-                }));
-              }
-              void Promise.all(grants).then((gs) => {
-                if (!mine()) return;
-                setRecapCoins(walletGrantsFrom(gs));   // the completed earn pays coins, the won earn shards
-                setClaimRun({ sessionId: j.sessionId, mode, score: res?.score ?? 0, won: Boolean(j?.won) });
-              });
+            // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
+            // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,
+            // so a retried session paid them twice). The card shows exactly the server's figure and nothing it did not
+            // grant: no coin tile when the run paid none, and no daily line (the daily first-session faucet is the wallet
+            // chip's, and a replay of it is not shown anywhere — lib/wallet/client.ts).
+            if (mine() && j?.paid === true) {
+              const coins = Number.isFinite(j?.coins) ? Number(j.coins) : 0;
+              const capped = Boolean(j?.coinsCapped);
+              if (coins > 0 || capped) setRecapCoins({ coins, capped });
             }
 
             // If this is a story run, complete the node
@@ -416,7 +430,7 @@ function GameShellInner({
               }).catch(() => {}); // best-effort, never block the recap
             }
           } else if (mine()) {
-            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 });
+            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, ...(j?.reason ? { unpaid: unpaidReason(j.reason, j.detail) } : {}) });
           }
         })
         .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
@@ -434,7 +448,6 @@ function GameShellInner({
     setResult(null);
     setRecap(null);
     setRecapCoins(null);
-    setClaimRun(null);
     setStoryReward(null);
     runSeq.current += 1;
     setArenaResult(null);
@@ -445,7 +458,7 @@ function GameShellInner({
     // the next run's evidence of play starts from zero, as a remount would start it — the game's record too: marked before
     // an in-place restart (it keeps the same harness run going, so only what comes after REPLAY is the rematch's)
     runMark.current = markRun(sessionStore.record());
-    if (inPlace.current?.()) { inputCount.current = 0; return; }
+    if (inPlace.current?.()) { inputCount.current = 0; serverRun.current = startServerRun(); return; }
     setGameKey((k) => k + 1);
   };
 
@@ -685,7 +698,52 @@ function GameShellInner({
                       <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
                     </div>
                   ) : (
-                  <EndCardRewards recap={recap} walletGrants={recapCoins} />
+                  <>
+                  {recap.unpaid && (
+                    <div data-recap="unpaid" className="fel-card mt-6 rounded-lg p-3 text-center">
+                      <div className="font-mono text-xs font-bold text-white/70">{unpaidTitle(recap.unpaid)}</div>
+                      <div className="mt-0.5 text-[11px] text-white/40">{unpaidLine(recap.unpaid)}</div>
+                    </div>
+                  )}
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="fel-card rounded-lg p-3">
+                      <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
+                      <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
+                    </div>
+                    <div className="fel-card rounded-lg p-3">
+                      <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
+                      <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
+                    </div>
+                    <div className="fel-card rounded-lg p-3">
+                      <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
+                      <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
+                    </div>
+                    <div className="fel-card rounded-lg p-3">
+                      {recap.prqDelta >= 0 ? (
+                        <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
+                      ) : (
+                        <TrendingDown className="mx-auto h-4 w-4 text-[#FF3366]" />
+                      )}
+                      <div className={`mt-1 font-mono text-xl font-bold ${recap.prqDelta >= 0 ? 'text-[#00E5FF]' : 'text-[#FF3366]'}`}>
+                        {recap.prqDelta >= 0 ? '+' : ''}
+                        {recap.prqDelta}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
+                    </div>
+                    {recapCoins !== null && (
+                      <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
+                        <Coins className="h-4 w-4 text-[#FFB020]" />
+                        {recapCoins.coins > 0 && <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>}
+                        <span className="text-[10px] uppercase tracking-wider text-white/40">
+                          {recapCoins.coins > 0 ? (recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins') : 'Wallet coin limit reached for now'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  </>
                   )}
                   {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
                   {storyReward && (
@@ -833,7 +891,6 @@ function GameShellInner({
                     >
                       <RotateCcw className="h-4 w-4" /> REPLAY
                     </button>
-                    {claimRun && recapCoins && (recapCoins.coins > 0 || recapCoins.shards > 0) && <EndCardClaim run={claimRun} />}
                     <Link
                       href={storyNodeId ? '/story' : '/'}
                       className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"

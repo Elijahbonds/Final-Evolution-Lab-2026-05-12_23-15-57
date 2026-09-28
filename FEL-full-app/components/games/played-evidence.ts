@@ -16,6 +16,14 @@
 // the server's own score checks (checkRunScore / modeScoreRules, app/api/sessions) still gate what actually gets
 // paid — it only keeps a real, non-zero-score run from being posted as the empty-session case `played` was built
 // to catch.
+//
+// QA A1-02 reference path (2026-09-28): dunk's finish (dunk-babylon.tsx, same GameShell/InputBus/TouchOverlay wiring
+// as every other babylon host, off-limits to edit) already posted played:true under real pad input. Not a different
+// code path — dunk's own play is discrete press-hold-RELEASE-repeat across separate attempts, so the SAME
+// EvidenceCounter re-arms (drops under EVIDENCE_STICK_OFF / the trigger's threshold) between attempts and crosses
+// it again on the next one — three-plus discrete crossings, easily. hoops3v3 and Gate Crasher's continuous
+// steering never gives it that gap. isPlayedRun's fourth check exists for exactly the modes whose natural play
+// doesn't look like dunk's.
 
 /** The three discrete-crossing evidence counts GameShell already computes. */
 export interface PlayEvidenceCounts {

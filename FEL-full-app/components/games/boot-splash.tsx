@@ -102,6 +102,8 @@ function Bars({ bars, tint }: { bars: { speed: number; hold: number; edge: numbe
 export interface BootSplashProps {
   modeId: string;
   title: string;
+  /** GATE-CRASHER-MAJOR: what winning IS, one line under the title (a mode publishes it as its `goal` HUD key). */
+  goal?: string;
   phase: ModePhase;
   detail?: number | string;         // countdown number or error message
   onStart: () => void;              // READY tap
@@ -301,6 +303,9 @@ export function SplashCard(props: BootSplashProps) {
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
+        {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
+          <p className="max-w-md text-[12px] font-bold tracking-[0.18em] text-white/85">{props.goal}</p>
+        )}
 
         {props.phase === 'loading' && (
           <div className="w-56">

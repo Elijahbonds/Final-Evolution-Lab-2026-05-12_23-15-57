@@ -32,6 +32,30 @@ describe('wallet client — the grant a report was paid', () => {
     }
   });
 
+  it('ECONOMY-SESSIONS-HARDEN: a REPLAYED key is nothing new — zero on the card, zero in the HUD event, still a 2xx', async () => {
+    // the eye at 46a8dc6a: the wallet chip's daily_first_session, re-sent from a fresh browser, answered "granted 100 coins"
+    // with the balance unchanged — the original grant of a key already in the ledger, which a display must not show as +100
+    const seen: unknown[] = [];
+    vi.stubGlobal('window', { dispatchEvent: (e: CustomEvent) => { seen.push(e.detail); return true; } });
+    vi.stubGlobal('CustomEvent', class { constructor(public type: string, public init: { detail: unknown }) {} get detail() { return this.init.detail; } });
+    const replay = { ...earned({ coins: 100 }), replayed: true };
+    vi.stubGlobal('fetch', respond(200, replay));
+    expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: { day: '2026-09-28' } })).toEqual({ coins: 0, shards: 0, capped: false });
+    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false }]);
+    vi.stubGlobal('fetch', respond(200, replay));
+    expect(await reportEarn({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: {} })).toBe(true);   // the chip marks the day done
+    // PM note (QA acceptance #5): the server now answers an already-claimed daily with granted 0 — nothing to show either way
+    seen.length = 0;
+    vi.stubGlobal('fetch', respond(200, { ...earned({ coins: 0 }), replayed: true, already_claimed: true }));
+    expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: {} })).toEqual({ coins: 0, shards: 0, capped: false });
+    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false }]);
+    // the first, real grant still shows
+    seen.length = 0;
+    vi.stubGlobal('fetch', respond(200, { ...earned({ coins: 100 }), replayed: false }));
+    expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-29:u1', event_type: 'daily_first_session', payload: {} })).toEqual({ coins: 100, shards: 0, capped: false });
+    expect(seen).toEqual([{ granted: { coins: 100, shards: 0 }, balances, capped: false }]);
+  });
+
   it('a cap is not a refusal: it says so, with the coins the cap left (MODE_SESSION_COMPLETED is 2 a minute)', async () => {
     vi.stubGlobal('fetch', respond(200, earned({ capped: true })));
     expect(await reportEarnGrant(report)).toEqual({ coins: 0, shards: 0, capped: true });
@@ -63,9 +87,12 @@ describe('wallet client — the grant a report was paid', () => {
 // cap wording are pinned in components/games/end-card-rewards.test.tsx; here, that the shell feeds them these grants.
 describe('the shell\'s wallet tiles (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
-  it('every answered report set lands on the card (a zero grant too), summed by walletGrantsFrom', () => {
-    expect(shell).toContain('setRecapCoins(walletGrantsFrom(gs));');
-    expect(shell).not.toContain('if (coins > 0 || capped) setRecapCoins');
-    expect(shell).toContain('<EndCardRewards recap={recap} walletGrants={recapCoins} />');
+  it('no tile for a refused earn or a zero grant nothing capped; a capped coin earn says so instead of "+0"', () => {
+    expect(shell).toContain('if (coins > 0 || capped) setRecapCoins({ coins, capped });');
+    // ECONOMY-SESSIONS-HARDEN: the figures are the session answer's (the run pays its coins), never an earn report's
+    expect(shell).toContain('const capped = Boolean(j?.coinsCapped);');
+    expect(shell).toContain('const coins = Number.isFinite(j?.coins) ? Number(j.coins) : 0;');
+    expect(shell).toContain('{recapCoins.coins > 0 && <span');
+    expect(shell).toContain("'Wallet coin limit reached for now'");
   });
 });

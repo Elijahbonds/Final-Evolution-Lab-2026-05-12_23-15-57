@@ -109,7 +109,15 @@ export async function claimEarnGrant(report: EarnReport): Promise<EarnClaim | nu
   return r && !r.rejected && r.balances ? { granted: r.granted, balances: r.balances } : null;
 }
 
-/** One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws. */
+/**
+ * One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws.
+ *
+ * ECONOMY-SESSIONS-HARDEN (2026-09-28, merged from origin/lane/finish-release 46a8dc6a): what it resolves to and
+ * broadcasts is what was credited NOW. The server answers a key already in the ledger with that key's original
+ * grant and `replayed: true` (nothing moved); that is reported here as a zero grant (below), so no HUD toasts it
+ * and no card adds it — already this function's own behavior (the `replayed` check below), kept as-is through this
+ * merge along with the P0-03 CLAIM feature (`opts.quiet` / `balances`), which origin's branch predates.
+ */
 async function postEarn(
   report: EarnReport,
   opts: { quiet?: boolean } = {},
@@ -126,7 +134,8 @@ async function postEarn(
     const out = { granted: { coins: 0, shards: 0 }, balances: null as EarnClaim['balances'] | null, capped: false, rejected: null as string | null };
     try {
       const data = await res.json();
-      out.granted = {
+      const replayed = data?.replayed === true;
+      out.granted = replayed ? { coins: 0, shards: 0 } : {
         coins: Number(data?.granted?.coins ?? 0),
         shards: Number(data?.granted?.shards ?? 0),
       };
