@@ -3,7 +3,14 @@
 // area the mode defines (court 16×28 centred; dojo mat 14×14; pitch 50×70 with the
 // goal line at z 10.4; gridiron x ±20 over z 0..40; links green 60×90, holes at
 // z 26–39; skatepark ±33; piste half-width 17; surf half-width 45).
-export interface PropPlacement { kit: string; model: string; at: [number, number, number]; yaw?: number; scale?: number; /** multiply the kit palette (e.g. a green over the nature kit's teal canopy) */ tint?: string }
+export interface PropPlacement {
+  kit: string; model: string; at: [number, number, number]; yaw?: number; scale?: number;
+  /** replace the kit palette colour (e.g. a green over the nature kit's teal canopy): one hex for every part, or a hex per
+   *  material name (`{ woodBark: '#…', leafsGreen: '#…' }`) so a trunk and its crown take different colours */
+  tint?: string | Readonly<Record<string, string>>;
+  /** per-axis multiply on top of `scale` — re-proportions a kit model (a Kenney palm drawn as a tall Venice palm) */
+  stretch?: readonly [number, number, number];
+}
 const ring = (kit: string, model: string, r: number, n: number, y = 0, scale = 1, phase = 0): PropPlacement[] =>
   Array.from({ length: n }, (_, i) => { const a = phase + (i / n) * Math.PI * 2; return { kit, model, at: [Math.sin(a) * r, y, Math.cos(a) * r], yaw: -a, scale }; });
 const line = (kit: string, model: string, from: [number, number], to: [number, number], n: number, yaw = 0, scale = 1, tint?: string): PropPlacement[] =>
@@ -22,6 +29,25 @@ const arc = (kit: string, model: string, centre: [number, number], radius: numbe
 const GREEN = '#63D452';
 /** GATE-CRASHER-MAJOR: the slope's pines take a deep needle green, not the lime the broadleaf kit wore on the snow. */
 const CONIFER = '#5E9468';
+
+/** DUNK-VENICE-ENV-RENDER: the Venice dunk's palm colours — a grey-brown trunk and a deep frond green, which the low sun warms.
+ *  (A tint is the material's albedo, which PBR reads as LINEAR: these are darker than they look as hex on purpose — the
+ *  first cut at '#3B5E30' rendered lime against the sunset.) */
+export const VENICE_PALM_TINT: Readonly<Record<string, string>> = { woodBark: '#4A3B2E', leafsGreen: '#223A1C' };
+/** A tall Venice palm: the kit's detailed palm (0.2 × 1.2 trunk, 1 m crown) drawn `h` metres tall on a slender trunk. */
+const venicePalm = (x: number, z: number, h: number, yaw = 0): PropPlacement =>
+  ({ kit: 'nature', model: 'tree_palmDetailedTall', at: [x, 0, z], yaw, stretch: [3.2, h / 1.43, 3.2], tint: VENICE_PALM_TINT });
+/** Rows: the bike path's planting strip (x 12.3), the promenade's far side (x 30.2), the beach path (x −13.8), two behind the
+ *  backboard, the north shore (clear of x ±20), a sparse far-beach line and a plaza row (x 46). 34 palms, three thin-instanced draws. */
+export const VENICE_PALMS: PropPlacement[] = [
+  ...[-40, -28, -16, -4, 8, 20, 32, 44].map((z, i) => venicePalm(12.3, z, 14 + (i % 3) * 1.2, i * 0.9)),
+  ...[-38, -26, -12, 2, 14, 28, 52].map((z, i) => venicePalm(30.2, z, 13 + ((i + 1) % 3) * 1.3, i * 1.3)),
+  ...[-30, -16, -2, 12, 26].map((z, i) => venicePalm(-13.8, z, 13.5 + (i % 2) * 1.6, i * 0.7)),
+  venicePalm(-9.5, -23, 16, 0.4), venicePalm(11.5, -25, 15, 2.1),
+  ...[-40, -24, 24, 42].map((x, i) => venicePalm(x, -50, 12 + (i % 2) * 2, i * 1.1)),
+  ...[-56, -24, 8, 40].map((z, i) => venicePalm(-34, z, 11 + (i % 2) * 1.5, i * 0.5)),
+  ...[-44, -14, 16, 46].map((z, i) => venicePalm(46, z, 15 + (i % 2) * 1.5, i * 0.8)),
+];
 
 export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
   // Court locations (docs/SPEC-COURT-LOCATIONS.md) — placed for the dunk camera: sides at x ±11–13, a back row behind the
@@ -75,6 +101,31 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     // the far pier on the northern water and three sail billboards along the boardwalk, all MID/FAR (≥ 15 m from the court)
     { kit: 'venice', model: 'pier_far', at: [-30, 0, -110], yaw: 0.2 },
     { kit: 'venice', model: 'sail_billboard_0', at: [34, 0, -22], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_1', at: [34, 0, 6], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_2', at: [34, 0, 32], yaw: -Math.PI / 2 },
+  ],
+  // DUNK-VENICE-ENV-RENDER (2026-09-28): the Venice dunk's own dressing (dunk + dunk duel; the other hoops courts keep
+  // 'venice-court-meshy'). The chunky low-poly palms (tree_palm / Tall / Short / Bend at 3.6–5.2×: 5–7 m green lollipops),
+  // the hedge and grass-tuft lines are gone. The palms are Venice's: tall, slender and in rows down the bike path, the far
+  // side of the promenade and the beach — the kit's DETAILED palm (separate trunk and two frond layers) drawn 12–16 m tall
+  // on a ~0.6 m trunk (`stretch`), bark and fronds each in their own colour. There is no palm GLB in props/venice; this is
+  // the best palm the shipped kits hold. The boats (sail_billboard_*) go on the water, where boats are — they stood on the
+  // grass past the boardwalk. The low fence line on the beach side read as an orange dotted line on the sand (the planter
+  // troughs' old complaint) and is gone too. Placed for the dunk camera (it looks −z from behind the player): the rows recede down both
+  // frame edges, two palms frame the backboard, and x −20…20 on the north shore stays open so the sea shows behind the hoop.
+  'venice-dunk': [
+    ...VENICE_PALMS,
+    ...line('racing', 'lightPostModern', [19, -36], [19, 36], 7, Math.PI, 2.4),   // the promenade's lamps (the boardwalk's FEL flags hang on them)
+    ...line('racing', 'lightPostModern', [-15, -36], [-15, 36], 6, 0, 2.4),       // the beach path's
+    { kit: 'racing', model: 'tent', at: [33, 0, -21], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [33, 0, 18], yaw: -Math.PI / 2, scale: 2.6 },
+    { kit: 'racing', model: 'tent', at: [33, 0, 40], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [22, 0, -48], yaw: 0, scale: 2.6 },
+    { kit: 'racing', model: 'tent', at: [-22, 0, -48], yaw: 0, scale: 2.6 },
+    // the vendors' second line across the plaza, staggered against the first — the concept's stalls and awnings
+    ...[-52, -34, -4, 8, 30, 56].map((z): PropPlacement => ({ kit: 'racing', model: 'tent', at: [38, 0, z], yaw: -Math.PI / 2, scale: 2.4 })),
+    { kit: 'racing', model: 'flagRed', at: [21, 0, -40], scale: 2.4 }, { kit: 'racing', model: 'flagGreen', at: [21, 0, 40], scale: 2.4 },
+    { kit: 'meshy', model: 'hoopbus', at: [30, 0, -46], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'sedan', at: [29, 0, 44], yaw: Math.PI / 2 },
+    { kit: 'venice', model: 'pier_far', at: [-30, 0, -110], yaw: 0.2 },
+    { kit: 'venice', model: 'sail_billboard_0', at: [-78, 0, -96], yaw: 0.6, scale: 2.5 },
+    { kit: 'venice', model: 'sail_billboard_1', at: [-118, 0, -42], yaw: -0.4, scale: 2.8 },
+    { kit: 'venice', model: 'sail_billboard_2', at: [-44, 0, -152], yaw: 1.2, scale: 2.3 },
   ],
   'dojo': [
     ...ring('mini-arena', 'column', 9.5, 8, 0, 1.5, Math.PI / 8),   // Pass 7: lantern-post height — at 2.6 they read as Greek temple pillars in a shrine courtyard
