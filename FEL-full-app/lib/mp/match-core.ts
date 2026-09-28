@@ -48,17 +48,12 @@ export function winnerIdFor(outcome: MpOutcome, hostId: string, guestId: string 
  * Quiz/co-op modes are intentionally excluded. Labels drive the lobby UI.
  */
 export const MP_MODES: { key: string; label: string }[] = [
-  // REVIVED 2026-09-13 — the four that came back into the nav. The multiplayer contract is that an ENABLED
-  // mode can always be staked against; a mode you can finish with nothing to challenge is a dead end, and
-  // the contract test caught these the moment they were re-enabled.
-  { key: 'sprint', label: 'The Track' },
-  { key: 'showdown', label: 'Showdown' },
-  { key: 'duel', label: 'Duel' },
-  { key: 'brainbrawl', label: 'Brain Brawl' },
+  // QA P1-27 (2026-09-27): the FIRST entry is the lobby's default (MP_CHALLENGE_MODES[0], the card editor's MP_MODES[0]),
+  // and it was the retired sprint, labelled "The Track". A hub mode leads now ([DECISION-EJ] default: Flight Night).
+  { key: 'dunk', label: 'Flight Night' },
   // NEW MODE (owner ask 2026-09-12): a time-attack course, so it stakes the same way every score run does.
   { key: 'aeroaces', label: 'Aero Aces' },
   { key: 'velocitykart', label: 'Velocity Kart' },
-  { key: 'dunk', label: 'Flight Night' },
   { key: 'threepoint', label: 'Downtown' },
   { key: 'big-air', label: 'Stomp' },
   { key: 'snowboard', label: 'Gate Crasher' },
@@ -85,7 +80,18 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'mixedcombat', label: 'Mixed Rules' },
   { key: 'dunkduel', label: 'Prove It' },
   { key: 'who-scene-it', label: 'Who Scene It' },
+  // REVIVED 2026-09-13 — the four that came back into the nav. The multiplayer contract is that an ENABLED
+  // mode can always be staked against; a mode you can finish with nothing to challenge is a dead end, and
+  // the contract test caught these the moment they were re-enabled. Still stakeable, no longer first (QA P1-27), and
+  // the sprint carries its mode's name.
+  { key: 'sprint', label: 'Beach Sprint' },
+  { key: 'showdown', label: 'Showdown' },
+  { key: 'duel', label: 'Duel' },
+  { key: 'brainbrawl', label: 'Brain Brawl' },
 ];
+
+/** The mode a new challenge starts on (the lobby, the card editor): the first entry, a hub mode. */
+export const MP_DEFAULT_MODE = MP_MODES[0].key;
 
 // Challenge key → the `mode` a GameSession is stored under (the GameShell prop). Measured 2026-09-04: twelve of the
 // fourteen keys never matched a session mode, so best scores read 0 and those challenges settled as ties.
