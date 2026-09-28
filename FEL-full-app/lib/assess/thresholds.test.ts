@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   PROTOCOL_VERSION, THRESHOLDS, THRESHOLDS_VERSION, THRESHOLD_IDS, bandOf, isProvisional, th, type Band,
 } from './thresholds';
@@ -63,5 +65,28 @@ describe('the threshold register', () => {
 
   it('bandOf refuses a non-band id', () => {
     expect(() => bandOf('gate.minConfidence')).toThrow(/not a band/);
+  });
+});
+
+describe('the sign-off sheet (docs/MIRROR-ASSESS-THRESHOLDS.md) matches the register', () => {
+  const doc = readFileSync(join(__dirname, '../../docs/MIRROR-ASSESS-THRESHOLDS.md'), 'utf8');
+  const fmt = (v: unknown): string => {
+    if (typeof v === 'number') return String(v);
+    if (v && typeof v === 'object' && 'good' in v) {
+      const b = v as Band;
+      return `good ${b.good} · poor ${b.poor}${b.fault !== null ? ` · fault ${b.faultOp} ${b.fault}` : ''}`;
+    }
+    return Object.entries(v as object).map(([k, x]) => `${k} ${x}`).join(' · ');
+  };
+
+  it('every threshold has a row with its current value and an empty sign-off cell, and the versions are named', () => {
+    expect(doc).toContain(THRESHOLDS_VERSION);
+    expect(doc).toContain(PROTOCOL_VERSION);
+    for (const id of THRESHOLD_IDS) {
+      const row = doc.split('\n').find((l) => l.startsWith(`| \`${id}\` |`));
+      expect(row, id).toBeDefined();
+      expect(row!, id).toContain(`| ${fmt(THRESHOLDS[id].value)} |`);
+      expect(row!.endsWith('| no | |'), id).toBe(true);
+    }
   });
 });
