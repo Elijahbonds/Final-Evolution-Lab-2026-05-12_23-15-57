@@ -14,6 +14,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@/public/_prisma/client';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { MasteryCore, type MasteryModeState, type MasteryUpEvent } from './mastery-core';
 
@@ -65,9 +66,16 @@ export interface RecordMasteryResult {
 }
 
 /** Record one graded session for mastery. Best-effort at the call site. */
-export async function recordMastery(userId: string, sig: SessionSignal): Promise<RecordMasteryResult> {
+export async function recordMastery(
+  userId: string, sig: SessionSignal,
+  // ECONOMY-SESSIONS-HARDEN (2026-09-28): a session run records its mastery sample inside the run's transaction (`db`),
+  // filed in the run's grant ledger, so a retried run cannot add the same sample twice; its mastery_up events are then
+  // sent after the commit (`emit: false`, then emitMasteryUps) so a rolled-back run announces nothing.
+  opts: { db?: typeof prisma | Prisma.TransactionClient; emit?: boolean } = {},
+): Promise<RecordMasteryResult> {
+  const db = opts.db ?? prisma;
   const { metricKey, raw } = deriveMasteryInput(sig);
-  const row = await prisma.modeMastery.findUnique({ where: { userId_mode: { userId, mode: sig.mode } } });
+  const row = await db.modeMastery.findUnique({ where: { userId_mode: { userId, mode: sig.mode } } });
   const persisted: number[] = row && Array.isArray(row.samples) ? (row.samples as number[]) : [];
   const state: Record<string, MasteryModeState> = {
     [sig.mode]: { samples: persisted, tier: row?.tier ?? 0 },
@@ -78,21 +86,26 @@ export async function recordMastery(userId: string, sig: SessionSignal): Promise
   const res = core.record(sig.mode, raw);
   const snap = core.state[sig.mode];
 
-  await prisma.modeMastery.upsert({
+  await db.modeMastery.upsert({
     where: { userId_mode: { userId, mode: sig.mode } },
     update: { samples: snap.samples as any, tier: snap.tier, updatedAt: new Date() },
     create: { userId, mode: sig.mode, samples: snap.samples as any, tier: snap.tier },
   });
 
-  for (const ev of res.events) {
+  const out = { mode: sig.mode, metricKey, avg: res.avg, tier: res.tier, tierIndex: res.tierIndex, events: res.events };
+  if (opts.emit !== false) await emitMasteryUps(userId, out);
+  return out;
+}
+
+/** The mastery_up analytics events for a recorded sample. */
+export async function emitMasteryUps(userId: string, r: RecordMasteryResult): Promise<void> {
+  for (const ev of r.events) {
     await recordServerEvent({
       name: 'mastery_up',
       userId,
-      props: { mode: sig.mode, tier: ev.tier, metricKey },
+      props: { mode: r.mode, tier: ev.tier, metricKey: r.metricKey },
     });
   }
-
-  return { mode: sig.mode, metricKey, avg: res.avg, tier: res.tier, tierIndex: res.tierIndex, events: res.events };
 }
 
 /** Full mastery map for an athlete (hub cards + profile badges). */

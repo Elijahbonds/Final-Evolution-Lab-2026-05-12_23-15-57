@@ -38,8 +38,10 @@ describe('what counts as played: input the game received, from any source (P3 st
 
   it('the mark is taken when the game mounts (the run before is the old record) and before REPLAY restarts in place', () => {
     // the effect that zeroes the shell's own count for a new game (keyed on gameKey) marks the record in the same place
-    const mount = between(shell, 'useEffect(() => {\n    inputCount.current = 0;', '}, [gameKey]);');
+    const mount = between(shell, 'useEffect(() => {\n    inputCount.current = 0;', '}, [gameKey, startServerRun]);');
     expect(mount).toContain('runMark.current = markRun(sessionStore.record());');
+    // ECONOMY-SESSIONS-HARDEN: the server's run starts in the same place, so every new game is a new run
+    expect(mount).toContain('serverRun.current = startServerRun();');
     // REPLAY: marked BEFORE the in-place restart — Brain Brawl's rematch keeps the same harness run, so only what comes
     // after the mark is the rematch's; a remount marks again in the effect above
     const replay = between(shell, 'const replay = () => {', 'setGameKey((k) => k + 1);');
@@ -62,12 +64,16 @@ describe('the music session request: the fields the server reads (session-payout
     expect(route).toContain('verifiedMusicDuel(userId, body?.arenaMatchId)');
   });
 
-  it('the won earn fires on the server\'s verdict, not the room\'s claim', () => {
-    const grants = between(shell, "event_type: 'mode_session_completed'", "event_type: 'mode_session_won'");
-    expect(grants).toContain('if (j?.won) {');
-    expect(grants).not.toContain('res?.won');
+  it('the won earn is paid on the server\'s verdict, not the room\'s claim — by the run itself now (ECONOMY-SESSIONS-HARDEN)', () => {
+    // the shell reports no session earn any more: the run's transaction pays the completed coins and, on the server's
+    // `won`, the won shards, keyed by the run (a retried session used to pay both again under the new session's id)
+    expect(shell).not.toMatch(/mode_session_completed|mode_session_won|reportEarnGrant/);
+    const route = read('app/api/sessions/route.ts');
+    const tx = route.slice(route.indexOf('prisma.$transaction'));
+    expect(tx).toMatch(/if \(won\) \{\s*const w = await sessionWalletGrant\(tx, \{ playerId: userId, reasonCode: REASON\.MODE_SESSION_WON/);
+    expect(route).toContain('const won = sessionWon(rulesMode, claimedWon, stats, duration, { score });');
     // the route answers with its own verdict under that name
-    expect(read('app/api/sessions/route.ts')).toMatch(/return NextResponse\.json\(\{\s*ok: true,\s*sessionId:[^\n]*\n[^\n]*\n\s*won,/);
+    expect(tx).toMatch(/const payload: Record<string, unknown> = \{\s*ok: true,\s*paid: true,\s*replayed: false,\s*runId: run\.id,\s*sessionId:[^\n]*\n\s*won,/);
   });
 });
 
@@ -139,7 +145,7 @@ describe('an answer that lands after REPLAY writes nothing to the next run\'s ca
     expect(writes.length).toBeGreaterThanOrEqual(10);
     // the answers still do their work for the run they belong to: the grants, the Story node and the Arena score are asked
     // for whatever the card shows now (only the card is guarded)
-    expect(h).not.toMatch(/if \(!mine\(\)\) return;\s*const grants/);
-    expect(between(h, 'if (j?.ok) {', "fetch('/api/story/complete'")).toContain('const grants = [reportEarnGrant({');
+    // ECONOMY-SESSIONS-HARDEN: the coins tile is the session answer's own figure (the run paid them), guarded like the rest
+    expect(between(h, 'if (j?.ok) {', "fetch('/api/story/complete'")).toMatch(/if \(mine\(\) && j\?\.paid === true\) \{[\s\S]*setRecapCoins\(\{ coins, capped \}\)/);
   });
 });

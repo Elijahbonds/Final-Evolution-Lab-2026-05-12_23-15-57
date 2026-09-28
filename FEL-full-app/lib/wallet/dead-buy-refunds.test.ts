@@ -69,7 +69,7 @@ const { POST: shopBuy } = await import('@/app/api/shop/purchase/route');
 const { DELETE: deleteMyData } = await import('@/app/api/v1/workout/scan/route');
 const { POST: sessionsBook } = await import('@/app/api/v1/sessions/book/route');
 const { upcomingGroupSlots } = await import('@/lib/sessions/schedule');
-const { readWallet, earn, spend } = await import('./wallet-service');
+const { readWallet, earn, spend, sessionWalletGrant } = await import('./wallet-service');
 const { refundNotesFor } = await import('./dead-buy-refunds');
 const { refundKey } = await import('./dead-buys');
 const { NOT_ON_SALE } = await import('./catalog');
@@ -1155,7 +1155,9 @@ describe('an earn under another wallet\'s key', () => {
       $transaction: async () => { throw new Error('the grant must not open a transaction'); },
     };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const r = await earn(db as never, { playerId: 'me', idempotencyKey: 'k_theirs', eventType: 'mode_session_completed', payload: { run_id: 'r1', score: 80 } });
+    // ECONOMY-SESSIONS-HARDEN: the vehicle was mode_session_completed, which the run pays now (earn refuses it before the
+    // key is tried); the daily faucet goes through every check a fresh key gets and then reaches the key the same way
+    const r = await earn(db as never, { playerId: 'me', idempotencyKey: 'k_theirs', eventType: 'daily_first_session', payload: { day: '2026-09-28', source: 'wallet-chip' } });
     warn.mockRestore();
     expect(r).toMatchObject({ granted: { coins: 0, shards: 0 }, entry_id: null, rejected: 'replayed_key', balances: { coins: 7 } });
     expect(updates).toEqual([{ where: { id: 'ev1' }, data: { rejectedReason: 'replayed_key' } }]);
@@ -1175,7 +1177,9 @@ describe('a refund is not an earn', () => {
       gameSession: { findFirst: async () => ({ won: false }) },
       rewardRule: { findUnique: async () => null },
     };
-    await expect(earn(db as never, { playerId: 'p1', idempotencyKey: 'k1', eventType: 'mode_session_completed', payload: { run_id: 'r1', score: 80 } }))
+    // ECONOMY-SESSIONS-HARDEN: the session coin earn is priced inside the run's transaction now (sessionWalletGrant), by the
+    // same caps earn() uses (capGrant) — the cap under test
+    await expect(sessionWalletGrant(db as never, { playerId: 'p1', reasonCode: 'MODE_SESSION_COMPLETED', payload: { run_id: 'r1', score: 80 }, idempotencyKey: 'run:r1:coins' }))
       .rejects.toThrow('stop here');
     expect(seen[0].where).toMatchObject({ currency: 'coins', delta: { gt: 0 }, reasonCode: { not: 'DEAD_BUY_REFUND' } });
   });

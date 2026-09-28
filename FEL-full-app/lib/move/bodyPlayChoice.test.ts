@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BODY_PLAY_KEY_PREFIX, WARMUP_HREF, WARMUP_LABEL, bodyButtonAction, bodyPlayOffer, readBodyPlay, warmupOffer, writeBodyPlay,
+  BODY_KICKS_KEY_PREFIX, KICKS_OPT_IN_LABEL, FIGHT_GAME_KEYS, readBodyKicks, writeBodyKicks, kicksOptInOffer,
   type BodyCard,
 } from './bodyPlayChoice';
 import { BODY_PROFILES } from '@/lib/input/bodyProfiles';
@@ -108,5 +109,30 @@ describe('the wake-up offer', () => {
     expect(warmupOffer('ready', href)).toEqual({ href, label: WARMUP_LABEL });
     for (const stage of ['frame', 'arms', 'advice', 'still', null]) expect(warmupOffer(stage, href)).toBeNull();
     expect(WARMUP_LABEL).toBe('2-minute wake-up first?');
+  });
+});
+
+describe('MOVEMENT PLAY P7: the spin / jump kick opt-in', () => {
+  it('is off by default, remembered per game, and a broken store never throws', () => {
+    const s = store();
+    expect(readBodyKicks('karate_vs', s)).toBe(false);
+    writeBodyKicks('karate_vs', true, s);
+    expect(s.m.get(`${BODY_KICKS_KEY_PREFIX}karate_vs`)).toBe('1');
+    expect([readBodyKicks('karate_vs', s), readBodyKicks('showdown', s)]).toEqual([true, false]);
+    writeBodyKicks('karate_vs', false, s);
+    expect(readBodyKicks('karate_vs', s)).toBe(false);
+    const bad = store(true);
+    expect(() => writeBodyKicks('karate_vs', true, bad)).not.toThrow();
+    expect(readBodyKicks('karate_vs', bad)).toBe(false);
+    expect(readBodyKicks('karate_vs', null)).toBe(false);
+  });
+  it('is offered only for a combat game the body plays, once the space check passed', () => {
+    const card = (key: string, drives: boolean) => ({ modeId: key, key, lines: [], drives, later: 'P7' } as unknown as BodyCard & { key: string });
+    expect(kicksOptInOffer(card('karate_vs', true), 'ready')).toBe(true);
+    expect(kicksOptInOffer(card('karate_vs', true), 'checking')).toBe(false);
+    expect(kicksOptInOffer(card('karate_vs', false), 'ready')).toBe(false);
+    expect(kicksOptInOffer(card('skateboard', true), 'ready')).toBe(false);
+    expect([...FIGHT_GAME_KEYS].sort()).toEqual(['duel', 'karate', 'karate_vs', 'mixedcombat', 'showdown']);
+    expect(KICKS_OPT_IN_LABEL).toMatch(/2 m clear/);
   });
 });

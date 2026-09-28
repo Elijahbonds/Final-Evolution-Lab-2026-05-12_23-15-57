@@ -957,9 +957,9 @@ describe('drift guards — the numbers mirrored out of mode files still match th
       for (const m of t.matchAll(/bonus: (\d+)/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
       for (const m of t.matchAll(/makeRail\([^;]*?, (\d+)\);/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
     }
-    // the snow ledges ([x, from, to, bonus] tuples) and the slope's rails (modes/snowSlope.ts, data)
-    const ledges = /for \(const \[x, d1, d2, bonus\] of (\[[^;]*?\]) as const\)/.exec(src('lib/babylon/modes/rideWorlds.ts'));
-    for (const [, , , bonus] of JSON.parse(ledges![1]) as number[][]) { seen++; expect(bonus).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
+    // the slope's rails are modes/snowSlope.ts data; the legacy slope-v2 ledges ([x, from, to, bonus] tuples) are gone
+    // (GATE-CRASHER-MAJOR: bare bars floating 0.7 m over the snow, one ending on gate 2's pole line) — and stay gone
+    expect(/for \(const \[x, d1, d2, bonus\] of/.test(src('lib/babylon/modes/rideWorlds.ts'))).toBe(false);
     for (const f of SNOW_SLOPE) { seen++; expect(f.bonus, f.kind).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
     expect(seen).toBeGreaterThan(25);
     // …and nothing else in the tree builds one

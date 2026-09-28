@@ -26,7 +26,7 @@ import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
-import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS } from '../core/FightCore';
+import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS } from '../core/FightCore';
 import {
   StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove, bookMoveset, stringRule } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
@@ -50,6 +50,19 @@ import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeAren
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
+// MOVEMENT PLAY P7 (2026-09-25): the body's own strikes, guard, slips and steps — behind its flag until the live probe
+// measures 0 misfires (bodyFightFlags; READY says "coming" meanwhile)
+import { MOVES as HORDE_MOVES } from '../core/HordeDynamics';
+import type { DefenseAction } from '../core/DefenseSystem';
+import type { AttackDef } from '../core/FightCore';
+import {
+  BodyFightDriver, DefenseLedger, DeferredHits, BodyDriveTracker, PadBlock, bodyDefenseAt, defenseActionOf, strongerDefense, contactMsOf, bodyLunge, stepSpace, planeMove,
+  FIGHT_CLAIMS, FIGHT_CARD_LINES,
+} from '../combat/bodyFight';
+import { bodyFightOn } from '../combat/bodyFightFlags';
+import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import type { BodyView } from '../core/ModeHarness';
 
 export type DuelWeapon = 'fists' | 'staff' | 'blade';
 const WEAPON_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
@@ -189,9 +202,112 @@ export const DuelMode: ModeDefinition = (() => {
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
   let foeReadThisSwing = false, foeGuardUntil = 0;   // phase 10
   let guardUp = false;
+  // MOVEMENT PLAY P7: the body's fight read (the Showdown seam; a weapon swings on the plane rule)
+  // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
+  // check over a pause), so a value read in load() would miss the player's tick for this match
+  const bodyDriver = new BodyFightDriver({ kicksOptIn: () => readBodyKicks('duel') });
+  const ledger = new DefenseLedger(), deferred = new DeferredHits(), drive = new BodyDriveTracker();
+  const padGuard = new PadBlock();   // P7 (the review, 2026-09-26): the pad's X guard apart from the body's — a deferred hit meets both
+  let bodyGuard = false;   // P7: the block is the body's (its guard up), to let go when the reader loses the guard
+  let bodyShift: { v: Vector3; left: number } | null = null;
+  let ctxRef: ModeContext | null = null;
+  const bodyDriven = (): boolean => drive.driven(!!ctxRef?.body?.()?.read.tracking);
   function banner(ctx: ModeContext, text: string, ms = 900): void {
     ctx.setHud({ banner: text });
     setTimeout(() => ctx.setHud({ banner: '' }), ms);
+  }
+
+  /** P7: what the rival's blow meets on a BODY player at `impactAt` (page ms) — Showdown's rule (bodyDefenseAt's windows). */
+  function bodyAction(atk: AttackDef, dist: number, impactAt: number): DefenseAction | 'evaded' {
+    if (dist > atk.range) return 'none';
+    const bd = bodyDefenseAt(ledger, impactAt);
+    // (the pad's guard counts too, as it stood AT the impact — see ShowdownMode)
+    const padHeld = padGuard.heldAt(impactAt);
+    const pad: DefenseAction = padHeld || padGuard.pressWithin(impactAt, PARRY_WINDOW_MS) !== null ? meDef.resolve(atk, dist, padHeld, impactAt) : 'none';
+    if (!meState.controllable) return ledger.at(impactAt).guardHeld || padHeld ? 'blocked' : 'none';   // a held guard stays up through a stagger
+    return strongerDefense(defenseActionOf(bd.d), pad);
+  }
+
+  /** P7: the ledger follows the body's own guard, per packet and per frame (see ShowdownMode). */
+  function bodyLedgerFrame(view: BodyView, t: number): void {
+    const g = ledger.frame(view, t, deferred.oldest);
+    if (g === 'down' && bodyGuard) { bodyGuard = false; if (!padGuard.held) { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; } }
+    else if (ledger.guardUp && !bodyGuard && phase === 'fighting' && meState.controllable) { drive.body(t); bodyGuard = true; meDef.pressBlock(-1e9, false); meState.pressBlock(-1e9); guardUp = true; }
+  }
+
+  /** P7: one fight-read event from the body — taken only in the fight: the weapon pick, the intro and the break between
+   *  rounds take nothing (A / B / Y there are the pad's), and nothing is refused out loud. Empty hands read the book; a
+   *  weapon swings on the plane rule (straight → its first move, hook → its second, uppercut → its third) and has no kick. */
+  function onBodyEvent(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+    const t = now();
+    ctxRef = ctx;
+    bodyLedgerFrame(view, t);
+    if (phase !== 'fighting') return false;
+    if (ev.kind !== 'blow' && ev.kind !== 'legKick' && ev.kind !== 'guard' && ev.kind !== 'evade' && ev.kind !== 'fightStep') return false;
+    const it = bodyDriver.intent(ev, view, t);
+    if (!it) return false;
+    if (it.kind === 'guard') ledger.guard(it);
+    if (!meState.controllable) return false;
+    switch (it.kind) {
+      case 'guard':
+        drive.body(t);
+        if (it.up) { const at = it.raise ? it.onsetPage : -1e9; meDef.pressBlock(at, it.raise && it.push); meState.pressBlock(at); guardUp = true; }
+        else if (!padGuard.held) { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; }
+        bodyGuard = it.up;
+        console.info(`[DL-BODY] guard ${it.up ? (it.raise ? 'raise' : 'up') : 'down'}`);
+        return true;
+      case 'strike': {
+        const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
+        const opts = { elapsedMs: t - it.onsetPage, contactMs: 0 };
+        // auto-spacing: a blow thrown with the rival a little out of its reach closes on him (bodyLunge)
+        const lungeFor = (id: string): void => {
+          const range = styled(myWeapon)[id]?.atk.range ?? 1.6, d = Vector3.Distance(player.root.position, rival.root.position), L = bodyLunge(d, range);
+          if (L > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(L / 0.15), left: 0.15 }; }
+        };
+        if (myWeapon === 'fists') {
+          const mv = book.pressMove(HORDE_MOVES[it.move], it.token, it.onsetPage / 1000);
+          opts.contactMs = contactMsOf(mv);
+          drive.body(t);
+          const ok = meStrike.request(mv.id, t, opts);
+          if (ok) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
+          lungeFor(mv.id);
+          if (book.history.length === 1) stringLabels = [];   // a body strike that starts a string starts its call
+          stringLabels.push(mv.label); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length} body ${it.body} age ${Math.round(t - it.onsetPage)}${ok ? '' : ' queued'}`);
+          if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); }
+          return true;
+        }
+        const id = planeMove(Object.keys(styled(myWeapon)), it.body);
+        if (!id) return false;   // a kick with a weapon in hand: nothing to swing
+        // a weapon's swing has no capture contact frame to hold to: its whole startup is its wind-up (the hit is never
+        // brought forward past the swing the rival sees)
+        opts.contactMs = (styled(myWeapon)[id]?.startupSec ?? 0) * 1000;
+        drive.body(t);
+        const ok = meStrike.request(id, t, opts);
+        if (ok) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
+        lungeFor(id);
+        console.info(`[DL-STORM] body ${it.body} → ${id}${ok ? '' : ' queued'} age ${Math.round(t - it.onsetPage)}`);
+        return true;
+      }
+      case 'evade': {
+        drive.body(t);
+        const r = ctx.camDirector.rightFlat();
+        const dir = it.side === null ? Vector3.Zero() : r.scale(it.side === 'L' ? -1 : 1);
+        if (!meMove.slip(dir.x, dir.z)) return false;   // (the i-frames only with the slip itself: see ShowdownMode)
+        ledger.evade(it);
+        console.info(`[DL-BODY] ${it.form}${it.side ?? ''}`);
+        return true;
+      }
+      case 'step': {
+        drive.body(t);
+        const sp = stepSpace(it.dir);
+        const to = rival.root.position.subtract(player.root.position); to.y = 0;
+        const along = to.lengthSquared() > 1e-4 ? to.normalize() : ctx.camDirector.forwardFlat();
+        const v = along.scale(sp.along).addInPlace(ctx.camDirector.rightFlat().scale(-sp.across));
+        bodyShift = { v: v.scale(1 / 0.25), left: 0.25 };
+        console.info(`[DL-BODY] step ${it.dir}`);
+        return true;
+      }
+    }
   }
 
   /** Ring-out check — leaving the disc ends the round immediately. */
@@ -202,20 +318,28 @@ export const DuelMode: ModeDefinition = (() => {
     return false;
   }
 
-  function resolveActive(ctx: ModeContext, mine: boolean): void {
+  function resolveActive(ctx: ModeContext, mine: boolean, body?: { move: CombatMove; impactAt: number }): void {
     const atkChar = mine ? player : rival;
     const defChar = mine ? rival : player;
     const atkState = mine ? meState : foeState;
     const defState = mine ? foeState : meState;
     const defCtrl = mine ? foeDef : meDef;
     const sc = mine ? meStrike : foeStrike;
-    const move = sc.current?.move;
-    if (!move || !sc.current!.hitLive) return;
-    sc.current!.consumeHit();
+    const move = body ? body.move : sc.current?.move;
+    if (!move) return;
+    if (!body) {
+      if (!sc.current!.hitLive) return;
+      sc.current!.consumeHit();
+      // P7: the rival's blow on a BODY player waits for the body's frames to cover the impact (DefenseLedger)
+      if (!mine && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => resolveActive(ctx, false, { move, impactAt: at })); return; }
+    } else if (phase !== 'fighting') return;
 
     const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
     if (!mine && meMove.dashIFrames) { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[DL-STORM] step i-frames — whiff · perfect dodge'); return; }   // phase 6: the read opens him   // phase 3
-    const action = defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
+    const bodyAct = body ? bodyAction(move.atk, dist, body.impactAt) : null;
+    if (bodyAct === 'evaded') { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[DL-STORM] body slip — whiff · perfect dodge'); return; }
+    const action = bodyAct ?? defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
+    if (body) console.info(`[DL-DEF] body ${action} (${Math.round(now() - body.impactAt)} ms late)`);
     const outcome = applyDefenseOutcome(action, atkState, defState, move.atk);
 
     switch (outcome) {
@@ -300,7 +424,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound(); xBtn.reset(); guardUp = false; book.reset(); stringLabels = []; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
+    meState.resetRound(); foeState.resetRound(); xBtn.reset(); padGuard.reset(); guardUp = false; book.reset(); stringLabels = []; deferred.clear(); ledger.reset(); bodyShift = null; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
     // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
     player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
@@ -329,6 +453,9 @@ export const DuelMode: ModeDefinition = (() => {
 
   return {
     modeId: 'duel', mood: 'dojoWarm', camPreset: 'duel',  // Phase 9: side-on disc framing
+    // MOVEMENT PLAY P7: the body plays the duel only behind its flag (read at mount — the dev probe's ?bodyfight=duel)
+    get body() { return bodyFightOn('duel') ? { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES } : undefined; },
+    get onBody() { return bodyFightOn('duel') ? onBodyEvent : undefined; },
 
     async load(ctx: ModeContext) {
       // A ROOM TO FIGHT IN (2026-09-13). Phase 0 measured this mode at SIXTEEN visible meshes — the sparsest
@@ -373,6 +500,7 @@ export const DuelMode: ModeDefinition = (() => {
       meState = new FighterState(100); foeState = new FighterState(100);
       // what the start-up screen chose, if it is one this mode offers (the gauntlet is not a duel weapon)
       myWeapon = (['fists', 'staff', 'blade'] as const).find((w) => w === readWeapon().id) ?? 'fists';
+      ctxRef = ctx;   // P7
       meStrike = new StrikeController(styled(myWeapon));
       showWeapons(ctx);
       foeStrike = new StrikeController(RIVAL_MOVESET[foeWeapon]());   // the rival fights unstyled
@@ -412,11 +540,14 @@ export const DuelMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }
       if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // phase 8: MATRIX FOCUS   // MODE-STICK-FACE: R stick → the director's look orbit
+      // P7: who is driving — a real press or push is the pad's
+      if (e.src !== 'body' && ((e.t === 'button' && e.pressed) || (e.t === 'stick' && Math.hypot(e.x, e.y) > 0.35))) drive.pad(now());
       if (e.t !== 'button') return;
       // phase 3: the X RELEASE is the dash / the guard coming down — it has to be read before the pressed-only gate below
       if (e.btn === 'X' && !e.pressed) {
         const g = xBtn.release(now() / 1000);
-        if (guardUp || g === 'held') { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; }
+        padGuard.release(now());
+        if ((guardUp || g === 'held') && !bodyGuard) { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; }   // (P7: a body guard still up keeps the block)
         if (g === 'tap' || g === 'double') {
           const to = rival.root.position.subtract(player.root.position); to.y = 0;
           const w = wish(ctx);
@@ -469,12 +600,14 @@ export const DuelMode: ModeDefinition = (() => {
         const to = rival.root.position.subtract(player.root.position);
         const w = wish(ctx);
         const flick = (w.x * to.x + w.z * to.z) > 0.3;
-        if (flick) { meDef.pressBlock(now(), true); meState.pressBlock(now()); guardUp = true; SoundKit.play('impact', { pitch: 1.6, volume: 0.18 }); ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450); }
+        if (flick) { meDef.pressBlock(now(), true); meState.pressBlock(now()); padGuard.press(now()); guardUp = true; SoundKit.play('impact', { pitch: 1.6, volume: 0.18 }); ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450); }
       }
     },
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      ctxRef = ctx;
+      { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       // phase 8 — MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock (his animator, brain, swings,
       // movement), me on mine. `sdtRoom` / `sdtHero` below are the two clocks; nothing else in this update reads `dt` for a body.
       const wasFocus = focus.active;
@@ -485,7 +618,7 @@ export const DuelMode: ModeDefinition = (() => {
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
-      if (!guardUp && xBtn.guardHeld(now() / 1000) && meState.controllable) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); }   // phase 3: the hold is the guard
+      if (!padGuard.held && xBtn.guardHeld(now() / 1000) && meState.controllable) { padGuard.press(now()); if (!guardUp) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); } }   // phase 3: the hold is the guard (P7: the pad's, apart from a body guard already up)
       if (phaseSec > BUDGET_SEC[phase]) {
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME');
         else if (phase === 'weaponSelect') { meStrike.swapMoveset(styled(myWeapon)); startRound(ctx); }
@@ -506,6 +639,12 @@ export const DuelMode: ModeDefinition = (() => {
         meMove.updateWithSelf(dt, 0, 0, false, player.root.position);
       }
       player.root.position.addInPlace(meMove.vel.scale(dt));
+      // P7 AUTO-SPACING: a body player has no stick — a step in / out / across moves the fighter (the disc's edge is still
+      // the edge: checkRingOut below); a stick past its dead zone always wins
+      if (bodyShift) {
+        if (Math.hypot(stickX, stickY) > 0.35 || !meState.controllable) bodyShift = null;
+        else { const step = Math.min(dt, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
+      }
 
       // rival AI: orbit + approach to weapon range, swing on cooldown
       if (foeState.controllable && !foeStrike.busy) {

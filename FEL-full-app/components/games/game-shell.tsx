@@ -15,9 +15,9 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
-import { reportEarnGrant } from '@/lib/wallet/client';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
+import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
@@ -67,6 +67,9 @@ interface MasteryRecap {
 interface RecapData {
   /** FEATURES-UX-SHOP: the server recorded no session — the run ended with no evidence of play. */
   noPlay?: boolean;
+  /** ECONOMY-SESSIONS-HARDEN: the run was recorded but paid nothing (AGENT / PLAYTEST / TEST_ACCOUNT), or the server refused
+   *  its result (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) — the reason the server gave. Absent on a paid run. */
+  unpaid?: string;
   xp: number;
   shards: number;
   credits: number;
@@ -117,6 +120,9 @@ function GameShellInner({
   const arenaMatchId = searchParams.get('arena');
   const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
   const carnivalFlag = searchParams.get('carnival');
+  // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
+  const agentRun = searchParams.get('agent') === '1';
+  const playtestRun = searchParams.get('playtest') === '1';
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
@@ -155,6 +161,18 @@ function GameShellInner({
   // came after the mark — never the run before (runId only grows). Read there once, not subscribed: a subscription would
   // re-render the shell, and the game under it, on every counted press.
   const runMark = useRef(markRun(null));
+  // ECONOMY-SESSIONS-HARDEN (2026-09-28): the run the SERVER started for this game (POST /api/sessions/start), asked for
+  // when the game mounts and on every REPLAY. Its runId is the one key the session's payouts are filed under, and the
+  // server times the run from its own start — the client's duration is not read. null = no run (signed out, offline):
+  // the finish then says RUN_MISSING and pays nothing.
+  const serverRun = useRef<Promise<string | null> | null>(null);
+  const startServerRun = useCallback((): Promise<string | null> => {
+    const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
+      .then((r) => (r?.ok ? r.json() : null))
+      .then((j) => (typeof j?.runId === 'string' ? j.runId : null))
+      .catch(() => null);
+  }, [mode, agentRun, playtestRun]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -185,6 +203,7 @@ function GameShellInner({
   useEffect(() => {
     inputCount.current = 0;
     runMark.current = markRun(sessionStore.record());
+    serverRun.current = startServerRun();
     const mark = () => { if (runLive.current) inputCount.current += 1; };
     window.addEventListener('keydown', mark);
     window.addEventListener('pointerdown', mark);
@@ -194,7 +213,7 @@ function GameShellInner({
       window.removeEventListener('pointerdown', mark);
       window.removeEventListener('touchstart', mark);
     };
-  }, [gameKey]);
+  }, [gameKey, startServerRun]);
 
   useEffect(() => {
     let live = true;
@@ -223,12 +242,18 @@ function GameShellInner({
       // 2's. Every answer below still does its work for this run (grants, Story, Arena); only the card is guarded.
       const run = runSeq.current;
       const mine = () => run === runSeq.current;
-      fetch('/api/sessions', {
+      // this run's server run, read now (a REPLAY swaps in the next one). Not cleared: a game that ends the same run twice
+      // finishes the same runId twice, and the server answers the second with the first's stored result (replayed)
+      const started = serverRun.current ?? Promise.resolve(null);
+      started.then((runId) => fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          score: res?.score ?? 0,
+          // ECONOMY-SESSIONS-HARDEN: the run the server started; the server checks the score as sent (a whole number >= 0,
+          // within the mode's rules) and times the run itself — `duration` is only the room's own figure now
+          runId,
+          score: Math.max(0, Math.round(res?.score ?? 0)),
           opponentScore: res?.opponentScore ?? 0,
           won: Boolean(res?.won),
           duration: res?.duration ?? 0,
@@ -241,12 +266,14 @@ function GameShellInner({
           ...(arenaMatchId ? { arenaMatchId } : {}),
           played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,
         }),
-      })
-        .then((r) => (r?.ok ? r.json() : null))
+      }))
+        // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
+        .then((r) => (r ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
+              ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
               credits: j?.credits ?? 0,
@@ -256,34 +283,15 @@ function GameShellInner({
               season: j?.season ?? null,
               mastery: j?.mastery ?? null,
             });
-            // FEL wallet (Phase 2): grant coins/shards for EVERY mode through
-            // this shared choke point. Dunk is skipped here because the dunk
-            // component self-reports richer per-attempt events. Keyed on the
-            // server sessionId so a retry is idempotent. Best-effort only.
-            // BRAINBRAWL-POLISH-2 N10: the card shows the coins those grants paid (the server's figure, summed) — the eye's paid
-            // Brain Brawl match landed +316 wallet coins and the card said nothing about them.
-            if (j?.sessionId && mode !== 'dunk') {
-              const grants = [reportEarnGrant({
-                idempotency_key: `sess:${j.sessionId}:complete`,
-                event_type: 'mode_session_completed',
-                payload: { mode, run_id: j.sessionId, score: res?.score ?? 0 },
-              })];
-              // the server's verdict, not the room's claim: a music set is won only by its counts (session-payout
-              // sessionWon), and a won earn the server refused was logged by the wallet as an anti-cheat refusal
-              if (j?.won) {
-                grants.push(reportEarnGrant({
-                  idempotency_key: `sess:${j.sessionId}:won`,
-                  event_type: 'mode_session_won',
-                  payload: { mode, run_id: j.sessionId },
-                }));
-              }
-              void Promise.all(grants).then((gs) => {
-                if (!mine()) return;
-                const paid = gs.filter((g): g is NonNullable<typeof g> => g !== null);
-                const coins = paid.reduce((sum, g) => sum + (Number.isFinite(g.coins) ? g.coins : 0), 0);
-                const capped = Boolean(gs[0]?.capped);   // the completed earn is the coin one (the won earn pays shards)
-                if (coins > 0 || capped) setRecapCoins({ coins, capped });
-              });
+            // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
+            // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,
+            // so a retried session paid them twice). The card shows exactly the server's figure and nothing it did not
+            // grant: no coin tile when the run paid none, and no daily line (the daily first-session faucet is the wallet
+            // chip's, and a replay of it is not shown anywhere — lib/wallet/client.ts).
+            if (mine() && j?.paid === true) {
+              const coins = Number.isFinite(j?.coins) ? Number(j.coins) : 0;
+              const capped = Boolean(j?.coinsCapped);
+              if (coins > 0 || capped) setRecapCoins({ coins, capped });
             }
 
             // If this is a story run, complete the node
@@ -401,7 +409,7 @@ function GameShellInner({
               }).catch(() => {}); // best-effort, never block the recap
             }
           } else if (mine()) {
-            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 });
+            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, ...(j?.reason ? { unpaid: unpaidReason(j.reason, j.detail) } : {}) });
           }
         })
         .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
@@ -429,7 +437,7 @@ function GameShellInner({
     // the next run's evidence of play starts from zero, as a remount would start it — the game's record too: marked before
     // an in-place restart (it keeps the same harness run going, so only what comes after REPLAY is the rematch's)
     runMark.current = markRun(sessionStore.record());
-    if (inPlace.current?.()) { inputCount.current = 0; return; }
+    if (inPlace.current?.()) { inputCount.current = 0; serverRun.current = startServerRun(); return; }
     setGameKey((k) => k + 1);
   };
 
@@ -669,6 +677,13 @@ function GameShellInner({
                       <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
                     </div>
                   ) : (
+                  <>
+                  {recap.unpaid && (
+                    <div data-recap="unpaid" className="fel-card mt-6 rounded-lg p-3 text-center">
+                      <div className="font-mono text-xs font-bold text-white/70">{unpaidTitle(recap.unpaid)}</div>
+                      <div className="mt-0.5 text-[11px] text-white/40">{unpaidLine(recap.unpaid)}</div>
+                    </div>
+                  )}
                   <div className="mt-6 grid grid-cols-2 gap-3">
                     <div className="fel-card rounded-lg p-3">
                       <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
@@ -707,6 +722,7 @@ function GameShellInner({
                       </div>
                     )}
                   </div>
+                  </>
                   )}
                   {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
                   {storyReward && (

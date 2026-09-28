@@ -47,6 +47,8 @@ model User {
 
   profile       PlayerProfile?
   sessions      GameSession[]
+  sessionRuns   SessionRun[]
+  sessionGrants SessionGrant[]
   ledger        CreditLedger[]
   cards         CardOwnership[]
   prqEntries    PrqEntry[]
@@ -181,6 +183,55 @@ model GameSession {
   createdAt     DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ECONOMY-SESSIONS-HARDEN (2026-09-28): a run the SERVER started. POST /api/sessions/start issues it (the run id is
+// the one idempotency key every payout of the run is filed under), and POST /api/sessions finishes it at most once:
+// its duration is now - startedAt, never a client number; payoutEligible is decided at start from signals the server
+// controls (?agent=1, the playtest flag, User.role / the test allowlist) and nothing in the finish can turn it on.
+// status: open -> paid (an eligible run's grants were written) | recorded (validated, ineligible: score kept, nothing
+// paid) | rejected (SCORE_INVALID and friends) | expired (never finished inside maxDurationMs + grace).
+// `result` is the response the finish returned, replayed verbatim (with replayed: true) to any retry.
+model SessionRun {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode             String
+  status           String    @default("open")
+  payoutEligible   Boolean
+  ineligibleReason String?
+  startedAt        DateTime  @default(now())
+  expiresAt        DateTime
+  finishedAt       DateTime?
+  score            Int?
+  durationMs       Int?
+  rejectReason     String?
+  sessionId        String?
+  result           Json?
+
+  grants SessionGrant[]
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+// ECONOMY-SESSIONS-HARDEN: the one ledger every payout of a run is written to, inside the run's transaction and BEFORE
+// any balance moves. The unique key is the idempotency: a second write of any grant of the same run fails, the whole
+// transaction rolls back, and the stored result is returned instead. grantType: xp | shards | wallet_lc | wallet_coins
+// | wallet_shards | season_xp | mastery | prq.
+model SessionGrant {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId     String
+  run       SessionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  grantType String
+  amount    Float
+  metadata  Json?
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, runId, grantType])
+  @@index([runId])
 }
 
 model CreditLedger {

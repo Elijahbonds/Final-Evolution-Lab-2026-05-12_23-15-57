@@ -195,6 +195,11 @@ const NOW = new Date('2026-09-26T12:00:00Z');
 const HOUR = 3_600_000;
 const past = (hours = 1) => new Date(NOW.getTime() - hours * HOUR);
 const future = (hours = 1) => new Date(NOW.getTime() + hours * HOUR);
+// P6 fix pass: these two race tests post to the LIVE routes (attemptPOST/submitPOST), which check expiresAt against the
+// real clock, not the fixed NOW above. future(10) is 10h past the fixed NOW (2026-09-26T22:00Z) — real, not fake — so
+// once the real date passes it, both requests get 409 EXPIRED and the test fails for a reason that has nothing to do
+// with the race it is testing. realFuture ties the expiry to the real clock instead.
+const realFuture = (hours = 1) => new Date(Date.now() + hours * HOUR);
 const FEE = 50;
 const RAKE = 10;
 
@@ -735,12 +740,12 @@ describe('P6 fix pass: races the review found, run with the fake\'s row locks', 
 
   it('two starts at once: WITHOUT the row lock both got 200 (two live attempts) — with it, one start and a 409 ONE_ATTEMPT', async () => {
     h.store.noLocks = true;                                                // the old read-then-insert, as it raced
-    const raced = duel({ mode: 'music', expiresAt: future(10) });
+    const raced = duel({ mode: 'music', expiresAt: realFuture(10) });
     const [a, b] = await Promise.all([post(attemptPOST, { matchId: raced.id, phase: 'start' }), post(attemptPOST, { matchId: raced.id, phase: 'start' })]);
     expect([a.status, b.status]).toEqual([200, 200]);
     expect(h.store.events.filter((e) => e.matchId === raced.id && e.eventType === START)).toHaveLength(2);
     h.store.noLocks = false;                                               // lockMatchRow, as shipped
-    const d = duel({ mode: 'music', expiresAt: future(10) });
+    const d = duel({ mode: 'music', expiresAt: realFuture(10) });
     const [x, y] = await Promise.all([post(attemptPOST, { matchId: d.id, phase: 'start' }), post(attemptPOST, { matchId: d.id, phase: 'start' })]);
     expect([x.status, y.status].sort()).toEqual([200, 409]);
     expect([x.json.error, y.json.error]).toContain('ONE_ATTEMPT');
@@ -748,7 +753,7 @@ describe('P6 fix pass: races the review found, run with the fake\'s row locks', 
   });
 
   it('two submits at once: the later one reads the other score back from its own write, and the duel SETTLES', async () => {
-    const d = duel({ expiresAt: future(10) });
+    const d = duel({ expiresAt: realFuture(10) });
     const [a, b] = await Promise.all([
       (async () => { h.store.user = 'u1'; return post(submitPOST, { matchId: d.id, score: 5 }); })(),
       (async () => { await new Promise((r) => setImmediate(r)); h.store.user = 'u2'; return post(submitPOST, { matchId: d.id, score: 9 }); })(),

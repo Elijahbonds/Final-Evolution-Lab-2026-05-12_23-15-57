@@ -103,6 +103,7 @@ describe('academyReplayRefusal / replayAcademyInPlace', () => {
 
 // ── the shell's REPLAY, end to end on a model of the mounted room ─────────────────────────────────────────────────────
 // GameShell.replay (game-shell.tsx, HELD — pinned below): `if (inPlace.current?.()) { … return; } setGameKey((k) => k + 1);`
+// (since the merge with ECONOMY-SESSIONS-HARDEN the in-place branch also starts the rematch's server run — pinned below)
 // — the registered restart first; a key bump (the Game and everything under it, HostLobby included, unmount and mount
 // fresh) only when there is none or it answers false. The model mounts a room the way StudioMode's state starts (the
 // splash up, a new phone room code from HostSession.start) and wires its restart exactly as StudioMode does.
@@ -233,7 +234,10 @@ describe('the wiring (source pins)', () => {
   const dev = code('app/dev/music/loader.tsx');
 
   it('GameShell (held, unedited): the registered restart first; the key bump only when there is none or it said false', () => {
-    expect(shell).toMatch(/if \(inPlace\.current\?\.\(\)\) \{ inputCount\.current = 0; return; \}\s*setGameKey\(\(k\) => k \+ 1\);/);
+    // MERGE WITH ECONOMY-SESSIONS-HARDEN (2026-09-28): an in-place replay starts the rematch's own server run too (every
+    // session finishes a run POST /api/sessions/start opened; the first set's run is closed, so reusing it would pay the
+    // rematch nothing). A remount starts one from the gameKey effect; the in-place branch must start it itself.
+    expect(shell).toMatch(/if \(inPlace\.current\?\.\(\)\) \{ inputCount\.current = 0; serverRun\.current = startServerRun\(\); return; \}\s*setGameKey\(\(k\) => k \+ 1\);/);
     expect(shell).toMatch(/<ReplayInPlaceContext\.Provider value=\{registerReplay\}>\s*<Game key=\{gameKey\}/);
     expect(seam).toContain('export function useReplayInPlace(restart: () => boolean): void {');
     expect(code('app/play/music/_components/loader.tsx')).toMatch(/<GameShell[\s\S]*?Game=\{StudioMode\}/);

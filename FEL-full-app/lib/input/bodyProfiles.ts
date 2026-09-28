@@ -56,6 +56,9 @@ export interface ModeBodySpec {
   /** The floor drops every binding whose `from` is claimed; onBody receives the claimed EVENT kinds. 'overhead' ⇒ overheadIsPlay. */
   claims?: readonly BodyClaim[];
   overheadIsPlay?: boolean;
+  /** MOVEMENT PLAY P7 (2026-09-25): the card's move → verb lines when the mode reads the body itself (its claims press
+   *  nothing on the floor, so cardLines(profile) would show none). */
+  lines?: readonly CardLine[];
 }
 
 export const MOVE_LABEL: Record<BodyBinding['from'], string> =
@@ -81,6 +84,10 @@ const ROWS: readonly BodyProfile[] = [
   //    BLADE (:430-434): session-only. VS and Showdown gate input to `fighting` (:683, :431); Mixed's loadout only
   //    STARTS the round on A / B / Y with the current pick (:751-754), and its resting-stick STAFF pick (:743) cannot
   //    fire (the floor never writes y). R1 and SELECT are never bound.
+  //    P7 (2026-09-25): VS, Mixed and Showdown read the body's OWN strikes, guard, slips and steps (their onBody claims
+  //    FIGHT_CLAIMS, punch and kick included, so these three rows press nothing while the mode's flag is on — they are
+  //    what the game falls back to if its flag goes off: lib/babylon/combat/bodyFightFlags). Duel and The Hundred stay
+  //    session-only ("coming") until the live probe measures 0 misfires in them.
   none('karate', 'karate', 'combat', 'P7', false),
   row({ key: 'karate_vs', modeId: 'karate-vs', family: 'combat', later: 'P7', overheadIsPlay: false, bindings: [
     { from: 'punch', to: 'A', verb: 'JAB' }, { from: 'kick', to: 'B', verb: 'KICK' },

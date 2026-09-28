@@ -28,7 +28,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { bodyPlay, BODY_PLAY_OFF, type BodyPlayView } from '@/lib/move/bodyPlay';
-import { bodyPlayOffer, warmupOffer } from '@/lib/move/bodyPlayChoice';
+import { bodyPlayOffer, warmupOffer, kicksOptInOffer, readBodyKicks, writeBodyKicks, KICKS_OPT_IN_LABEL } from '@/lib/move/bodyPlayChoice';
 import type { SpaceOverlay } from '@/lib/move/spaceCheck';
 import { COMING_COPY } from '@/lib/input/bodyProfiles';
 import { holdSharedPoseSource } from '@/lib/input/poseSource';
@@ -206,6 +206,7 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
             </ul>
           )}
           {warm && <a href={warm.href} className="text-sm text-[#00E5FF] underline">{warm.label}</a>}
+          {kicksOptInOffer(session, space?.stage ?? null) && <KicksOptIn gameKey={session.key!} />}
         </div>
       )}
 
@@ -221,6 +222,18 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
           className="rounded-2xl border border-white/20 px-4 py-2.5 text-sm font-bold text-white/70">Camera off</button>
       </div>
     </div>
+  );
+}
+
+/** MOVEMENT PLAY P7: spin and jump kicks, opt-in once the space check passed (a combat game only; off by default). */
+function KicksOptIn({ gameKey }: { gameKey: string }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => { setOn(readBodyKicks(gameKey)); }, [gameKey]);
+  return (
+    <label className="flex items-center gap-2 text-[12px] text-white/75" data-fel-body-kicks={on ? 'on' : 'off'}>
+      <input type="checkbox" checked={on} onChange={(e) => { setOn(e.target.checked); writeBodyKicks(gameKey, e.target.checked); }} />
+      {KICKS_OPT_IN_LABEL}
+    </label>
   );
 }
 

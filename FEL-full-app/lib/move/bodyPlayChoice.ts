@@ -4,7 +4,8 @@
 // OWNER'S DECISIONS (movement play rounds 3–5): "Play with your body" is a choice on each game's READY screen that runs
 // the space check, and it is REMEMBERED PER GAME; the header's Body button is a shortcut to that choice. Only the games
 // the body really drives offer it now (the nine P3 binds: skate, snow, surf, sprint, big air, free run, karate VS, mixed
-// combat, showdown); a game with a later phase (P5–P9) says body play is coming, and a game with none says nothing.
+// combat, showdown — the three fights reading the body's own strikes since P7); a game with a later phase (P5–P9) says body
+// play is coming, and a game with none says nothing.
 //
 // The offer is read from the running game's card (sessionStore: the harness writes `drives` from bodySeamFor — the
 // profile's bindings, or a mode's own onBody — and `later` from its row), never from a list of its own: when P5 gives
@@ -71,6 +72,26 @@ export function bodyButtonAction(v: BodyCard & { phase?: string | null }, camera
   if (offer === 'coming') return 'coming';
   if (offer === null) return 'unavailable';
   return v.phase === 'playing' ? 'begin-paused' : 'begin';
+}
+
+// ── the kicks opt-in (movement play P7, 2026-09-25) ──────────────────────────────────────────────────────────────────
+// Spin and jump kicks are OPT-IN (owner: behind the space check's clearance): offered on the READY screen only once the
+// check passed, only for a combat game the body plays; off by default and remembered per game (fel-body-kicks-<key>).
+export const BODY_KICKS_KEY_PREFIX = 'fel-body-kicks-';
+export const KICKS_OPT_IN_LABEL = 'Spin and jump kicks — need 2 m clear all round';
+/** The combat games whose body play reads kicks (their onBody). */
+export const FIGHT_GAME_KEYS: ReadonlySet<string> = new Set(['karate_vs', 'mixedcombat', 'showdown', 'duel', 'karate']);
+
+/** The player turned spin and jump kicks on for this game (absent, unreadable or throwing = off). */
+export function readBodyKicks(key: string, store: Getter | null = pageStorage()): boolean {
+  try { return store?.getItem(BODY_KICKS_KEY_PREFIX + key) === '1'; } catch { return false; }
+}
+export function writeBodyKicks(key: string, on: boolean, store: Setter | null = pageStorage()): void {
+  try { store?.setItem(BODY_KICKS_KEY_PREFIX + key, on ? '1' : '0'); } catch { /* not remembered */ }
+}
+/** The opt-in is offered: a combat game the body plays, once the space check has passed ('ready'). */
+export function kicksOptInOffer(v: BodyCard & { key: string | null }, spaceStage: string | null): boolean {
+  return !!v.key && FIGHT_GAME_KEYS.has(v.key) && v.drives && spaceStage === 'ready';
 }
 
 /**
