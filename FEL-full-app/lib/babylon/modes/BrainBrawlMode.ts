@@ -73,6 +73,11 @@ import {
 } from '../core/BrainBrawlCore';
 
 type Phase = 'pick' | 'spin' | 'expose' | 'answer' | 'result' | 'done';
+
+/** QA P2-05 (2026-09-27): a first visit read "best 0" — a personal best nobody set. No best yet says "first run". */
+export function bestLine(best: number): string {
+  return best > 0 ? `best ${best}` : 'first run';
+}
 const MAX_ROUNDS = 15;
 /** The spin, then the LANDING beat: the wheel stopped, the category named — before the card goes up. */
 const SPIN_S = 2.2, LAND_S = 0.7;
@@ -373,7 +378,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     const opt = (n: number, label: string) => (S.players === n ? `▸ ${label} ◂` : `  ${label}  `);
     ctx.setHud({
       banner: `${opt(1, '1P SOLO')}   ${opt(2, '2P DUEL')}`,
-      hint: `A starts ${S.players > 1 ? 'the duel · P1 faces, P2 arrows' : `solo · five categories · best ${S.best}`} · ◀ ▶ choose`,
+      hint: `A starts ${S.players > 1 ? 'the duel · P1 faces, P2 arrows' : `solo · five categories · ${bestLine(S.best)}`} · ◀ ▶ choose`,
       players: S.players, prompt: '', display: '', board: null, boardTitle: '', phase: 'pick',
     });
   }
@@ -552,7 +557,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       else if (claimed <= 1) { act(S, 0, 'party_lose', { loop: true, fadeSec: 0.25 }); speak(S, 0, 'lose'); }
       else act(S, 0, 'idle_stand', { loop: true, fadeSec: 0.25 });
       host(S, newBest ? 'best' : 'solo.done', 'present');
-      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : `COMPOSITE · ${p1}`, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED · best ${S.best}`, hint: '' });
+      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : `COMPOSITE · ${p1}`, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED${S.best > 0 ? ` · ${bestLine(S.best)}` : ''}`, hint: '' });
     }
     SoundKit.play('whistle'); if (outcome === 'win') { SoundKit.play('crowdCheer'); for (const cr of S.crowd) cr.cheer(1); }
     const stats = { players: S.players, p2score: p2, claims: claimedBy(S.claims, 0).length, p2claims: claimedBy(S.claims, 1).length, rounds: S.round, best: S.best };
