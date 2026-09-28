@@ -28,6 +28,9 @@ export interface BoardHostOpts {
   tricks: [string, string, string];
   /** Log tag for boot errors. */
   tag: string;
+  /** The splash title (GATE-CRASHER-MAJOR): the mode's NAME. It was the registry key upper-cased — "SNOWBOARD SLALOM" on a
+   *  route whose shell says GATE CRASHER. */
+  title?: string;
 }
 
 /** A labelled 0..max bar. Board sports live on their meters. */
@@ -42,6 +45,9 @@ function Meter({ label, value, max, color }: { label: string; value: number; max
     </div>
   );
 }
+
+/** A mode's NAME on the splash when the route does not pass one (GATE-CRASHER-MAJOR: every host of the slalom says what it is). */
+const HOST_TITLE: Record<string, string> = { snowboard_slalom: 'GATE CRASHER' };
 
 /** Build a GameShell-compatible board host bound to a specific registry mode. */
 export function makeBoardHost(opts: BoardHostOpts) {
@@ -74,7 +80,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
         const won = r.outcome === 'win';
         const combo = n('bestCombo', 1);
         const headline = modeKey === 'snowboard_slalom'
-          ? `${won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)} GATES · ${n('tricksLanded')} TRICKS · x${combo} BEST`
+          // GATE-CRASHER-MAJOR: a finished run says what the crash needed; the time bonus is named, not folded in silently
+          ? `${won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)} GATES${won ? '' : ` (${n('target', 15)} TO CRASH)`} · +${n('timeBonus')} TIME · ${n('tricksLanded')} TRICKS · x${combo} BEST`
           : modeKey === 'surf'
             ? `${won ? 'EPIC SESSION' : 'SESSION OVER'} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`
             : `${won ? 'LEGENDARY RUN' : 'RUN OVER'} · x${combo} BEST CHAIN · ${n('tricksLanded')} TRICKS · ${n('coinsCollected')} COINS`;
@@ -173,6 +180,10 @@ export function makeBoardHost(opts: BoardHostOpts) {
             {hud.gates != null && (
               <span className="fel-panel px-3 py-1 text-white/80">GATES {hnode(hud.gates)}</span>
             )}
+            {/* GATE-CRASHER-MAJOR: the win, in the bezel — the target before it is reached, the verdict after */}
+            {typeof hud.target === 'string' && hud.target && (
+              <span className={`fel-panel px-3 py-1 font-bold ${hud.target.includes('✓') ? 'text-[var(--fel-emerald)]' : 'text-[var(--fel-gold)]'}`}>{hud.target}</span>
+            )}
             {hud.goals != null && (
               <span className="fel-panel px-3 py-1 text-white/80">GOALS {hnode(hud.goals)}</span>
             )}
@@ -222,7 +233,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
 
         <BootSplash
           modeId={modeKey}
-          title={modeKey.replace(/_/g, ' ').toUpperCase()}
+          title={opts.title ?? HOST_TITLE[modeKey] ?? modeKey.replace(/_/g, ' ').toUpperCase()}
+          goal={typeof hud.goal === 'string' && hud.goal ? hud.goal : undefined}
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
           onStart={tapStart}

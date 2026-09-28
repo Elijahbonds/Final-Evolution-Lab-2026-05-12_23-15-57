@@ -31,8 +31,10 @@ const PLAY: Record<string, { hx: number; z: [number, number]; fan?: boolean }> =
   'gridiron':     { hx: 22, z: [-2, 42] },       // x ±20 over z 0..40
   'skatepark':    { hx: 34, z: [-34, 34] },
   // the authored piste half-width, over the RIDDEN run: the rider spawns at z 4 and descends to the finish
-  // past the last gate (z 238). The start-gate fence stands at z −12, behind the start and on the snow.
-  'slope':        { hx: 17, z: [0, 280] },
+  // arch 14 m past the last gate. The start-gate fence stands at z −12, behind the start and on the snow.
+  // GATE-CRASHER-MAJOR: the run grew to 30 gates (world z ~584, the finish ~597) and this still said 280 — so a row of
+  // trees authored ACROSS the run at z 300 passed, one of them on the racing line. The whole ridden run now.
+  'slope':        { hx: 17, z: [0, 600] },
   'bigair-run':   { hx: 8, z: [-160, 20] },      // ARENA-10PHASE P9: the run line from the strides (z 0) over the kicker (z −12) to the landing (z −130)
   // the surfable water: the widest break clamps the rider at 77 m, and the lap never reaches the sand
   'surf-break':   { hx: 78, z: [-60, 110] },

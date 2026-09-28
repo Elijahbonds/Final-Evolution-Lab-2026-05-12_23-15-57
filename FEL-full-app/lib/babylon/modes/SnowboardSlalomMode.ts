@@ -27,7 +27,7 @@ import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
 import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
-import { readBoardVenue, tuneForVenue } from '../nexus/boardVenues';   // three mountains, not three tints of one
+import { readBoardVenue, tuneForVenue, rideOf } from '../nexus/boardVenues';   // three mountains, not three tints of one
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -42,15 +42,24 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
+import { SnowSpray } from '../premium/SnowSpray';   // GATE-CRASHER-MAJOR: edge spray, carve tracks, powder
+import {
+  crashTarget, crashGoal, crashChip, judgeGate, resolveSolids, wipeRoll, WIPE_SEC, WIPE_FRICTION, SNOW_BANK_GAIN, carveSpeed01,
+  SNOW_SCRUB, rampUnder, kickerPop,
+  type RideSolid,
+} from './gateCrasher';   // GATE-CRASHER-MAJOR: the slalom's rules and the mountain's solids, pure and tested
 
-/** phase 10: the share of the gates that makes the run a GATE CRASHER (the win) */
-const GATE_CRASHER_SHARE = 0.5;
 const YETI_SPAWN_GATE = 5;                 // bursts out after this gate clears
 const YETI_CHASE_SEC = 8;
 const YETI_CLEAR_PTS = 150;
 const YETI_CATCH_PENALTY = 100;
 const ROCK_PENALTY = 50;
 const STUMBLE_IFRAME_SEC = 1.2;
+/** What the banner calls the thing a rider slammed (GATE-CRASHER-MAJOR). */
+const SOLID_NAME: Record<string, string> = {
+  snow_box: 'THE BOX', snow_rail: 'THE RAIL', snow_wallride: 'THE WALL', snow_kicker: 'THE KICKER', snow_roller: 'THE ROLLER',
+  kicker: 'THE KICKER', pylon: 'THE PYLON', crowd: 'THE CROWD',
+};
 /** Tuck depth at which the rider commits and starts SPENDING the boost meter. */
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
 let baseFov: number | null = null;
@@ -95,9 +104,24 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
   let bailBeatT = 0, landBeatT = 0, airT = 0;
   let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
+  // GATE-CRASHER-MAJOR (2026-09-28): the wipeout (a fall the body shows), the snow's answer to the board, the crossing the gate
+  // verdict is judged on, and the win said once when it is secured.
+  let wipeT = -1, wipeSide = 1;
+  let spray: SnowSpray | null = null;
+  let prevX = 0, prevZ = 0;
+  let crashSaid = false, goalSaid = false;
+  let scrapeLatch = 0;
+  let pitch = 0;
+  let lastRamp: RideSolid | null = null, lastRampT = 0;   // the kicker under the board a moment ago (its lip is a pop)
   /** BAIL HONESTY (2026-09-21): true while the board is against the edge of the piste, so one slam is one fall. */
   let edgeHit = false;
-  const BAIL_BEAT_SEC = 0.9, LAND_BEAT_SEC = 0.4;
+  const BAIL_BEAT_SEC = WIPE_SEC, LAND_BEAT_SEC = 0.4;   // the tree holds the bail as long as the body is down
+  /** A WIPEOUT: the tree's bail beat, the body laid over in the snow (wipeRoll), powder. Every fall in the mode comes here. */
+  function startWipe(side: number): void {   // (the fall's puff is powder: the brown 'dust' burst read as dirt on the snow)
+    bailBeatT = BAIL_BEAT_SEC;
+    wipeT = 0; wipeSide = side >= 0 ? 1 : -1;
+    spray?.burst(rig.char.root.position.add(new Vector3(0, 0.3, 0)), 1);
+  }
   function wipePunch(ctx: ModeContext): void {
     if (elapsed < wipeLatchUntil) return;
     wipeLatchUntil = elapsed + 0.5;
@@ -114,7 +138,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     ctx.juice.flash('#fff6dd', 100);
     console.info('[SNOW-JUICE] finish punch');
   }
-  const snowTune = tuneForVenue(SNOW_TUNING, readBoardVenue('snow'));
+  // GATE-CRASHER-MAJOR: A CARVE HOLDS ITS SPEED. The shared scrub charges a partial steer per second, so the small constant
+  // corrections a slalom IS cost the most: the gate line ran 8.2 m/s mean against a 13.4 cruise (never faster than 10.3), the
+  // 678 m run took 73–78 s against a 60 s time par, and speed was invisible. Snow only, here, the shared table untouched: the
+  // scrub a skid pays is a fifth of the base rate, so the hill's pull carries a rider carving the gates (measured after: 11.0
+  // m/s mean, the run in 59 s, the same heading driver making 26 of 30).
+  const snowTune = tuneForVenue({ ...SNOW_TUNING, scrubRate: SNOW_SCRUB }, readBoardVenue('snow'));
   const move = new BoardMovement(snowTune);   // Phase 12: carve weight + slope energy
   let mbus = new MomentumBus();
   // BOOST (FINISH-RELEASE, 2026-09-14): the shared BoostKit. The mode's own 0..100 meter was spent by TUCKING past 0.85
@@ -154,7 +183,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     yeti = null; yetiPool = null;
     gone.down();
     ctx.groundLock?.release(gone.char.root);
-    EffectsKit.burst(ctx.scene, gone.char.root.position.add(new Vector3(0, 1, 0)), 'dust');
+    spray?.burst(gone.char.root.position.add(new Vector3(0, 0.6, 0)), 0.8);   // powder, not dirt (GATE-CRASHER-MAJOR)
     const root = gone.char.root;
     const startY = root.position.y;
     const sink = ctx.scene.onBeforeRenderObservable.add(() => {
@@ -196,8 +225,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // floor at y 0) pinned the rider at y ≈ 0 above it, so rocks / the yeti (placed ON the piste) never made contact: the
       // ray missed once the snow was > 4.5 m below and the floor clamp fired every frame below −0.5. A longer ray, a floor
       // under the run's lowest point and the stick-down glue keep the rider on the snow (owner sign-off 2026-09-07).
-      const pisteBottomY = -Math.sin(SLOPE_PITCH) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
-      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, 0.2, 4), 0, world.ground, '#ff6b3d', 'snowboard', {
+      // GATE-CRASHER-MAJOR: the VENUE's pitch (the glacier runs 1.28x steeper, and its bottom was under this floor), and the
+      // spawn ON the snow. The rider spawned at y 0.2 over snow that is 0.9 m lower at z 4, so the first frames were a
+      // fall — and the harness measured the player ring's ground offset on that frame, once: the ring rode 1.09 m under
+      // the rider all run ("a dark disc at head height", "the ring left behind").
+      pitch = SLOPE_PITCH * rideOf(venue).pitch;
+      const pisteBottomY = -Math.sin(pitch) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
+      rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, -Math.tan(pitch) * 4 + 0.02, 4), 0, world.ground, '#ff6b3d', 'snowboard', {
         hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6,
         // BOARD-SPEED (2026-09-21): the Rider's own flat 16 m/s cap sat UNDER the momentum model's ceiling (17 × pace), so
         // both earlier pace passes were invisible on a straight descent — the hill already ran the board into the 16 wall
@@ -216,7 +250,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean';   // phase 6: the body reads the grade
           // SCORECARD FEEL (2026-09-15): a landed trick pops at the rider — the run measured 4.5 juice beats a minute
           ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2.1, 0)), b === 'land' ? 'STOMPED' : 'SKETCHY', b === 'land' ? '#a7f3d0' : '#fcd34d');
-        } else bailBeatT = BAIL_BEAT_SEC;
+          spray?.burst(rig.char.root.position, b === 'land' ? 0.35 : 0.55);   // GATE-CRASHER-MAJOR: the snow takes the landing
+        } else startWipe(rig.char.root.rotation.z >= 0 ? 1 : -1);   // a trick not finished before the snow is a wipeout
       } });
       animTree = new BoardAnimTree(rig.char.animator);
       posture?.dispose();
@@ -232,10 +267,31 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       trickLayer?.dispose();
       trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       bailBeatT = 0; landBeatT = 0; airT = 0; edgeHit = false;
+      {
+        // GATE-CRASHER-MAJOR (2026-09-28): the ride state the probe grades, as skate publishes its own — the gate the rider
+        // is on, the verdicts so far, the fall and the wall. Read-only; ModeHarness drops the handle on dispose.
+        const dev = (window as unknown as { __FEL_DEV__?: { snow?: unknown } }).__FEL_DEV__;
+        if (dev) dev.snow = () => ({
+          pos: { x: rig.char.root.position.x, y: rig.char.root.position.y, z: rig.char.root.position.z },
+          rot: { x: rig.char.root.rotation.x, y: rig.char.root.rotation.y, z: rig.char.root.rotation.z },
+          speed: move.speed, speed01: move.speed01, moveYaw: move.yaw, lean: move.balance.lean, onWall: move.onWall,
+          steer: stickX, tuck, grounded: rig.rider.grounded, grinding: rig.rider.grinding !== null, airT,
+          bailing: bailBeatT > 0, landing: landBeatT > 0 ? lastLanding : 'none', stumble: stumbleIframe, edge: edgeHit,
+          nextGate, gatesHit, gates: world.markers.length, score: tricks.score, elapsed, ended,
+          target: crashTarget(world.markers.length), wipe: wipeT, tracks: spray?.liveTracks ?? 0, finishZ: world.finish?.z ?? null,
+          solids: world.solids ?? [],
+          gate: world.markers[nextGate] ? { x: world.markers[nextGate].x, y: world.markers[nextGate].y, z: world.markers[nextGate].z } : null,
+          bound: world.bound,
+        });
+      }
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; gateStreak = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       wipeLatchUntil = 0; finishLatch = false;
+      wipeT = -1; crashSaid = false; goalSaid = false; scrapeLatch = 0; lastRamp = null; lastRampT = 0;
+      prevX = rig.char.root.position.x; prevZ = rig.char.root.position.z;
+      spray?.dispose(); spray = new SnowSpray(ctx.scene, venue.palette.edge, venue.palette.ground);
+      world.gates?.set(0, 'next');
       ctx.objectiveRef.current = world.markers[nextGate] ?? null;
       crowd = new Onlookers(ctx.scene, world.crowdSpots, '#2f3f57');   // L4: spectators on the slope
       // Phase 3 requires snapTo() at load and update() every frame. All three
@@ -255,7 +311,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const at = prev.add(gm.subtract(prev).scale(0.5));
         return { pos: at, yaw: Math.atan2(gm.x - prev.x, gm.z - prev.z), radius: 2.6 };
       }), '#9be7ff');
-      ctx.setHud({ score: 0, ...boostKit.hud(), gates: `0/${world.markers.length}`, hint: 'Gates for points · JUMP rocks · grind the rails · hold RB / Shift to BOOST' });
+      // GATE-CRASHER-MAJOR: the win, said before the run (the splash reads `goal`) and carried in the HUD (`target`)
+      ctx.setHud({ score: 0, ...boostKit.hud(), gates: `0/${world.markers.length}`, target: crashChip(0, world.markers.length), goal: crashGoal(world.markers.length), hint: 'Between the poles for 100 · JUMP rocks · grind the rails · hold RB / Shift to BOOST' });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -263,6 +320,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = Number.isFinite(e.y) ? e.y : 0; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') tuck = e.value;
+      // GATE-CRASHER-MAJOR: a rider lying in the snow does not jump or throw a trick — the press is answered, not eaten
+      if (wipeT >= 0 && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y')) { refuse(ctx, 'GETTING UP'); return; }
       if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A') {
           if (rig.rider.grounded) {
@@ -322,7 +381,14 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
-      elapsed += dt;
+      // GATE-CRASHER-MAJOR: the run clock counts PLAY. The harness hands over raw frame time, and the first frames after the
+      // wake can be 2.3 s long (shader compiles): the clock read 6 s before the rider had moved (QA P2-01).
+      elapsed += Math.min(dt, 0.1);
+      if (!goalSaid) {
+        goalSaid = true;
+        ctx.setHud({ banner: `CRASH ${crashTarget(world.markers.length)} OF ${world.markers.length} GATES` });
+        setTimeout(() => ctx.setHud({ banner: '' }), 1800);
+      }
       if (Math.floor(elapsed) !== hudSec) { hudSec = Math.floor(elapsed); ctx.setHud({ time: hudSec }); }   // P9 soft: the clock runs
       stumbleIframe = Math.max(0, stumbleIframe - dt);
       if (rig.rider.grinding && Math.abs(stickX) > 0.7) rig.rider.dismount();
@@ -343,9 +409,69 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       boostFx?.update(dt, boostKit, bev);
       if (bev.started) { ctx.setHud({ banner: 'BOOST' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
       if (bev.full) { ctx.setHud({ banner: 'BOOST READY' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
-      const v = move.update(dt, stickX, tuck, ctx.scene, rig.char.root.position, world.ground);
+      // a rider down in the snow does not steer or tuck, and the snow stops him (the wipeout, GATE-CRASHER-MAJOR)
+      const down = wipeT >= 0;
+      const steer = down ? 0 : stickX, crouch = down ? 0 : tuck;
+      const v = move.update(dt, steer, crouch, ctx.scene, rig.char.root.position, world.ground);
+      if (down) move.vel.scaleInPlace(Math.exp(-WIPE_FRICTION * dt));
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
-      rig.rider.update(dt, stickX, tuck);
+      const preY = rig.char.root.position.y;
+      // THE KICKER THROWS YOU (GATE-CRASHER-MAJOR): the ramp he is riding now, so the frame his board leaves its lip is a pop
+      const under = world.solids && rig.rider.grounded && !rig.rider.grinding
+        ? rampUnder(world.solids, rig.char.root.position.x, rig.char.root.position.z, preY) : null;
+      if (under) { lastRamp = under; lastRampT = 0.15; } else lastRampT = Math.max(0, lastRampT - dt);
+      const wasGrounded = rig.rider.grounded;
+      rig.rider.update(dt, steer, crouch);
+      if (wasGrounded && !rig.rider.grounded && !rig.rider.grinding && lastRamp && lastRampT > 0) {
+        const pop = kickerPop(move.speed, lastRamp);
+        if (pop > rig.rider.vel.y) { rig.rider.vel.y = pop; console.info(`[SNOW-KICK] ${lastRamp.tag} pop ${pop.toFixed(2)}`); }
+        lastRamp = null; lastRampT = 0;
+      }
+      // NOTHING ON THE MOUNTAIN IS RIDDEN THROUGH (GATE-CRASHER-MAJOR). The rider's one downward ray lifted him onto a box's
+      // deck in a frame (+0.9 … +1.49 m) and let him pass straight through a 3 m wallride, a rock, a pylon, a spectator.
+      // Every solid is a footprint and a top (world.solids); a body under the top is kept out, the board is turned off the
+      // face through the edge's own BoardMovement.wall (a glance scrapes along, head-on bounces), and a slam at speed is a
+      // wipeout. A body ON the deck or flying over it is the ground ray's, as before.
+      scrapeLatch = Math.max(0, scrapeLatch - dt);
+      if (world.solids && !rig.rider.grinding) {
+        const p = rig.char.root.position;
+        const r = resolveSolids({ x: p.x, z: p.z }, preY, world.solids);
+        if (r.contact) {
+          const c = r.contact;
+          p.x = r.x; p.z = r.z;
+          if (p.y > preY + 0.1) p.y = preY;   // refused the step: the deck he was lifted onto this frame is a face
+          const isRock = c.tag.startsWith('rock_');
+          const kind = move.wall(c.nx, c.nz);
+          if (!rig.rider.grinding) rig.char.root.rotation.y = move.yaw;
+          rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+          if (isRock && stumbleIframe === 0 && wipeT < 0) {
+            // THE ROCK: the stumble it always was — and the board slows for real (it used to cut the Rider's velocity, which
+            // the momentum model overwrote the next frame, so the rider hit the rock and carried on at full speed)
+            stumbleIframe = STUMBLE_IFRAME_SEC;
+            tricks.score = Math.max(0, tricks.score - ROCK_PENALTY);
+            move.vel.scaleInPlace(0.35); rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+            wipePunch(ctx);
+            startWipe(c.nx >= 0 ? 1 : -1);
+            console.info('[SNOW-ROCK] hit');
+            ctx.setHud({ score: tricks.score, banner: `ROCK! -${ROCK_PENALTY}` });
+            setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          } else if (!isRock && move.slammedWall && wipeT < 0) {
+            const what = SOLID_NAME[c.tag.replace(/_\d+$/, '')] ?? 'IT';
+            tricks.score = Math.max(0, tricks.score - ROCK_PENALTY);
+            move.vel.scaleInPlace(0.35); rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+            wipePunch(ctx);
+            startWipe(c.nx >= 0 ? 1 : -1);
+            console.info(`[SNOW-SOLID] slam ${c.tag}`);
+            ctx.setHud({ score: tricks.score, banner: `SLAMMED ${what}! -${ROCK_PENALTY}` });
+            setTimeout(() => ctx.setHud({ banner: '' }), 800);
+          } else if (kind && scrapeLatch <= 0) {
+            scrapeLatch = 0.35;
+            SoundKit.play('impact', { pitch: 1.5, volume: 0.25 });
+            spray?.burst(p.clone(), 0.25);
+            console.info(`[SNOW-SOLID] ${kind} ${c.tag}`);
+          }
+        }
+      }
       crowd.update(dt);
       // The rider has to FACE where they are going. This mode never set the
       // root rotation at ALL, so the board kept whatever yaw it spawned with
@@ -369,24 +495,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       { const bh = boostKit.hudIfChanged(); if (bh) ctx.setHud(bh); }
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
-      // ROCKS — grounded contact is a stumble; airborne clears clean
-      if (stumbleIframe === 0 && rig.rider.grounded && !rig.rider.grinding) {
-        const p = rig.char.root.position;
-        for (const o of world.obstacles) {
-          if (Math.hypot(p.x - o.pos.x, p.z - o.pos.z) < o.radius + 0.5 && Math.abs(p.y - o.pos.y) < 1.6) {
-            stumbleIframe = STUMBLE_IFRAME_SEC;
-            tricks.score = Math.max(0, tricks.score - ROCK_PENALTY);
-            rig.rider.vel.scaleInPlace(0.35);
-            wipePunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud (replaces impact SFX + feel.impact, which doubled the thud); dust kept
-            EffectsKit.burst(ctx.scene, p.clone(), 'dust');
-            bailBeatT = BAIL_BEAT_SEC;   // the tree plays the bail and holds it for the beat
-            console.info('[SNOW-ROCK] hit');
-            ctx.setHud({ score: tricks.score, banner: `ROCK! -${ROCK_PENALTY}` });
-            setTimeout(() => ctx.setHud({ banner: '' }), 700);
-            break;
-          }
-        }
-      }
+      // ROCKS are solids now (the contact above): a rock you do not jump is a stumble and a body that goes round it.
 
       // THE YETI — spawn after gate N, chase for a bounded window
       if (!yetiDone && gatesHit >= YETI_SPAWN_GATE) void spawnYeti(ctx);
@@ -407,11 +516,10 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             despawnYeti(ctx);
           } else {
             tricks.score = Math.max(0, tricks.score - YETI_CATCH_PENALTY);
-            rig.rider.vel.scaleInPlace(0.25);
+            move.vel.scaleInPlace(0.25); rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;   // the momentum model's speed (the Rider's is overwritten next frame)
             mob.onContactResolved();
             wipePunch(ctx);   // A+ P0: the yeti catch is a wipe too — same punch, same latch
-            EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
-            bailBeatT = BAIL_BEAT_SEC;
+            startWipe(rig.char.root.position.x >= mob.char.root.position.x ? 1 : -1);
             console.info('[SNOW-YETI] caught');
             ctx.setHud({ score: tricks.score, banner: `THE YETI GOT YOU -${YETI_CATCH_PENALTY}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 900);
@@ -432,30 +540,47 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       ((ctx.scene.metadata ??= {}) as { qaNextGate?: { x: number; z: number } | null }).qaNextGate = gate ? { x: gate.x, z: gate.z } : null;
       if (gate) {
         const p = rig.char.root.position;
-        if (p.z >= gate.z - 0.3) {
-          if (Math.abs(p.x - gate.x) <= 2.0) {
+        // GATE-CRASHER-MAJOR: judged where the rider CROSSED the gate's line, against the half-width the poles are drawn at
+        // (it was |x − gate| ≤ 2.0 on the first frame within 0.3 m of the line, poles at 1.7: three credits measured with
+        // the rider 0.10–0.29 m outside a pole). The gate on the mountain answers too: green, or grey with a red strip.
+        const verdict = judgeGate({ x: prevX, z: prevZ }, { x: p.x, z: p.z }, gate);
+        if (verdict.crossed) {
+          if (verdict.brush) { world.gates?.brush(nextGate, Math.sign(verdict.dx) || 1); SoundKit.play('impact', { pitch: 1.9, volume: 0.22 }); }
+          if (verdict.hit) {
+            world.gates?.set(nextGate, 'hit');
             gatesHit++;
             tricks.score += 100;
             boostKit.earn('trickSmall');   // a clean gate pays the boost — the slalom line is the fast line
             ctx.feel?.impact?.(0.15);
             SoundKit.play('score', { pitch: 1.4, volume: 0.35 });
-            EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'sparks');
+            // (no spark burst: the shared sparks die to black, and on snow every one was a black speck — the gate itself goes green)
             // SCORECARD FEEL (2026-09-15): the gate is the slalom's beat — a +100 pop at the rider and a gate-streak callout, so a
             // clean line reads as a line (the run measured 1.5 juice beats a minute)
             gateStreak++;
             ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), gateStreak >= 3 ? `+100 · ${gateStreak} IN A ROW` : '+100', '#7dd3fc');
-            console.info(`[SNOW-GATE] hit ${gatesHit}`);
-            ctx.setHud({ banner: 'GATE ✓', score: tricks.score });
+            console.info(`[SNOW-GATE] hit ${gatesHit} dx ${verdict.dx.toFixed(2)}`);
+            ctx.setHud({ banner: 'GATE ✓', score: tricks.score, target: crashChip(gatesHit, world.markers.length) });
             crowd?.cheer(0.5);
+            // THE WIN, SAID WHEN IT IS WON: the gate that makes the target is a moment, not a number on the end card
+            if (!crashSaid && gatesHit >= crashTarget(world.markers.length)) {
+              crashSaid = true;
+              ctx.juice.callout('GATE CRASHER!', '#22c55e', 1400);
+              SoundKit.play('crowdCheer', { volume: 0.55 });
+              crowd?.cheer(1);
+              console.info(`[SNOW-GATE] crashed at gate ${nextGate + 1}`);
+            }
           } else {
+            world.gates?.set(nextGate, 'miss');
             SoundKit.play('miss', { volume: 0.3 });
             if (gateStreak >= 3) ctx.juice.callout(`STREAK OVER — ${gateStreak}`, '#94a3b8', 700);
             gateStreak = 0;
-            console.info('[SNOW-GATE] miss');
+            console.info(`[SNOW-GATE] miss dx ${verdict.dx.toFixed(2)}`);
             ctx.setHud({ banner: 'MISSED GATE' });
           }
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
           nextGate++;
+          world.gates?.set(nextGate, 'next');
+          ctx.objectiveRef.current = world.markers[nextGate] ?? world.finish ?? null;
           ctx.setHud({ gates: `${gatesHit}/${world.markers.length}` });
         }
       }
@@ -493,10 +618,28 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // THE BOARD BANKS. Skate and surf have rolled the root off their lean since BIOMECH-WAVE2 G6; the snowboard —
       // the discipline whose whole identity is laying a board over on edge — never did, so it carved bolt upright.
       // The same function, the same easing, so a bank means one thing across all three.
-      if (!bio.airborne && !bio.bailing) {
-        const wantRoll = boardBank(move.balance.lean, move.speed01);
+      //
+      // GATE-CRASHER-MAJOR: ON ITS EDGE. The bank read speed against the 27 m/s ceiling, so at the gate line (8–10 m/s) a
+      // full carve rolled the board 7° and a carve and a glide were the same picture (measured roll max 9.4° over a whole
+      // run). A snowboard carves against its cruise pace, and harder: SNOW_BANK_GAIN over the shared table.
+      const carve01 = carveSpeed01(move.speed, snowTune.cruiseSpeed);
+      if (wipeT >= 0) {
+        // THE WIPEOUT: laid over on the board (bindings — it goes with him), down in the snow, back up (gateCrasher.wipeRoll)
+        wipeT += dt;
+        rig.char.root.rotation.z = wipeSide * wipeRoll(wipeT);
+        if (wipeT >= WIPE_SEC) wipeT = -1;
+      } else if (!bio.airborne && !bio.bailing) {
+        const wantRoll = boardBank(move.balance.lean, carve01) * SNOW_BANK_GAIN;
         rig.char.root.rotation.z += (wantRoll - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
       }
+      // THE SNOW ANSWERS: spray off the edge, the line it cuts, the wake at speed (premium/SnowSpray); a body in the snow plows it
+      spray?.update({
+        at: rig.char.root.position, yaw: move.yaw, speed: move.speed, pitch,
+        carve: wipeT >= 0 ? 0.9 : Math.abs(move.balance.lean) * carve01,
+        side: wipeT >= 0 ? wipeSide : (move.balance.lean >= 0 ? 1 : -1),
+        grounded: rig.rider.grounded && !rig.rider.grinding,
+      }, dt);
+      world.gates?.update(dt);
       trickLayer?.apply(dt, !rig.rider.grounded);   // TRICK POSE: the spin, the cork, the grab — after the mode's own root writes
       ctx.camDirector.setAir(!rig.rider.grounded && !rig.rider.grinding ? 1 : 0);   // the AIR CAM: the trick in the picture
       // Clamp at the edge of the snow, from the WORLD the venue built — the same
@@ -519,8 +662,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           tricks.score = Math.max(0, tricks.score - ROCK_PENALTY);
           rig.rider.vel.scaleInPlace(0.35); move.vel.scaleInPlace(0.35);
           wipePunch(ctx);
-          EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
-          bailBeatT = BAIL_BEAT_SEC;
+          startWipe(-Math.sign(rig.char.root.position.x) || 1);
           console.info('[SNOW-EDGE] slam');
           ctx.setHud({ score: tricks.score, banner: `OFF THE PISTE! -${ROCK_PENALTY}` });
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
@@ -528,17 +670,21 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         if (!edgeHit && !move.slammedWall) console.info('[SNOW-EDGE] turn');
         edgeHit = true;
       } else edgeHit = false;
+      prevX = rig.char.root.position.x; prevZ = rig.char.root.position.z;   // where the next gate's crossing is judged from
 
-      if (nextGate >= world.markers.length) {
+      // THE FINISH LINE (GATE-CRASHER-MAJOR): every gate judged AND the arch crossed — the run ends under the banner, not at
+      // the last gate with nothing there
+      if (nextGate >= world.markers.length && (!world.finish || rig.char.root.position.z >= world.finish.z)) {
         ended = true;
         SoundKit.play('whistle');
         finishPunch(ctx);   // A+ P0: run FINISHED — hit-stop + shake + short flash, once; the whistle stays
-        const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));
+        const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));   // par 60 is the Arena stake's mirrored ceiling (arena-score-integrity): unchanged
         // phase 10 — GATE CRASHER: the title is the win condition. Half the gates or better (15 of 30) is the crash; fewer is
         // a finished run. Before this the run ended 'FINISHED' whatever happened and the card said 0 COINS.
-        const crashed = gatesHit >= Math.ceil(world.markers.length * GATE_CRASHER_SHARE);
-        console.info(`[SNOW-END] ${crashed ? 'win' : 'complete'} gates ${gatesHit}/${world.markers.length} score ${tricks.score + timeBonus}`);
-        return ctx.end(crashed ? 'win' : 'complete', tricks.score + timeBonus, { gatesHit, gates: world.markers.length, elapsed: Math.round(elapsed), tricksLanded: tricks.landed, bestCombo: tricks.bestCombo });
+        const target = crashTarget(world.markers.length);
+        const crashed = gatesHit >= target;
+        console.info(`[SNOW-END] ${crashed ? 'win' : 'complete'} gates ${gatesHit}/${world.markers.length} score ${tricks.score + timeBonus} (gates+tricks ${tricks.score}, time +${timeBonus})`);
+        return ctx.end(crashed ? 'win' : 'complete', tricks.score + timeBonus, { gatesHit, gates: world.markers.length, target, timeBonus, elapsed: Math.round(elapsed), tricksLanded: tricks.landed, bestCombo: tricks.bestCombo });
       }
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, gate ?? null);
@@ -551,6 +697,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     dispose() {
       trickLayer?.dispose(); trickLayer = null;
+      spray?.dispose(); spray = null;
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       posture?.dispose(); posture = null;
       yeti?.char.dispose(); yeti = null; yetiPool = null;
