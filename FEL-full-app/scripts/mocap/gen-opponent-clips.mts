@@ -30,6 +30,10 @@ interface Entry {
   /** The retarget's Gaussian smoothing in REAL seconds (mocapRetarget default 0.035). A pinned 60-fps clip carries 0.07: the
    *  default read at the header's 120 was 4.2 frames, 70 ms of the true time, so the same kernel keeps its keys as they were. */
   smoothSec?: number;
+  /** HOOPS MOTION phase 3d (N4): re-root a one-shot so its first and last keys carry no hip yaw and the mode's root owns the turn
+   *  (mocapRetarget RetargetOpts.reRoot). Per entry, default off; set on the hoops one-shots only (bball_mc_*, not a loop) — every other
+   *  entry regenerates byte-identical (authored/mocapPins.test.ts pins the non-hoops rows). */
+  reRoot?: boolean;
 }
 const ROOT = join(process.env.HOME ?? '', 'Downloads/fel-mocap-sources');
 const CROUCH_DROP_K = Number(process.env.CROUCH_DROP_K ?? 1);   // LOWER STANCES: the drop's calibration against the floor test
@@ -75,7 +79,7 @@ for (const e of manifest.clips) {
   }
   let [from, to] = [e.from, e.to];
   if (e.loop && e.refineLoop) [from, to] = refineLoop(s, from, to, e.refineLoop);
-  const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack, smoothSec: e.smoothSec });
+  const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack, smoothSec: e.smoothSec, reRoot: e.reRoot });
   if (e.extend) {
     const ex = e.extend; const m = !!e.mirror;
     const tgt = (side: 'Left' | 'Right') => { const src = m ? (side === 'Left' ? ex.Right : ex.Left) : ex[side]; return src ? [m ? -src[0] : src[0], src[1], src[2]] as [number, number, number] : null; };
@@ -104,7 +108,8 @@ for (const e of manifest.clips) {
     }
   }
   const hands = r.keys.map((k) => Math.max(k.hands!.Left![1], k.hands!.Right![1]));
-  console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s @${s.fps.toFixed(0)} → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m${e.pin ? '  PIN' : ''}`);
+  const hy = (k: typeof r.keys[number]) => k.bones?.Hips?.[1] ?? 0;   // N4: the hip yaw the first and last keys hand over with
+  console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s @${s.fps.toFixed(0)} → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m  hip yaw ${hy(r.keys[0])}°→${hy(r.keys[r.keys.length - 1])}°${e.reRoot ? ' (re-rooted)' : ''}${e.pin ? '  PIN' : ''}`);
   out.push(`  {
     name: '${e.name}', replaces: '${e.replaces}', duration: ${r.duration}, loop: ${!!e.loop},${STYLES ? ` style: '${e.style}', label: '${e.label ?? e.name}',` : ''}
     source: '${e.source}:${e.file.split('/').pop()}${e.anim ? '#' + e.anim : ''} ${from.toFixed(2)}–${to.toFixed(2)}s${e.mirror ? ' mirrored' : ''}', license: ${JSON.stringify(LICENSE[e.source])},

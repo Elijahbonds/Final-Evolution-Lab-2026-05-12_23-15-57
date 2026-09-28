@@ -15,7 +15,7 @@
 
 import { Vector3 } from '@babylonjs/core';
 import type { Mesh, Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
-import { plantLeg } from './FootPlanting';
+import { plantLeg, claimLeg, releaseLeg } from './FootPlanting';
 import type { CharacterAnimator } from './CharacterAnimator';
 import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
@@ -353,6 +353,7 @@ export class FootPlant {
       plantLeg(hip, knee, ankle, target, this.mesh.forward);
     });
     this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, obs };
+    claimLeg(this.skeleton, side, pin);   // HOOPS MOTION phase 3d (S30): the one writer of this leg until release() — FootPlanting stands off
   }
 
   /** Advance the lock window; the pin itself runs after animations. */
@@ -365,6 +366,7 @@ export class FootPlant {
   release(): void {
     if (!this.lock) return;
     this.mesh.getScene().onAfterAnimationsObservable.remove(this.lock.obs);
+    releaseLeg(this.skeleton, this.lock.foot);   // S30: FootPlanting takes the foot over from the lock's pin
     this.lock = null;
   }
 

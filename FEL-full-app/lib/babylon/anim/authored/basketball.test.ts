@@ -428,20 +428,23 @@ describe('basketball packages on the forge rig', () => {
   it('the SHIMMY sells both ways with the ball tight at the chest and the feet planted', () => {
     rest(); const g = buildShimmy(scene, sk)!;
     const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
-    at(g, 0); const f0 = fwd(); const lf0 = pos('LeftFoot'), rf0 = pos('RightFoot');
+    at(g, 0); const f0 = fwd(); const lf0 = pos('LeftFoot').clone(), rf0 = pos('RightFoot').clone();
     at(g, 0.1); const a = Vector3.Cross(f0, fwd()).y;
     at(g, 0.2); const b = Vector3.Cross(f0, fwd()).y;
     expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.1); expect(Math.abs(b)).toBeGreaterThan(0.1);   // one way, then the other
     expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on the ball
     expect(Vector3.Distance(pos('LeftFoot'), lf0)).toBeLessThan(0.12); expect(Vector3.Distance(pos('RightFoot'), rf0)).toBeLessThan(0.12);   // the feet never move
   });
-  it('the DROP STEP turns the hips well past 90° from the seal and ends with the ball at the chest, loaded', () => {
+  // HOOPS MOTION phase 3d (one owner per body): the drop step's turn is the ROOT's — the mode squares the gather to the rim — so the clip
+  // keys none. Its 130° hip turn ran against that slew (rG: the world hips still through the step, then a 153° whip into the gather).
+  it('the DROP STEP keys no turn (the root owns it), steps the right foot round, and ends with the ball at the chest, loaded', () => {
     rest(); const g = buildDropStep(scene, sk)!;
     const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
-    at(g, 0); const f0 = fwd(); const ballLow = pos('RightHand').y;
+    at(g, 0); const f0 = fwd(); const ballLow = pos('RightHand').y; const rf0 = pos('RightFoot').clone();   // (a copy: getAbsolutePosition is the node's own vector)
     expect(ballLow).toBeLessThan(1.1);                                             // the seal: the ball low on the ball side
+    for (const t of [0.085, 0.17, 0.255, 0.34]) { at(g, t); expect(Vector3.Dot(fwd(), f0), `t ${t}`).toBeGreaterThan(Math.cos((5 * Math.PI) / 180)); }   // the hips never leave the root's facing
+    at(g, 0.17); expect(Vector3.Distance(pos('RightFoot'), rf0)).toBeGreaterThan(0.1);   // the step: the right foot swings off its spot
     at(g, 0.34);
-    expect(Vector3.Dot(fwd(), f0)).toBeLessThan(-0.1);                             // turned past 90°
     expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on it, at the chest
     expect(pos('RightHand').y).toBeGreaterThan(pos('Hips').y + 0.05);
   });

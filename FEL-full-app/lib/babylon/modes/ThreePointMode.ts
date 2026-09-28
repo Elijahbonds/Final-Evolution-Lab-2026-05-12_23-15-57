@@ -47,6 +47,7 @@ import { mountBallCarry, type BallCarry } from '../anim/ballCarry';            /
 const WATCH_IDLE = 'bball_idle_stand';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
 import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on the shooter
+import { BeatOwner } from '../anim/beatOwner';   // HOOPS MOTION phase 3d: one owner per body (the raw onEnd chains are gone)
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01 } from '../core/BallHandling';
@@ -173,6 +174,17 @@ function meterBegin(): void { meter3d?.begin({ center: SHOT_TARGET, half: goodBa
 /** Owner decision 2026-09-05: the contest's other shooters are ROSTER BODIES waiting behind the arc (idle, never seen
  *  shooting — D4's ruling stands); they replace the venue's capsule placeholders. */
 let rivalBodies: SpawnedCharacter[] = [];
+/**
+ * HOOPS MOTION phase 3d: ONE OWNER PER BODY. The shooter's clips were played from five places with raw onEnd chains (the set's freeze, the
+ * follow-through → absorb → idle, the make's celebrate → idle) — and Babylon raises a clip's end from stop() too, so a link CUT by the next
+ * clip ran its chain anyway: the celebrate cut the absorb and the absorb's chain faded idle in over the celebrate; the next ball's set cut
+ * the celebrate and ITS chain faded idle in over the set, which then froze back in over the idle (rE's weight log: the gather / jumpshot /
+ * follow-through each at full weight on top of idle_stand, 80 frames of one shot; celebrate + jumpshot on four more). Every play goes
+ * through a BeatOwner now: a cut beat's end is ignored (its token), a chain is a beat started from onSettle, and the body settles into the
+ * loop it asked for last. The sideline bodies' reactions too.
+ */
+let beats: BeatOwner | null = null;
+let rivalBeats: (BeatOwner | undefined)[] = [];
 const RIVAL_SEEDS = ['#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5'];
 let ball: Mesh | null = null;
 let arc: ShotArc | null = null;
@@ -250,7 +262,8 @@ function syncRacks(): void {
  */
 function setFeet(): void {
   if (!player) return;
-  player.animator.play('bball_pullup_gather', { fadeSec: 0.1, restart: true, onEnd: () => { if (player && S.phase === 'shoot' && !S.fired) player.animator.freezeAtEnd('bball_pullup_gather'); } });
+  beats?.beat('bball_pullup_gather', { fadeSec: 0.1, holdEnd: true });   // HOOPS MOTION phase 3d: held on its loaded frame until the shot cuts it
+  beats?.loop(WATCH_IDLE, { fadeSec: 0.2 });   // …and after the shot's chain, the body settles here (the set is in flight: not played now)
   console.info('[3PT-SET] feet set — loaded for the release');
 }
 
@@ -463,7 +476,7 @@ function fire(ctx: ModeContext, power?: number): void {
   // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias. BIOMECH-HOOPS-WAVE1: the clip is CUT at its
   // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
   // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
-  player.animator.play('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, onEnd: () => { /* cut at the release; a late end holds */ } });   // S2: the rise fades out of the SET
+  beats?.beat('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, holdEnd: true });   // S2: the rise fades out of the SET; cut at the release (a late end holds its last frame)
   releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
   pendingMade = made;
   {   // RIM PLAY: what this timing earned on the iron — early is short, late is long; a make inside the good window can rattle
@@ -571,7 +584,7 @@ function contactMake(ctx: ModeContext): void {
   const big = landing.perfect || landing.money;
   ctx.juice.shake(big ? 0.10 : 0.06, 100);
   // hoops detail pass (2026-09-18): the shooter ANSWERS a perfect / money make with arms up (the sideline bodies did; he never did)
-  if (big && player) player.animator.play(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12, onEnd: () => player?.animator.play(WATCH_IDLE, { loop: true, fadeSec: 0.2 }) });
+  if (big && player) beats?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });   // settles into the loop (WATCH_IDLE, set with the set)
   if (big) ctx.juice.flash(landing.money ? '#ffd75e' : '#fff6dd', 90);
   hoopJuice?.punch(true);   // RIM PLAY: escalates over a rattle's graze
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
@@ -823,6 +836,7 @@ export const ThreePointMode: ModeDefinition = {
     });
     neverBindPose(player.animator, 'idle_stand');
     installSafePlay(player.animator, 'threepoint');
+    beats = new BeatOwner(player.animator);   // HOOPS MOTION phase 3d: the shooter's one owner (after the play wrappers: it plays through them)
     // HOOPS MOTION phase 3: the shooter right-handed on screen — the hoops family and the dunk family (dunk_mc_celebrate_big is every make's
     // answer, and it played unmirrored: the next ball came off the rack into a hand crossing the body, 0.23 m left, measured)
     console.info(`[HOOPS-HAND] 3PT right-handed: ${rightHandHoops(player.animator, player.skeleton)} hoops / ${rightHandDunks(player.animator, player.skeleton)} dunk clips mirrored`);
@@ -837,7 +851,7 @@ export const ThreePointMode: ModeDefinition = {
     // harness reloaded it. The cards keep their five names; the bodies behind them alternate two seeds (two shared
     // containers) and arrive one at a time, after the court is up.
     void (async () => {
-      const bodies: SpawnedCharacter[] = [];
+      const bodies: SpawnedCharacter[] = []; const owners: BeatOwner[] = [];
       try {
         for (let i = 0; i < RIVAL_NAMES.length; i++) {
           if (!player || ctx.scene.isDisposed) break;
@@ -848,10 +862,11 @@ export const ThreePointMode: ModeDefinition = {
           neverBindPose(b.animator, 'idle_stand');
           rightHandHoops(b.animator, b.skeleton); rightHandDunks(b.animator, b.skeleton);   // HOOPS MOTION phase 3: every body right-handed on screen
           bodies.push(b);
+          owners.push(new BeatOwner(b.animator));   // HOOPS MOTION phase 3d
         }
       } catch (e) { console.warn('[FEL-3PT] rival bodies did not spawn', (e as Error)?.message ?? e); }
       if (!player || ctx.scene.isDisposed) { bodies.forEach((b) => b.dispose()); return; }
-      rivalBodies = bodies;
+      rivalBodies = bodies; rivalBeats = owners;
     })();
 
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
@@ -980,7 +995,9 @@ export const ThreePointMode: ModeDefinition = {
           // A+ mission #4: the body on the sideline ANSWERS its number — a big round celebrates, a poor one flinches.
           // (Lock D4 rules out visible rival shooting; a reaction to the posted score is not a shot.)
           const body = rivalBodies[RIVAL_NAMES.indexOf(f.name)];
-          if (body) body.animator.play(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { onEnd: () => body.animator.play(WATCH_IDLE, { loop: true }) });
+          const owner = rivalBeats[RIVAL_NAMES.indexOf(f.name)];
+          // HOOPS MOTION phase 3d: through the body's owner — the beat first, then the loop it settles into (busy: not played over it)
+          if (body && owner) { owner.beat(f.score >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { fadeSec: 0.15 }); owner.loop(WATCH_IDLE); }
           pushHud(ctx);
           if (!S.revealQueue.length) { micPlaced(); if (S.finalistsPosting) mic?.expect({ moment: 'three.go' }); }   // THE MIC: the last number is up
         }
@@ -1016,7 +1033,8 @@ export const ThreePointMode: ModeDefinition = {
       // Ease so the jog into the rack reads as deliberate rather than a snap.
       const k = S.moveT * S.moveT * (3 - 2 * S.moveT);
       player.root.position = Vector3.Lerp(S.from, target, k);
-      player.animator.play(k < 1 ? 'run' : WATCH_IDLE, { loop: true });
+      // HOOPS MOTION phase 3d: the jog's loop, and a beat still in flight (the last make's celebrate, the absorb) is cut to it — the feet move
+      beats?.loop(k < 1 ? 'run' : WATCH_IDLE); beats?.settle();
       // BIOMECH-HOOPS-WAVE1 G1: the jog faces its travel (the body ran sideways / backwards to the next rack), slewed
       const travel = yawOfVel({ x: target.x - S.from.x, z: target.z - S.from.z }, 0.05);
       if (k < 1 && travel !== null) player.root.rotation.y = slewYaw(player.root.rotation.y, travel, FACE_RATE, dt);
@@ -1052,7 +1070,7 @@ export const ThreePointMode: ModeDefinition = {
           // HOOPS-DEPTH S6: outside the good band the body shows the miss before the rim does: short = the early short arm, long = the late push
           const ftClip = followThroughFor(Math.abs(shotErr) < goodBand() ? 'good' : shotErr < 0 ? 'early' : 'late');
           console.info(`[3PT-SHOT] follow-through ${ftClip} (err ${shotErr.toFixed(3)})`);
-          player.animator.play(ftClip, { fadeSec: 0.08, onEnd: () => player?.animator.play('bball_land_absorb', { fadeSec: 0.1, onEnd: () => player?.animator.play(WATCH_IDLE, { loop: true, fadeSec: 0.2 }) }) });   // from the release frame: arms overhead → the wrist snap → down the front
+          beats?.beat(ftClip, { fadeSec: 0.08, onSettle: () => beats?.beat('bball_land_absorb', { fadeSec: 0.1 }) });   // from the release frame: arms overhead → the wrist snap → down the front; the absorb, then the loop
         }
       } else if (rimOut >= 0) {
         // the ball is live off the iron: let it bounce where the timing sent it, then the next ball is up
@@ -1121,8 +1139,8 @@ export const ThreePointMode: ModeDefinition = {
     carry?.dispose(); carry = null;   // HOOPS MOTION phase 3
     layers?.dispose(); layers = null;   // HOOPS MOTION phase 3c
     ring?.dispose(); ring = null;
-    player?.dispose(); player = null;
-    for (const b of rivalBodies) b.dispose(); rivalBodies = [];
+    player?.dispose(); player = null; beats = null;
+    for (const b of rivalBodies) b.dispose(); rivalBodies = []; rivalBeats = [];
     trail?.dispose(); trail = null; trailLevel = 'off';
     ball?.dispose(); ball = null;
     ballMat?.dispose(); ballMat = null;

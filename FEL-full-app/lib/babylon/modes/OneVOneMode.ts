@@ -107,7 +107,7 @@ import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionA
 import {
   CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
-  moveClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,
+  moveClip, flickClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
   type ChainState, type HandleMove,
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
@@ -1358,7 +1358,10 @@ export const OneVOneMode: ModeDefinition = (() => {
           meAnimTree.update({
             // STRIDE MATCHING needs real ground speed: speed01 is normalised and cannot pace a stride
             speedMps: Math.hypot(meDribble.vel.x, meDribble.vel.z),
-            speed01: drib.speed01, crossover: drib.crossover, crossoverDir: mx >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestDef,
+            // HOOPS MOTION phase 3d (S2): ONE SOURCE FOR A LEFT-STICK CROSSOVER'S BEAT — the move picker below (moveFromContext → doMove, which
+            // always resolves an owned move: the crossover is its floor). The tree's own crossover state played a beat here first, and doMove's
+            // cut it in the same frame: two plays in one frame, the loop the first was fading from stopped dead under the second (MAP S2)
+            speed01: drib.speed01, crossover: false, crossoverDir: mx >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestDef,
             hasBall: carrying && !loose, shooting, dunking,   // (3b review) make-it-take-it sets `carrying` while the ball is still in the net: 24 dribble frames on a make's exit
             driving: sprintOk && drib.speed01 > 0.6
               && Vector3.Dot(meDribble.vel, RIM.subtract(me.root.position)) > 0,
@@ -1472,7 +1475,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               // priced moves that no situation can ever produce
               chainLength: chain.length,
               inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,
-            }, handle));
+            }, handle), undefined, true);   // (3d review: a flick — off the head's body is the crossover)
           }
           // HESITATION — the pullback plant. You spent your momentum; if the
           // defender was CLOSING on you, they bite and you own the next beat
@@ -2997,7 +3000,9 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
   }
 
-  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right'): void {   // STICK HANDLE: the stick's side wins over the defender read
+  /** `flick`: a left-stick crossover's move (HOOPS MOTION phase 3d, S2 — this is its one beat source): a move with no clip of its own
+   *  plays the crossover (flickClip), so the flick always moves the hands. */
+  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', flick = false): void {   // STICK HANDLE: the stick's side wins over the defender read
     // THE DECISION IS SHARED (HandleSystem.resolveHandleMove); what stays here is the RENDERING — this
     // mode's clips, banners and defender. 3v3 renders the same outcome its own way, so a tuning change to
     // the chain or the odds lands in both games instead of one.
@@ -3014,7 +3019,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // nothing rendered the move: the tree's one crossover state (hardwired to `bball_crossover_left`) was the
     // body for all twelve of them. The ball ends on the side away from him, which is the side the move was for.
     const moveDir: 'left' | 'right' = dirHint ?? sideAwayFrom(me.root.position, me.root.rotation.y, foe.root.position);   // HOOPS MOTION phase 3: the one visual-side helper
-    const clip = moveClip(move, moveDir);
+    const clip = flick ? flickClip(move, moveDir) : moveClip(move, moveDir);
     const turboMove = !!meSlot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS (1.35×, a shorter fade)
     if (clip) meAnimTree.beat(clip, { fadeSec: moveFadeSec(turboMove), speedRatio: moveRate(turboMove) });
     console.info(`[1V1-HANDLE] move ${move} ${moveDir} → ${clip ?? 'mode-owned'} rate ${moveRate(turboMove).toFixed(2)} (chain ${chain.length}, handle ${handle})`);

@@ -104,6 +104,24 @@ export function pinWeight(driftM: number, maxDrift: number): number {
 /** A pin let go by the clip (a lift, a swing) fades out over this long instead of dropping in one frame. */
 export const RELEASE_FADE_SEC = 0.1;
 
+// ── one writer per leg ──────────────────────────────────────────────────────
+/**
+ * HOOPS MOTION phase 3d (S30): ONE LEG-IK WRITER DURING A PLANT. A plant-and-cut lock (basketballTree.FootPlant: the dribbler's cut, 0.18 s)
+ * holds a foot where it is in the WORLD while the body turns on it — and this layer's pin rides the root's yaw about the root (turning in
+ * place is not fought), so the two held that foot in two places, each solving the same leg every frame of the lock, and at the lock's end
+ * the foot left the lock's pin for this layer's in one frame. The lock now CLAIMS its leg: this layer skips a claimed leg (its contact state
+ * still reads the clip), and when the claim ends it takes the foot over from where the lock held it — its pin re-seeded there if the clip
+ * still has the foot down, faded out from there if not. Keyed by skeleton (the lock and this layer share nothing else).
+ */
+const legClaims = new WeakMap<Skeleton, Map<Side, Vector3>>();
+/** Another writer owns this leg (its pin in the world) until releaseLeg. */
+export function claimLeg(skeleton: Skeleton, side: Side, pinWorld: Vector3): void {
+  let m = legClaims.get(skeleton); if (!m) { m = new Map(); legClaims.set(skeleton, m); }
+  m.set(side, pinWorld.clone());
+}
+export function releaseLeg(skeleton: Skeleton, side: Side): void { legClaims.get(skeleton)?.delete(side); }
+export function legClaimed(skeleton: Skeleton, side: Side): boolean { return !!legClaims.get(skeleton)?.has(side); }
+
 // ── runtime ─────────────────────────────────────────────────────────────────
 
 export interface FootPlantingOpts {
@@ -159,14 +177,14 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
   // (the thing that makes feet skate) is resisted; code-driven turning in place
   // is not fought, or every facing change would wind the legs up.
   type Leg = { side: Side; hip: TransformNode; knee: TransformNode; ankle: TransformNode; pinLocal: Vector3; rootAtPlant: Vector3;
-    prevClip: Vector3 | null; prevRoot: Vector3 | null; fadeLeft: number; fadeW: number; fadeTarget: Vector3 };
+    prevClip: Vector3 | null; prevRoot: Vector3 | null; fadeLeft: number; fadeW: number; fadeTarget: Vector3; claimPin: Vector3 | null };
   const legs: Leg[] = [];
   for (const side of ['Left', 'Right'] as Side[]) {
     const hip = bone(skeleton, `${side}UpLeg`)?.getTransformNode() ?? null;
     const knee = bone(skeleton, `${side}Leg`)?.getTransformNode() ?? null;
     const ankle = bone(skeleton, `${side}Foot`)?.getTransformNode() ?? null;
     if (!hip || !knee || !ankle) continue;
-    legs.push({ side, hip, knee, ankle, pinLocal: new Vector3(), rootAtPlant: new Vector3(), prevClip: null, prevRoot: null, fadeLeft: 0, fadeW: 0, fadeTarget: new Vector3() });
+    legs.push({ side, hip, knee, ankle, pinLocal: new Vector3(), rootAtPlant: new Vector3(), prevClip: null, prevRoot: null, fadeLeft: 0, fadeW: 0, fadeTarget: new Vector3(), claimPin: null });
   }
   if (legs.length === 0) return { dispose() { /* no legs */ }, debug };
 
@@ -184,14 +202,24 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       const clipSpeed = pc && pr && rootStep ? swingSpeed(rootStep, { x: (ankle.x - rootPos.x) - (pc.x - pr.x), z: (ankle.z - rootPos.z) - (pc.z - pr.z) }, dt) : undefined;
       const jumped = !!rootStep && Math.hypot(rootStep.x, rootStep.z) > 2;   // a teleport (a reset)
       leg.prevClip = pc ?? new Vector3(); leg.prevClip.copyFrom(ankle); leg.prevRoot = pr ?? new Vector3(); leg.prevRoot.copyFrom(rootPos);
-      if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; continue; }   // a teleport: nothing to hold
+      if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';
       const prev = debug[key];
       const next = stepContact(prev, ankle.y - rootPos.y, { x: ankle.x, y: ankle.y, z: ankle.z }, params, clipSpeed);
       debug[key] = next;
+      // S30: a claimed leg is the claimant's (the contact state above still reads the clip); the claim's end hands the foot over from its pin
+      const claim = legClaims.get(skeleton)?.get(leg.side);
+      if (claim) { (leg.claimPin ??= new Vector3()).copyFrom(claim); leg.fadeLeft = 0; continue; }
+      let handover = false;
+      if (leg.claimPin) {
+        handover = true;
+        if (next.planted) { leg.rootAtPlant.copyFrom(rootPos); leg.claimPin.subtract(rootPos).applyRotationQuaternionToRef(Quaternion.Inverse(rootRot), leg.pinLocal); }
+        else { leg.fadeLeft = RELEASE_FADE_SEC; leg.fadeW = intensity; leg.fadeTarget.copyFrom(leg.claimPin); }
+        leg.claimPin = null;
+      }
       if (!next.planted) {
         // let go by the clip: the pin FADES instead of dropping — a planted foot the clip lifts or swings eases onto the clip
-        if (prev.planted) leg.fadeLeft = RELEASE_FADE_SEC;
+        if (prev.planted && !handover) leg.fadeLeft = RELEASE_FADE_SEC;
         if (leg.fadeLeft > 0 && leg.fadeW > 0.001) {
           leg.fadeLeft = Math.max(0, leg.fadeLeft - dt);
           const w = leg.fadeW * (leg.fadeLeft / RELEASE_FADE_SEC);
@@ -200,7 +228,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         continue;
       }
       leg.fadeLeft = 0;
-      if (!prev.planted) {
+      if (!prev.planted && !handover) {
         // touchdown: remember where the foot is, in the root's frame
         leg.rootAtPlant.copyFrom(rootPos);
         ankle.subtract(rootPos).applyRotationQuaternionToRef(Quaternion.Inverse(rootRot), leg.pinLocal);

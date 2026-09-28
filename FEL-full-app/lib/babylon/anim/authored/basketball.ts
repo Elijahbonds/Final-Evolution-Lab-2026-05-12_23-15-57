@@ -796,12 +796,18 @@ export function buildShimmy(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return buildPoseClip(scene, sk, 'bball_shimmy', 0.38, [key(0, 0, 0, -0.10), key(0.1, 14, 7, -0.11), key(0.2, -14, -7, -0.11), key(0.3, 9, 4, -0.10), key(0.38, 0, 0, -0.10)]);
 }
 /** The DROP STEP, right-side: from the seal (back to the basket, the ball low on the right) the right foot swings AROUND
- *  toward the iron and the hips turn 130° after it, the ball swept low across the body into both hands at the chest —
- *  set for the layup that follows (the mode walks the step; this is the turn that rides it). 0.34 s (DROP_STEP_SEC). */
+ *  toward the iron, the ball swept low across the body into both hands at the chest — set for the layup that follows (the
+ *  mode walks the step). 0.34 s (DROP_STEP_SEC).
+ *  HOOPS MOTION phase 3d (one owner per body): THE ROOT OWNS THE TURN. The clip turned the hips 130° (Hips yaw −70 → −130, the
+ *  chest and neck with them) while the mode's rim slew turned the root toward the iron — the gather is a shot, and a shot squares
+ *  to the rim (OneVOneMode: slewYaw at FACE_RIM_RATE while `shooting`). Measured on the probe's drop step (rG, 5 of 5 windows):
+ *  the two turns cancelled, the world hips held still for the whole step (19°) while the root went 109° round under them, then
+ *  whipped 153° in five frames into the layup gather (hip-yaw seam 41° in one frame; base2 34°). No yaw key now: the hips ride
+ *  the root through the step, and the gather takes them over where they are. */
 const DROP_STEP_KEYS: PoseKey[] = [
-  { t: 0,    bones: { Hips: [0, 0, 0],    Spine: [10, 0, 0],   Neck: [-6, 0, 0],  LeftUpLeg: [-26, 0, 20], RightUpLeg: [-26, 0, -20], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.44, 0.92, 0.04], Left: [-0.32, 1.24, -0.24] }, poles: { Left: [-0.9, 0.0, -0.3] }, hipsY: -0.10 },
-  { t: 0.17, bones: { Hips: [0, -70, 0],  Spine: [12, -10, 0], Neck: [-6, -8, 0], LeftUpLeg: [-18, 0, 12], RightUpLeg: [-56, 0, -14], LeftLeg: [30, 0, 0], RightLeg: [46, 0, 0] }, hands: { Right: [0.20, 0.98, 0.30], Left: [-0.06, 1.02, 0.32] }, hipsY: -0.08 },   // the step swings round, the ball low across
-  { t: 0.34, bones: { Hips: [0, -130, 0], Spine: [12, -6, 0],  Neck: [-6, 0, 0],  LeftUpLeg: [-30, 0, 8],  RightUpLeg: [-30, 0, -8],  LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: [0.16, 1.18, 0.24], Left: [-0.12, 1.16, 0.26] }, hipsY: -0.10 },   // facing the iron, loaded, the ball at the chest
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [10, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-26, 0, 20], RightUpLeg: [-26, 0, -20], LeftLeg: [40, 0, 0], RightLeg: [40, 0, 0] }, hands: { Right: [0.44, 0.92, 0.04], Left: [-0.32, 1.24, -0.24] }, poles: { Left: [-0.9, 0.0, -0.3] }, hipsY: -0.10 },
+  { t: 0.17, bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-18, 0, 12], RightUpLeg: [-56, 0, -14], LeftLeg: [30, 0, 0], RightLeg: [46, 0, 0] }, hands: { Right: [0.20, 0.98, 0.30], Left: [-0.06, 1.02, 0.32] }, hipsY: -0.08 },   // the step swings round, the ball low across
+  { t: 0.34, bones: { Hips: [0, 0, 0], Spine: [12, 0, 0], Neck: [-6, 0, 0], LeftUpLeg: [-30, 0, 8],  RightUpLeg: [-30, 0, -8],  LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: [0.16, 1.18, 0.24], Left: [-0.12, 1.16, 0.26] }, hipsY: -0.10 },   // loaded, the ball at the chest (the root has turned him to the iron)
 ];
 export function buildDropStep(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
   if (side === 'right') return buildPoseClip(scene, sk, 'bball_drop_step', 0.34, DROP_STEP_KEYS);
