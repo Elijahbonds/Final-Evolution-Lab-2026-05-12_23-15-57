@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
+import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
@@ -15,8 +16,16 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
+// QA merge note (feature/qa-fixes-0927 x origin/lane/finish-release 46a8dc6a): ECONOMY-SESSIONS-HARDEN removed
+// reportEarnGrant / EndCardRewards / EndCardClaim / walletGrantsFrom / the CLAIM feature entirely — coins now pay
+// once, in the session's own transaction (below), so there is no separate earn report left to claim or re-send.
+// Took origin's side throughout this cluster (payout is server-paired; the old client path would double-pay
+// against the new server).
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
+import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
+import { isPlayedRun } from './played-evidence';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
+import { EndCardClaim } from './end-card-rewards';
 import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
 import {
   type CarnivalStop, type CarnivalRunState,
@@ -44,6 +53,8 @@ export interface GameResult {
 export interface GameProps {
   grade: PrqGrade;
   prq: number;
+  /** QA P0-01: what a badge may print (measured PRQ only). `prq`/`grade` above are for difficulty, never for display. */
+  prqDisplay?: PrqDisplay;
   onEnd: (result: GameResult) => void;
   /** Gamepad state polled every frame by GameShell — games can read it. */
   gamepad?: import('@/lib/canvas-juice').GamepadState;
@@ -70,6 +81,9 @@ interface RecapData {
   /** ECONOMY-SESSIONS-HARDEN: the run was recorded but paid nothing (AGENT / PLAYTEST / TEST_ACCOUNT), or the server refused
    *  its result (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) — the reason the server gave. Absent on a paid run. */
   unpaid?: string;
+  /** QA (PM ruling, CLAIM redesign): this finish answered a runId already recorded (nothing moved) — the card shows
+   *  the original result, but CLAIM never offers to "claim" a grant that was never this call's to begin with. */
+  replayed?: boolean;
   xp: number;
   shards: number;
   credits: number;
@@ -123,7 +137,9 @@ function GameShellInner({
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
   const playtestRun = searchParams.get('playtest') === '1';
-  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
+  // `display` (PRQ badge/display surfaces, qa-fixes-owned) kept from this branch — origin/lane/finish-release
+  // forked before that feature existed, so its own profile state never had the field to drop.
+  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
   // with a blocked /api/** on /play/onevone: "HUB ONES Venice Beach Court" and
@@ -223,7 +239,7 @@ function GameShellInner({
       .then((j) => {
         if (!live) return;
         if (j?.grade) {
-          setProfile({ prq: j?.prq ?? 50, grade: j.grade });
+          setProfile({ prq: j?.prq ?? 50, grade: j.grade, display: readPrqDisplay(j) });
         } else {
           router.replace('/login');
         }
@@ -264,7 +280,16 @@ function GameShellInner({
           // the only thing that makes a music set an Arena set there (route.ts verifiedMusicDuel)
           stats: res?.stats,
           ...(arenaMatchId ? { arenaMatchId } : {}),
-          played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,
+          // QA A1-02: a continuously-held stick or trigger (smooth steering, holding one direction) can cross
+          // sessionStore's evidence threshold once and never again — hoops3v3 (agent-driven) and Gate Crasher /
+          // snowboarding (real keyboard/pad) both posted played:false on a finished, fully-played run this way.
+          // isPlayedRun (played-evidence.ts) adds one more, mechanism-independent check: a real non-zero score
+          // could not have come from the idle session `played` exists to catch. See that file for the full story.
+          played: isPlayedRun(res, {
+            windowEvents: inputCount.current,
+            harnessEvidence: countedSince(sessionStore.record(), runMark.current),
+            agentEvidence: agentPlayEvidence(),
+          }),
         }),
       }))
         // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
@@ -274,6 +299,7 @@ function GameShellInner({
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
+              replayed: Boolean(j?.replayed),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
               credits: j?.credits ?? 0,
@@ -563,9 +589,9 @@ function GameShellInner({
           {profile && (
             <span
               className="ml-auto rounded-md border px-2.5 py-1 font-mono text-xs"
-              style={{ borderColor: `${profile.grade?.color}55`, color: profile.grade?.color }}
+              style={{ borderColor: `${profile.display.color}55`, color: profile.display.color }}
             >
-              PRQ {Math.round(profile.prq)} · {profile.grade?.label}
+              {profile.display.badge}
             </span>
           )}
           {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
@@ -626,7 +652,7 @@ function GameShellInner({
         )}
         {profile ? (
           <ReplayInPlaceContext.Provider value={registerReplay}>
-            <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
+            <Game key={gameKey} grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
           </ReplayInPlaceContext.Provider>
         ) : (
           <div className="flex h-[60vh] items-center justify-center">
@@ -870,6 +896,12 @@ function GameShellInner({
                     >
                       <RotateCcw className="h-4 w-4" /> REPLAY
                     </button>
+                    {/* QA (PM ruling): no CLAIM on a paused mode (recap.unpaid — 422 no_rules), a replayed finish
+                        (the original result, not a fresh grant), or a practice run (agent / playtest / /dev) — and
+                        nothing to claim on an empty run either. */}
+                    {recap && !recap.unpaid && !recap.replayed && !agentRun && !playtestRun
+                      && (recap.xp > 0 || recap.shards > 0 || recap.credits > 0 || (recapCoins?.coins ?? 0) > 0)
+                      && <EndCardClaim />}
                     <Link
                       href={storyNodeId ? '/story' : '/'}
                       className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"

@@ -98,10 +98,18 @@ export function simulateShot(
   return { carry: { x: c.x, z: c.z }, rest: { x: r.x, z: r.z }, carryM: dist(c), totalM: dist(r), hangSec: hang };
 }
 
-/** The meter's lines: the carry (m) at 0 %, 10 % … 100 % of this club along this aim in this air. Eleven numbers. */
+/** QA A1-04: the putter barely leaves the ground (loftDeg 1.5), so its `carryM` — where it first touches down — is a
+ *  near-meaningless fraction of a meter; the shot that matters is where it STOPS rolling (`totalM`). A full swing's
+ *  carry is still the right read (Wii Sports shows carry, roll is a bonus tail), so only the putter switches. */
+export function shotDistanceM(club: WiiClub, pred: ShotPrediction): number {
+  return club.id === 'PUTTER' ? pred.totalM : pred.carryM;
+}
+
+/** The meter's lines: the distance (m) a putt rolls, or a swing carries, at 0 %, 10 % … 100 % of this club along this
+ *  aim in this air. Eleven numbers. */
 export function meterTicks(club: WiiClub, yaw: number, from: { x: number; y: number; z: number }, air: AirLike = STILL_AIR, surfaceAt?: (p: Vector3) => Surface): number[] {
   const out: number[] = [];
-  for (let i = 0; i <= 10; i++) out.push(Math.round(simulateShot(club, i / 10, yaw, from, air, surfaceAt).carryM));
+  for (let i = 0; i <= 10; i++) out.push(Math.round(shotDistanceM(club, simulateShot(club, i / 10, yaw, from, air, surfaceAt))));
   return out;
 }
 /** The carry a meter reading buys, off the ticks. */

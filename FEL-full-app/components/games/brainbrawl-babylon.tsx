@@ -43,6 +43,15 @@ const OPTS = [
   { key: 'optX', face: 'C', btn: 'X', dpad: '▼', color: '#a855f7' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '◀', color: '#facc15' },
 ] as const;
 const SEAT = ['#22d3ee', '#facc15'];
+
+/**
+ * QA P1-25 (2026-09-27): Enter did not leave the PLAYERS pick. InputBus maps no Enter key (and is the input seam, not
+ * this lane's), and the pick starts on a face button, so the keyboard's natural "go" did nothing. On the pick only, the
+ * host hands Enter to the mode as the A press (and its release) that confirms it.
+ */
+export function lobbyKeyPress(key: string): { t: 'button'; btn: 'A'; pressed: boolean }[] | null {
+  return key === 'Enter' ? [{ t: 'button', btn: 'A', pressed: true }, { t: 'button', btn: 'A', pressed: false }] : null;
+}
 const HOST_COLOR = '#b9b2ff';
 const HOST_LINE_MS = 2600;
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
@@ -214,6 +223,12 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
+  useEffect(() => {
+    if (phase !== 'playing' || hud.phase !== 'pick') return;
+    const onKey = (e: KeyboardEvent) => { const presses = lobbyKeyPress(e.key); if (!presses || e.repeat) return; e.preventDefault(); for (const p of presses) emit(p); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, hud.phase, emit]);
   const claims = typeof hud.claims === 'string' ? Object.fromEntries(hud.claims.split(',').map((kv) => { const [k, v] = kv.split(':'); return [k, v]; })) : {};
   const twoP = Number(hud.players) === 2;
   const display = typeof hud.display === 'string' && hud.display ? hud.display.split('\n') : [];

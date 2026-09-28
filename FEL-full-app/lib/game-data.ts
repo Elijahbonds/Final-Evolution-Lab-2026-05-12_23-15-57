@@ -25,7 +25,7 @@ export const VENUES: Venue[] = [
   { key: 'octagon', name: 'The Octagon', image: '', modes: ["Ring's Edge"], playable: true, href: '/play/mixedcombat' },
   // 'duelarena' (Weapon Duel) RETIRED from the v1 roster (owner, 2026-09-01:
   // the combat family is Karate VS / Karate Endless / Mixed Combat only).
-  { key: 'dunkduel', name: 'Dunk Duel Arena', image: '', modes: ['IRL Dunk Duel'], playable: true, href: '/play/dunkduel' },
+  { key: 'dunkduel', name: 'Dunk Duel Arena', image: '', modes: ['Prove It'], playable: true, href: '/play/dunkduel' },   // QA P1-28: the mode's name
 ];
 
 export interface RosterAvatar {
@@ -208,8 +208,8 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   dunkduel: { name: 'Prove It', venue: 'Venice Beach Court', href: '/play/dunkduel' },
   volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
-  duel: { name: 'Duel', venue: 'Shimogamo Dojo', href: '/play/duel' },
-  sprint: { name: 'Beach Sprint', venue: 'Muscle Beach Gym', href: '/play/sprint' },
+  duel: { name: 'Duel', venue: 'Neon Cage', href: '/play/duel' },   // QA P1-16/P1-28: the Duel never fights in the dojo; its default arena
+  sprint: { name: 'Beach Sprint', venue: 'Stadium Straight', href: '/play/sprint' },   // QA P1-19: its home place, not the gym
   // HOTFIX (2026-09-24): keyed 'music', the mode the Academy's GameShell saves the session under. The Arena and the
   // counsellor read sessions by this key; under 'musicAcademy' they matched none. See LEGACY_MODE_KEYS.
   music: { name: 'Groove Academy', venue: 'Studio', href: '/play/music' },

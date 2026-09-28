@@ -92,12 +92,22 @@ class Bridge {
   private warnings: string[] = [];
   private listeners = new Set<(e: AgentEvent) => void>();
   private manifestModes: AgentManifest['modes'] = [];
+  /** QA A1-02: how many act() calls actually reached a mode's ControlSource this run — the agent-driven equivalent of
+   *  GameShell's own inputCount (owner call 4's "input the game received", from every source). A mode with no
+   *  ControlSource (act() warns and returns) never bumps this, so it stays honest about what the game actually got. */
+  private acted = 0;
 
   // ── registration (called by ModeHarness) ───────────────────────────────
   attach(host: BridgeHost): void {
     this.host = host;
+    this.acted = 0;   // a fresh run's evidence, not the last mode's
     this.emit('lifecycle', `attached to "${host.modeId}"`, { modeId: host.modeId });
   }
+
+  /** QA A1-02: act() calls this run that reached a real ControlSource — GameShell reads this alongside its own window-event
+   *  count and sessionStore's record, so a run played entirely through the agent bridge (the same intent path a human's
+   *  press takes) is not silently NO PLAY just because it left no DOM event or InputBus crossing behind. */
+  actedCount(): number { return this.acted; }
 
   detach(): void {
     if (this.host) this.emit('lifecycle', `detached from "${this.host.modeId}"`);
@@ -231,6 +241,7 @@ class Bridge {
       return;
     }
     this.host.control.push(intent, ms);
+    this.acted += 1;
     this.emit('action', `act ${JSON.stringify(intent)} for ${ms}ms`);
     await new Promise((r) => setTimeout(r, ms));
   }
@@ -274,7 +285,7 @@ class Bridge {
     }
   }
 
-  reset(): void { this.events = []; this.errors = []; this.warnings = []; }
+  reset(): void { this.events = []; this.errors = []; this.warnings = []; this.acted = 0; }
 }
 
 // ── install ───────────────────────────────────────────────────────────────
@@ -309,6 +320,15 @@ export function installAgentBridge(modes: AgentManifest['modes']): Bridge | null
 /** Always safe to call; no-ops when the bridge is disabled. */
 export function agentBridge(): Bridge | null {
   return typeof window !== 'undefined' && window.__NEXUS_AGENT__ ? bridge : null;
+}
+
+/** QA A1-02: this run's count of act() calls that reached a real ControlSource, or 0 when the bridge is off or the
+ *  mode never wired one up. GameShell ORs this into `played` alongside its window-event count and sessionStore's
+ *  record, so a mode driven entirely through the agent bridge's intent path — the same path a human press takes,
+ *  per this file's own header — is not posted as NO PLAY just because that path leaves no DOM event or InputBus
+ *  crossing for the other two counters to see. */
+export function agentPlayEvidence(): number {
+  return agentBridge()?.actedCount() ?? 0;
 }
 
 export type { Bridge as AgentBridgeApi };

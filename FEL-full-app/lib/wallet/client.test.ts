@@ -82,7 +82,10 @@ describe('wallet client — the grant a report was paid', () => {
   });
 });
 
-describe('the shell\'s coins tile (components/games/game-shell.tsx)', () => {
+// ECONOMY-SESSIONS-HARDEN (2026-09-28) replaced the P0-02 tiles this comment used to point at
+// (components/games/end-card-rewards.tsx, deleted in the qa-fixes/movement-lane merge): the wallet coin tile now
+// reads the session's own payout figure, inlined in game-shell.tsx — checked below.
+describe('the shell\'s wallet tiles (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
   it('no tile for a refused earn or a zero grant nothing capped; a capped coin earn says so instead of "+0"', () => {
     expect(shell).toContain('if (coins > 0 || capped) setRecapCoins({ coins, capped });');

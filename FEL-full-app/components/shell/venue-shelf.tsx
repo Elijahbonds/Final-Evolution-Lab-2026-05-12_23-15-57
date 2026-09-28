@@ -16,6 +16,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Lock, Play } from 'lucide-react';
 import { VENUES } from '@/lib/game-data';
+import { venueCardModes } from '@/lib/venueModes';
 import { MasteryBadge } from '@/components/mastery-badge';
 
 /** A venue's /play/<route> slug is not the camelCase key its sessions post under; this is that map. */
@@ -107,7 +108,8 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
               <div className="flex items-center gap-2 p-4">
                 <div className="min-w-0">
                   <h3 className="fel-heading text-[17px] font-bold leading-tight text-white">{venue.name}</h3>
-                  <p className="mt-1 line-clamp-1 text-[12px] text-white/35">{(venue.modes ?? []).join(' · ')}</p>
+                  {/* QA P1-28: the live modes whose venue this is (lib/venueModes), not a hand list that drifts */}
+                  <p className="mt-1 line-clamp-2 text-[12px] text-white/35">{venueCardModes(venue).join(' · ')}</p>
                 </div>
                 {tier ? <MasteryBadge tierIndex={tier} className="ml-auto shrink-0" /> : null}
               </div>

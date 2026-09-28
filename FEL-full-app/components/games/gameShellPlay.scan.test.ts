@@ -31,9 +31,20 @@ const between = (src: string, from: string, to: string): string => {
 const sessionBody = (): string => between(shell, "fetch('/api/sessions'", '.then((r) =>');
 
 describe('what counts as played: input the game received, from any source (P3 step 5)', () => {
-  it('handleEnd sends the shell\'s own count OR the game\'s record since the mark — read once, at the end', () => {
-    expect(sessionBody()).toContain('played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,');
+  it('handleEnd sends isPlayedRun(res, ...) built from the shell\'s own count, the game\'s record and the agent bridge', () => {
+    expect(sessionBody()).toContain('played: isPlayedRun(res, {');
+    expect(sessionBody()).toContain('windowEvents: inputCount.current,');
+    expect(sessionBody()).toContain('harnessEvidence: countedSince(sessionStore.record(), runMark.current),');
+    expect(sessionBody()).toContain('agentEvidence: agentPlayEvidence(),');
     expect(shell).toMatch(/import \{ sessionStore, markRun, countedSince \} from '@\/lib\/babylon\/core\/sessionStore';/);
+  });
+
+  it('QA A1-02: a run played entirely through the agent bridge also counts — agentPlayEvidence() is a third source', () => {
+    expect(shell).toMatch(/import \{ agentPlayEvidence \} from '@\/lib\/babylon\/core\/AgentBridge';/);
+  });
+
+  it('QA A1-02: isPlayedRun is the shared payload builder (played-evidence.ts), not a shell-local computation', () => {
+    expect(shell).toMatch(/import \{ isPlayedRun \} from '\.\/played-evidence';/);
   });
 
   it('the mark is taken when the game mounts (the run before is the old record) and before REPLAY restarts in place', () => {
@@ -147,5 +158,18 @@ describe('an answer that lands after REPLAY writes nothing to the next run\'s ca
     // for whatever the card shows now (only the card is guarded)
     // ECONOMY-SESSIONS-HARDEN: the coins tile is the session answer's own figure (the run paid them), guarded like the rest
     expect(between(h, 'if (j?.ok) {', "fetch('/api/story/complete'")).toMatch(/if \(mine\(\) && j\?\.paid === true\) \{[\s\S]*setRecapCoins\(\{ coins, capped \}\)/);
+  });
+});
+
+describe('CLAIM (QA, PM ruling): a pure client-side reveal, never a second grant', () => {
+  it('EndCardClaim is gated off on a paused/refused run, a replayed finish, a practice run, and an empty run', () => {
+    expect(shell).toMatch(/import \{ EndCardClaim \} from '\.\/end-card-rewards';/);
+    expect(shell).toMatch(
+      /recap && !recap\.unpaid && !recap\.replayed && !agentRun && !playtestRun\s*\n\s*&& \(recap\.xp > 0 \|\| recap\.shards > 0 \|\| recap\.credits > 0 \|\| \(recapCoins\?\.coins \?\? 0\) > 0\)\s*\n\s*&& <EndCardClaim \/>/,
+    );
+  });
+
+  it('the replayed flag reaches the card from the session answer, for that gate', () => {
+    expect(shell).toContain('replayed: Boolean(j?.replayed),');
   });
 });

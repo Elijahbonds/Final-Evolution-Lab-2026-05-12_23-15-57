@@ -150,6 +150,30 @@ function buildReadableNet(scene: Scene, cfg: { halfWidth: number; netHeight: num
   return { dispose() { for (const m of made) m.dispose(); post.dispose(); mesh.dispose(); tape.dispose(); } };
 }
 
+/**
+ * Where a net court's crowd stands (QA P1-05, 2026-09-27). The onlookers are full athlete bodies idling on their spots, and
+ * at halfWidth + 3 they stood 1.8 m outside tennis's glass and in the volleyball free zone, with an end bank 4.2 m past
+ * each baseline: from the baseline camera they read as three more tennis opponents and extra volleyball players. Pure.
+ * Sides: CROWD_SIDE_M past the sideline, and CROWD_CLEAR_M past the glass where there is a cage. Ends (the beach court):
+ * CROWD_END_M past each baseline.
+ */
+export const CROWD_SIDE_M = 5, CROWD_CLEAR_M = 3, CROWD_END_M = 8;
+export function netCrowdSpots(cfg: RallyConfig, opts: { cage?: boolean; beach?: boolean }): { sides: Vector3[]; ends: Vector3[] } {
+  const sideX = Math.max(cfg.halfWidth + CROWD_SIDE_M, opts.cage ? glassX(cfg) + CROWD_CLEAR_M : 0);
+  const spread = cfg.halfLength * 0.62;
+  const sides: Vector3[] = [];
+  for (let i = 0; i < 12; i++) {
+    const t = (i % 6) / 5;                       // 0..1 along the sideline
+    sides.push(new Vector3(i < 6 ? -sideX : sideX, 0, -spread + t * spread * 2 + (i % 2) * 0.6));
+  }
+  const ends: Vector3[] = [];
+  if (opts.beach) {
+    const endZ = cfg.halfLength + CROWD_END_M;
+    for (let i = 0; i < 10; i++) { const t = (i % 5) / 4; ends.push(new Vector3(-5 + t * 10 + (i % 2) * 0.5, 0, i < 5 ? -endZ - (i % 2) * 0.8 : endZ + (i % 2) * 0.8)); }
+  }
+  return { sides, ends };
+}
+
 export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let me: SpawnedCharacter, foe: SpawnedCharacter;
   let ball: AbstractMesh;
@@ -897,23 +921,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         // Down both sidelines, derived from THIS court rather than hardcoded:
         // volleyball and tennis are very different sizes, and a fixed offset
         // that clears one sits inside the other. Always outside halfWidth, so
-        // nobody stands anywhere a ball can legally land.
-        const sideX = o.cfg.halfWidth + 3;
-        const spread = o.cfg.halfLength * 0.62;
-        const spots: Vector3[] = [];
-        for (let i = 0; i < 12; i++) {
-          const t = (i % 6) / 5;                       // 0..1 along the sideline
-          spots.push(new Vector3(i < 6 ? -sideX : sideX, 0, -spread + t * spread * 2 + (i % 2) * 0.6));
-        }
-        crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
-        if (o.beach) {
-          // P5: a second bank behind each baseline — the beach court's people read as a crowd, not four figures on a
-          // sideline ("billboard" bodies, playtest d3d4a93). Outside the free zone, in the foe's backdrop and the hero's.
-          const endZ = o.cfg.halfLength + 4.2;
-          const ends: Vector3[] = [];
-          for (let i = 0; i < 10; i++) { const t = (i % 5) / 4; ends.push(new Vector3(-5 + t * 10 + (i % 2) * 0.5, 0, i < 5 ? -endZ - (i % 2) * 0.8 : endZ + (i % 2) * 0.8)); }
-          crowdEnds = new Onlookers(ctx.scene, ends, '#F25F5C');
-        }
+        // nobody stands anywhere a ball can legally land — and far enough out (QA P1-05, netCrowdSpots) that a
+        // spectator never reads as a player.
+        const spots = netCrowdSpots(o.cfg, { cage: o.cage, beach: o.beach });
+        crowd = new Onlookers(ctx.scene, spots.sides, '#3E5A70');
+        // P5: a second bank behind each baseline — the beach court's people read as a crowd, not four figures on a
+        // sideline ("billboard" bodies, playtest d3d4a93). Outside the free zone, in the foe's backdrop and the hero's.
+        if (o.beach) crowdEnds = new Onlookers(ctx.scene, spots.ends, '#F25F5C');
       }
 
       rally = new RallyState(o.cfg);

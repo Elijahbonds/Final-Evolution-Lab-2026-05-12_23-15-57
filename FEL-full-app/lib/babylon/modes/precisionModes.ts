@@ -56,7 +56,7 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 // shot's launch (GolfAim), the flight itself (GolfBallSim: drag, Magnus, bounce, roll, wind through the air, wet turf),
 // and the weather (WeatherKit read from the start screen's chip, WeatherFx for what it looks like).
 import { GolfBallSim, type Surface as GolfSurface } from '../core/GolfBall';
-import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
+import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, shotDistanceM, type WiiClub, type AirLike } from '../core/GolfAim';
 import { mountAimArrow, type AimArrowHandle } from '../visual/AimArrow';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
@@ -67,6 +67,7 @@ import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { SoccerBall, GRASS } from '../core/SoccerBall';
 import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOAL } from '../core/PenaltyKick';
 import { WIND_GAIN } from '../core/GolfBall';
+import { ModeBeats } from '../core/ModeBeats';   // QA P0-04: the rounds move on the mode's update clock, never a wall timer
 import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
 import { stepRun } from '../core/RushRun';
 import { PAD, padMult, type PadKind, FLICK, flickRead, flickVel, type Ring, RINGS, ringsFor, ringPass, turbineFor, gustAt, BANK, bankReflect } from '../core/ParkourGolf';   // PARKOUR GOLF (owner brief, 2026-09-18)
@@ -435,8 +436,11 @@ export const GolfMode: ModeDefinition = (() => {
     arrow?.set(ball.position, aimYaw, pred.carryM, pred.carry, pred.rest); lastCarryM = pred.carryM;
     me.root.rotation.y = aimYaw;   // the golfer faces the arrow
     const aimDeg = Math.round(((aimYaw - pinYaw() + Math.PI * 3) % (Math.PI * 2) - Math.PI) * 180 / Math.PI);   // the arrow's offset from the pin line, for the HUD
-    if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(pred.carryM), aimDeg }); }
-    else ctx.setHud({ aimCarry: Math.round(pred.carryM), aimDeg });
+    // QA A1-04: the printed distance is shotDistanceM (GolfAim.ts) — the putter's roll-out, a swing's carry — so
+    // "FULL SWING 1m" (the putter's near-zero carry) agrees with the ~9m a full putt actually rolls (PUTT_RANGE_M).
+    // The arrow/ring above stay on carryM: the ring already marks the carry landing and the dots trail on to `rest`.
+    if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(shotDistanceM(c, pred)), aimDeg }); }
+    else ctx.setHud({ aimCarry: Math.round(shotDistanceM(c, pred)), aimDeg });
   }
 
   function strike(ctx: ModeContext, pwr: number, sideErr: number): void {
@@ -918,6 +922,8 @@ export const DerbyMode: ModeDefinition = (() => {
    *  the re-entry guard; using `incoming` for it meant the whiff test — which
    *  now fires on a ball at rest — retriggered during the gap between pitches. */
   let pending = false;
+  /** QA P0-04: the next pitch and the end wait for update(), so a pause (or a torn-down mount) cannot advance the round. */
+  const beats = new ModeBeats();
   /** A+ mission #7 (MLB Home Run Derby presentation): the round is OUTS_CAP outs or TOTAL pitches, whichever first —
    *  a swing that is not a homer is an out. Ten pitches used to be the whole round; twenty is the cap now that outs end it. */
   const TOTAL = 20;
@@ -1033,7 +1039,7 @@ export const DerbyMode: ModeDefinition = (() => {
     ctx.setHud({ score: pts, banner, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
     setTimeout(() => ctx.setHud({ banner: '' }), 900);
     console.info(`[PARK] ${verdict} ${lastDetail} +${gained}`);
-    if (roundOver) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); }
+    if (roundOver) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); beats.after(1, () => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget })); }
   }
 
   // THE BATTING CAMERA LOOKS OUT TO THE OUTFIELD (owner, 2026-09-15: "face outfield so we can see the pitcher and our
@@ -1240,7 +1246,7 @@ export const DerbyMode: ModeDefinition = (() => {
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'PITCH-PP');
 
-      round = 0; pts = 0; ended = false;
+      round = 0; pts = 0; ended = false; pending = false; beats.clear();
       SoundKit.startAmbient('stadium');
       tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
       ctx.setHud({ score: 0 });
@@ -1303,6 +1309,7 @@ export const DerbyMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      beats.update(dt);   // before the ended check: the end itself is a beat
       if (batSwingSec != null) { batSwingSec += dt; if (batSwingSec > BAT_SWING_SEC + BAT_RECOVER_SEC) batSwingSec = null; }
       if (ended) return;
       if (throwIn > 0) {
@@ -1357,12 +1364,12 @@ export const DerbyMode: ModeDefinition = (() => {
         // the whiff names the pitch — The Show tells you what beat you
         ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}`, outs: tally.outs });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        if (whiffOut) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); return; }
+        if (whiffOut) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); beats.after(1, () => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget })); return; }
       }
       if (!flying && !incoming && !pending) {
         if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); return ctx.end('DERBY_END', pts, { pitches: TOTAL, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }); }
         pending = true;
-        setTimeout(() => { pending = false; if (!ended) pitch(ctx); }, 800);
+        beats.after(0.8, () => { pending = false; if (!ended) pitch(ctx); });
       }
       // During the PITCH the fixed swing camera aims at where the pitch is
       // GOING (the strike zone), never at the moving ball: a 0.4 lerp onto a
@@ -1375,11 +1382,25 @@ export const DerbyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), flying && !incoming ? ball.position : PITCHER_VIEW);   // a hit ball is followed; a pitch is watched from the plate
     },
 
-    dispose() { for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { beats.clear(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
 // ═══════════════════════════════════════════════════════ PENALTY SHOOTOUT ══
+/**
+ * Where the shootout's crowd stands (QA P1-05, 2026-09-27). The onlookers are full athlete bodies, and the old bank ran
+ * straight across behind the goal: from the kicker's camera three of them stood in the goal mouth behind the keeper and
+ * read as more keepers. Two banks FLANK the goal now, GALLERY_CLEAR_M outside each post, still 4.4 m behind the line (the
+ * keeper round's camera sits at z 13.4 and must not stand inside anyone). Eight spots, so Onlookers keeps every one. Pure.
+ */
+export const GALLERY_CLEAR_M = 2;
+export function penaltyGallerySpots(): Vector3[] {
+  const inner = PEN_GOAL.halfW + GALLERY_CLEAR_M;
+  const out: Vector3[] = [];
+  for (let i = 0; i < 4; i++) for (const side of [-1, 1]) out.push(new Vector3(side * (inner + i * 1.7), 0, 15.4 + i * 0.4));
+  return out;
+}
+
 export const PenaltyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, keeper: SpawnedCharacter;
   let meAnim: BeatOwner, keeperAnim: BeatOwner;
@@ -1454,6 +1475,8 @@ export const PenaltyMode: ModeDefinition = (() => {
   /** L4 — the bank behind the goal. A shootout is watched. */
   let gallery: Onlookers | null = null;
   let strikerPosture: { dispose(): void } | null = null, keeperPosture: { dispose(): void } | null = null;
+  /** QA P0-04: their kick and its result wait for update(), so a pause (or a torn-down mount) cannot advance the kicks. */
+  const beats = new ModeBeats();
   // ── the shootout (D1/D2 built in the depth pass) ──
   /** The rival's goals — a shootout is against SOMEONE. Their kicks are
    *  simulated and revealed between yours (the numbers-only rival
@@ -1616,7 +1639,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     // YOUR kick, then THEIR answer — the shootout breathes in
     // alternating beats, and a tied fifth round goes to SUDDEN DEATH.
     // YOUR kick, then THEIR kick — and their kick is yours to keep.
-    setTimeout(() => { if (!ended) startKeeperRound(ctx); }, 1200);
+    beats.after(1.2, () => { if (!ended) startKeeperRound(ctx); });
     phase = 'aim'; brk.on = false; brk.counterLive = false; ctx.setHud({ clock: 0, flow: -1, kinetic: '' }); me.root.position.y = 0;
     betweenKicks = true;   // HOTFIX (2026-09-24): the result beat takes no kick input (onInput)
   }
@@ -1747,12 +1770,9 @@ export const PenaltyMode: ModeDefinition = (() => {
       spotMat.specularColor = Color3.Black();
       spot.material = spotMat;
       furniture.push(spot);
-      gallery = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
-        const k = i - 6.5;
-        // a shallow bank behind the goal — 2 m behind the keeper camera (fixed at z 13.4 on THEIR kick): at 13.2 the camera
-        // stood inside a spectator and the whole frame was the inside of a body (measured 2026-09-06)
-        return new Vector3(k * 1.5, 0, 15.4 + Math.abs(k) * 0.22);
-      }));
+      // a shallow bank either side of the goal — 2 m behind the keeper camera (fixed at z 13.4 on THEIR kick): at 13.2 the
+      // camera stood inside a spectator and the whole frame was the inside of a body (measured 2026-09-06)
+      gallery = new Onlookers(ctx.scene, penaltyGallerySpots());
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       // the left dive is the authored right dive reflected across the sagittal plane, registered as 'keeper_dive.M'
@@ -1799,7 +1819,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'KEEP-PP');
 
-      round = 0; goals = 0; stylePts = 0; ended = false; betweenKicks = false;
+      round = 0; goals = 0; stylePts = 0; ended = false; betweenKicks = false; beats.clear();
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       SoundKit.startAmbient('stadium');
       ctx.setHud({ score: 0 });   // net/precision phase 3: the score is the NUMBER the result reports; the kicks panel draws the board
@@ -1892,6 +1912,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      beats.update(dt);
       if (ended) return;
       meter.update(dt);
       syncReticle();
@@ -2016,7 +2037,7 @@ export const PenaltyMode: ModeDefinition = (() => {
                 : 'THEM: OFF TARGET',
             });
             keepPlan = null;
-            setTimeout(() => afterTheirKick(ctx), 1300);
+            beats.after(1.3, () => afterTheirKick(ctx));
           }
         }
         // the fixed camera only re-aims inside update(): without this it sat
@@ -2028,6 +2049,6 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);
     },
 
-    dispose() { strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { beats.clear(); strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

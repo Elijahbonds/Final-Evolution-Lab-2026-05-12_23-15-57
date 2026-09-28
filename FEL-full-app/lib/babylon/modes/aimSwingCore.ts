@@ -217,17 +217,32 @@ export function buildBallparkOutfield(scene: Scene): AbstractMesh[] {
     pole.material = poleMat;
     parts.push(pole);
   }
-  // distance band across dead centre — the number every broadcast quotes
-  const band = MeshBuilder.CreatePlane('ofwall_band', { width: 12, height: 1.1 }, scene);
-  band.position.set(0, 2.1, R - 0.3);
-  const dt = new DynamicTexture('ofwall_bandTex', { width: 512, height: 64 }, scene, false);
-  dt.drawText('124 FT  ·  124 FT  ·  124 FT', 10, 44, 'bold 34px monospace', '#f4f1de', 'transparent', true, true);
-  const bandMat = new StandardMaterial('ofwall_bandMat', scene);
-  bandMat.diffuseTexture = dt;
-  bandMat.specularColor = Color3.Black();
-  band.material = bandMat;
-  parts.push(band);
+  // the distance signs — the number every broadcast quotes. QA P1-13 (2026-09-27): this was ONE 12 m band across dead centre
+  // reading "124 FT · 124 FT · 124 FT", 571 px of text on a 512 px texture, over the bottom of the centre bullseye: the QA's
+  // overlapping signs. One sign per spot now, low on the wall and between the wall targets (DISTANCE_SIGNS).
+  const signMat = new StandardMaterial('ofwall_signMat', scene);
+  const dt = new DynamicTexture('ofwall_signTex', { width: 256, height: 64 }, scene, false);
+  dt.drawText('124 FT', null, 46, 'bold 38px monospace', '#f4f1de', 'transparent', true, true);
+  signMat.diffuseTexture = dt;
+  signMat.specularColor = Color3.Black();
+  for (const p of distanceSignPlacements(R)) {
+    const sign = MeshBuilder.CreatePlane(`ofwall_sign_${p.bearingDeg}`, { width: DISTANCE_SIGNS.width, height: DISTANCE_SIGNS.height }, scene);
+    sign.position.set(p.x, DISTANCE_SIGNS.y, p.z);
+    sign.rotation.y = (p.bearingDeg * Math.PI) / 180;
+    sign.material = signMat;
+    parts.push(sign);
+  }
   return parts;
+}
+
+/** Where the outfield's distance signs hang: low on the wall (under the lowest wall target's rim), between the Parkour Derby
+ *  targets (bearings −32 / −16 / 0 / 16 / 32), never over one. Pure, so a test holds the spacing. */
+export const DISTANCE_SIGNS = { bearingsDeg: [-44, -24, 24, 44] as readonly number[], width: 3.2, height: 0.9, y: 1.1 } as const;
+export function distanceSignPlacements(R = 38): { bearingDeg: number; x: number; z: number }[] {
+  return DISTANCE_SIGNS.bearingsDeg.map((d) => {
+    const rad = (d * Math.PI) / 180;
+    return { bearingDeg: d, x: Math.sin(rad) * (R - 0.3), z: Math.cos(rad) * (R - 0.3) };
+  });
 }
 
 /** The goal's regulation frame — the shot maths uses these numbers, so the MESH is fitted to them, never the other way. */

@@ -27,6 +27,20 @@ const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
 
 type Hud = Record<string, HudValue>;
 
+/**
+ * QA P2-02 (2026-09-27): Stomp showed CLEAN on spawn — a landing grade before any jump. The grade line comes from the
+ * mode's landing (AirSessionMode, a movement-lane file), so the HUD holds it: no landing grade, and no BEST, until the
+ * rider has been in the air this run. The run-up's own lines (PERFECT STRIDE, BOOST!) still show.
+ */
+const LANDING_GRADE = /^(STUCK IT!|CLEAN\b|SKETCHY\b|CRASH\b)/;
+export function landingReadout(banner: unknown, best: unknown, airborne: boolean): { banner: string; best: string } {
+  const b = typeof banner === 'string' ? banner : '';
+  return {
+    banner: !airborne && LANDING_GRADE.test(b) ? '' : b,
+    best: airborne && typeof best === 'string' ? best : '',
+  };
+}
+
 export function makeAirHost(modeKey: string, title: string) {
   function AirBabylon({ onEnd }: GameProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -43,6 +57,7 @@ export function makeAirHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    const [airborne, setAirborne] = useState(false);   // QA P2-02: has this run left the ground yet?
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -63,7 +78,7 @@ export function makeAirHost(modeKey: string, title: string) {
           setCountdown(typeof d === 'number' ? d : null);
           if (p === 'error') setLoadError(typeof d === 'string' ? d : 'load failed');
         },
-        onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        onHud: (h) => { if (!disposed) { setHud((prev) => ({ ...prev, ...h })); if (h.phase === 'Air' || h.phase === 'Land') setAirborne(true); } },
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;
@@ -97,6 +112,7 @@ export function makeAirHost(modeKey: string, title: string) {
       busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
     }, []);
 
+    const readout = landingReadout(hud.banner, hud.best, airborne);
     return (
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
@@ -122,12 +138,12 @@ export function makeAirHost(modeKey: string, title: string) {
               {typeof hud.combo === 'number' && hud.combo >= 2 && (
                 <span className="rounded bg-[#ffd75e]/15 px-2 py-0.5 text-[#ffd75e]">COMBO x{hud.combo}</span>
               )}
-              {typeof hud.best === 'string' && hud.best && (
-                <span className="rounded bg-white/10 px-2 py-0.5 text-white/60">BEST {hud.best}</span>
+              {readout.best && (
+                <span className="rounded bg-white/10 px-2 py-0.5 text-white/60">BEST {readout.best}</span>
               )}
             </div>
-            {typeof hud.banner === 'string' && hud.banner && (
-              <div className="mt-2 text-[#00E5FF]">{hud.banner}</div>
+            {readout.banner && (
+              <div className="mt-2 text-[#00E5FF]">{readout.banner}</div>
             )}
           </div>
         )}

@@ -472,7 +472,9 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (!mine && impactAt === undefined && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => onHitBeat(at)); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
       if (!mine) foeImpactAt = null;   // it landed or it did not; either way nothing is incoming now
-      let outcome = impactAt !== undefined ? bodyOutcome(atk, dist, impactAt) : resolveStrike(atk, dist, defState, now());
+      // QA A1-03: breakout=true — a continuous string used to stun-lock RIVAL SENSEI for a whole match (never
+      // regained control, so it could never counter). Pad/keyboard duels only; bodyOutcome (below) is unchanged.
+      let outcome = impactAt !== undefined ? bodyOutcome(atk, dist, impactAt) : resolveStrike(atk, dist, defState, now(), undefined, undefined, true);
       if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';
       if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
         // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
@@ -493,6 +495,18 @@ export const KarateVSMode: ModeDefinition = (() => {
           beatHit(mine, 'light'); beatParry(!mine);   // the attacker flinches (staggered), the defender's guard flicks
           ctx.setHud({ banner: mine ? 'PARRIED!' : 'PERFECT PARRY!', ...(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) }) });
           setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          break;
+        }
+        case 'escaped': {
+          // QA A1-03: STUN_CHAIN_BREAKOUT consecutive hits without regaining control — a substitution breaks the
+          // string. No damage, no restun (FightCore already cleared it): the defender is free and briefly unhittable.
+          SoundKit.play('impact', { pitch: 1.3, volume: 0.45 });
+          ctx.juice.shake(0.06, 100);
+          EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+          beatParry(!mine);   // the defender's flinch-free read beat, same as a parry
+          ctx.setHud({ banner: mine ? 'RIVAL BROKE FREE!' : 'YOU BROKE FREE!' });
+          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          console.info(`[KVS-DEF] stun-lock breakout (attacker mine ${mine})`);
           break;
         }
         case 'blocked': {

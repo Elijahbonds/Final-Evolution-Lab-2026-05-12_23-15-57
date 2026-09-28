@@ -238,7 +238,9 @@ const BOX_OUT_EDGE = 1.6;
 /** How much a board is decided by the bounce rather than by position. */
 const REBOUND_JITTER = 2.6;
 /** My possession: I take it back to the top, the rival sets 3 m in. */
-const MY_SPAWN = new Vector3(0, 0, 5), FOE_SPAWN = new Vector3(0, 0, 2);
+// QA P1-07 (2026-09-27): the rival set up at x 0, dead in line behind the ball handler from the camera at his back, so the
+// first frame read as one body with two heads. He sets 0.9 m off the line (still 3 m in, between the ball and the rim).
+const MY_SPAWN = new Vector3(0, 0, 5), FOE_SPAWN = new Vector3(0.9, 0, 2);
 /** Their possession: the CHECK. The rival checks up beyond the arc (top 7.24 m → z 6.64); I set 2 m inside him. */
 const CHECK_FOE = new Vector3(0, 0, 9.2), CHECK_ME = new Vector3(0, 0, 7.2);
 /** A poke's reach. Body collision holds two players ~1.1 m apart; 1.2 sat ON the standoff and flickered. */

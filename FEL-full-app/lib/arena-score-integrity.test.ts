@@ -1000,8 +1000,13 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect([Number(ev('counter_strike')[1]), Number(ev('counter_strike')[2])]).toEqual([m.counterStrikeSec, m.counterStrikePpu]);
     expect(c).toContain('charge = 0; cooldown = 0.5;');
     expect(c).toContain("if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {");
-    expect(c).toContain('to.scale(13 + p * 7)');
-    expect(c).toContain('if (ball.position.z >= 10.9) {');
+    // QA A1-01: the old speed (13 + p*7) fell short of the goal line at every power, even dead centre (measured
+    // against the real Flight sim — carnivalEvents.hotShot.physics.test.ts); HOT_SHOT_BASE_MPS/HOT_SHOT_POWER_MPS
+    // replace it, and the goal-line check now also resolves on `!flight.active` so a short shot can never soft-lock
+    // the event again (carnivalEvents.test.ts).
+    expect(c).toContain('to.scale(HOT_SHOT_BASE_MPS + p * HOT_SHOT_POWER_MPS)');
+    expect(c).toContain('const reachedGoal = ball.position.z >= 10.9;');
+    expect(c).toContain('if (reachedGoal || !flight.active) {');
     expect(c).toContain('.scaleInPlace(6);');
     expect(c).toContain('coins.line(new Vector3(-8, 0.4, -8), new Vector3(8, 0.4, 8), 7);');
     expect(Math.hypot(16, 16) / 6).toBeCloseTo(m.coinStormSpacing, 2);

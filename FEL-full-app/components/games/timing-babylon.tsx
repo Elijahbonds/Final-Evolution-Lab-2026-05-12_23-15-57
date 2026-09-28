@@ -9,11 +9,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { TimingPrompt } from './timing-prompt';
+import { LANE_PLATE_ALPHA, PASSED_CUE_OPACITY, hitRingStyle } from './cue-lane-style';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { timingWon } from './timing-won';
+import { opponentScoreFor } from './timing-opponent-score';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
@@ -81,7 +84,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const result: GameResult = {
           score: r.score,
           stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: modeKey === 'penalty' ? n('themGoals') : 0,
+          opponentScore: opponentScoreFor(modeKey, r.stats),
           won,
           duration: r.durationSec,
           headline,
@@ -197,12 +200,6 @@ export function makeTimingHost(opts: TimingHostOpts) {
           </div>
         )}
 
-        {/* The shot the mode graded, and the incoming-attack warning. */}
-        {typeof hud.shotType === 'string' && hud.shotType && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
-            <span className="fel-panel px-3 py-1 font-mono text-[11px] text-white/85">{hud.shotType}</span>
-          </div>
-        )}
 
         {/* GOLF (A+ mission #5, Everybody's Golf read + Wii size) — every block is key-gated, so the other timing sports
             are unchanged: the lie panel (club · pin · wind with a bearing arrow), the hole chip, the drawn three-press
@@ -382,14 +379,6 @@ export function makeTimingHost(opts: TimingHostOpts) {
             </div>
           </div>
         )}
-        {typeof hud.incomingTell === 'string' && hud.incomingTell && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-36 flex justify-center font-mono">
-            <span className="fel-panel px-4 py-1.5 text-sm font-bold text-white">
-              INCOMING · {hud.incomingTell}
-              {typeof hud.answer === 'string' && hud.answer ? <span className="ml-2 text-[var(--fel-cyan)]">answer {hud.answer}</span> : null}
-            </span>
-          </div>
-        )}
 
         {/* THE CUE LANE (dance, A+ mission #1): the next moves slide toward the
             hit ring, coloured by move family (= the band's instrument), glyph
@@ -397,10 +386,13 @@ export function makeTimingHost(opts: TimingHostOpts) {
             `cues`, so every other timing sport is unchanged. */}
         {isCueLane(hud.cues) && hud.cues.length > 0 && (
           <div className="pointer-events-none absolute inset-x-6 bottom-[34%] h-16">
-            <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/15" />
+            {/* QA P2-03: a plate under the lane (≥ 3:1 for every family colour on any stage), the hit ring lit on the beat */}
+            <div data-lane-plate className="absolute -inset-x-3 -inset-y-2 rounded-2xl" style={{ background: `rgba(0,0,0,${LANE_PLATE_ALPHA})` }} />
+            <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/30" />
             <div
-              className="absolute top-1/2 h-14 w-14 rounded-full border-4 border-[var(--fel-gold)]/80"
-              style={{ left: `${LANE_HIT_PCT}%`, transform: 'translate(-50%, -50%)' }}
+              data-hit-ring
+              className="absolute top-1/2 h-14 w-14 rounded-full border-4 border-[var(--fel-gold)]"
+              style={{ left: `${LANE_HIT_PCT}%`, transform: 'translate(-50%, -50%)', ...hitRingStyle(typeof hud.beatPulse === 'number' ? hud.beatPulse : null) }}
             />
             {hud.cues.map((c, i) => {
               const t = Math.max(-CUE_LINGER_SEC, Math.min(CUE_LOOKAHEAD_SEC, c.in));
@@ -413,9 +405,9 @@ export function makeTimingHost(opts: TimingHostOpts) {
                   style={{
                     left: `${x}%`,
                     background: c.color,
-                    opacity: c.in < -0.05 ? 0.45 : 1,
+                    opacity: c.in < -0.05 ? PASSED_CUE_OPACITY : 1,
                     transform: `translate(-50%, -50%) scale(${hot ? 1.18 : 1})`,
-                    boxShadow: hot ? `0 0 18px ${c.color}` : '0 2px 6px rgba(0,0,0,0.5)',
+                    boxShadow: hot ? `0 0 0 2px #fff, 0 0 18px ${c.color}` : '0 0 0 2px rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.5)',
                   }}
                 >
                   {c.glyph}
@@ -428,36 +420,11 @@ export function makeTimingHost(opts: TimingHostOpts) {
           </div>
         )}
 
-        {/* the cue — rhythm modes publish the incoming move; it goes gold
-            inside the last 0.35s so the tap is about reading, not guessing */}
-        {typeof hud.nextStep === 'string' && hud.nextStep && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
-            <span
-              className={`fel-panel px-4 py-1.5 font-mono text-sm font-bold transition-colors ${
-                typeof hud.nextStepIn === 'number' && hud.nextStepIn <= 0.35
-                  ? 'border-[var(--fel-gold)]/60 text-[var(--fel-gold)]'
-                  : 'text-white/85'
-              }`}
-            >
-              {typeof hud.nextStepIn === 'number' && hud.nextStepIn <= 0.35 ? 'NOW — ' : ''}
-              {hud.nextStep}
-              {typeof hud.nextStepIn === 'number' && hud.nextStepIn > 0.35 && (
-                <span className="text-white/40"> · {hud.nextStepIn.toFixed(1)}</span>
-              )}
-            </span>
-          </div>
-        )}
 
-        {/* The contact grade — PURE / OFF-CENTRE / EDGE OF THE BAT, plus the
-            pitch that threw it. Derby publishes it on every swing and the
-            bezel dropped it (same family trap as the energy gauge above,
-            whose comment names this exact failure). This is the benchmark's
-            named mechanic; it cannot be invisible. */}
-        {typeof hud.contact === 'string' && hud.contact && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-36 text-center">
-            <span className="fel-panel px-3 py-1 font-mono text-[11px] font-bold text-[var(--fel-gold)]">{hud.contact}</span>
-          </div>
-        )}
+        {/* THE PROMPT LINE (QA P1-12): the incoming tell, the contact grade (PURE / OFF-CENTRE / EDGE OF THE BAT — the
+            benchmark's named mechanic, it cannot be invisible), the graded shot and the rhythm cue (gold inside its last
+            0.35 s) share ONE slot under the meters — they used to sit at their own offsets and stack in a rally. */}
+        <TimingPrompt hud={hud} />
 
         {typeof hud.banner === 'string' && hud.banner && (
           <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
