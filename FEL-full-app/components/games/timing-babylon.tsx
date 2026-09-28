@@ -16,6 +16,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { timingWon } from './timing-won';
+import { opponentScoreFor } from './timing-opponent-score';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
@@ -83,7 +84,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const result: GameResult = {
           score: r.score,
           stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: modeKey === 'penalty' ? n('themGoals') : 0,
+          opponentScore: opponentScoreFor(modeKey, r.stats),
           won,
           duration: r.durationSec,
           headline,
