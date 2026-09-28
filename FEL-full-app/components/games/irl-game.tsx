@@ -26,7 +26,20 @@ const RED = '#FF3366';
 const GREEN = '#00FF9D';
 const GOLD = '#FFD700';
 
-type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results';
+type Phase = 'gate' | 'unsupported' | 'needs-permission' | 'live' | 'results' | 'no-sensor';
+
+/**
+ * QA P1-22 (2026-09-27): a desktop browser exposes DeviceMotionEvent and never fires it, so Hang Time went LIVE, counted
+ * nothing, and ended on "push off harder" — advice for a sensor that was never there. A session that sees no motion
+ * sample within SENSOR_WAIT_MS of starting (or whose permission is refused) says there is no sensor instead.
+ */
+export const SENSOR_WAIT_MS = 1500;
+export const NO_SENSOR_COPY = 'No motion sensor found. Hang Time needs a phone with motion access.';
+/** A devicemotion event carrying a reading (a sensorless browser can fire one with nulls). */
+export function isMotionSample(e: { accelerationIncludingGravity?: { x: number | null; y: number | null; z: number | null } | null }): boolean {
+  const a = e.accelerationIncludingGravity;
+  return !!a && a.x != null && a.y != null && a.z != null;
+}
 
 type DME = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
 
@@ -56,6 +69,8 @@ export default function IrlGame({ onEnd }: GameProps) {
   const samplesRef = useRef<MotionSample[]>([]);
   const t0Ref = useRef(0);
   const handlerRef = useRef<((e: DeviceMotionEvent) => void) | null>(null);
+  const sawMotionRef = useRef(false);
+  const sensorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Decide the gate on mount (client only).
   useEffect(() => {
@@ -66,6 +81,7 @@ export default function IrlGame({ onEnd }: GameProps) {
   }, []);
 
   const stopListening = useCallback(() => {
+    if (sensorTimerRef.current) { clearTimeout(sensorTimerRef.current); sensorTimerRef.current = null; }
     if (handlerRef.current) {
       window.removeEventListener('devicemotion', handlerRef.current);
       handlerRef.current = null;
@@ -80,10 +96,12 @@ export default function IrlGame({ onEnd }: GameProps) {
     setJumpCount(0);
     setBestCm(0);
     setSession(null);
+    sawMotionRef.current = false;
     const handler = (e: DeviceMotionEvent) => {
-      const acc = e.accelerationIncludingGravity;
-      if (!acc || acc.x == null || acc.y == null || acc.z == null) return;
-      const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      if (!isMotionSample(e)) return;
+      sawMotionRef.current = true;
+      const acc = e.accelerationIncludingGravity!;
+      const magnitude = Math.sqrt(acc.x! * acc.x! + acc.y! * acc.y! + acc.z! * acc.z!);
       const t = (performance.now() - t0Ref.current) / 1000;
       const buf = samplesRef.current;
       buf.push({ t, magnitude });
@@ -99,6 +117,12 @@ export default function IrlGame({ onEnd }: GameProps) {
     handlerRef.current = handler;
     window.addEventListener('devicemotion', handler);
     setPhase('live');
+    sensorTimerRef.current = setTimeout(() => {
+      sensorTimerRef.current = null;
+      if (sawMotionRef.current) return;
+      if (handlerRef.current) { window.removeEventListener('devicemotion', handlerRef.current); handlerRef.current = null; }
+      setPhase('no-sensor');
+    }, SENSOR_WAIT_MS);
   }, []);
 
   const requestPermission = useCallback(async () => {
@@ -109,6 +133,7 @@ export default function IrlGame({ onEnd }: GameProps) {
         const res = await dme.requestPermission();
         if (res !== 'granted') {
           setPermError('Motion access was denied. Enable it in your browser settings to measure jumps.');
+          setPhase('no-sensor');
           return;
         }
       } catch {
@@ -121,6 +146,8 @@ export default function IrlGame({ onEnd }: GameProps) {
 
   const finish = useCallback(() => {
     stopListening();
+    // ended inside the wait with nothing heard: no sensor, nothing measured, nothing to report
+    if (!sawMotionRef.current) { setPhase('no-sensor'); return; }
     const jumps = detectJumps(samplesRef.current);
     const summary = summarise(jumps);
     setSession(summary);
@@ -180,6 +207,8 @@ export default function IrlGame({ onEnd }: GameProps) {
           <LiveScreen jumpCount={jumpCount} bestCm={bestCm} onFinish={finish} />
         )}
 
+        {phase === 'no-sensor' && <NoSensorScreen reason={permError} onRetry={reset} />}
+
         {phase === 'results' && session && (
           <ResultsScreen session={session} onReplay={startListening} onMenu={reset} />
         )}
@@ -227,7 +256,26 @@ function LiveScreen({ jumpCount, bestCm, onFinish }: { jumpCount: number; bestCm
   );
 }
 
-function ResultsScreen({ session, onReplay, onMenu }: { session: IRLSession; onReplay: () => void; onMenu: () => void }) {
+export function NoSensorScreen({ reason, onRetry }: { reason: string | null; onRetry: () => void }) {
+  return (
+    <div data-irl="no-sensor" className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
+      <Smartphone className="mx-auto mb-4 h-12 w-12" style={{ color: RED }} />
+      <h2 className="text-2xl font-bold">NO MOTION SENSOR</h2>
+      <p className="mx-auto mt-3 max-w-md text-sm text-white/60">{NO_SENSOR_COPY}</p>
+      {reason && <p className="mt-3 text-sm" style={{ color: RED }}>{reason}</p>}
+      <div className="mt-6 flex gap-3">
+        <button onClick={onRetry} className="inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-sm font-bold text-black" style={{ background: CYAN }}>
+          <RotateCcw className="h-4 w-4" /> Try again
+        </button>
+        <Link href="/creator" className="flex flex-1 items-center justify-center rounded-full border border-white/20 py-3 text-sm font-bold transition hover:bg-white/10">
+          Back to Creator Hub
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+export function ResultsScreen({ session, onReplay, onMenu }: { session: IRLSession; onReplay: () => void; onMenu: () => void }) {
   const bestCm = Math.round(session.best * 100);
   const avgCm = Math.round(session.average * 100);
   return (
