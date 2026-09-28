@@ -86,6 +86,9 @@ model User {
   perfEarnEvents  PerfEarnEvent[]
   entitlements    PlayerEntitlement[]
 
+  // Direct book sales (Final Evolution Press). Guest rows stay on email until this account claims them.
+  bookEntitlements BookEntitlement[]
+
   // Marketing funnel + referral loop
   leadRecord      MarketingLead?  @relation("LeadConversion")
   referralCode    ReferralCode?   @relation("UserReferralCode")
@@ -1985,4 +1988,51 @@ model CoachClient {
 
   @@unique([coachId, clientId])
   @@index([clientId])
+}
+
+// ===========================================================================
+// FINAL EVOLUTION PRESS — direct ebook / audiobook sales.
+// Guest checkout is stored on email. userId is filled when that person logs in.
+// Webhook retries are safe: BookFulfillmentEvent.eventId is unique, and a
+// purchase is one row per (email, offer).
+// ===========================================================================
+
+/// A Stripe event the book shop has already handled. A refund is recorded even
+/// when the purchase row does not exist yet, so a late checkout webhook cannot
+/// grant a book that was already refunded.
+model BookFulfillmentEvent {
+  id              String   @id @default(cuid())
+  eventId         String   @unique
+  type            String
+  paymentIntentId String?
+  createdAt       DateTime @default(now())
+
+  @@index([paymentIntentId])
+}
+
+/// One paid offer (ebook, audiobook, or bundle) for one email address.
+model BookEntitlement {
+  id                    String    @id @default(cuid())
+  email                 String
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  offerId               String
+  /// ebook | audiobook | bundle
+  format                String
+  bookSlug              String
+  stripeSessionId       String
+  stripePaymentIntentId String?
+  stripeEventId         String
+  amountCents           Int
+  currency              String    @default("usd")
+  /// ACTIVE | REVOKED
+  status                String    @default("ACTIVE")
+  revokedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([email, offerId])
+  @@index([userId])
+  @@index([stripeSessionId])
+  @@index([stripePaymentIntentId])
 }

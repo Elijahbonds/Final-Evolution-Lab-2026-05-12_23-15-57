@@ -477,6 +477,18 @@ export type CoachInvite = $Result.DefaultSelection<Prisma.$CoachInvitePayload>
  * for somebody who is already there.
  */
 export type CoachClient = $Result.DefaultSelection<Prisma.$CoachClientPayload>
+/**
+ * Model BookFulfillmentEvent
+ * A Stripe event the book shop has already handled. A refund is recorded even
+ * when the purchase row does not exist yet, so a late checkout webhook cannot
+ * grant a book that was already refunded.
+ */
+export type BookFulfillmentEvent = $Result.DefaultSelection<Prisma.$BookFulfillmentEventPayload>
+/**
+ * Model BookEntitlement
+ * One paid offer (ebook, audiobook, or bundle) for one email address.
+ */
+export type BookEntitlement = $Result.DefaultSelection<Prisma.$BookEntitlementPayload>
 
 /**
  * Enums
@@ -1761,6 +1773,26 @@ export class PrismaClient<
     * ```
     */
   get coachClient(): Prisma.CoachClientDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.bookFulfillmentEvent`: Exposes CRUD operations for the **BookFulfillmentEvent** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BookFulfillmentEvents
+    * const bookFulfillmentEvents = await prisma.bookFulfillmentEvent.findMany()
+    * ```
+    */
+  get bookFulfillmentEvent(): Prisma.BookFulfillmentEventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.bookEntitlement`: Exposes CRUD operations for the **BookEntitlement** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BookEntitlements
+    * const bookEntitlements = await prisma.bookEntitlement.findMany()
+    * ```
+    */
+  get bookEntitlement(): Prisma.BookEntitlementDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2285,7 +2317,9 @@ export namespace Prisma {
     MirrorSession: 'MirrorSession',
     ShareLink: 'ShareLink',
     CoachInvite: 'CoachInvite',
-    CoachClient: 'CoachClient'
+    CoachClient: 'CoachClient',
+    BookFulfillmentEvent: 'BookFulfillmentEvent',
+    BookEntitlement: 'BookEntitlement'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2304,7 +2338,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient" | "bookFulfillmentEvent" | "bookEntitlement"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -8598,6 +8632,154 @@ export namespace Prisma {
           }
         }
       }
+      BookFulfillmentEvent: {
+        payload: Prisma.$BookFulfillmentEventPayload<ExtArgs>
+        fields: Prisma.BookFulfillmentEventFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BookFulfillmentEventFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BookFulfillmentEventFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          findFirst: {
+            args: Prisma.BookFulfillmentEventFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BookFulfillmentEventFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          findMany: {
+            args: Prisma.BookFulfillmentEventFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>[]
+          }
+          create: {
+            args: Prisma.BookFulfillmentEventCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          createMany: {
+            args: Prisma.BookFulfillmentEventCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BookFulfillmentEventCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>[]
+          }
+          delete: {
+            args: Prisma.BookFulfillmentEventDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          update: {
+            args: Prisma.BookFulfillmentEventUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          deleteMany: {
+            args: Prisma.BookFulfillmentEventDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BookFulfillmentEventUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BookFulfillmentEventUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>[]
+          }
+          upsert: {
+            args: Prisma.BookFulfillmentEventUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          aggregate: {
+            args: Prisma.BookFulfillmentEventAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBookFulfillmentEvent>
+          }
+          groupBy: {
+            args: Prisma.BookFulfillmentEventGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BookFulfillmentEventGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BookFulfillmentEventCountArgs<ExtArgs>
+            result: $Utils.Optional<BookFulfillmentEventCountAggregateOutputType> | number
+          }
+        }
+      }
+      BookEntitlement: {
+        payload: Prisma.$BookEntitlementPayload<ExtArgs>
+        fields: Prisma.BookEntitlementFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BookEntitlementFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BookEntitlementFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          findFirst: {
+            args: Prisma.BookEntitlementFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BookEntitlementFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          findMany: {
+            args: Prisma.BookEntitlementFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>[]
+          }
+          create: {
+            args: Prisma.BookEntitlementCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          createMany: {
+            args: Prisma.BookEntitlementCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BookEntitlementCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>[]
+          }
+          delete: {
+            args: Prisma.BookEntitlementDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          update: {
+            args: Prisma.BookEntitlementUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          deleteMany: {
+            args: Prisma.BookEntitlementDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BookEntitlementUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BookEntitlementUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>[]
+          }
+          upsert: {
+            args: Prisma.BookEntitlementUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          aggregate: {
+            args: Prisma.BookEntitlementAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBookEntitlement>
+          }
+          groupBy: {
+            args: Prisma.BookEntitlementGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BookEntitlementGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BookEntitlementCountArgs<ExtArgs>
+            result: $Utils.Optional<BookEntitlementCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -8767,6 +8949,8 @@ export namespace Prisma {
     shareLink?: ShareLinkOmit
     coachInvite?: CoachInviteOmit
     coachClient?: CoachClientOmit
+    bookFulfillmentEvent?: BookFulfillmentEventOmit
+    bookEntitlement?: BookEntitlementOmit
   }
 
   /* Types for Logging */
@@ -8888,6 +9072,7 @@ export namespace Prisma {
     mirrorTriumphs: number
     perfEarnEvents: number
     entitlements: number
+    bookEntitlements: number
     mpMatchesHost: number
     mpMatchesGuest: number
     creatorCards: number
@@ -8935,6 +9120,7 @@ export namespace Prisma {
     mirrorTriumphs?: boolean | UserCountOutputTypeCountMirrorTriumphsArgs
     perfEarnEvents?: boolean | UserCountOutputTypeCountPerfEarnEventsArgs
     entitlements?: boolean | UserCountOutputTypeCountEntitlementsArgs
+    bookEntitlements?: boolean | UserCountOutputTypeCountBookEntitlementsArgs
     mpMatchesHost?: boolean | UserCountOutputTypeCountMpMatchesHostArgs
     mpMatchesGuest?: boolean | UserCountOutputTypeCountMpMatchesGuestArgs
     creatorCards?: boolean | UserCountOutputTypeCountCreatorCardsArgs
@@ -9152,6 +9338,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountEntitlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: PlayerEntitlementWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountBookEntitlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookEntitlementWhereInput
   }
 
   /**
@@ -10441,6 +10634,7 @@ export namespace Prisma {
     wallet?: boolean | User$walletArgs<ExtArgs>
     perfEarnEvents?: boolean | User$perfEarnEventsArgs<ExtArgs>
     entitlements?: boolean | User$entitlementsArgs<ExtArgs>
+    bookEntitlements?: boolean | User$bookEntitlementsArgs<ExtArgs>
     leadRecord?: boolean | User$leadRecordArgs<ExtArgs>
     referralCode?: boolean | User$referralCodeArgs<ExtArgs>
     mpMatchesHost?: boolean | User$mpMatchesHostArgs<ExtArgs>
@@ -10551,6 +10745,7 @@ export namespace Prisma {
     wallet?: boolean | User$walletArgs<ExtArgs>
     perfEarnEvents?: boolean | User$perfEarnEventsArgs<ExtArgs>
     entitlements?: boolean | User$entitlementsArgs<ExtArgs>
+    bookEntitlements?: boolean | User$bookEntitlementsArgs<ExtArgs>
     leadRecord?: boolean | User$leadRecordArgs<ExtArgs>
     referralCode?: boolean | User$referralCodeArgs<ExtArgs>
     mpMatchesHost?: boolean | User$mpMatchesHostArgs<ExtArgs>
@@ -10613,6 +10808,7 @@ export namespace Prisma {
       wallet: Prisma.$WalletPayload<ExtArgs> | null
       perfEarnEvents: Prisma.$PerfEarnEventPayload<ExtArgs>[]
       entitlements: Prisma.$PlayerEntitlementPayload<ExtArgs>[]
+      bookEntitlements: Prisma.$BookEntitlementPayload<ExtArgs>[]
       leadRecord: Prisma.$MarketingLeadPayload<ExtArgs> | null
       referralCode: Prisma.$ReferralCodePayload<ExtArgs> | null
       mpMatchesHost: Prisma.$MpMatchPayload<ExtArgs>[]
@@ -11077,6 +11273,7 @@ export namespace Prisma {
     wallet<T extends User$walletArgs<ExtArgs> = {}>(args?: Subset<T, User$walletArgs<ExtArgs>>): Prisma__WalletClient<$Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     perfEarnEvents<T extends User$perfEarnEventsArgs<ExtArgs> = {}>(args?: Subset<T, User$perfEarnEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PerfEarnEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     entitlements<T extends User$entitlementsArgs<ExtArgs> = {}>(args?: Subset<T, User$entitlementsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlayerEntitlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    bookEntitlements<T extends User$bookEntitlementsArgs<ExtArgs> = {}>(args?: Subset<T, User$bookEntitlementsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     leadRecord<T extends User$leadRecordArgs<ExtArgs> = {}>(args?: Subset<T, User$leadRecordArgs<ExtArgs>>): Prisma__MarketingLeadClient<$Result.GetResult<Prisma.$MarketingLeadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     referralCode<T extends User$referralCodeArgs<ExtArgs> = {}>(args?: Subset<T, User$referralCodeArgs<ExtArgs>>): Prisma__ReferralCodeClient<$Result.GetResult<Prisma.$ReferralCodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     mpMatchesHost<T extends User$mpMatchesHostArgs<ExtArgs> = {}>(args?: Subset<T, User$mpMatchesHostArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MpMatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -12270,6 +12467,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: PlayerEntitlementScalarFieldEnum | PlayerEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * User.bookEntitlements
+   */
+  export type User$bookEntitlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    where?: BookEntitlementWhereInput
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    cursor?: BookEntitlementWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
   }
 
   /**
@@ -109504,6 +109725,2248 @@ export namespace Prisma {
 
 
   /**
+   * Model BookFulfillmentEvent
+   */
+
+  export type AggregateBookFulfillmentEvent = {
+    _count: BookFulfillmentEventCountAggregateOutputType | null
+    _min: BookFulfillmentEventMinAggregateOutputType | null
+    _max: BookFulfillmentEventMaxAggregateOutputType | null
+  }
+
+  export type BookFulfillmentEventMinAggregateOutputType = {
+    id: string | null
+    eventId: string | null
+    type: string | null
+    paymentIntentId: string | null
+    createdAt: Date | null
+  }
+
+  export type BookFulfillmentEventMaxAggregateOutputType = {
+    id: string | null
+    eventId: string | null
+    type: string | null
+    paymentIntentId: string | null
+    createdAt: Date | null
+  }
+
+  export type BookFulfillmentEventCountAggregateOutputType = {
+    id: number
+    eventId: number
+    type: number
+    paymentIntentId: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type BookFulfillmentEventMinAggregateInputType = {
+    id?: true
+    eventId?: true
+    type?: true
+    paymentIntentId?: true
+    createdAt?: true
+  }
+
+  export type BookFulfillmentEventMaxAggregateInputType = {
+    id?: true
+    eventId?: true
+    type?: true
+    paymentIntentId?: true
+    createdAt?: true
+  }
+
+  export type BookFulfillmentEventCountAggregateInputType = {
+    id?: true
+    eventId?: true
+    type?: true
+    paymentIntentId?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type BookFulfillmentEventAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookFulfillmentEvent to aggregate.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BookFulfillmentEvents
+    **/
+    _count?: true | BookFulfillmentEventCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BookFulfillmentEventMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BookFulfillmentEventMaxAggregateInputType
+  }
+
+  export type GetBookFulfillmentEventAggregateType<T extends BookFulfillmentEventAggregateArgs> = {
+        [P in keyof T & keyof AggregateBookFulfillmentEvent]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBookFulfillmentEvent[P]>
+      : GetScalarType<T[P], AggregateBookFulfillmentEvent[P]>
+  }
+
+
+
+
+  export type BookFulfillmentEventGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookFulfillmentEventWhereInput
+    orderBy?: BookFulfillmentEventOrderByWithAggregationInput | BookFulfillmentEventOrderByWithAggregationInput[]
+    by: BookFulfillmentEventScalarFieldEnum[] | BookFulfillmentEventScalarFieldEnum
+    having?: BookFulfillmentEventScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BookFulfillmentEventCountAggregateInputType | true
+    _min?: BookFulfillmentEventMinAggregateInputType
+    _max?: BookFulfillmentEventMaxAggregateInputType
+  }
+
+  export type BookFulfillmentEventGroupByOutputType = {
+    id: string
+    eventId: string
+    type: string
+    paymentIntentId: string | null
+    createdAt: Date
+    _count: BookFulfillmentEventCountAggregateOutputType | null
+    _min: BookFulfillmentEventMinAggregateOutputType | null
+    _max: BookFulfillmentEventMaxAggregateOutputType | null
+  }
+
+  type GetBookFulfillmentEventGroupByPayload<T extends BookFulfillmentEventGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BookFulfillmentEventGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BookFulfillmentEventGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BookFulfillmentEventGroupByOutputType[P]>
+            : GetScalarType<T[P], BookFulfillmentEventGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BookFulfillmentEventSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type BookFulfillmentEventSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type BookFulfillmentEventSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type BookFulfillmentEventSelectScalar = {
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }
+
+  export type BookFulfillmentEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "eventId" | "type" | "paymentIntentId" | "createdAt", ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type $BookFulfillmentEventPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BookFulfillmentEvent"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      eventId: string
+      type: string
+      paymentIntentId: string | null
+      createdAt: Date
+    }, ExtArgs["result"]["bookFulfillmentEvent"]>
+    composites: {}
+  }
+
+  type BookFulfillmentEventGetPayload<S extends boolean | null | undefined | BookFulfillmentEventDefaultArgs> = $Result.GetResult<Prisma.$BookFulfillmentEventPayload, S>
+
+  type BookFulfillmentEventCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BookFulfillmentEventFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BookFulfillmentEventCountAggregateInputType | true
+    }
+
+  export interface BookFulfillmentEventDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BookFulfillmentEvent'], meta: { name: 'BookFulfillmentEvent' } }
+    /**
+     * Find zero or one BookFulfillmentEvent that matches the filter.
+     * @param {BookFulfillmentEventFindUniqueArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BookFulfillmentEventFindUniqueArgs>(args: SelectSubset<T, BookFulfillmentEventFindUniqueArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BookFulfillmentEvent that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BookFulfillmentEventFindUniqueOrThrowArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BookFulfillmentEventFindUniqueOrThrowArgs>(args: SelectSubset<T, BookFulfillmentEventFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookFulfillmentEvent that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventFindFirstArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BookFulfillmentEventFindFirstArgs>(args?: SelectSubset<T, BookFulfillmentEventFindFirstArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookFulfillmentEvent that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventFindFirstOrThrowArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BookFulfillmentEventFindFirstOrThrowArgs>(args?: SelectSubset<T, BookFulfillmentEventFindFirstOrThrowArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BookFulfillmentEvents that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BookFulfillmentEvents
+     * const bookFulfillmentEvents = await prisma.bookFulfillmentEvent.findMany()
+     * 
+     * // Get first 10 BookFulfillmentEvents
+     * const bookFulfillmentEvents = await prisma.bookFulfillmentEvent.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const bookFulfillmentEventWithIdOnly = await prisma.bookFulfillmentEvent.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BookFulfillmentEventFindManyArgs>(args?: SelectSubset<T, BookFulfillmentEventFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BookFulfillmentEvent.
+     * @param {BookFulfillmentEventCreateArgs} args - Arguments to create a BookFulfillmentEvent.
+     * @example
+     * // Create one BookFulfillmentEvent
+     * const BookFulfillmentEvent = await prisma.bookFulfillmentEvent.create({
+     *   data: {
+     *     // ... data to create a BookFulfillmentEvent
+     *   }
+     * })
+     * 
+     */
+    create<T extends BookFulfillmentEventCreateArgs>(args: SelectSubset<T, BookFulfillmentEventCreateArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BookFulfillmentEvents.
+     * @param {BookFulfillmentEventCreateManyArgs} args - Arguments to create many BookFulfillmentEvents.
+     * @example
+     * // Create many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BookFulfillmentEventCreateManyArgs>(args?: SelectSubset<T, BookFulfillmentEventCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BookFulfillmentEvents and returns the data saved in the database.
+     * @param {BookFulfillmentEventCreateManyAndReturnArgs} args - Arguments to create many BookFulfillmentEvents.
+     * @example
+     * // Create many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BookFulfillmentEvents and only return the `id`
+     * const bookFulfillmentEventWithIdOnly = await prisma.bookFulfillmentEvent.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BookFulfillmentEventCreateManyAndReturnArgs>(args?: SelectSubset<T, BookFulfillmentEventCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BookFulfillmentEvent.
+     * @param {BookFulfillmentEventDeleteArgs} args - Arguments to delete one BookFulfillmentEvent.
+     * @example
+     * // Delete one BookFulfillmentEvent
+     * const BookFulfillmentEvent = await prisma.bookFulfillmentEvent.delete({
+     *   where: {
+     *     // ... filter to delete one BookFulfillmentEvent
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BookFulfillmentEventDeleteArgs>(args: SelectSubset<T, BookFulfillmentEventDeleteArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BookFulfillmentEvent.
+     * @param {BookFulfillmentEventUpdateArgs} args - Arguments to update one BookFulfillmentEvent.
+     * @example
+     * // Update one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BookFulfillmentEventUpdateArgs>(args: SelectSubset<T, BookFulfillmentEventUpdateArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BookFulfillmentEvents.
+     * @param {BookFulfillmentEventDeleteManyArgs} args - Arguments to filter BookFulfillmentEvents to delete.
+     * @example
+     * // Delete a few BookFulfillmentEvents
+     * const { count } = await prisma.bookFulfillmentEvent.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BookFulfillmentEventDeleteManyArgs>(args?: SelectSubset<T, BookFulfillmentEventDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookFulfillmentEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BookFulfillmentEventUpdateManyArgs>(args: SelectSubset<T, BookFulfillmentEventUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookFulfillmentEvents and returns the data updated in the database.
+     * @param {BookFulfillmentEventUpdateManyAndReturnArgs} args - Arguments to update many BookFulfillmentEvents.
+     * @example
+     * // Update many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BookFulfillmentEvents and only return the `id`
+     * const bookFulfillmentEventWithIdOnly = await prisma.bookFulfillmentEvent.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BookFulfillmentEventUpdateManyAndReturnArgs>(args: SelectSubset<T, BookFulfillmentEventUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BookFulfillmentEvent.
+     * @param {BookFulfillmentEventUpsertArgs} args - Arguments to update or create a BookFulfillmentEvent.
+     * @example
+     * // Update or create a BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.upsert({
+     *   create: {
+     *     // ... data to create a BookFulfillmentEvent
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BookFulfillmentEvent we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BookFulfillmentEventUpsertArgs>(args: SelectSubset<T, BookFulfillmentEventUpsertArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BookFulfillmentEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventCountArgs} args - Arguments to filter BookFulfillmentEvents to count.
+     * @example
+     * // Count the number of BookFulfillmentEvents
+     * const count = await prisma.bookFulfillmentEvent.count({
+     *   where: {
+     *     // ... the filter for the BookFulfillmentEvents we want to count
+     *   }
+     * })
+    **/
+    count<T extends BookFulfillmentEventCountArgs>(
+      args?: Subset<T, BookFulfillmentEventCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BookFulfillmentEventCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BookFulfillmentEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BookFulfillmentEventAggregateArgs>(args: Subset<T, BookFulfillmentEventAggregateArgs>): Prisma.PrismaPromise<GetBookFulfillmentEventAggregateType<T>>
+
+    /**
+     * Group by BookFulfillmentEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BookFulfillmentEventGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BookFulfillmentEventGroupByArgs['orderBy'] }
+        : { orderBy?: BookFulfillmentEventGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BookFulfillmentEventGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBookFulfillmentEventGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BookFulfillmentEvent model
+   */
+  readonly fields: BookFulfillmentEventFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BookFulfillmentEvent.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BookFulfillmentEventClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BookFulfillmentEvent model
+   */
+  interface BookFulfillmentEventFieldRefs {
+    readonly id: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly eventId: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly type: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly paymentIntentId: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly createdAt: FieldRef<"BookFulfillmentEvent", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BookFulfillmentEvent findUnique
+   */
+  export type BookFulfillmentEventFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent findUniqueOrThrow
+   */
+  export type BookFulfillmentEventFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent findFirst
+   */
+  export type BookFulfillmentEventFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookFulfillmentEvents.
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookFulfillmentEvents.
+     */
+    distinct?: BookFulfillmentEventScalarFieldEnum | BookFulfillmentEventScalarFieldEnum[]
+  }
+
+  /**
+   * BookFulfillmentEvent findFirstOrThrow
+   */
+  export type BookFulfillmentEventFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookFulfillmentEvents.
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookFulfillmentEvents.
+     */
+    distinct?: BookFulfillmentEventScalarFieldEnum | BookFulfillmentEventScalarFieldEnum[]
+  }
+
+  /**
+   * BookFulfillmentEvent findMany
+   */
+  export type BookFulfillmentEventFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvents to fetch.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BookFulfillmentEvents.
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    distinct?: BookFulfillmentEventScalarFieldEnum | BookFulfillmentEventScalarFieldEnum[]
+  }
+
+  /**
+   * BookFulfillmentEvent create
+   */
+  export type BookFulfillmentEventCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data needed to create a BookFulfillmentEvent.
+     */
+    data: XOR<BookFulfillmentEventCreateInput, BookFulfillmentEventUncheckedCreateInput>
+  }
+
+  /**
+   * BookFulfillmentEvent createMany
+   */
+  export type BookFulfillmentEventCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BookFulfillmentEvents.
+     */
+    data: BookFulfillmentEventCreateManyInput | BookFulfillmentEventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BookFulfillmentEvent createManyAndReturn
+   */
+  export type BookFulfillmentEventCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data used to create many BookFulfillmentEvents.
+     */
+    data: BookFulfillmentEventCreateManyInput | BookFulfillmentEventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BookFulfillmentEvent update
+   */
+  export type BookFulfillmentEventUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data needed to update a BookFulfillmentEvent.
+     */
+    data: XOR<BookFulfillmentEventUpdateInput, BookFulfillmentEventUncheckedUpdateInput>
+    /**
+     * Choose, which BookFulfillmentEvent to update.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent updateMany
+   */
+  export type BookFulfillmentEventUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BookFulfillmentEvents.
+     */
+    data: XOR<BookFulfillmentEventUpdateManyMutationInput, BookFulfillmentEventUncheckedUpdateManyInput>
+    /**
+     * Filter which BookFulfillmentEvents to update
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * Limit how many BookFulfillmentEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookFulfillmentEvent updateManyAndReturn
+   */
+  export type BookFulfillmentEventUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data used to update BookFulfillmentEvents.
+     */
+    data: XOR<BookFulfillmentEventUpdateManyMutationInput, BookFulfillmentEventUncheckedUpdateManyInput>
+    /**
+     * Filter which BookFulfillmentEvents to update
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * Limit how many BookFulfillmentEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookFulfillmentEvent upsert
+   */
+  export type BookFulfillmentEventUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The filter to search for the BookFulfillmentEvent to update in case it exists.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+    /**
+     * In case the BookFulfillmentEvent found by the `where` argument doesn't exist, create a new BookFulfillmentEvent with this data.
+     */
+    create: XOR<BookFulfillmentEventCreateInput, BookFulfillmentEventUncheckedCreateInput>
+    /**
+     * In case the BookFulfillmentEvent was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BookFulfillmentEventUpdateInput, BookFulfillmentEventUncheckedUpdateInput>
+  }
+
+  /**
+   * BookFulfillmentEvent delete
+   */
+  export type BookFulfillmentEventDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter which BookFulfillmentEvent to delete.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent deleteMany
+   */
+  export type BookFulfillmentEventDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookFulfillmentEvents to delete
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * Limit how many BookFulfillmentEvents to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookFulfillmentEvent without action
+   */
+  export type BookFulfillmentEventDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model BookEntitlement
+   */
+
+  export type AggregateBookEntitlement = {
+    _count: BookEntitlementCountAggregateOutputType | null
+    _avg: BookEntitlementAvgAggregateOutputType | null
+    _sum: BookEntitlementSumAggregateOutputType | null
+    _min: BookEntitlementMinAggregateOutputType | null
+    _max: BookEntitlementMaxAggregateOutputType | null
+  }
+
+  export type BookEntitlementAvgAggregateOutputType = {
+    amountCents: number | null
+  }
+
+  export type BookEntitlementSumAggregateOutputType = {
+    amountCents: number | null
+  }
+
+  export type BookEntitlementMinAggregateOutputType = {
+    id: string | null
+    email: string | null
+    userId: string | null
+    offerId: string | null
+    format: string | null
+    bookSlug: string | null
+    stripeSessionId: string | null
+    stripePaymentIntentId: string | null
+    stripeEventId: string | null
+    amountCents: number | null
+    currency: string | null
+    status: string | null
+    revokedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BookEntitlementMaxAggregateOutputType = {
+    id: string | null
+    email: string | null
+    userId: string | null
+    offerId: string | null
+    format: string | null
+    bookSlug: string | null
+    stripeSessionId: string | null
+    stripePaymentIntentId: string | null
+    stripeEventId: string | null
+    amountCents: number | null
+    currency: string | null
+    status: string | null
+    revokedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BookEntitlementCountAggregateOutputType = {
+    id: number
+    email: number
+    userId: number
+    offerId: number
+    format: number
+    bookSlug: number
+    stripeSessionId: number
+    stripePaymentIntentId: number
+    stripeEventId: number
+    amountCents: number
+    currency: number
+    status: number
+    revokedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type BookEntitlementAvgAggregateInputType = {
+    amountCents?: true
+  }
+
+  export type BookEntitlementSumAggregateInputType = {
+    amountCents?: true
+  }
+
+  export type BookEntitlementMinAggregateInputType = {
+    id?: true
+    email?: true
+    userId?: true
+    offerId?: true
+    format?: true
+    bookSlug?: true
+    stripeSessionId?: true
+    stripePaymentIntentId?: true
+    stripeEventId?: true
+    amountCents?: true
+    currency?: true
+    status?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BookEntitlementMaxAggregateInputType = {
+    id?: true
+    email?: true
+    userId?: true
+    offerId?: true
+    format?: true
+    bookSlug?: true
+    stripeSessionId?: true
+    stripePaymentIntentId?: true
+    stripeEventId?: true
+    amountCents?: true
+    currency?: true
+    status?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BookEntitlementCountAggregateInputType = {
+    id?: true
+    email?: true
+    userId?: true
+    offerId?: true
+    format?: true
+    bookSlug?: true
+    stripeSessionId?: true
+    stripePaymentIntentId?: true
+    stripeEventId?: true
+    amountCents?: true
+    currency?: true
+    status?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type BookEntitlementAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookEntitlement to aggregate.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BookEntitlements
+    **/
+    _count?: true | BookEntitlementCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: BookEntitlementAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: BookEntitlementSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BookEntitlementMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BookEntitlementMaxAggregateInputType
+  }
+
+  export type GetBookEntitlementAggregateType<T extends BookEntitlementAggregateArgs> = {
+        [P in keyof T & keyof AggregateBookEntitlement]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBookEntitlement[P]>
+      : GetScalarType<T[P], AggregateBookEntitlement[P]>
+  }
+
+
+
+
+  export type BookEntitlementGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookEntitlementWhereInput
+    orderBy?: BookEntitlementOrderByWithAggregationInput | BookEntitlementOrderByWithAggregationInput[]
+    by: BookEntitlementScalarFieldEnum[] | BookEntitlementScalarFieldEnum
+    having?: BookEntitlementScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BookEntitlementCountAggregateInputType | true
+    _avg?: BookEntitlementAvgAggregateInputType
+    _sum?: BookEntitlementSumAggregateInputType
+    _min?: BookEntitlementMinAggregateInputType
+    _max?: BookEntitlementMaxAggregateInputType
+  }
+
+  export type BookEntitlementGroupByOutputType = {
+    id: string
+    email: string
+    userId: string | null
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId: string | null
+    stripeEventId: string
+    amountCents: number
+    currency: string
+    status: string
+    revokedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: BookEntitlementCountAggregateOutputType | null
+    _avg: BookEntitlementAvgAggregateOutputType | null
+    _sum: BookEntitlementSumAggregateOutputType | null
+    _min: BookEntitlementMinAggregateOutputType | null
+    _max: BookEntitlementMaxAggregateOutputType | null
+  }
+
+  type GetBookEntitlementGroupByPayload<T extends BookEntitlementGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BookEntitlementGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BookEntitlementGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BookEntitlementGroupByOutputType[P]>
+            : GetScalarType<T[P], BookEntitlementGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BookEntitlementSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }, ExtArgs["result"]["bookEntitlement"]>
+
+  export type BookEntitlementSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }, ExtArgs["result"]["bookEntitlement"]>
+
+  export type BookEntitlementSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }, ExtArgs["result"]["bookEntitlement"]>
+
+  export type BookEntitlementSelectScalar = {
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type BookEntitlementOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "userId" | "offerId" | "format" | "bookSlug" | "stripeSessionId" | "stripePaymentIntentId" | "stripeEventId" | "amountCents" | "currency" | "status" | "revokedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["bookEntitlement"]>
+  export type BookEntitlementInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }
+  export type BookEntitlementIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }
+  export type BookEntitlementIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }
+
+  export type $BookEntitlementPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BookEntitlement"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      email: string
+      userId: string | null
+      offerId: string
+      /**
+       * ebook | audiobook | bundle
+       */
+      format: string
+      bookSlug: string
+      stripeSessionId: string
+      stripePaymentIntentId: string | null
+      stripeEventId: string
+      amountCents: number
+      currency: string
+      /**
+       * ACTIVE | REVOKED
+       */
+      status: string
+      revokedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["bookEntitlement"]>
+    composites: {}
+  }
+
+  type BookEntitlementGetPayload<S extends boolean | null | undefined | BookEntitlementDefaultArgs> = $Result.GetResult<Prisma.$BookEntitlementPayload, S>
+
+  type BookEntitlementCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BookEntitlementFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BookEntitlementCountAggregateInputType | true
+    }
+
+  export interface BookEntitlementDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BookEntitlement'], meta: { name: 'BookEntitlement' } }
+    /**
+     * Find zero or one BookEntitlement that matches the filter.
+     * @param {BookEntitlementFindUniqueArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BookEntitlementFindUniqueArgs>(args: SelectSubset<T, BookEntitlementFindUniqueArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BookEntitlement that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BookEntitlementFindUniqueOrThrowArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BookEntitlementFindUniqueOrThrowArgs>(args: SelectSubset<T, BookEntitlementFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookEntitlement that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementFindFirstArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BookEntitlementFindFirstArgs>(args?: SelectSubset<T, BookEntitlementFindFirstArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookEntitlement that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementFindFirstOrThrowArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BookEntitlementFindFirstOrThrowArgs>(args?: SelectSubset<T, BookEntitlementFindFirstOrThrowArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BookEntitlements that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BookEntitlements
+     * const bookEntitlements = await prisma.bookEntitlement.findMany()
+     * 
+     * // Get first 10 BookEntitlements
+     * const bookEntitlements = await prisma.bookEntitlement.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const bookEntitlementWithIdOnly = await prisma.bookEntitlement.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BookEntitlementFindManyArgs>(args?: SelectSubset<T, BookEntitlementFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BookEntitlement.
+     * @param {BookEntitlementCreateArgs} args - Arguments to create a BookEntitlement.
+     * @example
+     * // Create one BookEntitlement
+     * const BookEntitlement = await prisma.bookEntitlement.create({
+     *   data: {
+     *     // ... data to create a BookEntitlement
+     *   }
+     * })
+     * 
+     */
+    create<T extends BookEntitlementCreateArgs>(args: SelectSubset<T, BookEntitlementCreateArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BookEntitlements.
+     * @param {BookEntitlementCreateManyArgs} args - Arguments to create many BookEntitlements.
+     * @example
+     * // Create many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BookEntitlementCreateManyArgs>(args?: SelectSubset<T, BookEntitlementCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BookEntitlements and returns the data saved in the database.
+     * @param {BookEntitlementCreateManyAndReturnArgs} args - Arguments to create many BookEntitlements.
+     * @example
+     * // Create many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BookEntitlements and only return the `id`
+     * const bookEntitlementWithIdOnly = await prisma.bookEntitlement.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BookEntitlementCreateManyAndReturnArgs>(args?: SelectSubset<T, BookEntitlementCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BookEntitlement.
+     * @param {BookEntitlementDeleteArgs} args - Arguments to delete one BookEntitlement.
+     * @example
+     * // Delete one BookEntitlement
+     * const BookEntitlement = await prisma.bookEntitlement.delete({
+     *   where: {
+     *     // ... filter to delete one BookEntitlement
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BookEntitlementDeleteArgs>(args: SelectSubset<T, BookEntitlementDeleteArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BookEntitlement.
+     * @param {BookEntitlementUpdateArgs} args - Arguments to update one BookEntitlement.
+     * @example
+     * // Update one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BookEntitlementUpdateArgs>(args: SelectSubset<T, BookEntitlementUpdateArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BookEntitlements.
+     * @param {BookEntitlementDeleteManyArgs} args - Arguments to filter BookEntitlements to delete.
+     * @example
+     * // Delete a few BookEntitlements
+     * const { count } = await prisma.bookEntitlement.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BookEntitlementDeleteManyArgs>(args?: SelectSubset<T, BookEntitlementDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookEntitlements.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BookEntitlementUpdateManyArgs>(args: SelectSubset<T, BookEntitlementUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookEntitlements and returns the data updated in the database.
+     * @param {BookEntitlementUpdateManyAndReturnArgs} args - Arguments to update many BookEntitlements.
+     * @example
+     * // Update many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BookEntitlements and only return the `id`
+     * const bookEntitlementWithIdOnly = await prisma.bookEntitlement.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BookEntitlementUpdateManyAndReturnArgs>(args: SelectSubset<T, BookEntitlementUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BookEntitlement.
+     * @param {BookEntitlementUpsertArgs} args - Arguments to update or create a BookEntitlement.
+     * @example
+     * // Update or create a BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.upsert({
+     *   create: {
+     *     // ... data to create a BookEntitlement
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BookEntitlement we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BookEntitlementUpsertArgs>(args: SelectSubset<T, BookEntitlementUpsertArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BookEntitlements.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementCountArgs} args - Arguments to filter BookEntitlements to count.
+     * @example
+     * // Count the number of BookEntitlements
+     * const count = await prisma.bookEntitlement.count({
+     *   where: {
+     *     // ... the filter for the BookEntitlements we want to count
+     *   }
+     * })
+    **/
+    count<T extends BookEntitlementCountArgs>(
+      args?: Subset<T, BookEntitlementCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BookEntitlementCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BookEntitlement.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BookEntitlementAggregateArgs>(args: Subset<T, BookEntitlementAggregateArgs>): Prisma.PrismaPromise<GetBookEntitlementAggregateType<T>>
+
+    /**
+     * Group by BookEntitlement.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BookEntitlementGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BookEntitlementGroupByArgs['orderBy'] }
+        : { orderBy?: BookEntitlementGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BookEntitlementGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBookEntitlementGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BookEntitlement model
+   */
+  readonly fields: BookEntitlementFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BookEntitlement.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BookEntitlementClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends BookEntitlement$userArgs<ExtArgs> = {}>(args?: Subset<T, BookEntitlement$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BookEntitlement model
+   */
+  interface BookEntitlementFieldRefs {
+    readonly id: FieldRef<"BookEntitlement", 'String'>
+    readonly email: FieldRef<"BookEntitlement", 'String'>
+    readonly userId: FieldRef<"BookEntitlement", 'String'>
+    readonly offerId: FieldRef<"BookEntitlement", 'String'>
+    readonly format: FieldRef<"BookEntitlement", 'String'>
+    readonly bookSlug: FieldRef<"BookEntitlement", 'String'>
+    readonly stripeSessionId: FieldRef<"BookEntitlement", 'String'>
+    readonly stripePaymentIntentId: FieldRef<"BookEntitlement", 'String'>
+    readonly stripeEventId: FieldRef<"BookEntitlement", 'String'>
+    readonly amountCents: FieldRef<"BookEntitlement", 'Int'>
+    readonly currency: FieldRef<"BookEntitlement", 'String'>
+    readonly status: FieldRef<"BookEntitlement", 'String'>
+    readonly revokedAt: FieldRef<"BookEntitlement", 'DateTime'>
+    readonly createdAt: FieldRef<"BookEntitlement", 'DateTime'>
+    readonly updatedAt: FieldRef<"BookEntitlement", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BookEntitlement findUnique
+   */
+  export type BookEntitlementFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement findUniqueOrThrow
+   */
+  export type BookEntitlementFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement findFirst
+   */
+  export type BookEntitlementFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookEntitlements.
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookEntitlements.
+     */
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * BookEntitlement findFirstOrThrow
+   */
+  export type BookEntitlementFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookEntitlements.
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookEntitlements.
+     */
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * BookEntitlement findMany
+   */
+  export type BookEntitlementFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlements to fetch.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BookEntitlements.
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * BookEntitlement create
+   */
+  export type BookEntitlementCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * The data needed to create a BookEntitlement.
+     */
+    data: XOR<BookEntitlementCreateInput, BookEntitlementUncheckedCreateInput>
+  }
+
+  /**
+   * BookEntitlement createMany
+   */
+  export type BookEntitlementCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BookEntitlements.
+     */
+    data: BookEntitlementCreateManyInput | BookEntitlementCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BookEntitlement createManyAndReturn
+   */
+  export type BookEntitlementCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * The data used to create many BookEntitlements.
+     */
+    data: BookEntitlementCreateManyInput | BookEntitlementCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BookEntitlement update
+   */
+  export type BookEntitlementUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * The data needed to update a BookEntitlement.
+     */
+    data: XOR<BookEntitlementUpdateInput, BookEntitlementUncheckedUpdateInput>
+    /**
+     * Choose, which BookEntitlement to update.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement updateMany
+   */
+  export type BookEntitlementUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BookEntitlements.
+     */
+    data: XOR<BookEntitlementUpdateManyMutationInput, BookEntitlementUncheckedUpdateManyInput>
+    /**
+     * Filter which BookEntitlements to update
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * Limit how many BookEntitlements to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookEntitlement updateManyAndReturn
+   */
+  export type BookEntitlementUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * The data used to update BookEntitlements.
+     */
+    data: XOR<BookEntitlementUpdateManyMutationInput, BookEntitlementUncheckedUpdateManyInput>
+    /**
+     * Filter which BookEntitlements to update
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * Limit how many BookEntitlements to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BookEntitlement upsert
+   */
+  export type BookEntitlementUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * The filter to search for the BookEntitlement to update in case it exists.
+     */
+    where: BookEntitlementWhereUniqueInput
+    /**
+     * In case the BookEntitlement found by the `where` argument doesn't exist, create a new BookEntitlement with this data.
+     */
+    create: XOR<BookEntitlementCreateInput, BookEntitlementUncheckedCreateInput>
+    /**
+     * In case the BookEntitlement was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BookEntitlementUpdateInput, BookEntitlementUncheckedUpdateInput>
+  }
+
+  /**
+   * BookEntitlement delete
+   */
+  export type BookEntitlementDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter which BookEntitlement to delete.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement deleteMany
+   */
+  export type BookEntitlementDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookEntitlements to delete
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * Limit how many BookEntitlements to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookEntitlement.user
+   */
+  export type BookEntitlement$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * BookEntitlement without action
+   */
+  export type BookEntitlementDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -110839,6 +113302,38 @@ export namespace Prisma {
   export type CoachClientScalarFieldEnum = (typeof CoachClientScalarFieldEnum)[keyof typeof CoachClientScalarFieldEnum]
 
 
+  export const BookFulfillmentEventScalarFieldEnum: {
+    id: 'id',
+    eventId: 'eventId',
+    type: 'type',
+    paymentIntentId: 'paymentIntentId',
+    createdAt: 'createdAt'
+  };
+
+  export type BookFulfillmentEventScalarFieldEnum = (typeof BookFulfillmentEventScalarFieldEnum)[keyof typeof BookFulfillmentEventScalarFieldEnum]
+
+
+  export const BookEntitlementScalarFieldEnum: {
+    id: 'id',
+    email: 'email',
+    userId: 'userId',
+    offerId: 'offerId',
+    format: 'format',
+    bookSlug: 'bookSlug',
+    stripeSessionId: 'stripeSessionId',
+    stripePaymentIntentId: 'stripePaymentIntentId',
+    stripeEventId: 'stripeEventId',
+    amountCents: 'amountCents',
+    currency: 'currency',
+    status: 'status',
+    revokedAt: 'revokedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type BookEntitlementScalarFieldEnum = (typeof BookEntitlementScalarFieldEnum)[keyof typeof BookEntitlementScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -111330,6 +113825,7 @@ export namespace Prisma {
     wallet?: XOR<WalletNullableScalarRelationFilter, WalletWhereInput> | null
     perfEarnEvents?: PerfEarnEventListRelationFilter
     entitlements?: PlayerEntitlementListRelationFilter
+    bookEntitlements?: BookEntitlementListRelationFilter
     leadRecord?: XOR<MarketingLeadNullableScalarRelationFilter, MarketingLeadWhereInput> | null
     referralCode?: XOR<ReferralCodeNullableScalarRelationFilter, ReferralCodeWhereInput> | null
     mpMatchesHost?: MpMatchListRelationFilter
@@ -111401,6 +113897,7 @@ export namespace Prisma {
     wallet?: WalletOrderByWithRelationInput
     perfEarnEvents?: PerfEarnEventOrderByRelationAggregateInput
     entitlements?: PlayerEntitlementOrderByRelationAggregateInput
+    bookEntitlements?: BookEntitlementOrderByRelationAggregateInput
     leadRecord?: MarketingLeadOrderByWithRelationInput
     referralCode?: ReferralCodeOrderByWithRelationInput
     mpMatchesHost?: MpMatchOrderByRelationAggregateInput
@@ -111475,6 +113972,7 @@ export namespace Prisma {
     wallet?: XOR<WalletNullableScalarRelationFilter, WalletWhereInput> | null
     perfEarnEvents?: PerfEarnEventListRelationFilter
     entitlements?: PlayerEntitlementListRelationFilter
+    bookEntitlements?: BookEntitlementListRelationFilter
     leadRecord?: XOR<MarketingLeadNullableScalarRelationFilter, MarketingLeadWhereInput> | null
     referralCode?: XOR<ReferralCodeNullableScalarRelationFilter, ReferralCodeWhereInput> | null
     mpMatchesHost?: MpMatchListRelationFilter
@@ -118304,6 +120802,166 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"CoachClient"> | Date | string
   }
 
+  export type BookFulfillmentEventWhereInput = {
+    AND?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    OR?: BookFulfillmentEventWhereInput[]
+    NOT?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    id?: StringFilter<"BookFulfillmentEvent"> | string
+    eventId?: StringFilter<"BookFulfillmentEvent"> | string
+    type?: StringFilter<"BookFulfillmentEvent"> | string
+    paymentIntentId?: StringNullableFilter<"BookFulfillmentEvent"> | string | null
+    createdAt?: DateTimeFilter<"BookFulfillmentEvent"> | Date | string
+  }
+
+  export type BookFulfillmentEventOrderByWithRelationInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    eventId?: string
+    AND?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    OR?: BookFulfillmentEventWhereInput[]
+    NOT?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    type?: StringFilter<"BookFulfillmentEvent"> | string
+    paymentIntentId?: StringNullableFilter<"BookFulfillmentEvent"> | string | null
+    createdAt?: DateTimeFilter<"BookFulfillmentEvent"> | Date | string
+  }, "id" | "eventId">
+
+  export type BookFulfillmentEventOrderByWithAggregationInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: BookFulfillmentEventCountOrderByAggregateInput
+    _max?: BookFulfillmentEventMaxOrderByAggregateInput
+    _min?: BookFulfillmentEventMinOrderByAggregateInput
+  }
+
+  export type BookFulfillmentEventScalarWhereWithAggregatesInput = {
+    AND?: BookFulfillmentEventScalarWhereWithAggregatesInput | BookFulfillmentEventScalarWhereWithAggregatesInput[]
+    OR?: BookFulfillmentEventScalarWhereWithAggregatesInput[]
+    NOT?: BookFulfillmentEventScalarWhereWithAggregatesInput | BookFulfillmentEventScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BookFulfillmentEvent"> | string
+    eventId?: StringWithAggregatesFilter<"BookFulfillmentEvent"> | string
+    type?: StringWithAggregatesFilter<"BookFulfillmentEvent"> | string
+    paymentIntentId?: StringNullableWithAggregatesFilter<"BookFulfillmentEvent"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"BookFulfillmentEvent"> | Date | string
+  }
+
+  export type BookEntitlementWhereInput = {
+    AND?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    OR?: BookEntitlementWhereInput[]
+    NOT?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    id?: StringFilter<"BookEntitlement"> | string
+    email?: StringFilter<"BookEntitlement"> | string
+    userId?: StringNullableFilter<"BookEntitlement"> | string | null
+    offerId?: StringFilter<"BookEntitlement"> | string
+    format?: StringFilter<"BookEntitlement"> | string
+    bookSlug?: StringFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringFilter<"BookEntitlement"> | string
+    amountCents?: IntFilter<"BookEntitlement"> | number
+    currency?: StringFilter<"BookEntitlement"> | string
+    status?: StringFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }
+
+  export type BookEntitlementOrderByWithRelationInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type BookEntitlementWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    email_offerId?: BookEntitlementEmailOfferIdCompoundUniqueInput
+    AND?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    OR?: BookEntitlementWhereInput[]
+    NOT?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    email?: StringFilter<"BookEntitlement"> | string
+    userId?: StringNullableFilter<"BookEntitlement"> | string | null
+    offerId?: StringFilter<"BookEntitlement"> | string
+    format?: StringFilter<"BookEntitlement"> | string
+    bookSlug?: StringFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringFilter<"BookEntitlement"> | string
+    amountCents?: IntFilter<"BookEntitlement"> | number
+    currency?: StringFilter<"BookEntitlement"> | string
+    status?: StringFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }, "id" | "email_offerId">
+
+  export type BookEntitlementOrderByWithAggregationInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: BookEntitlementCountOrderByAggregateInput
+    _avg?: BookEntitlementAvgOrderByAggregateInput
+    _max?: BookEntitlementMaxOrderByAggregateInput
+    _min?: BookEntitlementMinOrderByAggregateInput
+    _sum?: BookEntitlementSumOrderByAggregateInput
+  }
+
+  export type BookEntitlementScalarWhereWithAggregatesInput = {
+    AND?: BookEntitlementScalarWhereWithAggregatesInput | BookEntitlementScalarWhereWithAggregatesInput[]
+    OR?: BookEntitlementScalarWhereWithAggregatesInput[]
+    NOT?: BookEntitlementScalarWhereWithAggregatesInput | BookEntitlementScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    email?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    userId?: StringNullableWithAggregatesFilter<"BookEntitlement"> | string | null
+    offerId?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    format?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    bookSlug?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableWithAggregatesFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    amountCents?: IntWithAggregatesFilter<"BookEntitlement"> | number
+    currency?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    status?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableWithAggregatesFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"BookEntitlement"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -118351,6 +121009,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -118422,6 +121081,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -118493,6 +121153,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -118564,6 +121225,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -126046,6 +128708,187 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type BookFulfillmentEventCreateInput = {
+    id?: string
+    eventId: string
+    type: string
+    paymentIntentId?: string | null
+    createdAt?: Date | string
+  }
+
+  export type BookFulfillmentEventUncheckedCreateInput = {
+    id?: string
+    eventId: string
+    type: string
+    paymentIntentId?: string | null
+    createdAt?: Date | string
+  }
+
+  export type BookFulfillmentEventUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventCreateManyInput = {
+    id?: string
+    eventId: string
+    type: string
+    paymentIntentId?: string | null
+    createdAt?: Date | string
+  }
+
+  export type BookFulfillmentEventUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementCreateInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutBookEntitlementsInput
+  }
+
+  export type BookEntitlementUncheckedCreateInput = {
+    id?: string
+    email: string
+    userId?: string | null
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutBookEntitlementsNestedInput
+  }
+
+  export type BookEntitlementUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementCreateManyInput = {
+    id?: string
+    email: string
+    userId?: string | null
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -126278,6 +129121,12 @@ export namespace Prisma {
     none?: PlayerEntitlementWhereInput
   }
 
+  export type BookEntitlementListRelationFilter = {
+    every?: BookEntitlementWhereInput
+    some?: BookEntitlementWhereInput
+    none?: BookEntitlementWhereInput
+  }
+
   export type MarketingLeadNullableScalarRelationFilter = {
     is?: MarketingLeadWhereInput | null
     isNot?: MarketingLeadWhereInput | null
@@ -126485,6 +129334,10 @@ export namespace Prisma {
   }
 
   export type PlayerEntitlementOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type BookEntitlementOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -131314,6 +134167,97 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
+  export type BookFulfillmentEventCountOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventMaxOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventMinOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookEntitlementEmailOfferIdCompoundUniqueInput = {
+    email: string
+    offerId: string
+  }
+
+  export type BookEntitlementCountOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookEntitlementAvgOrderByAggregateInput = {
+    amountCents?: SortOrder
+  }
+
+  export type BookEntitlementMaxOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookEntitlementMinOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookEntitlementSumOrderByAggregateInput = {
+    amountCents?: SortOrder
+  }
+
   export type PlayerProfileCreateNestedOneWithoutUserInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -131531,6 +134475,13 @@ export namespace Prisma {
     connectOrCreate?: PlayerEntitlementCreateOrConnectWithoutPlayerInput | PlayerEntitlementCreateOrConnectWithoutPlayerInput[]
     createMany?: PlayerEntitlementCreateManyPlayerInputEnvelope
     connect?: PlayerEntitlementWhereUniqueInput | PlayerEntitlementWhereUniqueInput[]
+  }
+
+  export type BookEntitlementCreateNestedManyWithoutUserInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
   }
 
   export type MarketingLeadCreateNestedOneWithoutConvertedUserInput = {
@@ -131899,6 +134850,13 @@ export namespace Prisma {
     connectOrCreate?: PlayerEntitlementCreateOrConnectWithoutPlayerInput | PlayerEntitlementCreateOrConnectWithoutPlayerInput[]
     createMany?: PlayerEntitlementCreateManyPlayerInputEnvelope
     connect?: PlayerEntitlementWhereUniqueInput | PlayerEntitlementWhereUniqueInput[]
+  }
+
+  export type BookEntitlementUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
   }
 
   export type MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput = {
@@ -132500,6 +135458,20 @@ export namespace Prisma {
     update?: PlayerEntitlementUpdateWithWhereUniqueWithoutPlayerInput | PlayerEntitlementUpdateWithWhereUniqueWithoutPlayerInput[]
     updateMany?: PlayerEntitlementUpdateManyWithWhereWithoutPlayerInput | PlayerEntitlementUpdateManyWithWhereWithoutPlayerInput[]
     deleteMany?: PlayerEntitlementScalarWhereInput | PlayerEntitlementScalarWhereInput[]
+  }
+
+  export type BookEntitlementUpdateManyWithoutUserNestedInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    upsert?: BookEntitlementUpsertWithWhereUniqueWithoutUserInput | BookEntitlementUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    set?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    disconnect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    delete?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    update?: BookEntitlementUpdateWithWhereUniqueWithoutUserInput | BookEntitlementUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: BookEntitlementUpdateManyWithWhereWithoutUserInput | BookEntitlementUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
   }
 
   export type MarketingLeadUpdateOneWithoutConvertedUserNestedInput = {
@@ -133216,6 +136188,20 @@ export namespace Prisma {
     update?: PlayerEntitlementUpdateWithWhereUniqueWithoutPlayerInput | PlayerEntitlementUpdateWithWhereUniqueWithoutPlayerInput[]
     updateMany?: PlayerEntitlementUpdateManyWithWhereWithoutPlayerInput | PlayerEntitlementUpdateManyWithWhereWithoutPlayerInput[]
     deleteMany?: PlayerEntitlementScalarWhereInput | PlayerEntitlementScalarWhereInput[]
+  }
+
+  export type BookEntitlementUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    upsert?: BookEntitlementUpsertWithWhereUniqueWithoutUserInput | BookEntitlementUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    set?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    disconnect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    delete?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    update?: BookEntitlementUpdateWithWhereUniqueWithoutUserInput | BookEntitlementUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: BookEntitlementUpdateManyWithWhereWithoutUserInput | BookEntitlementUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
   }
 
   export type MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput = {
@@ -136562,6 +139548,22 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCoachesInput, UserUpdateWithoutCoachesInput>, UserUncheckedUpdateWithoutCoachesInput>
   }
 
+  export type UserCreateNestedOneWithoutBookEntitlementsInput = {
+    create?: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutBookEntitlementsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneWithoutBookEntitlementsNestedInput = {
+    create?: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutBookEntitlementsInput
+    upsert?: UserUpsertWithoutBookEntitlementsInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutBookEntitlementsInput, UserUpdateWithoutBookEntitlementsInput>, UserUncheckedUpdateWithoutBookEntitlementsInput>
+  }
+
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -138319,6 +141321,50 @@ export namespace Prisma {
 
   export type PlayerEntitlementCreateManyPlayerInputEnvelope = {
     data: PlayerEntitlementCreateManyPlayerInput | PlayerEntitlementCreateManyPlayerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type BookEntitlementCreateWithoutUserInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementUncheckedCreateWithoutUserInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementCreateOrConnectWithoutUserInput = {
+    where: BookEntitlementWhereUniqueInput
+    create: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput>
+  }
+
+  export type BookEntitlementCreateManyUserInputEnvelope = {
+    data: BookEntitlementCreateManyUserInput | BookEntitlementCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -140093,6 +143139,43 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"PlayerEntitlement"> | Date | string
   }
 
+  export type BookEntitlementUpsertWithWhereUniqueWithoutUserInput = {
+    where: BookEntitlementWhereUniqueInput
+    update: XOR<BookEntitlementUpdateWithoutUserInput, BookEntitlementUncheckedUpdateWithoutUserInput>
+    create: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput>
+  }
+
+  export type BookEntitlementUpdateWithWhereUniqueWithoutUserInput = {
+    where: BookEntitlementWhereUniqueInput
+    data: XOR<BookEntitlementUpdateWithoutUserInput, BookEntitlementUncheckedUpdateWithoutUserInput>
+  }
+
+  export type BookEntitlementUpdateManyWithWhereWithoutUserInput = {
+    where: BookEntitlementScalarWhereInput
+    data: XOR<BookEntitlementUpdateManyMutationInput, BookEntitlementUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type BookEntitlementScalarWhereInput = {
+    AND?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
+    OR?: BookEntitlementScalarWhereInput[]
+    NOT?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
+    id?: StringFilter<"BookEntitlement"> | string
+    email?: StringFilter<"BookEntitlement"> | string
+    userId?: StringNullableFilter<"BookEntitlement"> | string | null
+    offerId?: StringFilter<"BookEntitlement"> | string
+    format?: StringFilter<"BookEntitlement"> | string
+    bookSlug?: StringFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringFilter<"BookEntitlement"> | string
+    amountCents?: IntFilter<"BookEntitlement"> | number
+    currency?: StringFilter<"BookEntitlement"> | string
+    status?: StringFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+  }
+
   export type MarketingLeadUpsertWithoutConvertedUserInput = {
     update: XOR<MarketingLeadUpdateWithoutConvertedUserInput, MarketingLeadUncheckedUpdateWithoutConvertedUserInput>
     create: XOR<MarketingLeadCreateWithoutConvertedUserInput, MarketingLeadUncheckedCreateWithoutConvertedUserInput>
@@ -140814,6 +143897,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -140884,6 +143968,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -140970,6 +144055,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -141040,6 +144126,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -141110,6 +144197,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -141180,6 +144268,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -141266,6 +144355,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -141336,6 +144426,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -141406,6 +144497,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -141476,6 +144568,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -141562,6 +144655,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -141632,6 +144726,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -141702,6 +144797,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -141772,6 +144868,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -141858,6 +144955,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -141928,6 +145026,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -141998,6 +145097,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -142068,6 +145168,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -142154,6 +145255,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -142224,6 +145326,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -142294,6 +145397,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -142364,6 +145468,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -142450,6 +145555,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -142520,6 +145626,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -142590,6 +145697,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -142660,6 +145768,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -142872,6 +145981,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -142942,6 +146052,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -143135,6 +146246,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -143205,6 +146317,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -143291,6 +146404,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -143361,6 +146475,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -143431,6 +146546,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -143501,6 +146617,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -143587,6 +146704,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -143657,6 +146775,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -144394,6 +147513,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -144464,6 +147584,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -144550,6 +147671,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -144620,6 +147742,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -144690,6 +147813,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -144760,6 +147884,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -144846,6 +147971,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -144916,6 +148042,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -144986,6 +148113,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -145056,6 +148184,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -145142,6 +148271,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -145212,6 +148342,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -145282,6 +148413,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -145352,6 +148484,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -145438,6 +148571,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -145508,6 +148642,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -145578,6 +148713,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -145648,6 +148784,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -145760,6 +148897,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -145830,6 +148968,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -145916,6 +149055,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -145986,6 +149126,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -146102,6 +149243,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -146172,6 +149314,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -146344,6 +149487,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -146414,6 +149558,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -146537,6 +149682,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -146607,6 +149753,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -146791,6 +149938,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -146861,6 +150009,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -146978,6 +150127,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -147048,6 +150198,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -147118,6 +150269,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -147188,6 +150340,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -147263,6 +150416,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -147333,6 +150487,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -147408,6 +150563,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -147478,6 +150634,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -147592,6 +150749,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -147662,6 +150820,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -147743,6 +150902,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -147813,6 +150973,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -147894,6 +151055,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -147964,6 +151126,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -148109,6 +151272,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -148179,6 +151343,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -148330,6 +151495,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -148400,6 +151566,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -148470,6 +151637,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -148540,6 +151708,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -148626,6 +151795,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -148696,6 +151866,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -148766,6 +151937,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -148836,6 +152008,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -148922,6 +152095,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -148992,6 +152166,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -149329,6 +152504,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -149399,6 +152575,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -149519,6 +152696,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -149589,6 +152767,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -149751,6 +152930,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -149821,6 +153001,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -149907,6 +153088,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -149977,6 +153159,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -150047,6 +153230,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -150117,6 +153301,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -150203,6 +153388,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -150273,6 +153459,7 @@ export namespace Prisma {
     mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -150344,6 +153531,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
     mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
@@ -150414,6 +153602,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
     mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
@@ -150500,6 +153689,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
     mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
@@ -150570,6 +153760,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
     mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
@@ -150640,6 +153831,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
     mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
@@ -150710,6 +153902,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
     mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
@@ -150822,6 +154015,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
     mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
@@ -150892,6 +154086,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
     mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
@@ -151042,6 +154237,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
@@ -151112,6 +154308,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
@@ -151187,6 +154384,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -151257,6 +154455,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -151343,6 +154542,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
@@ -151413,6 +154613,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
@@ -151494,6 +154695,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -151564,6 +154766,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -151634,6 +154837,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -151704,6 +154908,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -151790,6 +154995,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -151860,6 +155066,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -151930,6 +155137,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -152000,6 +155208,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -152086,6 +155295,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -152156,6 +155366,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -152226,6 +155437,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -152296,6 +155508,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -152382,6 +155595,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -152452,6 +155666,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -152522,6 +155737,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -152592,6 +155808,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -152706,6 +155923,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -152776,6 +155994,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -152862,6 +156081,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -152932,6 +156152,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -153041,6 +156262,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -153111,6 +156333,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -153209,6 +156432,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -153279,6 +156503,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -153365,6 +156590,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -153435,6 +156661,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -153506,6 +156733,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -153576,6 +156804,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -153662,6 +156891,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -153732,6 +156962,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -153802,6 +157033,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -153872,6 +157104,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -153958,6 +157191,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -154028,6 +157262,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -154098,6 +157333,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -154168,6 +157404,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -154254,6 +157491,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -154324,6 +157562,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -154516,6 +157755,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -154586,6 +157826,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -154694,6 +157935,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -154764,6 +158006,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -154956,6 +158199,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -155026,6 +158270,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -155146,6 +158391,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -155216,6 +158462,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -155410,6 +158657,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -155480,6 +158728,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -155718,6 +158967,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -155788,6 +159038,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -155970,6 +159221,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -156040,6 +159292,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -156218,6 +159471,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -156288,6 +159542,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -156438,6 +159693,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -156508,6 +159764,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -156686,6 +159943,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -156756,6 +160014,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -158202,6 +161461,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -158272,6 +161532,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -158482,6 +161743,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -158552,6 +161814,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -158707,6 +161970,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -158777,6 +162041,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -158863,6 +162128,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -158933,6 +162199,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -159003,6 +162270,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -159073,6 +162341,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -159159,6 +162428,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -159229,6 +162499,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -159299,6 +162570,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -159369,6 +162641,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -159444,6 +162717,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -159514,6 +162788,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -159677,6 +162952,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -159747,6 +163023,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -159828,6 +163105,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -159898,6 +163176,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -160274,6 +163553,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -160344,6 +163624,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -160430,6 +163711,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -160500,6 +163782,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -160570,6 +163853,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -160640,6 +163924,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -160726,6 +164011,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -160796,6 +164082,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -160866,6 +164153,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -160936,6 +164224,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -161022,6 +164311,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -161092,6 +164382,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -161162,6 +164453,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -161232,6 +164524,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -161307,6 +164600,7 @@ export namespace Prisma {
     wallet?: WalletCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
@@ -161377,6 +164671,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
     perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
     entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
     leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
     referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
     mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
@@ -161463,6 +164758,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -161533,6 +164829,7 @@ export namespace Prisma {
     wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
@@ -161614,6 +164911,7 @@ export namespace Prisma {
     wallet?: WalletUpdateOneWithoutPlayerNestedInput
     perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
     entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
     leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
     referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
     mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
@@ -161674,6 +164972,307 @@ export namespace Prisma {
     coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
     coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
     clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserCreateWithoutBookEntitlementsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutBookEntitlementsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutBookEntitlementsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+  }
+
+  export type UserUpsertWithoutBookEntitlementsInput = {
+    update: XOR<UserUpdateWithoutBookEntitlementsInput, UserUncheckedUpdateWithoutBookEntitlementsInput>
+    create: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutBookEntitlementsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutBookEntitlementsInput, UserUncheckedUpdateWithoutBookEntitlementsInput>
+  }
+
+  export type UserUpdateWithoutBookEntitlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutBookEntitlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
     ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
     partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
     competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
@@ -162039,6 +165638,23 @@ export namespace Prisma {
     id?: string
     skuId: string
     quantity?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementCreateManyUserInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -163299,6 +166915,57 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     skuId?: StringFieldUpdateOperationsInput | string
     quantity?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
