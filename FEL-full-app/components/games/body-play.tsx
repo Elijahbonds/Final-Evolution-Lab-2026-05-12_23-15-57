@@ -36,6 +36,7 @@ import { poseService } from '@/lib/pose/PoseService';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import type { ModePhase } from '@/lib/babylon';
 import { BodyReadyLine, HandsUpLine, HandsUpRing, type BodyLine } from './paused-layer';
+import { stanceLine } from '@/lib/move/rideStance';   // MOVEMENT PLAY P8: the board games' stance line
 
 // ── the words ──
 export const PLAY_WITH_BODY = 'PLAY WITH YOUR BODY';
@@ -169,6 +170,7 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
   const ready = space?.stage === 'ready';
   const warm = warmupOffer(space?.stage ?? null);
   const hint = space && space.stage === 'frame' && space.t - space.since < HINT_MS;
+  const stance = stanceLine(session.stance);   // MOVEMENT PLAY P8
   return (
     <div
       data-fel-space-panel={variant}
@@ -184,9 +186,11 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
         overlay={space ? <OverlayLines overlay={space.overlay} /> : null} />
 
       {space ? (
-        <div className="flex max-w-2xl items-center gap-3">
+        <div className="flex max-w-2xl items-center gap-3" data-fel-body-stance={ready && stance ? stance.id : undefined}>
           {!ready && <HoldRing progress={space.hold} />}
-          <p className="text-2xl font-black leading-tight text-white sm:text-3xl" aria-live="polite">{ready ? READY_LINE : space.say.text}</p>
+          {/* MOVEMENT PLAY P8: a board game asks for the stance after "All set" (measured: regular / goofy, or the square fallback) */}
+          {ready && stance?.ring != null && <HoldRing progress={stance.ring} />}
+          <p className="text-2xl font-black leading-tight text-white sm:text-3xl" aria-live="polite">{ready ? stance?.text ?? READY_LINE : space.say.text}</p>
         </div>
       ) : <CameraLine view={view} />}
 

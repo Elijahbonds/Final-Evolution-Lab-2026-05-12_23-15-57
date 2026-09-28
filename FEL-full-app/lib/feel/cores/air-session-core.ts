@@ -206,10 +206,12 @@ export class AirSessionCore {
 
   // ---- Discrete inputs (phase-guarded, like the reference) ----------------
 
-  /** Alternating run-up tap (vault). Ignored outside the Run phase. */
-  runTap(side: CadenceSide): CadenceQuality | null {
+  /** Alternating run-up tap (vault). Ignored outside the Run phase. MOVEMENT PLAY P8 (2026-09-26): `quality` = a body stride
+   *  graded on the camera's clock elsewhere (lib/babylon/core/rideBody); omitted, the core grades the tap itself, as before. */
+  runTap(side: CadenceSide, quality?: CadenceQuality): CadenceQuality | null {
     if (this.fsm.current !== 'Run') return null;
-    const q = this.cadence.tap(side);
+    const q = quality ?? this.cadence.tap(side);
+    if (quality && quality !== 'first') this.cadence.stats[quality]++;
     const t = this.t;
     const cap = this._runCap();
     if (q === 'perfect') this.state.speed = clamp(this.state.speed + t.perfectImpulse, 0, cap);

@@ -44,7 +44,8 @@ const noSubscribe = () => () => {};
 function costNotes(view: SessionView): string[] {
   const notes: string[] = [];
   if (view.lines.some((l) => l.move === MOVE_LABEL.squat)) notes.push('While you crouch, the trigger stays down even if your pad lets go.');
-  if (view.lines.some((l) => l.move === MOVE_LABEL.lean)) notes.push('A stick or key pushed the same way wins over your lean.');
+  // (MOVEMENT PLAY P8: the boards' toe / heel lean is a lean too — the same axis rule)
+  if (view.lines.some((l) => l.move === MOVE_LABEL.lean || l.move === MOVE_LABEL.carve)) notes.push('A stick or key pushed the same way wins over your lean.');
   return notes;
 }
 

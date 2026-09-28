@@ -27,7 +27,7 @@ import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
 import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
-import { readBoardVenue, tuneForVenue, rideOf } from '../nexus/boardVenues';   // three mountains, not three tints of one
+import { readBoardVenue, tuneForVenue, rideOf as mountainRideOf } from '../nexus/boardVenues';   // three mountains, not three tints of one
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -48,6 +48,11 @@ import {
   SNOW_SCRUB, rampUnder, kickerPop,
   type RideSolid,
 } from './gateCrasher';   // GATE-CRASHER-MAJOR: the slalom's rules and the mountain's solids, pure and tested
+// MOVEMENT PLAY P8 (2026-09-26): the body's grab and spin in the air, the body coyote off a kicker, and the rail inferred for
+// a body rider (a second hop in the air is not a natural body move, so the magnet catches the line skate's way)
+import { RideIntents, rideOf, rideLines, stickXFromBody, BODY_COYOTE_MS, type RideIntent } from '../core/rideBody';
+import { grabTrickFor, spinTrickFor } from '../core/rideTricks';
+import { pickRail } from '../core/RailMagnet';
 
 const YETI_SPAWN_GATE = 5;                 // bursts out after this gate clears
 const YETI_CHASE_SEC = 8;
@@ -83,6 +88,16 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   /** A full snowboard air's hang, for judging which trick the rider can finish. */
   const AIR_BUDGET_SEC = 1.2;
   let stickX = 0, stickY = 0, tuck = 0;   // stickY was dropped entirely, so up/down was unreadable for a trick grammar
+  // MOVEMENT PLAY P8: the stick's source, the take-off clock (the body coyote), the body's verbs and the body rail magnet
+  let stickFromBody = false, leftGroundAt = -1, jumpedAt = -1, wasGrounded = true, bodySynced = false;
+  const rideIntents = new RideIntents();
+  const bodyStats = { grabs: 0, spins: 0, latePops: 0, rails: 0, last: '' };
+  /** skate's magnet (SkateRunMode GRIND_MAGNET / GRIND_ALIGN): falling onto a line, running down it */
+  const BODY_RAIL_REACH = 2.0, BODY_RAIL_ALIGN = 0.34;
+  /** …and skate's RELOCK_MS: after any grind ends, the magnet waits this long (review fix, 2026-09-26 — without it a pad
+   *  stick's dismount over the middle of a rail was caught again ~0.2 s later, and paid again, until the rail's end band) */
+  const BODY_RAIL_RELOCK_MS = 350;
+  let wasGrinding = false, relockUntil = -1;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let ended = false;
   let stumbleIframe = 0;
@@ -196,8 +211,62 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     setTimeout(() => { try { gone.char.dispose(); } catch { /* already gone */ } }, 2500);
   }
 
+  /** MOVEMENT PLAY P8: the credit a caught rail pays — the button path's, shared with the body magnet. */
+  function bankRail(ctx: ModeContext): void {
+    const p = rig.char.root.position;
+    const nearest = world.grindLines.reduce((best, l) =>
+      Vector3.Distance(Vector3.Center(l.a, l.b), p) < Vector3.Distance(Vector3.Center(best.a, best.b), p) ? l : best,
+    world.grindLines[0]);
+    tricks.bankGrind(nearest);
+    const isCable = nearest.bonus >= 400;
+    ctx.setHud({ banner: isCable ? 'LIFT CABLE GRIND!' : 'RAIL GRIND!' });
+    SoundKit.play('powerUp', { volume: 0.45, pitch: isCable ? 1.4 : 1 });
+    if (isCable) { ctx.camDirector.pulse(0.8, 0.5); ctx.feel?.impact?.(0.4); }
+    ctx.feel?.impact?.(isCable ? 0.45 : 0.3);
+  }
+  /** MOVEMENT PLAY P8: the body's grab and spin in the air, and the rail a body rider falls onto. */
+  function bodyVerbs(ctx: ModeContext): void {
+    const view = ctx.body?.() ?? null;
+    const airborne = !rig.rider.grounded && !rig.rider.grinding && bailBeatT <= 0;
+    for (const it of rideIntents.poll(view, { airborne })) bodyVerb(ctx, it);
+    // (a grind just ended — the rail's end, a dismount — holds the magnet off for BODY_RAIL_RELOCK_MS, skate's rule)
+    if (wasGrinding && !rig.rider.grinding) relockUntil = performance.now() + BODY_RAIL_RELOCK_MS;
+    wasGrinding = !!rig.rider.grinding;
+    // THE BODY RAIL MAGNET: a body rider (a stance taken) falling onto a line and running down it catches it, skate's rule
+    if (rideOf(view)?.stance && !rig.rider.grounded && !rig.rider.grinding && rig.rider.vel.y <= 0.6 && performance.now() >= relockUntil) {
+      const caught = pickRail(world.grindLines, rig.char.root.position, move.vel, { reach: BODY_RAIL_REACH, align: BODY_RAIL_ALIGN });
+      if (caught && rig.rider.tryGrind([caught], BODY_RAIL_REACH)) {
+        bankRail(ctx);
+        bodyStats.rails++; bodyStats.last = 'RAIL';
+        console.info('[SNOW-BODY] rail caught by the magnet');
+      }
+    }
+  }
+  function bodyVerb(ctx: ModeContext, it: RideIntent): void {
+    if (it.kind === 'grab') {
+      const t = grabTrickFor('snow', it.hand, it.edge, AIR_BUDGET_SEC);
+      if (!t) return;
+      tricks.start(asTrickDef(t)); trickLayer?.start(t);
+      ctx.setHud({ banner: t.label }); setTimeout(() => ctx.setHud({ banner: '' }), 520);
+      bodyStats.grabs++; bodyStats.last = t.label;
+      console.info(`[SNOW-BODY] grab ${it.hand}/${it.edge ?? '-'} → ${t.label}`);
+    } else if (it.kind === 'grabEnd') {
+      tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release();
+    } else if (it.kind === 'spin') {
+      const t = spinTrickFor('snow', it.dir, AIR_BUDGET_SEC);
+      if (!t) return;
+      tricks.start(asTrickDef(t)); trickLayer?.start(t);
+      ctx.setHud({ banner: t.label }); setTimeout(() => ctx.setHud({ banner: '' }), 520);
+      if (t.spinDeg > 0) boostKit.earn(t.spinDeg >= 540 ? 'trickBig' : 'trickSmall', Math.max(1, t.spinDeg / 360));
+      bodyStats.spins++; bodyStats.last = t.label;
+      console.info(`[SNOW-BODY] ${it.dir} quarter → ${t.label}`);
+    }
+  }
+
   return {
     modeId: 'snowboard', camPreset: 'descent',
+    // MOVEMENT PLAY P8: the card — the floor's lines, then the grab and the spin this mode reads itself
+    body: { lines: rideLines('snowboard') },
     // The LIGHT is the venue's. A getter, because the harness reads this at mount — after the splash has written the
     // pick and before load() runs — and a module-level literal is why the night park would have rendered under an
     // alpine midday sun. Same reasoning for the painted horizon.
@@ -229,7 +298,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // spawn ON the snow. The rider spawned at y 0.2 over snow that is 0.9 m lower at z 4, so the first frames were a
       // fall — and the harness measured the player ring's ground offset on that frame, once: the ring rode 1.09 m under
       // the rider all run ("a dark disc at head height", "the ring left behind").
-      pitch = SLOPE_PITCH * rideOf(venue).pitch;
+      pitch = SLOPE_PITCH * mountainRideOf(venue).pitch;
       const pisteBottomY = -Math.sin(pitch) * (SLALOM_START + SLALOM_GATES * SLALOM_SPACING + 40);
       rig = await buildRig(ctx, CFG.heroUrl, new Vector3(0, -Math.tan(pitch) * 4 + 0.02, 4), 0, world.ground, '#ff6b3d', 'snowboard', {
         hardFloorY: pisteBottomY - 5, rayLength: 80, stickDown: 0.6,
@@ -286,6 +355,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 20, modeId: 'snowboard' });
       nextGate = 0; gatesHit = 0; elapsed = 0; gateStreak = 0; hudSec = -1; ended = false; stickX = 0; stickY = 0; tuck = 0;
+      stickFromBody = false; leftGroundAt = -1; jumpedAt = -1; wasGrounded = true; bodySynced = false; wasGrinding = false; relockUntil = -1; rideIntents.reset();   // MOVEMENT PLAY P8
+      Object.assign(bodyStats, { grabs: 0, spins: 0, latePops: 0, rails: 0, last: '' });
+      // MOVEMENT PLAY P8: the probe's read-only seam (heading, steer, air, the body's verbs)
+      (ctx.scene.metadata ??= {}).snow = { state: () => ({
+        heading: +move.yaw.toFixed(3), speed: +move.speed.toFixed(2), steer: stickX, tuck, grounded: rig.rider.grounded,
+        grinding: rig.rider.grinding !== null, stickFromBody, grabHeld: tricks.grabHeld, body: { ...bodyStats },
+      }) };
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       wipeLatchUntil = 0; finishLatch = false;
       wipeT = -1; crashSaid = false; goalSaid = false; scrapeLatch = 0; lastRamp = null; lastRampT = 0;
@@ -317,30 +393,33 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = Number.isFinite(e.y) ? e.y : 0; }
+      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = Number.isFinite(e.y) ? e.y : 0; stickFromBody = stickXFromBody(ctx.input, e); }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'trigger' && e.side === 'R') tuck = e.value;
       // GATE-CRASHER-MAJOR: a rider lying in the snow does not jump or throw a trick — the press is answered, not eaten
       if (wipeT >= 0 && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X' || e.btn === 'Y')) { refuse(ctx, 'GETTING UP'); return; }
       if (e.t === 'button' && e.pressed) {
+        // MOVEMENT PLAY P8: a BODY's hop is the jump and nothing else — up to BODY_COYOTE_MS after the board left a kicker it
+        // still jumps (told late); in the air it is spent, never a grind attempt (the body rider's rail is the magnet's)
+        if (e.btn === 'A' && e.src === 'body' && !rig.rider.grounded) {
+          const now = performance.now();
+          if (now - leftGroundAt <= BODY_COYOTE_MS && jumpedAt < leftGroundAt && !rig.rider.grinding) {
+            rig.rider.jump(0.5 + tuck * 0.5, true); jumpedAt = now; wasGrounded = false;
+            bodyStats.latePops++; bodyStats.last = 'LATE JUMP';
+            SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+            console.info(`[SNOW-BODY] late jump ${(now - leftGroundAt).toFixed(0)} ms off the kicker`);
+          }
+          return;
+        }
         if (e.btn === 'A') {
           if (rig.rider.grounded) {
             rig.rider.jump(0.5 + tuck * 0.5);   // the tree reads the air and plays board_air (a direct one-shot here ran out mid-flight)
+            jumpedAt = performance.now(); wasGrounded = false;   // MOVEMENT PLAY P8 (a jump, not a roll-off: update must not stamp it as one)
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
           } else if (rig.rider.tryGrind(world.grindLines)) {
-            // credit the line actually closest to the rider (lift cable pays 400)
-            const p = rig.char.root.position;
-            const nearest = world.grindLines.reduce((best, l) =>
-              Vector3.Distance(Vector3.Center(l.a, l.b), p) < Vector3.Distance(Vector3.Center(best.a, best.b), p) ? l : best,
-            world.grindLines[0]);
-            tricks.bankGrind(nearest);
-            const isCable = nearest.bonus >= 400;
-            ctx.setHud({ banner: isCable ? 'LIFT CABLE GRIND!' : 'RAIL GRIND!' });
-            SoundKit.play('powerUp', { volume: 0.45, pitch: isCable ? 1.4 : 1 });
-            // The lift cable is the run's biggest single score. It already
-            // sounded different from an ordinary rail; now it looks different.
-            if (isCable) { ctx.camDirector.pulse(0.8, 0.5); ctx.feel?.impact?.(0.4); }
-            ctx.feel?.impact?.(isCable ? 0.45 : 0.3);
+            // credit the line actually closest to the rider (lift cable pays 400). The lift cable is the run's biggest
+            // single score: it sounds and looks different (MOVEMENT PLAY P8: the credit is shared with the body's magnet)
+            bankRail(ctx);
           }
         }
         // THE NAMED VOCABULARY (BoardTricks). Three buttons used to mean three fixed tricks — a 360, a grab and a
@@ -391,7 +470,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }
       if (Math.floor(elapsed) !== hudSec) { hudSec = Math.floor(elapsed); ctx.setHud({ time: hudSec }); }   // P9 soft: the clock runs
       stumbleIframe = Math.max(0, stumbleIframe - dt);
-      if (rig.rider.grinding && Math.abs(stickX) > 0.7) rig.rider.dismount();
+      // (MOVEMENT PLAY P8: a body's carve never dismounts — the rail ends, or the rider hops off it)
+      if (rig.rider.grinding && Math.abs(stickX) > 0.7 && !stickFromBody) rig.rider.dismount();
+      if (wasGrounded && !rig.rider.grounded) leftGroundAt = performance.now();
+      wasGrounded = rig.rider.grounded;
+      // (from the first frame of play on: a quarter read before it — the turn into the stance at READY — is never a spin)
+      if (!bodySynced) { rideIntents.sync(ctx.body?.() ?? null); bodySynced = true; }
+      bodyVerbs(ctx);
       // Phase 12: slope energy via the shared board movement (descent builds
       // speed for real); tuck adds, boost spends the meter on a burst.
       // TUCK, not 0. The comment above says "tuck adds" and the HUD verb is
@@ -420,9 +505,9 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       const under = world.solids && rig.rider.grounded && !rig.rider.grinding
         ? rampUnder(world.solids, rig.char.root.position.x, rig.char.root.position.z, preY) : null;
       if (under) { lastRamp = under; lastRampT = 0.15; } else lastRampT = Math.max(0, lastRampT - dt);
-      const wasGrounded = rig.rider.grounded;
+      const wasGroundedPreUpdate = rig.rider.grounded;   // renamed from `wasGrounded`: the name collided with MOVEMENT PLAY P8's outer variable above
       rig.rider.update(dt, steer, crouch);
-      if (wasGrounded && !rig.rider.grounded && !rig.rider.grinding && lastRamp && lastRampT > 0) {
+      if (wasGroundedPreUpdate && !rig.rider.grounded && !rig.rider.grinding && lastRamp && lastRampT > 0) {
         const pop = kickerPop(move.speed, lastRamp);
         if (pop > rig.rider.vel.y) { rig.rider.vel.y = pop; console.info(`[SNOW-KICK] ${lastRamp.tag} pop ${pop.toFixed(2)}`); }
         lastRamp = null; lastRampT = 0;

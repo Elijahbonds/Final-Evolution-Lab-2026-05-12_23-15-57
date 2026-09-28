@@ -58,7 +58,8 @@ describe('the harness reads the body (plan §4.4)', () => {
   it('builds the seam with bodySeamFor, and nothing by hand (Z3, Z5: the row and `drives` are decided there, and tested there)', () => {
     // the step-3 review: `const drives = true` (a dunk paused for a pad player's body walking off) or every mode on
     // skateboard's row (the body pressing POP in a quiz) passed every test while the harness built these itself
-    expect(harness).toMatch(/const seam = bodySeamFor\(def\);\s*const store = sessionStore\.mount\(seam\.card\);/);
+    // (MOVEMENT PLAY P8: the mount's snapshot carries a board game's stance ask — sessionStore.stanceOnMount reads the row)
+    expect(harness).toMatch(/const seam = bodySeamFor\(def\);\s*const store = sessionStore\.mount\(\{ \.\.\.seam\.card, stance: stanceOnMount\(seam\.profile\) \}\);/);
     expect(harness).toMatch(/const \{ claimed, floor, session, evidence \} = seam;/);
     for (const byHand of [/new BodyFloor\(/, /new BodySession\(/, /new EvidenceCounter\(/, /resolveBodyProfile\(/, /cardLines\(/, /\.bindings\b/]) {
       expect(harness).not.toMatch(byHand);
