@@ -15,8 +15,9 @@
 import { synthesize, restPose, type JointClip, type Joints, type SynthOptions, type V3 } from '@/lib/pose/synth';
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import { FIXTURE_CAMERA, CLEAN_FILM, THIGH, SHIN, UPPER_ARM, FOREARM, solveMiddle, squatPose } from '@/lib/mirror/fixtures/build';
-import type { Side } from './protocol';
+import type { Side, TestId } from './protocol';
 import { calibrateFront, calibrateSide, type Calibration } from './calibration';
+import { gradeSession, type SessionCapture, type SessionResult } from './runner';
 
 // ── vectors (build.ts keeps its own private; these match them) ───────────────────────────────────────────────────
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -410,4 +411,48 @@ export function syntheticCalibration(o: { noise?: boolean; seed?: number } = {})
   const front = calibrateFront(f.frames, f.aspect), side = calibrateSide(s.frames, s.aspect);
   if (!front.ok || !side.ok) throw new Error(`[assess] synthetic calibration failed: ${!front.ok ? front.why : ''} ${!side.ok ? side.why : ''}`);
   return { aspect: f.aspect, front: front.value, side: side.value };
+}
+
+// ── the replay harness: a capture in, the whole graded session out ───────────────────────────────────────────────
+
+/** A synthetic Quick Screen, described by what the athlete does (every field optional: clean by default). */
+export interface QuickScenario {
+  /** T1's front reps: a recorded Mirror fixture (three reps of it), or synthetic knee shifts. */
+  t1Front?: string | { kneeInL?: number; kneeInR?: number };
+  t1Side?: OhsOpts;
+  t2?: Partial<Record<Side, KneeWallOpts>>;
+  t3?: Partial<Record<Side, SlsOpts>>;
+  t5?: CmjJump[];
+  /** Film everything with the synth's seeded jitter. */
+  noise?: boolean;
+  seed?: number;
+  fps?: number;
+  painAfter?: TestId | null;
+  takeoffLeg?: Side | null;
+  /** Leave tests out (they are then skipped). */
+  only?: TestId[];
+}
+
+/** The captures of a scenario (deterministic). Recorded fixtures are read by the caller and passed as frames. */
+export function quickCapture(sc: QuickScenario = {}, fixture?: (name: string) => PoseFrame[]): SessionCapture {
+  const o = { noise: sc.noise, seed: sc.seed, fps: sc.fps };
+  const seed = (k: number) => ({ ...o, seed: (sc.seed ?? 7) + k });
+  const want = (id: TestId) => !sc.only || sc.only.includes(id);
+  const front = typeof sc.t1Front === 'string'
+    ? (() => { if (!fixture) throw new Error('[assess] a fixture name needs a fixture reader'); const f = { frames: fixture(sc.t1Front as string), aspect: ASPECT, fps: 30 }; return concat([f, f, f]).frames; })()
+    : ohsFront(sc.t1Front ?? {}, seed(1)).frames;
+  return {
+    calibration: syntheticCalibration({ noise: sc.noise, seed: sc.seed }),
+    ...(want('T1') ? { T1: { front, side: ohsSide(sc.t1Side ?? {}, seed(2)).frames } } : {}),
+    ...(want('T2') ? { T2: { left: kneeWall('left', sc.t2?.left ?? {}, seed(3)).frames, right: kneeWall('right', sc.t2?.right ?? {}, seed(4)).frames } } : {}),
+    ...(want('T3') ? { T3: { left: singleLegSquat('left', sc.t3?.left ?? {}, seed(5)).frames, right: singleLegSquat('right', sc.t3?.right ?? {}, seed(6)).frames } } : {}),
+    ...(want('T5') ? { T5: cmj(sc.t5 ?? [{ heightM: 0.4 }, { heightM: 0.45 }, { heightM: 0.42 }], seed(7)).frames } : {}),
+    painAfter: sc.painAfter ?? null,
+    takeoffLeg: sc.takeoffLeg ?? null,
+  };
+}
+
+/** Replay a capture into the full session result: the same grading the live flow runs at the end (runner.gradeSession). */
+export function replay(capture: SessionCapture): SessionResult {
+  return gradeSession(capture);
 }
