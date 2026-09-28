@@ -75,6 +75,7 @@ export const THRESHOLDS = {
 
   // ── geometry (spec §3.2) ──
   'geom.heelRise': spec(0.015, '§3.2', 'body-height fraction', 'Heel lifts above its calibrated floor line by more than this'),
+  'geom.lensHfovDeg': spec(60, '§3.2', 'deg', 'Lane default: lens width the FPPA parallax correction assumes (a knee moving toward the lens)'),
   'geom.heelRiseRepo': repo(0.012, '§4 T1', 'image-height units', 'Reference only (not read by the scorer): the guided squat\'s heel line; ≈ geom.heelRise at 80% frame fill', 'lib/babylon/nexus/neuro-mirror/rules/squat-audit.ts heelRiseWarnPx'),
 
   // ── rep segmentation (lane defaults, §4 rules) ──
