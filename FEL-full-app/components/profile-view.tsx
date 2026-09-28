@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { MasteryBadge } from '@/components/mastery-badge';
 import { motion } from 'framer-motion';
 import { PRQ_ATTRS } from '@/lib/prq';
+import { readPrqDisplay } from '@/lib/prq-display';
 import { ROSTER } from '@/lib/game-data';
 import { AvatarFigure } from '@/components/avatar-figure';
 import { Flame, Sparkles, Coins, Gem, Check, Plus, X, Loader2, Download, Trash2 } from 'lucide-react';
@@ -52,7 +53,8 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
     };
   }, []);
 
-  const grade = data?.grade;
+  // QA P0-01: the chip and the ring show the MEASURED PRQ; data.prq/data.grade are the seeded gameplay numbers
+  const grade = data ? readPrqDisplay(data) : null;
   const p = data?.profile;
   const currentAvatar = ROSTER.find((r) => r.key === p?.avatarKey) ?? null;
 
@@ -62,7 +64,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
         <div className="flex flex-wrap items-center gap-5">
           <div
             className="flex h-20 w-20 items-center justify-center rounded-full border-2 text-3xl font-bold fel-heading"
-            style={{ borderColor: grade?.color ?? '#00E5FF', color: grade?.color ?? '#00E5FF', boxShadow: `0 0 28px ${grade?.color ?? '#00E5FF'}44` }}
+            style={{ borderColor: grade?.grade?.color ?? '#00E5FF', color: grade?.grade?.color ?? '#00E5FF', boxShadow: `0 0 28px ${grade?.grade?.color ?? '#00E5FF'}44` }}
           >
             {currentAvatar ? <AvatarFigure avatar={currentAvatar} size={54} cosmeticAssetId={p?.cosmeticAssetId} /> : (userName?.[0] ?? 'A').toUpperCase()}
           </div>
@@ -82,7 +84,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
                 className="fel-heading mt-2 inline-block rounded px-2.5 py-0.5 text-sm font-bold"
                 style={{ background: `${grade?.color}1c`, color: grade?.color, border: `1px solid ${grade?.color}55` }}
               >
-                {grade?.label} · PRQ {Math.round(data?.prq ?? 0)}
+                {grade.badge}
               </span>
             )}
           </div>
@@ -366,7 +368,7 @@ function PrqFoundation() {
 
       {prq && (
         <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 px-4 py-2 font-mono text-lg font-bold text-[#A855F7]">
-          PRQ {prq.score.toFixed(1)}
+          PRQ {prq.measured > 0 ? prq.score.toFixed(1) : '—'}
           <span className="text-xs font-normal text-white/40">
             ({prq.measured}/{prq.total} measured)
           </span>

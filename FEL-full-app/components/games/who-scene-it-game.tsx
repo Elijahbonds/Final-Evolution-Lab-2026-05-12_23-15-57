@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps } from '@/components/games/game-shell';
+import { prqDisplay } from '@/lib/prq-display';   // QA P0-01: the badge prints the measured PRQ
 import { QUIZ_BANK, QUIZ_CATEGORIES, type QuizQuestion } from '@/lib/quiz-data';
 import { SessionRecorder } from '@/lib/game-systems';
 import { QuizCore } from '@/lib/feel/quiz-core';
@@ -73,7 +74,7 @@ function buildDeck(): RoundQ[] {
   return [...trimmed, ...freeUse].slice(0, TOTAL_Q);
 }
 
-export default function WhoSceneItGame({ grade, prq, onEnd, gamepad }: GameProps) {
+export default function WhoSceneItGame({ grade, prqDisplay: shownPrq, onEnd, gamepad }: GameProps) {
   const [started, setStarted] = useState(false);
   const [cur, setCur] = useState<RoundQ | null>(null);
   const [qIndex, setQIndex] = useState(0);
@@ -256,7 +257,7 @@ export default function WhoSceneItGame({ grade, prq, onEnd, gamepad }: GameProps
               {feedback === 'wrong' && <span className="text-[#FF3366]">WRONG SCENE!</span>}
               {feedback === 'timeout' && <span className="text-[#FFD700]">TIME! MOVING ON...</span>}
             </div>
-            <p className="text-center font-mono text-[10px] text-white/30">PRQ {prq.toFixed(0)} · {grade.label}</p>
+            <p className="text-center font-mono text-[10px] text-white/30">{(shownPrq ?? prqDisplay(null)).badge}</p>
           </div>
         )}
       </div>

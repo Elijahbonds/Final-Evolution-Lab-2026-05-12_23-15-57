@@ -16,6 +16,7 @@ import { availablePaths } from '@/lib/kitchens/fulfillment';
 import type { FulfillmentPath, MealRx } from '@/lib/kitchens/types';
 import { GroceryList } from './grocery-list';
 import { YourBuildPanel } from './your-build-panel';
+import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 
 const THEME_LABEL: Record<string, string> = {
   recovery: 'Recovery', 'protein-rebuild': 'Protein rebuild', 'anti-inflammatory': 'Anti-inflammatory',
@@ -26,6 +27,8 @@ const BAND_LABEL: Record<string, string> = { easy: 'EASY DAY', train: 'TRAIN DAY
 export function FuelView() {
   const [rx, setRx] = useState<MealRx | null>(null);
   const [prq, setPrq] = useState<number | null>(null);
+  /** QA P0-01: the chip prints the measured PRQ; `prq` above (the profile's seeded number) only feeds the plan. */
+  const [shownPrq, setShownPrq] = useState<PrqDisplay | null>(null);
   const [path, setPath] = useState<FulfillmentPath>('list');
   const [error, setError] = useState('');
   const [instacart, setInstacart] = useState<{ available: boolean; url?: string; note?: string }>({ available: false });
@@ -38,6 +41,7 @@ export function FuelView() {
       const j = r.ok ? ((await r.json()) as { prq?: number }) : {};
       const score = typeof j.prq === 'number' ? j.prq : 0;
       setPrq(score);
+      setShownPrq(readPrqDisplay(j));
       // The Build store is read-only upstream; the snapshot is built from the profile's PRQ and the movement screen the
       // athlete entered (Your Build) until a Mirror scan lands. Keyed by today's date, so a rebuild in the same day is
       // idempotent — and an unchanged plan keeps its id, so the basket ticks stay.
@@ -103,7 +107,7 @@ export function FuelView() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[#A855F7]/40 bg-[#A855F7]/10 px-2.5 py-1 text-xs font-bold text-[#A855F7]" data-testid="rx-leak">LEAK · {rx.leakLabel.toUpperCase()}</span>
               <span className="rounded-full border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-2.5 py-1 text-xs font-bold text-[#00E5FF]" data-testid="rx-band">{BAND_LABEL[rx.loadBand]}</span>
-              {prq != null && <span className="rounded-full border border-white/15 px-2.5 py-1 font-mono text-xs text-white/70">PRQ {prq}</span>}
+              {shownPrq && <span className="rounded-full border border-white/15 px-2.5 py-1 font-mono text-xs text-white/70">{shownPrq.label}</span>}
               <span className="font-mono text-[11px] text-white/40">scan {rx.sourceScanDate}</span>
             </div>
             <p className="mt-3 text-sm text-white/85">{LEAK_ONE_LINER[rx.leak]}</p>

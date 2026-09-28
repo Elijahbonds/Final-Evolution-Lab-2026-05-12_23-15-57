@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
+import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
@@ -44,6 +45,8 @@ export interface GameResult {
 export interface GameProps {
   grade: PrqGrade;
   prq: number;
+  /** QA P0-01: what a badge may print (measured PRQ only). `prq`/`grade` above are for difficulty, never for display. */
+  prqDisplay?: PrqDisplay;
   onEnd: (result: GameResult) => void;
   /** Gamepad state polled every frame by GameShell — games can read it. */
   gamepad?: import('@/lib/canvas-juice').GamepadState;
@@ -117,7 +120,7 @@ function GameShellInner({
   const arenaMatchId = searchParams.get('arena');
   const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
   const carnivalFlag = searchParams.get('carnival');
-  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
+  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
   // with a blocked /api/** on /play/onevone: "HUB ONES Venice Beach Court" and
@@ -204,7 +207,7 @@ function GameShellInner({
       .then((j) => {
         if (!live) return;
         if (j?.grade) {
-          setProfile({ prq: j?.prq ?? 50, grade: j.grade });
+          setProfile({ prq: j?.prq ?? 50, grade: j.grade, display: readPrqDisplay(j) });
         } else {
           router.replace('/login');
         }
@@ -555,9 +558,9 @@ function GameShellInner({
           {profile && (
             <span
               className="ml-auto rounded-md border px-2.5 py-1 font-mono text-xs"
-              style={{ borderColor: `${profile.grade?.color}55`, color: profile.grade?.color }}
+              style={{ borderColor: `${profile.display.color}55`, color: profile.display.color }}
             >
-              PRQ {Math.round(profile.prq)} · {profile.grade?.label}
+              {profile.display.badge}
             </span>
           )}
           {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
@@ -618,7 +621,7 @@ function GameShellInner({
         )}
         {profile ? (
           <ReplayInPlaceContext.Provider value={registerReplay}>
-            <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
+            <Game key={gameKey} grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
           </ReplayInPlaceContext.Provider>
         ) : (
           <div className="flex h-[60vh] items-center justify-center">
