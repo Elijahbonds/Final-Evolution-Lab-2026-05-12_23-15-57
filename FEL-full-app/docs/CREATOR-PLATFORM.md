@@ -114,6 +114,7 @@ With `PRINTFUL_ENABLED` off (default), `syncProducts()` returns a 5-item fixture
 ## Known limits
 
 - The inquiry and checkout rate limits are in-memory per server instance (`lib/rate-limit.ts`), like the rest of the app.
+- Holds are cheap to create. Someone who starts checkouts and abandons them can keep slots held for about an hour each; the per-IP checkout limit (10 per 10 minutes) is the only brake.
 - No emails: `notifyBooking()` is a stub and inquiries get no auto-reply.
 - A `CONFLICT` booking needs a person to refund it.
 - Instagram stats are a fixture (`getInstagramStats()`), shown with an "Example data" badge.
