@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { TimingPrompt } from './timing-prompt';
+import { LANE_PLATE_ALPHA, PASSED_CUE_OPACITY, hitRingStyle } from './cue-lane-style';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -384,10 +385,13 @@ export function makeTimingHost(opts: TimingHostOpts) {
             `cues`, so every other timing sport is unchanged. */}
         {isCueLane(hud.cues) && hud.cues.length > 0 && (
           <div className="pointer-events-none absolute inset-x-6 bottom-[34%] h-16">
-            <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/15" />
+            {/* QA P2-03: a plate under the lane (≥ 3:1 for every family colour on any stage), the hit ring lit on the beat */}
+            <div data-lane-plate className="absolute -inset-x-3 -inset-y-2 rounded-2xl" style={{ background: `rgba(0,0,0,${LANE_PLATE_ALPHA})` }} />
+            <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/30" />
             <div
-              className="absolute top-1/2 h-14 w-14 rounded-full border-4 border-[var(--fel-gold)]/80"
-              style={{ left: `${LANE_HIT_PCT}%`, transform: 'translate(-50%, -50%)' }}
+              data-hit-ring
+              className="absolute top-1/2 h-14 w-14 rounded-full border-4 border-[var(--fel-gold)]"
+              style={{ left: `${LANE_HIT_PCT}%`, transform: 'translate(-50%, -50%)', ...hitRingStyle(typeof hud.beatPulse === 'number' ? hud.beatPulse : null) }}
             />
             {hud.cues.map((c, i) => {
               const t = Math.max(-CUE_LINGER_SEC, Math.min(CUE_LOOKAHEAD_SEC, c.in));
@@ -400,9 +404,9 @@ export function makeTimingHost(opts: TimingHostOpts) {
                   style={{
                     left: `${x}%`,
                     background: c.color,
-                    opacity: c.in < -0.05 ? 0.45 : 1,
+                    opacity: c.in < -0.05 ? PASSED_CUE_OPACITY : 1,
                     transform: `translate(-50%, -50%) scale(${hot ? 1.18 : 1})`,
-                    boxShadow: hot ? `0 0 18px ${c.color}` : '0 2px 6px rgba(0,0,0,0.5)',
+                    boxShadow: hot ? `0 0 0 2px #fff, 0 0 18px ${c.color}` : '0 0 0 2px rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.5)',
                   }}
                 >
                   {c.glyph}
