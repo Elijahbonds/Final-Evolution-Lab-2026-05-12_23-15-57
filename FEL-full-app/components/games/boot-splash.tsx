@@ -43,7 +43,7 @@ const VENUE_ART: Record<string, { venue: string; sub: string; tint: string }> = 
   snowboard_slalom: { venue: 'mountain-slope', sub: 'MOUNTAIN SLOPE', tint: '#cfe8ff' },
   snowboard: { venue: 'mountain-slope', sub: 'MOUNTAIN SLOPE', tint: '#cfe8ff' },
   surf: { venue: 'surf-break', sub: 'SURF BREAK', tint: '#37b6d9' },
-  tennis: { venue: 'tennis-court', sub: 'CENTRE COURT', tint: '#7bd88f' },
+  tennis: { venue: 'tennis-court', sub: 'CENTER COURT', tint: '#7bd88f' },   // QA P1-18: US spelling, as everywhere else
   golf: { venue: 'coastal-links', sub: 'COASTAL LINKS', tint: '#8fe0a0' },
   baseball: { venue: 'ballpark', sub: 'THE BALLPARK', tint: '#ffd08a' },
   soccer: { venue: 'fc-stadium', sub: 'FC STADIUM', tint: '#7be0a8' },
