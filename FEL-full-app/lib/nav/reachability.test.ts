@@ -34,6 +34,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/train': 'a tab',
   '/profile': 'a tab',
   '/studio': 'HOLD — not shipped, deliberately unlinked',
+  '/bookings': 'Stripe Checkout returns here after a service booking (success_url)',
 };
 
 function topLevelRoutes(): string[] {
