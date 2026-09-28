@@ -56,7 +56,7 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 // shot's launch (GolfAim), the flight itself (GolfBallSim: drag, Magnus, bounce, roll, wind through the air, wet turf),
 // and the weather (WeatherKit read from the start screen's chip, WeatherFx for what it looks like).
 import { GolfBallSim, type Surface as GolfSurface } from '../core/GolfBall';
-import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
+import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, shotDistanceM, type WiiClub, type AirLike } from '../core/GolfAim';
 import { mountAimArrow, type AimArrowHandle } from '../visual/AimArrow';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
@@ -436,8 +436,11 @@ export const GolfMode: ModeDefinition = (() => {
     arrow?.set(ball.position, aimYaw, pred.carryM, pred.carry, pred.rest); lastCarryM = pred.carryM;
     me.root.rotation.y = aimYaw;   // the golfer faces the arrow
     const aimDeg = Math.round(((aimYaw - pinYaw() + Math.PI * 3) % (Math.PI * 2) - Math.PI) * 180 / Math.PI);   // the arrow's offset from the pin line, for the HUD
-    if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(pred.carryM), aimDeg }); }
-    else ctx.setHud({ aimCarry: Math.round(pred.carryM), aimDeg });
+    // QA A1-04: the printed distance is shotDistanceM (GolfAim.ts) — the putter's roll-out, a swing's carry — so
+    // "FULL SWING 1m" (the putter's near-zero carry) agrees with the ~9m a full putt actually rolls (PUTT_RANGE_M).
+    // The arrow/ring above stay on carryM: the ring already marks the carry landing and the dots trail on to `rest`.
+    if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(shotDistanceM(c, pred)), aimDeg }); }
+    else ctx.setHud({ aimCarry: Math.round(shotDistanceM(c, pred)), aimDeg });
   }
 
   function strike(ctx: ModeContext, pwr: number, sideErr: number): void {

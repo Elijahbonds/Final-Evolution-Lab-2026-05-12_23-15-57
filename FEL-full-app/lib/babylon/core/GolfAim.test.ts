@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, AIM_LIMIT_RAD } from './GolfAim';
+import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, shotDistanceM, AIM_LIMIT_RAD } from './GolfAim';
 import { GolfBallSim } from './GolfBall';
 
 const TEE = { x: 0, y: 0.05, z: 0 };
@@ -44,6 +44,20 @@ describe('GolfAim — the Wii Sports read', () => {
     expect(ticks).toHaveLength(11);
     for (let i = 1; i < ticks.length; i++) expect(ticks[i]).toBeGreaterThanOrEqual(ticks[i - 1]);
     expect(carryAt(ticks, 0.5)).toBe(ticks[5]); expect(carryAt(ticks, 0.55)).toBeGreaterThan(ticks[5]); expect(carryAt(ticks, 1)).toBe(ticks[10]);
+  });
+  it('QA A1-04: shotDistanceM is the roll-out for a putter and the carry for a swing — the HUD reads one number, not two disagreeing ones', () => {
+    const puttPred = simulateShot(WII_PUTTER, 1, 0, TEE, undefined, () => 'green');
+    expect(shotDistanceM(WII_PUTTER, puttPred)).toBe(puttPred.totalM);
+    expect(shotDistanceM(WII_PUTTER, puttPred)).toBeGreaterThan(puttPred.carryM * 2);   // the old "FULL SWING 1m" bug: carry alone is a sliver of the real roll
+    const drivePred = simulateShot(DRIVER, 1, 0, TEE);
+    expect(shotDistanceM(DRIVER, drivePred)).toBe(drivePred.carryM);   // a swing still shows carry (Wii Sports' own convention), roll is a bonus tail
+  });
+  it("QA A1-04: the putter's meter ticks are FULL SWING distance (roll-out), not the near-zero airborne carry", () => {
+    const puttTicks = meterTicks(WII_PUTTER, 0, TEE, undefined, () => 'green');
+    expect(puttTicks).toHaveLength(11);
+    expect(puttTicks[10]).toBeGreaterThan(5);    // matches PUTT_RANGE_M (9): a full putt is meant to cover the green
+    expect(puttTicks[10]).toBeLessThan(20);
+    for (let i = 1; i < puttTicks.length; i++) expect(puttTicks[i]).toBeGreaterThanOrEqual(puttTicks[i - 1]);
   });
   it('the stick turns the arrow at a rate, inside the limit either side of the pin line, across the wrap', () => {
     let yaw = 0;
