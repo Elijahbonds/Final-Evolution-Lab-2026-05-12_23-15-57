@@ -1384,6 +1384,20 @@ export const DerbyMode: ModeDefinition = (() => {
 })();
 
 // ═══════════════════════════════════════════════════════ PENALTY SHOOTOUT ══
+/**
+ * Where the shootout's crowd stands (QA P1-05, 2026-09-27). The onlookers are full athlete bodies, and the old bank ran
+ * straight across behind the goal: from the kicker's camera three of them stood in the goal mouth behind the keeper and
+ * read as more keepers. Two banks FLANK the goal now, GALLERY_CLEAR_M outside each post, still 4.4 m behind the line (the
+ * keeper round's camera sits at z 13.4 and must not stand inside anyone). Eight spots, so Onlookers keeps every one. Pure.
+ */
+export const GALLERY_CLEAR_M = 2;
+export function penaltyGallerySpots(): Vector3[] {
+  const inner = PEN_GOAL.halfW + GALLERY_CLEAR_M;
+  const out: Vector3[] = [];
+  for (let i = 0; i < 4; i++) for (const side of [-1, 1]) out.push(new Vector3(side * (inner + i * 1.7), 0, 15.4 + i * 0.4));
+  return out;
+}
+
 export const PenaltyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, keeper: SpawnedCharacter;
   let meAnim: BeatOwner, keeperAnim: BeatOwner;
@@ -1753,12 +1767,9 @@ export const PenaltyMode: ModeDefinition = (() => {
       spotMat.specularColor = Color3.Black();
       spot.material = spotMat;
       furniture.push(spot);
-      gallery = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
-        const k = i - 6.5;
-        // a shallow bank behind the goal — 2 m behind the keeper camera (fixed at z 13.4 on THEIR kick): at 13.2 the camera
-        // stood inside a spectator and the whole frame was the inside of a body (measured 2026-09-06)
-        return new Vector3(k * 1.5, 0, 15.4 + Math.abs(k) * 0.22);
-      }));
+      // a shallow bank either side of the goal — 2 m behind the keeper camera (fixed at z 13.4 on THEIR kick): at 13.2 the
+      // camera stood inside a spectator and the whole frame was the inside of a body (measured 2026-09-06)
+      gallery = new Onlookers(ctx.scene, penaltyGallerySpots());
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       // the left dive is the authored right dive reflected across the sagittal plane, registered as 'keeper_dive.M'
