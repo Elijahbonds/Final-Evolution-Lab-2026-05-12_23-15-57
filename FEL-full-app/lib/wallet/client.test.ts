@@ -58,12 +58,14 @@ describe('wallet client — the grant a report was paid', () => {
   });
 });
 
-describe('the shell\'s coins tile (components/games/game-shell.tsx)', () => {
+// QA P0-02 (2026-09-27) replaced "no tile for a zero grant": the card shows the wallet's coins AND shards for every
+// reported run, "+0" when nothing was granted, so a DNF can no longer read as a profile-shard "+1". The tiles and their
+// cap wording are pinned in components/games/end-card-rewards.test.tsx; here, that the shell feeds them these grants.
+describe('the shell\'s wallet tiles (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
-  it('no tile for a refused earn or a zero grant nothing capped; a capped coin earn says so instead of "+0"', () => {
-    expect(shell).toContain('if (coins > 0 || capped) setRecapCoins({ coins, capped });');
-    expect(shell).toContain('const capped = Boolean(gs[0]?.capped);');
-    expect(shell).toContain('{recapCoins.coins > 0 && <span');
-    expect(shell).toContain("'Wallet coin limit reached for now'");
+  it('every answered report set lands on the card (a zero grant too), summed by walletGrantsFrom', () => {
+    expect(shell).toContain('setRecapCoins(walletGrantsFrom(gs));');
+    expect(shell).not.toContain('if (coins > 0 || capped) setRecapCoins');
+    expect(shell).toContain('<EndCardRewards recap={recap} walletGrants={recapCoins} />');
   });
 });

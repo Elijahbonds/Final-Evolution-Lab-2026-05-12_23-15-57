@@ -5,7 +5,7 @@ import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
+import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
@@ -17,6 +17,7 @@ import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import type { SessionTallies } from '@/lib/game-systems';
 import { reportEarnGrant } from '@/lib/wallet/client';
+import { EndCardRewards, walletGrantsFrom, type WalletGrants } from './end-card-rewards';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
 import {
@@ -129,9 +130,9 @@ function GameShellInner({
   const [profileTry, setProfileTry] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
   const [recap, setRecap] = useState<RecapData | null>(null);
-  /** The wallet coins this run's earn reports were granted (BRAINBRAWL-POLISH-2 N10), and whether a cap cut the coin earn —
-   *  null until a grant lands, and left null for a refused earn or a zero grant nothing capped (no "+0" tile). */
-  const [recapCoins, setRecapCoins] = useState<{ coins: number; capped: boolean } | null>(null);
+  /** What this run's earn reports were granted, coins and shards (BRAINBRAWL-POLISH-2 N10; QA P0-02: the shards too, and
+   *  "+0" when nothing was granted) — null until the reports answer, and for a run the shell does not report (dunk). */
+  const [recapCoins, setRecapCoins] = useState<WalletGrants | null>(null);
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
@@ -282,10 +283,7 @@ function GameShellInner({
               }
               void Promise.all(grants).then((gs) => {
                 if (!mine()) return;
-                const paid = gs.filter((g): g is NonNullable<typeof g> => g !== null);
-                const coins = paid.reduce((sum, g) => sum + (Number.isFinite(g.coins) ? g.coins : 0), 0);
-                const capped = Boolean(gs[0]?.capped);   // the completed earn is the coin one (the won earn pays shards)
-                if (coins > 0 || capped) setRecapCoins({ coins, capped });
+                setRecapCoins(walletGrantsFrom(gs));   // the completed earn pays coins, the won earn shards
               });
             }
 
@@ -672,44 +670,7 @@ function GameShellInner({
                       <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
                     </div>
                   ) : (
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    <div className="fel-card rounded-lg p-3">
-                      <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
-                    </div>
-                    <div className="fel-card rounded-lg p-3">
-                      <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
-                    </div>
-                    <div className="fel-card rounded-lg p-3">
-                      <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
-                    </div>
-                    <div className="fel-card rounded-lg p-3">
-                      {recap.prqDelta >= 0 ? (
-                        <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
-                      ) : (
-                        <TrendingDown className="mx-auto h-4 w-4 text-[#FF3366]" />
-                      )}
-                      <div className={`mt-1 font-mono text-xl font-bold ${recap.prqDelta >= 0 ? 'text-[#00E5FF]' : 'text-[#FF3366]'}`}>
-                        {recap.prqDelta >= 0 ? '+' : ''}
-                        {recap.prqDelta}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
-                    </div>
-                    {recapCoins !== null && (
-                      <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
-                        <Coins className="h-4 w-4 text-[#FFB020]" />
-                        {recapCoins.coins > 0 && <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>}
-                        <span className="text-[10px] uppercase tracking-wider text-white/40">
-                          {recapCoins.coins > 0 ? (recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins') : 'Wallet coin limit reached for now'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <EndCardRewards recap={recap} walletGrants={recapCoins} />
                   )}
                   {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
                   {storyReward && (
