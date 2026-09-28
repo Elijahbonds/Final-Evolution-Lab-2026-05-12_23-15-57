@@ -127,7 +127,8 @@ interface Template {
 const T: Record<string, Template> = {
   // T1
   valgusLeft: {
-    f: RATIO, said: (m, s) => `${s} knee sat ${RATIO.v(m.value!)} hip half-widths inside its hip–ankle line at the bottom`,
+    f: RATIO, shown: (v) => RATIO.n(Math.abs(v)),
+    said: (m, s) => `${s} knee sat ${RATIO.v(Math.abs(m.value!))} hip half-widths ${m.value! >= 0 ? 'inside' : 'outside'} its hip–ankle line at the bottom`,
     meaning: 'The knee is taking rotation the hip should control, which is where landing forces go wrong.',
     clean: 'The knee tracked over the foot.', fix: DRILLS.knee,
   },
@@ -167,7 +168,8 @@ const T: Record<string, Template> = {
   },
   // T3
   fppa: {
-    f: DEG, said: (m, s) => `${s} knee moved ${DEG.v(m.value!)} toward the midline at the bottom (against your standing line)`,
+    f: DEG, shown: (v) => DEG.n(Math.abs(v)),
+    said: (m, s) => `${s} knee moved ${DEG.v(Math.abs(m.value!))} ${m.value! >= 0 ? 'toward' : 'away from'} the midline at the bottom (against your standing line)`,
     meaning: 'The knee drifted in as you went down on one leg, the same pattern a one-foot landing shows under load.',
     clean: 'The knee stayed over the foot.', fix: DRILLS.knee,
   },
@@ -193,7 +195,8 @@ const T: Record<string, Template> = {
     meaning: 'The landing was stiff: the force went up through the legs instead of being absorbed.', clean: 'Soft landings.', fix: DRILLS.landing,
   },
   landingValgusLeft: {
-    f: DEG, said: (m, s) => `${s} knee moved ${DEG.v(m.value!)} toward the midline on landing`,
+    f: DEG, shown: (v) => DEG.n(Math.abs(v)),
+    said: (m, s) => `${s} knee moved ${DEG.v(Math.abs(m.value!))} ${m.value! >= 0 ? 'toward' : 'away from'} the midline on landing`,
     meaning: 'The knee drifted in as you absorbed the landing.', clean: 'The knee stayed over the foot on landing.', fix: DRILLS.knee,
   },
   landingSym: {

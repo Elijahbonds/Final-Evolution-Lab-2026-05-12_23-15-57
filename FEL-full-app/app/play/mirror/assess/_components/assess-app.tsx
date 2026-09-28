@@ -67,14 +67,16 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
   const highFpsRef = useRef(false);
   const deviceRef = useRef<{ model: 'lite' | 'full' | null; width: number; height: number }>({ model: null, width: 0, height: 0 });
 
-  const cleanup = useCallback(() => {
+  /** Drop this page's listeners; stop the camera too unless `keepFeed` and the QA feed is standing in for it. */
+  const cleanup = useCallback((keepFeed = false) => {
     previewRef.current?.(); previewRef.current = null;
     for (const u of unsubRef.current.splice(0)) u();
-    poseService().stop();
+    const svc = poseService();
+    if (!(keepFeed && svc.status.source === 'feed')) svc.stop();
     try { window.speechSynthesis?.cancel(); } catch { /* nothing speaking */ }
   }, []);
   // the camera stops when the page goes away
-  useEffect(() => cleanup, [cleanup]);
+  useEffect(() => () => cleanup(), [cleanup]);
 
   const draw = useCallback((f: PoseFrame, colour: string) => {
     // the picture: the camera's current frame, painted (see the header)
@@ -97,7 +99,8 @@ export function AssessApp({ signedIn }: { signedIn: boolean }) {
   }, []);
 
   const start = useCallback(async (model?: 'lite') => {
-    cleanup();
+    // a camera already running is restarted (the lighter model); a QA feed standing in for it is kept (lib/pose/feed.ts)
+    cleanup(true);
     setPhase('starting');
     const svc = poseService();
     unsubRef.current.push(svc.onStatus((s) => setStatus(s)));

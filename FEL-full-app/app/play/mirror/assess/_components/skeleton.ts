@@ -97,3 +97,18 @@ export function metricFocus(metric: string, side: 'left' | 'right' | undefined, 
     default: return { highlight: [], guides: [] };
   }
 }
+
+/**
+ * The same pose, re-framed to fill a `w`×`h` canvas (the frozen worst rep: a body a third of the frame tall drawn at
+ * full-frame scale is a stick figure you cannot read). Uniform scale in pixels, so no angle is bent; `aspect` is the
+ * source image's width ÷ height.
+ */
+export function fitToBox(img: readonly Lm[], aspect: number, w: number, h: number, pad = 0.08): Lm[] {
+  const pts = img.filter((l) => l && l.v >= 0.35);
+  if (!pts.length) return [...img];
+  const xs = pts.map((l) => l.x * aspect), ys = pts.map((l) => l.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const scale = Math.min((w * (1 - 2 * pad)) / Math.max(1e-6, x1 - x0), (h * (1 - 2 * pad)) / Math.max(1e-6, y1 - y0));
+  const ox = (w - (x1 - x0) * scale) / 2, oy = (h - (y1 - y0) * scale) / 2;
+  return img.map((l) => ({ ...l, x: (ox + (l.x * aspect - x0) * scale) / w, y: (oy + (l.y - y0) * scale) / h }));
+}

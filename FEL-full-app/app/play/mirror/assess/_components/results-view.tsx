@@ -11,7 +11,7 @@ import type { FrozenRep, SideResult, TestResult } from '@/lib/assess/scoring';
 import { PROTOCOL, NOT_BUILT_LINE, testDef, type Side } from '@/lib/assess/protocol';
 import { PROVISIONAL_LABEL } from '@/lib/assess/thresholds';
 import { PAIN_REFERRAL, inches, type Reason } from '@/lib/assess/why';
-import { drawSkeleton, metricFocus, SKELETON_COLOURS } from './skeleton';
+import { drawSkeleton, fitToBox, metricFocus, SKELETON_COLOURS } from './skeleton';
 
 export type SaveState =
   | { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved'; body: Record<string, unknown> }
@@ -194,14 +194,15 @@ function TestCard({ test, reasons, leg }: { test: TestResult; reasons: Reason[];
 /** The worst rep, from its landmarks on a blank canvas: never a camera frame. Held in this page's memory only. */
 function Frozen({ f }: { f: FrozenRep }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
-  const w = 180, h = Math.round(w / (f.aspect || 4 / 3));
+  const w = 180, h = 220;
   useEffect(() => {
     const c = ref.current, ctx = c?.getContext('2d');
     if (!c || !ctx) return;
     ctx.fillStyle = '#0b0b0b';
     ctx.fillRect(0, 0, c.width, c.height);
-    const focus = metricFocus(f.metric, f.side, f.image);
-    drawSkeleton(ctx, f.image, { colour: SKELETON_COLOURS.tracking, mirror: true, highlight: focus.highlight, guides: focus.guides });
+    const img = fitToBox(f.image, f.aspect || 4 / 3, c.width, c.height);
+    const focus = metricFocus(f.metric, f.side, img);
+    drawSkeleton(ctx, img, { colour: SKELETON_COLOURS.tracking, mirror: true, highlight: focus.highlight, guides: focus.guides });
   }, [f]);
   return (
     <figure className="w-[180px]">
