@@ -56,6 +56,8 @@ import { chipLabel } from '@/lib/mirror/hudChip';
 // reward and the scoring sat in lib/mirror with no importer at all. lib/nav/modules.test.ts is what found them.
 import { ScreenRunner, type RunnerState } from '@/lib/mirror/screenRunner';
 import { NOT_GRADED_LINE, scoreScreen, type ScreenId, type CheckResult, type ScreenResultSummary } from '@/lib/mirror/screen';
+import { cameraHelp, isCameraError, type CameraHelp } from '@/lib/camera/cameraHelp';
+import { CameraHelpPanel } from '@/components/camera-help-panel';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -87,6 +89,8 @@ export function MirrorHarness() {
 
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
+  /** QA P1-23: a camera that did not start is said with its steps (lib/camera/cameraHelp), not one red line. */
+  const [camHelp, setCamHelp] = useState<CameraHelp | null>(null);
   const [phase, setPhase] = useState<string>('hold');
   const [frameMs, setFrameMs] = useState<number>(0);
   const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState>>({
@@ -258,6 +262,7 @@ export function MirrorHarness() {
       setRunner(null); setScreenSummary(null); setScreenMessage('');
     }
     setError('');
+    setCamHelp(null);
     setJumps([]);
     setReps(null);
     jumpTrackerRef.current.reset();
@@ -406,12 +411,11 @@ export function MirrorHarness() {
       // Honest errors: a denied camera, a missing camera, and a dead 3D
       // overlay are three different problems (measured: a WebGL-less
       // environment hit the overlay path and the page blamed the camera).
-      setError(
-        e?.name === 'NotAllowedError'
-          ? 'Camera permission denied. Allow camera access and try again.'
-          : e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError' || e?.name === 'NotReadableError'
-            ? 'Camera unavailable in this browser/environment.'
-            : 'The coaching overlay failed to start (3D renderer). Try a WebGL-capable browser.');
+      // A camera failure (its DOMException name, or a page with no secure context and so no camera at all) gets its steps.
+      const insecure = typeof window !== 'undefined' && !window.isSecureContext;
+      const help = insecure || isCameraError(e) ? cameraHelp(e, { secure: !insecure }) : null;
+      setCamHelp(help);
+      setError(help ? help.title : 'The coaching overlay failed to start (3D renderer). Try a WebGL-capable browser.');
       setStatus('error');
     }
   }, []);
@@ -851,7 +855,7 @@ export function MirrorHarness() {
           <p className="mt-2 text-[13px] font-semibold leading-relaxed text-[#FFC24B]">{DEEPER_LINE}</p>
         )}
 
-        {error && (
+        {camHelp ? <CameraHelpPanel help={camHelp} onRetry={() => void start()} /> : error && (
           <p className="mt-4 rounded-xl border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-3 text-[13px] text-[#ff8da8]">
             {error}
           </p>

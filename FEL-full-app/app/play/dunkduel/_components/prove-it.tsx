@@ -16,6 +16,7 @@ import { Camera, CameraOff, RotateCcw, Users, Trophy } from 'lucide-react';
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
+import { cameraHelp, cameraHelpText } from '@/lib/camera/cameraHelp';   // QA P1-23: the camera-off copy says what to do
 
 const BG = '#050505';
 const CYAN = '#00E5FF';
@@ -119,9 +120,9 @@ export default function ProveIt() {
     } catch (e) {
       if (stale()) return;   // left or restarted meanwhile: stopAll() already freed this attempt
       stopAll();             // a camera that opened but would not play must not stay on behind "no camera"
-      setError(e instanceof DOMException && e.name === 'NotAllowedError'
-        ? 'Camera access was denied. Prove It measures your dunk through the camera — allow it to play.'
-        : 'No usable camera on this device. Prove It needs to see you.');
+      // QA P1-23: the failure's own steps (lib/camera/cameraHelp), after what Prove It needs the camera for
+      const insecure = typeof window !== 'undefined' && !window.isSecureContext;
+      setError(`Prove It measures your dunk through the camera. ${cameraHelpText(cameraHelp(e, { secure: !insecure }))}`);
       setStage('camera-off');
     }
   }, [stopAll]);
