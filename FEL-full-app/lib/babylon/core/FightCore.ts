@@ -78,6 +78,14 @@ export const PARRY_WINDOW_MS = 160;
 export const GUARD_BREAK_STAGGER_SEC = 1.4;
 export const PARRY_STAGGER_SEC = 0.9;
 export const COMBO_WINDOW_SEC = 1.1;
+/** QA A1-03: consecutive hits landed on a defender who never regained control (one unbroken stun/stagger string)
+ *  before it breaks out instead of taking the next one. Lowering damage was rejected as the fix — a fast enough
+ *  string re-stunned before stunSec ever reached 0, so a rival at 100 HP could be locked for a whole match. This
+ *  caps the STRING, not the damage. */
+export const STUN_CHAIN_BREAKOUT = 4;
+/** How long the breakout's substitution buys: the next swing(s) inside this window whiff, same as a read step, so
+ *  the fighter that just broke out gets a real beat to act before the string could re-close on them. */
+export const BREAKOUT_INVULN_SEC = 0.6;
 
 export class FighterState {
   hp: number;
@@ -89,6 +97,10 @@ export class FighterState {
   lastBlockPressMs = -1e9;   // for the parry window
   combo = 0;                 // hits landed BY this fighter in the window
   comboTimer = 0;
+  /** QA A1-03: hits landed while NOT controllable, in this one unbroken string — see STUN_CHAIN_BREAKOUT. */
+  stunChain = 0;
+  /** QA A1-03: seconds left on a breakout's substitution — incoming strikes whiff past it. */
+  escapeSec = 0;
 
   constructor(public maxHp = 100) { this.hp = maxHp; }
 
@@ -99,6 +111,7 @@ export class FighterState {
     this.stunSec = Math.max(0, this.stunSec - dt);
     this.staggerSec = Math.max(0, this.staggerSec - dt);
     this.comboTimer = Math.max(0, this.comboTimer - dt);
+    this.escapeSec = Math.max(0, this.escapeSec - dt);
     if (this.comboTimer === 0) this.combo = 0;
     if (!this.blockHeld && this.guard < GUARD_MAX) this.guard = Math.min(GUARD_MAX, this.guard + 9 * dt);
   }
@@ -110,11 +123,14 @@ export class FighterState {
     this.hp = this.maxHp; this.guard = GUARD_MAX;
     this.stunSec = 0; this.staggerSec = 0; this.combo = 0; this.comboTimer = 0;
     this.blockHeld = false; this.lastBlockPressMs = -1e9;
+    this.stunChain = 0; this.escapeSec = 0;
   }
 }
 
 // ── Strike resolution ────────────────────────────────────────────────────
-export type StrikeOutcome = 'whiff' | 'parried' | 'blocked' | 'guardBreak' | 'hit' | 'stepped';
+/** QA A1-03: `'escaped'` — the defender broke out of an unbroken stun/stagger string (STUN_CHAIN_BREAKOUT) instead
+ *  of taking this hit. Only reachable when the caller opts in (`resolveStrike`'s `breakout` param). */
+export type StrikeOutcome = 'whiff' | 'parried' | 'blocked' | 'guardBreak' | 'hit' | 'stepped' | 'escaped';
 
 /** How far off the attack line a defender must be for a vertical to whiff
  *  past them. TUNE(elijah), MEASURED: fighters move 3.3 m/s, so a committed
@@ -137,10 +153,30 @@ export const STEP_CHI_GAIN = 8;
  *
  *  `lateralOffsetM` = the defender's sideways distance from the attacker's
  *  facing line at impact. Only vertical attacks check it (a stepped
- *  vertical whiffs past); horizontals ignore it — that's their job. */
-export function resolveStrike(atk: AttackDef, dist: number, defender: FighterState, nowMs: number, lateralOffsetM?: number, parryWindowMs = PARRY_WINDOW_MS): StrikeOutcome {
+ *  vertical whiffs past); horizontals ignore it — that's their job.
+ *
+ *  `breakout` (QA A1-03, default off — every existing caller and the pad-equivalence fixture keep the old,
+ *  unconditional-hit behavior byte for byte): when true, a defender who has taken STUN_CHAIN_BREAKOUT hits in one
+ *  unbroken string escapes instead of taking the next one ('escaped', no damage, no restun — see FighterState),
+ *  and is briefly unhittable while they do. Lowering damage was rejected: a fast enough string re-stunned before
+ *  stunSec ever reached 0, so a defender could be locked for a whole match regardless of how weak each hit was. */
+export function resolveStrike(atk: AttackDef, dist: number, defender: FighterState, nowMs: number, lateralOffsetM?: number, parryWindowMs = PARRY_WINDOW_MS, breakout = false): StrikeOutcome {
   if (dist > atk.range) return 'whiff';
-  if (!defender.controllable) return 'hit';                 // stunned/staggered = defenseless
+  // QA A1-03: the substitution's window applies whether or not the breakout also left them controllable (it does) —
+  // check it before the controllable branch, or a swing landing the instant control returns would restun them.
+  if (breakout && defender.escapeSec > 0) return 'stepped';
+  if (!defender.controllable) {
+    if (!breakout) return 'hit';                             // stunned/staggered = defenseless (pre-A1-03 behavior)
+    defender.stunChain += 1;
+    if (defender.stunChain >= STUN_CHAIN_BREAKOUT) {
+      defender.stunSec = 0; defender.staggerSec = 0;
+      defender.escapeSec = BREAKOUT_INVULN_SEC;
+      defender.stunChain = 0;
+      return 'escaped';
+    }
+    return 'hit';
+  }
+  if (breakout) defender.stunChain = 0;                      // controllable: no string is open, so none can be mid-count
   // MOVEMENT PLAY P7 (2026-09-25): `parryWindowMs` is a BODY defender's widened window (bodyFight.BODY_PARRY_WINDOW_MS);
   // every pad defender keeps the default
   if (nowMs - defender.lastBlockPressMs <= parryWindowMs) return 'parried';
