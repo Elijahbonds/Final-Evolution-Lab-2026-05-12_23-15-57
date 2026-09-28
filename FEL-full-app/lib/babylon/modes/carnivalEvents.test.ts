@@ -73,16 +73,23 @@ vi.mock('./boardCore', async (orig) => ({
     dispose: () => undefined,
   }),
 }));
+// QA A1-01(a): 'goal' (the default, every existing test) puts the shot at the goal line on the next step, as before.
+// 'short' lands it well before the line with the flight stopped (a grounded shot) — Flight's own real contract for
+// a shot that falls short — so the hotShot soft-lock test can drive the exact case that used to never resolve.
+let flightOutcome: 'goal' | 'short' = 'goal';
+const powerMeterCalls = { starts: 0 };
 vi.mock('./aimSwingCore', () => ({
   buildGoal: () => [],
   Reticle: class { pos = new Vector3(0, 1.2, 11); update(): void {} dispose(): void {} },
-  PowerMeter: class { start(): void {} stop(): number { return 0.5; } update(): void {} },
-  // the shot arrives at the goal line on the next step, in the frame
+  PowerMeter: class { start(): void { powerMeterCalls.starts++; } stop(): number { return 0.5; } update(): void {} },
   Flight: class {
     active = false;
     constructor(public ball: { position: Vector3 }) {}
     launch(): void { this.active = true; }
-    step(): boolean { this.ball.position.set(0, 1, 11); return true; }
+    step(): boolean {
+      if (flightOutcome === 'short') { this.ball.position.set(0, 0.05, 4); this.active = false; return false; }
+      this.ball.position.set(0, 1, 11); return true;
+    }
   },
 }));
 vi.mock('../core/Pickups', () => ({
@@ -119,7 +126,7 @@ function fakeCtx() {
 }
 const press = (btn: string): FelInput => ({ t: 'button', btn, pressed: true } as unknown as FelInput);
 
-beforeEach(() => { rider.grounded = true; rider.vel.set(0, 0, 0); coinGain.next = 0; owners.length = 0; ballRig.dressed.length = 0; ballRig.hands.length = 0; vi.useFakeTimers(); });
+beforeEach(() => { rider.grounded = true; rider.vel.set(0, 0, 0); coinGain.next = 0; owners.length = 0; ballRig.dressed.length = 0; ballRig.hands.length = 0; flightOutcome = 'goal'; powerMeterCalls.starts = 0; vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('TRICK GAUNTLET: the call is the banner (1), the machine keeps off the night total (2), a landing is heard (3)', () => {
@@ -223,6 +230,20 @@ describe('every carnival event reports its successes to the momentum bus (3)', (
     ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));   // power, then shoot
     ev.tick(f.ctx, 1 / 60);
     expect(f.report).toHaveBeenCalledWith(expect.objectContaining({ kind: 'big_make' }));
+    f.dispose();
+  });
+
+  it('HOT SHOT: a short shot resets instead of soft-locking the event (QA A1-01a)', async () => {
+    const f = fakeCtx(); const ev = hotShot(); await ev.build(f.ctx);
+    flightOutcome = 'short';               // the ball lands well before the goal line — used to leave `phase` stuck at 'flight' forever
+    ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));   // power, then shoot
+    ev.tick(f.ctx, 1 / 60);
+    expect(f.report).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'big_make' }));   // no score — it never reached the line
+    // the event must be back at 'aim': a fresh A press starts a new power charge. Before the fix, `onInput` had
+    // nothing to do (phase was stuck at 'flight') and this never fired.
+    powerMeterCalls.starts = 0;
+    ev.onInput(f.ctx, press('A'));
+    expect(powerMeterCalls.starts).toBe(1);
     f.dispose();
   });
 

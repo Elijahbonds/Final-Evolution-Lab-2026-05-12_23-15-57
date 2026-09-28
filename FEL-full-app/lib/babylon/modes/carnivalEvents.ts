@@ -291,9 +291,14 @@ export function hotShot(): CarnivalEvent {
       if (phase === 'aim') reticle.update(dt, stickX, stickY);
       if (phase === 'flight') {
         flight.step(dt);
-        if (ball.position.z >= 10.9) {
+        const reachedGoal = ball.position.z >= 10.9;
+        // QA A1-01(a): a shot that falls short (or wide enough to ground before the line) used to leave `flight`
+        // inactive with phase stuck at 'flight' forever — nothing here ever ran again, so the event soft-locked
+        // after one short shot. `!flight.active` (the ball has stopped, from Flight.step's own ground check) is
+        // now just as much a resolution as reaching the line: always a miss, since it never got there to score.
+        if (reachedGoal || !flight.active) {
           flight.active = false;
-          if (Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4) { goals++; SoundKit.play('score'); EffectsKit.burst(ctx.scene, goalCenter, 'confetti'); ctx.momentum.report({ kind: 'big_make', weight: 8 }); }
+          if (reachedGoal && Math.abs(ball.position.x) < 3.6 && ball.position.y < 2.4) { goals++; SoundKit.play('score'); EffectsKit.burst(ctx.scene, goalCenter, 'confetti'); ctx.momentum.report({ kind: 'big_make', weight: 8 }); }
           else SoundKit.play('miss');
           ball.position.set(0, 0.11, 0);
           phase = 'aim';
