@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { TimingPrompt } from './timing-prompt';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -197,12 +198,6 @@ export function makeTimingHost(opts: TimingHostOpts) {
           </div>
         )}
 
-        {/* The shot the mode graded, and the incoming-attack warning. */}
-        {typeof hud.shotType === 'string' && hud.shotType && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
-            <span className="fel-panel px-3 py-1 font-mono text-[11px] text-white/85">{hud.shotType}</span>
-          </div>
-        )}
 
         {/* GOLF (A+ mission #5, Everybody's Golf read + Wii size) — every block is key-gated, so the other timing sports
             are unchanged: the lie panel (club · pin · wind with a bearing arrow), the hole chip, the drawn three-press
@@ -382,14 +377,6 @@ export function makeTimingHost(opts: TimingHostOpts) {
             </div>
           </div>
         )}
-        {typeof hud.incomingTell === 'string' && hud.incomingTell && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-36 flex justify-center font-mono">
-            <span className="fel-panel px-4 py-1.5 text-sm font-bold text-white">
-              INCOMING · {hud.incomingTell}
-              {typeof hud.answer === 'string' && hud.answer ? <span className="ml-2 text-[var(--fel-cyan)]">answer {hud.answer}</span> : null}
-            </span>
-          </div>
-        )}
 
         {/* THE CUE LANE (dance, A+ mission #1): the next moves slide toward the
             hit ring, coloured by move family (= the band's instrument), glyph
@@ -428,36 +415,11 @@ export function makeTimingHost(opts: TimingHostOpts) {
           </div>
         )}
 
-        {/* the cue — rhythm modes publish the incoming move; it goes gold
-            inside the last 0.35s so the tap is about reading, not guessing */}
-        {typeof hud.nextStep === 'string' && hud.nextStep && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
-            <span
-              className={`fel-panel px-4 py-1.5 font-mono text-sm font-bold transition-colors ${
-                typeof hud.nextStepIn === 'number' && hud.nextStepIn <= 0.35
-                  ? 'border-[var(--fel-gold)]/60 text-[var(--fel-gold)]'
-                  : 'text-white/85'
-              }`}
-            >
-              {typeof hud.nextStepIn === 'number' && hud.nextStepIn <= 0.35 ? 'NOW — ' : ''}
-              {hud.nextStep}
-              {typeof hud.nextStepIn === 'number' && hud.nextStepIn > 0.35 && (
-                <span className="text-white/40"> · {hud.nextStepIn.toFixed(1)}</span>
-              )}
-            </span>
-          </div>
-        )}
 
-        {/* The contact grade — PURE / OFF-CENTRE / EDGE OF THE BAT, plus the
-            pitch that threw it. Derby publishes it on every swing and the
-            bezel dropped it (same family trap as the energy gauge above,
-            whose comment names this exact failure). This is the benchmark's
-            named mechanic; it cannot be invisible. */}
-        {typeof hud.contact === 'string' && hud.contact && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-36 text-center">
-            <span className="fel-panel px-3 py-1 font-mono text-[11px] font-bold text-[var(--fel-gold)]">{hud.contact}</span>
-          </div>
-        )}
+        {/* THE PROMPT LINE (QA P1-12): the incoming tell, the contact grade (PURE / OFF-CENTRE / EDGE OF THE BAT — the
+            benchmark's named mechanic, it cannot be invisible), the graded shot and the rhythm cue (gold inside its last
+            0.35 s) share ONE slot under the meters — they used to sit at their own offsets and stack in a rally. */}
+        <TimingPrompt hud={hud} />
 
         {typeof hud.banner === 'string' && hud.banner && (
           <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
