@@ -79,9 +79,9 @@ export const THRESHOLDS = {
   'geom.heelRiseRepo': repo(0.012, '§4 T1', 'image-height units', 'Reference only (not read by the scorer): the guided squat\'s heel line; ≈ geom.heelRise at 80% frame fill', 'lib/babylon/nexus/neuro-mirror/rules/squat-audit.ts heelRiseWarnPx'),
 
   // ── rep segmentation (lane defaults, §4 rules) ──
-  't1.repEnter': spec(0.15, '§4 rules', 'hip drop / standing hip height', 'Lane default: a squat rep starts past this hip drop'),
-  't1.repExit': spec(0.08, '§4 rules', 'hip drop / standing hip height', 'Lane default: …and ends back under this'),
-  't1.repMinPeak': spec(0.25, '§4 rules', 'hip drop / standing hip height', 'Lane default: a rep shallower than this is not a rep'),
+  't1.repEnter': spec(0.1, '§4 rules', 'hip drop / standing hip height', 'Lane default: a squat rep starts past this hip drop'),
+  't1.repExit': spec(0.05, '§4 rules', 'hip drop / standing hip height', 'Lane default: …and ends back under this'),
+  't1.repMinPeak': spec(0.15, '§4 rules', 'hip drop / standing hip height', 'Lane default: a dip shallower than this (~45° of knee bend) is not a rep; a shallow squat past it IS one, and scores low on depth'),
   't2.repRise': spec(6, '§4 T2', 'deg', 'Lane default: a knee-to-wall rock is a tibia swing of at least this'),
   't3.repEnter': spec(20, '§4 T3', 'deg knee flexion', 'Lane default: a single-leg squat rep starts past this'),
   't3.repExit': spec(12, '§4 T3', 'deg knee flexion', 'Lane default: …and ends back under this'),
@@ -116,6 +116,7 @@ export const THRESHOLDS = {
   't5.flightMinMs': repo(180, '§4 T5', 'ms', 'A shorter flight is a hop, not a jump', 'lib/irl/dunkTracker.ts MIN_FLIGHT_MS'),
   't5.flightMaxMs': repo(1200, '§4 T5', 'ms', 'A longer flight is refused (the camera lost the feet)', 'lib/irl/dunkTracker.ts MAX_FLIGHT_MS'),
   't5.maxHeightCm': repo(130, '§4 T5', 'cm', 'Heights over this are refused', 'lib/irl/dunkTracker.ts MAX_VERTICAL_CM'),
+  't5.nominalHeightM': spec(1.6, '§4 T5', 'm nose to floor', 'Lane default: the body height a flight\'s sanity check assumes when there are no world landmarks (a flight\'s feet must rise half what its air time needs)'),
   't5.landingWindowMs': spec(300, '§4 T5', 'ms', 'Landing metrics read the peak within this long of touchdown'),
   't5.landingFlex': spec(band(0.25, 0.1, 0.1, '<='), '§4 T5', 'hip drop / standing hip height', 'Landing knee-flexion proxy: stiff landing at the fault line'),
   't5.landingValgus': spec(band(5, 20, 10, '>'), '§4 T5', 'deg', 'Landing FPPA at peak flexion, minus standing baseline (T3 bands)'),

@@ -57,17 +57,20 @@ export interface MetricResult {
   side?: Side;
   /** 1-based rep (or jump) the value came from. */
   rep?: number;
+  /** For a test filmed from two views (T1), which one this metric was read from; reps are numbered per view. */
+  view?: 'front' | 'side';
   thresholdId: ThresholdId;
   /** Why a metric was not scored ("not scored at this frame rate"). */
   note?: string;
 }
 
 /** Build a scored metric from its band. A null or non-finite value is unread: no score, no fault. */
-export function metric(id: string, label: string, unit: string, value: number | null, thresholdId: ThresholdId, b: Band, weight: number, o: { side?: Side; rep?: number } = {}): MetricResult {
+export function metric(id: string, label: string, unit: string, value: number | null, thresholdId: ThresholdId, b: Band, weight: number, o: { side?: Side; rep?: number; view?: 'front' | 'side' } = {}): MetricResult {
   const read = value !== null && Number.isFinite(value);
   return {
     id, label, unit, value: read ? value : null, score: read ? bandScore(value!, b) : null, weight,
-    fault: read ? isFault(value!, b) : false, thresholdId, ...(o.side ? { side: o.side } : {}), ...(o.rep ? { rep: o.rep } : {}),
+    fault: read ? isFault(value!, b) : false, thresholdId,
+    ...(o.side ? { side: o.side } : {}), ...(o.rep ? { rep: o.rep } : {}), ...(o.view ? { view: o.view } : {}),
   };
 }
 
@@ -110,6 +113,8 @@ export interface SideResult {
   complete: boolean;
   /** Why the side is capped at 1 besides the score (balance lost). */
   capReason?: string;
+  /** For a two-view test (T1): the valid and total reps of each view. */
+  views?: { front: { valid: number; total: number }; side: { valid: number; total: number } };
 }
 
 export function sideResult(metrics: MetricResult[], o: { repsValid: number; repsTotal: number; capAt1?: string }): SideResult {
@@ -153,6 +158,17 @@ export function confidenceOf(passing: number, total: number, poseHz: number): nu
 }
 
 export const scorable = (confidence: number): boolean => confidence >= th('gate.minConfidence');
+
+/** Pose frames per second a capture delivered: 1000 over the median gap between frames (a dropped frame is a longer gap). */
+export function poseHz(frames: readonly { t: number }[]): number {
+  if (frames.length < 2) return 0;
+  const gaps: number[] = [];
+  for (let i = 1; i < frames.length; i++) { const g = frames[i].t - frames[i - 1].t; if (g > 0) gaps.push(g); }
+  if (!gaps.length) return 0;
+  gaps.sort((a, b) => a - b);
+  const m = gaps.length >> 1, med = gaps.length % 2 ? gaps[m] : (gaps[m - 1] + gaps[m]) / 2;
+  return Math.round((1000 / med) * 10) / 10;
+}
 
 // ── the CMJ's own numbers ──
 

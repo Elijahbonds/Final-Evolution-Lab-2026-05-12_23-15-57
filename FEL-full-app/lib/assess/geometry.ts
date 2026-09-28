@@ -17,8 +17,10 @@
 // Pure: numbers in, numbers out.
 import {
   SIDE, LEFT_HIP, RIGHT_HIP, LEFT_SHOULDER, RIGHT_SHOULDER, NOSE, LEFT_EAR, RIGHT_EAR,
-  type Lm, type Wm, type Side,
+  type Lm, type Wm, type Side, type PoseFrame,
 } from '@/lib/pose/landmarks';
+import { PoseFilter } from '@/lib/pose/oneEuro';
+import { sideWidth, SIDE_WIDTH_MAX } from '@/lib/mirror/framing';
 import { th } from './thresholds';
 
 /** A point in image-height units: x × aspect, y (down). */
@@ -282,4 +284,58 @@ export function kneeFlexionFront(img: readonly Lm[], world: readonly Wm[] | unde
 export function wristsAboveShoulders(img: readonly Lm[]): number {
   const shY = (img[LEFT_SHOULDER].y + img[RIGHT_SHOULDER].y) / 2;
   return shY - Math.min(img[SIDE.left.wrist].y, img[SIDE.right.wrist].y);
+}
+
+// ── the per-frame gate (spec §3.1, §3.2) ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * The view a frame shows: side-on when the shoulders have collapsed against the torso (framing.ts SIDE_WIDTH_MAX),
+ * else facing. Null when the four points are missing.
+ */
+export function viewOf(img: readonly Lm[]): 'front' | 'side' | null {
+  const w = sideWidth({ landmarks: img as Lm[] });
+  return w === null ? null : w < SIDE_WIDTH_MAX ? 'side' : 'front';
+}
+
+/** A scoring frame: a body, every point this test reads seen at the scoring visibility, and the view the test needs. */
+export function passes(img: readonly Lm[] | undefined, required: readonly number[], view: 'front' | 'side', minVis: number): boolean {
+  if (!img || img.length < 33) return false;
+  return visible(img, required, minVis) && viewOf(img) === view;
+}
+
+/**
+ * The angle stream: every frame through the One-Euro filter (lib/pose/oneEuro.ts, its tuned defaults), as the spec asks
+ * for angles (§3.1). Event TIMING (a jump's take-off and landing) reads the raw frames instead, because smoothing
+ * delays an edge. A fresh filter per call, so the same frames always smooth the same way (replay is deterministic).
+ */
+export function smooth(frames: readonly PoseFrame[]): PoseFrame[] {
+  const f = new PoseFilter();
+  return frames.map((x) => f.filter(x));
+}
+
+/**
+ * How far the free foot's lowest point sits above the stance foot's, in standing body heights: a touch-down reads ~0.
+ *
+ * NOT against the calibrated floor line: a free foot held forward sits nearer the lens, and below the lens a nearer
+ * point lands LOWER in the image. Measured on the synthetic single-leg squat, a foot 17 cm off the floor and 43 cm
+ * in front of the stance foot read on the floor line — a touch-down on every clean rep. World landmarks (metres, y
+ * down) have no parallax and win when the frame has them, divided by the standing world height from calibration;
+ * otherwise both feet are taken at the hip's depth first (atHipDepth).
+ */
+export function footClearance(img: readonly Lm[], world: readonly Wm[] | undefined, stance: Side, bodyHeightImg: number, worldBodyHeight: number | null): number {
+  const free = other(stance);
+  const pts = (s: Side) => [SIDE[s].ankle, SIDE[s].heel, SIDE[s].footIndex];
+  if (world && world.length >= 33 && worldBodyHeight && worldBodyHeight > 0.5) {
+    const low = (s: Side) => Math.max(...pts(s).map((i) => world[i].y));
+    return (low(stance) - low(free)) / worldBodyHeight;
+  }
+  const low = (s: Side) => Math.max(...pts(s).map((i) => atHipDepth(img[i]).y));
+  return (low(stance) - low(free)) / bodyHeightImg;
+}
+
+/** Standing height in world metres (nose to the lower foot), or null without world landmarks. */
+export function worldHeight(world: readonly Wm[] | undefined): number | null {
+  if (!world || world.length < 33) return null;
+  const foot = Math.max(...[27, 28, 29, 30, 31, 32].map((i) => world[i].y));
+  return foot - world[NOSE].y;
 }

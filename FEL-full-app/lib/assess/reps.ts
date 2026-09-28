@@ -144,3 +144,18 @@ export function medianRep(values: readonly number[], among: readonly number[]): 
   const lo = picks[picks.length / 2 - 1], hi = picks[picks.length / 2];
   return { value: (lo.v + hi.v) / 2, at: lo.i };
 }
+
+/**
+ * A rep's extreme read robustly: the median of `f` over the frames within ±`ms` of the extreme frame (those `ok`).
+ * Taking the single most extreme frame would read the noise's peak as well as the body's (measured on a jittered
+ * knee-to-wall: the max read 2° high); a joint turning around at the end of its range sits within a degree of its peak
+ * for longer than this window.
+ */
+export function aroundPeak(frames: readonly { t: number }[], center: number, f: (i: number) => number, ok: (i: number) => boolean, ms = 100): number {
+  const t0 = frames[center]?.t;
+  if (t0 === undefined) return NaN;
+  const vals: number[] = [];
+  for (let i = center; i >= 0 && frames[i].t >= t0 - ms; i--) if (ok(i)) vals.push(f(i));
+  for (let i = center + 1; i < frames.length && frames[i].t <= t0 + ms; i++) if (ok(i)) vals.push(f(i));
+  return median(vals.filter(Number.isFinite));
+}

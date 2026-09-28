@@ -16,6 +16,7 @@ import { synthesize, restPose, type JointClip, type Joints, type SynthOptions, t
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import { FIXTURE_CAMERA, CLEAN_FILM, THIGH, SHIN, UPPER_ARM, FOREARM, solveMiddle, squatPose } from '@/lib/mirror/fixtures/build';
 import type { Side } from './protocol';
+import { calibrateFront, calibrateSide, type Calibration } from './calibration';
 
 // ── vectors (build.ts keeps its own private; these match them) ───────────────────────────────────────────────────
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -295,7 +296,7 @@ export function slsJoints(stance: Side, d: number, o: SlsOpts = {}): Joints {
   // the free leg: thigh forward, shin hanging; at a touch-down the foot reaches the floor
   const Kf = add(Hf, [0, -THIGH * Math.cos(rad(70)), THIGH * Math.sin(rad(70))]);
   let Af = add(Kf, [0, -SHIN, 0.03]);
-  if (b.touchDown && d > 0.6) Af = [Af[0], 0.08, Af[2]];
+  if (b.touchDown && d > 0.6) Af = [Af[0], 0.08, Hf[2] + 0.22];
   j[`${F}Leg`] = b.touchDown && d > 0.6 ? solveMiddle(Hf, Af, THIGH, SHIN, [0, 0, 1]) : Kf;
   j[`${F}Foot`] = Af; j[`${F}Toe`] = add(Af, [0, -0.06, 0.12]);
   // the upper body rides on the pelvis and leans sideways toward the stance leg
@@ -397,4 +398,14 @@ export function cmj(jumps: readonly CmjJump[], opts: { fps?: number; noise?: boo
     for (const d of repCurve(0, 0.15, 0.05, 0.45, 1.0)) frames.push(handsOnHips(squatPose(land * d, { kneeInL: kneeIn, kneeInR: kneeIn })));
   }
   return { ...film({ fps: SRC_FPS, frames }, opts), truth };
+}
+
+// ── the synthetic athlete's calibration ──────────────────────────────────────────────────────────────────────────
+
+/** The calibration a synthetic session opens with: 3 s facing, 2 s side-on (left to the lens), clean or jittered. */
+export function syntheticCalibration(o: { noise?: boolean; seed?: number } = {}): Calibration {
+  const f = standFront(3, o), s = standSide('left', 2, { ...o, seed: (o.seed ?? 7) + 1 });
+  const front = calibrateFront(f.frames, f.aspect), side = calibrateSide(s.frames, s.aspect);
+  if (!front.ok || !side.ok) throw new Error(`[assess] synthetic calibration failed: ${!front.ok ? front.why : ''} ${!side.ok ? side.why : ''}`);
+  return { aspect: f.aspect, front: front.value, side: side.value };
 }

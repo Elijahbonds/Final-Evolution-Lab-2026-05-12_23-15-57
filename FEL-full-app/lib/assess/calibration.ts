@@ -16,7 +16,7 @@
 import { CORE_POINTS, NOSE, type PoseFrame } from '@/lib/pose/landmarks';
 import { sideWidth, SIDE_WIDTH_MAX } from '@/lib/mirror/framing';
 import {
-  facingSign, fppa, footLowY, hipMidY, nearSide, pelvicTilt, visible, weightShift,
+  facingSign, fppa, footLowY, hipMidY, nearSide, pelvicTilt, visible, weightShift, worldHeight,
 } from './geometry';
 import { th } from './thresholds';
 import type { Side } from './protocol';
@@ -44,6 +44,8 @@ export interface FrontCalibration {
   pelvicTilt: PerSide<number>;
   /** Hip midpoint against the ankle midpoint, standing, in hip widths. */
   shift: number;
+  /** Nose to floor in world metres, when the frames carried world landmarks; null otherwise. */
+  worldHeight: number | null;
   frames: number;
 }
 
@@ -91,7 +93,11 @@ function enough(all: readonly PoseFrame[], good: readonly PoseFrame[], ms: numbe
   return span >= ms * 0.9 && good.length >= Math.max(5, all.length * 0.6);
 }
 
-export function calibrateFront(frames: readonly PoseFrame[], aspect: number, ms = th('calib.frontMs')): CalibrationResult<FrontCalibration> {
+/**
+ * `ms` and `maxSway` default to the register's; a replay of a recorded stream that never stood still for three seconds
+ * (the owner's jump takes start mid-dip) passes its own, and says so where it does.
+ */
+export function calibrateFront(frames: readonly PoseFrame[], aspect: number, ms = th('calib.frontMs'), maxSway = th('calib.maxSway')): CalibrationResult<FrontCalibration> {
   const good = usable(frames).filter((f) => {
     const w = sideWidth({ landmarks: f.image });
     return w === null || w >= SIDE_WIDTH_MAX;          // facing the camera, not side-on
@@ -101,7 +107,7 @@ export function calibrateFront(frames: readonly PoseFrame[], aspect: number, ms 
   const floorY = Math.max(footFloorY.left, footFloorY.right);
   const bodyHeight = floorY - median(good.map((f) => f.image[NOSE].y));
   if (!(bodyHeight > 0.2)) return { ok: false, why: 'Step back so your whole body, head to feet, is in the shot.' };
-  if (sway(good, aspect, bodyHeight) > th('calib.maxSway')) return { ok: false, why: 'Hold still for a moment, arms by your sides.' };
+  if (sway(good, aspect, bodyHeight) > maxSway) return { ok: false, why: 'Hold still for a moment, arms by your sides.' };
   const hipY = median(good.map((f) => hipMidY(f.image)));
   return {
     ok: true,
@@ -113,6 +119,10 @@ export function calibrateFront(frames: readonly PoseFrame[], aspect: number, ms 
       fppa: perSide((s) => median(good.map((f) => fppa(f.image, s, aspect)))),
       pelvicTilt: perSide((s) => median(good.map((f) => pelvicTilt(f.image, s, aspect)))),
       shift: median(good.map((f) => weightShift(f.image))),
+      worldHeight: ((): number | null => {
+        const w = good.map((f) => worldHeight(f.world)).filter((x): x is number => x !== null);
+        return w.length >= good.length / 2 ? median(w) : null;
+      })(),
       frames: good.length,
     },
   };
