@@ -30,8 +30,8 @@
 //
 // Pure: no database, no session. app/api/mirror/screen/route.ts does the IO around decideScreenPost.
 import {
-  cameraSlots, protocolSourceOf, resultsForScreen, screenFor, screenVariantFor, scoreScreen, type CheckResult, type ScreenId,
-  type ScreenResultSummary, type ScreenStation, type StationView,
+  cameraChecksRead, cameraSlots, protocolSourceOf, resultsForScreen, screenFor, screenVariantFor, scoreScreen, type CheckResult,
+  type ScreenId, type ScreenResultSummary, type ScreenStation, type StationView,
 } from './screen';
 import { decideScreenReward, MIN_CHECKS_FOR_REWARD, type ScreenRewardDecision } from './screenReward';
 import { SHORT_LABEL } from './screenCorrectives';
@@ -116,16 +116,44 @@ export function stationIdFor(screen: ScreenId, checkId: string, side?: 'left' | 
   return asking.find((st) => st.stance && st.stance === side)?.id ?? null;
 }
 
-/** How much of a screen the camera read: DIFFERENT checks, and the DIFFERENT stations they came from. */
+/**
+ * How much of a screen the camera read: DIFFERENT checks, and the DIFFERENT stations they came from. The check count is
+ * screen.ts cameraChecksRead — the same function the summary's readCount comes from (MIRROR-COACH P3 follow-up,
+ * 2026-09-28), so `readableCameraChecks`, the payout bar and the athlete's "from N of 6 checks read" cannot disagree.
+ */
 export function screenCoverage(screen: ScreenId, results: readonly unknown[]): { checks: number; stations: number } {
   const kept = resultsForScreen(screen, results);
   const stations = new Set(kept.map((r) => stationIdFor(screen, r.checkId, r.side)).filter((x): x is string => !!x));
-  return { checks: new Set(kept.map((r) => r.checkId)).size, stations: stations.size };
+  return { checks: cameraChecksRead(screen, kept).readCount, stations: stations.size };
 }
 
 /** A screen, not a station or two: the bar the payout, the stored `provisional` and the coach's "current data" share. */
 export function isScreenNotStation(c: { checks: number; stations: number }): boolean {
   return c.checks >= MIN_READABLE_CAMERA_CHECKS && c.stations >= MIN_READABLE_CAMERA_STATIONS;
+}
+
+/**
+ * How many of the screen's CAMERA stations a post has any kept claim from — read, flagged or not read — out of how many
+ * it has (MIRROR-COACH P3 follow-up review, 2026-09-28). A screen run to its end has a grade from every one (a station
+ * the athlete never turned for is kept as not read); End posts only the stations reached. A claim that names no station
+ * is placed by its check (stationIdFor).
+ */
+export function cameraStationsAttempted(
+  screen: ScreenId, camera: readonly { checkId: string; side?: 'left' | 'right'; stationId?: string }[],
+): { attempted: number; total: number } {
+  const cameraStations = screenFor(screen).filter((st) => st.checks.some((c) => c.source === 'camera'));
+  const seen = new Set(camera.map((c) => (typeof c.stationId === 'string' && c.stationId ? c.stationId : stationIdFor(screen, c.checkId, c.side))));
+  return { attempted: cameraStations.filter((st) => seen.has(st.id)).length, total: cameraStations.length };
+}
+
+/**
+ * An ENDED screen that did not reach every camera station (screenReward.ts ENDED_EARLY_LINE: stored and scored, not paid,
+ * until the owner decides whether an ended screen pays). False for any post not marked `ended`.
+ */
+export function isEndedEarly(screen: ScreenId, ended: boolean, camera: Parameters<typeof cameraStationsAttempted>[1]): boolean {
+  if (!ended) return false;
+  const { attempted, total } = cameraStationsAttempted(screen, camera);
+  return attempted < total;
 }
 
 /** Cap on claims read from one post: the screen has 7 camera slots; anything past a few dozen is not a screen. */
@@ -248,7 +276,7 @@ export function screenReadLine(outcome: Pick<ScreenClaimsOutcome, 'results' | 'c
   const top = [...n].sort((a, b) => b[1] - a[1])[0]?.[0];
   const sample = unread.find((c) => (c.reason ?? '') === top);
   const said = sample?.note ? sample.note.replace(/^Not read: /, '').replace(/\.$/, '') : '';
-  const hint = sample ? retestHintFor({ reason: (sample.reason as UnreadableReason | undefined), side: sample.side }) : '';
+  const hint = sample ? retestHintFor({ reason: (sample.reason as UnreadableReason | undefined), side: sample.side, checkId: sample.checkId, frames: sample.frames }) : '';
   const why = said ? ` Most of the rest: ${said}.${hint ? ` ${hint}` : ''}` : '';
   if (!read.length) return `The camera could not read any of this screen's checks, so it does not count and pays nothing.${why}`;
   const names = read.map((id) => (isGraderId(id) ? SHORT_LABEL[id] : id)).join(', ');
@@ -274,6 +302,11 @@ export interface ScreenPostBody {
   results?: unknown;
   /** Self-report answers, if the athlete answered before the screen was posted (usually they arrive by PATCH). */
   answers?: unknown;
+  /**
+   * True when the athlete pressed End and this is what was read so far (MIRROR-COACH P3 follow-up, 2026-09-28; its review
+   * marks it). Stored on the row; an ended screen that did not reach every camera station is not paid (isEndedEarly).
+   */
+  ended?: unknown;
 }
 
 export type ScreenPostDecision =
@@ -286,6 +319,8 @@ export type ScreenPostDecision =
     summary: ScreenResultSummary;
     answers: SelfReportEntry[];
     reward: ScreenRewardDecision;
+    /** The post was marked `ended` (End pressed): stored on the row as such. */
+    ended: boolean;
   };
 
 /** The screen id a client may use: 64 characters of [A-Za-z0-9_:-], else '' (refused). */
@@ -315,11 +350,12 @@ export function decideScreenPost(body: unknown, athleteId: string): ScreenPostDe
   // attempted: the camera sent grades (P3 review — "not graded yet" is for a screen with none)
   const summary = scoreScreen(screen, outcome.results, { attempted: outcome.camera.length > 0 });
   const answers = selfReportAnswersFor(screen, b.answers);
+  const ended = b.ended === true;
   const reward = decideScreenReward({
     screenId, athleteId, provisional: outcome.provisional, checksTaken: outcome.readableChecks,
-    readLine: screenReadLine(outcome) ?? undefined,
+    readLine: screenReadLine(outcome) ?? undefined, endedEarly: isEndedEarly(screen, ended, outcome.camera),
   });
-  return { ok: true, screenId, screen, outcome, summary, answers, reward };
+  return { ok: true, screenId, screen, outcome, summary, answers, reward, ended };
 }
 
 /**
@@ -342,8 +378,10 @@ export function decisionFromStoredRow(metrics: unknown, athleteId: string): {
   const provisional = metrics.provisional === true || !isScreenNotStation(coverage);
   const summary = scoreScreen(screen, results, { attempted: camera.length > 0 });
   const readLine = screenReadLine({ results, camera, provisional, readableStations: coverage.stations });
+  // an ended screen answers a retry as it was answered (isEndedEarly): a re-post cannot turn it into a paid one
   const reward = decideScreenReward({
     screenId: metrics.screenId, athleteId, provisional, checksTaken: coverage.checks, readLine: readLine ?? undefined,
+    endedEarly: isEndedEarly(screen, metrics.ended === true, camera.filter(isRecord) as RegradedCheck[]),
   });
   return { screenId: metrics.screenId, summary, provisional, readableChecks: coverage.checks, reward };
 }

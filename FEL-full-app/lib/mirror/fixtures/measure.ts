@@ -14,7 +14,7 @@ import { LungeAudit } from '../lungeAudit';
 import { checkFraming, type FramingIssue, type FramingView } from '../framing';
 import { ScreenRunner } from '../screenRunner';
 import {
-  NOT_GRADED_LINE, distinctChecks, resultsForScreen, scoreScreen, screenFor, screenVariantFor, type ScreenId, type ScreenResultSummary,
+  NOT_GRADED_LINE, distinctChecks, resultsForScreen, scoreLine, scoreScreen, screenFor, screenVariantFor, type ScreenId, type ScreenResultSummary,
 } from '../screen';
 import { decideScreenReward, type ScreenRewardDecision } from '../screenReward';
 import { isUngradedStoredScreen, readStoredScreen, storedScreen, type StoredScreen } from '../screenStore';
@@ -265,8 +265,10 @@ export function runScreen(screen: ScreenId, frameFor: StationFrames, opts: { sta
   const reward = decideScreenReward({ screenId, athleteId: opts.athleteId ?? 'fixture-athlete', provisional: false, checksTaken: distinctChecks(results) });
   const readable = readStoredScreen(JSON.parse(JSON.stringify(stored)));
   const prescribeReason = readable ? null : isUngradedStoredScreen(stored) ? 'ungraded_screen' : 'unreadable_screen';
+  // the panel as mirror-harness.tsx paints it since the MIRROR-COACH P3 follow-up (2026-09-28): the score with what it is
+  // over (owner decision #31, scoreLine) and the checks read counted the server's way (summary.readCount of totalCount)
   const athletePanel = summary.graded
-    ? `Score ${summary.score ?? '—'} · Movement flags ${summary.movementFlags} · One-sided ${summary.asymmetries} · Checks ${results.length}`
+    ? `${scoreLine(summary) ?? 'Score —'} · Movement flags ${summary.movementFlags} · One-sided ${summary.asymmetries} · Checks read ${summary.readCount ?? 0} of ${summary.totalCount ?? 0}`
     : NOT_GRADED_LINE;
   return {
     screen, completed, stalledAt, poseClockSec: r2(now / 1000), stations, resultsRecorded: results.length,

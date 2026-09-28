@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_CHECKS_FOR_REWARD, PROVISIONAL_LINE, decideScreenReward } from './screenReward';
+import { ENDED_EARLY_LINE, MIN_CHECKS_FOR_REWARD, PROVISIONAL_LINE, decideScreenReward } from './screenReward';
 import { NOT_GRADED_LINE } from './screen';
 
 const base = { screenId: 's1', athleteId: 'a1', provisional: false, checksTaken: 6 };
@@ -68,5 +68,17 @@ describe('a screen nothing graded', () => {
     const d = decideScreenReward({ ...base, checksTaken: 0, provisional: true });
     expect(d.message).toBe(NOT_GRADED_LINE);
     expect(d.pay).toBe(false);
+  });
+});
+
+// MIRROR-COACH P3 follow-up review (2026-09-28): an ended screen that did not reach every camera station is not paid
+describe('an ended screen', () => {
+  it('ended early: kept, not paid, and it says why — ahead of the check count, after a provisional screen\'s own reasons', () => {
+    const d = decideScreenReward({ ...base, endedEarly: true });
+    expect(d).toMatchObject({ pay: false, message: ENDED_EARLY_LINE, idempotencyKey: 'screen:a1:s1' });
+    expect(decideScreenReward({ ...base, provisional: true, endedEarly: true, readLine: 'The camera read 1 check.' }).message).toBe('The camera read 1 check.');
+    expect(decideScreenReward({ ...base, checksTaken: 0, endedEarly: true }).pay).toBe(false);
+    expect(decideScreenReward({ ...base, endedEarly: false }).pay).toBe(true);
+    expect(ENDED_EARLY_LINE).not.toMatch(/shards are in your wallet/i);
   });
 });

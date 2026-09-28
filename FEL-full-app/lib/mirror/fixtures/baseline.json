@@ -1576,7 +1576,10 @@
           "notScored": [
             "Rib angle and breath"
           ],
-          "ranAll": true
+          "ranAll": true,
+          "readCount": 6,
+          "totalCount": 6,
+          "notRead": []
         },
         "stored": {
           "screenId": "fixture-modified",
@@ -1647,7 +1650,10 @@
             "notScored": [
               "Rib angle and breath"
             ],
-            "ranAll": true
+            "ranAll": true,
+            "readCount": 6,
+            "totalCount": 6,
+            "notRead": []
           }
         },
         "reward": {
@@ -1657,7 +1663,7 @@
           "message": "Screen logged. Shards are in your wallet."
         },
         "prescribeReason": null,
-        "athletePanel": "Score 100 · Movement flags 0 · One-sided 0 · Checks 7"
+        "athletePanel": "Score 100 · from 6 of 6 checks read · Movement flags 0 · One-sided 0 · Checks read 6 of 6"
       }
     },
     "full": {
@@ -1771,7 +1777,10 @@
             "Pelvic tilt (hands on the hip points)",
             "Seated rotation, each side"
           ],
-          "ranAll": true
+          "ranAll": true,
+          "readCount": 6,
+          "totalCount": 6,
+          "notRead": []
         },
         "stored": {
           "screenId": "fixture-full",
@@ -1844,7 +1853,10 @@
               "Pelvic tilt (hands on the hip points)",
               "Seated rotation, each side"
             ],
-            "ranAll": true
+            "ranAll": true,
+            "readCount": 6,
+            "totalCount": 6,
+            "notRead": []
           }
         },
         "reward": {
@@ -1854,7 +1866,7 @@
           "message": "Screen logged. Shards are in your wallet."
         },
         "prescribeReason": null,
-        "athletePanel": "Score 100 · Movement flags 0 · One-sided 0 · Checks 7"
+        "athletePanel": "Score 100 · from 6 of 6 checks read · Movement flags 0 · One-sided 0 · Checks read 6 of 6"
       }
     }
   }

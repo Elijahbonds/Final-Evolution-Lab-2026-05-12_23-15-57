@@ -45,7 +45,24 @@ export interface ScreenRewardInput {
    * 2026-09-26).
    */
   readLine?: string;
+  /**
+   * The athlete pressed End before every camera station had been attempted (screenClaims.ts endedEarly — End posts what
+   * was read so far since the MIRROR-COACH P3 follow-up, 2026-09-28). See ENDED_EARLY_LINE.
+   */
+  endedEarly?: boolean;
 }
+
+/**
+ * AN ENDED SCREEN IS KEPT AND SCORED, AND DOES NOT PAY — UNTIL THE OWNER DECIDES (MIRROR-COACH P3 follow-up review,
+ * 2026-09-28). Owner decision #31 fixed the bar (>= 3 readable checks from >= 2 stations) when only a screen that reached
+ * its last station was ever posted. The follow-up made End post what was read so far, and End after the first two
+ * stations (~26 s of holds) cleared that bar and paid the full MOVEMENT_SCREEN_COMPLETED reward — beside this file's own
+ * "a couple of stations is not a screen", and twice a day under the wallet's cap with a new screen id each Start.
+ * Whether an ended screen pays is the owner's call, not this lane's: until they make it, a post marked `ended` pays only
+ * when every camera station was at least attempted (a grade, read or not, from each) — what a screen that reached the
+ * end always has — and says why otherwise. The bar itself is unchanged for every screen that runs to the end.
+ */
+export const ENDED_EARLY_LINE = 'Ended before the last station: what was read is kept and scored. A screen pays when it is run to the end.';
 
 /**
  * A provisional screen, when no line from the camera's own reasons came with it. MIRROR-COACH P3 review (2026-09-26): it
@@ -70,6 +87,9 @@ export function decideScreenReward(input: ScreenRewardInput): ScreenRewardDecisi
   }
   if (input.provisional) {
     return { pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key, message: input.readLine || PROVISIONAL_LINE };
+  }
+  if (input.endedEarly) {
+    return { pay: false, reasonCode: REASON.MOVEMENT_SCREEN_COMPLETED, idempotencyKey: key, message: ENDED_EARLY_LINE };
   }
   if (input.checksTaken < MIN_CHECKS_FOR_REWARD) {
     return {

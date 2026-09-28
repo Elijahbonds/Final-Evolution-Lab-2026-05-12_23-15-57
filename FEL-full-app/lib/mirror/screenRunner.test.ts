@@ -18,6 +18,22 @@ function shot(facing: 'front' | 'back' | 'side' = 'front'): FramingFrame {
 }
 const NOTHING: FramingFrame = { landmarks: [], present: false };
 
+/**
+ * One shot ticked every `step` ms from `from` until the runner leaves the phase it is in for one of `until` (or `to`).
+ * MIRROR-COACH P3 follow-up review (2026-09-28): a tick adds at most STATION_THRESHOLDS.clock.maxTickMs, and a gap of
+ * ABANDON_MS is an absence — so a single tick "well past the hold" (these tests' old shorthand, and a render loop paused
+ * in a hidden tab) no longer finishes a station. They tick at a frame rate now.
+ */
+function steady(r: ScreenRunner, f: FramingFrame | ((view: 'front' | 'back' | 'side') => FramingFrame), from: number, to: number, step = 100,
+  until: readonly RunnerState['phase'][] = ['retest', 'stationDone', 'complete']): { s: RunnerState; t: number } {
+  let s!: RunnerState, t = from;
+  for (; t <= to; t += step) {
+    s = r.tick(typeof f === 'function' ? f(r.station?.view ?? 'front') : f, t);
+    if (until.includes(s.phase)) break;
+  }
+  return { s, t };
+}
+
 describe('running the screen', () => {
   it('opens facing AWAY, because the Playbook starts at the heels', () => {
     const r = new ScreenRunner('modified');
@@ -50,17 +66,16 @@ describe('running the screen', () => {
 
   it('completing a station moves to the next one and asks for the new view', () => {
     const r = new ScreenRunner('modified');
-    r.tick(shot('back'), 0);
     // MIRROR-COACH P3 (2026-09-26): the hold now ends in a grade. This hand-built shot has no heel points, so the heel
     // line is not readable: the station gets its ONE retest, and then moves on with the check kept as not read.
-    const first = r.tick(shot('back'), 60_000);   // well past the hold
-    expect(first.phase).toBe('retest');
-    r.tick(shot('back'), 60_000 + RETEST_PAUSE_MS + 1);
-    const done = r.tick(shot('back'), 130_000);
-    expect(done.phase).toBe('stationDone');
-    expect(done.grades.map((g) => [g.checkId, g.status])).toEqual([['heelLine', 'unreadable']]);
-    expect(done.results).toEqual([]);
-    const next = r.tick(shot('back'), 130_100);   // still facing away: wrong for the front station
+    // (Held at 10 frames a second since the follow-up's review: one tick at 60 s used to be "well past the hold".)
+    const first = steady(r, shot('back'), 0, 60_000);
+    expect(first.s.phase).toBe('retest');
+    const done = steady(r, shot('back'), first.t + RETEST_PAUSE_MS + 1, first.t + 60_000);
+    expect(done.s.phase).toBe('stationDone');
+    expect(done.s.grades.map((g) => [g.checkId, g.status])).toEqual([['heelLine', 'unreadable']]);
+    expect(done.s.results).toEqual([]);
+    const next = r.tick(shot('back'), done.t + 100);   // still facing away: wrong for the front station
     expect(next.station?.view).toBe('front');
     expect(next.say).toMatch(/face the camera|square-on/i);
   });
@@ -75,14 +90,10 @@ describe('running the screen', () => {
 
   it('runs out of stations and says so', () => {
     const r = new ScreenRunner('modified');
-    let t = 0;
-    for (let i = 0; i < 40; i++) {
-      const view = r.station?.view ?? 'front';
-      const s = r.tick(shot(view), t);
-      t += 40_000;
-      if (s.phase === 'complete') break;
-    }
-    const end = r.tick(shot('front'), t);
+    // the right view at every station, 10 frames a second (it ticked every 40 s before the follow-up's review)
+    const { s, t } = steady(r, (view) => shot(view), 0, 900_000, 100, ['complete']);
+    expect(s.phase).toBe('complete');
+    const end = r.tick(shot('front'), t + 100);
     expect(end.phase).toBe('complete');
     expect(end.say).toMatch(/screen done/i);
   });
@@ -346,5 +357,425 @@ describe('the runner grades each station from the frames its hold clock ran on',
     expect(end.grades[0].status).toBe('pass');
     expect(end.grades[0].frames).toBe(d.states.filter((s) => s.phase === 'holding').length + 1);
     void dimmed;
+  });
+});
+
+// ── MIRROR-COACH P3 follow-up (2026-09-28): the side-on dead end ────────────────────────────────────────────────────
+// The P3 live proof, row 5: an athlete who stayed facing the camera at the side station saw the clock sit at 10 for the
+// 45.6 s the proof watched; the turn cue was said once; no retest, no timeout — and End posted nothing. Every test here
+// fails on 42c5e8a0: the runner stayed in 'positioning' forever, said the turn line with no reminder, and had no
+// readSoFar(). (Old-code run: see the follow-up's report.)
+import { MOVE_ON_LINE, spokenKey } from './screenRunner';
+import { STATION_THRESHOLDS } from './stationGraders';
+import { TURN_CUE } from './screen';
+import { LEFT_FOOT_INDEX, NOSE, RIGHT_FOOT_INDEX } from '@/lib/pose/landmarks';
+
+const W = STATION_THRESHOLDS.wrongView;
+const sideOn = (sec = 12) => film(standClip(toSide(standPose()), sec));
+/** Nobody in the shot, one frame every 33 ms. */
+const nobody = (sec: number) => Array.from({ length: Math.round((sec * 1000) / 33) }, (_, i) => ({ landmarks: [], present: false, timestampMs: i * 33 })) as unknown as PoseFrame[];
+/** A clean athlete through heels, front stack and breath: the runner then stands at 'profile', the side station. */
+function toProfile(r: ScreenRunner): number {
+  let t = 0;
+  for (const frames of [back(14), frontOf({}, 16), frontOf({}, 10)]) t = drive(r, frames, t).t;
+  expect(r.station?.id).toBe('profile');
+  return t;
+}
+/** Tick every frame (no early stop), returning each state with its clock. */
+function feed(r: ScreenRunner, frames: readonly PoseFrame[], t0: number): { at: number; s: RunnerState }[] {
+  return frames.map((f) => ({ at: t0 + f.timestampMs, s: r.tick(f, t0 + f.timestampMs) }));
+}
+
+describe('the wrong view ends (MIRROR-COACH P3 follow-up): a spaced reminder, then not read, one retest, move on', () => {
+  it('facing the camera at the side station: the turn is said again every remindMs, and at endMs the station ends NOT READ (wrongView) with its one retest', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t0 = toProfile(r);
+    const d = drive(r, frontOf({}, 40), t0);                 // stays facing the camera
+    const offer = last(d);
+    const waiting = d.states.slice(0, -1);
+    expect(offer.phase).toBe('retest');                      // on 42c5e8a0: 'positioning', for all 40 s
+    expect(waiting.every((s) => s.phase === 'positioning' && s.say === TURN_CUE.side)).toBe(true);
+    // the reminder: the same line, asked for again twice (at ~7 s and ~14 s) — not every frame
+    const keys = [...new Set(waiting.map(spokenKey))];
+    expect(keys).toHaveLength(Math.ceil(W.endMs / W.remindMs));   // said at 0, 7 and 14 s
+    expect(waiting.length).toBeGreaterThan(500);                  // ~600 frames, three things said
+    const firstReminder = waiting.findIndex((s) => s.sayAgain > waiting[0].sayAgain);
+    const frames = frontOf({}, 40);
+    expect(frames[firstReminder].timestampMs).toBeGreaterThanOrEqual(W.remindMs - 100);
+    expect(frames[firstReminder].timestampMs).toBeLessThan(W.remindMs + 100);
+    // at endMs of wrong view: not read, reason wrongView, and the ONE retest — whose line says the turn
+    expect(offer.phase).toBe('retest');
+    expect(frames[d.states.length - 1].timestampMs).toBeGreaterThanOrEqual(W.endMs - 100);
+    expect(frames[d.states.length - 1].timestampMs).toBeLessThan(W.endMs + 100);
+    expect(offer.stations.find((x) => x.stationId === 'profile')).toMatchObject({ attempts: 1, retesting: true });
+    expect(offer.stations.find((x) => x.stationId === 'profile')!.grades).toEqual([
+      expect.objectContaining({ checkId: 'headFloat', status: 'unreadable', reason: 'wrongView', value: null, stationId: 'profile' }),
+    ]);
+    expect(offer.say).toBe(retestLine(offer.stations[3].grades, { fix: TURN_CUE.side }));
+    expect(offer.say).toContain(TURN_CUE.side);
+    // the runner's own end grades no frame (frames 0) — how a reader tells it from a grader's 'wrongView'
+    expect(offer.stations[3].grades[0]).toMatchObject({ frames: 0, readableFrames: 0 });
+    expect(offer.stations[3]).toMatchObject({ held: false });
+  });
+
+  it('still facing the camera through the retest: kept as not read, and the screen MOVES ON — in about 2 × endMs + the retest line, not forever', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t0 = toProfile(r);
+    const first = drive(r, frontOf({}, 40), t0);
+    expect(last(first).phase).toBe('retest');
+    const second = drive(r, frontOf({}, 40), first.t + RETEST_PAUSE_MS);
+    const end = last(second);
+    expect(end.phase).toBe('stationDone');
+    expect(end.say).toBe(MOVE_ON_LINE);
+    expect(second.states.filter((s) => s.phase === 'retest')).toHaveLength(0);        // no second retest, no loop
+    expect(r.station?.id).toBe('wobbleL');
+    expect(end.grades.find((g) => g.checkId === 'headFloat')).toMatchObject({ status: 'unreadable', reason: 'wrongView' });
+    expect(end.stations.find((x) => x.stationId === 'profile')).toMatchObject({ attempts: 2, retesting: false });
+    expect(end.results.map((x) => x.checkId)).not.toContain('headFloat');             // unreadable is never a result
+    expect(second.t - t0).toBeLessThan(2 * W.endMs + RETEST_PAUSE_MS + 1000);
+  });
+
+  it('turning round during the retest reads the station: the retest\'s read is kept', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t0 = toProfile(r);
+    const first = drive(r, frontOf({}, 40), t0);
+    const end = last(drive(r, sideOn(12), first.t + RETEST_PAUSE_MS));
+    expect(end.phase).toBe('stationDone');
+    expect(end.grades.find((g) => g.checkId === 'headFloat')).toMatchObject({ status: 'pass' });
+    expect(end.results.map((x) => x.checkId)).toContain('headFloat');
+    expect(end.stations.find((x) => x.stationId === 'profile')).toMatchObject({ attempts: 2 });
+  });
+
+  it('only the wrong view counts: out of the shot still PAUSES a station (P1), and a right-view STRETCH resets the wait', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    let t = toProfile(r);
+    // 40 s with nobody in the shot: no end, no reminder
+    const away = feed(r, nobody(40), t);
+    expect(away.every(({ s }) => s.phase === 'positioning')).toBe(true);
+    expect(new Set(away.map(({ s }) => s.sayAgain)).size).toBe(1);
+    t = away[away.length - 1].at + 34;
+    // wrong for 15 s, right for 2 s, wrong for 15 s: never endMs in one stretch, so never ended. (It was right for 1 s — 30
+    // frames, 967 ms — until the follow-up's review: a turn is W.resetAfterMs of consecutive right-view frames now.)
+    const a = feed(r, frontOf({}, 15), t);
+    t = a[a.length - 1].at + 34;
+    const b = feed(r, sideOn(2), t);
+    expect(b.some(({ s }) => s.phase === 'holding')).toBe(true);
+    t = b[b.length - 1].at + 34;
+    const c = feed(r, frontOf({}, 15), t);
+    expect([...a, ...c].every(({ s }) => s.phase === 'positioning')).toBe(true);
+    t = c[c.length - 1].at + 34;
+    // then they turn and hold it: read on the first attempt, no retest
+    const end = last(drive(r, sideOn(12), t));
+    expect(end.phase).toBe('stationDone');
+    expect(end.grades.find((g) => g.checkId === 'headFloat')).toMatchObject({ status: 'pass' });
+    expect(end.stations.find((x) => x.stationId === 'profile')).toMatchObject({ attempts: 1 });
+  });
+
+  it('spokenKey: the same line asked for again is a new thing to say; the same state is not', () => {
+    expect(spokenKey({ say: TURN_CUE.side, sayAgain: 1 })).not.toBe(spokenKey({ say: TURN_CUE.side, sayAgain: 0 }));
+    expect(spokenKey({ say: TURN_CUE.side, sayAgain: 1 })).toBe(spokenKey({ say: TURN_CUE.side, sayAgain: 1 }));
+    expect(spokenKey({ say: 'a', sayAgain: 0 })).not.toBe(spokenKey({ say: 'b', sayAgain: 0 }));
+  });
+});
+
+describe('End posts what was read so far (MIRROR-COACH P3 follow-up): readSoFar()', () => {
+  it('stuck at the side station after three stations: the four camera checks already read are there to post', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t0 = toProfile(r);
+    feed(r, frontOf({}, 5), t0);                              // facing the wrong way, and they press End
+    const so = r.readSoFar();
+    expect(so.screen).toBe('modified');
+    expect(so.grades.map((g) => `${g.checkId}:${g.status}`)).toEqual(['heelLine:pass', 'kneeWindow:pass', 'hipLevel:pass', 'shoulderLevel:pass']);
+    expect(so.results.map((x) => x.checkId)).toEqual(['heelLine', 'kneeWindow', 'hipLevel', 'shoulderLevel']);
+  });
+
+  it('a station waiting on its one retest counts with its first run\'s grades (what skipRetest would keep) — its unreadable check is no result', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const h = drive(r, back(14), 0);
+    const dimKnees = (frames: PoseFrame[]) => frames.map((f) => ({
+      ...f, landmarks: f.landmarks.map((l, i) => (i === LEFT_KNEE || i === RIGHT_KNEE ? { ...l, visibility: 0.2 } : l)),
+    }));
+    expect(last(drive(r, dimKnees(frontOf({ hipDrop: { side: 'right', cm: 5 } }, 16)), h.t)).phase).toBe('retest');
+    const so = r.readSoFar();
+    expect(so.grades.map((g) => `${g.checkId}:${g.status}`)).toEqual(['heelLine:pass', 'kneeWindow:unreadable', 'hipLevel:flag', 'shoulderLevel:pass']);
+    expect(so.results.map((x) => `${x.checkId}:${x.grade}`)).toEqual(['heelLine:stable', 'hipLevel:fail', 'shoulderLevel:stable']);
+  });
+
+  it('nothing finished: nothing read (the harness posts nothing — no empty run is stored)', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    feed(r, back(5), 0);
+    expect(r.readSoFar()).toEqual({ screen: 'modified', results: [], grades: [], stations: [] });
+  });
+});
+
+// ── MIRROR-COACH P3 follow-up (2026-09-28): face and feet unseen is not a wrong view ────────────────────────────────
+describe('the head float with the face and feet unseen', () => {
+  const FACE_FEET = new Set([NOSE, LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX]);
+  const FEET = new Set([LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX]);
+  /** The face and feet only DIM: every point still inside the shot. */
+  const unseen = (frames: PoseFrame[]) => frames.map((f) => ({ ...f, landmarks: f.landmarks.map((l, i) => (FACE_FEET.has(i) ? { ...l, visibility: 0.35 } : l)) }));
+  /** The face dim and the feet below the bottom of the image (the ankles still in: the framing check passes it). */
+  const feetOut = (frames: PoseFrame[]) => frames.map((f) => ({
+    ...f, landmarks: f.landmarks.map((l, i) => (i === NOSE ? { ...l, visibility: 0.35 } : FEET.has(i) ? { ...l, y: 1.03 } : l)),
+  }));
+
+  // CHANGED ON PURPOSE (MIRROR-COACH P3 follow-up review, 2026-09-28): this body's face and feet are all INSIDE the shot,
+  // only dimmed (visibility 0.35), and the follow-up told it "Step back so your head and your feet are both in the
+  // shot." — which makes a dim body smaller and fixes no light. Dim only is 'lowVisibility', and the retest says the light.
+  it('a side-on body whose face and near foot are only DIM: lowVisibility and the light hint — not "a different view", not "step back"', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t0 = toProfile(r);
+    const offer = last(drive(r, unseen(sideOn(12)), t0));
+    expect(offer.phase).toBe('retest');                     // the framing check passed it as side-on: the hold ran
+    const g = offer.stations.find((x) => x.stationId === 'profile')!.grades[0];
+    expect(g).toMatchObject({ checkId: 'headFloat', status: 'unreadable', reason: 'lowVisibility' });
+    expect(g.note).not.toMatch(/different view/);
+    expect(offer.say).toContain(RETEST_HINT.lowVisibility);
+    expect(offer.say).not.toContain(RETEST_HINT.faceFeetUnseen);
+    expect(offer.say).not.toContain(RETEST_HINT.wrongView);
+  });
+
+  it('the feet OUTSIDE the shot (the face dim): faceFeetUnseen and the step-back hint', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t0 = toProfile(r);
+    const offer = last(drive(r, feetOut(sideOn(12)), t0));
+    expect(offer.phase).toBe('retest');
+    const g = offer.stations.find((x) => x.stationId === 'profile')!.grades[0];
+    expect(g).toMatchObject({ checkId: 'headFloat', status: 'unreadable', reason: 'faceFeetUnseen' });
+    expect(offer.say).toContain(RETEST_HINT.faceFeetUnseen);
+  });
+});
+
+// ── MIRROR-COACH P3 follow-up REVIEW (2026-09-28) ──────────────────────────────────────────────────────────────────────
+// The review's probes (bundled against the worktree modules, no dev server) found the follow-up's bound did not hold for
+// a body that flickers across the side-on line, a shot that never comes good for another reason, or one late frame; a
+// grader's own 'wrongView' answered with the turn cue; "That one wasn't read" over a station that read two of its three
+// checks; and End's cards drawn from state that left out a pending retest. Each test below fails on the follow-up's diff.
+import { HEAD_TURNED_HINT, type StationGrade } from './stationGraders';
+import { NEXT_LINE, PART_READ_LINE, moveOnLine } from './screenRunner';
+import { checkFraming } from './framing';
+
+const W2 = STATION_THRESHOLDS.wrongView;
+const STALL = STATION_THRESHOLDS.stalled;
+const CLOCK = STATION_THRESHOLDS.clock;
+
+/** At the side station, facing the camera, with ONE side-on frame every `everyMs` (a lucky frame on a ~50° turn). */
+function flicker(everyMs: number, forMs: number) {
+  const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+  let t = toProfile(r);
+  const front = frontOf({}, 1)[0], side = sideOn(1)[0];
+  expect(checkFraming(front, 'side').worst).toBe('turned');
+  expect(checkFraming(side, 'side').ok).toBe(true);
+  const start = t, states: RunnerState[] = [];
+  let lastGood = -Infinity;
+  for (; t < start + forMs; t += 33) {
+    const good = t - lastGood >= everyMs;
+    if (good) lastGood = t;
+    const s = r.tick({ ...(good ? side : front), timestampMs: t }, t);
+    states.push(s);
+    if (s.phase === 'retest') break;
+  }
+  return { r, states, endedAfterMs: t - start };
+}
+
+describe('one frame is not a turn: the wrong-view wait resets only after a right-view stretch', () => {
+  it.each([3000, 8000])('one side-on frame every %i ms: the station still ends at endMs of wrong view, with its reminders (it never ended)', (every) => {
+    const { states, endedAfterMs } = flicker(every, 10 * 60_000);
+    const offer = states[states.length - 1];
+    expect(offer.phase).toBe('retest');                                    // on the follow-up: 'positioning' after 10 min
+    expect(endedAfterMs).toBeLessThan(W2.endMs + 2000);                    // endMs of turned frames, give or take the lucky ones
+    expect(offer.stations.find((x) => x.stationId === 'profile')!.grades[0]).toMatchObject({ reason: 'wrongView', frames: 0 });
+    expect(offer.say).toContain(TURN_CUE.side);
+    expect(Math.max(...states.map((s) => s.sayAgain)) - states[0].sayAgain).toBe(Math.ceil(W2.endMs / W2.remindMs) - 1);   // 7 s, 14 s
+  });
+
+  it('a right-view stretch shorter than resetAfterMs does not reset it; one as long does', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    let t = toProfile(r);
+    const wrong = (ms: number) => { const a = feed(r, frontOf({}, ms / 1000), t); t = a[a.length - 1].at + 34; return a; };
+    const right = (ms: number) => { const b = feed(r, sideOn(ms / 1000), t); t = b[b.length - 1].at + 34; return b; };
+    wrong(12_000); right(500);                                              // half a second side-on: not a turn
+    const c = wrong(9_000);                                                 // 12 + 9 > endMs: ended
+    expect(c.some(({ s }) => s.phase === 'retest')).toBe(true);
+    const r2 = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    t = toProfile(r2);
+    const w1 = feed(r2, frontOf({}, 12), t); t = w1[w1.length - 1].at + 34;
+    const ok = feed(r2, sideOn((W2.resetAfterMs + 300) / 1000), t); t = ok[ok.length - 1].at + 34;
+    const w2 = feed(r2, frontOf({}, 9), t);
+    expect(w2.every(({ s }) => s.phase === 'positioning')).toBe(true);     // the stretch reset it
+  });
+});
+
+describe('the station-level backstop (STATION_THRESHOLDS.stalled): a shot that never comes good ends, for the reason the camera saw most', () => {
+  it('side-on but off-centre after facing the camera: ends NOT READ as out of the shot, and the retest says "Move to the middle" — not the turn', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    let t = toProfile(r);
+    const offCentre = shifted(sideOn(1), 0.3)[0];
+    expect(checkFraming(offCentre, 'side').worst).toBe('offCentre');
+    const facing = feed(r, frontOf({}, 15), t);                             // 15 s facing the camera
+    t = facing[facing.length - 1].at + 34;
+    let s!: RunnerState;
+    const start = t;
+    for (; t < start + 60_000; t += 33) { s = r.tick({ ...offCentre, timestampMs: t }, t); if (s.phase === 'retest') break; }
+    expect(s.phase).toBe('retest');                                         // the review's case ended as 'wrongView' after 81 s
+    expect(t - start + 15_000).toBeLessThan(STALL.endMs + 1000);            // stalled.endMs of frames the clock refused
+    const g = s.stations.find((x) => x.stationId === 'profile')!.grades[0];
+    expect(g).toMatchObject({ status: 'unreadable', reason: 'outOfFrame', frames: 0 });
+    expect(s.say).toBe(retestLine([g], { fix: 'Move to the middle of the shot.' }));
+    expect(s.say).not.toContain(TURN_CUE.side);
+  });
+
+  it('a dim room at the front stack: ends NOT READ (lowVisibility) with the light fix, its one retest, then moves on — never a loop', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const h = drive(r, back(14), 0);
+    expect(r.station?.id).toBe('frontStack');
+    const dim = dimmed(frontOf({}, 1), 0.5)[0];
+    expect(checkFraming(dim, 'front').worst).toBe('dim');
+    const run = (from: number) => {
+      let s!: RunnerState, t = from;
+      for (; t < from + 2 * STALL.endMs; t += 33) { s = r.tick({ ...dim, timestampMs: t }, t); if (s.phase !== 'positioning') break; }
+      return { s, t };
+    };
+    const first = run(h.t);
+    expect(first.s.phase).toBe('retest');
+    expect(first.t - h.t).toBeGreaterThanOrEqual(STALL.endMs - 100);
+    expect(first.s.stations[1].grades.map((g) => `${g.checkId}:${g.reason}`)).toEqual(['kneeWindow:lowVisibility', 'hipLevel:lowVisibility', 'shoulderLevel:lowVisibility']);
+    expect(first.s.say).toContain('More light');
+    const second = run(first.t + RETEST_PAUSE_MS + 34);
+    expect(second.s.phase).toBe('stationDone');
+    expect(second.s.say).toBe(MOVE_ON_LINE);
+    expect(r.station?.id).toBe('breath');
+    expect(second.s.stations[1]).toMatchObject({ attempts: 2, retesting: false, held: false });
+  });
+
+  it('nobody in the shot never ends a station (P1: leaving pauses it) — not in twice the backstop', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t = toProfile(r);
+    const away = feed(r, nobody((2 * STALL.endMs) / 1000), t);
+    expect(away.every(({ s }) => s.phase === 'positioning')).toBe(true);
+  });
+});
+
+describe('one tick adds at most a frame (STATION_THRESHOLDS.clock); a gap as long as ABANDON_MS is an absence', () => {
+  it('a second "turned" tick 25 s after the first (the render loop paused) does not end the station, and says no reminder it skipped', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t = toProfile(r);
+    const front = frontOf({}, 1)[0];
+    const a = r.tick({ ...front, timestampMs: t }, t);
+    const b = r.tick({ ...front, timestampMs: t + 25_000 }, t + 25_000);
+    expect(a.phase).toBe('positioning');
+    expect(b.phase).toBe('positioning');                                    // on the follow-up: 'retest', at once
+    expect(b.sayAgain).toBe(a.sayAgain);
+    // and the wait still runs from the frames that follow: endMs of them ends it
+    const rest = feed(r, frontOf({}, 40), t + 25_034);
+    const endAt = rest.findIndex(({ s }) => s.phase === 'retest');
+    expect(endAt).toBeGreaterThan(0);
+    expect(rest[endAt].at - (t + 25_034)).toBeGreaterThanOrEqual(W2.endMs - 100);
+  });
+
+  it('good frames far apart bank at most maxTickMs each; a gap of ABANDON_MS starts the hold again', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const b = back(1)[0];
+    r.tick(b, 0);
+    const s1 = r.tick(b, 4000);                                             // 4 s later: one frame's worth, not 4 s
+    expect(r.station!.holdSec - s1.remainingSec).toBeCloseTo(CLOCK.maxTickMs / 1000, 5);
+    const s2 = r.tick(b, 4000 + ABANDON_MS);                                // an absence: back to the top
+    expect(s2.remainingSec).toBe(r.station!.holdSec);
+  });
+});
+
+describe('what the runner says: the turn only for its own end, and "not read" only when nothing was', () => {
+  it('a grader\'s wrongView at the side station (the head turned from the body — framing passed every frame) keeps the grader\'s hint, not the turn', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const t = toProfile(r);
+    const headBack = sideOn(12).map((f) => {
+      const L = f.landmarks.map((p) => ({ ...p }));
+      const ear = (L[7].z ?? 0) < (L[8].z ?? 0) ? L[7] : L[8];
+      L[0] = { ...L[0], x: 2 * ear.x - L[0].x };                           // the nose on the other side of the near ear
+      return { ...f, landmarks: L };
+    });
+    expect(headBack.every((f) => checkFraming(f, 'side').ok)).toBe(true);
+    const offer = last(drive(r, headBack, t));
+    expect(offer.phase).toBe('retest');
+    const g = offer.stations.find((x) => x.stationId === 'profile')!.grades[0];
+    expect(g).toMatchObject({ reason: 'wrongView' });
+    expect(g.frames).toBeGreaterThan(0);                                    // a grader's read, not the runner's end
+    expect(offer.say).toContain(HEAD_TURNED_HINT);
+    expect(offer.say).not.toContain(TURN_CUE.side);                         // the follow-up said "Turn side-on…" to somebody side-on
+    expect(offer.stations.find((x) => x.stationId === 'profile')).toMatchObject({ held: true });
+  });
+
+  it('a retest the athlete never turns for, after a first run that READ two of three checks: "Part of that one was read", and the reads are kept', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const h = drive(r, back(14), 0);
+    const dimKnees = (frames: PoseFrame[]) => frames.map((f) => ({
+      ...f, landmarks: f.landmarks.map((l, i) => (i === LEFT_KNEE || i === RIGHT_KNEE ? { ...l, visibility: 0.2 } : l)),
+    }));
+    const a = drive(r, dimKnees(frontOf({ hipDrop: { side: 'right', cm: 5 } }, 16)), h.t);
+    expect(last(a).phase).toBe('retest');
+    const b = last(drive(r, sideOn(40), a.t + RETEST_PAUSE_MS));          // side-on at a front station: never turns
+    expect(b.phase).toBe('stationDone');
+    expect(b.say).toBe(PART_READ_LINE);                                     // it said "That one wasn't read."
+    expect(b.grades.filter((g) => g.stationId === 'frontStack').map((g) => `${g.checkId}:${g.status}`))
+      .toEqual(['kneeWindow:unreadable', 'hipLevel:flag', 'shoulderLevel:pass']);
+  });
+
+  it('moveOnLine: all read → "Good", some → "Part of", none → "not read"; a station with nothing to grade by whether its hold ran', () => {
+    const g = (status: StationGrade['status']) => ({ checkId: 'hipLevel', status, value: null, unit: 'ratio', frames: 1, readableFrames: 0, note: '' }) as StationGrade;
+    expect(moveOnLine([g('pass'), g('flag')], true)).toBe(NEXT_LINE);
+    expect(moveOnLine([g('pass'), g('unreadable')], true)).toBe(PART_READ_LINE);
+    expect(moveOnLine([g('unreadable')], true)).toBe(MOVE_ON_LINE);
+    expect(moveOnLine([], true)).toBe(NEXT_LINE);
+    expect(moveOnLine([], false)).toBe(MOVE_ON_LINE);
+  });
+});
+
+describe('End\'s cards and what the breath station held (readSoFar().stations, StationRecord.held)', () => {
+  it('End during a pending retest: the station card is kept as not read, not "retesting" — the same grades End posts', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const h = drive(r, back(14), 0);
+    const dimKnees = (frames: PoseFrame[]) => frames.map((f) => ({
+      ...f, landmarks: f.landmarks.map((l, i) => (i === LEFT_KNEE || i === RIGHT_KNEE ? { ...l, visibility: 0.2 } : l)),
+    }));
+    const offer = last(drive(r, dimKnees(frontOf({ hipDrop: { side: 'right', cm: 5 } }, 16)), h.t));
+    expect(offer.stations[1]).toMatchObject({ retesting: true });
+    expect(offer.grades.map((g) => g.checkId)).toEqual(['heelLine']);       // the last runner state leaves the pending station out
+    const so = r.readSoFar();
+    expect(so.stations.map((x) => [x.stationId, x.retesting])).toEqual([['heels', false], ['frontStack', false]]);
+    expect(so.stations.flatMap((x) => x.grades)).toEqual(so.grades);        // the cards show exactly what is posted
+    expect(so.grades.find((g) => g.checkId === 'hipLevel')).toMatchObject({ status: 'flag' });
+  });
+
+  it('the breath station is held on a clean run, and NOT held when the runner ended it (a dim room)', () => {
+    const clean = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    toProfile(clean);
+    expect(clean.readSoFar().stations.find((x) => x.stationId === 'breath')).toMatchObject({ held: true, grades: [] });
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    let t = drive(r, back(14), 0).t;
+    t = drive(r, frontOf({}, 16), t).t;
+    expect(r.station?.id).toBe('breath');
+    const dim = dimmed(frontOf({}, 1), 0.4)[0];
+    let s!: RunnerState;
+    for (const start = t; t < start + 2 * STALL.endMs; t += 33) { s = r.tick({ ...dim, timestampMs: t }, t); if (s.phase !== 'positioning') break; }
+    expect(s.phase).toBe('stationDone');                                    // nothing for the camera: no retest to give
+    expect(s.say).toBe(MOVE_ON_LINE);
+    expect(s.stations.find((x) => x.stationId === 'breath')).toMatchObject({ held: false, grades: [] });
+  });
+});
+
+describe('dim all over is dim, not turned — for the waits too', () => {
+  it('a body facing the camera in a room so dim the framing check reads its face as turned away: NOT ended as a wrong view — the backstop ends it as lowVisibility, with the light line', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    const h = drive(r, back(14), 0);
+    const veryDim = dimmed(frontOf({}, 1), 0.4)[0];
+    expect(checkFraming(veryDim, 'front').worst).toBe('turned');           // the framing check's own order
+    expect(checkFraming(veryDim, 'front').issues).toContain('dim');
+    let s!: RunnerState, t = h.t;
+    for (const start = t; t < start + 2 * STALL.endMs; t += 33) { s = r.tick({ ...veryDim, timestampMs: t }, t); if (s.phase !== 'positioning') break; }
+    expect(s.phase).toBe('retest');
+    expect(t - h.t).toBeGreaterThanOrEqual(STALL.endMs - 100);             // not at W.endMs: it is not a wrong view
+    expect(s.stations[1].grades.every((g) => g.reason === 'lowVisibility')).toBe(true);
+    expect(s.say).toContain('More light');
+    expect(s.say).not.toContain(TURN_CUE.front);
   });
 });

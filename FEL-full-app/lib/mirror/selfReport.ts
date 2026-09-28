@@ -71,6 +71,24 @@ export function selfReportChecksFor(screen: ScreenId): ScreenCheck[] { return ch
 /** The screen's coach-only checks, in protocol order: the athlete is told their coach checks these. */
 export function coachChecksFor(screen: ScreenId): ScreenCheck[] { return checksOf(screen, 'coach'); }
 
+/**
+ * Said in place of the questions when the station they ask about was never HELD (MIRROR-COACH P3 follow-up review,
+ * 2026-09-28): the screen was ended before it, or the runner ended it because the shot never came good — so its cue
+ * ("Hands on the sides of your lower ribs…") was never said and there is no breath to ask about.
+ */
+export const SELF_REPORT_NOT_REACHED = 'Not asked: the screen ended before this station was held, so there is nothing to answer about.';
+
+/**
+ * Whether the screen HELD every station its self-report questions ask about — each has a record whose hold ran
+ * (lib/mirror/screenRunner.ts StationRecord.held). Before End posted what was read so far (the P3 follow-up), a screen
+ * reached this card only at its end, when the breath station had always run; End at station one or two asked about a
+ * breath that never happened, and the answers were saved to the screen and shown to a coach who is shared them.
+ */
+export function selfReportReached(screen: ScreenId, stations: readonly { stationId: string; held: boolean }[]): boolean {
+  const asking = screenFor(screen).filter((st) => st.checks.some((c) => c.source === 'selfReport')).map((st) => st.id);
+  return asking.every((id) => stations.some((r) => r.stationId === id && r.held));
+}
+
 /** The questions this screen asks, in protocol order. */
 export function selfReportQuestionsFor(screen: ScreenId): SelfReportQuestion[] {
   const ids = new Set(selfReportChecksFor(screen).map((c) => c.id));

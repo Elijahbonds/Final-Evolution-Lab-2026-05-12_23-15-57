@@ -13,7 +13,7 @@ const g = (over: Partial<StationGrade> & Pick<StationGrade, 'checkId' | 'status'
   note: over.status === 'unreadable' ? 'Not read: part of you was outside the shot.' : 'Shoulders read level (…).', ...over,
 });
 const rec = (stationIndex: number, grades: StationGrade[], o: Partial<StationRecord> = {}): StationRecord =>
-  ({ stationId: 'x', stationIndex, attempts: 1, retesting: false, grades, ...o });
+  ({ stationId: 'x', stationIndex, attempts: 1, retesting: false, held: true, grades, ...o });
 
 describe('the per-station card', () => {
   it('a pass shows its value with the unit, labelled estimated, and no fix line', () => {

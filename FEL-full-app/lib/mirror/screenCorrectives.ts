@@ -121,6 +121,8 @@ export interface GradeLike {
   stanceSec?: number;
   note?: string;
   reason?: string;
+  /** The frames the grade was read over (0 = the runner ended the station before any: retestHintFor). */
+  frames?: number;
 }
 
 const LEGS = ['left', 'right'] as const;
@@ -155,8 +157,10 @@ function flagOutcome(checkId: GraderId, side: 'left' | 'right' | undefined, valu
 function passOutcome(checkId: GraderId, side: 'left' | 'right' | undefined, value: string | null): CheckOutcome {
   return { checkId, ...(side ? { side } : {}), label: SHORT_LABEL[checkId], status: 'pass', value, note: null, hint: null, fix: null, block: null };
 }
-function retestOutcome(checkId: GraderId, leg: 'left' | 'right' | undefined, note: string | null, reason?: string): CheckOutcome {
-  const hint = reason && reason in RETEST_HINT ? retestHintFor({ reason: reason as UnreadableReason, side: leg }) : RETEST_DEFAULT_HINT;
+function retestOutcome(checkId: GraderId, leg: 'left' | 'right' | undefined, note: string | null, reason?: string, frames?: number): CheckOutcome {
+  const hint = reason && reason in RETEST_HINT
+    ? retestHintFor({ reason: reason as UnreadableReason, side: leg, checkId, ...(finite(frames) ? { frames } : {}) })
+    : RETEST_DEFAULT_HINT;
   return {
     checkId, ...(leg ? { side: leg } : {}), label: SHORT_LABEL[checkId], status: 'retest', value: null,
     note: note || NOT_MEASURED_NOTE, hint, fix: null, block: null,
@@ -176,7 +180,7 @@ export function outcomesFromGrades(screen: ScreenId, grades: readonly GradeLike[
       .reduce<GradeLike | undefined>((best, x) => (!best || rank(x) > rank(best) ? x : best), undefined);
     if (!g) return retestOutcome(checkId, leg, null);
     const readable = (g.status === 'pass' || g.status === 'flag') && finite(g.value);
-    if (!readable) return retestOutcome(checkId, leg, typeof g.note === 'string' ? g.note : null, g.reason);
+    if (!readable) return retestOutcome(checkId, leg, typeof g.note === 'string' ? g.note : null, g.reason, g.frames);
     // a stored row is JSON: only numbers reach the formatter (a malformed per-side read is dropped, not printed)
     const bySide = g.bySide && finite(g.bySide.left) && finite(g.bySide.right) ? { left: g.bySide.left, right: g.bySide.right } : undefined;
     const value = formatGradeValue({

@@ -206,6 +206,10 @@ describe('4. invariants a re-record must never accept', () => {
       expect(r.onComplete.summary.movementFlags).toBe(0);
       expect(r.onComplete.summary.notMeasured).toEqual([]);
       for (const x of res) expect(x.detail, x.checkId).toMatch(/estimated/);
+      // MIRROR-COACH P3 follow-up (2026-09-28): 7 results are 6 checks read — the panel said "Checks 7" (results, each leg
+      // counted) where the server counted 6; it now shows the server's count, and the score with it (owner decision #31)
+      expect(r.onComplete.summary).toMatchObject({ readCount: 6, totalCount: 6, notRead: [] });
+      expect(r.onComplete.athletePanel).toBe('Score 100 · from 6 of 6 checks read · Movement flags 0 · One-sided 0 · Checks read 6 of 6');
     }
   });
 });

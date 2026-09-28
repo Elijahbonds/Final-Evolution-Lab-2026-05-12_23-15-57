@@ -180,6 +180,18 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(h.includes('new ScreenRunner(screenIdRef.current)'), 'the screen runner is built from the picker\'s CURRENT value');
   // MIRROR-COACH P3 (2026-09-26): …with every grade beside the results, for the server's regrade (stationGraders.ts)
   ok(h.includes('submitScreen(runner.results, runner.screen, runner.grades)'), 'the screen posts the variant the runner ran, with its grades');
+  // MIRROR-COACH P3 follow-up (2026-09-28): End posts what the screen read so far (it posted nothing unless complete); the
+  // turn reminder is spoken (a line is said when it OR its reminder count changes); the panel counts checks the server's
+  // way and says the score with its count, the unread checks listed as not read (owner decision #31)
+  // (its review, 2026-09-28: the post is marked ended — not paid unless every camera station was attempted — and the
+  // cards are drawn from what End posted)
+  ok(/const endSession = useCallback\(\(\) => \{[\s\S]{0,300}?runnerRef\.current\.readSoFar\(\);[\s\S]{0,120}?if \(soFar\.grades\.length\) \{[\s\S]{0,160}?void submitScreen\(soFar\.results, soFar\.screen, soFar\.grades, \{ ended: true \}\);/.test(h),
+    'End posts the screen read so far (readSoFar), marked ended, through the same submitScreen');
+  ok(h.includes('spokenKey(st) !== lastSaidRef.current') && h.includes('lastSaidRef.current = spokenKey(st);'), 'the spaced turn reminder is spoken (spokenKey), not only a changed line');
+  ok(h.includes('value={`${screenSummary.readCount ?? 0} of ${screenSummary.totalCount ?? 0}`}') && !/runner\?\.results\.length/.test(code),
+    'the panel\'s checks-read figure is the summary\'s readCount (the server\'s readableCameraChecks), not the results counted');
+  ok(h.includes('cameraChecksRead(runner.screen, runner.results).readCount'), 'the stage\'s "Checks read" counts the same way');
+  ok(h.includes('{scoreLine(screenSummary)}') && h.includes('notReadLines(screenSummary).map('), 'the score is said with its count and the unread checks are listed as not read');
   ok(!/provisional/.test(code), 'an ungraded screen is not sent as provisional (that earned a retry prompt)');
   // MIRROR-COACH P3 review (2026-09-26): the ungraded branch shows the summary's own line — NOT_READ_LINE when the camera
   // tried and read nothing, NOT_GRADED_LINE when there were no grades — never a score
@@ -188,7 +200,7 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(/\{screenSummary\.headline \|\| NOT_GRADED_LINE\}<\/p>\s*\{screenMessage && screenMessage !== \(screenSummary\.headline \|\| NOT_GRADED_LINE\)/.test(h), 'an ungraded screen still says when it could not be saved');
   // P3 review: the camera's aspect is re-read every frame (a phone turned after Start), and the youth gate reaches the card
   ok(/onFrame:[\s\S]{0,2000}?runnerRef\.current\.setAspect\(v\.videoWidth \/ v\.videoHeight\);\s*const st = runnerRef\.current\.tick\(/.test(h), 'the aspect is re-read on every frame, before the runner ticks');
-  ok(h.includes('<ScreenNextSteps screen={runner.screen} grades={runner.grades} youth={youth} />'), 'the next-steps card gets the youth gate');
+  ok(h.includes('<ScreenNextSteps screen={runner.screen} grades={endedWith?.grades ?? runner.grades} youth={youth} />'), 'the next-steps card gets the youth gate (and, after End, the grades End posted)');
   ok(h.includes('{screenSummary.headline}'), 'a graded screen shows its headline (a partial one says it is not clear)');
   // MIRROR-COACH P3 (2026-09-25): a refused post says the server's own line on a 422 (the screen could not be checked)
   // and "not saved" otherwise — and either way the answers card is told there is no saved screen to answer onto

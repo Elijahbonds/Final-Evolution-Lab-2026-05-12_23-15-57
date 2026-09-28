@@ -47,6 +47,12 @@ export interface StoredScreen {
    * (lib/mirror/screenClaims.ts). Absent on older rows — whose grades, if any, were the posting client's own word.
    */
   gradedBy?: 'server';
+  /**
+   * The athlete pressed End, and this is what the screen had read by then (MIRROR-COACH P3 follow-up review, 2026-09-28).
+   * Stored and scored like any screen; not paid unless every camera station was attempted (screenReward.ts
+   * ENDED_EARLY_LINE). Absent on a screen that ran to its end, and on every row stored before today.
+   */
+  ended?: true;
 }
 
 /** What a stored row carries beyond the scored screen (MIRROR-COACH P3). */
@@ -54,6 +60,8 @@ export interface StoredScreenExtras {
   camera?: readonly RegradedCheck[];
   provisional?: boolean;
   selfReport?: readonly SelfReportEntry[];
+  /** The post was marked `ended` (End pressed). */
+  ended?: boolean;
 }
 
 /**
@@ -69,6 +77,7 @@ export function storedScreen(
   row.camera = [...(extras.camera ?? [])];
   row.provisional = Boolean(extras.provisional);
   if (extras.selfReport?.length) row.selfReport = [...extras.selfReport];
+  if (extras.ended) row.ended = true;
   return row;
 }
 
@@ -153,6 +162,7 @@ export function readStoredScreen(metrics: unknown): StoredScreen | null {
   if (m.gradedBy === 'server') out.gradedBy = 'server';
   if (Array.isArray(m.camera)) out.camera = m.camera;
   if (typeof m.provisional === 'boolean') out.provisional = m.provisional;
+  if (m.ended === true) out.ended = true;
   const answers = storedSelfReport(metrics);
   if (answers.length) out.selfReport = answers;
   return out;

@@ -90,3 +90,32 @@ describe('an answer never changes a scored number', () => {
     expect(scoreScreen('modified', [...cam, ...(answered as unknown as CheckResult[])])).toEqual(scoreScreen('modified', cam));
   });
 });
+
+// MIRROR-COACH P3 follow-up review (2026-09-28): End posts what was read so far, so the answers card appeared after End at
+// station one or two and asked about a breath that never happened (its cue was never said), saving the answers to the
+// screen. The questions are asked only when the station they ask about was HELD (screenRunner.ts StationRecord.held).
+import { SELF_REPORT_NOT_REACHED, selfReportReached } from './selfReport';
+import { ScreenRunner } from './screenRunner';
+import { film, standClip, standPose, toBack, STATION_ASPECT } from './fixtures/stations';
+
+describe('selfReportReached: the questions only after the breath station was held', () => {
+  const rec = (stationId: string, held: boolean) => ({ stationId, held });
+  it('held → asked; not reached, or ended by the runner (not held) → not asked; on both variants', () => {
+    for (const screen of ['modified', 'full'] as const) {
+      expect(selfReportReached(screen, [rec('heels', true), rec('frontStack', true), rec('breath', true)])).toBe(true);
+      expect(selfReportReached(screen, [rec('heels', true)])).toBe(false);
+      expect(selfReportReached(screen, [])).toBe(false);
+      expect(selfReportReached(screen, [rec('heels', true), rec('frontStack', true), rec('breath', false)])).toBe(false);
+    }
+    expect(SELF_REPORT_NOT_REACHED).toMatch(/^Not asked/);
+    expect(screenText(SELF_REPORT_NOT_REACHED)).toEqual([]);
+  });
+
+  it('End after the first station (the runner as it stands): not asked', () => {
+    const r = new ScreenRunner('modified', { aspect: STATION_ASPECT });
+    let t = 0;
+    for (const f of film(standClip(toBack(standPose()), 14))) { t = f.timestampMs; if (r.tick(f, t).phase === 'stationDone') break; }
+    expect(r.station?.id).toBe('frontStack');
+    expect(selfReportReached('modified', r.readSoFar().stations)).toBe(false);
+  });
+});

@@ -127,7 +127,9 @@ describe('rows stored before 2026-09-25', () => {
   it('the export re-scores a legacy row that has results, and leaves today\'s rows and other kinds alone', () => {
     const legacyGraded = { kind: MIRROR_SCREEN_KIND, metrics: { screenId: 'old-2', screen: 'modified', results: [{ checkId: 'heelLine', grade: 'stable', source: 'camera' }], summary: { ...legacyEmpty.summary, screen: 'modified' } } };
     const m = screenRowForExport(legacyGraded).metrics as Record<string, any>;
-    expect(m.summary.score).toBeNull();
+    // CHANGED ON PURPOSE in the MIRROR-COACH P3 follow-up (2026-09-28), owner decision #31: `score` was pinned null. The
+    // re-scored row is scored over its one check read and carries the count (1 of 6), so the export says what it is over
+    expect(m.summary).toMatchObject({ score: 100, readCount: 1, totalCount: 6 });
     expect(m.summary.triage).toBe('partial');
     expect(m.note).toBe(RESCORED_SCREEN_NOTE);
     const fresh = { kind: MIRROR_SCREEN_KIND, metrics: storedScreen('s1', 'modified', [], scoreScreen('modified', [])) };

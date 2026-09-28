@@ -32,6 +32,7 @@ import {
   type CameraRow, type Prescription, type ScreenReview,
 } from '@/lib/coach/mirrorToProgram';
 import { CAMERA_NOT_DIAGNOSIS } from '@/lib/mirror/screenCorrectives';
+import { scoreLine } from '@/lib/mirror/screen';
 
 export type { Prescription };
 
@@ -39,6 +40,8 @@ export interface Draft {
   screenAt: string | null; headline?: string | null; prescriptions: Prescription[]; reason?: string;
   /** Set when a newer run than the screen drafted from was not graded (app/api/coach/prescribe). */
   newerRunAt?: string | null;
+  /** Set when a newer run was graded but read too little to be a screen (MIRROR-COACH P3 follow-up review, 2026-09-28). */
+  newerPartial?: { at: string; readCount: number; totalCount: number };
   /** MIRROR-COACH P3: the three groups, the variant, and what kind of grading the screen had. */
   review?: ScreenReview;
   screen?: 'modified' | 'full';
@@ -46,6 +49,11 @@ export interface Draft {
   provisional?: boolean;
   serverGraded?: boolean;
   retests?: number;
+  /** Owner decision #31 (MIRROR-COACH P3 follow-up, 2026-09-28): the score over what was read, and what it is over. */
+  score?: number | null;
+  readCount?: number;
+  totalCount?: number;
+  legsNotRead?: number;
   /** MIRROR-COACH P3 review: 'unread_screen' — why the camera read nothing, and the one fix. */
   unread?: { why: string; hint: string };
   /** Youth rules for this client, and what they change (lib/coach/mirrorToProgram.ts YOUTH_DRAFT_NOTE). */
@@ -96,6 +104,15 @@ export function emptyDraftLine(reason: string | undefined, opts: { newerRunUngra
     default:
       return `Nothing to draft from their last screen.${newer}`;
   }
+}
+
+/**
+ * A newer run that read too little to count as a screen, named above the screen the draft comes from (MIRROR-COACH P3
+ * follow-up review, 2026-09-28: a run ended after one station replaced the last full screen here, and its flags left the
+ * draft).
+ */
+export function newerPartialLine(p: { at: string; readCount: number; totalCount: number }): string {
+  return `A newer run on ${new Date(p.at).toLocaleDateString()} read ${p.readCount} of ${p.totalCount} checks — too little to count as a screen; this is the last one that did.`;
 }
 
 /** "2 checks the camera could not read need a retest." — said beside flags too, so a flagged screen is not read as whole. */
@@ -198,6 +215,9 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       {draft.newerRunAt && (
         <p className="mt-1 text-white/35">A newer run on {new Date(draft.newerRunAt).toLocaleDateString()} was not graded; this is the one before it.</p>
       )}
+      {draft.newerPartial && <p className="mt-1 text-white/35" data-newer-partial>{newerPartialLine(draft.newerPartial)}</p>}
+      {/* owner decision #31: the score over what was read, never without the count (the camera rows below list the rest) */}
+      {scoreLine(draft) && <p className="mt-1 font-semibold text-white/75" data-score>{scoreLine(draft)}</p>}
       {draft.headline && <p className="mt-1 text-white/60">{draft.headline}</p>}
       {draft.reason && <p className="mt-1 text-white/45" data-draft-reason={draft.reason}>{emptyDraftLine(draft.reason, { newerRunUngraded: false, retests: draft.retests })}</p>}
       {!draft.reason && !!draft.retests && (

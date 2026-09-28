@@ -11,7 +11,11 @@
 //
 // What the body holds (the phone's grades): heel line pass; front stack — knee window FLAGGED on the left (0.67 hip
 // half-widths inside the line), hip level and shoulder height pass; head float UNREADABLE, reason wrongView (0 of 301
-// frames readable); both single-leg stances pass. Synthetic bodies, not a person.
+// frames readable); both single-leg stances pass. Synthetic bodies, not a person. (That wrongView came from the facing
+// test on a side-on body whose face and feet were unseen; since the P3 follow-up, 2026-09-28, the phone says
+// 'faceFeetUnseen' for it — and since its review, 'lowVisibility' when the face and feet were in the shot but dim, which on
+// a frame the framing check passed they nearly always are. The body below is the captured one, unedited, so it keeps the
+// reason it was sent with.)
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -69,8 +73,9 @@ import { NextRequest } from 'next/server';
 import { PATCH as screenPATCH, POST as screenPOST } from '@/app/api/mirror/screen/route';
 import { GET as prescribeGET } from '@/app/api/coach/prescribe/route';
 import { ANSWERS_WITHHELD } from '@/lib/coach/mirrorToProgram';
-import { MIRROR_SCREEN_KIND } from './screen';
+import { MIRROR_SCREEN_KIND, notReadLines, scoreLine } from './screen';
 import { regradeFromSummary } from './stationGraders';
+import { ENDED_EARLY_LINE } from './screenReward';
 
 const LIVE = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/p3LiveModifiedPost.json', import.meta.url)), 'utf8')) as Row;
 const GRADES = LIVE.grades as Row[];
@@ -104,17 +109,25 @@ describe('the live proof\'s captured body is what the proof says it is', () => {
 });
 
 describe('POST /api/mirror/screen on the live body (the server\'s score)', () => {
-  it('graded by the server: 1 movement flag (one-sided, left knee), NO score because head float was not read, 5 readable checks, paid', async () => {
+  it('graded by the server: 1 movement flag (one-sided, left knee), Score 78 from the 5 of 6 checks read (head float not read), paid', async () => {
     const { status, json } = await post(LIVE);
     expect(status).toBe(200);
     expect(json).toMatchObject({ graded: true, provisional: false, readableCameraChecks: 5, dropped: 0, paid: true, awarded: 25, screenId: LIVE.screenId });
-    // only a screen that ran every camera check has a score (screen.ts scoreScreen: ranAll); head float is not measured
+    // CHANGED ON PURPOSE in the MIRROR-COACH P3 follow-up (2026-09-28) — owner decision #31, the proof's row 6. This pinned
+    // `score: null` ("Score —" beside "Shards are in your wallet"): only a screen that ran every camera check had a score.
+    // The server now scores over the checks it read — 100 − 22 for the one-sided knee flag — and says it over 5 of 6,
+    // the same 5 as readableCameraChecks; the head float is listed as not read. Triage, headline and pay are unchanged.
     expect(json.summary).toMatchObject({
-      score: null, ranAll: false, movementFlags: 1, asymmetries: 1, triage: 'addressFirst', notMeasured: ['Head float'],
+      score: 78, readCount: 5, totalCount: 6, notRead: ['Head float'],
+      ranAll: false, movementFlags: 1, asymmetries: 1, triage: 'addressFirst', notMeasured: ['Head float'],
       headline: 'Knee window was flagged for a closer look on the left knee. One side off and one side fine matters more than both being mildly off.',
     });
+    expect(scoreLine(json.summary)).toBe('Score 78 · from 5 of 6 checks read');
+    expect(notReadLines(json.summary)).toEqual(['Head float · not read']);
+    expect(json.summary.readCount).toBe(json.readableCameraChecks);
     expect(json.message).toBe('Screen logged. Shards are in your wallet.');
     const row = stored()[0].metrics;
+    expect(row.summary).toMatchObject({ score: 78, readCount: 5, totalCount: 6 });
     expect(row).toMatchObject({ gradedBy: 'server', provisional: false, screen: 'modified' });
     expect(row.camera.map((c: Row) => `${c.checkId}:${c.status}:${c.view}`)).toEqual([
       'heelLine:pass:back', 'kneeWindow:flag:front', 'hipLevel:pass:front', 'shoulderLevel:pass:front', 'headFloat:unreadable:side', 'singleLeg:pass:front', 'singleLeg:pass:front',
@@ -172,6 +185,8 @@ describe('PATCH + the coach\'s draft on the live screen', () => {
     ];
     const d = await (await prescribeGET(new NextRequest('http://fel.test/api/coach/prescribe?clientId=athlete-1'))).json() as Row;
     expect(d).toMatchObject({ serverGraded: true, provisional: false, complete: false, retests: 1 });
+    // owner decision #31 on the coach's side too (P3 follow-up, 2026-09-28): the same score and the same count
+    expect(d).toMatchObject({ score: 78, readCount: 5, totalCount: 6 });
     const cam = Object.fromEntries(d.review.camera.map((r: Row) => [`${r.checkId}${r.side ? `:${r.side}` : ''}`, r.status]));
     expect(cam).toMatchObject({ heelLine: 'pass', 'kneeWindow:left': 'flag', hipLevel: 'pass', shoulderLevel: 'pass', headFloat: 'retest' });
     const knee = d.review.camera.find((r: Row) => r.checkId === 'kneeWindow');
@@ -181,5 +196,42 @@ describe('PATCH + the coach\'s draft on the live screen', () => {
     expect(d.review.coachChecks).toEqual([]);
     expect(d.prescriptions).toHaveLength(1);
     expect(d.prescriptions[0]).toMatchObject({ findingId: 'kneeWindow', side: 'left', section: 'prep', matchedBy: 'tags', exercise: { id: 'pe-hip9090' } });
+  });
+});
+
+// ── MIRROR-COACH P3 follow-up review (2026-09-28): End after two stations paid the full screen ──────────────────────────
+// The follow-up made End post what was read so far. Heels + the front stack (~26 s of holds) read 4 checks from 2
+// stations — the owner's bar (decision #31) — and paid MOVEMENT_SCREEN_COMPLETED with "Screen logged. Shards are in your
+// wallet." At 42c5e8a0 End posted nothing, so only a screen that reached its last station was ever paid. Whether an
+// ended screen pays is the owner's call; until then an ENDED post pays only when every camera station was attempted.
+describe('an ended screen (End pressed): kept and scored; paid only when every camera station was attempted', () => {
+  const HEELS_AND_FRONT = GRADES.filter((g) => g.stationId === 'heels' || g.stationId === 'frontStack');
+
+  it('End after heels + front stack: stored (ended), scored over what was read, NOT paid — and the retried id is answered from the row, unpaid', async () => {
+    const { status, json } = await post({ ...LIVE, screenId: 'live-ended-two', grades: HEELS_AND_FRONT, ended: true });
+    expect(status).toBe(200);
+    expect(json).toMatchObject({ graded: true, provisional: false, readableCameraChecks: 4, paid: false, awarded: 0 });
+    expect(json.message).toBe(ENDED_EARLY_LINE);                            // on the follow-up: "Screen logged. Shards are in your wallet."
+    expect(scoreLine(json.summary)).toBe('Score 78 · from 4 of 6 checks read');
+    expect(m.grants).toEqual([]);
+    expect(stored()[0].metrics).toMatchObject({ ended: true, provisional: false, gradedBy: 'server' });
+    // a retry of the same id — even one that drops the mark — is the stored screen's answer: no pay
+    const again = await post({ ...LIVE, screenId: 'live-ended-two', grades: HEELS_AND_FRONT });
+    expect(again.json).toMatchObject({ alreadyStored: true, paid: false, message: ENDED_EARLY_LINE });
+    expect(m.grants).toEqual([]);
+    expect(stored()).toHaveLength(1);
+  });
+
+  it('the bar itself is unchanged: the same two stations NOT marked ended pay as before (decision #31: >= 3 checks from >= 2 stations)', async () => {
+    const { json } = await post({ ...LIVE, screenId: 'live-two-stations', grades: HEELS_AND_FRONT });
+    expect(json).toMatchObject({ provisional: false, readableCameraChecks: 4, paid: true, awarded: 25 });
+    expect(stored()[0].metrics.ended).toBeUndefined();
+  });
+
+  it('End during the last station\'s retest (every camera station attempted, one not read) pays like a screen run to the end', async () => {
+    const { json } = await post({ ...LIVE, screenId: 'live-ended-late', ended: true });
+    expect(json).toMatchObject({ provisional: false, readableCameraChecks: 5, paid: true, awarded: 25 });
+    expect(json.message).toBe('Screen logged. Shards are in your wallet.');
+    expect(stored()[0].metrics).toMatchObject({ ended: true });
   });
 });

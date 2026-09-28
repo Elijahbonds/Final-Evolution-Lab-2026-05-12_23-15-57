@@ -410,11 +410,27 @@ export interface CoachDraft {
   serverGraded?: boolean;
   /** How many camera slots came back 'retest'. */
   retests?: number;
+  /**
+   * OWNER DECISION #31 (MIRROR-COACH P3 follow-up, 2026-09-28): the screen's score over the checks that were read, and
+   * what it is over — the stored summary re-scored (readStoredScreen), readCount the same count as the server's
+   * readableCameraChecks. The panel says it as "Score 78 · from 5 of 6 checks read" (screen.ts scoreLine).
+   */
+  score?: number | null;
+  readCount?: number;
+  totalCount?: number;
+  /** A leg of the single-leg stance not read beside a read one (screen.ts readPhrase: "…, one leg not read"). */
+  legsNotRead?: number;
   prescriptions: Prescription[];
   review?: ScreenReview;
   reason?: DraftReason;
   /** A newer run than the screen drafted from was not graded. */
   newerRunAt?: Date | string | null;
+  /**
+   * A newer run than the screen drafted from WAS graded but read too little to count as a screen (provisional: under
+   * the owner's bar of >= 3 checks from >= 2 stations) — named, with what it read, rather than drafted from
+   * (MIRROR-COACH P3 follow-up review, 2026-09-28).
+   */
+  newerPartial?: { at: Date | string; readCount: number; totalCount: number };
   /** 'unread_screen': why the camera could not read it (the commonest stored reason) and the one fix. */
   unread?: { why: string; hint: string };
   /** The client is under youth rules: blocks off, pin rows not offered (YOUTH_DRAFT_NOTE). */
@@ -458,19 +474,34 @@ function unreadOf(metrics: unknown): { why: string; hint: string } | null {
  * can read. A newer run that graded nothing — every camera check unreadable, or an old client that posted no grades —
  * is skipped and named as `newerRunAt`, rather than hiding the graded screen before it.
  * 'clear_screen' needs a COMPLETE screen with no flag and no retest; anything with a retest is 'partial_screen'.
+ *
+ * …THE LAST ONE THAT IS A SCREEN (MIRROR-COACH P3 follow-up review, 2026-09-28). Since End posts what was read so far,
+ * a run quit after its first station is stored (provisional, unpaid) — and, as the newest readable row, it replaced
+ * yesterday's full screen here: "Score 100 · from 1 of 6 checks read", and the knee flag the full screen found no longer
+ * reached the draft or the prescriptions. The draft now comes from the newest row that clears the owner's screen bar
+ * (isScreenNotStation — the bar the payout and `provisional` share), and a newer provisional run is NAMED
+ * (`newerPartial`) the way a newer ungraded one is. Only when no row clears the bar does it draft from the newest
+ * readable one, provisional as before.
  */
 export function coachDraft(
   scans: readonly { metrics: unknown; createdAt: Date | string }[], catalogue: readonly CatalogueExercise[], opts: DraftOptions = {},
 ): CoachDraft {
   if (!scans.length) return { screenAt: null, prescriptions: [], reason: 'no_screen' };
   const newest = scans[0];
-  const graded = scans.map((s) => ({ scan: s, stored: readStoredScreen(s.metrics) })).find((x) => x.stored);
+  const read = scans.map((s) => ({ scan: s, stored: readStoredScreen(s.metrics) }));
+  const isProvisional = (st: StoredScreen) => st.provisional === true || !isScreenNotStation(screenCoverage(st.screen, st.results));
+  const graded = read.find((x) => x.stored && !isProvisional(x.stored)) ?? read.find((x) => x.stored);
   if (!graded) {
     const unread = isUngradedStoredScreen(newest.metrics) ? unreadOf(newest.metrics) : null;
     const reason: DraftReason = unread ? 'unread_screen' : isUngradedStoredScreen(newest.metrics) ? 'ungraded_screen' : 'unreadable_screen';
     return { screenAt: newest.createdAt, prescriptions: [], reason, ...(unread ? { unread } : {}) };
   }
   const stored = graded.stored!;
+  // what is newer than the screen drafted from: a run that graded nothing (newerRunAt), and a run that read too little to
+  // be a screen (newerPartial) — each the newest of its kind
+  const newer = read.slice(0, read.indexOf(graded));
+  const newerUngraded = newer.find((x) => !x.stored);
+  const newerProvisional = newer.find((x) => x.stored) ?? null;
   // YOUTH RULES (MIRROR-COACH P3 review, 2026-09-26; owner decisions #6, #20, PLAN item 9): the written blocks are off,
   // and a catalogue row that pins is never offered — the Mirror's own mapping holds no pin (screenCorrectives.ts), but a
   // coach's "Calf pin and stretch" tagged 'joints' matched a heel-line flag and went into a 15-year-old's Prep in one tap
@@ -488,13 +519,23 @@ export function coachDraft(
     headline: stored.summary.headline,
     complete,
     // re-derived from the row's own results, not only its stored flag (P3 review: one station is not a screen)
-    provisional: stored.provisional === true || !isScreenNotStation(screenCoverage(stored.screen, stored.results)),
+    provisional: isProvisional(stored),
     serverGraded: isServerGradedScreen(graded.scan.metrics),
     retests,
+    score: stored.summary.score,
+    readCount: stored.summary.readCount,
+    totalCount: stored.summary.totalCount,
+    ...(stored.summary.legsNotRead ? { legsNotRead: stored.summary.legsNotRead } : {}),
     prescriptions,
     review: reviewScreen(stored, outcomes, { answersShared: opts.answersShared }),
     ...reason,
-    ...(graded.scan === newest ? {} : { newerRunAt: newest.createdAt }),
+    ...(newerUngraded ? { newerRunAt: newerUngraded.scan.createdAt } : {}),
+    ...(newerProvisional ? {
+      newerPartial: {
+        at: newerProvisional.scan.createdAt,
+        readCount: newerProvisional.stored!.summary.readCount ?? 0, totalCount: newerProvisional.stored!.summary.totalCount ?? 0,
+      },
+    } : {}),
     ...(youth ? { youth, youthNote: YOUTH_DRAFT_NOTE[youth], pinRowsSkipped: catalogue.length - offered.length } : {}),
   };
 }

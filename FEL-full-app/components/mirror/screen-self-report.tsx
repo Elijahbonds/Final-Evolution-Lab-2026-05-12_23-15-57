@@ -15,8 +15,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ScreenId } from '@/lib/mirror/screen';
 import {
-  ANSWER_LABEL, COACH_CHECK_LINE, SELF_REPORT_ANSWERS, SELF_REPORT_NOTE, coachChecksFor, selfReportChecksFor, selfReportQuestionsFor,
-  type SelfReportAnswer,
+  ANSWER_LABEL, COACH_CHECK_LINE, SELF_REPORT_ANSWERS, SELF_REPORT_NOTE, SELF_REPORT_NOT_REACHED, coachChecksFor, selfReportChecksFor,
+  selfReportQuestionsFor, type SelfReportAnswer,
 } from '@/lib/mirror/selfReport';
 
 export type AnswerSaveState = 'idle' | 'saving' | 'saved' | 'failed' | 'noScreen';
@@ -40,6 +40,12 @@ export interface ScreenSelfReportProps {
   screenId: string | null | 'unsaved';
   /** Stand-in for the network in tests; the default PATCHes /api/mirror/screen. */
   save?: (screenId: string, answers: { questionId: string; answer: SelfReportAnswer }[]) => Promise<boolean>;
+  /**
+   * False when the station the questions ask about was never held (lib/mirror/selfReport.ts selfReportReached — End
+   * before it; MIRROR-COACH P3 follow-up review, 2026-09-28): the questions are not asked and nothing is saved, and the
+   * card says so. Default true (a screen that ran to its end).
+   */
+  asked?: boolean;
 }
 
 async function patchAnswers(screenId: string, answers: { questionId: string; answer: SelfReportAnswer }[]): Promise<boolean> {
@@ -70,8 +76,9 @@ export function planSave(
   return { send: { screenId, answers: list }, state: 'saving' };
 }
 
-export function ScreenSelfReport({ screen, screenId, save = patchAnswers }: ScreenSelfReportProps) {
-  const questions = selfReportQuestionsFor(screen);
+export function ScreenSelfReport({ screen, screenId, save = patchAnswers, asked = true }: ScreenSelfReportProps) {
+  const questions = asked ? selfReportQuestionsFor(screen) : [];
+  const unasked = asked ? [] : selfReportQuestionsFor(screen);
   const selfChecks = selfReportChecksFor(screen);
   const coachChecks = coachChecksFor(screen);
   const [answers, setAnswers] = useState<Record<string, SelfReportAnswer>>({});
@@ -96,10 +103,18 @@ export function ScreenSelfReport({ screen, screenId, save = patchAnswers }: Scre
     void push(next);
   };
 
-  if (!questions.length && !coachChecks.length) return null;
+  if (!questions.length && !unasked.length && !coachChecks.length) return null;
 
   return (
     <section aria-labelledby="screen-self-report-heading" className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+      {unasked.length > 0 && (
+        <>
+          <h2 id="screen-self-report-heading" className="fel-heading text-[15px] font-bold text-white/80">
+            {selfChecks.map((c) => c.label).join(' · ')}
+          </h2>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-white/50" data-not-reached>{SELF_REPORT_NOT_REACHED}</p>
+        </>
+      )}
       {questions.length > 0 && (
         <>
           <h2 id="screen-self-report-heading" className="fel-heading text-[15px] font-bold text-white/80">
@@ -139,8 +154,8 @@ export function ScreenSelfReport({ screen, screenId, save = patchAnswers }: Scre
       )}
 
       {coachChecks.length > 0 && (
-        <div className={questions.length ? 'mt-5 border-t border-white/8 pt-4' : ''}>
-          {!questions.length && <h2 id="screen-self-report-heading" className="sr-only">Checked by your coach</h2>}
+        <div className={questions.length || unasked.length ? 'mt-5 border-t border-white/8 pt-4' : ''}>
+          {!questions.length && !unasked.length && <h2 id="screen-self-report-heading" className="sr-only">Checked by your coach</h2>}
           <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/40">Checked by your coach</p>
           <ul className="mt-2 grid gap-2">
             {coachChecks.map((c) => (

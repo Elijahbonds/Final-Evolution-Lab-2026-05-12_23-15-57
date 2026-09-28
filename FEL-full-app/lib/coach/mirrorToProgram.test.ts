@@ -283,6 +283,38 @@ describe('the route\'s read: the LAST GRADED screen', () => {
     expect(coachDraft([], CAT)).toEqual({ screenAt: null, prescriptions: [], reason: 'no_screen' });
   });
 
+  // MIRROR-COACH P3 follow-up review (2026-09-28): End posts what was read so far, so a run quit after one station is
+  // stored (provisional, unpaid) — and, as the newest readable row, it REPLACED yesterday's full screen here: "Score 100 ·
+  // from 1 of 6 checks read", the knee flag gone from the draft. Fails on the follow-up's diff.
+  it('a newer run that read too little to be a screen (End after one station) does not replace the last screen — and is named', () => {
+    const onlyHeels: Over = { kneeWindow: 'absent', hipLevel: 'absent', shoulderLevel: 'absent', headFloat: 'absent', singleLegL: 'absent', singleLegR: 'absent' };
+    const quit = row(onlyHeels);
+    expect(readStoredScreen(quit)).not.toBeNull();                   // it is a readable row…
+    expect(quit.provisional).toBe(true);                               // …that is not a screen
+    const full = row({ kneeWindow: FLAG.kneeWindow });
+    const d = coachDraft([{ metrics: quit, createdAt: at(12) }, { metrics: full, createdAt: at(9) }], CAT);
+    expect(d.screenAt).toBe(at(9));                                    // on the follow-up: at(12), "Score 100 · from 1 of 6"
+    expect(d.prescriptions.map((p) => p.findingId)).toEqual(['kneeWindow']);
+    expect(d).toMatchObject({ provisional: false, readCount: 6, totalCount: 6, newerPartial: { at: at(12), readCount: 1, totalCount: 6 } });
+    expect(d.newerRunAt).toBeUndefined();                              // it was graded: not "not graded"
+  });
+
+  it('only runs that are not screens: the newest one is drafted from, provisional, as before — nothing newer to name', () => {
+    const onlyHeels: Over = { kneeWindow: 'absent', hipLevel: 'absent', shoulderLevel: 'absent', headFloat: 'absent', singleLegL: 'absent', singleLegR: 'absent' };
+    const older = row({ ...onlyHeels, heelLine: FLAG.heelLine });
+    const d = coachDraft([{ metrics: row(onlyHeels), createdAt: at(12) }, { metrics: older, createdAt: at(9) }], CAT);
+    expect(d).toMatchObject({ screenAt: at(12), provisional: true });
+    expect(d.newerPartial).toBeUndefined();
+  });
+
+  it('a newer ungraded run AND a newer run too thin to be a screen are both named above the screen drafted from', () => {
+    const onlyHeels: Over = { kneeWindow: 'absent', hipLevel: 'absent', shoulderLevel: 'absent', headFloat: 'absent', singleLegL: 'absent', singleLegR: 'absent' };
+    const d = coachDraft([
+      { metrics: row(allUnread()), createdAt: at(13) }, { metrics: row(onlyHeels), createdAt: at(12) }, { metrics: row({ hipLevel: FLAG.hipLevel }), createdAt: at(9) },
+    ], CAT);
+    expect(d).toMatchObject({ screenAt: at(9), newerRunAt: at(13), newerPartial: { at: at(12), readCount: 1 } });
+  });
+
   it('says whether the grades were the server\'s, and whether the screen was provisional', () => {
     const graded = coachDraft([{ metrics: row({ hipLevel: FLAG.hipLevel }), createdAt: at(1) }], CAT);
     expect(graded).toMatchObject({ serverGraded: true, provisional: false });

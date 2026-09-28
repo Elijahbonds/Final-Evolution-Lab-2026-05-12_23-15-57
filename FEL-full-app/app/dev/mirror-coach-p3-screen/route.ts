@@ -35,11 +35,11 @@ export async function POST(req: NextRequest) {
   // — app/api/mirror/screen/route.ts POST, from the body onwards —
   const d = decideScreenPost(body, ATHLETE);
   if (!d.ok) return NextResponse.json({ response: d.body, status: d.status, dev: { stored: null } }, { status: 200 });
-  const { screenId, screen, outcome, summary, answers, reward } = d;
+  const { screenId, screen, outcome, summary, answers, reward, ended } = d;
   const seen = storedScreenId(rows()[rows().length - 1]?.metrics ?? null);
   if (seen !== screenId) {
     rows().push({ id: `scan-${rows().length + 1}`, at: new Date().toISOString(), metrics: JSON.parse(JSON.stringify(storedScreen(screenId, screen, outcome.results, summary, {
-      camera: outcome.camera, provisional: outcome.provisional, selfReport: answers,
+      camera: outcome.camera, provisional: outcome.provisional, selfReport: answers, ended,
     }))) });
   }
   const stored = rows()[rows().length - 1].metrics;

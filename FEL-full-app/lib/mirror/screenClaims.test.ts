@@ -3,11 +3,13 @@
 // and sweep every camera check's value range to show the server's status is the grader's own, value for value.
 import { describe, expect, it } from 'vitest';
 import {
-  GAVE_UP_NOTE, MAX_CLAIMS, MIN_READABLE_CAMERA_CHECKS, MIN_READABLE_CAMERA_STATIONS, claimFromGrade, decideScreenPost,
-  isScreenNotStation, regradeClaims, screenCoverage, screenReadLine, type CameraCheckClaim,
+  GAVE_UP_NOTE, MAX_CLAIMS, MIN_READABLE_CAMERA_CHECKS, MIN_READABLE_CAMERA_STATIONS, cameraStationsAttempted, claimFromGrade,
+  decideScreenPost, decisionFromStoredRow, isEndedEarly, isScreenNotStation, regradeClaims, screenCoverage, screenReadLine,
+  type CameraCheckClaim,
 } from './screenClaims';
+import { storedScreen } from './screenStore';
 import { screenText } from '@/lib/share/screen';
-import { MIN_CHECKS_FOR_REWARD } from './screenReward';
+import { ENDED_EARLY_LINE, MIN_CHECKS_FOR_REWARD } from './screenReward';
 import { STATION_THRESHOLDS, minReadableFrames, regradeFromSummary, type StationGrade } from './stationGraders';
 
 const base: Record<string, CameraCheckClaim> = {
@@ -236,5 +238,52 @@ describe('the review\'s cases', () => {
     const wrong = { ...base.singleLeg, status: 'unreadable' as const, value: null, readableFrames: 900, uncertainty: null, reason: 'wrongLeg' as const };
     const line = screenReadLine(regradeClaims('modified', [base.hipLevel, wrong]))!;
     expect(line).toMatch(/Stand on your LEFT leg\.$/);
+  });
+});
+
+// MIRROR-COACH P3 follow-up review (2026-09-28): End posts what was read so far, marked `ended`; until the owner decides
+// whether an ended screen pays, it pays only when every camera station was attempted (screenReward.ts ENDED_EARLY_LINE)
+describe('an ended screen', () => {
+  const heels = honest('heelLine', 0), hip = honest('hipLevel', 0), sh = honest('shoulderLevel', 0), knee = honest('kneeWindow', 0);
+  const head = honest('headFloat', 0);
+  const legL = honest('singleLeg', 0.02), legR = honest('singleLeg', 0.02, { side: 'right', stationId: 'wobbleR' });
+  const unreadHead = { ...head, status: 'unreadable' as const, value: null, readableFrames: 0, reason: 'wrongView' as const };
+
+  it('cameraStationsAttempted counts a station with ANY kept claim, read or not, placed by its id or by its check', () => {
+    expect(cameraStationsAttempted('modified', [heels, hip, sh, knee])).toEqual({ attempted: 2, total: 5 });
+    expect(cameraStationsAttempted('modified', [heels, hip, unreadHead, legL, legR])).toEqual({ attempted: 5, total: 5 });
+    const { stationId: _drop, ...noStation } = head;
+    void _drop;
+    expect(cameraStationsAttempted('full', [noStation as CameraCheckClaim])).toEqual({ attempted: 1, total: 5 });
+  });
+
+  it('isEndedEarly: only a post marked ended, and only while a camera station was never attempted', () => {
+    expect(isEndedEarly('modified', false, [heels])).toBe(false);
+    expect(isEndedEarly('modified', true, [heels, hip, sh, knee])).toBe(true);
+    expect(isEndedEarly('modified', true, [heels, hip, unreadHead, legL, legR])).toBe(false);
+  });
+
+  it('decideScreenPost: two stations ended → scored, not paid, kept as ended; the same two stations not ended pay (the bar is unchanged)', () => {
+    const ended = decideScreenPost({ screenId: 'e1', screen: 'modified', checks: [heels, hip, sh, knee], ended: true }, 'a1');
+    const run = decideScreenPost({ screenId: 'e2', screen: 'modified', checks: [heels, hip, sh, knee] }, 'a1');
+    if (!ended.ok || !run.ok) throw new Error('refused');
+    expect(ended).toMatchObject({ ended: true, reward: { pay: false, message: ENDED_EARLY_LINE } });
+    expect(ended.summary.score).toBe(100);
+    expect(ended.outcome.provisional).toBe(false);
+    expect(run).toMatchObject({ ended: false, reward: { pay: true } });
+    // a stored ended row answers a retry unpaid; the same row without the mark would pay
+    const row = storedScreen('e1', ended.screen, ended.outcome.results, ended.summary, { camera: ended.outcome.camera, provisional: false, ended: true });
+    expect(row.ended).toBe(true);
+    expect(decisionFromStoredRow(JSON.parse(JSON.stringify(row)), 'a1')?.reward).toMatchObject({ pay: false, message: ENDED_EARLY_LINE });
+    const { ended: _e, ...unmarked } = row;
+    void _e;
+    expect(decisionFromStoredRow(JSON.parse(JSON.stringify(unmarked)), 'a1')?.reward.pay).toBe(true);
+  });
+
+  it('`ended` must be the boolean true — anything else is a screen run to its end', () => {
+    for (const junk of ['true', 1, {}, null]) {
+      const d = decideScreenPost({ screenId: 'e3', screen: 'modified', checks: [heels, hip, sh, knee], ended: junk }, 'a1');
+      expect(d.ok && d.ended).toBe(false);
+    }
   });
 });

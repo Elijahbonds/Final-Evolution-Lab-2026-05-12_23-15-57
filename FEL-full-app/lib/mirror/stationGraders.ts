@@ -86,7 +86,10 @@ export type UnreadableReason =
   | 'wrongLeg'       // single leg: the camera saw the OTHER foot up — the athlete stood on the other leg
   | 'lowRate'        // single leg: the phone read the pose too few times a second to follow a sway or a touch-down
   | 'feetTurned'     // heel line: one foot turned in or out against the other, which moves the heel point sideways
-  | 'cameraMoved';   // the camera image changed shape during the hold (the phone was turned between portrait and landscape)
+  | 'cameraMoved'    // the camera image changed shape during the hold (the phone was turned between portrait and landscape)
+  // MIRROR-COACH P3 follow-up (2026-09-28):
+  | 'faceFeetUnseen'; // head float: neither the face nor the near foot was seen, one of them OUTSIDE the shot (both only
+                    // dim is 'lowVisibility'), so which way the body faces is unknown
 
 /** The frame a grader reads — the Mirror adapter's PoseFrame (render/pose-frame-gate.ts admits one per camera frame). */
 export interface GraderPoint { x: number; y: number; z?: number; visibility?: number }
@@ -317,6 +320,61 @@ export const STATION_THRESHOLDS = {
      *  before is a touch-down. A longer framing pause still reads as one — the runner does not say the count aloud. */
     stepOffToleranceSec: 3,
   },
+  /**
+   * THE WRONG VIEW THAT NEVER TURNS (MIRROR-COACH P3 follow-up, 2026-09-28; the P3 live proof's row 5). The hold clock runs
+   * only on a good shot for the station's view (screenRunner.ts), and nothing ended a station whose hold never started:
+   * an athlete who stayed facing the camera at the side station saw the clock sit at 10 for the 45.6 s the proof watched,
+   * heard the turn cue once, and got no retest and no timeout. Read by lib/mirror/screenRunner.ts, not by a grader.
+   * The wrong-view time is the time on frames whose FIRST fix is the turn (framing.ts worst 'turned'); a RIGHT-VIEW
+   * STRETCH of resetAfterMs resets it (not one frame — see resetAfterMs), and a frame with nobody in it neither adds to
+   * it nor resets it (leaving the shot pauses a station, P1).
+   */
+  wrongView: {
+    /** While the view is wrong, the turn line is said again every this long — a reminder heard across a room (~3 s of
+     *  speech, then as long again of quiet), never every frame. */
+    remindMs: 7000,
+    /** After this long facing the wrong way the station ends with every camera check NOT READ, reason 'wrongView', through
+     *  the one-retest rule: the turn is said at 0, 7 and 14 s, and at 20 s the station gives up. FEL judgement: longer than
+     *  turning round and walking back to the mark takes; under half the proof's 45.6 s of nothing happening. With its one
+     *  retest a station the athlete never turns for is left in about 44 s (20 s, the retest line, 20 s) — and, since the
+     *  follow-up's review (resetAfterMs below), that holds for a body that flickers across the side-on line too. */
+    endMs: 20000,
+    /** THE TURN IS A STRETCH, NOT A FRAME (MIRROR-COACH P3 follow-up review, 2026-09-28). ONE passing frame reset the wait,
+     *  so a body facing the camera at the side station with one frame in 3 s reading side-on (a ~50° turn sits on
+     *  framing.ts SIDE_WIDTH_MAX, "not yet measured on a recording") was still at the station after 10 minutes with no
+     *  reminder said, and with one in 8 s after 30 minutes, the reminder said about twice every 8 s. The wait resets only
+     *  after this long of CONSECUTIVE right-view frames: about a second (~30 camera frames) — a turn made, not a lucky
+     *  frame. The hold clock still runs on every good frame, as before. */
+    resetAfterMs: 1000,
+  },
+  /**
+   * THE STATION-LEVEL BACKSTOP (MIRROR-COACH P3 follow-up review, 2026-09-28). The wrong-view wait covers a body that never
+   * turns. Nothing covered a shot that never comes good for any OTHER reason — a dim room, a body off to one side, too
+   * far, cut off — or for a mix of reasons none of which lasts. (The review's case: side-on but off-centre for a minute,
+   * then facing the camera for 5.5 s while walking to the middle, ended as 'wrongView' — the turn retest said to somebody
+   * who had stood the right way round for a minute.) Every frame the hold clock does NOT run on while somebody is in the
+   * shot (any framing reason; a frame with nobody in it still only pauses a station, P1) adds to the attempt's stalled
+   * time. At endMs the attempt ends with every camera check NOT READ for the reason the camera saw for MOST of that time
+   * (turned → wrongView; cut off, off-centre, too close → outOfFrame; too far → tooSmall; dim → lowVisibility), through
+   * the same one-retest rule, and the retest says the fix the framing check asked for most. Read by
+   * lib/mirror/screenRunner.ts, not by a grader.
+   */
+  stalled: {
+    /** FEL judgement: three times the wrong-view wait — room for walking back to the mark, re-propping the phone and a
+     *  couple of framing fixes at the first station, and still a bound where there was none. */
+    endMs: 60000,
+  },
+  /**
+   * THE RUNNER'S CLOCK (MIRROR-COACH P3 follow-up review, 2026-09-28). The runner adds the time between two ticks to the
+   * hold and to the waits above, and one late frame added the whole gap: with the render loop paused (the tab hidden, the
+   * window switched; the harness takes no wake lock) a second 'turned' tick 25 s after the first ended the side station
+   * at once with neither reminder said — and on good frames the gap was banked as held time (since P1). One tick now adds
+   * at most maxTickMs: a pose frame is ~33–100 ms, and 250 ms is a phone reading four frames a second, slower than any
+   * the graders can use (singleLeg.maxFrameMs is 70). A gap as long as the runner's ABANDON_MS is an absence.
+   */
+  clock: {
+    maxTickMs: 250,
+  },
 } as const;
 
 type T = typeof STATION_THRESHOLDS;
@@ -479,9 +537,21 @@ function readHead(f: GraderFrame, stationAspect: number): FrameRead<number> {
   if (torso < C.minSpan) return no('tooSmall');
   const lean = leanDeg(sh, px(L[ankle], aspect));
   if (lean === null || lean > STATION_THRESHOLDS.headFloat.uprightMaxDeg) return no('notUpright');
+  // FACE AND FEET UNSEEN IS NOT A WRONG VIEW (MIRROR-COACH P3 follow-up, 2026-09-28). This returned 'wrongView' when neither
+  // the nose nor the near heel and toe cleared the gates — on a body the framing check had just passed as side-on — so the
+  // athlete was told "the camera saw a different view", which was untrue (the P3 live proof, row 5), and asked to face
+  // the way they already faced. Nothing to read the facing from is its own reason, with its own fix: head and feet in the
+  // shot. A nose and toes that point opposite ways still read 'wrongView' (the body and the head disagree).
+  // …AND WHY THEY WERE UNSEEN DECIDES THE FIX (the follow-up's review, 2026-09-28). Every frame the hold keeps has passed
+  // the framing check, which already needs the nose inside the top of the shot and both ankles in it and seen — so on a
+  // kept frame the face and feet are nearly always IN the shot and only dim, and "Step back so your head and your feet
+  // are both in the shot" sent somebody standing in bad light further from the phone. Both only dim (under the visibility
+  // cut) is 'lowVisibility' — "More light…"; either one outside the image is 'faceFeetUnseen', the step-back fix.
   let facing = 0;
-  if (!pointsGate(f, [NOSE])) facing += Math.sign(L[NOSE].x - L[near.ear].x);
-  if (!pointsGate(f, [near.heel, near.toe])) facing += Math.sign(L[near.toe].x - L[near.heel].x);
+  const faceWhy = pointsGate(f, [NOSE]), feetWhy = pointsGate(f, [near.heel, near.toe]);
+  if (!faceWhy) facing += Math.sign(L[NOSE].x - L[near.ear].x);
+  if (!feetWhy) facing += Math.sign(L[near.toe].x - L[near.heel].x);
+  if (faceWhy && feetWhy) return no(faceWhy === 'outOfFrame' || feetWhy === 'outOfFrame' ? 'faceFeetUnseen' : 'lowVisibility');
   if (facing === 0) return no('wrongView');
   return { ok: true, v: ((ear.x - sh.x) * Math.sign(facing)) / torso };
 }
@@ -770,6 +840,7 @@ export function unreadableLine(checkId: GraderId, reason: UnreadableReason, m?: 
     lowRate: 'the phone read you too few times a second to follow this one',
     feetTurned: 'one foot was turned in or out more than the other, which moves the heel point from behind',
     cameraMoved: 'the phone turned during the count',
+    faceFeetUnseen: 'your face or your feet were outside the shot, so the camera could not tell which way you were facing',
   };
   return `Not read: ${say[reason]}.`;
 }
@@ -790,15 +861,27 @@ export const RETEST_HINT: Record<UnreadableReason, string> = {
   lowRate: 'Close other apps and keep the phone plugged in, so it can keep up.',
   feetTurned: 'Toes pointing straight ahead, both feet the same.',
   cameraMoved: 'Keep the phone the same way round for the whole count.',
+  faceFeetUnseen: 'Step back so your head and your feet are both in the shot.',
 };
 
 /**
- * The retest hint for one grade: RETEST_HINT, with the leg named where the grade knows it (MIRROR-COACH P3 review,
- * 2026-09-26) — "Stand on your LEFT leg." says what "the leg the cue names" leaves to the athlete across the room.
+ * The head float's own 'wrongView' (MIRROR-COACH P3 follow-up review, 2026-09-28). On a frame the hold kept, the framing
+ * check has ALREADY passed the body as side-on, so the grader's 'wrongView' over those frames means the nose and the toes
+ * point opposite ways — the head turned from the way the body faces — not a body facing the wrong way; the follow-up's
+ * retest said the turn cue itself to somebody already side-on. A station the runner ENDED because the athlete never
+ * turned grades no frame at all (notReadStation, frames 0) and keeps the turn (screenRunner.ts retestLine).
  */
-export function retestHintFor(g: Pick<StationGrade, 'reason' | 'side'>): string {
+export const HEAD_TURNED_HINT = 'Stay side-on and look straight ahead, the way your toes point.';
+
+/**
+ * The retest hint for one grade: RETEST_HINT, with the leg named where the grade knows it (MIRROR-COACH P3 review,
+ * 2026-09-26) — "Stand on your LEFT leg." says what "the leg the cue names" leaves to the athlete across the room — and,
+ * given the check and its frames, the head float's own wrong view read over frames the hold kept (HEAD_TURNED_HINT).
+ */
+export function retestHintFor(g: Pick<StationGrade, 'reason' | 'side'> & { checkId?: string; frames?: number }): string {
   if (!g.reason) return '';
   if (g.reason === 'wrongLeg' && g.side) return `Stand on your ${g.side.toUpperCase()} leg.`;
+  if (g.reason === 'wrongView' && g.checkId === 'headFloat' && typeof g.frames === 'number' && g.frames > 0) return HEAD_TURNED_HINT;
   return RETEST_HINT[g.reason];
 }
 
@@ -944,13 +1027,30 @@ export function gradeScreenStation(station: ScreenStation, frames: readonly Grad
     .map((c) => gradeStation(c.grader!, frames, station.view, { ...opts, stance: station.stance, stationId: station.id }));
 }
 
+/**
+ * Every camera check at a station as NOT READ for one reason, with no frame graded — what the runner keeps for a station
+ * that ended before its hold could run (MIRROR-COACH P3 follow-up, 2026-09-28: the wrong view that never turned,
+ * STATION_THRESHOLDS.wrongView; since its review, a shot that never came good for any reason, STATION_THRESHOLDS.stalled).
+ * Built through decideGrade, so the note, the unit and the server's regrade (regradeFromSummary) are the graders' own,
+ * and 'unreadable' is the only status it can give. The runner passes no `frames` (0): the station was graded over no
+ * frame, and frames 0 is how a reader tells the runner's own end from a grader's read (retestHintFor).
+ */
+export function notReadStation(station: ScreenStation, reason: UnreadableReason, frames = 0): StationGrade[] {
+  return station.checks
+    .filter((c) => c.source === 'camera' && c.grader)
+    .map((c) => decideGrade({
+      checkId: c.grader!, frames, readableFrames: 0, value: null, uncertainty: null, spread: null, reason, stationId: station.id,
+      ...(c.grader === 'singleLeg' && station.stance ? { side: station.stance } : {}),
+    }));
+}
+
 // ── the server's side, and the bridge to scoreScreen ───────────────────────────────────────────────────────────────
 
 const num = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null);
 const count = (x: unknown): number | null => { const n = num(x); return n !== null && n >= 0 && Number.isInteger(n) ? n : null; };
 const REASONS: readonly UnreadableReason[] = [
   'wrongView', 'noBody', 'outOfFrame', 'lowVisibility', 'notUpright', 'tooSmall', 'tooFewFrames', 'tooNoisy', 'notStarted', 'tooShort',
-  'wrongLeg', 'lowRate', 'feetTurned', 'cameraMoved',
+  'wrongLeg', 'lowRate', 'feetTurned', 'cameraMoved', 'faceFeetUnseen',
 ];
 
 /** What the server knows about the station a claim came from, for the plausibility bounds (regradeFromSummary). */

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   // Re-checked, not trusted. The client renders its own summary too, but what gets stored and paid for is this.
   const d = decideScreenPost(body, athleteId);
   if (!d.ok) return NextResponse.json(d.body, { status: d.status });
-  const { screenId, screen, outcome, summary, answers, reward: decision } = d;
+  const { screenId, screen, outcome, summary, answers, reward: decision, ended } = d;
 
   // THE STORED ROW IS THE SCREEN (MIRROR-COACH P3 review, 2026-09-26; lib/mirror/screenClaims.ts decisionFromStoredRow):
   // a screen id already stored is answered from its row — nothing re-decided from the new body, nothing stored again, and
@@ -119,8 +119,10 @@ export async function POST(req: NextRequest) {
 
   // Kept AFTER the reward, and never allowed to break it: a screen the athlete earned is not undone by a write.
   // (Deduped on screenId above: a retried post is one screen in their history rather than two.)
+  // `ended` (MIRROR-COACH P3 follow-up review, 2026-09-28): End posts what was read so far, marked so; it is kept and
+  // scored, and paid only when every camera station was attempted (screenReward.ts ENDED_EARLY_LINE — the owner's call)
   const row = storedScreen(screenId, screen, outcome.results, summary, {
-    camera: outcome.camera, provisional: outcome.provisional, selfReport: answers,
+    camera: outcome.camera, provisional: outcome.provisional, selfReport: answers, ended,
   });
   const saved = await prisma.workoutScan.create({
     data: { userId: athleteId, kind: MIRROR_SCREEN_KIND, metrics: row as unknown as object },

@@ -105,7 +105,10 @@ describe('the rows behind those reasons', () => {
     const legacy = { screenId: 'old', screen: 'full', results, summary: { screen: 'full', redFlags: 0, score: 100, triage: 'proceed', headline: 'Nothing flagged. That is a platform you can load.', meaning: [], suggestions: [], programming: ['Train normally.'] } };
     const back = readStoredScreen(JSON.parse(JSON.stringify(legacy)))!;
     expect(back.screen).toBe('modified');                  // a legacy 'full' label ran the modified stations
-    expect(back.summary.score).toBeNull();
+    // CHANGED ON PURPOSE in the MIRROR-COACH P3 follow-up (2026-09-28), owner decision #31: `score` was pinned null. The
+    // stored 100 is still not trusted — the row is re-scored, and the 100 it gets now is over its ONE check read and
+    // carries that count (1 of 6); the triage is still partial, never "proceed" / "Nothing flagged"
+    expect(back.summary).toMatchObject({ score: 100, readCount: 1, totalCount: 6 });
     expect(back.summary.triage).toBe('partial');
     expect(back.summary.headline).not.toMatch(/nothing flagged/i);
   });
@@ -115,7 +118,7 @@ describe('the rows behind those reasons', () => {
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
-import { DraftView, type Draft, type DraftViewProps } from './screen-prescriptions';
+import { DraftView, newerPartialLine, type Draft, type DraftViewProps } from './screen-prescriptions';
 import { ANSWERS_WITHHELD, REVIEW_GROUPS, coachDraft, type CatalogueExercise } from '@/lib/coach/mirrorToProgram';
 import { decideScreenPost } from '@/lib/mirror/screenClaims';
 import { regradeFromSummary } from '@/lib/mirror/stationGraders';
@@ -177,6 +180,27 @@ describe('the panel: camera / their answers / your checks, in that order, never 
 
   it('a flagged screen with a check not read says the retest too, so it is not read as whole', () => {
     expect(plain(view())).toContain('1 check the camera could not read needs a retest.');
+  });
+
+  // MIRROR-COACH P3 follow-up (2026-09-28), owner decision #31: the coach sees the athlete's score, over the checks read,
+  // with the same count the server paid on. Fails on 42c5e8a0 (the draft carried no score or counts).
+  it('the score over what was read, with the count: "Score 78 · from 5 of 6 checks read" (hip flag one-sided, head float not read)', () => {
+    const d = fixtureDraft();
+    expect(d).toMatchObject({ score: 78, readCount: 5, totalCount: 6 });
+    expect(plain(view())).toContain('Score 78 · from 5 of 6 checks read');
+    // a draft with no score (no screen to draft from) says none
+    expect(plain(view({ draft: { screenAt: null, prescriptions: [], reason: 'no_screen' } }))).not.toMatch(/Score \d/);
+  });
+
+  // MIRROR-COACH P3 follow-up review (2026-09-28): a newer run too thin to be a screen is named, not drafted from; and a
+  // missing leg is said beside the count (screen.ts readPhrase)
+  it('a newer run too thin to be a screen is named above the screen drafted from; a leg not read is said beside the count', () => {
+    const draft = { ...fixtureDraft(), newerPartial: { at: '2026-09-28T09:00:00.000Z', readCount: 1, totalCount: 6 } };
+    const t = plain(view({ draft }));
+    expect(t).toContain(newerPartialLine(draft.newerPartial));
+    expect(newerPartialLine(draft.newerPartial)).toMatch(/read 1 of 6 checks — too little to count as a screen; this is the last one that did\.$/);
+    expect(plain(view())).not.toContain('too little to count as a screen');
+    expect(plain(view({ draft: { ...fixtureDraft(), legsNotRead: 1 } }))).toContain('Score 78 · from 5 of 6 checks read, one leg not read');
   });
 
   it('a pass shows its value and prescribes nothing', () => {

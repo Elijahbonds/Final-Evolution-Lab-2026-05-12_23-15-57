@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { screenText } from '@/lib/share/screen';
-import { LEFT_HEEL, RIGHT_ANKLE, RIGHT_HEEL } from '@/lib/pose/landmarks';
+import { LEFT_FOOT_INDEX, LEFT_HEEL, NOSE, RIGHT_ANKLE, RIGHT_FOOT_INDEX, RIGHT_HEEL } from '@/lib/pose/landmarks';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { toAdapterFrames } from './fixtures/index';
 import { readFixture } from './fixtures/load';
@@ -18,8 +18,8 @@ import {
   toOtherSide, toSide, turnFoot, withStepOff, type StandShape,
 } from './fixtures/stations';
 import {
-  GRADER_IDS, GRADER_VIEW, RETEST_HINT, STATION_THRESHOLDS, decideGrade, formatGradeValue, gradeScreenStation, gradeStation,
-  measureStation, minReadableFrames, regradeFromSummary, resultsFromGrades, retestHintFor, toCheckResult, unreadableLine,
+  GRADER_IDS, GRADER_VIEW, HEAD_TURNED_HINT, RETEST_HINT, STATION_THRESHOLDS, decideGrade, formatGradeValue, gradeScreenStation, gradeStation,
+  measureStation, minReadableFrames, notReadStation, regradeFromSummary, resultsFromGrades, retestHintFor, toCheckResult, unreadableLine,
   type GraderId, type StationGrade, type UnreadableReason,
 } from './stationGraders';
 import { FULL_SCREEN, MODIFIED_SCREEN, scoreScreen, type StationView } from './screen';
@@ -414,13 +414,18 @@ describe('unreadable is never pass', () => {
     expect(results.map((r) => r.checkId)).toEqual(['shoulderLevel']);
     const s = scoreScreen('modified', results);
     expect(s.triage).not.toBe('proceed');
-    expect(s.score).toBeNull();
+    // CHANGED ON PURPOSE in the MIRROR-COACH P3 follow-up (2026-09-28), owner decision #31: this pinned `score` null (only
+    // a complete screen was scored). The score is now over the checks that WERE read — here the one shoulder pass, 100 —
+    // always said with its count, and the knee is listed as not read. It still is not 'proceed' and never "clear".
+    expect(s.score).toBe(100);
+    expect(s).toMatchObject({ readCount: 1, totalCount: 6 });
+    expect(s.notRead).toContain('Knee window');
     expect(s.notMeasured.join(' ')).toMatch(/Knee window/);
   });
 
   it('every way a measurement fails is unreadable, whatever the value says', () => {
     const base = { checkId: 'hipLevel' as const, frames: 300, readableFrames: 300, value: 0, uncertainty: 0, spread: 0 };
-    for (const reason of ['wrongView', 'noBody', 'outOfFrame', 'lowVisibility', 'notUpright', 'tooSmall', 'tooFewFrames', 'tooNoisy'] as UnreadableReason[]) {
+    for (const reason of ['wrongView', 'noBody', 'outOfFrame', 'lowVisibility', 'notUpright', 'tooSmall', 'tooFewFrames', 'tooNoisy', 'faceFeetUnseen'] as UnreadableReason[]) {
       expect(decideGrade({ ...base, reason }).status, reason).toBe('unreadable');
     }
     expect(decideGrade({ ...base, uncertainty: STATION_THRESHOLDS.hipLevel.maxUncertainty * 2 }).status).toBe('unreadable');
@@ -511,6 +516,116 @@ describe('the table is the only source of numbers', () => {
   });
 });
 
+// ── MIRROR-COACH P3 follow-up (2026-09-28) ──────────────────────────────────────────────────────────────────────────
+// The P3 live proof's "not read · wrong view" on the head float came from the facing test on a SIDE-ON body whose face
+// and feet were unseen (stationGraders.ts readHead): the athlete was told the camera saw a different view — untrue — and
+// the retest asked them to face the way they already faced. On 42c5e8a0 these read 'wrongView'.
+describe('face and feet unseen is its own reason, not a wrong view', () => {
+  const hide = (frames: PoseFrame[], ids: readonly number[]) =>
+    frames.map((f) => ({ ...f, landmarks: f.landmarks.map((l, i) => (ids.includes(i) ? { ...l, visibility: 0.35 } : l)) }));
+  const FACE_AND_FEET = [NOSE, LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX];
+
+  // CHANGED ON PURPOSE (MIRROR-COACH P3 follow-up review, 2026-09-28): this body's face and feet are all INSIDE the shot,
+  // only dimmed to 0.35 — and it was told "Step back so your head and your feet are both in the shot", which makes a dim
+  // body smaller and fixes no light. Every frame the hold keeps has passed the framing check (the nose in the top of the
+  // shot, both ankles in and seen), so face-and-feet-unseen on a kept frame is nearly always dim: 'lowVisibility'.
+  it('a side-on body with the nose and both feet only DIM (all inside the shot): lowVisibility and the light hint — not a wrong view', () => {
+    const frames = hide(turned(toSide, {}, 10), FACE_AND_FEET);
+    for (const i of FACE_AND_FEET) expect(frames.every((f) => f.landmarks[i].x >= 0 && f.landmarks[i].x <= 1 && f.landmarks[i].y >= 0 && f.landmarks[i].y <= 1)).toBe(true);
+    const g = gradeStation('headFloat', frames, 'side', OPT);
+    expect(g.status).toBe('unreadable');
+    expect(g.reason).toBe('lowVisibility');
+    expect(g.note).not.toMatch(/different view/);
+    expect(retestHintFor(g)).toBe(RETEST_HINT.lowVisibility);
+    expect(retestHintFor(g)).not.toMatch(/step back/i);
+  });
+
+  it('the feet OUTSIDE the shot (below the image) with the face dim: faceFeetUnseen, its own line and the step-back hint', () => {
+    const FEET = [LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX];
+    const frames = hide(turned(toSide, {}, 10), [NOSE]).map((f) => ({ ...f, landmarks: f.landmarks.map((l, i) => (FEET.includes(i) ? { ...l, y: 1.03 } : l)) }));
+    const g = gradeStation('headFloat', frames, 'side', OPT);
+    expect(g.status).toBe('unreadable');
+    expect(g.reason).toBe('faceFeetUnseen');
+    expect(g.value).toBeNull();
+    expect(g.note).toBe(unreadableLine('headFloat', 'faceFeetUnseen'));
+    expect(g.note).toMatch(/outside the shot/);
+    expect(g.note).not.toMatch(/different view/);
+    expect(retestHintFor(g)).toBe(RETEST_HINT.faceFeetUnseen);
+    expect(RETEST_HINT.faceFeetUnseen).toMatch(/head and your feet are both in the shot/);
+    expect(RETEST_HINT.faceFeetUnseen).not.toBe(RETEST_HINT.wrongView);
+    // the server regrades it the same (REASONS knows the reason), and it is never a result
+    expect(regradeFromSummary(JSON.parse(JSON.stringify(g)))).toMatchObject({ status: 'unreadable', reason: 'faceFeetUnseen' });
+    expect(toCheckResult(g)).toBeNull();
+  });
+
+  it('either the face OR the feet is enough to read the facing (unchanged); a body facing the camera is still wrongView', () => {
+    expect(gradeStation('headFloat', hide(turned(toSide, {}, 10), [NOSE]), 'side', OPT).status).toBe('pass');
+    expect(gradeStation('headFloat', hide(turned(toSide, {}, 10), [LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX]), 'side', OPT).status).toBe('pass');
+    expect(gradeStation('headFloat', front({}, 10), 'side', OPT).reason).toBe('wrongView');
+  });
+});
+
+describe('a station that ended before its hold ran: notReadStation', () => {
+  it('every camera check at the station, not read for the one reason, through the graders\' own decision — the server agrees', () => {
+    const profile = MODIFIED_SCREEN.find((s) => s.id === 'profile')!;
+    const frontStack = MODIFIED_SCREEN.find((s) => s.id === 'frontStack')!;
+    const wobbleR = MODIFIED_SCREEN.find((s) => s.id === 'wobbleR')!;
+    expect(notReadStation(profile, 'wrongView')).toEqual([
+      expect.objectContaining({ checkId: 'headFloat', status: 'unreadable', reason: 'wrongView', value: null, frames: 0, readableFrames: 0, stationId: 'profile', note: unreadableLine('headFloat', 'wrongView', { frames: 0, readableFrames: 0 }) }),
+    ]);
+    expect(notReadStation(frontStack, 'wrongView').map((g) => g.checkId)).toEqual(['kneeWindow', 'hipLevel', 'shoulderLevel']);
+    expect(notReadStation(wobbleR, 'wrongView')[0]).toMatchObject({ checkId: 'singleLeg', side: 'right' });
+    expect(notReadStation(MODIFIED_SCREEN.find((s) => s.id === 'breath')!, 'wrongView')).toEqual([]);   // nothing for the camera
+    for (const g of [...notReadStation(profile, 'wrongView'), ...notReadStation(frontStack, 'wrongView'), ...notReadStation(wobbleR, 'wrongView')]) {
+      expect(regradeFromSummary(JSON.parse(JSON.stringify(g)), { holdSec: 30 })).toMatchObject({ status: 'unreadable', reason: 'wrongView' });
+    }
+  });
+
+  it('the wait is in the table, commented, and the runner reads it from there', () => {
+    const T = STATION_THRESHOLDS.wrongView;
+    expect(T.remindMs).toBeGreaterThan(0);
+    expect(T.endMs).toBeGreaterThan(2 * T.remindMs);            // at least two reminders before it gives up
+    const src = readFileSync(resolve(process.cwd(), 'lib/mirror/stationGraders.ts'), 'utf8');
+    expect(src).toMatch(/THE WRONG VIEW THAT NEVER TURNS[\s\S]{0,1600}wrongView: \{[\s\S]{0,400}remindMs: \d+[\s\S]{0,800}endMs: \d+/);
+    // the runner has no number of its own for the wait
+    const runner = readFileSync(resolve(process.cwd(), 'lib/mirror/screenRunner.ts'), 'utf8');
+    expect(runner).toMatch(/STATION_THRESHOLDS\.wrongView/);
+    expect(runner).not.toMatch(/20_?000|7_?000/);
+  });
+
+  // MIRROR-COACH P3 follow-up review (2026-09-28): the reset stretch, the backstop and the tick cap are in the table too
+  it('the right-view stretch, the station backstop and the runner\'s tick cap are in the table, commented, and read from there', () => {
+    const T = STATION_THRESHOLDS;
+    expect(T.wrongView.resetAfterMs).toBeGreaterThan(0);
+    expect(T.wrongView.resetAfterMs).toBeLessThan(T.wrongView.remindMs);
+    expect(T.stalled.endMs).toBeGreaterThan(T.wrongView.endMs);            // the wrong view keeps its own, shorter wait
+    expect(T.clock.maxTickMs).toBeGreaterThan(T.singleLeg.maxFrameMs);      // never slows a phone the graders can use
+    const src = readFileSync(resolve(process.cwd(), 'lib/mirror/stationGraders.ts'), 'utf8');
+    expect(src).toMatch(/THE TURN IS A STRETCH, NOT A FRAME[\s\S]{0,900}resetAfterMs: \d+/);
+    expect(src).toMatch(/THE STATION-LEVEL BACKSTOP[\s\S]{0,1600}stalled: \{[\s\S]{0,400}endMs: \d+/);
+    expect(src).toMatch(/THE RUNNER'S CLOCK[\s\S]{0,1200}clock: \{\s*maxTickMs: \d+/);
+    const runner = readFileSync(resolve(process.cwd(), 'lib/mirror/screenRunner.ts'), 'utf8');
+    for (const k of ['wrongView.resetAfterMs', 'stalled.endMs', 'clock.maxTickMs']) expect(runner).toContain(`STATION_THRESHOLDS.${k}`);
+    expect(runner).not.toMatch(/60_?000|(?<![\w.])250(?![\w])/);                     // (1000 is its ms → s)
+  });
+});
+
+// MIRROR-COACH P3 follow-up review (2026-09-28): a grader's own 'wrongView' at the side station — over frames the framing
+// check passed as side-on, so the head turned from the body — got the turn cue ("Turn side-on…") to somebody side-on
+describe('the head float\'s own wrong view has its own hint; the runner\'s wrong-view end (no frame graded) keeps the turn', () => {
+  it('HEAD_TURNED_HINT for a head-float wrongView read over frames; the generic hint for a runner\'s end (frames 0) and for any other check', () => {
+    const profile = MODIFIED_SCREEN.find((s) => s.id === 'profile')!;
+    const runnerEnd = notReadStation(profile, 'wrongView')[0];
+    expect(runnerEnd.frames).toBe(0);
+    expect(retestHintFor(runnerEnd)).toBe(RETEST_HINT.wrongView);
+    const read = { ...runnerEnd, frames: 301 };
+    expect(retestHintFor(read)).toBe(HEAD_TURNED_HINT);
+    expect(retestHintFor({ ...read, checkId: 'kneeWindow' })).toBe(RETEST_HINT.wrongView);
+    expect(retestHintFor({ reason: 'wrongView' })).toBe(RETEST_HINT.wrongView);        // a caller that does not say the check
+    expect(HEAD_TURNED_HINT).not.toMatch(/turn side-on/i);
+  });
+});
+
 describe('the words the graders say', () => {
   const lines = (): string[] => {
     const out = new Set<string>();
@@ -521,6 +636,7 @@ describe('the words the graders say', () => {
       out.add(unreadableLine(id, r, { readableFrames: 3, frames: 90, stanceSec: 4 }));
       out.add(RETEST_HINT[r]);
     }
+    out.add(HEAD_TURNED_HINT);
     return [...out].filter((l) => l !== '—');
   };
 

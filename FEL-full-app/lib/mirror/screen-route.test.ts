@@ -212,7 +212,11 @@ describe('POST: the server re-decides every grade (MIRROR-COACH P3)', () => {
     const { status, json } = await post({ screenId: 's-4b', screen: 'modified', checks: allClaims({ headFloat: { ...fromFront, status: 'unreadable' } }) });
     expect(status).toBe(200);
     expect(json.summary.notMeasured).toEqual(['Head float']);
-    expect(json.summary.score).toBeNull();                    // partial: a camera check was not read
+    // CHANGED ON PURPOSE in the MIRROR-COACH P3 follow-up (2026-09-28), owner decision #31: this pinned `score` null
+    // ("partial: a camera check was not read"). The server now scores over the checks it read — 5 of 6, none flagged —
+    // and says so; the head float is listed as not read, and the screen is still partial, never clear.
+    expect(json.summary).toMatchObject({ score: 100, readCount: 5, totalCount: 6, notRead: ['Head float'], triage: 'partial' });
+    expect(json.readableCameraChecks).toBe(json.summary.readCount);
     expect(stored()[0].metrics.camera.find((c: Row) => c.checkId === 'headFloat')).toMatchObject({ status: 'unreadable', value: null, claimed: 'unreadable' });
   });
 
@@ -334,8 +338,10 @@ describe('POST: duplicates, foreign checks, junk and bare grades are dropped', (
   it('three copies of one REAL claim are one check: stored once, a partial screen, not paid', async () => {
     const { json } = await post({ screenId: 'j-3', screen: 'modified', checks: [claim('hipLevel'), claim('hipLevel'), claim('hipLevel')] });
     expect(stored()[0].metrics.results).toEqual([{ checkId: 'hipLevel', grade: 'stable', source: 'camera', detail: expect.stringMatching(/estimated$/) }]);
-    expect(json.summary).toMatchObject({ graded: true, score: null, triage: 'partial', ranAll: false });
-    expect(json).toMatchObject({ paid: false, dropped: 2 });
+    // CHANGED ON PURPOSE (P3 follow-up, owner decision #31): `score` was pinned null. Scored over the ONE check read and
+    // counted as one (three copies are one check) — shown as "from 1 of 6" — still partial, still unpaid
+    expect(json.summary).toMatchObject({ graded: true, score: 100, readCount: 1, totalCount: 6, triage: 'partial', ranAll: false });
+    expect(json).toMatchObject({ paid: false, dropped: 2, readableCameraChecks: 1 });
   });
 
   it('malformed numbers are dropped, never thrown on', async () => {
@@ -682,5 +688,51 @@ describe('GET /api/prq/export', () => {
     expect(screen.metrics).toMatchObject({ gradedBy: 'server', graded: true, selfReport: [{ questionId: 'lowerRibsWiden', answer: 'yes' }] });
     expect(screen.metrics.camera).toHaveLength(7);
     expect(screen.metrics).not.toHaveProperty('note');
+  });
+});
+
+// ── MIRROR-COACH P3 follow-up (2026-09-28): owner decision #31 and the one count, through the real route ──────────────
+// Fails on 42c5e8a0: the summary had no readCount/totalCount and a screen with an unread check had `score: null`.
+describe('POST: the score over what was read, and one count shared by the panel and the server', () => {
+  it('the summary\'s readCount IS readableCameraChecks, on every shape of screen — and the stored row carries the counts', async () => {
+    const posts = [
+      { screenId: 'c-all', checks: allClaims() },
+      { screenId: 'c-head', checks: allClaims({ headFloat: unreadable('headFloat') }) },
+      { screenId: 'c-legs', checks: [claim('singleLegL'), claim('singleLegR'), claim('hipLevel')] },
+      { screenId: 'c-one', checks: [claim('hipLevel'), claim('hipLevel')] },
+      { screenId: 'c-none', checks: KEYS.map(unreadable) },
+    ];
+    for (const p of posts) {
+      const { json } = await post({ screen: 'modified', ...p });
+      expect(json.summary.readCount, p.screenId).toBe(json.readableCameraChecks);
+      expect(json.summary.totalCount, p.screenId).toBe(6);
+      const row = stored().find((r) => r.metrics.screenId === p.screenId)!.metrics;
+      expect(row.summary, p.screenId).toMatchObject({ readCount: json.readableCameraChecks, totalCount: 6 });
+    }
+    // both legs are one check: 2, not 3
+    expect(stored().find((r) => r.metrics.screenId === 'c-legs')!.metrics.summary.readCount).toBe(2);
+  });
+
+  it('a screen with an unread check has a score now, said with its count — and the payout rule is unchanged', async () => {
+    const two = await post({ screenId: 'd31-2', screen: 'modified', checks: [claim('heelLine'), claim('hipLevel', { status: 'flag', value: 0.12 }), unreadable('headFloat')] });
+    // 2 readable from 2 stations: scored (one one-sided hip flag, 78), provisional, NOT paid
+    expect(two.json.summary).toMatchObject({ graded: true, score: 78, readCount: 2, totalCount: 6 });
+    expect(two.json).toMatchObject({ provisional: true, paid: false, awarded: 0 });
+    const three = await post({ screenId: 'd31-3', screen: 'modified', checks: [claim('heelLine'), claim('hipLevel', { status: 'flag', value: 0.12 }), claim('headFloat')] });
+    expect(three.json.summary).toMatchObject({ score: 78, readCount: 3 });
+    expect(three.json).toMatchObject({ provisional: false, paid: true });
+    // nothing read: no score, the not-read line (P1's ungraded branch), not paid
+    const none = await post({ screenId: 'd31-0', screen: 'modified', checks: KEYS.map(unreadable) });
+    expect(none.json.summary).toMatchObject({ graded: false, score: null, readCount: 0 });
+    expect(none.json.paid).toBe(false);
+  });
+
+  it('a retried post is answered from the stored row with the same score and counts', async () => {
+    const body = { screenId: 'd31-retry', screen: 'modified', checks: allClaims({ headFloat: unreadable('headFloat') }) };
+    const a = await post(body);
+    const b = await post(body);
+    expect(b.json.alreadyStored).toBe(true);
+    expect(b.json.summary).toMatchObject({ score: a.json.summary.score, readCount: 5, totalCount: 6 });
+    expect(b.json.readableCameraChecks).toBe(5);
   });
 });

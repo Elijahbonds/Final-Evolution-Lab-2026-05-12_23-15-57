@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { SAVE_LINE, ScreenSelfReport, planSave } from './screen-self-report';
-import { COACH_CHECK_LINE, SELF_REPORT_NOTE, SELF_REPORT_QUESTIONS } from '@/lib/mirror/selfReport';
+import { COACH_CHECK_LINE, SELF_REPORT_NOTE, SELF_REPORT_NOT_REACHED, SELF_REPORT_QUESTIONS } from '@/lib/mirror/selfReport';
 
 const render = (screen: 'modified' | 'full', screenId: string | null | 'unsaved' = null) =>
   renderToStaticMarkup(createElement(ScreenSelfReport, { screen, screenId, save: async () => true }));
@@ -70,5 +70,25 @@ describe('planSave', () => {
 
   it('a screen that was not saved cannot take answers, and says so', () => {
     expect(planSave('unsaved', { lowerRibsWiden: 'yes' })).toEqual({ send: null, state: 'noScreen' });
+  });
+});
+
+// MIRROR-COACH P3 follow-up review (2026-09-28): after End before the breath station was held, no breath questions — the
+// card says why, and the coach's stations are still named on a full screen
+describe('the breath station not held (End before it)', () => {
+  const unasked = (screen: 'modified' | 'full') =>
+    renderToStaticMarkup(createElement(ScreenSelfReport, { screen, screenId: 'saved-1', save: async () => true, asked: false }));
+  it('no question, no tap, and the not-reached line in their place', () => {
+    const html = unasked('modified');
+    for (const q of SELF_REPORT_QUESTIONS) expect(text(html)).not.toContain(q.text);
+    expect(html).not.toContain('<button');
+    expect(text(html)).toContain(SELF_REPORT_NOT_REACHED);
+    expect(text(html)).toContain('Rib angle and breath');
+  });
+  it('a full screen still names its coach checks', () => {
+    const full = text(unasked('full'));
+    expect(full).toContain('Checked by your coach');
+    expect(full).toContain(COACH_CHECK_LINE);
+    expect(full).toContain(SELF_REPORT_NOT_REACHED);
   });
 });
