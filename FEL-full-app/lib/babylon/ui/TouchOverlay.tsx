@@ -35,27 +35,51 @@ function safeCapture(el: Element, pointerId: number): void {
 const SAFE_LEFT: React.CSSProperties = { left: 'max(0.75rem, env(safe-area-inset-left))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
 const SAFE_RIGHT: React.CSSProperties = { right: 'max(0.75rem, env(safe-area-inset-right))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
 
+/**
+ * QA P1-10 (2026-09-27): the deck lives inside the mode's 16:10 stage (overflow hidden). A 390-wide phone's stage is ~234 px
+ * tall and the right column (boost, diamond, stick) is ~306 px, so its top buttons were cut off; sideways and on a desktop
+ * the stage runs past the bottom of the screen, and the bottom-anchored deck went with it. Pure: how far to LIFT a column
+ * (the stage below the viewport) and how much to SCALE it (to fit what is visible of the stage), margins kept.
+ */
+export function fitDeck(stage: { top: number; bottom: number }, viewportH: number, columnH: number, margin = 12): { lift: number; scale: number } {
+  const visBottom = Math.min(stage.bottom, viewportH);
+  const room = Math.max(0, visBottom - Math.max(stage.top, 0) - 2 * margin);
+  return { lift: Math.max(0, stage.bottom - visBottom), scale: columnH > 0 ? Math.min(1, room / columnH) : 1 };
+}
+
 export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: boolean }) {
   const cfg = MODE_VERBS[props.modeId] ?? MODE_VERBS.default;
   const [landscape, setLandscape] = useState(window.innerWidth > window.innerHeight);
+  const root = useRef<HTMLDivElement>(null), colL = useRef<HTMLDivElement>(null), colR = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState({ lift: 0, l: 1, r: 1 });
 
   useEffect(() => {
-    const onR = () => setLandscape(window.innerWidth > window.innerHeight);
+    const onR = () => {
+      setLandscape(window.innerWidth > window.innerHeight);
+      const stage = root.current?.parentElement?.getBoundingClientRect();
+      if (!stage) return;
+      const l = fitDeck(stage, window.innerHeight, colL.current?.offsetHeight ?? 0), r = fitDeck(stage, window.innerHeight, colR.current?.offsetHeight ?? 0);
+      setFit((f) => (f.lift === l.lift && f.l === l.scale && f.r === r.scale ? f : { lift: l.lift, l: l.scale, r: r.scale }));
+    };
+    onR();
     window.addEventListener('resize', onR);
-    return () => window.removeEventListener('resize', onR);
-  }, []);
+    window.addEventListener('scroll', onR, { passive: true });
+    return () => { window.removeEventListener('resize', onR); window.removeEventListener('scroll', onR); };
+  }, [props.visible]);
 
   if (!props.visible || props.bus.gamepadActive) return null;
+  const lifted = (side: React.CSSProperties, k: number, origin: string): React.CSSProperties =>
+    ({ ...side, bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${fit.lift}px)`, transform: `scale(${k})`, transformOrigin: origin });
 
   return (
-    <div className={landscape
+    <div ref={root} className={landscape
       ? 'pointer-events-none absolute inset-0 z-30'
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
-      <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col items-center gap-2" style={SAFE_LEFT}>
+      <div ref={colL} className="pointer-events-auto absolute bottom-3 left-3 flex flex-col items-center gap-2" style={lifted(SAFE_LEFT, fit.l, 'bottom left')}>
         <DPad bus={props.bus} />
         <AnalogStick bus={props.bus} side="L" label="MOVE" />
       </div>
-      <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={SAFE_RIGHT}>
+      <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}>
         {cfg.boost && <BoostPill bus={props.bus} />}
         <ButtonDiamond bus={props.bus} buttons={cfg.buttons} />
         {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
