@@ -15,7 +15,7 @@ import { stepSpeedFov } from '../core/SpeedFov';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (landings and grinds fill it, RB/Shift burns it)
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
-import { Vector3, type TransformNode } from '@babylonjs/core';
+import { Ray, Vector3, type TransformNode } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition, BodyView } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
@@ -34,7 +34,7 @@ import { BalanceChannel, tryRevert, type BalanceChannelKind } from '../core/Grin
 import { pickRail, nearestOnSegment } from '../core/RailMagnet';   // VENICE-SKATE-THPS: the catch window, testable on its own
 import { ComboChain } from '../core/ComboChain';
 import { WALL_RIDE, canWallRide, startWallRide, stepWallRide, wallSide, wallRideExitVel, wallplantVel, canLipStall, startLipStall, stepLipStall, dropInVel, lipStallPts, type Wall, type Lip, type WallRideState, type LipStallState } from '../core/WallRide';   // WALL RIDES + LIP TRICKS (2026-09-18)
-import { plazaWalls, plazaLips } from './skatePlaza';
+import { plazaWalls, plazaLips, SKATE_COIN_LOOK } from './skatePlaza';
 import { BoardAnimTree } from '../anim/boardTree';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the board family (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
 // 2942860, per rendered frame:
@@ -69,6 +69,10 @@ import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 // in the air (the game throws and finishes the spin), a kick-push with the back foot (PUSH, off the claimed step)
 import { RideIntents, KickPush, rideLines, stickXFromBody, BODY_COYOTE_MS, type RideIntent } from '../core/rideBody';
 import { grabTrickFor, spinTrickFor } from '../core/rideTricks';
+// SKATE-SCORE (2026-09-29): the eye's SK-1/2/3/5 (grabs pay and count, a finished spin lands, the card counts landings, the
+// pop scales with the roll) and GC-13 (a body's HUD says a body's words)
+import { GrabBook, LandedTricks, skateLandingError01, skateAirLeft, skateAirBudget, fitToAir, popVy, popHeight, isBigAir } from './skateScore';
+import { RideHudSwitch, skateHudWords, setRingGlyph } from './rideHud';
 
 const RUN_SEC = 90;
 /** phase 10: the banked score that wins the run */
@@ -115,7 +119,15 @@ export const SkateRunMode: ModeDefinition = (() => {
   let settleT = 0;
   /** Latched while the rider is against the fence, so the cue fires once per contact rather than every frame. */
   let fenceHit = false;
-  let landedTotal = 0;   // phase 10: tricks landed across the run (the card reads it)
+  // phase 10: tricks landed across the run (the card reads it). SKATE-SCORE (SK-3): counted off the GRADE — it took every
+  // touchdown's chain, bails included ("10 TRICKS" on a run whose every trick bailed), and was never reset on a remount
+  const landed = new LandedTricks();
+  /** SK-1: the grab thrown this air, as a link of the air's chain (AirControl keeps only flips and spins there). */
+  const grabs = new GrabBook();
+  /** SK-5: how high this air's pop reaches over flat ground (0 for an air no pop made) — "big air" has to beat it. */
+  let popApex = 0;
+  /** GC-13: whose words the HUD says — a body's, or a pad's / the keys' / touch's. */
+  const hudSwitch = new RideHudSwitch();
   /** Heading when the wheels left the ground — decides switch stance on landing. */
   let airEntryYaw = 0;
   /** Has the camera been snapped since play actually began? */
@@ -128,9 +140,15 @@ export const SkateRunMode: ModeDefinition = (() => {
   let boostPads: BoostPads | null = null;
   let boostHeld = false;
   let timeLeft = RUN_SEC;
-  /** How long a full-pop air lasts, for judging which trick the rider can finish. Measured against the ollie's own
-   *  hang rather than guessed: a kerb ollie is a quarter-second, a ramp air most of a second. */
-  const AIR_BUDGET_SEC = 0.95;
+  /** SKATE-SCORE (SK-2): the air, measured. `left` is the fall from here to the ground he took off from
+   *  (skateScore.skateAirLeft); `budget` the whole of this air, flown plus left — the scale the trick table's airSec is
+   *  written in. It was a fixed 0.95 s minus the airtime: the uncharged pop's hang, so no charged pop bought a bigger trick
+   *  and every Y trick (JAPAN 0.96, FS 360 1.04, the 540 1.24) threw nothing. A trick is picked by the budget and must
+   *  still finish its motion inside `left` (skateScore.fitToAir, Gate Crasher's GC-2 rule). */
+  const airNow = (): { left: number; budget: number } => {
+    const left = skateAirLeft(rig.char.root.position.y - lastGroundY, rig.rider.vel.y);
+    return { left, budget: skateAirBudget(air.state.airtime, left) };
+  };
   let stickX = 0, stickY = 0, pump = 0;
   // MOVEMENT PLAY P8: whose value the L stick carries (a body's carve held into the game's longer air must not spin the
   // skater: the player flies 0.4–0.6 s, the rider 0.93–1.31 s), when the wheels last left the ground and whether a pop took
@@ -152,12 +170,21 @@ export const SkateRunMode: ModeDefinition = (() => {
    *   full      9.18 m/s      3.01 m    1.31 s
    *
    * RAISED from 1.10–2.63 m on the owner's call (2026-09-17): the pop read short. Worth knowing what it trades —
-   * hang is what BoardTricks' `airSec` is judged against, and at a 0.93 s floor every skate trick in the table
-   * (the longest is the 360 FLIP at 0.58 s) already fits off a flat-ground ollie, so `fitsAir` no longer gates
-   * anything for skate. That was already true at the old numbers; this widens it. If the trick hierarchy should
-   * mean something again, the hard tricks' `airSec` has to come up with the ollie — that is a separate call.
+   * hang is what BoardTricks' `airSec` is judged against (BOARD-10PHASE P5 rescaled the table to it: uncharged holds
+   * up to the BS 180, half adds the JAPAN AIR / FS 360 / 360 FLIP, full the 540).
+   *
+   * SKATE-SCORE (SK-5, 2026-09-29): that is the ROLLING pop. Standing still it was the same 1.5–3 m and 0.9–1.3 s
+   * ("big air 2.2 m" at 0.0–0.15 m/s), so the launch now scales with the roll (skateScore.popVy): half the launch
+   * standing — 0.38 m / 0.46 s uncharged, 0.75 m / 0.66 s fully crouched — rising to the table above at 4.5 m/s.
    */
   const olliePower = (): number => 0.27 + ollieCharge() * 0.49;
+  /** The pop: GroundRide's jump (it clears `grounded`, the coyote's `late` included), then the launch this roll and this
+   *  crouch earn (SK-5). Every pop in the mode goes through here — the flick, the button and the body's late hop. */
+  const popOff = (late: boolean): void => {
+    rig.rider.jump(olliePower(), late);
+    rig.rider.vel.y = popVy(move.speed, ollieCharge());
+    popApex = popHeight(rig.rider.vel.y);
+  };
   let ended = false;
 
   const flick = new FlickStick();
@@ -227,7 +254,14 @@ export const SkateRunMode: ModeDefinition = (() => {
   /** Airtime + height of the current air, for the big-air spectacle beat. The floor is the last y the wheels were on —
    *  a raycast per frame for one number the park already told us when it landed. */
   let apexDone = false, lastVy = 0, lastGroundY = 0;
-  const groundUnder = (): number => lastGroundY;
+  /** SKATE-SCORE (SK-5): the ground actually UNDER the rider — one ray, at an air's apex only (the last y the wheels were on
+   *  if it finds nothing). The take-off height alone made every flat ollie "big air". */
+  const DOWN = new Vector3(0, -1, 0);
+  const groundBelow = (ctx: ModeContext): number => {
+    const p = rig.char.root.position;
+    const hit = ctx.scene.pickWithRay(new Ray(new Vector3(p.x, p.y + 0.3, p.z), DOWN, 60), (m) => world.ground.includes(m));
+    return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : lastGroundY;
+  };
   /** Eased deck pitch (radians): a manual rides the tail with the nose up, everything else is flat. */
   let boardPitch = 0;
   /** ANIM-RESIDUAL: the deck's eased root-local offset (under the feet in the air), the feet midpoint the stance holds on
@@ -263,7 +297,7 @@ export const SkateRunMode: ModeDefinition = (() => {
     // SKATE-MAJOR: the same X press that asked for the wall threw a GRAB a frame earlier (the air branch of onInput), and
     // the grab was still HELD through the whole ride — measured, 57 of 60 detached-feet air frames were board_grab on the
     // wall. The wall takes the board: the grab is banked and released the way a release would.
-    if (air.state.grabHeld) { trickLayer?.release(); const pts = air.releaseGrab(); if (pts > 0) combo.add('GRAB', pts, 'air'); }
+    letGoGrab();
     combo.add('WALL RIDE', WALL_RIDE.pts, 'grind');
     bannerFlash(ctx, 'WALL RIDE', 700);
     SoundKit.play('powerUp', { volume: 0.4, pitch: 1.15 }); ctx.feel?.impact?.(0.25);
@@ -361,6 +395,10 @@ export const SkateRunMode: ModeDefinition = (() => {
    *  throws a trick, lets it turn and throws another is inside this window; nothing a human does is refused by it. */
   const TRICK_CADENCE_SEC = 0.18;
   let lastTrickAt = 1e9;
+  /** SKATE-SCORE (SK-2): the flick gestures the table spells differently — the flick's 360 FLIP is the table's 'tre'. */
+  const FLICK_ALIAS: Readonly<Record<string, string>> = { treflip: 'tre' };
+  /** SK-2: a whole-turn spin no table row names (the flick's BS 360) is caught in the FS 360's own time (trickSeconds). */
+  const UNNAMED_SPIN_SEC = 0.62;
   const airTrick = (
     ctx: ModeContext, id: string, label: string,
     family: 'flip' | 'grab' | 'spin', basePts: number, difficulty: number,
@@ -369,19 +407,41 @@ export const SkateRunMode: ModeDefinition = (() => {
     lastTrickAt = timeLeft;
     // TRICK POSE: the named trick's shape goes on the rig (the deck flips, a shuv turns the deck not the rider, a grab puts
     // the right hand on the right edge), and a flip is caught at the table's roll so the grade and the picture agree
-    const named = SKATE_TRICKS.find((t) => t.id === id) ?? (family === 'grab' ? SKATE_TRICKS.find((t) => t.id === 'indy') : null);
+    const key = FLICK_ALIAS[id] ?? id;
+    const named = SKATE_TRICKS.find((t) => t.id === key) ?? (family === 'grab' ? SKATE_TRICKS.find((t) => t.id === 'indy') : null);
     const boardOnly = named ? BOARD_ONLY_SPINS.has(named.id) : false;
+    // SKATE-SCORE (SK-2): a trick that turns nothing (a mid-air OLLIE) is caught at zero, as the shuv-it's deck is. Thrown as a
+    // free 'spin' (the button) or 'flip' (the flick) it turned the rider at 7.2 rad/s until the ground, and the landing bailed
+    // a trick with no rotation in it. A spin no row names (the flick's BS 360) is caught at a whole turn, its own way round.
+    const still = !!named && named.spinDeg === 0 && named.flipDeg === 0 && named.grab === 'none';
+    const unnamedSpin = !named && family === 'spin';
+    if (family === 'grab') letGoGrab();   // SK-1: a new grab lets the one still held go (its hold is kept)
     air.applyTrick({
-      id, label, family: boardOnly ? 'flip' : family, basePts, difficulty,
-      ...(named && (named.flipDeg !== 0 || boardOnly) ? { flipTarget: named.flipDeg * Math.PI / 180, flipSec: trickSeconds(named) } : {}),
+      id, label, family: boardOnly || still ? 'flip' : family, basePts, difficulty,
+      ...(named && (named.flipDeg !== 0 || boardOnly || still) ? { flipTarget: named.flipDeg * Math.PI / 180, flipSec: trickSeconds(named) } : {}),
       // a body spin (fs 360, bs 180, the 540 indy) is caught at the table's angle — frontside one way, backside the other
       ...(named && named.spinDeg !== 0 && !boardOnly ? { spinTarget: (named.id.startsWith('bs') ? -1 : 1) * named.spinDeg * Math.PI / 180, spinSec: trickSeconds(named) } : {}),
+      ...(unnamedSpin ? { spinTarget: (id.startsWith('bs') ? -1 : 1) * Math.PI * 2, spinSec: UNNAMED_SPIN_SEC } : {}),
     });
+    // SK-1: a grab is a link of this air's chain from the moment it is thrown, paid its named points at the landing — and so
+    // is a spin thrown with a grab (the 540), which AirControl holds as a grab and never put in the chain either
+    if (family === 'grab' && air.state.airborne) grabs.thrown(air.state.chain, { id, label, basePts, difficulty });
     if (named) trickLayer?.start(named);
     ctx.setHud({ banner: label });
     setTimeout(() => ctx.setHud({ banner: '' }), 500);
     SoundKit.play('whoosh', { pitch: 1 + difficulty * 0.15, volume: 0.4 });
   };
+  /**
+   * SKATE-SCORE (SK-1): a grab let go — by its release, the rail, the wall or the touchdown — adds what the hold earned to
+   * its link in the air's chain, and the landing grades it with the rest of the air. It used to be paid on the spot as a
+   * nameless 'GRAB' worth only the hold (40 a second), which the landing then called "clean (0 tricks)" and the card never
+   * counted. One door for all six places a grab ends.
+   */
+  function letGoGrab(): void {
+    if (!air.state.grabHeld) return;
+    trickLayer?.release();
+    grabs.letGo(air.state.chain, air.releaseGrab());
+  }
 
   // ── A+ P0 juice — Skate attention. No hang slowMo, no juice.impact({slow}), no HoopJuice. ────────────────────────
   /** A clean landing: a soft shake (the light feel hit stays), a short white-gold flash only when the chain was long. */
@@ -463,25 +523,22 @@ export const SkateRunMode: ModeDefinition = (() => {
     for (const it of intents) bodyVerb(ctx, it);
   }
   function bodyVerb(ctx: ModeContext, it: RideIntent): void {
-    const air01 = Math.max(0.25, AIR_BUDGET_SEC - air.state.airtime);
+    const a = airNow();   // SK-2: this air, measured
     if (it.kind === 'grab') {
       // the hand and the edge name it (rear·toe INDY, lead·heel MELON, lead·toe JAPAN when the air holds it); any other the plain GRAB
-      const named = grabTrickFor('skate', it.hand, it.edge, air01);
+      const named = grabTrickFor('skate', it.hand, it.edge, a.budget);
       if (named) airTrick(ctx, named.id, named.label, 'grab', trickPts(named), Math.max(1, Math.round(named.difficulty)));
       else airTrick(ctx, 'grab', TRICKS.grab.name, 'grab', TRICKS.grab.pts, 1);
       bodyStats.grabs++; bodyStats.last = named?.label ?? TRICKS.grab.name;
       console.info(`[SKATE-BODY] grab ${it.hand}/${it.edge ?? '-'} → ${bodyStats.last}`);
     } else if (it.kind === 'grabEnd') {
-      if (air.state.grabHeld) {
-        trickLayer?.release();
-        const pts = air.releaseGrab();
-        if (pts > 0) combo.add('GRAB', pts, 'air');
-      }
+      letGoGrab();
     } else if (it.kind === 'spin') {
       // the biggest spin that way the air left can finish (backside: the 540 or BS 180; frontside: FS 360 or nothing) —
       // the game's caught spin turns it the rest of the way
-      const t = spinTrickFor('skate', it.dir, air01);
-      if (!t) { console.info(`[SKATE-BODY] ${it.dir} quarter, no spin fits ${air01.toFixed(2)} s of air`); return; }
+      const t = fitToAir((b) => spinTrickFor('skate', it.dir, b), a.budget, a.left);
+      // SKATE-SCORE: a turn the air cannot finish is answered, not dropped in silence (the pad's press gets the same words)
+      if (!t) { refuse(ctx, 'NOT ENOUGH AIR'); console.info(`[SKATE-BODY] ${it.dir} quarter, no spin fits ${a.left.toFixed(2)} s of air left`); return; }
       airTrick(ctx, t.id, t.label, t.grab !== 'none' ? 'grab' : 'spin', trickPts(t), Math.max(1, Math.round(t.difficulty)));
       bodyStats.spins++; bodyStats.last = t.label;
       console.info(`[SKATE-BODY] ${it.dir} quarter → ${t.label}`);
@@ -620,11 +677,12 @@ export const SkateRunMode: ModeDefinition = (() => {
       grindCh = null; manualCh = null; save = null;
       stickFromBody = false; leftGroundAt = -1; poppedAt = -1; wasGrounded = true; bodySynced = false; rideIntents.reset(); kickPush.reset();   // MOVEMENT PLAY P8
       Object.assign(bodyStats, { grabs: 0, spins: 0, pushes: 0, latePops: 0, last: '' });
+      landed.reset(); grabs.reset(); popApex = 0; hudSwitch.reset();   // SKATE-SCORE: a remount starts the card and the HUD over
       // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
       // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
       SoundKit.startAmbient('wind');
       EffectsKit.ambient(ctx.scene, 'park');
-      coins = new CoinField(ctx.scene);
+      coins = new CoinField(ctx.scene, SKATE_COIN_LOOK);   // SK-6: gold you can read across the plaza, not olive dots
       coins.line(new Vector3(-16, 0.4, -16), new Vector3(16, 0.4, 16), 10);
       coins.line(new Vector3(16, 0.4, -16), new Vector3(-16, 0.4, 16), 10);
       coins.arc(new Vector3(-3, 1.2, -2), new Vector3(3, 1.2, -2), 2.4, 6);
@@ -632,7 +690,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
       // ...and an air arc over the bowl rim
       coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
-      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, hint: 'HOLD FORWARD to push · POP to ollie · B to MANUAL · GRIND the rails · hold RB / Shift to BOOST' });
+      ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, ...skateHudWords(false) });   // GC-13: the pad's words (rideHud), until a body plays
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -687,7 +745,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         const canPop = (rig.rider.grounded || coyote.ok) && !air.state.airborne;
         if (g && g.id === 'ollie' && canPop) {
           // `late` (SKATE-MAJOR): the Rider's own grounded guard used to swallow the press the coyote window accepted
-          rig.rider.jump(olliePower(), !rig.rider.grounded);
+          popOff(!rig.rider.grounded);   // SK-5: the launch this roll earns
           airEntryYaw = rig.char.root.rotation.y;
           air.launch();
           // MOVEMENT PLAY P8: the wheels left on a pop (the body coyote is for a lip) — and update must not stamp this take-off
@@ -704,11 +762,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           // the card. A flip is an AIR trick, and that rule is worth one line and a tick.
           refuse(ctx, `${g.label} — POP FIRST`);
         }
-        if (!flick.heldGrab && air.state.grabHeld) {
-          trickLayer?.release();
-          const pts = air.releaseGrab();
-          if (pts > 0) combo.add('GRAB', pts, 'air');
-        }
+        if (!flick.heldGrab && air.state.grabHeld) letGoGrab();
       }
       if (e.t === 'trigger' && e.side === 'R') {
         // the crouch is a real action with a real payoff (it scales the pop), and it used to be heard as nothing at all
@@ -743,7 +797,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         if (e.btn === 'A' && e.src === 'body' && !rig.rider.grounded && !wallRide && !lipStall) {
           const now = performance.now();
           if (now - leftGroundAt <= BODY_COYOTE_MS && poppedAt < leftGroundAt && !air.state.chain.length && !rig.rider.grinding) {
-            rig.rider.jump(olliePower(), true);
+            popOff(true);   // SK-5
             airEntryYaw = rig.char.root.rotation.y;
             air.launch();
             poppedAt = now; wasGrounded = false; popBeatT = POP_BEAT_SEC; apexDone = false; lastVy = rig.rider.vel.y;
@@ -758,7 +812,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           // the button — the keyboard's and the touch deck's only pop — did not, so the same late press off a ledge was
           // spent as a mid-air OLLIE trick with no height under it.
           if (rig.rider.grounded || (coyote.ok && !air.state.airborne)) {
-            rig.rider.jump(olliePower(), !rig.rider.grounded);
+            popOff(!rig.rider.grounded);   // SK-5
             airEntryYaw = rig.char.root.rotation.y;
             air.launch();
             poppedAt = performance.now(); wasGrounded = false;   // MOVEMENT PLAY P8 (not a roll-off: the body coyote's clock)
@@ -791,11 +845,11 @@ export const SkateRunMode: ModeDefinition = (() => {
           // graded as a bail the player did not cause. airTrickFor() asks for the hardest version this air can hold,
           // so the budget is the skill rather than a trap.
           const held = heldTrickDir(stickX, stickY);   // shared, so every board discipline reads a held stick alike
-          // AirControl tracks the airtime ALREADY SPENT, so what is left is the pop's budget minus that. No Rider API
-          // exposes a remaining-air figure, and inventing one would have been a silent `undefined`.
-          const air01 = Math.max(0.25, AIR_BUDGET_SEC - air.state.airtime);
+          // SKATE-SCORE (SK-2): the table picks by the whole of this air, and the pick must finish inside what is left (airNow)
+          // — it was a fixed 0.95 s budget minus the airtime, which no charged pop could raise, so Y never threw anything
+          const a = airNow();
           // air tricks only (ANIM-RESIDUAL): the whole-list search handed a mid-air press the NOSE MANUAL and the slides
-          const fits = airTrickFor('skate', held, e.btn as BoardTrick['btn'], air01);
+          const fits = fitToAir((b) => airTrickFor('skate', held, e.btn as BoardTrick['btn'], b), a.budget, a.left);
           if (fits) {
             airTrick(ctx, fits.id, fits.label, fits.grab !== 'none' ? 'grab' : fits.flipDeg !== 0 ? 'flip' : 'spin',
               trickPts(fits), Math.max(1, Math.round(fits.difficulty)));
@@ -803,15 +857,11 @@ export const SkateRunMode: ModeDefinition = (() => {
             // X is the GRAB hold in the air (its release banks it, below). Skate has no named X air, and the whole-list
             // search used to label the hold with a rail slide — "BOARDSLIDE" over open air. Name it what it is.
             airTrick(ctx, 'grab', TRICKS.grab.name, 'grab', TRICKS.grab.pts, 1);
-          }
+          } else if (!rig.rider.grinding && !wallRide && !lipStall) refuse(ctx, 'NOT ENOUGH AIR');   // SKATE-SCORE: a press the air cannot hold is answered, not dropped in silence
         }
       }
       // releasing GRAB banks the hold, exactly as the flick path does
-      if (e.t === 'button' && !e.pressed && e.btn === 'X' && air.state.grabHeld) {
-        trickLayer?.release();
-        const pts = air.releaseGrab();
-        if (pts > 0) combo.add('GRAB', pts, 'air');
-      }
+      if (e.t === 'button' && !e.pressed && e.btn === 'X' && air.state.grabHeld) letGoGrab();
     },
 
     update(ctx: ModeContext, dtRaw: number) {
@@ -841,7 +891,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // less per line since the repeat decay, so the par sits at 1500) — it ended 'RUN_COMPLETE' with no win before
         const won = finalScore >= SKATE_WIN_SCORE;
         console.info(`[SKATE-END] ${won ? 'win' : 'complete'} banked ${combo.banked} coins ${coins.collected} best ${combo.bestCombo}x`);
-        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: combo.links.length + landedTotal });
+        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total });   // SK-3: landed tricks only (the live pot's links were never landed)
       }
       const gained = coins.update(dt, rig.char.root.position);
       if (gained > 0) {
@@ -955,15 +1005,16 @@ export const SkateRunMode: ModeDefinition = (() => {
         air.land();
       } else if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15) {
         // touchdown: grade the landing
-        const res = resolveLanding(air, move.balance, {
-          error01: air.landingError01(), slopeMismatch01: 0, speed01: move.speed01,
-        });
+        // SKATE-SCORE (SK-2): graded to the nearest HALF turn — a 180 lands fakie (landsSwitch, below) with the board under
+        // the rider; AirControl's whole-turn measure called that the worst landing there is, and every finished 180 bailed
+        const error01 = skateLandingError01(air.state);
+        // a grab still held at touchdown (a B-grab has no release button of its own) is let go here, after the error has taxed
+        // a late hold (SKATE-MAJOR). SK-1: into the chain, so the grade pays it, names it and counts it with the rest
+        letGoGrab();
+        const res = resolveLanding(air, move.balance, { error01, slopeMismatch01: 0, speed01: move.speed01 });
         const chainPts = res.chain.reduce((sum, t) => sum + t.basePts, 0);
-        // a grab still held at touchdown (a B-grab has no release button of its own) is banked here, after the grade has
-        // taxed it — it used to stay "held" on the ground and its points were never paid (SKATE-MAJOR)
-        if (air.state.grabHeld) { trickLayer?.release(); const gp = air.releaseGrab(); if (gp > 0 && res.grade !== 'bail') combo.add('GRAB', gp, 'air'); }
         bailLatch = false;                       // A+ P0: a fresh touchdown gets one bail punch at most
-        landedTotal += res.chain.length;   // phase 10: the card reads how many tricks the run landed
+        landed.touchdown(res.grade, res.chain.length);   // phase 10 + SK-3: the card counts what LANDED, never a bail's chain
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');
@@ -1017,8 +1068,8 @@ export const SkateRunMode: ModeDefinition = (() => {
         // often as a read did. The side to lean is SAID, and it updates as the wobble crosses over.
         const lean: 'LEFT' | 'RIGHT' = save.wobble > 0 ? 'LEFT' : 'RIGHT';
         if (lean !== saveLean) { saveLean = lean; ctx.setHud({ saveDir: lean }); ctx.juice.callout(lean === 'LEFT' ? 'LEAN ◀' : 'LEAN ▶', '#fde047', 320); }
-        if (save.saved) { bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }
-        else if (save.failed) { console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
+        if (save.saved) { landed.saveResolved(true); console.info('[SKATE-LAND] save held'); bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // SK-3: a saved landing's tricks count now
+        else if (save.failed) { landed.saveResolved(false); console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail
@@ -1046,7 +1097,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         grindAskedAt = -1;
         // the rail takes the board: a grab still held from the air is banked and let go (SKATE-MAJOR — it used to ride the
         // whole grind with the deck hauled up to the hand and the free arm out straight)
-        if (air.state.grabHeld) { trickLayer?.release(); const gp = air.releaseGrab(); if (gp > 0) combo.add('GRAB', gp, 'air'); }
+        letGoGrab();   // SK-1: into the air's chain — paid when this line comes down clean
         grindCh = new BalanceChannel('grind', move.balance);
         grindCh.start(move.speed01);
         combo.add(line.bonus >= 260 ? 'TRANSFER GRIND' : 'GRIND', line.bonus, 'grind');
@@ -1156,14 +1207,18 @@ export const SkateRunMode: ModeDefinition = (() => {
       // ── the spectacle beats (H4) ──
       // The APEX of a real air: rising turns to falling, more than a third of a second up, and high enough off the deck
       // that it is a gap or a lip rather than a kerb hop. One per air, and never inside the cooldown.
+      // SKATE-SCORE (SK-5): BIG AIR IS AIR BIGGER THAN ITS POP. Measured off the take-off height, every flat ollie cleared the
+      // 1.15 m bar (the rolling pop is 1.5–3 m) — the eye logged "big air" on nearly every pop, a standstill hop's 2.2 m among
+      // them. At the apex one ray finds the ground actually under the rider, and the air has to beat its own pop's flat apex
+      // by BIG_AIR_OVER_POP_M: the ground fell away (a drop, a gap, off the top of a bank), or it was an ollie.
       if (!rig.rider.grounded && air.state.airborne) {
-        const height = rig.char.root.position.y - groundUnder();
-        if (!apexDone && lastVy > 0 && rig.rider.vel.y <= 0 && air.state.airtime > 0.32 && height > 1.15) {
+        if (!apexDone && lastVy > 0 && rig.rider.vel.y <= 0 && air.state.airtime > 0.32) {
           apexDone = true;
-          spectacle(ctx, `big air ${height.toFixed(1)}m`);
+          const height = rig.char.root.position.y - groundBelow(ctx);
+          if (isBigAir(height, popApex)) spectacle(ctx, `big air ${height.toFixed(1)}m`);
         }
         lastVy = rig.rider.vel.y;
-      } else { apexDone = false; lastVy = 0; }
+      } else { apexDone = false; lastVy = 0; if (rig.rider.grounded) popApex = 0; }
       if (popBeatT > 0) { popBeatT -= dt; if (popBeatT <= 0) animTree.clearBeat('ollie'); }
 
       // ── animation tree ──
@@ -1285,6 +1340,14 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
       if (!touchedWall) fenceHit = false;
       ctx.setHud({ time: Math.ceil(timeLeft) });
+      // SKATE-SCORE (GC-13): the HUD says the words of whoever is riding — a body the camera sees, or a pad / the keys / touch —
+      // and the player ring's puck (a gamepad for most players) is off while a body plays; the ring itself (the boost tank)
+      // stays. Once per switch, and the puck re-asserted once a second while a body plays (the harness may mount it late).
+      {
+        const sw = hudSwitch.next(!!(ctx.body?.() ?? null));
+        if (sw !== null) { ctx.setHud({ ...skateHudWords(sw) }); setRingGlyph(ctx.scene.meshes, !sw); }
+        else if (hudSwitch.isBody && hudSwitch.glyphDue(dtRaw)) setRingGlyph(ctx.scene.meshes, false);
+      }
       // Snap once more on the first PLAYED frame. The load-time snapTo is
       // correct when it runs and stale by the time it matters: between load and
       // play the rider drops onto the park and starts rolling down it, so the
