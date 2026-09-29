@@ -1,7 +1,7 @@
 // MIRROR-COACH P5 (2026-09-29): app/api/health/pain's routes, run for real over a fake Prisma client — the same
 // vi.mock pattern lib/coach/today-route.test.ts uses to test a route file vitest cannot otherwise collect (app/ is
 // out of vitest's include list; only the session and the database are stand-ins here).
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface Row {
   id: string;
@@ -105,6 +105,10 @@ async function post(body: unknown) {
 }
 
 beforeEach(() => {
+  // Pinned clock: the fixtures sit 20 h before "now" and the route keys days in UTC, so after 20:00 UTC a real clock
+  // put "yesterday" on today (CI red at 22:29 UTC on 3fe481af). At 15:00 UTC every -20 h fixture is the previous day.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-29T15:00:00Z'));
   h.user = 'client-1';
   h.rows = [];
   h.intakes = [];
@@ -114,6 +118,7 @@ beforeEach(() => {
   h.healthConsents = [{ userId: 'client-1', scope: 'health_data', coachId: null, grantedAt: new Date('2026-09-01'), revokedAt: null }];
   h.nextId = 1;
 });
+afterEach(() => { vi.useRealTimers(); });
 
 describe('GET /api/health/pain', () => {
   it('401s with no session', async () => {
