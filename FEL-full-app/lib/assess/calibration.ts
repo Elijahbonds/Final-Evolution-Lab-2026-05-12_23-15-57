@@ -90,7 +90,8 @@ function sway(frames: readonly PoseFrame[], aspect: number, bodyHeight: number):
 function enough(all: readonly PoseFrame[], good: readonly PoseFrame[], ms: number): boolean {
   if (all.length < 2) return false;
   const span = all[all.length - 1].t - all[0].t;
-  return span >= ms * 0.9 && good.length >= Math.max(5, all.length * 0.6);
+  const a = th('calib.accept');
+  return span >= ms * a.spanShare && good.length >= Math.max(a.minFrames, all.length * a.frameShare);
 }
 
 /**
@@ -106,7 +107,7 @@ export function calibrateFront(frames: readonly PoseFrame[], aspect: number, ms 
   const footFloorY = perSide((s) => median(good.map((f) => footLowY(f.image, s))));
   const floorY = Math.max(footFloorY.left, footFloorY.right);
   const bodyHeight = floorY - median(good.map((f) => f.image[NOSE].y));
-  if (!(bodyHeight > 0.2)) return { ok: false, why: 'Step back so your whole body, head to feet, is in the shot.' };
+  if (!(bodyHeight > th('calib.accept').minBodyHeight)) return { ok: false, why: 'Step back so your whole body, head to feet, is in the shot.' };
   if (sway(good, aspect, bodyHeight) > maxSway) return { ok: false, why: 'Hold still for a moment, arms by your sides.' };
   const hipY = median(good.map((f) => hipMidY(f.image)));
   return {
@@ -138,7 +139,7 @@ export function calibrateSide(frames: readonly PoseFrame[], aspect: number, ms =
   const facing: 1 | -1 = faces.filter((x) => x > 0).length >= faces.length / 2 ? 1 : -1;
   const floorY = median(good.map((f) => Math.max(footLowY(f.image, 'left'), footLowY(f.image, 'right'))));
   const bodyHeight = floorY - median(good.map((f) => f.image[NOSE].y));
-  if (!(bodyHeight > 0.2)) return { ok: false, why: 'Step back so your whole body, head to feet, is in the shot.' };
+  if (!(bodyHeight > th('calib.accept').minBodyHeight)) return { ok: false, why: 'Step back so your whole body, head to feet, is in the shot.' };
   if (sway(good, aspect, bodyHeight) > th('calib.maxSway')) return { ok: false, why: 'Hold still for a moment.' };
   const nears = good.map((f) => nearSide(f.image));
   return {

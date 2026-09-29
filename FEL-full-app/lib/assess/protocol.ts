@@ -6,7 +6,7 @@
 // later" rather than a grader that does not exist.
 //
 // Pure data.
-import { PROTOCOL_VERSION } from './thresholds';
+import { PROTOCOL_VERSION, th } from './thresholds';
 
 export type TestId = 'T1' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7';
 export type AssessMode = 'quick' | 'full';
@@ -32,21 +32,26 @@ export interface ProtocolTest {
   specSection: string;
 }
 
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+/** "three", for a setup line that says how many reps (the count is the register's, so the words follow it). */
+export const countWord = (n: number): string => WORDS[n] ?? String(n);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 export const PROTOCOL: readonly ProtocolTest[] = [
   {
-    id: 'T1', name: 'Overhead squat', short: 'Overhead squat', view: 'front+side', sided: false, reps: 3,
+    id: 'T1', name: 'Overhead squat', short: 'Overhead squat', view: 'front+side', sided: false, reps: th('t1.reps'),
     modes: ['quick', 'full'], notBuilt: false, specSection: '§4 T1',
-    setup: 'Feet about shoulder-width, arms straight overhead. Squat as deep as you can, three times, at your own pace.',
+    setup: `Feet about shoulder-width, arms straight overhead. Squat as deep as you can, ${countWord(th('t1.reps'))} times, at your own pace.`,
   },
   {
-    id: 'T2', name: 'Ankle dorsiflexion (knee to wall)', short: 'Ankle range', view: 'side', sided: true, reps: 3,
+    id: 'T2', name: 'Ankle dorsiflexion (knee to wall)', short: 'Ankle range', view: 'side', sided: true, reps: th('t2.reps'),
     modes: ['quick', 'full'], notBuilt: false, specSection: '§4 T2',
-    setup: 'Step one foot forward, heel flat. Drive that knee forward as far as it goes with the heel down, then back. Three times.',
+    setup: `Step one foot forward, heel flat. Drive that knee forward as far as it goes with the heel down, then back. ${cap(countWord(th('t2.reps')))} times.`,
   },
   {
-    id: 'T3', name: 'Single-leg squat', short: 'Single-leg squat', view: 'front', sided: true, reps: 5,
+    id: 'T3', name: 'Single-leg squat', short: 'Single-leg squat', view: 'front', sided: true, reps: th('t3.reps'),
     modes: ['quick', 'full'], notBuilt: false, specSection: '§4 T3',
-    setup: 'Stand on one leg, the other foot just off the floor, hands on your hips. Squat down about a third of the way, five times.',
+    setup: `Stand on one leg, the other foot just off the floor, hands on your hips. Squat down about a third of the way, ${countWord(th('t3.reps'))} times.`,
   },
   {
     id: 'T4', name: 'Hip hinge', short: 'Hip hinge', view: 'side', sided: false, reps: 5,
@@ -54,10 +59,10 @@ export const PROTOCOL: readonly ProtocolTest[] = [
     setup: 'Hinge at the hips, soft knees, five times.',
   },
   {
-    id: 'T5', name: 'Countermovement jump', short: 'Jump', view: 'front', sided: false, reps: 3,
+    id: 'T5', name: 'Countermovement jump', short: 'Jump', view: 'front', sided: false, reps: th('t5.reps'),
     modes: ['quick', 'full'], notBuilt: false, specSection: '§4 T5',
     // OWNER DEFAULT Q3: hands on hips, the standard; the arm-swing variant is not built
-    setup: 'Hands on your hips the whole time. Dip and jump as high as you can, land, and stand still. Three jumps.',
+    setup: `Hands on your hips the whole time. Dip and jump as high as you can, land, and stand still. ${cap(countWord(th('t5.reps')))} jumps.`,
   },
   {
     id: 'T6', name: 'Drop landing → drop jump', short: 'Drop landing', view: 'front', sided: false, reps: 3,

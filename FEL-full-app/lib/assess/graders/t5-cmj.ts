@@ -32,7 +32,7 @@ export const T5_THRESHOLDS: ThresholdId[] = [
   'gate.minConfidence', 'gate.visibility', 'gate.visibilityScoring', 'gate.minValidReps', 'gate.minPoseHz', 'gate.jumpFps',
   'geom.lensHfovDeg', 't5.contactLine', 't5.airLine', 't5.flightMinMs', 't5.flightMaxMs', 't5.maxHeightCm',
   't5.landingWindowMs', 't5.landingFlex', 't5.landingValgus', 't5.landingSymMs', 't5.cvPct', 't5.weights',
-  't5.armSwingWrist', 't5.nominalHeightM', 'score.meanWorst', 'score.bands03', 'prq.verticalJump',
+  't5.armSwingWrist', 't5.nominalHeightM', 't5.flightDetect', 't5.reps', 'score.meanWorst', 'score.bands03', 'prq.verticalJump',
 ];
 
 const FEET = [27, 28, 29, 30, 31, 32];
@@ -68,30 +68,33 @@ function edgeAt(pts: readonly { t: number; h: number }[], lo: number, hi: number
   return Number.isFinite(t0) ? Math.max(lo, Math.min(hi, t0)) : mid;
 }
 
+/** The flight finder's numbers, all in the register (lib/screen/PROPOSED-thresholds.ts 't5.flightDetect'). */
+const FD = th('t5.flightDetect');
+
 /**
  * A foot moving slower than this (body heights per second, over PLANTED_MS) is planted: it is where the floor is. Read
  * over a fixed time rather than one frame, so a 60 fps stream is not twice as quick to call a slow foot planted (a foot
  * slowing at the top of a jump read as planted at 60 fps and landed the jump in the air), and one frame's jitter is
  * not a step.
  */
-const PLANTED = 0.45;
-const PLANTED_MS = 66;
+const PLANTED = FD.plantedSpeed;
+const PLANTED_MS = FD.plantedMs;
 /** Planted frames the floor is read from, at most, next to an edge. */
-const FLOOR_FRAMES = 12;
+const FLOOR_FRAMES = FD.floorFrames;
 /**
  * The edge line is fitted through the airborne frames within this long of the edge (at least two): the early rise, the
  * late fall. By time, not by count: three frames at 30 fps span a stretch of the flight curved enough to pull the line
  * (a clean flight read 13 ms long), while at 60 fps three frames are what jitter needs.
  */
-const EDGE_SPAN_MS = 50;
+const EDGE_SPAN_MS = FD.edgeSpanMs;
 /** …and only while the foot is this low (body heights): higher, the legs are tucking and the line bends. */
-const EDGE_TOP = 0.15;
+const EDGE_TOP = FD.edgeTop;
 /**
  * How far past the frame gap an edge may be placed (ms): one 60 fps frame. Under jitter the last planted frame can read
  * just over the contact line, which put the gap after the true take-off; measured on the synthetic CMJ at 60 fps, a
  * clamp to the gap alone read every flight short (−1.7 cm mean). A whole frame of slack at 30 fps over-read (+1.7 cm).
  */
-const EDGE_SLACK_MS = 17;
+const EDGE_SLACK_MS = FD.edgeSlackMs;
 
 /** A flight: take-off and landing, or a reason it is not one. */
 export type FlightCheck = { ok: true } | { ok: false; why: string };
@@ -125,26 +128,26 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
     if (!Number.isFinite(low[s][i])) return false;
     let j = i - 1;
     while (j > 0 && t(i) - t(j) < PLANTED_MS) j--;
-    if (j < 0 || !Number.isFinite(low[s][j]) || t(i) - t(j) < PLANTED_MS * 0.5) return false;
+    if (j < 0 || !Number.isFinite(low[s][j]) || t(i) - t(j) < PLANTED_MS * FD.plantedMinShare) return false;
     return Math.abs(low[s][i] - low[s][j]) / bh / ((t(i) - t(j)) / 1000) < PLANTED;
   };
   const plantedBoth = (i: number) => planted('left', i) && planted('right', i);
   /** The level of the planted run nearest frame i in direction dir (one level: it ends where the foot moves on). */
   const runNear = (s: 'left' | 'right', i: number, dir: -1 | 1): number => {
     let k = i;
-    while (k >= 0 && k < n && Math.abs(t(k) - t(i)) < 3000 && !planted(s, k)) k += dir;
+    while (k >= 0 && k < n && Math.abs(t(k) - t(i)) < FD.searchMs && !planted(s, k)) k += dir;
     const ys: number[] = [];
     let gap = 0;
     for (; k >= 0 && k < n && ys.length < FLOOR_FRAMES; k += dir) {
-      if (planted(s, k) && (!ys.length || Math.abs(low[s][k] - ys[0]) / bh < 0.03)) { ys.push(low[s][k]); gap = 0; }
+      if (planted(s, k) && (!ys.length || Math.abs(low[s][k] - ys[0]) / bh < FD.runLevel)) { ys.push(low[s][k]); gap = 0; }
       else if (++gap > 1) break;                                   // one jittered frame does not end the run
     }
-    if (ys.length >= 3) { ys.sort((a, b) => a - b); return ys[ys.length >> 1]; }
+    if (ys.length >= FD.minRunFrames) { ys.sort((a, b) => a - b); return ys[ys.length >> 1]; }
     // no run to read (a heel peeling off slowly before a rebound): the foot's low line over the last 0.8 s instead,
     // the median of its three lowest reads so one jittered frame is not the floor; the calibration's line last of all
     const near: number[] = [];
-    for (let q = i; q >= 0 && q < n && Math.abs(t(q) - t(i)) <= 800; q += dir) if (Number.isFinite(low[s][q])) near.push(low[s][q]);
-    if (near.length < 3) return front.footFloorY[s];
+    for (let q = i; q >= 0 && q < n && Math.abs(t(q) - t(i)) <= FD.lookbackMs; q += dir) if (Number.isFinite(low[s][q])) near.push(low[s][q]);
+    if (near.length < FD.minRunFrames) return front.footFloorY[s];
     near.sort((a, b) => b - a);
     return near[1];
   };
@@ -160,8 +163,8 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
     if (!(both(i, pre) > air)) { i++; continue; }
     // stepped to a new spot: the feet settle again within ~0.1 s, still low — a new floor, not a flight
     let k = i, still = 0;
-    while (k < n && t(k) - t(i) <= 130 && still < 3) { still = plantedBoth(k) ? still + 1 : 0; k++; }
-    if (still >= 3 && both(k - 1, pre) < 3 * air) { i = k; continue; }
+    while (k < n && t(k) - t(i) <= FD.settleMs && still < FD.settleFrames) { still = plantedBoth(k) ? still + 1 : 0; k++; }
+    if (still >= FD.settleFrames && both(k - 1, pre) < FD.settleRise * air) { i = k; continue; }
     // the last frame down before it, against the floor the feet left from
     let b = i - 1;
     while (b >= 0 && !(both(b, pre) <= contact)) b--;
@@ -175,13 +178,13 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
     }
     // the edge may sit a little before the last frame read as down: under jitter a planted foot reads a little up
     const takeoffT = edgeAt(rise, t(b) - EDGE_SLACK_MS, t(b + 1));
-    const limit = takeoffT + th('t5.flightMaxMs') + 1500;
+    const limit = takeoffT + th('t5.flightMaxMs') + FD.limitSlackMs;
     // the apex, then the first planted run after the feet have come down from it: the landing floor
     let apex = i, r = -1;
     for (let q = i; q < n && t(q) <= limit; q++) {
       const h = both(q, pre);
       if (Number.isFinite(h) && h > both(apex, pre)) apex = q;
-      if (q > apex && Number.isFinite(h) && h < both(apex, pre) - 0.05 && plantedBoth(q) && plantedBoth(q + 1 < n ? q + 1 : q)) { r = q; break; }
+      if (q > apex && Number.isFinite(h) && h < both(apex, pre) - FD.apexDrop && plantedBoth(q) && plantedBoth(q + 1 < n ? q + 1 : q)) { r = q; break; }
     }
     const post = r >= 0 ? floorAt(r, 1) : pre;
     let d = apex;
@@ -210,7 +213,7 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
     // the feet have to rise as far as the air time says, against either floor (loose: half, and a nominal height)
     const T = (landT - takeoffT) / 1000;
     const risen = Math.min(both(apex, pre), both(apex, post)) * heightM;
-    const check: FlightCheck = !landed || T <= 0 || risen >= 0.5 * (9.81 * T * T) / 8 ? { ok: true }
+    const check: FlightCheck = !landed || T <= 0 || risen >= FD.riseShare * (G * T * T) / 8 ? { ok: true }
       : { ok: false, why: 'your feet did not rise as far as that air time needs, so the camera lost them' };
     flights.push({ takeoffT, landT, footDownT: { left: footDown('left'), right: footDown('right') }, takeoffIdx: b, landIdx: last, airIdx, landed, check });
     i = landed ? d + 1 : n;

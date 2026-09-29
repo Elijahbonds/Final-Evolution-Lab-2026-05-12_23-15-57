@@ -21,7 +21,7 @@ describe('the jump-screen protocol', () => {
   it('views and sides are the spec\'s', () => {
     expect(testDef('T1')).toMatchObject({ view: 'front+side', sided: false, reps: 3 });
     expect(testDef('T2')).toMatchObject({ view: 'side', sided: true });
-    expect(testDef('T3')).toMatchObject({ view: 'front', sided: true, reps: 5 });
+    expect(testDef('T3')).toMatchObject({ view: 'front', sided: true, reps: 3 });   // SCREEN-SHIP A2-2: three reps per check (was 5)
     expect(testDef('T5')).toMatchObject({ view: 'front', sided: false, reps: 3 });
     expect(testDef('T7').sided).toBe(true);
   });

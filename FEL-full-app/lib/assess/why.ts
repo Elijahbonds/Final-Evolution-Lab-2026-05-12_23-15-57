@@ -16,15 +16,11 @@
 // Pure.
 import type { Side, TestId } from './protocol';
 import { sideLabel } from './protocol';
-import { bandOf } from './thresholds';
+import { bandOf, th } from './thresholds';
+import { PLACEHOLDER_TAG, PR20_DRILLS, type DrillHint } from '@/lib/screen/PROPOSED-thresholds';
 import type { MetricResult, TestResult } from './scoring';
 
-export interface DrillHint {
-  /** What the screen shows: always tagged. */
-  label: string;
-  drill: string;
-  placeholder: true;
-}
+export type { DrillHint };
 
 export type ReasonKind = 'fault' | 'note' | 'clean' | 'link' | 'status';
 
@@ -47,21 +43,10 @@ export interface WhyContext {
   takeoffLeg?: Side | null;
 }
 
-export const PLACEHOLDER_TAG = '[PLACEHOLDER DRILL]';
-const drill = (name: string): DrillHint => ({ label: `${PLACEHOLDER_TAG} ${name}`, drill: name, placeholder: true });
+export { PLACEHOLDER_TAG };
 
-/** The §7.2 draft library, by finding. Names only, no doses: every one a placeholder until Elijah approves them. */
-export const DRILLS = {
-  ankle: [drill('Knee-to-wall rocks'), drill('Slant-board calf raises')],
-  arms: [drill('Wall slides with exhale'), drill('Half-kneeling thoracic rotation')],
-  squatPattern: [drill('Goblet squat hold'), drill('Heel-elevated tempo squat')],
-  knee: [drill('Banded lateral walks'), drill('Step-down from a low box')],
-  pelvis: [drill('Single-leg RDL to target'), drill('Side plank')],
-  balance: [drill('Single-leg stance with reach')],
-  landing: [drill('Snap-downs'), drill('Box drop-to-stick')],
-  landingSides: [drill('Single-leg hop-to-stick')],
-  shift: [drill('Split squat, slow tempo')],
-} as const;
+/** The §7.2 draft library, by finding (lib/screen/PROPOSED-thresholds.ts PR20_DRILLS): names only, all placeholders. */
+export const DRILLS = PR20_DRILLS;
 
 /** Said when pain stops the screen. Nothing is scored or saved after it. */
 export const PAIN_REFERRAL =
@@ -217,7 +202,7 @@ export function metricReason(m: MetricResult, testId: TestId, ctx: WhyContext = 
   }
   const side = sideText(m.side, ctx);
   const measured = `${tpl.said(m, side)}${repText(m, testId === 'T5' ? 'jump' : 'rep')} ${tpl.target ?? targetText(m, tpl.f)}.`;
-  const low = m.fault || (m.score !== null && m.score < 80);
+  const low = m.fault || (m.score !== null && m.score < th('score.bands03').three);
   const effect = m.fault
     ? ` A fault here caps ${TEST_NAME[testId]} at 2/3.`
     : m.score !== null && m.weight > 0 ? ` ${m.score}/100 on this check.` : '';
@@ -243,7 +228,7 @@ export function reasonsFor(test: TestResult & { t2?: { rejected: { side: Side; r
     const pct = Math.round(test.confidence * 100);
     return [{
       testId: id, kind: 'status', numbers: [pct],
-      text: `${TEST_NAME[id]}: not scored. The camera read ${pct}% of it clearly and needs 60%. Step back so your whole body stays in the shot, and try it again.`,
+      text: `${TEST_NAME[id]}: not scored. The camera read ${pct}% of it clearly and needs ${Math.round(th('gate.minConfidence') * 100)}%. Step back so your whole body stays in the shot, and try it again.`,
     }];
   }
   const out: Reason[] = [];
@@ -255,7 +240,7 @@ export function reasonsFor(test: TestResult & { t2?: { rejected: { side: Side; r
       out.push({
         testId: id, kind: 'note', rep: x.bestJump ?? undefined,
         numbers: [inches(x.bestHeightCm), r1(x.bestHeightCm), r2(x.bestFlightMs / 1000), r0(x.poseFps)],
-        text: `Jump ${inches(x.bestHeightCm)} in (${r1(x.bestHeightCm)} cm), best of ${x.jumps.filter((j) => j.valid).length}: estimated from a ${r2(x.bestFlightMs / 1000)} s flight at ${r0(x.poseFps)} fps${pm}.${x.fpsLow ? ' Under 50 fps each end of the flight can be a frame out, so read it as a range.' : ''}`,
+        text: `Jump ${inches(x.bestHeightCm)} in (${r1(x.bestHeightCm)} cm), best of ${x.jumps.filter((j) => j.valid).length}: estimated from a ${r2(x.bestFlightMs / 1000)} s flight at ${r0(x.poseFps)} fps${pm}.${x.fpsLow ? ` Under ${th('gate.jumpFps')} fps each end of the flight can be a frame out, so read it as a range.` : ''}`,
       });
     }
     for (const j of x.jumps.filter((q) => !q.valid)) {
@@ -277,7 +262,7 @@ export function reasonsFor(test: TestResult & { t2?: { rejected: { side: Side; r
       out.push({
         testId: id, kind: 'note', numbers: [s.repsValid],
         ...(key !== 'both' ? { side: key } : {}),
-        text: `${key !== 'both' ? `${sideText(key, ctx)}: ` : ''}${s.repsValid} valid rep${s.repsValid === 1 ? '' : 's'}${views}, fewer than the three the score needs, so it is capped at 1/3.`,
+        text: `${key !== 'both' ? `${sideText(key, ctx)}: ` : ''}${s.repsValid} valid rep${s.repsValid === 1 ? '' : 's'}${views}, fewer than the ${th('gate.minValidReps')} the score needs, so it is capped at 1/3.`,
       });
     }
   }

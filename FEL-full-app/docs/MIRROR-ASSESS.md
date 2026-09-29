@@ -5,8 +5,25 @@ each one 0–3 and 0–100 per side with the measured reasons behind every score
 Score (MQS) that sits **beside** PRQ, and writes PRQ **power** and **flexibility** as camera estimates.
 
 Source spec: `FEL-MIRROR-REALTIME-SPEC.md` ("FEL Mirror: Real-Time Movement Assessment, Spec v1"). Built by the
-mirror-realtime lane from Elijah's defaults for the spec's open questions (below). **Every threshold is provisional**:
+mirror-realtime lane from Elijah's defaults for the spec's open questions (below). **Every threshold is PROPOSED, not
+final, pending Elijah**: they all live in [`lib/screen/PROPOSED-thresholds.ts`](../lib/screen/PROPOSED-thresholds.ts);
 see [MIRROR-ASSESS-THRESHOLDS.md](MIRROR-ASSESS-THRESHOLDS.md), the sign-off sheet.
+
+## SCREEN-SHIP (2026-09-29): the Quick Screen as it ships
+
+- **One QR address: `/screen`** → a temporary (307) redirect to `/play/mirror/assess`, query string kept, no sign-in.
+- **Portrait first, one step per screen, system font**: start → age → a parent's consent (under 18, or no age given) →
+  "Does anything hurt right now?" (yes ends it: no camera) → camera → each check (framing outline, 3-2-1, three rep dots,
+  a "Done" beat; "Step back into the light" when tracking is lost) → results.
+- **Results in words**: Green "Good to go" / Yellow "Worth working on" / Red "Priority to work on", an icon, a word and
+  a colour per check; the top 1–2 priorities with one drill cue each (PROPOSED) and a demo slot; the jump as a personal
+  best (never banded); "Build my Dunk Program" (→ `/screen/program/<lane>`), Brain Brawl, "Screenshot this to keep your
+  results.", "Done, clear my results". Lanes: `lib/screen/PROPOSED-program-lanes.ts`.
+- **Nothing is saved to the server in this ship.** The screen never calls `POST /api/mirror/assessment` (the route is
+  unchanged, unwired). Results live in the page's memory and this tab's sessionStorage, written only after the age
+  answer (and a parent's consent under 18); never localStorage. A new screen wipes the last one first.
+- The MQS, PRQ preview and per-metric reasons below are still computed, but the Quick Screen's results no longer show
+  them (they carry per-rep numbers, which never leave memory).
 
 ## What it runs
 
@@ -111,13 +128,17 @@ and nothing is saved.
 
 ## Files
 
-`lib/assess/`: `thresholds.ts` (the register), `protocol.ts` (T1–T7), `geometry.ts`, `calibration.ts`, `reps.ts`,
+`lib/screen/`: `PROPOSED-thresholds.ts` (THE register: every threshold, band, weight and drill cue), `PROPOSED-program-lanes.ts`,
+`checks.ts` (bands, priorities, lane, clean rule), `store.ts` (sessionStorage + the consent gate), `flow.ts` (the steps
+before the camera), `config.ts`, `copy.ts`, `ui.ts`, with tests. `app/screen/` (the `/screen` redirect and
+`/screen/program/[lane]`), `app/play/mirror/assess/results/`.
+`lib/assess/`: `thresholds.ts` (a re-export of the PROPOSED register), `protocol.ts` (T1–T7), `geometry.ts`, `calibration.ts`, `reps.ts`,
 `scoring.ts`, `graders/t1-overhead-squat.ts`, `t2-dorsiflexion.ts`, `t3-single-leg-squat.ts`, `t5-cmj.ts`, `why.ts`,
 `prqWrite.ts`, `runner.ts` (the live flow + `gradeSession`), `replay.ts` (synthetic captures + replay), a test beside each,
 and `assessment-route.test.ts` (the API run for real). `app/play/mirror/assess/` (page + `_components`),
 `app/api/mirror/assessment/route.ts`.
 
-Run the lane's tests: `npx vitest run lib/assess lib/profile/scanToSnapshot.test.ts`.
+Run the lane's tests: `npx vitest run lib/assess lib/screen components/providers.test.tsx lib/profile/scanToSnapshot.test.ts`.
 
 ## QA without a camera
 

@@ -22,13 +22,13 @@ describe('T2 knee-to-wall dorsiflexion', () => {
   });
 
   it('a restricted ankle faults on its own side, and the gap is an asymmetry flag', () => {
-    const r = grade({ tibiaMax: 44 }, { tibiaMax: 33 });
+    const r = grade({ tibiaMax: 44 }, { tibiaMax: 26 });   // SCREEN-SHIP: Red is under 30° now (was a fault under 35°)
     expect(r.sides.right!.metrics[0].fault).toBe(true);
     expect(r.sides.left!.metrics[0].fault).toBe(false);
     expect(r.score03).toBe(1);                        // the worse side
     expect(r.asymmetry).toMatchObject({ flagged: true, weaker: 'right' });
-    expect(r.asymmetry!.metric!.value).toBeCloseTo(11, 0);
-    expect(r.t2.lrDiffDeg).toBeCloseTo(11, 0);
+    expect(r.asymmetry!.metric!.value).toBeCloseTo(18, 0);
+    expect(r.t2.lrDiffDeg).toBeCloseTo(18, 0);
     expect(r.frozen.map((f) => `${f.metric}:${f.side}`)).toEqual(['tibia:right']);
   });
 

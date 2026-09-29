@@ -2,18 +2,25 @@
 
 // What the athlete sees across the room while a test runs (spec §8): the big rep counter, the side, the countdown, one
 // instruction, the prompts, and a stop button that is always there. Plain DOM over the canvas, so no text is mirrored.
+//
+// SCREEN-SHIP (Squad gate 2): a framing outline until framed, then a big 3-2-1, then the check with three rep dots that
+// fill only on COUNTED reps (A2-2), then a clear "Done" beat; lost tracking shows "Step back into the light" and
+// pauses. No score is shown mid-screen.
+import { Check } from 'lucide-react';
 import type { RunnerView } from '@/lib/assess/runner';
 import { testDef, type Side } from '@/lib/assess/protocol';
 import type { FramingIssue } from '@/lib/mirror/framing';
+import { repDots } from '@/lib/screen/ui';
+import { TRACKING_LOSS_PROMPT } from '@/lib/screen/copy';
 
 const CHIP: Record<FramingIssue, string> = {
   noBody: 'Step into the shot', cutOffBottom: 'Feet in the shot', cutOffTop: 'Head in the shot', tooClose: 'Step back',
   tooFar: 'Come closer', offCentre: 'Move to the middle', turned: 'Turn the way asked', dim: 'More light',
 };
-const MARK = { clean: 'bg-[#00FF9D]', fault: 'bg-[#FFB020]', notRead: 'bg-white/30' } as const;
+const DOT = { clean: 'bg-[#00FF9D]', fault: 'bg-[#FFB020]', empty: 'border border-white/50 bg-transparent' } as const;
 
-export function LiveHud({ view, caption, onPain, onTakeoff, onStop }: {
-  view: RunnerView; caption: string; onPain: (pain: boolean) => void; onTakeoff: (s: Side) => void; onStop: () => void;
+export function LiveHud({ view, onPain, onTakeoff, onStop }: {
+  view: RunnerView; onPain: (pain: boolean) => void; onTakeoff: (s: Side) => void; onStop: () => void;
 }) {
   const v = view;
   const inTest = v.step === 'position' || v.step === 'countdown' || v.step === 'active' || v.step === 'paused' || v.step === 'calibrateSide';
@@ -23,18 +30,14 @@ export function LiveHud({ view, caption, onPain, onTakeoff, onStop }: {
     <div className="absolute inset-0">
       {/* top bar: the test and the side */}
       <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-        {v.test ? <span className="rounded-full bg-black/60 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.16em] text-white/85">{testDef(v.test).short}</span> : null}
+        {v.test ? <span className="rounded-full bg-black/60 px-3 py-1 text-[12px] font-bold uppercase tracking-[0.12em] text-white/85">{testDef(v.test).short}</span> : null}
         {v.label ? <span className="rounded-full bg-[#00E5FF] px-3 py-1 text-[14px] font-black tracking-wide text-black">{v.label}</span> : null}
-        <span className="font-mono text-[10px] text-white/50">part {Math.min(v.progress.done + 1, v.progress.total)} of {v.progress.total}</span>
       </div>
 
       {/* the big rep counter */}
       {inTest && v.reps.target ? (
-        <div className="absolute right-3 top-3 rounded-2xl bg-black/60 px-4 py-2 text-right">
-          <div className="text-[44px] font-black leading-none tabular-nums text-white">{v.reps.count}<span className="text-[22px] text-white/45">/{v.reps.target}</span></div>
-          <div className="mt-1.5 flex justify-end gap-1">
-            {v.reps.marks.map((m, i) => <span key={i} className={`h-2.5 w-2.5 rounded-full ${MARK[m]}`} title={m} />)}
-          </div>
+        <div data-rep-dots className="absolute right-3 top-3 flex gap-2 rounded-2xl bg-black/60 px-3 py-2.5" aria-label={`${v.reps.count} counted`}>
+          {repDots(v.reps.marks, v.reps.target).map((d, i) => <span key={i} data-dot={d} className={`h-4 w-4 rounded-full ${DOT[d]}`} />)}
         </div>
       ) : null}
 
@@ -66,23 +69,23 @@ export function LiveHud({ view, caption, onPain, onTakeoff, onStop }: {
         </div>
       ) : null}
 
-      {/* paused */}
+      {/* tracking lost: paused */}
       {v.step === 'paused' ? (
-        <div className="absolute inset-0 grid place-items-center bg-black/55 px-6 text-center">
+        <div data-tracking-loss className="absolute inset-0 grid place-items-center bg-black/60 px-6 text-center">
           <div>
-            <p className="text-[26px] font-black">Paused</p>
-            <p className="mt-1 text-[15px] text-white/80">Step back into the shot to carry on.</p>
-            {v.restartInMs !== null ? <p className="mt-2 font-mono text-[12px] text-white/55">This test starts again in {Math.ceil(v.restartInMs / 1000)} s</p> : null}
+            <p className="text-[26px] font-black">{TRACKING_LOSS_PROMPT}</p>
+            <p className="mt-1 text-[15px] text-white/80">Paused. {v.framing && !v.framing.ok ? v.framing.instruction : 'Step back into the shot to carry on.'}</p>
+            {v.restartInMs !== null ? <p className="mt-2 text-[12px] text-white/55">This check starts again in {Math.ceil(v.restartInMs / 1000)} s</p> : null}
           </div>
         </div>
       ) : null}
 
-      {/* the mini-result */}
-      {v.step === 'miniResult' && v.mini ? (
-        <div className="absolute inset-0 grid place-items-center bg-black/60 px-6 text-center">
+      {/* the "Done" beat: after a part, and after a test */}
+      {(v.step === 'partDone' && v.done) || (v.step === 'miniResult' && v.mini) ? (
+        <div data-done-beat className="absolute inset-0 grid place-items-center bg-black/60 px-6 text-center">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#00E5FF]">Provisional</p>
-            <p className="mt-2 text-[28px] font-black leading-tight">{v.mini.text}</p>
+            <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#00FF9D] text-black"><Check aria-hidden className="h-9 w-9" /></span>
+            <p className="mt-3 text-[28px] font-black leading-tight">{v.step === 'miniResult' && v.mini ? v.mini.text : 'Done'}</p>
           </div>
         </div>
       ) : null}
@@ -102,15 +105,15 @@ export function LiveHud({ view, caption, onPain, onTakeoff, onStop }: {
         </Prompt>
       ) : null}
 
-      {/* the one instruction, and stop */}
-      <div className="absolute inset-x-3 bottom-3 flex items-end gap-2">
-        <p className="min-h-[2.6em] flex-1 rounded-2xl bg-black/65 px-4 py-2 text-[15px] font-semibold leading-snug text-white">{v.instruction || caption}</p>
-        {inTest || v.step === 'calibrate' ? (
-          <button type="button" onClick={onStop} className="shrink-0 rounded-2xl border border-[#FFB020]/60 bg-black/70 px-3 py-2 text-[12.5px] font-bold text-[#FFB020]">
+      {/* stop, always there in a check. The one instruction sits UNDER the picture (the page's), not over it: on a
+          portrait phone a 4:3 picture is short, and a setup line over it wrapped into the labels and the overlays. */}
+      {inTest || v.step === 'calibrate' ? (
+        <div className="absolute bottom-3 right-3">
+          <button type="button" onClick={onStop} data-stop className="rounded-2xl border border-[#FFB020]/60 bg-black/70 px-3 py-2 text-[12.5px] font-bold text-[#FFB020]">
             Something hurts: stop
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

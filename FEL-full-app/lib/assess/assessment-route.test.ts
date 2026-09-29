@@ -187,7 +187,7 @@ describe('POST /api/mirror/assessment', () => {
   it('stores the spec §9 shape, numbers only', async () => {
     await post(record());
     const s = scans()[0].metrics;
-    expect(s).toMatchObject({ version: 1, protocolVersion: 'jump-screen-1.0', thresholdsVersion: 'jump-screen-0.1-provisional', mode: 'quick', takeoffLeg: 'left', program: null });
+    expect(s).toMatchObject({ version: 1, protocolVersion: 'jump-screen-1.0', thresholdsVersion: 'jump-screen-0.2-proposed', mode: 'quick', takeoffLeg: 'left', program: null });
     expect(s.device).toEqual(device);
     expect(s.tests.map((t: Row) => t.id)).toEqual(['T1', 'T2', 'T3', 'T5']);
     expect(s.prqWrites.every((w: Row) => typeof w.entryId === 'string')).toBe(true);

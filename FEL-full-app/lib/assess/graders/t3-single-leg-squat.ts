@@ -24,7 +24,7 @@ export type T3Capture = Partial<Record<Side, readonly PoseFrame[]>>;
 
 export const T3_THRESHOLDS: ThresholdId[] = [
   'gate.minConfidence', 'gate.visibilityScoring', 'gate.minValidReps', 'gate.minPoseHz', 'geom.lensHfovDeg',
-  't3.repEnter', 't3.repExit', 't3.repMinPeak', 't3.fppa', 't3.pelvicDrop', 't3.trunkLean', 't3.depth', 't3.balanceReps',
+  't3.repEnter', 't3.repExit', 't3.repMinPeak', 't3.bottomWindow', 't3.reps', 't3.fppa', 't3.pelvicDrop', 't3.trunkLean', 't3.depth', 't3.balanceReps',
   't3.weights', 't5.contactLine', 't5.airLine', 'score.meanWorst', 'score.bands03', 'score.asymmetryPoints',
 ];
 
@@ -46,7 +46,7 @@ function gradeSide(raw: readonly PoseFrame[], s: Side, ctx: GradeContext): T3Sid
   const free = other(s), bodyH = front.bodyHeight;
   const reads: RepRead[] = reps.map((rep) => {
     const win: number[] = [];
-    for (let i = rep.start; i <= rep.end; i++) if (ok[i] && samples[i].v >= 0.9 * rep.peak) win.push(i);
+    for (let i = rep.start; i <= rep.end; i++) if (ok[i] && samples[i].v >= th('t3.bottomWindow') * rep.peak) win.push(i);
     const at = (f: (i: number) => number) => (win.length ? median(win.map(f)) : null);
     const img = (i: number) => frames[i].image;
     // balance, over the whole rep on the RAW frames (a touch-down is an event; smoothing would round it off)

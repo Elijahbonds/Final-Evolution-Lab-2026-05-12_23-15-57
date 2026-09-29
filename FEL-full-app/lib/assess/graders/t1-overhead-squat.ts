@@ -31,7 +31,7 @@ export interface T1Capture { front: readonly PoseFrame[]; side: readonly PoseFra
 
 export const T1_THRESHOLDS: ThresholdId[] = [
   'gate.minConfidence', 'gate.visibilityScoring', 'gate.minValidReps', 'gate.minPoseHz', 'geom.heelRise',
-  't1.repEnter', 't1.repExit', 't1.repMinPeak', 't1.depthKneeFlex', 't1.hipCrease', 't1.trunkTibia', 't1.shoulderFlex',
+  't1.repEnter', 't1.repExit', 't1.repMinPeak', 't1.bottomWindow', 't1.reps', 't1.depthKneeFlex', 't1.hipCrease', 't1.trunkTibia', 't1.shoulderFlex',
   't1.heelRiseReps', 't1.valgus', 't1.lateralShift', 't1.weights', 'score.meanWorst', 'score.bands03',
 ];
 
@@ -66,7 +66,7 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
   const fReps = segment(fSamples, repThresholds());
   const fScored: Scored[] = fReps.map((rep) => {
     const idx = inRep(rep, fOk);
-    const bottom = idx.filter((i) => fSamples[i].v >= 0.7 * rep.peak);
+    const bottom = idx.filter((i) => fSamples[i].v >= th('t1.bottomWindow') * rep.peak);
     const worstAt = (f: (i: number) => number) => bottom.reduce((b, i) => (f(i) > f(b) ? i : b), bottom[0] ?? rep.bottom);
     const vl = (i: number) => kneeInsideRatio(cap.front[i].image, 'left'), vr = (i: number) => kneeInsideRatio(cap.front[i].image, 'right');
     const sh = (i: number) => Math.abs(weightShift(cap.front[i].image) - front.shift);
@@ -98,7 +98,7 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
     const img = (i: number) => cap.side[i].image;
     const kf = (i: number) => kneeFlexion(img(i), near, aspect);
     const iBottom = idx.reduce((b, i) => (kf(i) > kf(b) ? i : b), idx[0] ?? rep.bottom);
-    const bottomWin = idx.filter((i) => sSamples[i].v >= 0.7 * rep.peak);
+    const bottomWin = idx.filter((i) => sSamples[i].v >= th('t1.bottomWindow') * rep.peak);
     const iArms = bottomWin.reduce((b, i) => (shoulderFlexion(img(i), near, aspect) < shoulderFlexion(img(b), near, aspect) ? i : b), bottomWin[0] ?? iBottom);
     const iCrease = idx.reduce((b, i) => (hipAboveKnee(img(i), near, aspect) < hipAboveKnee(img(b), near, aspect) ? i : b), idx[0] ?? iBottom);
     // heels: each one the model sees, against its own standing line; a side is named only when one heel rose alone

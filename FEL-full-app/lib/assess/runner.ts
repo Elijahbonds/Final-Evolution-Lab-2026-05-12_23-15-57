@@ -11,8 +11,14 @@
 //     and — allowed by the spec — "slower" and "a little deeper". Never a correction of the pattern being measured.
 //
 // The flow: framing → "any pain right now?" → takeoff leg (once) → calibration (3 s still) → T1 front, T1 side (with a
-// 2 s side-on calibration first), T2 left, T2 right, T3 left, T3 right, T5 → after each TEST a 3 s mini-result and
-// "any pain in that one?" → results. Pain at either prompt ends the screen with the referral, and nothing is saved.
+// 2 s side-on calibration first), T2 left, T2 right, T3 left, T3 right, T5 → after each PART a "Done" beat, after each
+// TEST a 3 s "done" card and "any pain in that one?" → results. Pain at either prompt ends the screen with the referral,
+// and nothing is saved.
+//
+// SCREEN-SHIP (2026-09-29): the page asks "Does anything hurt right now?" before the camera starts (`painAsked`), so the
+// runner skips its own first pain prompt then; every rep count and part limit is read from the PROPOSED register (three
+// reps per check, A2-2); lost tracking (no body, or too few confident joints) for LOSS_FRAMES frames in a row pauses the
+// check with "Step back into the light" (Squad gate 2).
 //
 // Pure: frames and a clock in, a view out. The page renders the view, speaks `say`, and answers the prompts.
 import type { PoseFrame } from '@/lib/pose/landmarks';
@@ -27,7 +33,9 @@ import { SIDE } from '@/lib/pose/landmarks';
 import { RepCounter, RockCounter, type Rep } from './reps';
 import { mqs as mqsOf, type Mqs, type TestResult } from './scoring';
 import { bandOf, th } from './thresholds';
-import { facingCue, testDef, type AssessMode, type Side, type TestId } from './protocol';
+import { countWord, facingCue, testDef, type AssessMode, type Side, type TestId } from './protocol';
+import { DONE_BEAT_MS, LOSS_FRAMES, trackingLost } from '@/lib/screen/ui';
+import { TRACKING_LOSS_PROMPT } from '@/lib/screen/copy';
 import { gradeT1 } from './graders/t1-overhead-squat';
 import { gradeT2 } from './graders/t2-dorsiflexion';
 import { gradeT3 } from './graders/t3-single-leg-squat';
@@ -124,19 +132,20 @@ export interface PartDef {
   label: string | null;
 }
 
+const TRIES = th('run.maxAttempts'), LIMIT = th('run.maxMs');
 export const QUICK_PARTS: readonly PartDef[] = [
-  { id: 'T1-front', test: 'T1', view: 'front', target: 3, maxAttempts: 6, maxMs: 60000, label: null, setup: `Overhead squat, facing the camera. ${testDef('T1').setup}` },
-  { id: 'T1-side', test: 'T1', view: 'side', near: 'left', target: 3, maxAttempts: 6, maxMs: 60000, label: null, calibrateSide: true, setup: 'Now side-on, left side to the camera. Same overhead squat, three times.' },
-  { id: 'T2-left', test: 'T2', view: 'side', side: 'left', near: 'left', target: 3, maxAttempts: 7, maxMs: 60000, label: 'LEFT LEG', setup: `Ankle range, left leg. Left side to the camera, left foot forward toward a wall. ${testDef('T2').setup}` },
-  { id: 'T2-right', test: 'T2', view: 'side', side: 'right', near: 'right', target: 3, maxAttempts: 7, maxMs: 60000, label: 'RIGHT LEG', setup: 'Now the right leg. Turn around so your right side faces the camera, right foot forward.' },
-  { id: 'T3-left', test: 'T3', view: 'front', side: 'left', target: 5, maxAttempts: 8, maxMs: 60000, label: 'LEFT LEG', setup: `Single-leg squat on your left leg, facing the camera. ${testDef('T3').setup}` },
-  { id: 'T3-right', test: 'T3', view: 'front', side: 'right', target: 5, maxAttempts: 8, maxMs: 60000, label: 'RIGHT LEG', setup: 'Now on your right leg. Same thing, five times.' },
-  { id: 'T5', test: 'T5', view: 'front', target: 3, maxAttempts: 6, maxMs: 90000, label: null, highFps: true, setup: `Jump. ${testDef('T5').setup}` },
+  { id: 'T1-front', test: 'T1', view: 'front', target: th('t1.reps'), maxAttempts: TRIES.T1, maxMs: LIMIT.T1, label: null, setup: `Overhead squat, facing the camera. ${testDef('T1').setup}` },
+  { id: 'T1-side', test: 'T1', view: 'side', near: 'left', target: th('t1.reps'), maxAttempts: TRIES.T1, maxMs: LIMIT.T1, label: null, calibrateSide: true, setup: `Now side-on, left side to the camera. Same overhead squat, ${countWord(th('t1.reps'))} times.` },
+  { id: 'T2-left', test: 'T2', view: 'side', side: 'left', near: 'left', target: th('t2.reps'), maxAttempts: TRIES.T2, maxMs: LIMIT.T2, label: 'LEFT LEG', setup: `Ankle range, left leg. Left side to the camera, left foot forward toward a wall. ${testDef('T2').setup}` },
+  { id: 'T2-right', test: 'T2', view: 'side', side: 'right', near: 'right', target: th('t2.reps'), maxAttempts: TRIES.T2, maxMs: LIMIT.T2, label: 'RIGHT LEG', setup: 'Now the right leg. Turn around so your right side faces the camera, right foot forward.' },
+  { id: 'T3-left', test: 'T3', view: 'front', side: 'left', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'LEFT LEG', setup: `Single-leg squat on your left leg, facing the camera. ${testDef('T3').setup}` },
+  { id: 'T3-right', test: 'T3', view: 'front', side: 'right', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'RIGHT LEG', setup: `Now on your right leg. Same thing, ${countWord(th('t3.reps'))} times.` },
+  { id: 'T5', test: 'T5', view: 'front', target: th('t5.reps'), maxAttempts: TRIES.T5, maxMs: LIMIT.T5, label: null, highFps: true, setup: `Jump. ${testDef('T5').setup}` },
 ];
 
 export type RunnerStep =
   | 'framing' | 'pain' | 'takeoff' | 'calibrate' | 'calibrateSide' | 'position' | 'countdown' | 'active' | 'paused'
-  | 'miniResult' | 'painCheck' | 'done' | 'stopped';
+  | 'partDone' | 'miniResult' | 'painCheck' | 'done' | 'stopped';
 
 export type RepMark = 'clean' | 'fault' | 'notRead';
 
@@ -161,6 +170,8 @@ export interface RunnerView {
   skeleton: 'tracking' | 'clean' | 'fault';
   wantsHighFps: boolean;
   mini: { test: TestId; text: string } | null;
+  /** The part just finished, during its "Done" beat. */
+  done: { test: TestId; part: PartId } | null;
   result: SessionResult | null;
   /** Parts finished of all parts. */
   progress: { done: number; total: number };
@@ -172,7 +183,7 @@ export interface RunnerView {
  * so a framing fix that stays true is not nagged every 2.5 s.
  */
 export class CueQueue {
-  static readonly REPEAT_MS = 8000;
+  static readonly REPEAT_MS = th('ui.timing').cueRepeatMs;
   private pending: { text: string; force: boolean } | null = null;
   private lastAt = -Infinity;
   private lastText = '';
@@ -214,6 +225,8 @@ interface PartState {
 export interface RunnerOptions {
   /** Known from the profile or an earlier session; else the flow asks. */
   takeoffLeg?: Side | null;
+  /** The page already asked "Does anything hurt right now?" before the camera (SCREEN-SHIP): skip the first prompt. */
+  painAsked?: boolean;
   aspect: number;
   parts?: readonly PartDef[];
   cameraFps?: () => number | null;
@@ -231,6 +244,8 @@ export class AssessRunner {
   private stepAt = 0;
   private lastT: number | null = null;
   private badSince: number | null = null;
+  private lostFrames = 0;
+  private donePart: { test: TestId; part: PartId } | null = null;
   private readonly cues = new CueQueue();
   private takeoff: Side | null;
   private lastRepAt = -Infinity;
@@ -304,7 +319,7 @@ export class AssessRunner {
 
     switch (this.step) {
       case 'framing': {
-        if (this.gate.ready(framing, frame.t)) { this.gate.reset(); this.go('pain', now); }
+        if (this.gate.ready(framing, frame.t)) { this.gate.reset(); this.go(this.o.painAsked ? (this.takeoff ? 'calibrate' : 'takeoff') : 'pain', now); }
         else this.say(framing.worst ? framing.instruction : 'Hold that.');
         break;
       }
@@ -346,7 +361,7 @@ export class AssessRunner {
       }
       case 'countdown': {
         if (!this.activeOk(framing)) { this.go('position', now); break; }
-        const left = 3000 - (now - this.stepAt);
+        const left = th('ui.timing').countdownMs - (now - this.stepAt);
         if (left <= 0) { this.go('active', now); this.say('Go.', true); }
         else this.say(String(Math.ceil(left / 1000)), true);
         break;
@@ -354,9 +369,12 @@ export class AssessRunner {
       case 'active':
       case 'paused': {
         const p = this.part!;
-        if (!this.activeOk(framing)) {
+        // out of the shot, or tracking lost (no body / too few confident joints): the frame is not read; after
+        // LOSS_FRAMES of it in a row the check pauses with the prompt, and a long absence restarts the part
+        if (!this.activeOk(framing) || trackingLost(frame)) {
           this.badSince ??= now;
-          if (this.step === 'active') { this.step = 'paused'; this.say(framing.instruction); }
+          this.lostFrames++;
+          if (this.step === 'active' && this.lostFrames >= LOSS_FRAMES) { this.step = 'paused'; this.say(`${TRACKING_LOSS_PROMPT}.`); }
           if (now - this.badSince >= th('gate.absenceRestartMs')) {
             this.resetPart();
             this.go('position', now);
@@ -365,11 +383,16 @@ export class AssessRunner {
           break;
         }
         this.badSince = null;
+        this.lostFrames = 0;
         if (this.step === 'paused') this.step = 'active';
         p.activeMs += dt;
         p.frames.push(frame);
         this.feed(p, frame, now);
         if (p.valid >= p.def.target || p.attempts >= p.def.maxAttempts || p.activeMs >= p.def.maxMs) this.finishPart(now);
+        break;
+      }
+      case 'partDone': {
+        if (now - this.stepAt >= DONE_BEAT_MS) { this.donePart = null; this.startPart(now); }
         break;
       }
       case 'miniResult': {
@@ -418,6 +441,7 @@ export class AssessRunner {
         ? { enter: th('t3.repEnter'), exit: th('t3.repExit'), minPeak: th('t3.repMinPeak') }
         : { enter: th('t1.repEnter'), exit: th('t1.repExit'), minPeak: th('t1.repMinPeak') }) }) : null };
     this.badSince = null;
+    this.lostFrames = 0;
     this.gate.reset();
   }
 
@@ -458,7 +482,7 @@ export class AssessRunner {
     } else {
       this.say(NUMBERS[p.valid - 1] ?? String(p.valid));
       // allowed coaching (spec §8): tempo and depth, never the pattern
-      if (rep.tEnd - rep.tStart < 800) this.say('Slower.');
+      if (rep.tEnd - rep.tStart < th('cue.slowerRepMs')) this.say('Slower.');
       else if (p.def.test === 'T3' && rep.peak < bandOf('t3.depth').fault!) this.say('A little deeper on the next one.');
     }
   }
@@ -487,8 +511,8 @@ export class AssessRunner {
       }
       case 'T2-left': case 'T2-right': {
         const s = p.def.side!, ys = [...p.heelYs].sort((x, y) => x - y);
-        const floor = ys[Math.floor(0.9 * (ys.length - 1))];
-        const bodyH = this.calib.side?.bodyHeight ?? front?.bodyHeight ?? 0.7;
+        const floor = ys[Math.floor(th('t2.heelFloorPercentile') * (ys.length - 1))];
+        const bodyH = this.calib.side?.bodyHeight ?? front?.bodyHeight ?? th('geom.nominalBodyHeight');
         if (bottom && (floor - bottom[SIDE[s].heel].y) / bodyH > th('geom.heelRise')) return 'notRead';
         return faults([rep.peak < bandOf('t2.tibia').fault!]);
       }
@@ -510,12 +534,12 @@ export class AssessRunner {
   private feedJump(p: PartState, now: number): void {
     const front = this.calib.front;
     // the flight finder reads the whole take, so it runs twice a second, not every frame
-    if (!front || now - this.lastJumpScan < 500) return;
+    if (!front || now - this.lastJumpScan < th('ui.timing').jumpScanMs) return;
     this.lastJumpScan = now;
     const flights = detectFlights(p.frames, front).filter((fl) => fl.landed && fl.landT - fl.takeoffT >= th('t5.flightMinMs'));
     if (flights.length <= p.lastFlightCount) return;
     const last = flights[flights.length - 1];
-    if ((p.frames[p.frames.length - 1]?.t ?? 0) - last.landT < 400) return;   // let the landing settle first
+    if ((p.frames[p.frames.length - 1]?.t ?? 0) - last.landT < th('ui.timing').jumpSettleMs) return;   // let the landing settle first
     const res = gradeT5(p.frames, { calibration: this.calib, aspect: this.o.aspect });
     const jumps = res.t5.jumps;
     for (let k = p.lastFlightCount; k < jumps.length; k++) {
@@ -541,7 +565,10 @@ export class AssessRunner {
     else if (d.id === 'T5') this.captures.T5 = p.frames;
     const nextDef = this.parts[this.partIdx + 1];
     const testDone = !nextDef || nextDef.test !== d.test;
-    if (!testDone) { this.say('Good.', true); this.partIdx++; this.startPart(now); return; }
+    // the last count is said with the done line: "Three. Done." (a forced line would otherwise replace "Three")
+    const lastCount = p.valid >= d.target && p.valid > 0 && d.test !== 'T5' ? `${NUMBERS[p.valid - 1] ?? p.valid}. ` : '';
+    // the part is done: a "Done" beat (visual + voice), then the next part's setup
+    if (!testDone) { this.say(`${lastCount}Done.`, true); this.donePart = { test: d.test, part: d.id }; this.part = null; this.partIdx++; this.go('partDone', now); return; }
     // the test is complete: grade it, show the mini-result, then ask about pain
     const ctx = { calibration: this.calib, aspect: this.o.aspect };
     const t = d.test === 'T1' ? gradeT1(this.captures.T1, ctx)
@@ -549,8 +576,8 @@ export class AssessRunner {
       : d.test === 'T3' ? gradeT3(this.captures.T3, ctx)
       : gradeT5(this.captures.T5 ?? [], { ...ctx, cameraFps: this.o.cameraFps?.() ?? null });
     this.graded.push(t);
-    this.mini = { test: t.id, text: miniLine(t) };
-    this.say(this.mini.text, true);
+    this.mini = { test: t.id, text: doneLine(t) };
+    this.say(`${lastCount}${this.mini.text}`, true);
     this.part = null;
     this.go('miniResult', now);
   }
@@ -600,12 +627,13 @@ export class AssessRunner {
     const p = this.part;
     const def = p?.def ?? null;
     const say = this.cues.take(now);
-    const countdown = this.step === 'countdown' ? Math.max(1, Math.ceil((3000 - (now - this.stepAt)) / 1000)) : null;
-    const recent = now - this.lastRepAt < 1200 && this.lastMark && this.lastMark !== 'notRead' ? this.lastMark : 'tracking';
+    const { countdownMs, markMs } = th('ui.timing');
+    const countdown = this.step === 'countdown' ? Math.max(1, Math.ceil((countdownMs - (now - this.stepAt)) / 1000)) : null;
+    const recent = now - this.lastRepAt < markMs && this.lastMark && this.lastMark !== 'notRead' ? this.lastMark : 'tracking';
     const calHold = (this.step === 'calibrate' || this.step === 'calibrateSide') && this.calFrames.length > 1
       ? Math.min(1, (this.calFrames[this.calFrames.length - 1].t - this.calFrames[0].t) / (this.step === 'calibrate' ? th('calib.frontMs') : th('calib.sideMs'))) : 0;
     return {
-      step: this.step, test: def?.test ?? this.mini?.test ?? null, part: def?.id ?? null, label: def?.label ?? null,
+      step: this.step, test: def?.test ?? (this.step === 'partDone' ? this.donePart?.test : null) ?? this.mini?.test ?? null, part: def?.id ?? null, label: def?.label ?? null,
       view: this.step === 'calibrateSide' ? 'side' : def?.view ?? 'front',
       reps: { count: p?.valid ?? 0, target: def?.target ?? 0, marks: [...(p?.marks ?? [])] },
       countdown,
@@ -615,6 +643,7 @@ export class AssessRunner {
       say, skeleton: recent as RunnerView['skeleton'],
       wantsHighFps: !!def?.highFps,
       mini: this.step === 'miniResult' || this.step === 'painCheck' ? this.mini : null,
+      done: this.step === 'partDone' ? this.donePart : null,
       result: this.result,
       progress: { done: this.partIdx, total: this.parts.length },
     };
@@ -632,7 +661,8 @@ export class AssessRunner {
         ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def?.setup ?? '';
       case 'countdown': return 'Get ready.';
       case 'active': return def?.setup ?? '';
-      case 'paused': return `Paused: ${this.lastFraming?.instruction ?? 'step back into the shot.'}`;
+      case 'paused': return `${TRACKING_LOSS_PROMPT}. ${this.lastFraming?.instruction ?? ''}`.trim();
+      case 'partDone': return 'Done.';
       case 'miniResult': return this.mini?.text ?? '';
       case 'painCheck': return 'Any pain in that one?';
       case 'done': return 'Screen complete.';
@@ -641,7 +671,17 @@ export class AssessRunner {
   }
 }
 
-/** "Single-leg squat L 2/3 · R 3/3" (spec §8), or the reason it has no score. */
+/**
+ * The "done" card after a test (SCREEN-SHIP): no score mid-screen, only that it is done, or that the camera could not
+ * read it. The grades come once, on the results screen, in words.
+ */
+export function doneLine(t: TestResult): string {
+  const name = testDef(t.id).short;
+  if (t.status === 'notScored') return `${name}: done, but the camera could not read it clearly.`;
+  return `${name}: done.`;
+}
+
+/** "Single-leg squat L 2/3 · R 3/3" (spec §8), or the reason it has no score. PR #20's line, kept for its tests. */
 export function miniLine(t: TestResult): string {
   const name = testDef(t.id).short;
   if (t.status === 'notScored') return `${name}: not scored (the camera read ${Math.round(t.confidence * 100)}% of it)`;

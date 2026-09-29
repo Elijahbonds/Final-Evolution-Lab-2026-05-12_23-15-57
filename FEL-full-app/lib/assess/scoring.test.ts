@@ -35,9 +35,9 @@ describe('metric bands', () => {
     const depth = bandOf('t1.depthKneeFlex');            // fault if < 80
     expect(isFault(79.9, depth)).toBe(true);
     expect(isFault(80, depth)).toBe(false);
-    const valgus = bandOf('t1.valgus');                  // fault if ≥ 0.35
-    expect(isFault(0.35, valgus)).toBe(true);
-    expect(isFault(0.349, valgus)).toBe(false);
+    const valgus = bandOf('t1.valgus');                  // fault if > 0.8 (SCREEN-SHIP: the Squad's "over 0.8" is Red)
+    expect(isFault(0.801, valgus)).toBe(true);
+    expect(isFault(0.8, valgus)).toBe(false);
     expect(isFault(NaN, valgus)).toBe(false);
   });
 

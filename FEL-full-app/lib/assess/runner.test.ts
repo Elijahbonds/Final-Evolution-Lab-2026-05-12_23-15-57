@@ -26,7 +26,10 @@ function drive(sc: Scenario = {}, maxLoops = 4000) {
   const steps: string[] = [], said: string[] = [];
   const highFps = new Set<string>();
   const fed = new Set<string>();
-  const feed = (c: Capture | PoseFrame[], opts: { gapAt?: number; gapMs?: number } = {}) => {
+  // SCREEN-SHIP: `part` stops the take when that part ends (the athlete does as told: three reps now, A2-2, so a
+  // five-rep take's leftover reps would otherwise run into the next part: left-leg squats read as the right leg's
+  // free foot touching down)
+  const feed = (c: Capture | PoseFrame[], opts: { gapAt?: number; gapMs?: number; part?: string } = {}) => {
     const frames = Array.isArray(c) ? c : c.frames;
     const first = frames[0]?.t ?? 0;
     const start = t + 33;
@@ -40,6 +43,7 @@ function drive(sc: Scenario = {}, maxLoops = 4000) {
       t = start + (frames[k].t - first) + shift;
       v = r.tick({ ...frames[k], t }, t);
       track();
+      if (opts.part && v.part !== opts.part) break;
     }
   };
   const track = () => {
@@ -61,7 +65,7 @@ function drive(sc: Scenario = {}, maxLoops = 4000) {
             : part === 'T2-left' ? kneeWall('left') : part === 'T2-right' ? kneeWall('right')
             : part === 'T3-left' ? singleLegSquat('left', sc.t3Left ?? {}) : part === 'T3-right' ? singleLegSquat('right')
             : cmj([{ heightM: 0.4 }, { heightM: 0.45 }, { heightM: 0.42 }]);
-          feed(cap, sc.absence?.part === part ? { gapAt: Math.floor(cap.frames.length / 2), gapMs: sc.absence.ms } : {});
+          feed(cap, sc.absence?.part === part ? { gapAt: Math.floor(cap.frames.length / 2), gapMs: sc.absence.ms, part } : { part });
         } else feed(standFor(v));
         break;
       }
@@ -96,9 +100,11 @@ describe('the Quick Screen, start to finish', () => {
   });
 
   it('says one thing at a time: the setup, the countdown, the rep count, the mini-result — and no pattern coaching', () => {
-    expect(run.said).toEqual(expect.arrayContaining(['3', '2', '1', 'Go.', 'One', 'Two', 'Three', 'Any pain right now? Tap yes or no.']));
-    expect(run.said.some((s) => /^Overhead squat 3\/3$/.test(s))).toBe(true);
-    expect(run.said.some((s) => /^Single-leg squat L 3\/3 · R 3\/3$/.test(s))).toBe(true);
+    expect(run.said).toEqual(expect.arrayContaining(['3', '2', '1', 'Go.', 'One', 'Two', 'Three. Done.', 'Any pain right now? Tap yes or no.']));
+    // SCREEN-SHIP: the per-test card says "done" (no score mid-screen; the grades come once, in words, on the results)
+    expect(run.said.some((s) => /^Three\. Overhead squat: done\.$/.test(s))).toBe(true);
+    expect(run.said.some((s) => /^Three\. Single-leg squat: done\.$/.test(s))).toBe(true);
+    expect(run.said.filter((s) => s === 'Three. Done.').length).toBe(3);   // the beat after T1-front, T2-left, T3-left
     expect(run.said.filter((s) => /knees? out|chest up|brace|keep your back|straighten/i.test(s))).toEqual([]);
   });
 
@@ -126,7 +132,7 @@ describe('leaving the shot', () => {
     const run = drive({ absence: { part: 'T3-left', ms: 2000 } });
     expect(run.steps).toContain('paused:T3-left');
     expect(run.v.step).toBe('done');
-    expect(run.v.result!.tests[2].sides.left!.repsValid).toBe(5);
+    expect(run.v.result!.tests[2].sides.left!.repsValid).toBe(3);   // SCREEN-SHIP: three reps asked (A2-2; was five)
   });
 
   it('six seconds out of the shot restarts the part', () => {

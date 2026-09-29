@@ -13,6 +13,7 @@
 //                returns to vertical): a rep is a rise of `rise` over the running low and a fall of `rise` back.
 //
 // Pure.
+import { th } from './thresholds';
 
 export interface Sample {
   /** Index of the frame in the capture. */
@@ -124,7 +125,7 @@ export function median(v: readonly number[]): number {
  * The positions of the best `n` reps by score (higher = better), in the order they were performed. Ties go to the
  * earlier rep, so the choice never depends on sort stability.
  */
-export function bestReps(scores: readonly number[], n = 3): number[] {
+export function bestReps(scores: readonly number[], n: number = th('score.bestOf')): number[] {
   return scores.map((s, i) => ({ s, i }))
     .sort((a, b) => (b.s - a.s) || (a.i - b.i))
     .slice(0, n)
@@ -151,7 +152,7 @@ export function medianRep(values: readonly number[], among: readonly number[]): 
  * knee-to-wall: the max read 2° high); a joint turning around at the end of its range sits within a degree of its peak
  * for longer than this window.
  */
-export function aroundPeak(frames: readonly { t: number }[], center: number, f: (i: number) => number, ok: (i: number) => boolean, ms = 100): number {
+export function aroundPeak(frames: readonly { t: number }[], center: number, f: (i: number) => number, ok: (i: number) => boolean, ms: number = th('score.peakWindowMs')): number {
   const t0 = frames[center]?.t;
   if (t0 === undefined) return NaN;
   const vals: number[] = [];

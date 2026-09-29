@@ -30,7 +30,7 @@ const record = (tests: TestResult[] = TESTS): AssessmentRecord => toRecord({
 describe('the record is numbers', () => {
   it('carries the spec §9 shape and validates round trip', () => {
     const rec = record();
-    expect(rec).toMatchObject({ version: 1, protocolVersion: 'jump-screen-1.0', thresholdsVersion: 'jump-screen-0.1-provisional', mode: 'quick', takeoffLeg: 'left' });
+    expect(rec).toMatchObject({ version: 1, protocolVersion: 'jump-screen-1.0', thresholdsVersion: 'jump-screen-0.2-proposed', mode: 'quick', takeoffLeg: 'left' });
     expect(rec.tests.map((t) => t.id)).toEqual(['T1', 'T2', 'T3', 'T5']);
     expect(rec.tests[0].sides.both!.faults).toEqual(['valgusLeft']);
     expect(rec.mqs).toMatchObject({ label: 'Quick' });

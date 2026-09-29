@@ -89,7 +89,7 @@ describe('T5 quality is the landing', () => {
   });
 
   it('knees caving on the landing fault each knee\'s FPPA', () => {
-    const { r } = grade(three(0.35, { landDepth: 0.6, landKneeIn: 0.07 }), { fps: 60 });
+    const { r } = grade(three(0.35, { landDepth: 0.6, landKneeIn: 0.12 }), { fps: 60 });   // SCREEN-SHIP: Red is over 20° (≈26° here; 0.07 read ≈15°, Yellow)
     const ids = r.sides.both!.metrics.filter((m) => m.fault).map((m) => m.id);
     expect(ids).toEqual(expect.arrayContaining(['landingValgusLeft', 'landingValgusRight']));
     expect(r.frozen.length).toBeGreaterThanOrEqual(2);

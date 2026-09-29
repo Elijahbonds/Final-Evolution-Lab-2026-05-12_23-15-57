@@ -19,28 +19,28 @@ describe('T3 single-leg squat', () => {
     expect(faults(r, 'left')).toEqual([]);
     expect(faults(r, 'right')).toEqual([]);
     expect(r.score03).toBe(3);
-    expect(r.sides.left!.repsValid).toBe(5);
+    expect(r.sides.left!.repsValid).toBe(5);   // the synthetic take has five reps; the live flow now stops at three (A2-2)
     expect(r.t3.balance).toEqual({ left: [], right: [] });
   });
 
   it('a knee caving in on the LEFT flags FPPA on the left only, and the sides are asymmetric', () => {
-    const r = grade({ kneeIn: 0.06 }, {});
+    const r = grade({ kneeIn: 0.09 }, {});
     expect(faults(r, 'left')).toEqual(['fppa']);
     expect(faults(r, 'right')).toEqual([]);
-    expect(r.sides.left!.metrics.find((m) => m.id === 'fppa')!.value!).toBeGreaterThan(10);
+    expect(r.sides.left!.metrics.find((m) => m.id === 'fppa')!.value!).toBeGreaterThan(20);   // SCREEN-SHIP: Red is over 20° (kneeIn 0.09 ≈ 27°; 0.06 read ≈ 18°, Yellow)
     expect(r.asymmetry).toMatchObject({ flagged: true, weaker: 'left' });
     expect(r.frozen.map((f) => `${f.metric}:${f.side}`)).toEqual(['fppa:left']);
   });
 
   it('…and on the RIGHT, the right only', () => {
-    const r = grade({}, { kneeIn: 0.06 });
+    const r = grade({}, { kneeIn: 0.09 });
     expect(faults(r, 'right')).toEqual(['fppa']);
     expect(faults(r, 'left')).toEqual([]);
   });
 
   it('a dropping pelvis and a leaning trunk fault their own metrics', () => {
-    expect(faults(grade({}, { pelvicDrop: 10 }), 'right')).toEqual(['pelvicDrop']);
-    expect(faults(grade({ trunkLean: 15 }, {}), 'left')).toEqual(['trunkLean']);
+    expect(faults(grade({}, { pelvicDrop: 14 }), 'right')).toEqual(['pelvicDrop']);   // SCREEN-SHIP: Red over 10° (was a fault over 8°)
+    expect(faults(grade({ trunkLean: 20 }, {}), 'left')).toEqual(['trunkLean']);     // SCREEN-SHIP: Red over 15° (was a fault over 12°)
     expect(faults(grade({ depth: 38 }, {}), 'left')).toEqual(['depth']);
   });
 
@@ -53,14 +53,14 @@ describe('T3 single-leg squat', () => {
   });
 
   it('without world landmarks the depth estimate gives the same verdicts', () => {
-    const r = grade({ kneeIn: 0.06 }, {}, { world: false });
+    const r = grade({ kneeIn: 0.09 }, {}, { world: false });
     expect(faults(r, 'left')).toEqual(['fppa']);
     expect(faults(r, 'right')).toEqual([]);
     expect(r.sides.right!.score03).toBe(3);
   });
 
   it('holds under the synth\'s jitter', () => {
-    const r = grade({ kneeIn: 0.06 }, {}, { noise: true });
+    const r = grade({ kneeIn: 0.09 }, {}, { noise: true });
     expect(faults(r, 'left')).toEqual(['fppa']);
     expect(faults(r, 'right')).toEqual([]);
     expect(r.t3.balance).toEqual({ left: [], right: [] });

@@ -37,7 +37,7 @@ describe('a replayed Quick Screen', () => {
   });
 
   it('a single-leg knee-in flags that side on T3', () => {
-    const r = run({ t3: { right: { kneeIn: 0.06 } } });
+    const r = run({ t3: { right: { kneeIn: 0.09 } } });   // SCREEN-SHIP: Red is over 20° (0.06 read ≈ 18°, Yellow)
     expect(r.tests[2].sides.right!.metrics.find((m) => m.id === 'fppa')!.fault).toBe(true);
     expect(r.tests[2].sides.left!.metrics.find((m) => m.id === 'fppa')!.fault).toBe(false);
   });
@@ -108,9 +108,11 @@ describe('the picture never leaves the page', () => {
     const EXPORT = /\.toDataURL\s*\(|\.toBlob\s*\(|getImageData\s*\(|captureStream\s*\(|MediaRecorder|sendBeacon|\bWebSocket\b|RTCPeerConnection|\bEventSource\b|XMLHttpRequest/;
     expect(page.filter((f) => EXPORT.test(readFileSync(f, 'utf8')))).toEqual([]);
   });
-  it('the page\'s one network call is postAssessment, which sends the numbers-only record to its own route', () => {
+  // SCREEN-SHIP (A2-3): tightened. The page used to make one call (postAssessment, for a signed-in athlete); with no
+  // server save in this ship it makes none. The only fetch left under lib/assess is postAssessment's own, unwired.
+  it('the page makes no network call at all; postAssessment stays in lib/assess, called by nothing on the page', () => {
     const calls = page.flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/\bfetch\s*\(/g)].map(() => f));
-    expect(calls).toEqual(['app/play/mirror/assess/_components/assess-app.tsx']);
-    expect(readFileSync('app/play/mirror/assess/_components/assess-app.tsx', 'utf8')).toMatch(/postAssessment\(record, \(u, i\) => fetch\(u, i\)\)/);
+    expect(calls.filter((f) => f.startsWith('app/'))).toEqual([]);
+    expect(page.filter((f) => f.startsWith('app/') && /postAssessment/.test(readFileSync(f, 'utf8')))).toEqual([]);
   });
 });

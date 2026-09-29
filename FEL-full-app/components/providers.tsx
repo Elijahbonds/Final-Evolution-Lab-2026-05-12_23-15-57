@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { SessionProvider } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
+import { SessionContext, SessionProvider } from 'next-auth/react';
 import { agentEnabled } from '@/lib/babylon/core/AgentBridge';
 
 /**
@@ -20,7 +21,32 @@ function AgentFlag() {
   return null;
 }
 
+/**
+ * THE QUICK SCREEN SENDS NOTHING BEFORE THE AGE QUESTION (SCREEN-SHIP, Squad gate 5, 2026-09-29).
+ *
+ * next-auth's SessionProvider fetches /api/auth/session as it mounts and then writes `nextauth.message` to
+ * localStorage (its cross-tab broadcast), on every page. The Quick Screen's pages (/screen, /screen/**,
+ * /play/mirror/assess/**) must make no /api request and write no storage before the athlete says how old they are,
+ * and they never use the session (nothing is saved to an account in this ship). So on exactly those paths the app gets
+ * a fixed signed-out session from the context itself: no fetch, no broadcast, no storage. The rail and the tab bar
+ * render nothing when signed out, as they already do for a guest. Every other path keeps the same SessionProvider,
+ * unchanged; moving between the two remounts the provider, so the first page after the screen fetches its session
+ * as any page load does. (components/providers.test.tsx pins both.)
+ */
+export const isQuickScreenPath = (p: string): boolean => /^\/(screen|play\/mirror\/assess)(\/|$)/.test(p);
+
+const SIGNED_OUT = { data: null, status: 'unauthenticated' as const, update: async () => null };
+
 export function Providers({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() || '/';
+  if (isQuickScreenPath(pathname)) {
+    return (
+      <SessionContext.Provider value={SIGNED_OUT}>
+        <AgentFlag />
+        {children}
+      </SessionContext.Provider>
+    );
+  }
   return (
     <SessionProvider>
       <AgentFlag />

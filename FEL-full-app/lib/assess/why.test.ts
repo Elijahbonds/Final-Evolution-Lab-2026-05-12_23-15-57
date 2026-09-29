@@ -33,11 +33,11 @@ function sweep(): TestResult[] {
     out.push(gradeT1({ front: front3(name), side: ohsSide(side).frames }, ctx));
   }
   out.push(gradeT1({ front: front3('squat_clean'), side: ohsSide({}, { reps: 2 }).frames }, ctx));
-  out.push(gradeT2({ left: kneeWall('left', { tibiaMax: 44 }).frames, right: kneeWall('right', { tibiaMax: 33 }).frames }, ctx));
+  out.push(gradeT2({ left: kneeWall('left', { tibiaMax: 44 }).frames, right: kneeWall('right', { tibiaMax: 26 }).frames }, ctx));
   out.push(gradeT2({ left: kneeWall('left', { tibiaMax: 44 }, { perRep: (i) => (i === 1 ? { heelLiftM: 0.05 } : {}) }).frames, right: kneeWall('right').frames }, ctx));
-  out.push(gradeT3({ left: singleLegSquat('left', { kneeIn: 0.06, pelvicDrop: 10 }).frames, right: singleLegSquat('right', { trunkLean: 15 }, { perRep: (i) => (i === 1 ? { touchDown: true } : {}) }).frames }, ctx));
+  out.push(gradeT3({ left: singleLegSquat('left', { kneeIn: 0.09, pelvicDrop: 14 }).frames, right: singleLegSquat('right', { trunkLean: 20 }, { perRep: (i) => (i === 1 ? { touchDown: true } : {}) }).frames }, ctx));
   out.push(gradeT3({ left: singleLegSquat('left', { depth: 38 }).frames, right: singleLegSquat('right').frames }, ctx));
-  out.push(gradeT5(cmj([{ heightM: 0.4, landDepth: 0.1 }, { heightM: 0.4, armSwing: true }, { heightM: 1.4 }, { heightM: 0.35, landDepth: 0.6, landKneeIn: 0.07 }]).frames, ctx));
+  out.push(gradeT5(cmj([{ heightM: 0.4, landDepth: 0.1 }, { heightM: 0.4, armSwing: true }, { heightM: 1.4 }, { heightM: 0.35, landDepth: 0.6, landKneeIn: 0.12 }]).frames, ctx));
   out.push(gradeT5(cmj([0, 1, 2].map(() => ({ heightM: 0.4, rightLateMs: 70 })), { fps: 60 }).frames, ctx));
   out.push(gradeT5(cmj([{ heightM: 0.2 }, { heightM: 0.45 }, { heightM: 0.3 }]).frames, ctx));
   return out;
@@ -71,7 +71,7 @@ describe('every displayed score has a reason with a measured number in it', () =
   it('a fault names its side and the rep it happened on', () => {
     const r = reasonsFor(TESTS[1]).find((x) => x.metricId === 'valgusLeft')!;
     expect(r.kind).toBe('fault');
-    expect(r.text).toMatch(/^Left knee sat 0\.\d+ hip half-widths inside its hip–ankle line at the bottom on front-view rep \d \(target ≤ 0\.15, fault at 0\.35\)\. A fault here caps Overhead squat at 2\/3\./);
+    expect(r.text).toMatch(/^Left knee sat 0\.\d+ hip half-widths inside its hip–ankle line at the bottom on front-view rep \d \(target ≤ 0\.4, fault at 0\.8\)\. A fault here caps Overhead squat at 2\/3\./);
     const heel = reasonsFor(TESTS[1]).find((x) => x.metricId === 'heelRise')!;
     expect(heel.text).toMatch(/^The heels came up on 3 reps, first on side-view rep 1 \(target: heels down on every rep; any rep is a fault\)\./);
   });
@@ -116,12 +116,12 @@ describe('drill hints are placeholders, with no doses (owner default Q7)', () =>
 
 describe('cross-test links connect findings (spec §6)', () => {
   const t1Heel = TESTS[1];                      // left knee in + heel up
-  const t2RightTight = TESTS[5];                // right shin 33°
+  const t2RightTight = TESTS[5];                // right shin 26° (SCREEN-SHIP: Red is under 30°; was 33° under a 35° line)
   const t3LeftKneeDrop = TESTS[7];              // left knee in + left pelvic drop
 
   it('heel rise + a restricted ankle: "most likely an ankle-range limit"', () => {
     const [l] = crossLinks([t1Heel, t2RightTight]);
-    expect(l.text).toMatch(/most likely an ankle-range limit: your right shin reached only 33°/);
+    expect(l.text).toMatch(/most likely an ankle-range limit: your right shin reached only 26°/);
   });
 
   it('heel rise + normal ankles: weight shifting forward or balance', () => {
@@ -134,12 +134,12 @@ describe('cross-test links connect findings (spec §6)', () => {
   });
 
   it('knee in on the single-leg squat + a restricted ankle on that side', () => {
-    const t2LeftTight = gradeT2({ left: kneeWall('left', { tibiaMax: 32 }).frames, right: kneeWall('right').frames }, ctx);
+    const t2LeftTight = gradeT2({ left: kneeWall('left', { tibiaMax: 26 }).frames, right: kneeWall('right').frames }, ctx);
     expect(crossLinks([t2LeftTight, t3LeftKneeDrop]).map((r) => r.text).join(' ')).toMatch(/Ankle range may be forcing the left knee inward/);
   });
 
   it('knee in on landing + on the single-leg squat: a priority', () => {
-    const t5 = gradeT5(cmj([0, 1, 2].map(() => ({ heightM: 0.35, landDepth: 0.6, landKneeIn: 0.07 })), { fps: 60 }).frames, ctx);
+    const t5 = gradeT5(cmj([0, 1, 2].map(() => ({ heightM: 0.35, landDepth: 0.6, landKneeIn: 0.12 })), { fps: 60 }).frames, ctx);
     expect(crossLinks([t3LeftKneeDrop, t5]).map((r) => r.text).join(' ')).toMatch(/left knee pattern shows up in slow and fast movement.*priority/);
   });
 

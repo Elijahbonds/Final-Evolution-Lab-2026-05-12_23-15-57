@@ -7,23 +7,25 @@ import {
 
 describe('the threshold register', () => {
   it('carries the owner-set versions', () => {
-    expect(THRESHOLDS_VERSION).toBe('jump-screen-0.1-provisional');
+    expect(THRESHOLDS_VERSION).toBe('jump-screen-0.2-proposed');   // SCREEN-SHIP: bumped (the draft's bands, A2 reps)
     expect(PROTOCOL_VERSION).toBe('jump-screen-1.0');
   });
 
-  it('NOTHING IS SIGNED OFF: every entry is signedOff false, from the spec or the repo', () => {
+  it('NOTHING IS SIGNED OFF: every entry is signedOff false, from the spec, the repo, the research draft or the Squad', () => {
     for (const id of THRESHOLD_IDS) {
       const t = THRESHOLDS[id];
       expect(t.signedOff, id).toBe(false);
-      expect(['spec-TUNE-EJ', 'repo-TUNE(elijah)'], id).toContain(t.source);
-      expect(t.spec, id).toMatch(/§/);
+      expect(['spec-TUNE-EJ', 'repo-TUNE(elijah)', 'research-advisor-draft-2026-09-28', 'Screening Squad 2026-09-28'], id).toContain(t.source);
+      expect(t.spec, id).toMatch(/§|draft|A2-/);
       expect(t.label.length, id).toBeGreaterThan(10);
       if (t.source === 'repo-TUNE(elijah)') expect((t as { repo?: string }).repo, id).toBeTruthy();
     }
   });
 
   it('the values reused from the repo are the repo\'s own numbers, still unsigned', () => {
-    expect(bandOf('t1.valgus')).toMatchObject({ fault: 0.35, poor: 0.7 });
+    // SCREEN-SHIP: t1.valgus is the Screening Squad's now (0.4 / 0.8 hip half-widths), no longer the repo's 0.35 / 0.70
+    expect(THRESHOLDS['t1.valgus'].source).toBe('Screening Squad 2026-09-28');
+    expect(bandOf('t1.valgus')).toMatchObject({ good: 0.4, fault: 0.8, faultOp: '>' });
     expect(bandOf('t1.lateralShift').fault).toBe(0.3);
     expect(th('gate.minConfidence')).toBe(0.6);
     expect(th('prq.verticalJump')).toEqual({ floor: 12, ceiling: 40 });
