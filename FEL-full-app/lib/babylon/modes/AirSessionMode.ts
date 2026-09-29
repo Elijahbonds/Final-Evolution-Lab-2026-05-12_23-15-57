@@ -41,6 +41,14 @@ import { stepSpeedFov } from '../core/SpeedFov';
 import { BoardAnimTree } from '../anim/boardTree';   // boards pass phase 5: the family's one clip owner on big air too
 import { airBoardFeed, AIR_LAND_BEAT_SEC, AIR_BAIL_BEAT_SEC } from './airBoardFeed';
 import { dressBoard } from '../visual/meshyProps';   // phase 5: a snowboard under the rider (there was none)
+// MOVEMENT PLAY P8 (2026-09-26): the run-up from running in place (the steps graded on the camera's clock against a body's
+// cadence), a real quarter-turn in the air (the game plants the spin), a hand at the edge (the grab); steps in the Air
+// phase are IGNORED (P3's row flipped the spin's direction on every stride a player still jogging took there)
+import { RideIntents, BodyStride, rideLines, type RideIntent } from '../core/rideBody';
+import { grabTrickFor } from '../core/rideTricks';
+import { gravityAccelForVy } from '../../feel';
+import type { BodyView } from '../core/ModeHarness';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
 
 export interface AirSessionModeOpts {
   modeId: string;
@@ -90,6 +98,13 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   let boostPads: BoostPads | null = null;
   let boostHeld = false;
   let baseFov: number | null = null;
+  // MOVEMENT PLAY P8: the body's run-up grader, its air verbs, and the spin the game will plant (turns; null = none running)
+  const stride = new BodyStride();
+  const rideIntents = new RideIntents();
+  let plantAt: number | null = null;
+  let bodyPhase: string | null = null;   // the core's phase last frame: a new run-up starts the body's stride clean
+  let bodySynced = false;   // the body's quarters count from the first frame of play (rideIntents.sync)
+  const bodyStats = { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, ignoredInAir: 0, spins: 0, plants: 0, grabs: 0, last: '' };
 
   /** A clean / stuck landing: a soft shake on top of the scorePop + light feel hit that stay. */
   const landBeat = (ctx: ModeContext, grade: TrickGrade): void => { ctx.juice.shake(0.06, 120); console.info(`[AIR-JUICE] clean land (${grade})`); };
@@ -128,6 +143,51 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     S.attempt = 0; S.score = 0; S.combo = 0; S.best = null;
     S.nextFoot = 'L'; S.banner = ''; S.bannerT = 0; S.done = false;
     crashAt = 0; finishLatch = false;
+    stride.reset(); rideIntents.reset(); plantAt = null; bodyPhase = null; bodySynced = false;   // MOVEMENT PLAY P8
+    Object.assign(bodyStats, { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, ignoredInAir: 0, spins: 0, plants: 0, grabs: 0, last: '' });
+  };
+  /** The stride's feedback: the d-pad's and a body's step share it. */
+  const strideSay = (q: ReturnType<AirSessionCore['runTap']>): void => {
+    if (q === 'perfect') { say('PERFECT STRIDE', 0.5); SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 }); }
+    else if (q === 'good' || q === 'first') { say('GOOD', 0.4); SoundKit.play('uiTick', { pitch: 1.15, volume: 0.3 }); }
+    else if (q === 'fault') { say('STUMBLE!', 0.6); SoundKit.play('thud', { pitch: 0.8, volume: 0.4 }); }
+    else { say('OFF-BEAT', 0.4); SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 }); }
+  };
+  /**
+   * MOVEMENT PLAY P8: how many turns a spin started now can reach before touchdown — the core's own flight (its variable
+   * gravity) simulated forward from here at the spin's rate. The game plants the spin at the biggest half turn inside it
+   * (owner call 5's default: "the game finishes them").
+   */
+  const reachableTurns = (st: { vy: number; pos: { y: number } }): number => {
+    if (!core) return 0;
+    let vy = st.vy, y = st.pos.y, t = 0;
+    const dt = 1 / 120;
+    while ((y > 0 || vy > 0) && t < 5) { vy -= gravityAccelForVy(vy, core.feel.gravity) * dt; y += vy * dt; t += dt; }
+    return Math.abs(core.airTrick.rotation) + (core.airTrick.spinRatePerSec || 0) * t;
+  };
+  /** MOVEMENT PLAY P8: the body's verbs in the core's Air phase. */
+  const bodyVerb = (it: RideIntent): void => {
+    if (!core || core.state.phase !== 'Air') return;
+    if (it.kind === 'spin') {
+      if (core.airTrick.taps > 0 || plantAt !== null) return;   // one body spin an air (a pad's A may still run it)
+      // the planted half turn the air can finish (a margin of one frame's spin before touchdown); none fits → no spin
+      const target = Math.floor(reachableTurns(core.state) * 2 - 0.1) / 2;
+      if (target < 0.5) { console.info('[AIR-BODY] quarter-turn, no half turn fits the air left'); return; }
+      core.setSpinDir(it.side === 'R' ? 1 : -1);   // turned to the right = frontside (the d-pad's ▶)
+      core.trick();
+      plantAt = target;
+      const t = airTrickFor('snow', it.side === 'R' ? 'right' : 'left', 'A', 1.2);
+      if (t && t.kind === 'air' && !S.named.some((n) => n.id === t.id)) { S.named.push(t); if (t.grab !== 'none') grabThisAir = true; }
+      say(t?.label ?? 'SPIN', 0.7); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
+      bodyStats.spins++; bodyStats.last = `${it.dir} → ${target} turns`;
+      console.info(`[AIR-TRICK] body ${it.dir} quarter (${it.side}) → spin to ${target} turns`);
+    } else if (it.kind === 'grab') {
+      const t = grabTrickFor('snow', it.hand, it.edge, 1.2);
+      if (!t || S.named.some((n) => n.id === t.id)) return;
+      S.named.push(t); grabThisAir = true; say(t.label, 0.7);
+      bodyStats.grabs++; bodyStats.last = t.label;
+      console.info(`[AIR-TRICK] body grab ${it.hand}/${it.edge ?? '-'} → ${t.id}`);
+    }
   };
 
   const pushHud = (ctx: ModeContext): void => {
@@ -165,6 +225,22 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     modeId: opts.modeId,
     mood: opts.mood,
     camPreset: 'runner',
+    // MOVEMENT PLAY P8: the steps are the mode's — the run-up in 'Run', ignored anywhere else (never the spin's direction).
+    // The claim takes the P3 row's step → d-pad off the floor (dropping it is the cut line); the card says the run-up, the
+    // spin and the grab this mode reads itself
+    body: { claims: ['step'], lines: rideLines(opts.modeId, ['step']) },
+    onBody(_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+      if (ev.kind !== 'step' || S.done || !core) return false;
+      if (core.state.phase !== 'Run') { if (core.state.phase === 'Air') bodyStats.ignoredInAir++; return false; }
+      const q = stride.grade(ev, view);
+      if (!q) return false;
+      const got = core.runTap(ev.foot, q);
+      if (got === null) return false;
+      S.nextFoot = ev.foot === 'L' ? 'R' : 'L';
+      strideSay(got);
+      bodyStats.strides++; if (got !== 'first') bodyStats[got]++;
+      return true;
+    },
 
     async load(ctx: ModeContext): Promise<void> {
       loadCount += 1;
@@ -288,6 +364,12 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-4, 0, -3 - i * 2.2)),
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(4, 0, -4.5 - i * 2.2)),
       ]);
+      // MOVEMENT PLAY P8: the probe's read-only seam
+      (ctx.scene.metadata ??= {}).bigair = { state: () => ({
+        phase: core?.state.phase ?? null, speed: core ? +core.state.speed.toFixed(2) : 0, spinTurns: core ? +core.airTrick.rotation.toFixed(2) : 0,
+        spinDir: core?.airTrick.dir ?? null, spinning: core?.airTrick.spinning ?? false, attempt: core?.state.attempt ?? 0,
+        lastGrade: core?.state.lastGrade ?? null, lastRotations: core?.state.lastRotations ?? 0, named: S.named.map((t) => t.id), body: { ...bodyStats },
+      }) };
       pushHud(ctx);
     },
 
@@ -309,10 +391,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const side: CadenceSide = e.dir === 'left' ? 'L' : 'R';
         const q = core.runTap(side);
         S.nextFoot = side === 'L' ? 'R' : 'L';
-        if (q === 'perfect') { say('PERFECT STRIDE', 0.5); SoundKit.play('uiTick', { pitch: 1.5, volume: 0.4 }); }
-        else if (q === 'good' || q === 'first') { say('GOOD', 0.4); SoundKit.play('uiTick', { pitch: 1.15, volume: 0.3 }); }
-        else if (q === 'fault') { say('STUMBLE!', 0.6); SoundKit.play('thud', { pitch: 0.8, volume: 0.4 }); }
-        else { say('OFF-BEAT', 0.4); SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 }); }
+        strideSay(q);   // (MOVEMENT PLAY P8: the same feedback a body's graded step gets)
         return;
       }
 
@@ -344,6 +423,22 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       const bev = boost.update(dt, boostHeld, core.state.phase === 'Run');
       core.boostK = boost.k;
       const st = core.step(dt, dt);
+      // MOVEMENT PLAY P8: the body's air verbs, and the planted spin — the game plants it at the half turn it aimed for; a new
+      // attempt's run-up grades its first stride as a first (not against the last attempt's last step)
+      if (st.phase === 'Run' && bodyPhase !== null && bodyPhase !== 'Run') stride.reset();
+      bodyPhase = st.phase;
+      // (a quarter read before the first frame of play — a turn at READY — is never a spin: review fix)
+      if (!bodySynced) { rideIntents.sync(ctx.body?.() ?? null); bodySynced = true; }
+      if (st.phase === 'Air') for (const it of rideIntents.poll(ctx.body?.() ?? null, { airborne: true })) bodyVerb(it);
+      else rideIntents.poll(ctx.body?.() ?? null, { airborne: false });
+      if (plantAt !== null) {
+        if (st.phase !== 'Air') plantAt = null;
+        else if (core.airTrick.spinning && Math.abs(core.airTrick.rotation) >= plantAt) {
+          core.trick(); bodyStats.plants++;
+          console.info(`[AIR-TRICK] planted at ${Math.abs(core.airTrick.rotation).toFixed(2)} turns (aimed ${plantAt})`);
+          plantAt = null;
+        } else if (!core.airTrick.spinning) plantAt = null;   // a pad's A planted it first
+      }
 
       // Drive the athlete straight from the core's own 3D position.
       athlete.root.position.set(st.pos.x, Math.max(0, st.pos.y), st.pos.z);

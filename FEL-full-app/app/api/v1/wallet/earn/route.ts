@@ -43,5 +43,10 @@ export async function POST(req: NextRequest) {
     entry_id: result.entry_id,
     capped: result.capped,
     rejected: result.rejected ?? null,
+    // ECONOMY-SESSIONS-HARDEN: true when this key was already in the ledger — `granted` is the original grant and
+    // nothing was credited now (the display shows nothing new; lib/wallet/client.ts)
+    replayed: result.replayed === true,
+    // the daily first-session reward was already claimed: granted is 0 and this says why
+    already_claimed: result.alreadyClaimed === true,
   });
 }

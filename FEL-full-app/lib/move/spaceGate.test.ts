@@ -297,8 +297,8 @@ describe('G5: warnings never lock the player out', () => {
 const BOUND = Object.values(BODY_PROFILES).filter((p) => p.bindings.length > 0);
 
 describe('G6: nothing reaches a game before the check has passed', () => {
-  it('there are nine bound games', () => {
-    expect(BOUND.map((p) => p.key).sort()).toEqual(['bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf']);
+  it('there are eleven bound games (P3\'s nine, and P8\'s kart and plane)', () => {
+    expect(BOUND.map((p) => p.key).sort()).toEqual(['aeroaces', 'bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf', 'velocitykart']);
   });
 
   const streams: [string, PoseFrame[]][] = [
@@ -359,7 +359,7 @@ describe('G6: nothing reaches a game before the check has passed', () => {
     expect(used.size).toBe(jumps.length);
   });
 
-  it('given the check\'s calibration, karate VS jabs three times and kicks once (punch_kick)', () => {
+  it('given the check\'s calibration, karate VS jabs three times and kicks once (punch_kick) (the floor row; the harness claims these in P7)', () => {
     const { cal, packets } = calibrated('punch_kick');
     expect(cal).not.toBeNull();
     const r = seamReplay(packets, { profile: BODY_PROFILES['karate-vs'], start: 'playing' });

@@ -48,6 +48,7 @@ import { FREERUN_TRICKS, LAUNCH_MULT, TIERS } from './babylon/core/FreeRunCore';
 import { EVENTS_PER_NIGHT } from './babylon/core/CarnivalNight';
 import type { GrindLine } from './babylon/core/GroundRide';
 import { SNOW_SLOPE } from './babylon/modes/snowSlope';
+import { timeBonus, TIME_BONUS_MAX } from './babylon/modes/gateCrasher';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const num = (text: string, re: RegExp, what: string): number => {
@@ -908,9 +909,9 @@ describe('drift guards — the numbers mirrored out of mode files still match th
       for (const m of t.matchAll(/bonus: (\d+)/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
       for (const m of t.matchAll(/makeRail\([^;]*?, (\d+)\);/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
     }
-    // the snow ledges ([x, from, to, bonus] tuples) and the slope's rails (modes/snowSlope.ts, data)
-    const ledges = /for \(const \[x, d1, d2, bonus\] of (\[[^;]*?\]) as const\)/.exec(src('lib/babylon/modes/rideWorlds.ts'));
-    for (const [, , , bonus] of JSON.parse(ledges![1]) as number[][]) { seen++; expect(bonus).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
+    // the slope's rails are modes/snowSlope.ts data; the legacy slope-v2 ledges ([x, from, to, bonus] tuples) are gone
+    // (GATE-CRASHER-MAJOR: bare bars floating 0.7 m over the snow, one ending on gate 2's pole line) — and stay gone
+    expect(/for \(const \[x, d1, d2, bonus\] of/.test(src('lib/babylon/modes/rideWorlds.ts'))).toBe(false);
     for (const f of SNOW_SLOPE) { seen++; expect(f.bonus, f.kind).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
     expect(seen).toBeGreaterThan(25);
     // …and nothing else in the tree builds one
@@ -937,7 +938,14 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(snow, /tricks\.score \+= (\d+);/, 'gate points')).toBe(MIRRORED.slalomGatePts);
     expect(num(snow, /const YETI_CLEAR_PTS = (\d+);/, 'YETI_CLEAR_PTS')).toBe(MIRRORED.yetiClearPts);
     expect(snow).toContain('yetiDone = true;                       // one appearance per run');
-    expect(snow).toContain('Math.max(0, Math.round((60 - elapsed) * 10))');
+    // GATE-CRASHER-POLISH-2 (GC-9): the time bonus is gateCrasher.timeBonus — a new CURVE (10 a second under 90 s, so one fall no
+    // longer zeroes it), the SAME ceiling. This guard pinned the old formula's text; it now reads the function's own maximum
+    // against the mirror, and that the mode pays the time through it and nothing hand-rolled beside it.
+    expect(snow).toContain('timeBonus(elapsed)');
+    expect(snow).not.toMatch(/Math\.round\(\(\d+ - elapsed\)/);
+    expect(timeBonus(0)).toBe(MIRRORED.snowTimeBonusMax);
+    expect(TIME_BONUS_MAX).toBe(MIRRORED.snowTimeBonusMax);
+    expect(Math.max(...Array.from({ length: 481 }, (_, i) => timeBonus(i * 0.5)))).toBe(MIRRORED.snowTimeBonusMax);
     expect(MIRRORED.snowTimeBonusMax).toBe(60 * 10);
     expect(snow.match(/tricks\.score \+= /g)).toHaveLength(2);                   // the yeti and a gate
     expect(snow).toContain('rig.rider.jump(0.5 + tuck * 0.5)');

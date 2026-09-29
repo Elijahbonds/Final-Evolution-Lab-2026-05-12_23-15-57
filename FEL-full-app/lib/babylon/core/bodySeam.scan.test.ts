@@ -58,7 +58,8 @@ describe('the harness reads the body (plan §4.4)', () => {
   it('builds the seam with bodySeamFor, and nothing by hand (Z3, Z5: the row and `drives` are decided there, and tested there)', () => {
     // the step-3 review: `const drives = true` (a dunk paused for a pad player's body walking off) or every mode on
     // skateboard's row (the body pressing POP in a quiz) passed every test while the harness built these itself
-    expect(harness).toMatch(/const seam = bodySeamFor\(def\);\s*const store = sessionStore\.mount\(seam\.card\);/);
+    // (MOVEMENT PLAY P8: the mount's snapshot carries a board game's stance ask — sessionStore.stanceOnMount reads the row)
+    expect(harness).toMatch(/const seam = bodySeamFor\(def\);\s*const store = sessionStore\.mount\(\{ \.\.\.seam\.card, stance: stanceOnMount\(seam\.profile\) \}\);/);
     expect(harness).toMatch(/const \{ claimed, floor, session, evidence \} = seam;/);
     for (const byHand of [/new BodyFloor\(/, /new BodySession\(/, /new EvidenceCounter\(/, /resolveBodyProfile\(/, /cardLines\(/, /\.bindings\b/]) {
       expect(harness).not.toMatch(byHand);
@@ -71,8 +72,9 @@ describe('the harness reads the body (plan §4.4)', () => {
     const on = harness.slice(harness.indexOf('input.onBody('));
     expect(on.length).toBeGreaterThan(0);
     expect(on).toMatch(/^input\.onBody\(\(p\) => \{\s*const now = performance\.now\(\);\s*const s = session\.step\(phase, p, now\);\s*applyBody\(s\);\s*if \(p\.final\) releaseBody\(\);\s*if \(phase === 'playing'\) \{\s*for \(const e of floor\.step\(p, now, s\.latched\)\) input\.emitBody\(e\);/);
-    // the raw events go to QA's bodyLog; a claimed kind goes to the mode's onBody and counts as play
-    expect(on).toMatch(/qa\?\.body\(ev\.kind, now - ev\.t\);\s*if \(def\.onBody && claimed\.has\(ev\.kind\)\) \{\s*qa\?\.press\(`body:\$\{ev\.kind\}`\); store\.count\('body'\); session\.noteInput\('body', now\);\s*def\.onBody\(ctx, ev, viewOf\(p\)\);/);
+    // the raw events go to QA's bodyLog; a claimed kind goes to the mode's onBody — never while the START latch holds
+    // (P7) — and counts as play only when the mode took it (onBody did not return false: a menu is not play)
+    expect(on).toMatch(/qa\?\.body\(ev\.kind, now - ev\.t\);\s*if \(def\.onBody && claimed\.has\(ev\.kind\) && !s\.latched\) \{\s*if \(def\.onBody\(ctx, ev, viewOf\(p\)\) !== false\) \{ qa\?\.press\(`body:\$\{ev\.kind\}`\); store\.count\('body'\); session\.noteInput\('body', now\); \}/);
     expect(on).toMatch(/store\.setBody\(s\.presence, s\.handsUp01\);\s*\}\);/);
     // the render loop ticks the session and the floor's pulses in every phase, before the mode's update — and writes the
     // tick's presence (the step-4a review: a stalled camera's last 'present' stayed on the pause line and the Body card)

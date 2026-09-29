@@ -472,11 +472,23 @@ export interface SynthOptions {
   latencyMs?: number;
   latencyJitterMs?: number;
   gt?: GtOptions;
+  /**
+   * MOVEMENT PLAY P7 (2026-09-25): MOTION BLUR — a hand or foot point moving faster than `px` pixels per 1/30 s (its true
+   * image position between delivered frames, so the same speed blurs at any camera rate) comes back UNSURE (visibility
+   * under 0.5) and `mult`× noisier, the way the model loses a wrist at a punch's peak speed. At the default camera 6 px
+   * is ~3 cm, ~1 m/s. Off by default: every earlier fixture and gate is unchanged (it draws no extra random numbers).
+   */
+  blur?: { px: number; mult: number } | false;
 }
 export interface ResolvedSynth {
   camera: CameraSpec; fps: number; frameJitterMs: number; t0: number; seed: number; noise: NoiseSpec | false;
   dropRate: number; missRate: number; latencyMs: number; latencyJitterMs: number; gt: Required<GtOptions>;
+  blur?: { px: number; mult: number } | false;
 }
+/** The blur model's default (PLAN-P7 §6.3, est.): > 6 px per 1/30 s, 3× the noise. */
+export const DEFAULT_BLUR = { px: 6, mult: 3 } as const;
+/** The points the blur model reads: the wrists and hands (15–22), the ankles, heels and toes (27–32). */
+const BLUR_POINTS = new Set([15, 16, 17, 18, 19, 20, 21, 22, 27, 28, 29, 30, 31, 32]);
 
 const TORSO_FACE = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 23, 24]);
 const TORSO_QUAD = [LEFT_SHOULDER, RIGHT_SHOULDER, RIGHT_HIP, LEFT_HIP];
@@ -544,6 +556,13 @@ export function assertHandedness(cam: Camera, clip: JointClip): void {
 
 export interface Synthesized { frames: PoseFrame[]; gt: GroundTruth; settings: ResolvedSynth }
 
+/** The hand and foot points that moved more than `px` pixels (image width `W`) since the last delivered frame. */
+function blurredPoints(now: Lm[], prev: Lm[], px: number, W: number): Set<number> {
+  const out = new Set<number>();
+  for (const i of BLUR_POINTS) if (Math.hypot(now[i].x - prev[i].x, now[i].y - prev[i].y) * W > px) out.add(i);
+  return out;
+}
+
 /** A clip → what a phone would deliver, plus the ground truth aligned to it. */
 export function synthesize(clip: JointClip, opt: SynthOptions = {}): Synthesized {
   const settings: ResolvedSynth = {
@@ -553,6 +572,7 @@ export function synthesize(clip: JointClip, opt: SynthOptions = {}): Synthesized
     dropRate: opt.dropRate ?? 0.02, missRate: opt.missRate ?? 0.01,
     latencyMs: opt.latencyMs ?? 66, latencyJitterMs: opt.latencyJitterMs ?? 8,
     gt: { ...DEFAULT_GT, ...opt.gt },
+    ...(opt.blur ? { blur: opt.blur } : {}),
   };
   const cam = makeCamera(settings.camera);
   assertHandedness(cam, clip);
@@ -563,6 +583,7 @@ export function synthesize(clip: JointClip, opt: SynthOptions = {}): Synthesized
   const frames: PoseFrame[] = [];
   const times: number[] = [];   // source seconds of each delivered frame
   let lastArrive = -Infinity;
+  let prevTrue: Lm[] | null = null, prevTs = 0;   // the last delivered frame's true image points and time (the blur model)
   for (let k = 0; ; k++) {
     const ideal = k / settings.fps;
     if (ideal > dur) break;
@@ -577,6 +598,8 @@ export function synthesize(clip: JointClip, opt: SynthOptions = {}): Synthesized
     times.push(ts);
     const j = sampleClip(clip, ts);
     const { image, world, depth, faceAway } = renderFrame(cam, j, foot);
+    const blurred = settings.blur && prevTrue ? blurredPoints(image, prevTrue, (settings.blur.px * Math.max(1e-3, ts - prevTs) * 30), settings.camera.width) : null;
+    if (settings.blur) { prevTrue = image.map((l) => ({ ...l })); prevTs = ts; }
     // a body the model can find: 5 of the 9 core points in frame
     const inCount = CORE_POINTS.filter((i) => inFrame(image[i])).length;
     if (missed || inCount < 5) { frames.push({ t, present: false, image: [], arrive }); continue; }
@@ -593,9 +616,12 @@ export function synthesize(clip: JointClip, opt: SynthOptions = {}): Synthesized
       if (!inFrame(l)) v = 0.05 + spread * 0.05;
       else if ((!TORSO_FACE.has(i) && depth[i] > torsoDepth + 0.08 && insidePoly(l.x, l.y, grown)) || (faceAway && FACE.includes(i))) v = 0.3 + spread * 0.15;
       else v = 0.9 + spread * 0.09;
+      // motion blur: a fast hand or foot comes back unsure and noisier (P7)
+      const blurMult = blurred?.has(i) && settings.blur ? settings.blur.mult : 1;
+      if (blurMult > 1 && v >= 0.5) v = 0.3 + spread * 0.15;
       l.v = v;
       if (settings.noise) {
-        const n = settings.noise, weak = v < 0.5 ? 3 : 1;
+        const n = settings.noise, weak = blurMult > 1 ? blurMult : v < 0.5 ? 3 : 1;
         const si = (TORSO_FACE.has(i) ? n.imageTorso : n.imageLimb) * weak;
         const sw = (TORSO_FACE.has(i) ? n.worldTorso : n.worldLimb) * weak;
         l.x += gauss() * si; l.y += gauss() * si * aspect; l.z += gauss() * si * n.depthScale;

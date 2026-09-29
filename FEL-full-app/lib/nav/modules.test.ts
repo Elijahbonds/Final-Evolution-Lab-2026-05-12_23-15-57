@@ -31,6 +31,10 @@ const NOT_IMPORTED: Record<string, string> = {
   // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
   // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
+  // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
+  // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
+  // without that GO; wiring it is two lines per sessions route, then this line goes.
+  'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */

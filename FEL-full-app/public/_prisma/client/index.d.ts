@@ -29,6 +29,16 @@ export type PlayerProfile = $Result.DefaultSelection<Prisma.$PlayerProfilePayloa
  */
 export type GameSession = $Result.DefaultSelection<Prisma.$GameSessionPayload>
 /**
+ * Model SessionRun
+ * 
+ */
+export type SessionRun = $Result.DefaultSelection<Prisma.$SessionRunPayload>
+/**
+ * Model SessionGrant
+ * 
+ */
+export type SessionGrant = $Result.DefaultSelection<Prisma.$SessionGrantPayload>
+/**
  * Model CreditLedger
  * 
  */
@@ -941,6 +951,26 @@ export class PrismaClient<
     * ```
     */
   get gameSession(): Prisma.GameSessionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.sessionRun`: Exposes CRUD operations for the **SessionRun** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SessionRuns
+    * const sessionRuns = await prisma.sessionRun.findMany()
+    * ```
+    */
+  get sessionRun(): Prisma.SessionRunDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.sessionGrant`: Exposes CRUD operations for the **SessionGrant** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SessionGrants
+    * const sessionGrants = await prisma.sessionGrant.findMany()
+    * ```
+    */
+  get sessionGrant(): Prisma.SessionGrantDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.creditLedger`: Exposes CRUD operations for the **CreditLedger** model.
@@ -2204,6 +2234,8 @@ export namespace Prisma {
     User: 'User',
     PlayerProfile: 'PlayerProfile',
     GameSession: 'GameSession',
+    SessionRun: 'SessionRun',
+    SessionGrant: 'SessionGrant',
     CreditLedger: 'CreditLedger',
     CardOwnership: 'CardOwnership',
     StoryNodeProgress: 'StoryNodeProgress',
@@ -2304,7 +2336,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "shareLink" | "coachInvite" | "coachClient"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2527,6 +2559,154 @@ export namespace Prisma {
           count: {
             args: Prisma.GameSessionCountArgs<ExtArgs>
             result: $Utils.Optional<GameSessionCountAggregateOutputType> | number
+          }
+        }
+      }
+      SessionRun: {
+        payload: Prisma.$SessionRunPayload<ExtArgs>
+        fields: Prisma.SessionRunFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SessionRunFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SessionRunFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>
+          }
+          findFirst: {
+            args: Prisma.SessionRunFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SessionRunFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>
+          }
+          findMany: {
+            args: Prisma.SessionRunFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>[]
+          }
+          create: {
+            args: Prisma.SessionRunCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>
+          }
+          createMany: {
+            args: Prisma.SessionRunCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SessionRunCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>[]
+          }
+          delete: {
+            args: Prisma.SessionRunDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>
+          }
+          update: {
+            args: Prisma.SessionRunUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>
+          }
+          deleteMany: {
+            args: Prisma.SessionRunDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SessionRunUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SessionRunUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>[]
+          }
+          upsert: {
+            args: Prisma.SessionRunUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionRunPayload>
+          }
+          aggregate: {
+            args: Prisma.SessionRunAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSessionRun>
+          }
+          groupBy: {
+            args: Prisma.SessionRunGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SessionRunGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SessionRunCountArgs<ExtArgs>
+            result: $Utils.Optional<SessionRunCountAggregateOutputType> | number
+          }
+        }
+      }
+      SessionGrant: {
+        payload: Prisma.$SessionGrantPayload<ExtArgs>
+        fields: Prisma.SessionGrantFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SessionGrantFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SessionGrantFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>
+          }
+          findFirst: {
+            args: Prisma.SessionGrantFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SessionGrantFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>
+          }
+          findMany: {
+            args: Prisma.SessionGrantFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>[]
+          }
+          create: {
+            args: Prisma.SessionGrantCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>
+          }
+          createMany: {
+            args: Prisma.SessionGrantCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SessionGrantCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>[]
+          }
+          delete: {
+            args: Prisma.SessionGrantDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>
+          }
+          update: {
+            args: Prisma.SessionGrantUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>
+          }
+          deleteMany: {
+            args: Prisma.SessionGrantDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SessionGrantUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SessionGrantUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>[]
+          }
+          upsert: {
+            args: Prisma.SessionGrantUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SessionGrantPayload>
+          }
+          aggregate: {
+            args: Prisma.SessionGrantAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSessionGrant>
+          }
+          groupBy: {
+            args: Prisma.SessionGrantGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SessionGrantGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SessionGrantCountArgs<ExtArgs>
+            result: $Utils.Optional<SessionGrantCountAggregateOutputType> | number
           }
         }
       }
@@ -8685,6 +8865,8 @@ export namespace Prisma {
     user?: UserOmit
     playerProfile?: PlayerProfileOmit
     gameSession?: GameSessionOmit
+    sessionRun?: SessionRunOmit
+    sessionGrant?: SessionGrantOmit
     creditLedger?: CreditLedgerOmit
     cardOwnership?: CardOwnershipOmit
     storyNodeProgress?: StoryNodeProgressOmit
@@ -8862,6 +9044,8 @@ export namespace Prisma {
 
   export type UserCountOutputType = {
     sessions: number
+    sessionRuns: number
+    sessionGrants: number
     ledger: number
     cards: number
     prqEntries: number
@@ -8909,6 +9093,8 @@ export namespace Prisma {
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     sessions?: boolean | UserCountOutputTypeCountSessionsArgs
+    sessionRuns?: boolean | UserCountOutputTypeCountSessionRunsArgs
+    sessionGrants?: boolean | UserCountOutputTypeCountSessionGrantsArgs
     ledger?: boolean | UserCountOutputTypeCountLedgerArgs
     cards?: boolean | UserCountOutputTypeCountCardsArgs
     prqEntries?: boolean | UserCountOutputTypeCountPrqEntriesArgs
@@ -8970,6 +9156,20 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: GameSessionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountSessionRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionRunWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountSessionGrantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionGrantWhereInput
   }
 
   /**
@@ -9271,6 +9471,37 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountCrmNotesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CrmNoteWhereInput
+  }
+
+
+  /**
+   * Count Type SessionRunCountOutputType
+   */
+
+  export type SessionRunCountOutputType = {
+    grants: number
+  }
+
+  export type SessionRunCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    grants?: boolean | SessionRunCountOutputTypeCountGrantsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * SessionRunCountOutputType without action
+   */
+  export type SessionRunCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRunCountOutputType
+     */
+    select?: SessionRunCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * SessionRunCountOutputType without action
+   */
+  export type SessionRunCountOutputTypeCountGrantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionGrantWhereInput
   }
 
 
@@ -10411,6 +10642,8 @@ export namespace Prisma {
     policyAcceptedAt?: boolean
     profile?: boolean | User$profileArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
+    sessionRuns?: boolean | User$sessionRunsArgs<ExtArgs>
+    sessionGrants?: boolean | User$sessionGrantsArgs<ExtArgs>
     ledger?: boolean | User$ledgerArgs<ExtArgs>
     cards?: boolean | User$cardsArgs<ExtArgs>
     prqEntries?: boolean | User$prqEntriesArgs<ExtArgs>
@@ -10521,6 +10754,8 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     profile?: boolean | User$profileArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
+    sessionRuns?: boolean | User$sessionRunsArgs<ExtArgs>
+    sessionGrants?: boolean | User$sessionGrantsArgs<ExtArgs>
     ledger?: boolean | User$ledgerArgs<ExtArgs>
     cards?: boolean | User$cardsArgs<ExtArgs>
     prqEntries?: boolean | User$prqEntriesArgs<ExtArgs>
@@ -10583,6 +10818,8 @@ export namespace Prisma {
     objects: {
       profile: Prisma.$PlayerProfilePayload<ExtArgs> | null
       sessions: Prisma.$GameSessionPayload<ExtArgs>[]
+      sessionRuns: Prisma.$SessionRunPayload<ExtArgs>[]
+      sessionGrants: Prisma.$SessionGrantPayload<ExtArgs>[]
       ledger: Prisma.$CreditLedgerPayload<ExtArgs>[]
       cards: Prisma.$CardOwnershipPayload<ExtArgs>[]
       prqEntries: Prisma.$PrqEntryPayload<ExtArgs>[]
@@ -11047,6 +11284,8 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     profile<T extends User$profileArgs<ExtArgs> = {}>(args?: Subset<T, User$profileArgs<ExtArgs>>): Prisma__PlayerProfileClient<$Result.GetResult<Prisma.$PlayerProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GameSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    sessionRuns<T extends User$sessionRunsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionRunsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    sessionGrants<T extends User$sessionGrantsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionGrantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     ledger<T extends User$ledgerArgs<ExtArgs> = {}>(args?: Subset<T, User$ledgerArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreditLedgerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     cards<T extends User$cardsArgs<ExtArgs> = {}>(args?: Subset<T, User$cardsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CardOwnershipPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     prqEntries<T extends User$prqEntriesArgs<ExtArgs> = {}>(args?: Subset<T, User$prqEntriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PrqEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -11570,6 +11809,54 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: GameSessionScalarFieldEnum | GameSessionScalarFieldEnum[]
+  }
+
+  /**
+   * User.sessionRuns
+   */
+  export type User$sessionRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    where?: SessionRunWhereInput
+    orderBy?: SessionRunOrderByWithRelationInput | SessionRunOrderByWithRelationInput[]
+    cursor?: SessionRunWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SessionRunScalarFieldEnum | SessionRunScalarFieldEnum[]
+  }
+
+  /**
+   * User.sessionGrants
+   */
+  export type User$sessionGrantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    where?: SessionGrantWhereInput
+    orderBy?: SessionGrantOrderByWithRelationInput | SessionGrantOrderByWithRelationInput[]
+    cursor?: SessionGrantWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SessionGrantScalarFieldEnum | SessionGrantScalarFieldEnum[]
   }
 
   /**
@@ -15414,6 +15701,2367 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: GameSessionInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SessionRun
+   */
+
+  export type AggregateSessionRun = {
+    _count: SessionRunCountAggregateOutputType | null
+    _avg: SessionRunAvgAggregateOutputType | null
+    _sum: SessionRunSumAggregateOutputType | null
+    _min: SessionRunMinAggregateOutputType | null
+    _max: SessionRunMaxAggregateOutputType | null
+  }
+
+  export type SessionRunAvgAggregateOutputType = {
+    score: number | null
+    durationMs: number | null
+  }
+
+  export type SessionRunSumAggregateOutputType = {
+    score: number | null
+    durationMs: number | null
+  }
+
+  export type SessionRunMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    mode: string | null
+    status: string | null
+    payoutEligible: boolean | null
+    ineligibleReason: string | null
+    startedAt: Date | null
+    expiresAt: Date | null
+    finishedAt: Date | null
+    score: number | null
+    durationMs: number | null
+    rejectReason: string | null
+    sessionId: string | null
+  }
+
+  export type SessionRunMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    mode: string | null
+    status: string | null
+    payoutEligible: boolean | null
+    ineligibleReason: string | null
+    startedAt: Date | null
+    expiresAt: Date | null
+    finishedAt: Date | null
+    score: number | null
+    durationMs: number | null
+    rejectReason: string | null
+    sessionId: string | null
+  }
+
+  export type SessionRunCountAggregateOutputType = {
+    id: number
+    userId: number
+    mode: number
+    status: number
+    payoutEligible: number
+    ineligibleReason: number
+    startedAt: number
+    expiresAt: number
+    finishedAt: number
+    score: number
+    durationMs: number
+    rejectReason: number
+    sessionId: number
+    result: number
+    _all: number
+  }
+
+
+  export type SessionRunAvgAggregateInputType = {
+    score?: true
+    durationMs?: true
+  }
+
+  export type SessionRunSumAggregateInputType = {
+    score?: true
+    durationMs?: true
+  }
+
+  export type SessionRunMinAggregateInputType = {
+    id?: true
+    userId?: true
+    mode?: true
+    status?: true
+    payoutEligible?: true
+    ineligibleReason?: true
+    startedAt?: true
+    expiresAt?: true
+    finishedAt?: true
+    score?: true
+    durationMs?: true
+    rejectReason?: true
+    sessionId?: true
+  }
+
+  export type SessionRunMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    mode?: true
+    status?: true
+    payoutEligible?: true
+    ineligibleReason?: true
+    startedAt?: true
+    expiresAt?: true
+    finishedAt?: true
+    score?: true
+    durationMs?: true
+    rejectReason?: true
+    sessionId?: true
+  }
+
+  export type SessionRunCountAggregateInputType = {
+    id?: true
+    userId?: true
+    mode?: true
+    status?: true
+    payoutEligible?: true
+    ineligibleReason?: true
+    startedAt?: true
+    expiresAt?: true
+    finishedAt?: true
+    score?: true
+    durationMs?: true
+    rejectReason?: true
+    sessionId?: true
+    result?: true
+    _all?: true
+  }
+
+  export type SessionRunAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SessionRun to aggregate.
+     */
+    where?: SessionRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionRuns to fetch.
+     */
+    orderBy?: SessionRunOrderByWithRelationInput | SessionRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SessionRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SessionRuns
+    **/
+    _count?: true | SessionRunCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SessionRunAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SessionRunSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SessionRunMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SessionRunMaxAggregateInputType
+  }
+
+  export type GetSessionRunAggregateType<T extends SessionRunAggregateArgs> = {
+        [P in keyof T & keyof AggregateSessionRun]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSessionRun[P]>
+      : GetScalarType<T[P], AggregateSessionRun[P]>
+  }
+
+
+
+
+  export type SessionRunGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionRunWhereInput
+    orderBy?: SessionRunOrderByWithAggregationInput | SessionRunOrderByWithAggregationInput[]
+    by: SessionRunScalarFieldEnum[] | SessionRunScalarFieldEnum
+    having?: SessionRunScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SessionRunCountAggregateInputType | true
+    _avg?: SessionRunAvgAggregateInputType
+    _sum?: SessionRunSumAggregateInputType
+    _min?: SessionRunMinAggregateInputType
+    _max?: SessionRunMaxAggregateInputType
+  }
+
+  export type SessionRunGroupByOutputType = {
+    id: string
+    userId: string
+    mode: string
+    status: string
+    payoutEligible: boolean
+    ineligibleReason: string | null
+    startedAt: Date
+    expiresAt: Date
+    finishedAt: Date | null
+    score: number | null
+    durationMs: number | null
+    rejectReason: string | null
+    sessionId: string | null
+    result: JsonValue | null
+    _count: SessionRunCountAggregateOutputType | null
+    _avg: SessionRunAvgAggregateOutputType | null
+    _sum: SessionRunSumAggregateOutputType | null
+    _min: SessionRunMinAggregateOutputType | null
+    _max: SessionRunMaxAggregateOutputType | null
+  }
+
+  type GetSessionRunGroupByPayload<T extends SessionRunGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SessionRunGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SessionRunGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SessionRunGroupByOutputType[P]>
+            : GetScalarType<T[P], SessionRunGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SessionRunSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    mode?: boolean
+    status?: boolean
+    payoutEligible?: boolean
+    ineligibleReason?: boolean
+    startedAt?: boolean
+    expiresAt?: boolean
+    finishedAt?: boolean
+    score?: boolean
+    durationMs?: boolean
+    rejectReason?: boolean
+    sessionId?: boolean
+    result?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    grants?: boolean | SessionRun$grantsArgs<ExtArgs>
+    _count?: boolean | SessionRunCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sessionRun"]>
+
+  export type SessionRunSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    mode?: boolean
+    status?: boolean
+    payoutEligible?: boolean
+    ineligibleReason?: boolean
+    startedAt?: boolean
+    expiresAt?: boolean
+    finishedAt?: boolean
+    score?: boolean
+    durationMs?: boolean
+    rejectReason?: boolean
+    sessionId?: boolean
+    result?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sessionRun"]>
+
+  export type SessionRunSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    mode?: boolean
+    status?: boolean
+    payoutEligible?: boolean
+    ineligibleReason?: boolean
+    startedAt?: boolean
+    expiresAt?: boolean
+    finishedAt?: boolean
+    score?: boolean
+    durationMs?: boolean
+    rejectReason?: boolean
+    sessionId?: boolean
+    result?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sessionRun"]>
+
+  export type SessionRunSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    mode?: boolean
+    status?: boolean
+    payoutEligible?: boolean
+    ineligibleReason?: boolean
+    startedAt?: boolean
+    expiresAt?: boolean
+    finishedAt?: boolean
+    score?: boolean
+    durationMs?: boolean
+    rejectReason?: boolean
+    sessionId?: boolean
+    result?: boolean
+  }
+
+  export type SessionRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "mode" | "status" | "payoutEligible" | "ineligibleReason" | "startedAt" | "expiresAt" | "finishedAt" | "score" | "durationMs" | "rejectReason" | "sessionId" | "result", ExtArgs["result"]["sessionRun"]>
+  export type SessionRunInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    grants?: boolean | SessionRun$grantsArgs<ExtArgs>
+    _count?: boolean | SessionRunCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type SessionRunIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type SessionRunIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $SessionRunPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SessionRun"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+      grants: Prisma.$SessionGrantPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      mode: string
+      status: string
+      payoutEligible: boolean
+      ineligibleReason: string | null
+      startedAt: Date
+      expiresAt: Date
+      finishedAt: Date | null
+      score: number | null
+      durationMs: number | null
+      rejectReason: string | null
+      sessionId: string | null
+      result: Prisma.JsonValue | null
+    }, ExtArgs["result"]["sessionRun"]>
+    composites: {}
+  }
+
+  type SessionRunGetPayload<S extends boolean | null | undefined | SessionRunDefaultArgs> = $Result.GetResult<Prisma.$SessionRunPayload, S>
+
+  type SessionRunCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SessionRunFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SessionRunCountAggregateInputType | true
+    }
+
+  export interface SessionRunDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SessionRun'], meta: { name: 'SessionRun' } }
+    /**
+     * Find zero or one SessionRun that matches the filter.
+     * @param {SessionRunFindUniqueArgs} args - Arguments to find a SessionRun
+     * @example
+     * // Get one SessionRun
+     * const sessionRun = await prisma.sessionRun.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SessionRunFindUniqueArgs>(args: SelectSubset<T, SessionRunFindUniqueArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SessionRun that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SessionRunFindUniqueOrThrowArgs} args - Arguments to find a SessionRun
+     * @example
+     * // Get one SessionRun
+     * const sessionRun = await prisma.sessionRun.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SessionRunFindUniqueOrThrowArgs>(args: SelectSubset<T, SessionRunFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SessionRun that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunFindFirstArgs} args - Arguments to find a SessionRun
+     * @example
+     * // Get one SessionRun
+     * const sessionRun = await prisma.sessionRun.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SessionRunFindFirstArgs>(args?: SelectSubset<T, SessionRunFindFirstArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SessionRun that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunFindFirstOrThrowArgs} args - Arguments to find a SessionRun
+     * @example
+     * // Get one SessionRun
+     * const sessionRun = await prisma.sessionRun.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SessionRunFindFirstOrThrowArgs>(args?: SelectSubset<T, SessionRunFindFirstOrThrowArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SessionRuns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SessionRuns
+     * const sessionRuns = await prisma.sessionRun.findMany()
+     * 
+     * // Get first 10 SessionRuns
+     * const sessionRuns = await prisma.sessionRun.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const sessionRunWithIdOnly = await prisma.sessionRun.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SessionRunFindManyArgs>(args?: SelectSubset<T, SessionRunFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SessionRun.
+     * @param {SessionRunCreateArgs} args - Arguments to create a SessionRun.
+     * @example
+     * // Create one SessionRun
+     * const SessionRun = await prisma.sessionRun.create({
+     *   data: {
+     *     // ... data to create a SessionRun
+     *   }
+     * })
+     * 
+     */
+    create<T extends SessionRunCreateArgs>(args: SelectSubset<T, SessionRunCreateArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SessionRuns.
+     * @param {SessionRunCreateManyArgs} args - Arguments to create many SessionRuns.
+     * @example
+     * // Create many SessionRuns
+     * const sessionRun = await prisma.sessionRun.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SessionRunCreateManyArgs>(args?: SelectSubset<T, SessionRunCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SessionRuns and returns the data saved in the database.
+     * @param {SessionRunCreateManyAndReturnArgs} args - Arguments to create many SessionRuns.
+     * @example
+     * // Create many SessionRuns
+     * const sessionRun = await prisma.sessionRun.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SessionRuns and only return the `id`
+     * const sessionRunWithIdOnly = await prisma.sessionRun.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SessionRunCreateManyAndReturnArgs>(args?: SelectSubset<T, SessionRunCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SessionRun.
+     * @param {SessionRunDeleteArgs} args - Arguments to delete one SessionRun.
+     * @example
+     * // Delete one SessionRun
+     * const SessionRun = await prisma.sessionRun.delete({
+     *   where: {
+     *     // ... filter to delete one SessionRun
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SessionRunDeleteArgs>(args: SelectSubset<T, SessionRunDeleteArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SessionRun.
+     * @param {SessionRunUpdateArgs} args - Arguments to update one SessionRun.
+     * @example
+     * // Update one SessionRun
+     * const sessionRun = await prisma.sessionRun.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SessionRunUpdateArgs>(args: SelectSubset<T, SessionRunUpdateArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SessionRuns.
+     * @param {SessionRunDeleteManyArgs} args - Arguments to filter SessionRuns to delete.
+     * @example
+     * // Delete a few SessionRuns
+     * const { count } = await prisma.sessionRun.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SessionRunDeleteManyArgs>(args?: SelectSubset<T, SessionRunDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SessionRuns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SessionRuns
+     * const sessionRun = await prisma.sessionRun.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SessionRunUpdateManyArgs>(args: SelectSubset<T, SessionRunUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SessionRuns and returns the data updated in the database.
+     * @param {SessionRunUpdateManyAndReturnArgs} args - Arguments to update many SessionRuns.
+     * @example
+     * // Update many SessionRuns
+     * const sessionRun = await prisma.sessionRun.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SessionRuns and only return the `id`
+     * const sessionRunWithIdOnly = await prisma.sessionRun.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SessionRunUpdateManyAndReturnArgs>(args: SelectSubset<T, SessionRunUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SessionRun.
+     * @param {SessionRunUpsertArgs} args - Arguments to update or create a SessionRun.
+     * @example
+     * // Update or create a SessionRun
+     * const sessionRun = await prisma.sessionRun.upsert({
+     *   create: {
+     *     // ... data to create a SessionRun
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SessionRun we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SessionRunUpsertArgs>(args: SelectSubset<T, SessionRunUpsertArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SessionRuns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunCountArgs} args - Arguments to filter SessionRuns to count.
+     * @example
+     * // Count the number of SessionRuns
+     * const count = await prisma.sessionRun.count({
+     *   where: {
+     *     // ... the filter for the SessionRuns we want to count
+     *   }
+     * })
+    **/
+    count<T extends SessionRunCountArgs>(
+      args?: Subset<T, SessionRunCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SessionRunCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SessionRun.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SessionRunAggregateArgs>(args: Subset<T, SessionRunAggregateArgs>): Prisma.PrismaPromise<GetSessionRunAggregateType<T>>
+
+    /**
+     * Group by SessionRun.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionRunGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SessionRunGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SessionRunGroupByArgs['orderBy'] }
+        : { orderBy?: SessionRunGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SessionRunGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSessionRunGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SessionRun model
+   */
+  readonly fields: SessionRunFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SessionRun.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SessionRunClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    grants<T extends SessionRun$grantsArgs<ExtArgs> = {}>(args?: Subset<T, SessionRun$grantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SessionRun model
+   */
+  interface SessionRunFieldRefs {
+    readonly id: FieldRef<"SessionRun", 'String'>
+    readonly userId: FieldRef<"SessionRun", 'String'>
+    readonly mode: FieldRef<"SessionRun", 'String'>
+    readonly status: FieldRef<"SessionRun", 'String'>
+    readonly payoutEligible: FieldRef<"SessionRun", 'Boolean'>
+    readonly ineligibleReason: FieldRef<"SessionRun", 'String'>
+    readonly startedAt: FieldRef<"SessionRun", 'DateTime'>
+    readonly expiresAt: FieldRef<"SessionRun", 'DateTime'>
+    readonly finishedAt: FieldRef<"SessionRun", 'DateTime'>
+    readonly score: FieldRef<"SessionRun", 'Int'>
+    readonly durationMs: FieldRef<"SessionRun", 'Int'>
+    readonly rejectReason: FieldRef<"SessionRun", 'String'>
+    readonly sessionId: FieldRef<"SessionRun", 'String'>
+    readonly result: FieldRef<"SessionRun", 'Json'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SessionRun findUnique
+   */
+  export type SessionRunFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionRun to fetch.
+     */
+    where: SessionRunWhereUniqueInput
+  }
+
+  /**
+   * SessionRun findUniqueOrThrow
+   */
+  export type SessionRunFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionRun to fetch.
+     */
+    where: SessionRunWhereUniqueInput
+  }
+
+  /**
+   * SessionRun findFirst
+   */
+  export type SessionRunFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionRun to fetch.
+     */
+    where?: SessionRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionRuns to fetch.
+     */
+    orderBy?: SessionRunOrderByWithRelationInput | SessionRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SessionRuns.
+     */
+    cursor?: SessionRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SessionRuns.
+     */
+    distinct?: SessionRunScalarFieldEnum | SessionRunScalarFieldEnum[]
+  }
+
+  /**
+   * SessionRun findFirstOrThrow
+   */
+  export type SessionRunFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionRun to fetch.
+     */
+    where?: SessionRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionRuns to fetch.
+     */
+    orderBy?: SessionRunOrderByWithRelationInput | SessionRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SessionRuns.
+     */
+    cursor?: SessionRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SessionRuns.
+     */
+    distinct?: SessionRunScalarFieldEnum | SessionRunScalarFieldEnum[]
+  }
+
+  /**
+   * SessionRun findMany
+   */
+  export type SessionRunFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionRuns to fetch.
+     */
+    where?: SessionRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionRuns to fetch.
+     */
+    orderBy?: SessionRunOrderByWithRelationInput | SessionRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SessionRuns.
+     */
+    cursor?: SessionRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionRuns.
+     */
+    skip?: number
+    distinct?: SessionRunScalarFieldEnum | SessionRunScalarFieldEnum[]
+  }
+
+  /**
+   * SessionRun create
+   */
+  export type SessionRunCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SessionRun.
+     */
+    data: XOR<SessionRunCreateInput, SessionRunUncheckedCreateInput>
+  }
+
+  /**
+   * SessionRun createMany
+   */
+  export type SessionRunCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SessionRuns.
+     */
+    data: SessionRunCreateManyInput | SessionRunCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SessionRun createManyAndReturn
+   */
+  export type SessionRunCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * The data used to create many SessionRuns.
+     */
+    data: SessionRunCreateManyInput | SessionRunCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SessionRun update
+   */
+  export type SessionRunUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SessionRun.
+     */
+    data: XOR<SessionRunUpdateInput, SessionRunUncheckedUpdateInput>
+    /**
+     * Choose, which SessionRun to update.
+     */
+    where: SessionRunWhereUniqueInput
+  }
+
+  /**
+   * SessionRun updateMany
+   */
+  export type SessionRunUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SessionRuns.
+     */
+    data: XOR<SessionRunUpdateManyMutationInput, SessionRunUncheckedUpdateManyInput>
+    /**
+     * Filter which SessionRuns to update
+     */
+    where?: SessionRunWhereInput
+    /**
+     * Limit how many SessionRuns to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionRun updateManyAndReturn
+   */
+  export type SessionRunUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * The data used to update SessionRuns.
+     */
+    data: XOR<SessionRunUpdateManyMutationInput, SessionRunUncheckedUpdateManyInput>
+    /**
+     * Filter which SessionRuns to update
+     */
+    where?: SessionRunWhereInput
+    /**
+     * Limit how many SessionRuns to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SessionRun upsert
+   */
+  export type SessionRunUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SessionRun to update in case it exists.
+     */
+    where: SessionRunWhereUniqueInput
+    /**
+     * In case the SessionRun found by the `where` argument doesn't exist, create a new SessionRun with this data.
+     */
+    create: XOR<SessionRunCreateInput, SessionRunUncheckedCreateInput>
+    /**
+     * In case the SessionRun was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SessionRunUpdateInput, SessionRunUncheckedUpdateInput>
+  }
+
+  /**
+   * SessionRun delete
+   */
+  export type SessionRunDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    /**
+     * Filter which SessionRun to delete.
+     */
+    where: SessionRunWhereUniqueInput
+  }
+
+  /**
+   * SessionRun deleteMany
+   */
+  export type SessionRunDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SessionRuns to delete
+     */
+    where?: SessionRunWhereInput
+    /**
+     * Limit how many SessionRuns to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionRun.grants
+   */
+  export type SessionRun$grantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    where?: SessionGrantWhereInput
+    orderBy?: SessionGrantOrderByWithRelationInput | SessionGrantOrderByWithRelationInput[]
+    cursor?: SessionGrantWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SessionGrantScalarFieldEnum | SessionGrantScalarFieldEnum[]
+  }
+
+  /**
+   * SessionRun without action
+   */
+  export type SessionRunDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SessionGrant
+   */
+
+  export type AggregateSessionGrant = {
+    _count: SessionGrantCountAggregateOutputType | null
+    _avg: SessionGrantAvgAggregateOutputType | null
+    _sum: SessionGrantSumAggregateOutputType | null
+    _min: SessionGrantMinAggregateOutputType | null
+    _max: SessionGrantMaxAggregateOutputType | null
+  }
+
+  export type SessionGrantAvgAggregateOutputType = {
+    amount: number | null
+  }
+
+  export type SessionGrantSumAggregateOutputType = {
+    amount: number | null
+  }
+
+  export type SessionGrantMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    runId: string | null
+    grantType: string | null
+    amount: number | null
+    createdAt: Date | null
+  }
+
+  export type SessionGrantMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    runId: string | null
+    grantType: string | null
+    amount: number | null
+    createdAt: Date | null
+  }
+
+  export type SessionGrantCountAggregateOutputType = {
+    id: number
+    userId: number
+    runId: number
+    grantType: number
+    amount: number
+    metadata: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type SessionGrantAvgAggregateInputType = {
+    amount?: true
+  }
+
+  export type SessionGrantSumAggregateInputType = {
+    amount?: true
+  }
+
+  export type SessionGrantMinAggregateInputType = {
+    id?: true
+    userId?: true
+    runId?: true
+    grantType?: true
+    amount?: true
+    createdAt?: true
+  }
+
+  export type SessionGrantMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    runId?: true
+    grantType?: true
+    amount?: true
+    createdAt?: true
+  }
+
+  export type SessionGrantCountAggregateInputType = {
+    id?: true
+    userId?: true
+    runId?: true
+    grantType?: true
+    amount?: true
+    metadata?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type SessionGrantAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SessionGrant to aggregate.
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionGrants to fetch.
+     */
+    orderBy?: SessionGrantOrderByWithRelationInput | SessionGrantOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SessionGrantWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionGrants from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionGrants.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SessionGrants
+    **/
+    _count?: true | SessionGrantCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SessionGrantAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SessionGrantSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SessionGrantMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SessionGrantMaxAggregateInputType
+  }
+
+  export type GetSessionGrantAggregateType<T extends SessionGrantAggregateArgs> = {
+        [P in keyof T & keyof AggregateSessionGrant]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSessionGrant[P]>
+      : GetScalarType<T[P], AggregateSessionGrant[P]>
+  }
+
+
+
+
+  export type SessionGrantGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SessionGrantWhereInput
+    orderBy?: SessionGrantOrderByWithAggregationInput | SessionGrantOrderByWithAggregationInput[]
+    by: SessionGrantScalarFieldEnum[] | SessionGrantScalarFieldEnum
+    having?: SessionGrantScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SessionGrantCountAggregateInputType | true
+    _avg?: SessionGrantAvgAggregateInputType
+    _sum?: SessionGrantSumAggregateInputType
+    _min?: SessionGrantMinAggregateInputType
+    _max?: SessionGrantMaxAggregateInputType
+  }
+
+  export type SessionGrantGroupByOutputType = {
+    id: string
+    userId: string
+    runId: string
+    grantType: string
+    amount: number
+    metadata: JsonValue | null
+    createdAt: Date
+    _count: SessionGrantCountAggregateOutputType | null
+    _avg: SessionGrantAvgAggregateOutputType | null
+    _sum: SessionGrantSumAggregateOutputType | null
+    _min: SessionGrantMinAggregateOutputType | null
+    _max: SessionGrantMaxAggregateOutputType | null
+  }
+
+  type GetSessionGrantGroupByPayload<T extends SessionGrantGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SessionGrantGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SessionGrantGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SessionGrantGroupByOutputType[P]>
+            : GetScalarType<T[P], SessionGrantGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SessionGrantSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    runId?: boolean
+    grantType?: boolean
+    amount?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | SessionRunDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sessionGrant"]>
+
+  export type SessionGrantSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    runId?: boolean
+    grantType?: boolean
+    amount?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | SessionRunDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sessionGrant"]>
+
+  export type SessionGrantSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    runId?: boolean
+    grantType?: boolean
+    amount?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | SessionRunDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sessionGrant"]>
+
+  export type SessionGrantSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    runId?: boolean
+    grantType?: boolean
+    amount?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+  }
+
+  export type SessionGrantOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "runId" | "grantType" | "amount" | "metadata" | "createdAt", ExtArgs["result"]["sessionGrant"]>
+  export type SessionGrantInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | SessionRunDefaultArgs<ExtArgs>
+  }
+  export type SessionGrantIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | SessionRunDefaultArgs<ExtArgs>
+  }
+  export type SessionGrantIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | SessionRunDefaultArgs<ExtArgs>
+  }
+
+  export type $SessionGrantPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SessionGrant"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+      run: Prisma.$SessionRunPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      runId: string
+      grantType: string
+      amount: number
+      metadata: Prisma.JsonValue | null
+      createdAt: Date
+    }, ExtArgs["result"]["sessionGrant"]>
+    composites: {}
+  }
+
+  type SessionGrantGetPayload<S extends boolean | null | undefined | SessionGrantDefaultArgs> = $Result.GetResult<Prisma.$SessionGrantPayload, S>
+
+  type SessionGrantCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SessionGrantFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SessionGrantCountAggregateInputType | true
+    }
+
+  export interface SessionGrantDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SessionGrant'], meta: { name: 'SessionGrant' } }
+    /**
+     * Find zero or one SessionGrant that matches the filter.
+     * @param {SessionGrantFindUniqueArgs} args - Arguments to find a SessionGrant
+     * @example
+     * // Get one SessionGrant
+     * const sessionGrant = await prisma.sessionGrant.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SessionGrantFindUniqueArgs>(args: SelectSubset<T, SessionGrantFindUniqueArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SessionGrant that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SessionGrantFindUniqueOrThrowArgs} args - Arguments to find a SessionGrant
+     * @example
+     * // Get one SessionGrant
+     * const sessionGrant = await prisma.sessionGrant.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SessionGrantFindUniqueOrThrowArgs>(args: SelectSubset<T, SessionGrantFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SessionGrant that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantFindFirstArgs} args - Arguments to find a SessionGrant
+     * @example
+     * // Get one SessionGrant
+     * const sessionGrant = await prisma.sessionGrant.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SessionGrantFindFirstArgs>(args?: SelectSubset<T, SessionGrantFindFirstArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SessionGrant that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantFindFirstOrThrowArgs} args - Arguments to find a SessionGrant
+     * @example
+     * // Get one SessionGrant
+     * const sessionGrant = await prisma.sessionGrant.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SessionGrantFindFirstOrThrowArgs>(args?: SelectSubset<T, SessionGrantFindFirstOrThrowArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SessionGrants that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SessionGrants
+     * const sessionGrants = await prisma.sessionGrant.findMany()
+     * 
+     * // Get first 10 SessionGrants
+     * const sessionGrants = await prisma.sessionGrant.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const sessionGrantWithIdOnly = await prisma.sessionGrant.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SessionGrantFindManyArgs>(args?: SelectSubset<T, SessionGrantFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SessionGrant.
+     * @param {SessionGrantCreateArgs} args - Arguments to create a SessionGrant.
+     * @example
+     * // Create one SessionGrant
+     * const SessionGrant = await prisma.sessionGrant.create({
+     *   data: {
+     *     // ... data to create a SessionGrant
+     *   }
+     * })
+     * 
+     */
+    create<T extends SessionGrantCreateArgs>(args: SelectSubset<T, SessionGrantCreateArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SessionGrants.
+     * @param {SessionGrantCreateManyArgs} args - Arguments to create many SessionGrants.
+     * @example
+     * // Create many SessionGrants
+     * const sessionGrant = await prisma.sessionGrant.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SessionGrantCreateManyArgs>(args?: SelectSubset<T, SessionGrantCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SessionGrants and returns the data saved in the database.
+     * @param {SessionGrantCreateManyAndReturnArgs} args - Arguments to create many SessionGrants.
+     * @example
+     * // Create many SessionGrants
+     * const sessionGrant = await prisma.sessionGrant.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SessionGrants and only return the `id`
+     * const sessionGrantWithIdOnly = await prisma.sessionGrant.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SessionGrantCreateManyAndReturnArgs>(args?: SelectSubset<T, SessionGrantCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SessionGrant.
+     * @param {SessionGrantDeleteArgs} args - Arguments to delete one SessionGrant.
+     * @example
+     * // Delete one SessionGrant
+     * const SessionGrant = await prisma.sessionGrant.delete({
+     *   where: {
+     *     // ... filter to delete one SessionGrant
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SessionGrantDeleteArgs>(args: SelectSubset<T, SessionGrantDeleteArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SessionGrant.
+     * @param {SessionGrantUpdateArgs} args - Arguments to update one SessionGrant.
+     * @example
+     * // Update one SessionGrant
+     * const sessionGrant = await prisma.sessionGrant.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SessionGrantUpdateArgs>(args: SelectSubset<T, SessionGrantUpdateArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SessionGrants.
+     * @param {SessionGrantDeleteManyArgs} args - Arguments to filter SessionGrants to delete.
+     * @example
+     * // Delete a few SessionGrants
+     * const { count } = await prisma.sessionGrant.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SessionGrantDeleteManyArgs>(args?: SelectSubset<T, SessionGrantDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SessionGrants.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SessionGrants
+     * const sessionGrant = await prisma.sessionGrant.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SessionGrantUpdateManyArgs>(args: SelectSubset<T, SessionGrantUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SessionGrants and returns the data updated in the database.
+     * @param {SessionGrantUpdateManyAndReturnArgs} args - Arguments to update many SessionGrants.
+     * @example
+     * // Update many SessionGrants
+     * const sessionGrant = await prisma.sessionGrant.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SessionGrants and only return the `id`
+     * const sessionGrantWithIdOnly = await prisma.sessionGrant.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SessionGrantUpdateManyAndReturnArgs>(args: SelectSubset<T, SessionGrantUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SessionGrant.
+     * @param {SessionGrantUpsertArgs} args - Arguments to update or create a SessionGrant.
+     * @example
+     * // Update or create a SessionGrant
+     * const sessionGrant = await prisma.sessionGrant.upsert({
+     *   create: {
+     *     // ... data to create a SessionGrant
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SessionGrant we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SessionGrantUpsertArgs>(args: SelectSubset<T, SessionGrantUpsertArgs<ExtArgs>>): Prisma__SessionGrantClient<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SessionGrants.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantCountArgs} args - Arguments to filter SessionGrants to count.
+     * @example
+     * // Count the number of SessionGrants
+     * const count = await prisma.sessionGrant.count({
+     *   where: {
+     *     // ... the filter for the SessionGrants we want to count
+     *   }
+     * })
+    **/
+    count<T extends SessionGrantCountArgs>(
+      args?: Subset<T, SessionGrantCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SessionGrantCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SessionGrant.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SessionGrantAggregateArgs>(args: Subset<T, SessionGrantAggregateArgs>): Prisma.PrismaPromise<GetSessionGrantAggregateType<T>>
+
+    /**
+     * Group by SessionGrant.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SessionGrantGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SessionGrantGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SessionGrantGroupByArgs['orderBy'] }
+        : { orderBy?: SessionGrantGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SessionGrantGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSessionGrantGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SessionGrant model
+   */
+  readonly fields: SessionGrantFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SessionGrant.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SessionGrantClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    run<T extends SessionRunDefaultArgs<ExtArgs> = {}>(args?: Subset<T, SessionRunDefaultArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SessionGrant model
+   */
+  interface SessionGrantFieldRefs {
+    readonly id: FieldRef<"SessionGrant", 'String'>
+    readonly userId: FieldRef<"SessionGrant", 'String'>
+    readonly runId: FieldRef<"SessionGrant", 'String'>
+    readonly grantType: FieldRef<"SessionGrant", 'String'>
+    readonly amount: FieldRef<"SessionGrant", 'Float'>
+    readonly metadata: FieldRef<"SessionGrant", 'Json'>
+    readonly createdAt: FieldRef<"SessionGrant", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SessionGrant findUnique
+   */
+  export type SessionGrantFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionGrant to fetch.
+     */
+    where: SessionGrantWhereUniqueInput
+  }
+
+  /**
+   * SessionGrant findUniqueOrThrow
+   */
+  export type SessionGrantFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionGrant to fetch.
+     */
+    where: SessionGrantWhereUniqueInput
+  }
+
+  /**
+   * SessionGrant findFirst
+   */
+  export type SessionGrantFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionGrant to fetch.
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionGrants to fetch.
+     */
+    orderBy?: SessionGrantOrderByWithRelationInput | SessionGrantOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SessionGrants.
+     */
+    cursor?: SessionGrantWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionGrants from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionGrants.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SessionGrants.
+     */
+    distinct?: SessionGrantScalarFieldEnum | SessionGrantScalarFieldEnum[]
+  }
+
+  /**
+   * SessionGrant findFirstOrThrow
+   */
+  export type SessionGrantFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionGrant to fetch.
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionGrants to fetch.
+     */
+    orderBy?: SessionGrantOrderByWithRelationInput | SessionGrantOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SessionGrants.
+     */
+    cursor?: SessionGrantWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionGrants from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionGrants.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SessionGrants.
+     */
+    distinct?: SessionGrantScalarFieldEnum | SessionGrantScalarFieldEnum[]
+  }
+
+  /**
+   * SessionGrant findMany
+   */
+  export type SessionGrantFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * Filter, which SessionGrants to fetch.
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SessionGrants to fetch.
+     */
+    orderBy?: SessionGrantOrderByWithRelationInput | SessionGrantOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SessionGrants.
+     */
+    cursor?: SessionGrantWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SessionGrants from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SessionGrants.
+     */
+    skip?: number
+    distinct?: SessionGrantScalarFieldEnum | SessionGrantScalarFieldEnum[]
+  }
+
+  /**
+   * SessionGrant create
+   */
+  export type SessionGrantCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SessionGrant.
+     */
+    data: XOR<SessionGrantCreateInput, SessionGrantUncheckedCreateInput>
+  }
+
+  /**
+   * SessionGrant createMany
+   */
+  export type SessionGrantCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SessionGrants.
+     */
+    data: SessionGrantCreateManyInput | SessionGrantCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SessionGrant createManyAndReturn
+   */
+  export type SessionGrantCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * The data used to create many SessionGrants.
+     */
+    data: SessionGrantCreateManyInput | SessionGrantCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SessionGrant update
+   */
+  export type SessionGrantUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SessionGrant.
+     */
+    data: XOR<SessionGrantUpdateInput, SessionGrantUncheckedUpdateInput>
+    /**
+     * Choose, which SessionGrant to update.
+     */
+    where: SessionGrantWhereUniqueInput
+  }
+
+  /**
+   * SessionGrant updateMany
+   */
+  export type SessionGrantUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SessionGrants.
+     */
+    data: XOR<SessionGrantUpdateManyMutationInput, SessionGrantUncheckedUpdateManyInput>
+    /**
+     * Filter which SessionGrants to update
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * Limit how many SessionGrants to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionGrant updateManyAndReturn
+   */
+  export type SessionGrantUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * The data used to update SessionGrants.
+     */
+    data: XOR<SessionGrantUpdateManyMutationInput, SessionGrantUncheckedUpdateManyInput>
+    /**
+     * Filter which SessionGrants to update
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * Limit how many SessionGrants to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SessionGrant upsert
+   */
+  export type SessionGrantUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SessionGrant to update in case it exists.
+     */
+    where: SessionGrantWhereUniqueInput
+    /**
+     * In case the SessionGrant found by the `where` argument doesn't exist, create a new SessionGrant with this data.
+     */
+    create: XOR<SessionGrantCreateInput, SessionGrantUncheckedCreateInput>
+    /**
+     * In case the SessionGrant was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SessionGrantUpdateInput, SessionGrantUncheckedUpdateInput>
+  }
+
+  /**
+   * SessionGrant delete
+   */
+  export type SessionGrantDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
+    /**
+     * Filter which SessionGrant to delete.
+     */
+    where: SessionGrantWhereUniqueInput
+  }
+
+  /**
+   * SessionGrant deleteMany
+   */
+  export type SessionGrantDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SessionGrants to delete
+     */
+    where?: SessionGrantWhereInput
+    /**
+     * Limit how many SessionGrants to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SessionGrant without action
+   */
+  export type SessionGrantDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionGrant
+     */
+    select?: SessionGrantSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionGrant
+     */
+    omit?: SessionGrantOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionGrantInclude<ExtArgs> | null
   }
 
 
@@ -109586,6 +112234,39 @@ export namespace Prisma {
   export type GameSessionScalarFieldEnum = (typeof GameSessionScalarFieldEnum)[keyof typeof GameSessionScalarFieldEnum]
 
 
+  export const SessionRunScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    mode: 'mode',
+    status: 'status',
+    payoutEligible: 'payoutEligible',
+    ineligibleReason: 'ineligibleReason',
+    startedAt: 'startedAt',
+    expiresAt: 'expiresAt',
+    finishedAt: 'finishedAt',
+    score: 'score',
+    durationMs: 'durationMs',
+    rejectReason: 'rejectReason',
+    sessionId: 'sessionId',
+    result: 'result'
+  };
+
+  export type SessionRunScalarFieldEnum = (typeof SessionRunScalarFieldEnum)[keyof typeof SessionRunScalarFieldEnum]
+
+
+  export const SessionGrantScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    runId: 'runId',
+    grantType: 'grantType',
+    amount: 'amount',
+    metadata: 'metadata',
+    createdAt: 'createdAt'
+  };
+
+  export type SessionGrantScalarFieldEnum = (typeof SessionGrantScalarFieldEnum)[keyof typeof SessionGrantScalarFieldEnum]
+
+
   export const CreditLedgerScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
@@ -110956,6 +113637,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Json'
+   */
+  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+  /**
+   * Reference to a field of type 'QueryMode'
+   */
+  export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+  /**
    * Reference to a field of type 'LedgerAccountType'
    */
   export type EnumLedgerAccountTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LedgerAccountType'>
@@ -110980,20 +113675,6 @@ export namespace Prisma {
    * Reference to a field of type 'LedgerCurrency[]'
    */
   export type ListEnumLedgerCurrencyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LedgerCurrency[]'>
-    
-
-
-  /**
-   * Reference to a field of type 'Json'
-   */
-  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
-    
-
-
-  /**
-   * Reference to a field of type 'QueryMode'
-   */
-  export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 
@@ -111300,6 +113981,8 @@ export namespace Prisma {
     policyAcceptedAt?: DateTimeNullableFilter<"User"> | Date | string | null
     profile?: XOR<PlayerProfileNullableScalarRelationFilter, PlayerProfileWhereInput> | null
     sessions?: GameSessionListRelationFilter
+    sessionRuns?: SessionRunListRelationFilter
+    sessionGrants?: SessionGrantListRelationFilter
     ledger?: CreditLedgerListRelationFilter
     cards?: CardOwnershipListRelationFilter
     prqEntries?: PrqEntryListRelationFilter
@@ -111371,6 +114054,8 @@ export namespace Prisma {
     policyAcceptedAt?: SortOrderInput | SortOrder
     profile?: PlayerProfileOrderByWithRelationInput
     sessions?: GameSessionOrderByRelationAggregateInput
+    sessionRuns?: SessionRunOrderByRelationAggregateInput
+    sessionGrants?: SessionGrantOrderByRelationAggregateInput
     ledger?: CreditLedgerOrderByRelationAggregateInput
     cards?: CardOwnershipOrderByRelationAggregateInput
     prqEntries?: PrqEntryOrderByRelationAggregateInput
@@ -111445,6 +114130,8 @@ export namespace Prisma {
     policyAcceptedAt?: DateTimeNullableFilter<"User"> | Date | string | null
     profile?: XOR<PlayerProfileNullableScalarRelationFilter, PlayerProfileWhereInput> | null
     sessions?: GameSessionListRelationFilter
+    sessionRuns?: SessionRunListRelationFilter
+    sessionGrants?: SessionGrantListRelationFilter
     ledger?: CreditLedgerListRelationFilter
     cards?: CardOwnershipListRelationFilter
     prqEntries?: PrqEntryListRelationFilter
@@ -111788,6 +114475,182 @@ export namespace Prisma {
     combos?: IntWithAggregatesFilter<"GameSession"> | number
     maxCombo?: IntWithAggregatesFilter<"GameSession"> | number
     createdAt?: DateTimeWithAggregatesFilter<"GameSession"> | Date | string
+  }
+
+  export type SessionRunWhereInput = {
+    AND?: SessionRunWhereInput | SessionRunWhereInput[]
+    OR?: SessionRunWhereInput[]
+    NOT?: SessionRunWhereInput | SessionRunWhereInput[]
+    id?: StringFilter<"SessionRun"> | string
+    userId?: StringFilter<"SessionRun"> | string
+    mode?: StringFilter<"SessionRun"> | string
+    status?: StringFilter<"SessionRun"> | string
+    payoutEligible?: BoolFilter<"SessionRun"> | boolean
+    ineligibleReason?: StringNullableFilter<"SessionRun"> | string | null
+    startedAt?: DateTimeFilter<"SessionRun"> | Date | string
+    expiresAt?: DateTimeFilter<"SessionRun"> | Date | string
+    finishedAt?: DateTimeNullableFilter<"SessionRun"> | Date | string | null
+    score?: IntNullableFilter<"SessionRun"> | number | null
+    durationMs?: IntNullableFilter<"SessionRun"> | number | null
+    rejectReason?: StringNullableFilter<"SessionRun"> | string | null
+    sessionId?: StringNullableFilter<"SessionRun"> | string | null
+    result?: JsonNullableFilter<"SessionRun">
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    grants?: SessionGrantListRelationFilter
+  }
+
+  export type SessionRunOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    mode?: SortOrder
+    status?: SortOrder
+    payoutEligible?: SortOrder
+    ineligibleReason?: SortOrderInput | SortOrder
+    startedAt?: SortOrder
+    expiresAt?: SortOrder
+    finishedAt?: SortOrderInput | SortOrder
+    score?: SortOrderInput | SortOrder
+    durationMs?: SortOrderInput | SortOrder
+    rejectReason?: SortOrderInput | SortOrder
+    sessionId?: SortOrderInput | SortOrder
+    result?: SortOrderInput | SortOrder
+    user?: UserOrderByWithRelationInput
+    grants?: SessionGrantOrderByRelationAggregateInput
+  }
+
+  export type SessionRunWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SessionRunWhereInput | SessionRunWhereInput[]
+    OR?: SessionRunWhereInput[]
+    NOT?: SessionRunWhereInput | SessionRunWhereInput[]
+    userId?: StringFilter<"SessionRun"> | string
+    mode?: StringFilter<"SessionRun"> | string
+    status?: StringFilter<"SessionRun"> | string
+    payoutEligible?: BoolFilter<"SessionRun"> | boolean
+    ineligibleReason?: StringNullableFilter<"SessionRun"> | string | null
+    startedAt?: DateTimeFilter<"SessionRun"> | Date | string
+    expiresAt?: DateTimeFilter<"SessionRun"> | Date | string
+    finishedAt?: DateTimeNullableFilter<"SessionRun"> | Date | string | null
+    score?: IntNullableFilter<"SessionRun"> | number | null
+    durationMs?: IntNullableFilter<"SessionRun"> | number | null
+    rejectReason?: StringNullableFilter<"SessionRun"> | string | null
+    sessionId?: StringNullableFilter<"SessionRun"> | string | null
+    result?: JsonNullableFilter<"SessionRun">
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    grants?: SessionGrantListRelationFilter
+  }, "id">
+
+  export type SessionRunOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    mode?: SortOrder
+    status?: SortOrder
+    payoutEligible?: SortOrder
+    ineligibleReason?: SortOrderInput | SortOrder
+    startedAt?: SortOrder
+    expiresAt?: SortOrder
+    finishedAt?: SortOrderInput | SortOrder
+    score?: SortOrderInput | SortOrder
+    durationMs?: SortOrderInput | SortOrder
+    rejectReason?: SortOrderInput | SortOrder
+    sessionId?: SortOrderInput | SortOrder
+    result?: SortOrderInput | SortOrder
+    _count?: SessionRunCountOrderByAggregateInput
+    _avg?: SessionRunAvgOrderByAggregateInput
+    _max?: SessionRunMaxOrderByAggregateInput
+    _min?: SessionRunMinOrderByAggregateInput
+    _sum?: SessionRunSumOrderByAggregateInput
+  }
+
+  export type SessionRunScalarWhereWithAggregatesInput = {
+    AND?: SessionRunScalarWhereWithAggregatesInput | SessionRunScalarWhereWithAggregatesInput[]
+    OR?: SessionRunScalarWhereWithAggregatesInput[]
+    NOT?: SessionRunScalarWhereWithAggregatesInput | SessionRunScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SessionRun"> | string
+    userId?: StringWithAggregatesFilter<"SessionRun"> | string
+    mode?: StringWithAggregatesFilter<"SessionRun"> | string
+    status?: StringWithAggregatesFilter<"SessionRun"> | string
+    payoutEligible?: BoolWithAggregatesFilter<"SessionRun"> | boolean
+    ineligibleReason?: StringNullableWithAggregatesFilter<"SessionRun"> | string | null
+    startedAt?: DateTimeWithAggregatesFilter<"SessionRun"> | Date | string
+    expiresAt?: DateTimeWithAggregatesFilter<"SessionRun"> | Date | string
+    finishedAt?: DateTimeNullableWithAggregatesFilter<"SessionRun"> | Date | string | null
+    score?: IntNullableWithAggregatesFilter<"SessionRun"> | number | null
+    durationMs?: IntNullableWithAggregatesFilter<"SessionRun"> | number | null
+    rejectReason?: StringNullableWithAggregatesFilter<"SessionRun"> | string | null
+    sessionId?: StringNullableWithAggregatesFilter<"SessionRun"> | string | null
+    result?: JsonNullableWithAggregatesFilter<"SessionRun">
+  }
+
+  export type SessionGrantWhereInput = {
+    AND?: SessionGrantWhereInput | SessionGrantWhereInput[]
+    OR?: SessionGrantWhereInput[]
+    NOT?: SessionGrantWhereInput | SessionGrantWhereInput[]
+    id?: StringFilter<"SessionGrant"> | string
+    userId?: StringFilter<"SessionGrant"> | string
+    runId?: StringFilter<"SessionGrant"> | string
+    grantType?: StringFilter<"SessionGrant"> | string
+    amount?: FloatFilter<"SessionGrant"> | number
+    metadata?: JsonNullableFilter<"SessionGrant">
+    createdAt?: DateTimeFilter<"SessionGrant"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    run?: XOR<SessionRunScalarRelationFilter, SessionRunWhereInput>
+  }
+
+  export type SessionGrantOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    runId?: SortOrder
+    grantType?: SortOrder
+    amount?: SortOrder
+    metadata?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+    run?: SessionRunOrderByWithRelationInput
+  }
+
+  export type SessionGrantWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId_runId_grantType?: SessionGrantUserIdRunIdGrantTypeCompoundUniqueInput
+    AND?: SessionGrantWhereInput | SessionGrantWhereInput[]
+    OR?: SessionGrantWhereInput[]
+    NOT?: SessionGrantWhereInput | SessionGrantWhereInput[]
+    userId?: StringFilter<"SessionGrant"> | string
+    runId?: StringFilter<"SessionGrant"> | string
+    grantType?: StringFilter<"SessionGrant"> | string
+    amount?: FloatFilter<"SessionGrant"> | number
+    metadata?: JsonNullableFilter<"SessionGrant">
+    createdAt?: DateTimeFilter<"SessionGrant"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    run?: XOR<SessionRunScalarRelationFilter, SessionRunWhereInput>
+  }, "id" | "userId_runId_grantType">
+
+  export type SessionGrantOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    runId?: SortOrder
+    grantType?: SortOrder
+    amount?: SortOrder
+    metadata?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: SessionGrantCountOrderByAggregateInput
+    _avg?: SessionGrantAvgOrderByAggregateInput
+    _max?: SessionGrantMaxOrderByAggregateInput
+    _min?: SessionGrantMinOrderByAggregateInput
+    _sum?: SessionGrantSumOrderByAggregateInput
+  }
+
+  export type SessionGrantScalarWhereWithAggregatesInput = {
+    AND?: SessionGrantScalarWhereWithAggregatesInput | SessionGrantScalarWhereWithAggregatesInput[]
+    OR?: SessionGrantScalarWhereWithAggregatesInput[]
+    NOT?: SessionGrantScalarWhereWithAggregatesInput | SessionGrantScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SessionGrant"> | string
+    userId?: StringWithAggregatesFilter<"SessionGrant"> | string
+    runId?: StringWithAggregatesFilter<"SessionGrant"> | string
+    grantType?: StringWithAggregatesFilter<"SessionGrant"> | string
+    amount?: FloatWithAggregatesFilter<"SessionGrant"> | number
+    metadata?: JsonNullableWithAggregatesFilter<"SessionGrant">
+    createdAt?: DateTimeWithAggregatesFilter<"SessionGrant"> | Date | string
   }
 
   export type CreditLedgerWhereInput = {
@@ -118321,6 +121184,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -118392,6 +121257,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -118463,6 +121330,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -118534,6 +121403,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -118935,6 +121806,196 @@ export namespace Prisma {
     dodges?: IntFieldUpdateOperationsInput | number
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionRunCreateInput = {
+    id?: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    user: UserCreateNestedOneWithoutSessionRunsInput
+    grants?: SessionGrantCreateNestedManyWithoutRunInput
+  }
+
+  export type SessionRunUncheckedCreateInput = {
+    id?: string
+    userId: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type SessionRunUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    user?: UserUpdateOneRequiredWithoutSessionRunsNestedInput
+    grants?: SessionGrantUpdateManyWithoutRunNestedInput
+  }
+
+  export type SessionRunUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type SessionRunCreateManyInput = {
+    id?: string
+    userId: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
+  export type SessionRunUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
+  export type SessionRunUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
+  export type SessionGrantCreateInput = {
+    id?: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutSessionGrantsInput
+    run: SessionRunCreateNestedOneWithoutGrantsInput
+  }
+
+  export type SessionGrantUncheckedCreateInput = {
+    id?: string
+    userId: string
+    runId: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type SessionGrantUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutSessionGrantsNestedInput
+    run?: SessionRunUpdateOneRequiredWithoutGrantsNestedInput
+  }
+
+  export type SessionGrantUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionGrantCreateManyInput = {
+    id?: string
+    userId: string
+    runId: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type SessionGrantUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionGrantUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -126120,6 +129181,18 @@ export namespace Prisma {
     none?: GameSessionWhereInput
   }
 
+  export type SessionRunListRelationFilter = {
+    every?: SessionRunWhereInput
+    some?: SessionRunWhereInput
+    none?: SessionRunWhereInput
+  }
+
+  export type SessionGrantListRelationFilter = {
+    every?: SessionGrantWhereInput
+    some?: SessionGrantWhereInput
+    none?: SessionGrantWhereInput
+  }
+
   export type CreditLedgerListRelationFilter = {
     every?: CreditLedgerWhereInput
     some?: CreditLedgerWhereInput
@@ -126393,6 +129466,14 @@ export namespace Prisma {
   }
 
   export type GameSessionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SessionRunOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SessionGrantOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -126942,6 +130023,161 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedBoolFilter<$PrismaModel>
     _max?: NestedBoolFilter<$PrismaModel>
+  }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type SessionRunCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    mode?: SortOrder
+    status?: SortOrder
+    payoutEligible?: SortOrder
+    ineligibleReason?: SortOrder
+    startedAt?: SortOrder
+    expiresAt?: SortOrder
+    finishedAt?: SortOrder
+    score?: SortOrder
+    durationMs?: SortOrder
+    rejectReason?: SortOrder
+    sessionId?: SortOrder
+    result?: SortOrder
+  }
+
+  export type SessionRunAvgOrderByAggregateInput = {
+    score?: SortOrder
+    durationMs?: SortOrder
+  }
+
+  export type SessionRunMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    mode?: SortOrder
+    status?: SortOrder
+    payoutEligible?: SortOrder
+    ineligibleReason?: SortOrder
+    startedAt?: SortOrder
+    expiresAt?: SortOrder
+    finishedAt?: SortOrder
+    score?: SortOrder
+    durationMs?: SortOrder
+    rejectReason?: SortOrder
+    sessionId?: SortOrder
+  }
+
+  export type SessionRunMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    mode?: SortOrder
+    status?: SortOrder
+    payoutEligible?: SortOrder
+    ineligibleReason?: SortOrder
+    startedAt?: SortOrder
+    expiresAt?: SortOrder
+    finishedAt?: SortOrder
+    score?: SortOrder
+    durationMs?: SortOrder
+    rejectReason?: SortOrder
+    sessionId?: SortOrder
+  }
+
+  export type SessionRunSumOrderByAggregateInput = {
+    score?: SortOrder
+    durationMs?: SortOrder
+  }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
+  }
+
+  export type SessionRunScalarRelationFilter = {
+    is?: SessionRunWhereInput
+    isNot?: SessionRunWhereInput
+  }
+
+  export type SessionGrantUserIdRunIdGrantTypeCompoundUniqueInput = {
+    userId: string
+    runId: string
+    grantType: string
+  }
+
+  export type SessionGrantCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    runId?: SortOrder
+    grantType?: SortOrder
+    amount?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SessionGrantAvgOrderByAggregateInput = {
+    amount?: SortOrder
+  }
+
+  export type SessionGrantMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    runId?: SortOrder
+    grantType?: SortOrder
+    amount?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SessionGrantMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    runId?: SortOrder
+    grantType?: SortOrder
+    amount?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SessionGrantSumOrderByAggregateInput = {
+    amount?: SortOrder
   }
 
   export type CreditLedgerUserIdDedupeKeyCompoundUniqueInput = {
@@ -127622,29 +130858,6 @@ export namespace Prisma {
     _min?: NestedEnumLedgerCurrencyFilter<$PrismaModel>
     _max?: NestedEnumLedgerCurrencyFilter<$PrismaModel>
   }
-  export type JsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
 
   export type LedgerTransactionCountOrderByAggregateInput = {
     id?: SortOrder
@@ -127669,32 +130882,6 @@ export namespace Prisma {
     idempotencyKey?: SortOrder
     currency?: SortOrder
     createdAt?: SortOrder
-  }
-  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedJsonNullableFilter<$PrismaModel>
-    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type LedgerTransactionScalarRelationFilter = {
@@ -131327,6 +134514,20 @@ export namespace Prisma {
     connect?: GameSessionWhereUniqueInput | GameSessionWhereUniqueInput[]
   }
 
+  export type SessionRunCreateNestedManyWithoutUserInput = {
+    create?: XOR<SessionRunCreateWithoutUserInput, SessionRunUncheckedCreateWithoutUserInput> | SessionRunCreateWithoutUserInput[] | SessionRunUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionRunCreateOrConnectWithoutUserInput | SessionRunCreateOrConnectWithoutUserInput[]
+    createMany?: SessionRunCreateManyUserInputEnvelope
+    connect?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+  }
+
+  export type SessionGrantCreateNestedManyWithoutUserInput = {
+    create?: XOR<SessionGrantCreateWithoutUserInput, SessionGrantUncheckedCreateWithoutUserInput> | SessionGrantCreateWithoutUserInput[] | SessionGrantUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutUserInput | SessionGrantCreateOrConnectWithoutUserInput[]
+    createMany?: SessionGrantCreateManyUserInputEnvelope
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+  }
+
   export type CreditLedgerCreateNestedManyWithoutUserInput = {
     create?: XOR<CreditLedgerCreateWithoutUserInput, CreditLedgerUncheckedCreateWithoutUserInput> | CreditLedgerCreateWithoutUserInput[] | CreditLedgerUncheckedCreateWithoutUserInput[]
     connectOrCreate?: CreditLedgerCreateOrConnectWithoutUserInput | CreditLedgerCreateOrConnectWithoutUserInput[]
@@ -131693,6 +134894,20 @@ export namespace Prisma {
     connectOrCreate?: GameSessionCreateOrConnectWithoutUserInput | GameSessionCreateOrConnectWithoutUserInput[]
     createMany?: GameSessionCreateManyUserInputEnvelope
     connect?: GameSessionWhereUniqueInput | GameSessionWhereUniqueInput[]
+  }
+
+  export type SessionRunUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<SessionRunCreateWithoutUserInput, SessionRunUncheckedCreateWithoutUserInput> | SessionRunCreateWithoutUserInput[] | SessionRunUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionRunCreateOrConnectWithoutUserInput | SessionRunCreateOrConnectWithoutUserInput[]
+    createMany?: SessionRunCreateManyUserInputEnvelope
+    connect?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+  }
+
+  export type SessionGrantUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<SessionGrantCreateWithoutUserInput, SessionGrantUncheckedCreateWithoutUserInput> | SessionGrantCreateWithoutUserInput[] | SessionGrantUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutUserInput | SessionGrantCreateOrConnectWithoutUserInput[]
+    createMany?: SessionGrantCreateManyUserInputEnvelope
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
   }
 
   export type CreditLedgerUncheckedCreateNestedManyWithoutUserInput = {
@@ -132096,6 +135311,34 @@ export namespace Prisma {
     update?: GameSessionUpdateWithWhereUniqueWithoutUserInput | GameSessionUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: GameSessionUpdateManyWithWhereWithoutUserInput | GameSessionUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: GameSessionScalarWhereInput | GameSessionScalarWhereInput[]
+  }
+
+  export type SessionRunUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SessionRunCreateWithoutUserInput, SessionRunUncheckedCreateWithoutUserInput> | SessionRunCreateWithoutUserInput[] | SessionRunUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionRunCreateOrConnectWithoutUserInput | SessionRunCreateOrConnectWithoutUserInput[]
+    upsert?: SessionRunUpsertWithWhereUniqueWithoutUserInput | SessionRunUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SessionRunCreateManyUserInputEnvelope
+    set?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    disconnect?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    delete?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    connect?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    update?: SessionRunUpdateWithWhereUniqueWithoutUserInput | SessionRunUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SessionRunUpdateManyWithWhereWithoutUserInput | SessionRunUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SessionRunScalarWhereInput | SessionRunScalarWhereInput[]
+  }
+
+  export type SessionGrantUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SessionGrantCreateWithoutUserInput, SessionGrantUncheckedCreateWithoutUserInput> | SessionGrantCreateWithoutUserInput[] | SessionGrantUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutUserInput | SessionGrantCreateOrConnectWithoutUserInput[]
+    upsert?: SessionGrantUpsertWithWhereUniqueWithoutUserInput | SessionGrantUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SessionGrantCreateManyUserInputEnvelope
+    set?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    disconnect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    delete?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    update?: SessionGrantUpdateWithWhereUniqueWithoutUserInput | SessionGrantUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SessionGrantUpdateManyWithWhereWithoutUserInput | SessionGrantUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
   }
 
   export type CreditLedgerUpdateManyWithoutUserNestedInput = {
@@ -132812,6 +136055,34 @@ export namespace Prisma {
     update?: GameSessionUpdateWithWhereUniqueWithoutUserInput | GameSessionUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: GameSessionUpdateManyWithWhereWithoutUserInput | GameSessionUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: GameSessionScalarWhereInput | GameSessionScalarWhereInput[]
+  }
+
+  export type SessionRunUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SessionRunCreateWithoutUserInput, SessionRunUncheckedCreateWithoutUserInput> | SessionRunCreateWithoutUserInput[] | SessionRunUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionRunCreateOrConnectWithoutUserInput | SessionRunCreateOrConnectWithoutUserInput[]
+    upsert?: SessionRunUpsertWithWhereUniqueWithoutUserInput | SessionRunUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SessionRunCreateManyUserInputEnvelope
+    set?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    disconnect?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    delete?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    connect?: SessionRunWhereUniqueInput | SessionRunWhereUniqueInput[]
+    update?: SessionRunUpdateWithWhereUniqueWithoutUserInput | SessionRunUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SessionRunUpdateManyWithWhereWithoutUserInput | SessionRunUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SessionRunScalarWhereInput | SessionRunScalarWhereInput[]
+  }
+
+  export type SessionGrantUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SessionGrantCreateWithoutUserInput, SessionGrantUncheckedCreateWithoutUserInput> | SessionGrantCreateWithoutUserInput[] | SessionGrantUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutUserInput | SessionGrantCreateOrConnectWithoutUserInput[]
+    upsert?: SessionGrantUpsertWithWhereUniqueWithoutUserInput | SessionGrantUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SessionGrantCreateManyUserInputEnvelope
+    set?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    disconnect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    delete?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    update?: SessionGrantUpdateWithWhereUniqueWithoutUserInput | SessionGrantUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SessionGrantUpdateManyWithWhereWithoutUserInput | SessionGrantUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
   }
 
   export type CreditLedgerUncheckedUpdateManyWithoutUserNestedInput = {
@@ -133552,6 +136823,90 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutSessionsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSessionsInput, UserUpdateWithoutSessionsInput>, UserUncheckedUpdateWithoutSessionsInput>
+  }
+
+  export type UserCreateNestedOneWithoutSessionRunsInput = {
+    create?: XOR<UserCreateWithoutSessionRunsInput, UserUncheckedCreateWithoutSessionRunsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSessionRunsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type SessionGrantCreateNestedManyWithoutRunInput = {
+    create?: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput> | SessionGrantCreateWithoutRunInput[] | SessionGrantUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutRunInput | SessionGrantCreateOrConnectWithoutRunInput[]
+    createMany?: SessionGrantCreateManyRunInputEnvelope
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+  }
+
+  export type SessionGrantUncheckedCreateNestedManyWithoutRunInput = {
+    create?: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput> | SessionGrantCreateWithoutRunInput[] | SessionGrantUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutRunInput | SessionGrantCreateOrConnectWithoutRunInput[]
+    createMany?: SessionGrantCreateManyRunInputEnvelope
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutSessionRunsNestedInput = {
+    create?: XOR<UserCreateWithoutSessionRunsInput, UserUncheckedCreateWithoutSessionRunsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSessionRunsInput
+    upsert?: UserUpsertWithoutSessionRunsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSessionRunsInput, UserUpdateWithoutSessionRunsInput>, UserUncheckedUpdateWithoutSessionRunsInput>
+  }
+
+  export type SessionGrantUpdateManyWithoutRunNestedInput = {
+    create?: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput> | SessionGrantCreateWithoutRunInput[] | SessionGrantUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutRunInput | SessionGrantCreateOrConnectWithoutRunInput[]
+    upsert?: SessionGrantUpsertWithWhereUniqueWithoutRunInput | SessionGrantUpsertWithWhereUniqueWithoutRunInput[]
+    createMany?: SessionGrantCreateManyRunInputEnvelope
+    set?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    disconnect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    delete?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    update?: SessionGrantUpdateWithWhereUniqueWithoutRunInput | SessionGrantUpdateWithWhereUniqueWithoutRunInput[]
+    updateMany?: SessionGrantUpdateManyWithWhereWithoutRunInput | SessionGrantUpdateManyWithWhereWithoutRunInput[]
+    deleteMany?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
+  }
+
+  export type SessionGrantUncheckedUpdateManyWithoutRunNestedInput = {
+    create?: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput> | SessionGrantCreateWithoutRunInput[] | SessionGrantUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: SessionGrantCreateOrConnectWithoutRunInput | SessionGrantCreateOrConnectWithoutRunInput[]
+    upsert?: SessionGrantUpsertWithWhereUniqueWithoutRunInput | SessionGrantUpsertWithWhereUniqueWithoutRunInput[]
+    createMany?: SessionGrantCreateManyRunInputEnvelope
+    set?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    disconnect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    delete?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+    update?: SessionGrantUpdateWithWhereUniqueWithoutRunInput | SessionGrantUpdateWithWhereUniqueWithoutRunInput[]
+    updateMany?: SessionGrantUpdateManyWithWhereWithoutRunInput | SessionGrantUpdateManyWithWhereWithoutRunInput[]
+    deleteMany?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutSessionGrantsInput = {
+    create?: XOR<UserCreateWithoutSessionGrantsInput, UserUncheckedCreateWithoutSessionGrantsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSessionGrantsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type SessionRunCreateNestedOneWithoutGrantsInput = {
+    create?: XOR<SessionRunCreateWithoutGrantsInput, SessionRunUncheckedCreateWithoutGrantsInput>
+    connectOrCreate?: SessionRunCreateOrConnectWithoutGrantsInput
+    connect?: SessionRunWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutSessionGrantsNestedInput = {
+    create?: XOR<UserCreateWithoutSessionGrantsInput, UserUncheckedCreateWithoutSessionGrantsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSessionGrantsInput
+    upsert?: UserUpsertWithoutSessionGrantsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSessionGrantsInput, UserUpdateWithoutSessionGrantsInput>, UserUncheckedUpdateWithoutSessionGrantsInput>
+  }
+
+  export type SessionRunUpdateOneRequiredWithoutGrantsNestedInput = {
+    create?: XOR<SessionRunCreateWithoutGrantsInput, SessionRunUncheckedCreateWithoutGrantsInput>
+    connectOrCreate?: SessionRunCreateOrConnectWithoutGrantsInput
+    upsert?: SessionRunUpsertWithoutGrantsInput
+    connect?: SessionRunWhereUniqueInput
+    update?: XOR<XOR<SessionRunUpdateToOneWithWhereWithoutGrantsInput, SessionRunUpdateWithoutGrantsInput>, SessionRunUncheckedUpdateWithoutGrantsInput>
   }
 
   export type UserCreateNestedOneWithoutLedgerInput = {
@@ -136778,6 +140133,29 @@ export namespace Prisma {
     _min?: NestedBoolFilter<$PrismaModel>
     _max?: NestedBoolFilter<$PrismaModel>
   }
+  export type NestedJsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type NestedEnumLedgerAccountTypeFilter<$PrismaModel = never> = {
     equals?: $Enums.LedgerAccountType | EnumLedgerAccountTypeFieldRefInput<$PrismaModel>
@@ -136811,29 +140189,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumLedgerCurrencyFilter<$PrismaModel>
     _max?: NestedEnumLedgerCurrencyFilter<$PrismaModel>
-  }
-  export type NestedJsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<NestedJsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
   export type NestedEnumSubscriptionProductFilter<$PrismaModel = never> = {
@@ -137319,6 +140674,78 @@ export namespace Prisma {
 
   export type GameSessionCreateManyUserInputEnvelope = {
     data: GameSessionCreateManyUserInput | GameSessionCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SessionRunCreateWithoutUserInput = {
+    id?: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantCreateNestedManyWithoutRunInput
+  }
+
+  export type SessionRunUncheckedCreateWithoutUserInput = {
+    id?: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type SessionRunCreateOrConnectWithoutUserInput = {
+    where: SessionRunWhereUniqueInput
+    create: XOR<SessionRunCreateWithoutUserInput, SessionRunUncheckedCreateWithoutUserInput>
+  }
+
+  export type SessionRunCreateManyUserInputEnvelope = {
+    data: SessionRunCreateManyUserInput | SessionRunCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SessionGrantCreateWithoutUserInput = {
+    id?: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    run: SessionRunCreateNestedOneWithoutGrantsInput
+  }
+
+  export type SessionGrantUncheckedCreateWithoutUserInput = {
+    id?: string
+    runId: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type SessionGrantCreateOrConnectWithoutUserInput = {
+    where: SessionGrantWhereUniqueInput
+    create: XOR<SessionGrantCreateWithoutUserInput, SessionGrantUncheckedCreateWithoutUserInput>
+  }
+
+  export type SessionGrantCreateManyUserInputEnvelope = {
+    data: SessionGrantCreateManyUserInput | SessionGrantCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -139215,6 +142642,71 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"GameSession"> | Date | string
   }
 
+  export type SessionRunUpsertWithWhereUniqueWithoutUserInput = {
+    where: SessionRunWhereUniqueInput
+    update: XOR<SessionRunUpdateWithoutUserInput, SessionRunUncheckedUpdateWithoutUserInput>
+    create: XOR<SessionRunCreateWithoutUserInput, SessionRunUncheckedCreateWithoutUserInput>
+  }
+
+  export type SessionRunUpdateWithWhereUniqueWithoutUserInput = {
+    where: SessionRunWhereUniqueInput
+    data: XOR<SessionRunUpdateWithoutUserInput, SessionRunUncheckedUpdateWithoutUserInput>
+  }
+
+  export type SessionRunUpdateManyWithWhereWithoutUserInput = {
+    where: SessionRunScalarWhereInput
+    data: XOR<SessionRunUpdateManyMutationInput, SessionRunUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type SessionRunScalarWhereInput = {
+    AND?: SessionRunScalarWhereInput | SessionRunScalarWhereInput[]
+    OR?: SessionRunScalarWhereInput[]
+    NOT?: SessionRunScalarWhereInput | SessionRunScalarWhereInput[]
+    id?: StringFilter<"SessionRun"> | string
+    userId?: StringFilter<"SessionRun"> | string
+    mode?: StringFilter<"SessionRun"> | string
+    status?: StringFilter<"SessionRun"> | string
+    payoutEligible?: BoolFilter<"SessionRun"> | boolean
+    ineligibleReason?: StringNullableFilter<"SessionRun"> | string | null
+    startedAt?: DateTimeFilter<"SessionRun"> | Date | string
+    expiresAt?: DateTimeFilter<"SessionRun"> | Date | string
+    finishedAt?: DateTimeNullableFilter<"SessionRun"> | Date | string | null
+    score?: IntNullableFilter<"SessionRun"> | number | null
+    durationMs?: IntNullableFilter<"SessionRun"> | number | null
+    rejectReason?: StringNullableFilter<"SessionRun"> | string | null
+    sessionId?: StringNullableFilter<"SessionRun"> | string | null
+    result?: JsonNullableFilter<"SessionRun">
+  }
+
+  export type SessionGrantUpsertWithWhereUniqueWithoutUserInput = {
+    where: SessionGrantWhereUniqueInput
+    update: XOR<SessionGrantUpdateWithoutUserInput, SessionGrantUncheckedUpdateWithoutUserInput>
+    create: XOR<SessionGrantCreateWithoutUserInput, SessionGrantUncheckedCreateWithoutUserInput>
+  }
+
+  export type SessionGrantUpdateWithWhereUniqueWithoutUserInput = {
+    where: SessionGrantWhereUniqueInput
+    data: XOR<SessionGrantUpdateWithoutUserInput, SessionGrantUncheckedUpdateWithoutUserInput>
+  }
+
+  export type SessionGrantUpdateManyWithWhereWithoutUserInput = {
+    where: SessionGrantScalarWhereInput
+    data: XOR<SessionGrantUpdateManyMutationInput, SessionGrantUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type SessionGrantScalarWhereInput = {
+    AND?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
+    OR?: SessionGrantScalarWhereInput[]
+    NOT?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
+    id?: StringFilter<"SessionGrant"> | string
+    userId?: StringFilter<"SessionGrant"> | string
+    runId?: StringFilter<"SessionGrant"> | string
+    grantType?: StringFilter<"SessionGrant"> | string
+    amount?: FloatFilter<"SessionGrant"> | number
+    metadata?: JsonNullableFilter<"SessionGrant">
+    createdAt?: DateTimeFilter<"SessionGrant"> | Date | string
+  }
+
   export type CreditLedgerUpsertWithWhereUniqueWithoutUserInput = {
     where: CreditLedgerWhereUniqueInput
     update: XOR<CreditLedgerUpdateWithoutUserInput, CreditLedgerUncheckedUpdateWithoutUserInput>
@@ -140784,6 +144276,8 @@ export namespace Prisma {
     policyVersion?: string | null
     policyAcceptedAt?: Date | string | null
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -140854,6 +144348,8 @@ export namespace Prisma {
     policyVersion?: string | null
     policyAcceptedAt?: Date | string | null
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -140940,6 +144436,8 @@ export namespace Prisma {
     policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -141010,6 +144508,8 @@ export namespace Prisma {
     policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -141080,6 +144580,8 @@ export namespace Prisma {
     policyVersion?: string | null
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -141150,6 +144652,8 @@ export namespace Prisma {
     policyVersion?: string | null
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -141236,6 +144740,8 @@ export namespace Prisma {
     policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -141306,6 +144812,8 @@ export namespace Prisma {
     policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -141360,6 +144868,742 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
   }
 
+  export type UserCreateWithoutSessionRunsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutSessionRunsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutSessionRunsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutSessionRunsInput, UserUncheckedCreateWithoutSessionRunsInput>
+  }
+
+  export type SessionGrantCreateWithoutRunInput = {
+    id?: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutSessionGrantsInput
+  }
+
+  export type SessionGrantUncheckedCreateWithoutRunInput = {
+    id?: string
+    userId: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type SessionGrantCreateOrConnectWithoutRunInput = {
+    where: SessionGrantWhereUniqueInput
+    create: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput>
+  }
+
+  export type SessionGrantCreateManyRunInputEnvelope = {
+    data: SessionGrantCreateManyRunInput | SessionGrantCreateManyRunInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutSessionRunsInput = {
+    update: XOR<UserUpdateWithoutSessionRunsInput, UserUncheckedUpdateWithoutSessionRunsInput>
+    create: XOR<UserCreateWithoutSessionRunsInput, UserUncheckedCreateWithoutSessionRunsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutSessionRunsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutSessionRunsInput, UserUncheckedUpdateWithoutSessionRunsInput>
+  }
+
+  export type UserUpdateWithoutSessionRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutSessionRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type SessionGrantUpsertWithWhereUniqueWithoutRunInput = {
+    where: SessionGrantWhereUniqueInput
+    update: XOR<SessionGrantUpdateWithoutRunInput, SessionGrantUncheckedUpdateWithoutRunInput>
+    create: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput>
+  }
+
+  export type SessionGrantUpdateWithWhereUniqueWithoutRunInput = {
+    where: SessionGrantWhereUniqueInput
+    data: XOR<SessionGrantUpdateWithoutRunInput, SessionGrantUncheckedUpdateWithoutRunInput>
+  }
+
+  export type SessionGrantUpdateManyWithWhereWithoutRunInput = {
+    where: SessionGrantScalarWhereInput
+    data: XOR<SessionGrantUpdateManyMutationInput, SessionGrantUncheckedUpdateManyWithoutRunInput>
+  }
+
+  export type UserCreateWithoutSessionGrantsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutSessionGrantsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutSessionGrantsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutSessionGrantsInput, UserUncheckedCreateWithoutSessionGrantsInput>
+  }
+
+  export type SessionRunCreateWithoutGrantsInput = {
+    id?: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    user: UserCreateNestedOneWithoutSessionRunsInput
+  }
+
+  export type SessionRunUncheckedCreateWithoutGrantsInput = {
+    id?: string
+    userId: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
+  export type SessionRunCreateOrConnectWithoutGrantsInput = {
+    where: SessionRunWhereUniqueInput
+    create: XOR<SessionRunCreateWithoutGrantsInput, SessionRunUncheckedCreateWithoutGrantsInput>
+  }
+
+  export type UserUpsertWithoutSessionGrantsInput = {
+    update: XOR<UserUpdateWithoutSessionGrantsInput, UserUncheckedUpdateWithoutSessionGrantsInput>
+    create: XOR<UserCreateWithoutSessionGrantsInput, UserUncheckedCreateWithoutSessionGrantsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutSessionGrantsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutSessionGrantsInput, UserUncheckedUpdateWithoutSessionGrantsInput>
+  }
+
+  export type UserUpdateWithoutSessionGrantsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutSessionGrantsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type SessionRunUpsertWithoutGrantsInput = {
+    update: XOR<SessionRunUpdateWithoutGrantsInput, SessionRunUncheckedUpdateWithoutGrantsInput>
+    create: XOR<SessionRunCreateWithoutGrantsInput, SessionRunUncheckedCreateWithoutGrantsInput>
+    where?: SessionRunWhereInput
+  }
+
+  export type SessionRunUpdateToOneWithWhereWithoutGrantsInput = {
+    where?: SessionRunWhereInput
+    data: XOR<SessionRunUpdateWithoutGrantsInput, SessionRunUncheckedUpdateWithoutGrantsInput>
+  }
+
+  export type SessionRunUpdateWithoutGrantsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    user?: UserUpdateOneRequiredWithoutSessionRunsNestedInput
+  }
+
+  export type SessionRunUncheckedUpdateWithoutGrantsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
   export type UserCreateWithoutLedgerInput = {
     id?: string
     email: string
@@ -141377,6 +145621,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
     lessons?: LessonProgressCreateNestedManyWithoutUserInput
@@ -141447,6 +145693,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
     lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
@@ -141533,6 +145781,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
     lessons?: LessonProgressUpdateManyWithoutUserNestedInput
@@ -141603,6 +145853,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
     lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
@@ -141673,6 +145925,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
     lessons?: LessonProgressCreateNestedManyWithoutUserInput
@@ -141743,6 +145997,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
     lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
@@ -141829,6 +146085,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
     lessons?: LessonProgressUpdateManyWithoutUserNestedInput
@@ -141899,6 +146157,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
     lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
@@ -141969,6 +146229,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -142039,6 +146301,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -142125,6 +146389,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -142195,6 +146461,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -142265,6 +146533,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -142335,6 +146605,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -142421,6 +146693,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -142491,6 +146765,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -142561,6 +146837,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -142631,6 +146909,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -142843,6 +147123,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -142913,6 +147195,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -143106,6 +147390,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -143176,6 +147462,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -143262,6 +147550,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -143332,6 +147622,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -143402,6 +147694,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -143472,6 +147766,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -143558,6 +147854,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -143628,6 +147926,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -144365,6 +148665,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -144435,6 +148737,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -144521,6 +148825,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -144591,6 +148897,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -144661,6 +148969,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -144731,6 +149041,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -144817,6 +149129,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -144887,6 +149201,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -144957,6 +149273,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -145027,6 +149345,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -145113,6 +149433,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -145183,6 +149505,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -145253,6 +149577,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -145323,6 +149649,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -145409,6 +149737,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -145479,6 +149809,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -145549,6 +149881,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -145619,6 +149953,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -145731,6 +150067,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -145801,6 +150139,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -145887,6 +150227,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -145957,6 +150299,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -146073,6 +150417,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -146143,6 +150489,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -146315,6 +150663,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -146385,6 +150735,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -146508,6 +150860,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -146578,6 +150932,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -146762,6 +151118,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -146832,6 +151190,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -146949,6 +151309,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -147019,6 +151381,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -147089,6 +151453,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -147159,6 +151525,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -147234,6 +151602,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -147304,6 +151674,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -147379,6 +151751,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -147449,6 +151823,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -147563,6 +151939,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -147633,6 +152011,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -147714,6 +152094,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -147784,6 +152166,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -147865,6 +152249,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -147935,6 +152321,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -148080,6 +152468,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -148150,6 +152540,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -148301,6 +152693,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -148371,6 +152765,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -148441,6 +152837,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -148511,6 +152909,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -148597,6 +152997,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -148667,6 +153069,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -148737,6 +153141,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     lessons?: LessonProgressCreateNestedManyWithoutUserInput
@@ -148807,6 +153213,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
@@ -148893,6 +153301,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     lessons?: LessonProgressUpdateManyWithoutUserNestedInput
@@ -148963,6 +153373,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
@@ -149300,6 +153712,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -149370,6 +153784,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -149490,6 +153906,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -149560,6 +153978,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -149722,6 +154142,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -149792,6 +154214,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -149878,6 +154302,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -149948,6 +154374,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -150018,6 +154446,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -150088,6 +154518,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -150174,6 +154606,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -150244,6 +154678,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -150314,6 +154750,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -150384,6 +154822,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -150470,6 +154910,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -150540,6 +154982,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -150610,6 +155054,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -150680,6 +155126,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -150792,6 +155240,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -150862,6 +155312,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -151012,6 +155464,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -151082,6 +155536,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -151157,6 +155613,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -151227,6 +155685,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -151313,6 +155773,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -151383,6 +155845,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -151464,6 +155928,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -151534,6 +156000,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -151604,6 +156072,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -151674,6 +156144,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -151760,6 +156232,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -151830,6 +156304,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -151900,6 +156376,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -151970,6 +156448,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -152056,6 +156536,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -152126,6 +156608,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -152196,6 +156680,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -152266,6 +156752,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -152352,6 +156840,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -152422,6 +156912,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -152492,6 +156984,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -152562,6 +157056,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -152676,6 +157172,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -152746,6 +157244,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -152832,6 +157332,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -152902,6 +157404,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -153011,6 +157515,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -153081,6 +157587,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -153180,6 +157688,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -153250,6 +157760,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -153336,6 +157848,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -153406,6 +157920,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -153476,6 +157992,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -153546,6 +158064,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -153632,6 +158152,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -153702,6 +158224,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -153772,6 +158296,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -153842,6 +158368,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -153928,6 +158456,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -153998,6 +158528,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -154068,6 +158600,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -154138,6 +158672,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -154224,6 +158760,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -154294,6 +158832,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -154486,6 +159026,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -154556,6 +159098,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -154664,6 +159208,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -154734,6 +159280,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -154926,6 +159474,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -154996,6 +159546,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -155116,6 +159668,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -155186,6 +159740,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -155380,6 +159936,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -155450,6 +160008,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -155688,6 +160248,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -155758,6 +160320,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -155940,6 +160504,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -156010,6 +160576,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -156188,6 +160756,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -156258,6 +160828,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -156408,6 +160980,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -156478,6 +161052,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -156656,6 +161232,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -156726,6 +161304,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -158172,6 +162752,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -158242,6 +162824,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -158452,6 +163036,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -158522,6 +163108,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -158677,6 +163265,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -158747,6 +163337,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -158833,6 +163425,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -158903,6 +163497,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -158973,6 +163569,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -159043,6 +163641,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -159129,6 +163729,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -159199,6 +163801,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -159269,6 +163873,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -159339,6 +163945,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -159414,6 +164022,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -159484,6 +164094,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -159647,6 +164259,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -159717,6 +164331,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -159798,6 +164414,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -159868,6 +164486,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -160245,6 +164865,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -160315,6 +164937,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -160401,6 +165025,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -160471,6 +165097,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -160541,6 +165169,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -160611,6 +165241,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -160697,6 +165329,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -160767,6 +165401,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -160837,6 +165473,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -160907,6 +165545,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -160993,6 +165633,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -161063,6 +165705,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -161133,6 +165777,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -161203,6 +165849,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -161278,6 +165926,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileCreateNestedOneWithoutUserInput
     sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerCreateNestedManyWithoutUserInput
     cards?: CardOwnershipCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
@@ -161348,6 +165998,8 @@ export namespace Prisma {
     policyAcceptedAt?: Date | string | null
     profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
     sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
     ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
     cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
     prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
@@ -161434,6 +166086,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -161504,6 +166158,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -161585,6 +166241,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
@@ -161655,6 +166313,8 @@ export namespace Prisma {
     policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
     sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
     ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
     cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
     prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
@@ -161724,6 +166384,31 @@ export namespace Prisma {
     dodges?: number
     combos?: number
     maxCombo?: number
+    createdAt?: Date | string
+  }
+
+  export type SessionRunCreateManyUserInput = {
+    id?: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
+  export type SessionGrantCreateManyUserInput = {
+    id?: string
+    runId: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
   }
 
@@ -162334,6 +167019,83 @@ export namespace Prisma {
     dodges?: IntFieldUpdateOperationsInput | number
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionRunUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUpdateManyWithoutRunNestedInput
+  }
+
+  export type SessionRunUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type SessionRunUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+  }
+
+  export type SessionGrantUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    run?: SessionRunUpdateOneRequiredWithoutGrantsNestedInput
+  }
+
+  export type SessionGrantUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionGrantUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -164034,6 +168796,42 @@ export namespace Prisma {
     dealId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionGrantCreateManyRunInput = {
+    id?: string
+    userId: string
+    grantType: string
+    amount: number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type SessionGrantUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutSessionGrantsNestedInput
+  }
+
+  export type SessionGrantUncheckedUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SessionGrantUncheckedUpdateManyWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    grantType?: StringFieldUpdateOperationsInput | string
+    amount?: FloatFieldUpdateOperationsInput | number
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type CellWisdomCreateManyProjectInput = {

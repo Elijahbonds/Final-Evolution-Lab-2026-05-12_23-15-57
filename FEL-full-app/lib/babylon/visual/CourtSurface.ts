@@ -250,14 +250,34 @@ function grain(g: CanvasRenderingContext2D, S: number, rnd: () => number, amount
   g.putImageData(img as ImageData, 0, 0);
 }
 
+export interface StreetCourtPalette {
+  base: string; base2: string; key: string; seam: string;
+  /** Long low-alpha swell strokes in two blues under the grain — the Venice courts' ocean art, as paint, not water. */
+  swell?: { light: string; dark: string };
+}
+
+/** The shared street court (1v1, 3v3, three-point, carnival — every Venice hoops venue). */
+export const STREET_COURT_PALETTE: StreetCourtPalette = {
+  // The key has to READ from the dunk camera at 14 m under a golden-hour grade that lifts everything warm: at #16506E
+  // against this base it measured as the same teal (shot 2026-09-09). A painted key is a different colour, not a shade.
+  base: '#2C6B88', base2: '#37809C', key: '#0D3448', seam: '#1B4A61',
+};
+
+/**
+ * DUNK-VENICE-ENV-RENDER (2026-09-28): the Venice dunk court in the Venice kit's own blue — venice-blue-court and the concept
+ * (public/backdrops/dunk.jpg) are a deep ocean blue with swell art, where the shared street paint is a sealcoat teal. Same
+ * rulebook markings and the same base-to-key value step (the key still has to read at 14 m); matte, so it does not read as
+ * water (M12.2). Dunk and dunk duel only — the other Venice courts keep STREET_COURT_PALETTE.
+ */
+export const VENICE_DUNK_COURT_PALETTE: StreetCourtPalette = {
+  base: '#1F5A8E', base2: '#2A6CA6', key: '#0B2B52', seam: '#16426E',
+  swell: { light: '90,160,215', dark: '8,34,70' },
+};
+
 /** Deterministic street-court albedo. `wM`/`lM` are the real court metres the texture covers. */
 export function paintStreetCourt(
   g: CanvasRenderingContext2D, S: number, wM: number, lM: number,
-  palette: { base: string; base2: string; key: string; seam: string } = {
-    // The key has to READ from the dunk camera at 14 m under a golden-hour grade that lifts everything warm: at #16506E
-    // against this base it measured as the same teal (shot 2026-09-09). A painted key is a different colour, not a shade.
-    base: '#2C6B88', base2: '#37809C', key: '#0D3448', seam: '#1B4A61',
-  },
+  palette: StreetCourtPalette = STREET_COURT_PALETTE,
 ): void {
   const rnd = makeRng(0x5eed17);
   const pxW = S / wM, pxL = S / lM;             // pixels per metre on each axis
@@ -284,6 +304,20 @@ export function paintStreetCourt(
     g.beginPath(); g.moveTo(-40, y);
     for (let x = -40; x <= S + 40; x += 60) g.lineTo(x, y + Math.sin(x * 0.004 + i) * (18 + rnd() * 22));
     g.stroke();
+  }
+  // ── 1b. the swell art (Venice dunk): long wavy strokes in two blues at low alpha, painted before the grain so the
+  //      aggregate sits over them — a painted ocean on a matte court, never a glossy one
+  if (palette.swell) {
+    for (let i = 0; i < 22; i++) {
+      const y = (i / 22) * S + rnd() * S * 0.03;
+      const amp = S * (0.008 + rnd() * 0.024);
+      const light = rnd() < 0.55;
+      g.strokeStyle = `rgba(${light ? palette.swell.light : palette.swell.dark}, ${0.06 + rnd() * 0.08})`;
+      g.lineWidth = S * (0.006 + rnd() * 0.02);
+      g.beginPath(); g.moveTo(-40, y);
+      for (let x = -40; x <= S + 40; x += 32) g.lineTo(x, y + Math.sin(x * (2.7 / S) * 4 + i * 1.7) * amp + Math.sin(x * (9.3 / S) * 4 + i) * amp * 0.3);
+      g.stroke();
+    }
   }
   // ── 2. aggregate — the grain that stops the court reading as a flat fill.
   //      ONE pass over the pixel buffer, not 26 000 fillRects: at 2048² the per-call `fillStyle = 'rgba(…)'` string parse
@@ -375,6 +409,7 @@ export function paintStreetCourt(
  */
 export function mountStreetCourt(
   scene: Scene, holder: TransformNode, x: readonly [number, number], z: readonly [number, number], y = 0.02,
+  palette: StreetCourtPalette = STREET_COURT_PALETTE,
 ): Mesh {
   const wM = Math.abs(x[1] - x[0]), lM = Math.abs(z[1] - z[0]);
   const mobile = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile';
@@ -383,7 +418,7 @@ export function mountStreetCourt(
   // mounts TWICE on a page load (measured 2026-09-09: three-point logged its build twice and lost the WebGL context —
   // "Graphics were reset by the device" — on the first one). The paint is deterministic, so the second mount takes the
   // first one's texture. It lives and dies with the scene, like every other cached ground texture here.
-  const key = `${S}:${wM.toFixed(2)}x${lM.toFixed(2)}`;
+  const key = `${S}:${wM.toFixed(2)}x${lM.toFixed(2)}:${palette.base}`;
   let byKey = courtTexCache.get(scene);
   if (!byKey) { byKey = new Map(); courtTexCache.set(scene, byKey); }
   let tex = byKey.get(key);
@@ -391,7 +426,7 @@ export function mountStreetCourt(
   if (!tex) {
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     tex = new DynamicTexture('court_street_tex', { width: S, height: S }, scene, true);
-    paintStreetCourt(tex.getContext() as unknown as CanvasRenderingContext2D, S, wM, lM);
+    paintStreetCourt(tex.getContext() as unknown as CanvasRenderingContext2D, S, wM, lM, palette);
     tex.update(false);
     paintMs = Math.round((typeof performance !== 'undefined' ? performance.now() : 0) - t0);
     tex.wrapU = Texture.CLAMP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;

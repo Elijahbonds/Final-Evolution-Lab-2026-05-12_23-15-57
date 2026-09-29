@@ -1,191 +1,174 @@
 /**
- * Venice LOOK — surround KEEP/HIDE + palm tip scale + golden-haze clearColor.
- * Never edit GLB bytes. Scene-only enable/scale after mount.
- * Spec: SPEC-VENICE-LOOK.md + palm LOOK 3b (tips 8–12 m, prefer ~10 m).
+ * Venice LOOK — the Venice dunk's sky and light (DunkMode + DunkDuelMode, under Venice only). Scene-only; never edits GLB bytes.
+ *
+ * DUNK-VENICE-ENV-RENDER (2026-09-28). This pass used to mount /models/maps/venice-court-surround.glb, KEEP its Ocean / trunk /
+ * frond nodes, HIDE its clutter and scale its palms to ~10 m tips. Measured at a1a1c5f9 it had NEVER mounted the GLB:
+ * `ensureVeniceSurroundMounted` stood down whenever any node named `trunk*` existed, and the venue spec's own stub palms
+ * (`prop_palm_*`, hidden once the kit loads) carry exactly that name — so the "surround" was three hidden stub cones scaled
+ * ×2.2–2.6 and nothing else. It is also the wrong asset to mount here: the GLB is a toy-scale diorama (its ocean is a 12 m
+ * disc at the origin, its nine palms are untextured cones within 3 m of centre court — on the court at native scale), so
+ * the only thing the pass ever delivered was the golden clear colour. What it does now:
+ *
+ *  · THE SKY — the Venice kit's own sunset (`/backdrops/venice-sky-sunset.jpg`, the backdrop `lib/map-data.ts` gives the
+ *    venice-blue-court map) laid into the venue's sky dome, horizon on the sea line, sun where the key light comes from.
+ *    Only the photo's lower band is used: its top third is the arched red cloud field the owner turned down as a sky on
+ *    2026-09-05 ("a red wall — not hell"); above the band the dome fades to a dusk blue instead.
+ *  · THE LIGHT — the mode rig's sun (`fel_sun`, the goldenHour mood's) moved to a real golden-hour sun: low (24°) over the
+ *    ocean to the north-west, where the photo puts it. The mood's sun stands at 55° in the south-east — a noon sun, behind
+ *    the camera, with the painted sunset in front of it.
+ *  · THE HAZE — the golden clear colour (unchanged).
  */
-import {
-  AbstractMesh,
-  Color4,
-  Scene,
-  SceneLoader,
-  TransformNode,
-  Vector3,
-} from '@babylonjs/core';
-import '@babylonjs/loaders/glTF';
+import { Color3, Color4, DynamicTexture, Texture, Vector3 } from '@babylonjs/core';
+import type { DirectionalLight, Scene, StandardMaterial } from '@babylonjs/core';
 
 /** Golden-hour haze — not void #0b0e16. */
 export const VENICE_GOLDEN_HAZE = Color4.FromHexString('#d4a06aff');
 
-const SURROUND_URL = '/models/maps/venice-court-surround.glb';
-const SURROUND_ROOT = 'meshy_venice_surround';
+/** The key light. Azimuth in degrees WEST of north (the dunk camera looks north, −z); elevation above the horizon. */
+export const VENICE_SUN = { azimuthDeg: 55, elevationDeg: 24, intensity: 3.0, color: '#ffb070' } as const;
 
-/** KEEP enabled (prefix / exact). */
-const KEEP_PREFIXES = ['Ocean', 'trunk', 'frond'] as const;
-/** HIDE via setEnabled(false) — do not delete from GLB. */
-const HIDE_PREFIXES = ['Bleach', 'body', 'head', 'kiosk', 'kroof'] as const;
-const HIDE_EXACT = new Set(['GroundApron', 'SandRing', 'BoardwalkBand']);
+/** The sky photo and where things sit in it (measured on the 1408 × 704 file). */
+export const VENICE_SKY = {
+  url: '/backdrops/venice-sky-sunset.jpg',
+  photoHorizon: 605 / 704,   // the sea line
+  photoTop: 250 / 704,       // first row used — above it, the arched red bands
+  photoSunX: 716 / 1408,     // the sun's column
+  /** Fraction of the dome's 360° the photo spans (~169°): the dunk camera's 81° view is all photo but its left ~10° (the feather),
+   *  with the sun just past its right edge. */
+  span: 0.47,
+  zenith: '#26295c',
+  /** Emissive level: the photo's sun band clips to white under the goldenHour exposure at 1. */
+  level: 0.9,
+} as const;
 
-const ATHLETE_M = 1.85;
-const PALM_TIP_TARGET_M = 10; // prefer mid of 8–12 m band
-const PALM_TIP_MIN_M = 8;
-const PALM_TIP_MAX_M = 12;
-
-function nameOf(n: { name?: string } | null | undefined): string {
-  return n?.name ?? '';
-}
-
-function matchesPrefix(name: string, prefixes: readonly string[]): boolean {
-  return prefixes.some((p) => name === p || name.startsWith(p));
-}
-
-function isKeep(name: string): boolean {
-  return matchesPrefix(name, KEEP_PREFIXES);
-}
-
-function isHide(name: string): boolean {
-  if (HIDE_EXACT.has(name)) return true;
-  return matchesPrefix(name, HIDE_PREFIXES);
-}
-
-function walkNodes(scene: Scene): Array<AbstractMesh | TransformNode> {
-  const out: Array<AbstractMesh | TransformNode> = [];
-  for (const m of scene.meshes) out.push(m);
-  for (const t of scene.transformNodes) out.push(t);
-  return out;
+/** Unit vector from the scene TOWARD the sun. */
+export function veniceSunPosition(): Vector3 {
+  const a = (VENICE_SUN.azimuthDeg * Math.PI) / 180, e = (VENICE_SUN.elevationDeg * Math.PI) / 180;
+  return new Vector3(-Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e));
 }
 
 /**
- * KEEP Ocean*, trunk*, frond*; HIDE Bleach*, body*, head*, kiosk*, kroof*, GroundApron, SandRing, BoardwalkBand.
- * Court: Mesh_0 only as painted playable court (sibling court paint meshes under Meshy court stay off).
+ * Where the photo lands in a W × H dome texture. Babylon's sphere maps u 0 → +x (east), 0.25 → −z (north), 0.5 → −x (west)
+ * and v 0 → zenith, 0.5 → the equator — which is the sea line, because the sea planes run out past the dome wall at y 0.
+ * The band is drawn aspect-true: its height in degrees is its row count scaled by the same degrees-per-pixel as its width.
  */
-export function applyVeniceSurroundVisibility(scene: Scene): void {
-  for (const node of walkNodes(scene)) {
-    const n = nameOf(node);
-    if (!n) continue;
-
-    if (isKeep(n)) {
-      node.setEnabled(true);
-      if ('isVisible' in node) (node as AbstractMesh).isVisible = true;
-      if ('visibility' in node) (node as AbstractMesh).visibility = 1;
-      continue;
-    }
-
-    if (isHide(n)) {
-      node.setEnabled(false);
-      if ('isVisible' in node) (node as AbstractMesh).isVisible = false;
-      continue;
-    }
-
-    // Court: Mesh_0 only — hide other Mesh_* paint siblings under meshy court roots.
-    if (/^Mesh_\d+$/.test(n) && n !== 'Mesh_0') {
-      let p: { name: string; parent: unknown } | null = node as unknown as { name: string; parent: unknown };
-      let underCourt = false;
-      while (p) {
-        if (p.name.includes('venice') && p.name.includes('court')) { underCourt = true; break; }
-        if (p.name === 'meshy_venice_court' || p.name.startsWith('nexus_venue_map_venice')) { underCourt = true; break; }
-        p = (p.parent as { name: string; parent: unknown } | null) ?? null;
-      }
-      if (underCourt) {
-        node.setEnabled(false);
-        if ('isVisible' in node) (node as AbstractMesh).isVisible = false;
-      }
-    }
-  }
-  console.info('[FEL-VENICE-LOOK] applyVeniceSurroundVisibility KEEP Ocean/trunk/frond · HIDE clutter · Mesh_0 court');
+export function veniceSkyLayout(W: number, H: number, photoW: number, photoH: number) {
+  const bandRows = (VENICE_SKY.photoHorizon - VENICE_SKY.photoTop) * photoH;
+  const elevDeg = (VENICE_SKY.span * 360 * bandRows) / photoW;
+  const horizonY = H * 0.5;
+  const topY = horizonY - (elevDeg / 180) * H;
+  const uSun = 0.25 + VENICE_SUN.azimuthDeg / 360;
+  const width = VENICE_SKY.span * W;
+  const x0 = (uSun - VENICE_SKY.photoSunX * VENICE_SKY.span) * W;
+  return { horizonY, topY, x0, width, elevDeg, uSun, bandRows };
 }
 
-/**
- * Uniform-scale trunk* + frond* about their base so tips land ~10 m (8–12 band).
- * NEVER apply this scale to Ocean* (no vertical wall).
- */
-export function scaleVenicePalms(scene: Scene, tipTargetM = PALM_TIP_TARGET_M): number {
-  const target = Math.max(PALM_TIP_MIN_M, Math.min(PALM_TIP_MAX_M, tipTargetM));
-  // Group fronds with nearest trunk when possible; otherwise scale each trunk/frond root.
-  const trunks: TransformNode[] = [];
-  const fronds: AbstractMesh[] = [];
+/** The dome direction a texture column u faces (horizontal, unit). */
+export function skyDirectionAtU(u: number): Vector3 {
+  const phi = u * Math.PI * 2;
+  return new Vector3(Math.cos(phi), 0, -Math.sin(phi));
+}
 
-  for (const node of walkNodes(scene)) {
-    const n = nameOf(node);
-    if (matchesPrefix(n, ['Ocean'])) continue; // LOCK: never palm-scale Ocean
-    if (matchesPrefix(n, ['trunk'])) trunks.push(node as TransformNode);
-    else if (matchesPrefix(n, ['frond']) && 'getBoundingInfo' in node) fronds.push(node as AbstractMesh);
-  }
+type Ctx2D = CanvasRenderingContext2D;
 
-  let scaled = 0;
-  const scaledIds = new Set<number>();
-
-  const scaleAboutBase = (node: TransformNode | AbstractMesh, factor: number) => {
-    if (!(factor > 1.01) || !(factor < 40)) return;
-    // Prefer parent transform if shared; else scale node local about base (Y=0 local).
-    const before = node.getHierarchyBoundingVectors?.(true)
-      ?? { min: node.getAbsolutePosition?.() ?? Vector3.Zero(), max: node.getAbsolutePosition?.() ?? Vector3.Zero() };
-    const baseY = before.min.y;
-    const world = node.getAbsolutePosition();
-    node.scaling.x *= factor;
-    node.scaling.y *= factor;
-    node.scaling.z *= factor;
-    node.computeWorldMatrix(true);
-    const after = node.getHierarchyBoundingVectors?.(true)
-      ?? { min: node.getAbsolutePosition?.() ?? Vector3.Zero(), max: node.getAbsolutePosition?.() ?? Vector3.Zero() };
-    // Keep base planted: compensate world Y drift from scale-about-pivot.
-    const dy = baseY - after.min.y;
-    if (Math.abs(dy) > 1e-4) {
-      node.position.y += dy;
-      node.computeWorldMatrix(true);
-    }
-    // Keep XZ footprint center if scale pivoted oddly
-    void world;
-    scaled += 1;
+function paintVeniceSky(g: Ctx2D, W: number, H: number, img: HTMLImageElement): void {
+  const L = veniceSkyLayout(W, H, img.width, img.height);
+  const srcY = VENICE_SKY.photoTop * img.height;
+  const bandH = L.horizonY - L.topY;
+  const canvas2d = (w: number, h: number, readback = false): Ctx2D | null => {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    return c.getContext('2d', readback ? { willReadFrequently: true } : undefined) as Ctx2D | null;
   };
+  // a little out of the red, on the working canvases rather than the whole dome: 'saturation' with a grey keeps each
+  // pixel's hue and value and pulls its chroma toward the grey
+  const desaturate = (c: Ctx2D, w: number, h: number) => {
+    c.globalCompositeOperation = 'saturation'; c.fillStyle = 'rgba(128,128,128,0.18)'; c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+  };
+  // 1. the dome under the photo: zenith → the band's VERTICAL PROFILE (each row's mean colour across the whole photo) → the
+  //    sea line, one gradient top to bottom, so nothing meets at an edge. A stretched small copy of the band carried its
+  //    features round the dome instead — the sun as a white smear and the shore palms as a black blob at the horizon
+  //    behind the camera, and a seam where its two ends met. (The mean is taken in JS over a 176 × 24 copy: one drawImage
+  //    straight down to a few pixels samples a few source pixels, not their mean.)
+  const PW = 176, PH = 24;
+  const prof = canvas2d(PW, PH, true);
+  if (!prof) return;
+  prof.drawImage(img, 0, srcY, img.width, L.bandRows, 0, 0, PW, PH);
+  desaturate(prof, PW, PH);
+  const px = prof.getImageData(0, 0, PW, PH).data;
+  const row = (y: number): string => {
+    let r = 0, gg = 0, b = 0;
+    for (let x = 0; x < PW; x++) { const i = (y * PW + x) * 4; r += px[i]; gg += px[i + 1]; b += px[i + 2]; }
+    return `rgb(${Math.round(r / PW)},${Math.round(gg / PW)},${Math.round(b / PW)})`;
+  };
+  const grad = g.createLinearGradient(0, 0, 0, L.horizonY);
+  grad.addColorStop(0, VENICE_SKY.zenith);
+  for (let y = 0; y < PH; y++) grad.addColorStop((L.topY + ((y + 0.5) / PH) * bandH) / L.horizonY, row(y));
+  g.fillStyle = grad; g.fillRect(0, 0, W, L.horizonY);
+  g.fillStyle = row(PH - 1); g.fillRect(0, L.horizonY, W, H - L.horizonY);   // under the sea line (hidden by the sea)
+  // 2. the photo band itself, feathered into that on both sides and along its top
+  const band = canvas2d(Math.round(L.width), Math.round(bandH));
+  if (!band) return;
+  const bw = band.canvas.width, bh = band.canvas.height;
+  band.drawImage(img, 0, srcY, img.width, L.bandRows, 0, 0, bw, bh);
+  desaturate(band, bw, bh);
+  band.globalCompositeOperation = 'destination-out';
+  const fx = band.createLinearGradient(0, 0, bw, 0);
+  fx.addColorStop(0, 'rgba(0,0,0,1)'); fx.addColorStop(0.15, 'rgba(0,0,0,0)'); fx.addColorStop(0.85, 'rgba(0,0,0,0)'); fx.addColorStop(1, 'rgba(0,0,0,1)');
+  band.fillStyle = fx; band.fillRect(0, 0, bw, bh);
+  const fy = band.createLinearGradient(0, 0, 0, bh);
+  fy.addColorStop(0, 'rgba(0,0,0,1)'); fy.addColorStop(0.35, 'rgba(0,0,0,0)');
+  band.fillStyle = fy; band.fillRect(0, 0, bw, bh);
+  for (const dx of [-W, 0, W]) g.drawImage(band.canvas, L.x0 + dx, L.topY);   // wraps across the u seam
+}
 
-  for (const trunk of trunks) {
-    const id = (trunk as unknown as { uniqueId?: number }).uniqueId ?? scaled;
-    if (scaledIds.has(id)) continue;
-    trunk.computeWorldMatrix(true);
-    const b = trunk.getHierarchyBoundingVectors(true);
-    const tipY = b.max.y;
-    const baseY = b.min.y;
-    const height = Math.max(0.05, tipY - baseY);
-    // Native tips measured ~0.67–0.89 m as shrubs; grow to target tip height.
-    const factor = target / Math.max(height, 0.2);
-    if (factor < 1.05 && tipY >= PALM_TIP_MIN_M) continue;
-    scaleAboutBase(trunk, factor);
-    scaledIds.add(id);
+/**
+ * Lay the Venice sunset into the venue's sky dome (`nexus_sky`). Returns at once; the photo lands when it has loaded, and the
+ * painted beach dome stays if it never does. Waits for the baked beach dome's own async load first — that callback assigns the
+ * dome's texture and would otherwise overwrite this one.
+ */
+export function mountVeniceSunsetSky(scene: Scene): void {
+  if (typeof Image === 'undefined' || typeof document === 'undefined') return;
+  const sky = scene.getMeshByName('nexus_sky');
+  const mat = sky?.material as StandardMaterial | null | undefined;
+  if (!sky || !mat || !('emissiveTexture' in mat)) { console.warn('[FEL-VENICE-LOOK] no nexus_sky — sunset sky skipped'); return; }
+  if (mat.emissiveTexture?.name === 'venice_sky_tex') return;
+  const mobile = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile';
+  const W = mobile ? 1024 : 2048, H = W / 2;
+  const img = new Image();
+  const bakedLoaded = (): Promise<void> => {
+    const baked = scene.textures.find((t) => (t as Texture).url?.endsWith('/backdrops/baked/beach.jpg')) as Texture | undefined;
+    if (!baked || baked.isReady()) return Promise.resolve();
+    return new Promise((res) => { baked.onLoadObservable.addOnce(() => res()); setTimeout(res, 8000); });
+  };
+  img.onload = () => {
+    void bakedLoaded().then(() => {
+      if (scene.isDisposed || sky.isDisposed()) return;
+      const t0 = performance.now();
+      const tex = new DynamicTexture('venice_sky_tex', { width: W, height: H }, scene, false);
+      paintVeniceSky(tex.getContext() as unknown as Ctx2D, W, H, img);
+      tex.update(false);
+      tex.level = VENICE_SKY.level;
+      tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+      mat.emissiveTexture = tex;
+      console.info(`[FEL-VENICE-LOOK] sunset sky ${W}×${H} painted in ${Math.round(performance.now() - t0)} ms (sun u ${veniceSkyLayout(W, H, img.width, img.height).uSun.toFixed(3)})`);
+    });
+  };
+  img.onerror = () => console.warn('[FEL-VENICE-LOOK] sunset sky did not load — the painted dome stays');
+  img.src = VENICE_SKY.url;
+}
 
-    // Fronds that sit near this trunk: match the same factor if still short.
-    for (const frond of fronds) {
-      const fid = (frond as unknown as { uniqueId?: number }).uniqueId ?? -1;
-      if (scaledIds.has(fid)) continue;
-      frond.computeWorldMatrix(true);
-      const fb = frond.getBoundingInfo().boundingBox;
-      const fCenter = fb.centerWorld;
-      const tCenter = b.min.add(b.max).scale(0.5);
-      const xz = Math.hypot(fCenter.x - tCenter.x, fCenter.z - tCenter.z);
-      if (xz > 3.5) continue;
-      scaleAboutBase(frond, factor);
-      scaledIds.add(fid);
-    }
-  }
-
-  // Orphan fronds (no trunk match): scale so their tip hits band.
-  for (const frond of fronds) {
-    const fid = (frond as unknown as { uniqueId?: number }).uniqueId ?? -1;
-    if (scaledIds.has(fid)) continue;
-    frond.computeWorldMatrix(true);
-    const fb = frond.getHierarchyBoundingVectors?.(true) ?? {
-      min: frond.getBoundingInfo().boundingBox.minimumWorld,
-      max: frond.getBoundingInfo().boundingBox.maximumWorld,
-    };
-    const height = Math.max(0.05, fb.max.y - fb.min.y);
-    const tipY = fb.max.y;
-    if (tipY >= PALM_TIP_MIN_M && tipY <= PALM_TIP_MAX_M) continue;
-    const factor = target / Math.max(height, 0.2);
-    scaleAboutBase(frond, factor);
-    scaledIds.add(fid);
-  }
-
-  console.info(`[FEL-VENICE-LOOK] scaleVenicePalms tipTarget=${target}m athlete=${ATHLETE_M}m nodes=${scaled}`);
-  return scaled;
+/** Move the mode rig's sun to the golden-hour sun over the ocean. The rig's own shadow generator follows the light. */
+export function applyVeniceGoldenLight(scene: Scene): boolean {
+  const sun = scene.getLightByName('fel_sun') as DirectionalLight | null;
+  if (!sun) return false;
+  const toSun = veniceSunPosition();
+  sun.direction = toSun.scale(-1);
+  sun.position = toSun.scale(40);
+  sun.intensity = VENICE_SUN.intensity;
+  sun.diffuse = Color3.FromHexString(VENICE_SUN.color);
+  console.info(`[FEL-VENICE-LOOK] golden sun ${VENICE_SUN.azimuthDeg}° W of N at ${VENICE_SUN.elevationDeg}° (${VENICE_SUN.intensity})`);
+  return true;
 }
 
 /** Venice dunk clearColor = golden-hour haze (not #0b0e16). */
@@ -194,42 +177,9 @@ export function applyVeniceGoldenHaze(scene: Scene): void {
   console.info('[FEL-VENICE-LOOK] clearColor golden-haze #d4a06a');
 }
 
-/** Load surround GLB once if no Ocean/trunk nodes exist yet. Never edits bytes. */
-export async function ensureVeniceSurroundMounted(scene: Scene): Promise<boolean> {
-  const has = walkNodes(scene).some((n) => {
-    const name = nameOf(n);
-    return matchesPrefix(name, KEEP_PREFIXES);
-  });
-  if (has) return true;
-  if (scene.getTransformNodeByName(SURROUND_ROOT)) return true;
-
-  try {
-    const head = await fetch(SURROUND_URL, { method: 'HEAD' });
-    if (!head.ok) {
-      // Fall back to ImportMesh without HEAD (file:// / offline).
-      console.warn('[FEL-VENICE-LOOK] surround HEAD failed; trying import anyway');
-    }
-    const root = new TransformNode(SURROUND_ROOT, scene);
-    const res = await SceneLoader.ImportMeshAsync('', '/models/maps/', 'venice-court-surround.glb', scene);
-    for (const m of res.meshes) {
-      if (!m.parent) m.parent = root;
-      m.isPickable = false;
-    }
-    for (const t of res.transformNodes ?? []) {
-      if (!t.parent) t.parent = root;
-    }
-    console.info('[FEL-VENICE-LOOK] mounted venice-court-surround.glb');
-    return true;
-  } catch (e) {
-    console.warn('[FEL-VENICE-LOOK] surround mount failed', e);
-    return false;
-  }
-}
-
-/** Full LOOK pass for Venice dunk mount. */
+/** Full LOOK pass for the Venice dunk mount (the sky lands async; nothing here blocks the mode's load). */
 export async function applyVeniceDunkLookPass(scene: Scene): Promise<void> {
-  await ensureVeniceSurroundMounted(scene);
-  applyVeniceSurroundVisibility(scene);
-  scaleVenicePalms(scene, PALM_TIP_TARGET_M);
+  mountVeniceSunsetSky(scene);
+  applyVeniceGoldenLight(scene);
   applyVeniceGoldenHaze(scene);
 }

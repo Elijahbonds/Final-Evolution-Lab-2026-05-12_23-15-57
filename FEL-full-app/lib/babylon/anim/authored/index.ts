@@ -42,7 +42,7 @@ import { buildKeeperDive, buildKeeperSet, buildSoccerKick, buildKeeperDiveHold, 
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush, buildBoardStandIdle, buildBoardLandSketchy,
-  buildSkateKickflip, buildSkateBail,
+  buildSkateKickflip, buildSkateBail, buildSnowBail,
   buildBoardManual, buildSkateOllie,   // VENICE-SKATE-THPS (2026-09-09): the manual had no clip and the pop had no body
 } from './boardSuite';
 
@@ -174,6 +174,7 @@ export function registerAuthoredClips(
     ['board_push', () => buildBoardPush(scene, skeleton)],   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
     ['skate_kickflip', () => buildSkateKickflip(scene, skeleton)],
     ['skate_bail', () => buildSkateBail(scene, skeleton)],
+    ['snow_bail', () => buildSnowBail(scene, skeleton)],   // GATE-CRASHER-POLISH-2: the snowboard's wipeout, down in the snow
     ['board_manual', () => buildBoardManual(scene, skeleton)],   // VENICE-SKATE-THPS: the back-truck balance act (the tree pointed 'manual' at the ride idle)
     ['skate_ollie', () => buildSkateOllie(scene, skeleton)],    // VENICE-SKATE-THPS: plant -> pop -> hang, the sticky beat under the pop
     // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,
