@@ -1,7 +1,9 @@
 // LINKS-PAGE live probe (2026-09-29): /elijah on a `next start` build (LINKS_BASE; this lane used :3181), signed out, in
 // a fresh browser context. GET /elijah answers 200 with no Location; every button's href; /screen and /try open signed
 // out; every request /elijah makes (first-party only, and whether next-auth's session fetch appears); screenshots at
-// 390×844 and desktop width. The external shops are never opened: checking the hrefs is enough.
+// 390×844 and desktop width. The external shops are never opened: checking the hrefs is enough. With the server's
+// NEXTAUTH_URL set to the production host, the web.app count in /elijah's HTML (and, for comparison, in /try's, which
+// keeps the root layout's share-image tags) shows the page names no host (the FE PM amend, two hosts).
 //
 // Run from FEL-full-app (Node 26), with the server up:
 //   LINKS_BASE=http://127.0.0.1:3181 node node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json scripts/probes/_links-page-live.mts
@@ -20,6 +22,9 @@ const report: Json = { base: BASE, date: new Date().toISOString() };
 // the raw answer: no redirect followed
 const head = await fetch(`${BASE}/elijah`, { redirect: 'manual' });
 report.get = { status: head.status, location: head.headers.get('location'), setCookie: head.headers.get('set-cookie') };
+const HOST = new RegExp(['web', 'app'].join('\\.'), 'gi');
+const count = async (path: string) => ((await (await fetch(`${BASE}${path}`)).text()).match(HOST) ?? []).length;
+report.hostCount = { '/elijah': await count('/elijah'), '/try': await count('/try') };
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true });
 try {
@@ -33,7 +38,7 @@ try {
     await page.goto(`${BASE}/elijah`);
     await page.waitForSelector('[data-links-page]');
     await page.waitForTimeout(2000);
-    const links = await page.evaluate(`Array.from(document.querySelectorAll('[data-links-page] a')).map((a) => ({ label: a.getAttribute('data-link'), href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), affiliate: !!a.querySelector('[data-affiliate]'), height: Math.round(a.getBoundingClientRect().height) }))`);
+    const links = await page.evaluate(`Array.from(document.querySelectorAll('[data-links-page] a')).map((a) => ({ label: a.getAttribute('data-link'), href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), paidNote: (a.parentElement.querySelector('[data-paid-link-note]') || {}).textContent || null, height: Math.round(a.getBoundingClientRect().height) }))`);
     const storage = await page.evaluate(`({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) })`);
     const shot = join(OUT, `elijah-${tag}.png`);
     await page.screenshot({ path: shot, fullPage: true });
@@ -59,4 +64,4 @@ try {
   await browser.close();
 }
 writeFileSync(join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-console.log(JSON.stringify({ get: report.get, phone: { ...report.phone, requests: report.phone.requests.length }, desktop: { title: report.desktop.title, requests: report.desktop.requests.length, api: report.desktop.api }, open: [report['open:Free Jump Screen'], report['open:Play the Game, Free']] }, null, 1));
+console.log(JSON.stringify({ get: report.get, hostCount: report.hostCount, phone: { ...report.phone, requests: report.phone.requests.length }, desktop: { title: report.desktop.title, requests: report.desktop.requests.length, api: report.desktop.api }, open: [report['open:Free Jump Screen'], report['open:Play the Game, Free']] }, null, 1));
