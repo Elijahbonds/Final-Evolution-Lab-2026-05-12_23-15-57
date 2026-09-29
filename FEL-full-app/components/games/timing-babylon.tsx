@@ -22,6 +22,11 @@ import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } fr
 // this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
 import { decodeInstrumentChips } from '@/lib/babylon/dance/ui/InstrumentChips';
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
+// MUSIC-SUITE P8 (2026-09-25): Stoop's caption — the same shared caption layer THE MIC's hoops modes already draw
+// with (mic-caption.tsx's <MicCaption>, reading hud.mic/hud.micWho); DanceMode.ts is the only mode this host also
+// drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
+// renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
+import { MicCaption } from './mic-caption';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -520,6 +525,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
         {busRef.current && (
           <TouchOverlay bus={busRef.current} modeId={modeKey} visible={phase === 'playing' || phase === 'countdown'} />
         )}
+
+        {modeKey === 'dance' && <MicCaption text={hud.mic} who={hud.micWho} className="bottom-[10%]" />}
       </div>
     );
   }
