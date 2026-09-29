@@ -53,6 +53,8 @@ jobs:
       - run: npx prisma generate
       - name: type-check
         run: npx tsc --noEmit
+      - name: lint
+        run: npm run lint
       - name: unit tests
         run: npx vitest run
       # THE HEADLESS SUITES. Until 2026-09-16 these ran nowhere: CI was tsc + vitest +
