@@ -243,6 +243,30 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(await ledgerFor(run.runId)).toEqual([]);
   });
 
+  it('OWNER DECISION: a mode with no rules row (hoops3v3) is recorded unpaid — ok, NO_RULES, nothing filed', async () => {
+    as('player');
+    const before = await balances(users.player);
+    const run = await start('hoops3v3');
+    await playedFor(run.runId, 60);
+    const r = await finish({ mode: 'hoops3v3', score: 11, won: true, duration: 60, played: true, runId: run.runId });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'NO_RULES', score: 11, sessionId: null });
+    expect(await ledgerFor(run.runId)).toEqual([]);
+    expect(await balances(users.player)).toEqual(before);
+    expect(await prisma.sessionRun.findUnique({ where: { id: run.runId } })).toMatchObject({ status: 'recorded', score: 11 });
+  });
+
+  it('OWNER DECISION: a derived row pays (acting, capped at 100 by its own scorer) and refuses above it', async () => {
+    as('player');
+    const run = await start('acting');
+    await playedFor(run.runId, 30);
+    const r = await finish({ mode: 'acting', score: 80, won: true, duration: 30, played: true, runId: run.runId });
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: true });
+    const over = await start('acting');
+    await playedFor(over.runId, 30);
+    expect((await finish({ mode: 'acting', score: 101, won: true, duration: 30, played: true, runId: over.runId })).body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_max_score', limit: 100 });
+  });
+
   it('the wallet earn refuses the session events the run pays now (a run cannot be paid again from there)', async () => {
     as('player');
     const before = await balances(users.player);

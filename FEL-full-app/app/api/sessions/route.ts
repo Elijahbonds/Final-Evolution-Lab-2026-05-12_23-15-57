@@ -16,12 +16,12 @@ import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POW
 import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
-  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt,
+  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
 } from '@/lib/session-payout';
 import { canonicalModeKey } from '@/lib/game-data';
 import { isExpired } from '@/lib/arena-reclaim';
 import { readMusicAttempt, musicAttemptScore, claimMusicSessionPay, MUSIC_SESSION_PAID } from '@/lib/arena-music';
-import { checkRunScore } from '@/lib/sessions/modeScoreRules';
+import { checkRunScore, checkUnruledScore } from '@/lib/sessions/modeScoreRules';
 import {
   RUN_STATUS, RunClosedError, claimRun, closeRun, fileGrants, findRun, readRunId, replayOf, runWalletKey, settleGrant,
   storePaidResult, storedResult, type StoredResult,
@@ -72,11 +72,17 @@ const OPEN_MATCH_STATES = ['WAITING', 'ACTIVE'];
  * (The expiry check and the no-opponent check below stay: #30, and movement play's WAITING-duel farm.)
  *
  * MERGE WITH ECONOMY-SESSIONS-HARDEN (2026-09-28): the three rules live inside the run the server started. This read is
- * the EARLY answer only — it runs after the run is found, open, of this mode and inside the mode's score rules (so while
- * music has no MEASURED_RUNS row, fail closed, nothing here is reached and nothing is paid). A score above the rejudge is
+ * the EARLY answer only — it runs after the run is found, open, of this mode and inside the mode's score rules (at this
+ * merge music had no MEASURED_RUNS row, failed closed, and nothing here was reached — no longer so, see the follow-up
+ * paragraph below). A score above the rejudge is
  * SCORE_INVALID above_rejudge (rejected, never clamped — the hardening clamps nothing), and the pay-once claim is made
  * inside the run's paying transaction, after claimRun and before the ledger is filed, so the ledger records what the run
  * was actually paid and a rolled-back run releases its claim with it.
+ *
+ * ECONOMY-SESSIONS-HARDEN follow-up (owner decisions 2026-09-28): music HAS a rules row now (modeScoreRules.ts
+ * derivedBounds: the int4 column limit; its per-set bound stays sessionScoreCap → above_run_cap), so a music run inside
+ * its rules DOES reach this read and the three rules above are what hold an Arena set. A mode with no row is recorded
+ * unpaid (NO_RULES) and returns before the paying transaction, so it never makes the pay-once claim.
  */
 interface ArenaMusicVerdict { matchId: string; rejudged: number }
 async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise<ArenaMusicVerdict | null> {
@@ -205,17 +211,26 @@ export async function POST(req: Request) {
     // FIX 1: the mode's rules (MODE_SCORE_RULES) — a finite integer >= 0, within maxScore and maxScorePerSecond, a
     // duration inside the believable window, a known and enabled mode. Broken = SCORE_INVALID: rejected, never clamped.
     const check = checkRunScore({ mode: run.mode, score: body?.score, durationMs });
-    if (!check.ok) {
+    // OWNER DECISION (2026-09-28, after land): a catalogue mode with no rules row yet is RECORDED unpaid (NO_RULES), not
+    // refused — refused, it also skipped the shell's Arena submit, carnival relay and challenge join (they follow only an
+    // ok answer). It still has to be a storable whole number, and it still meets its own per-run cap below.
+    const unruled = !check.ok && check.detail === 'no_rules' ? checkUnruledScore(body?.score) : null;
+    if (!check.ok && !unruled?.ok) {
+      const bad = unruled && !unruled.ok ? unruled : check;
       const rawScore = typeof body?.score === 'number' && Number.isInteger(body.score) ? body.score : null;
-      return send(await refuse(userId, mode, check.reason, 422, { detail: check.detail, limit: check.limit }, { id: run.id, close: 'rejected', score: rawScore, durationMs }));
+      return send(await refuse(userId, mode, bad.reason, 422, { detail: bad.detail, limit: bad.limit }, { id: run.id, close: 'rejected', score: rawScore, durationMs }));
     }
-    const score = check.score;
+    const score = check.ok ? check.score : (unruled as { ok: true; score: number }).score;
+    const noRules = !check.ok;
+    // OWNER DECISION: a floor-only mode (Prove It) pays as a score of 0 and no win — the played floor — and keeps its
+    // validated score on the history row (modeScoreRules.ts payFloorOnly)
+    const floorOnly = check.ok && check.rule.payFloorOnly === true;
 
     // MUSIC-SUITE P2 FIX PASS (2026-09-25): until the shell forwards `stats` (ROOM_STATS_FORWARDED, a held file), a
     // session without them is an old-contract client and keeps its own music win (the room applies the rule itself) —
     // this refused every honest win while the card said "set won". A mode the catalogue does not know wins nothing.
-    const won = sessionWon(rulesMode, claimedWon, stats, duration, { score });
-    if (claimedWon && !won) {
+    const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score });
+    if (claimedWon && !won && !floorOnly) {
       const read = readMusicSet(stats, duration);
       console.info('session win refused:', mode, !isCatalogueMode(mode) ? 'not a catalogue mode' : read ? `accuracy ${read.accuracy.toFixed(3)} over ${read.bars} bars${read.issues.length ? ` (${read.issues.slice(0, 3).join('; ')})` : ''}` : 'no set counts');
     }
@@ -270,6 +285,7 @@ export async function POST(req: Request) {
       return send(await refuse(userId, mode, 'SCORE_INVALID', 422, { detail: 'above_rejudge', limit: arena.rejudged }, { id: run.id, close: 'rejected', score, durationMs }));
     }
     const paidScore = score;
+    const payScore = floorOnly ? 0 : paidScore;   // what the payout formulas read (the row keeps paidScore)
 
     // FIX 3: a run that does not pay (AGENT / PLAYTEST / TEST_ACCOUNT — decided at start, stored on the run, never re-read
     // from this request) is validated above like any other and RECORDED on its run with its score, and nothing else: no
@@ -277,12 +293,15 @@ export async function POST(req: Request) {
     // Lab Credits, wallet coins, PRQ, streak, season XP or mastery, and no ledger row. (MUSIC-SUITE P6: nor does it make an
     // Arena music duel's pay-once claim — that is made only in the paying transaction below — so an agent or playtest run
     // of a staked set never spends the player's one Arena pay for that duel.)
-    if (!run.payoutEligible) {
-      await recordServerEvent({ name: 'session_unpaid', userId, props: { mode, score, won, duration, reason: run.ineligibleReason ?? '' } });
+    // OWNER DECISION: a mode with no rules row yet (NO_RULES) is recorded the same way — and, returning here, it never
+    // reaches the paying transaction either, so it never makes the pay-once claim (verifiedMusicDuel above only reads).
+    if (!run.payoutEligible || noRules) {
+      const reason = !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : 'NO_RULES';
+      await recordServerEvent({ name: 'session_unpaid', userId, props: { mode, score, won, duration, reason } });
       return send(await closeRun(prisma, run.id, {
         status: RUN_STATUS.recorded, score, durationMs, now,
         result: { status: 200, body: {
-          ok: true, paid: false, replayed: false, reason: run.ineligibleReason ?? 'UNPAID', runId: run.id, sessionId: null,
+          ok: true, paid: false, replayed: false, reason, runId: run.id, sessionId: null,
           score, won, capped: false, xp: 0, shards: 0, credits: 0, coins: 0, streakDays: profile?.streakDays ?? 0, streakBonus: 0,
           prqDelta: 0, prqBefore: before, prqAfter: before, grade: prqGrade(before),
           labCredits: (profile as any)?.labCredits ?? 0, season: null, mastery: null,
@@ -305,11 +324,13 @@ export async function POST(req: Request) {
     // (Merge with ECONOMY-SESSIONS-HARDEN: both plans pay the validated score as sent. It already passed the mode's rules,
     // the run cap and — for an Arena set — the rejudge above, and the free-play cap is never below the Arena one, so a plan
     // clamps nothing; they differ only in the endless ceiling and what that makes of XP, shards and PRQ.)
+    // (OWNER DECISION 2026-09-28: the formulas read payScore — a floor-only run's 0, the played floor — while the history
+    // row, the run and the Arena rejudge keep paidScore.)
     const planFor = (arenaVerified: boolean) => {
       // MUSIC-SUITE P2: dance and music train by the run's ACCURACY (lib/prq.ts ACCURACY_PRQ_MODES), read from their counts
       // (P2 FIX PASS: and by the old score path while the shell sends no counts at all — ROOM_STATS_FORWARDED).
       const prqDelta = computePrqDelta({
-        mode: rulesMode, score: paidScore, won, duration, accuracy: sessionAccuracy(rulesMode, stats, duration),
+        mode: rulesMode, score: payScore, won, duration, accuracy: sessionAccuracy(rulesMode, stats, duration),
         whenNoAccuracy: !stats && !ROOM_STATS_FORWARDED ? 'score' : 'none',
       });
       // MUSIC-SUITE P2: XP = 1.5 × score and shards = score / 20 had no ceiling, and an endless run (music free play, The
@@ -317,7 +338,9 @@ export async function POST(req: Request) {
       // most what a flawless finite game does (ENDLESS_SESSION_CEILING); every game with an end of its own is paid as before.
       // (P2 FIX PASS: prorated by the session's length, so back-to-back 5 s sets no longer pay ~12× the ceiling's minute.)
       const endless = isEndlessSession(rulesMode, stats, duration, { arenaVerified });
-      const payout = sessionPayout({ score: paidScore, won, endless, durationSec: duration });
+      // (FOLLOW-UP 2026-09-29: skateboarding and surfing are paid at most what 4 × their best run seen would pay —
+      // session-payout finitePayCapScore; the score itself is recorded as sent)
+      const payout = sessionPayout({ score: payScore, won, endless, durationSec: duration, payCapScore: finitePayCapScore(rulesMode) });
       // Distribute PRQ delta to mode-relevant attributes
       const attrData: Record<string, any> = {};
       for (const a of attrs) {
@@ -335,7 +358,8 @@ export async function POST(req: Request) {
     // (wallet-service.sessionWalletGrant). The shell used to report them to POST /v1/wallet/earn under keys built from
     // the new GameSession id, so a retried session paid them again; that route now refuses both events. Dunk keeps the
     // shell's old exception (its host reports richer per-attempt earns).
-    const walletCoins = mode !== 'dunk';
+    // A floor-only run (Prove It, owner decision) pays neither: the played floor is XP, a shard and the streak day.
+    const walletCoins = mode !== 'dunk' && !floorOnly;
 
     const at = new Date();
     let committed: { payload: Record<string, unknown>; season: Awaited<ReturnType<typeof addSeasonXp>>; mastery: Awaited<ReturnType<typeof recordMastery>> | null; plan: Plan };
@@ -355,7 +379,8 @@ export async function POST(req: Request) {
         await fileGrants(tx, {
           userId, runId: run.id,
           amounts: {
-            xp, shards, prq: prqDelta, season_xp: 0, mastery: 1,
+            xp, shards, prq: prqDelta,
+            ...(floorOnly ? {} : { season_xp: 0, mastery: 1 }),
             ...(credits > 0 ? { wallet_lc: credits } : {}),
             ...(walletCoins ? { wallet_coins: 0 } : {}),
             ...(walletCoins && won ? { wallet_shards: 0 } : {}),
@@ -445,9 +470,10 @@ export async function POST(req: Request) {
         // --- M13: season pass + mastery. ECONOMY-SESSIONS-HARDEN: inside the run's transaction now, each filed in the
         // ledger above, so a retried run adds neither twice (they ran after the commit, unkeyed). Tier rewards and the
         // announcements go out after the commit (bookSeasonTierUps / emitMasteryUps). ---
-        const season = await addSeasonXp({ userId, mode, score: paidScore, won }, { db: tx, deferTierRewards: true });
-        await settleGrant(tx, { userId, runId: run.id, grantType: 'season_xp', amount: season?.gained ?? 0, ...(season ? {} : { metadata: { noActiveSeason: true } }) });
-        const mastery = await recordMastery(userId, { mode, score: paidScore, won, hits, misses, maxCombo }, { db: tx, emit: false });
+        // (a floor-only run adds neither — the owner's played floor is XP, a shard and the streak day)
+        const season = floorOnly ? null : await addSeasonXp({ userId, mode, score: paidScore, won }, { db: tx, deferTierRewards: true });
+        if (!floorOnly) await settleGrant(tx, { userId, runId: run.id, grantType: 'season_xp', amount: season?.gained ?? 0, ...(season ? {} : { metadata: { noActiveSeason: true } }) });
+        const mastery = floorOnly ? null : await recordMastery(userId, { mode, score: paidScore, won, hits, misses, maxCombo }, { db: tx, emit: false });
 
         const after = prqScore(updated as any);
         const payload: Record<string, unknown> = {
@@ -509,7 +535,8 @@ export async function POST(req: Request) {
     // PASS: an Arena plan that lost the pay-once claim was paid as free play)
     {
       const { payout, xp, shards } = committed.plan;
-      if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
+      if (payout.capped && finitePayCapScore(rulesMode) !== null) console.info('session payout capped (finite pay cap):', mode, `score ${paidScore} → ${xp} XP / ${shards} shards (paid as at most ${finitePayCapScore(rulesMode)})`);
+      else if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
     }
 
     // after the commit: idempotent tier rewards, announcements, telemetry (best-effort — the run is paid either way)

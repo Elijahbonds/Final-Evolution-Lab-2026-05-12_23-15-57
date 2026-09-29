@@ -1,25 +1,32 @@
 // store — where a Quick Screen's result lives: THIS TAB'S sessionStorage, and nowhere else (SCREEN-SHIP A4-6).
 //
-//   · NOTHING IS SENT. No server save in this ship (A2-3): no fetch, no POST, no analytics; results stay on the phone.
+//   · NOTHING IS SENT. No server save in this ship (A2-3): no fetch, no POST, no analytics; results stay on the device.
 //   · sessionStorage ONLY. Never localStorage, IndexedDB or a cookie. Every key starts SCREEN_PREFIX, so "Done, clear
 //     my results" can remove every one of them.
-//   · THE CONSENT GATE COMES FIRST. Nothing is written before the age question is answered; for under 18 or an age not
-//     given, nothing is written before a parent's consent (the gate record says which). write() refuses otherwise, and
-//     read() refuses a result whose gate record does not allow it, so a crafted key cannot skip consent either.
-//   · A NEW SCREEN WIPES THE OLD ONE FIRST (shared event phones): clear() before anything new is shown or written.
+//   · THE AGE ANSWER IS THE ONE KEY WRITTEN BEFORE A RESULT (SCREEN-FIX Cyber 2). lockAge() writes the band once, the
+//     moment it is answered, and it is then read back for the rest of the tab (lib/screen/age.ts): the question is not
+//     asked again, and a second answer cannot change it. Clearing keeps it; closing the tab ends it.
+//   · THE GROWN-UP STEP COMES FIRST for everything else. No result and no takeoff leg is written before the age
+//     answer; for under 18 or an age not given, none before "A grown-up is with me" is ticked (the gate record says
+//     which). write() refuses otherwise, and read() refuses a result whose gate record does not allow it, so a crafted
+//     key cannot skip the grown-up step either.
+//   · A NEW SCREEN WIPES THE OLD ONE FIRST (shared event devices): clear() before anything new is shown or written.
 //
-// The consent record holds EXACTLY the age band, the parent checkbox, a timestamp and the consent text version (gate
-// 5). It stays on the phone: the GuardianConsent model needs a signed-in mentee, a guardian's name and email and an
-// emailed token, so it cannot hold just these four without a schema change (none in this ship).
+// The gate record holds EXACTLY the age band, the grown-up checkbox, a timestamp and the step's text version (gate
+// 5). It stays on the device: nothing in this ship keeps it anywhere else.
 //
 // The storage is injected (a tab's window.sessionStorage in the page, a map in tests). Pure otherwise.
-import { CONSENT_TEXT_VERSION } from './copy';
+import { GROWN_UP_TEXT_VERSION } from './copy';
+import { isAgeBand, type AgeBand } from './age';
 import { SUMMARY_VERSION, type ScreenSummary } from './checks';
 import { GRADED_CHECKS, THRESHOLDS_VERSION, type BandWord } from './PROPOSED-thresholds';
 import { isLaneSlug } from './PROPOSED-program-lanes';
 
+export type { AgeBand } from './age';
+
 export const SCREEN_PREFIX = 'fel.screen.';
 export const KEYS = {
+  age: `${SCREEN_PREFIX}age`,
   gate: `${SCREEN_PREFIX}gate`,
   takeoff: `${SCREEN_PREFIX}takeoffLeg`,
   summary: `${SCREEN_PREFIX}summary`,
@@ -27,41 +34,36 @@ export const KEYS = {
 /** PR #20's old localStorage keys (a preview build wrote them): removed on clear, never written again. */
 export const LEGACY_LOCAL_KEYS = ['fel.assess.takeoffLeg', 'fel.assess.voice'] as const;
 
-export type AgeBand = '18+' | 'under-18' | 'unknown';
-
-/** The consent record: these four fields and nothing else. */
+/** The gate record: these four fields and nothing else. */
 export interface GateRecord {
   ageBand: AgeBand;
-  parentCheckbox: boolean;
+  grownUp: boolean;
   at: string;
   textVersion: string;
 }
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>;
 
-export const needsParent = (age: AgeBand): boolean => age !== '18+';
-
-/** An adult, or a parent who ticked the box: then (and only then) the screen may keep anything, in this tab. */
+/** An adult, or a younger athlete with a grown-up ticked: then (and only then) the screen may keep anything, in this tab. */
 export function mayPersist(g: GateRecord | null | undefined): boolean {
   if (!g) return false;
   if (g.ageBand === '18+') return true;
-  return g.parentCheckbox === true && g.textVersion === CONSENT_TEXT_VERSION;
+  return g.grownUp === true && g.textVersion === GROWN_UP_TEXT_VERSION;
 }
 
-export function gateRecord(ageBand: AgeBand, parentCheckbox: boolean, now: Date = new Date()): GateRecord {
-  return { ageBand, parentCheckbox, at: now.toISOString(), textVersion: CONSENT_TEXT_VERSION };
+export function gateRecord(ageBand: AgeBand, grownUp: boolean, now: Date = new Date()): GateRecord {
+  return { ageBand, grownUp, at: now.toISOString(), textVersion: GROWN_UP_TEXT_VERSION };
 }
 
-const isAge = (x: unknown): x is AgeBand => x === '18+' || x === 'under-18' || x === 'unknown';
 const isBand = (x: unknown): x is BandWord | null => x === null || x === 'green' || x === 'yellow' || x === 'red';
 
 function parseGate(raw: string | null): GateRecord | null {
   try {
     const o = JSON.parse(raw ?? 'null') as Record<string, unknown> | null;
     if (!o || typeof o !== 'object') return null;
-    if (Object.keys(o).sort().join() !== 'ageBand,at,parentCheckbox,textVersion') return null;
-    if (!isAge(o.ageBand) || typeof o.parentCheckbox !== 'boolean' || typeof o.at !== 'string' || typeof o.textVersion !== 'string') return null;
-    return { ageBand: o.ageBand, parentCheckbox: o.parentCheckbox, at: o.at, textVersion: o.textVersion };
+    if (Object.keys(o).sort().join() !== 'ageBand,at,grownUp,textVersion') return null;
+    if (!isAgeBand(o.ageBand) || typeof o.grownUp !== 'boolean' || typeof o.at !== 'string' || typeof o.textVersion !== 'string') return null;
+    return { ageBand: o.ageBand, grownUp: o.grownUp, at: o.at, textVersion: o.textVersion };
   } catch { return null; }
 }
 
@@ -82,7 +84,38 @@ function parseSummary(raw: string | null): ScreenSummary | null {
   } catch { return null; }
 }
 
-/** Keep the gate record and the result, after consent. Returns whether it wrote (false: refused, or no storage). */
+// ── the age lock (Cyber 2) ──
+
+// The page's memory of the answer, for a browser that refuses sessionStorage: the lock still holds for this page's life.
+let ageMemory: AgeBand | null = null;
+
+/** This tab's age answer, or null when it has not been given. */
+export function readAge(s: StorageLike | null): AgeBand | null {
+  try {
+    const v = s?.getItem(KEYS.age) ?? null;
+    if (isAgeBand(v)) return v;
+  } catch { /* no storage: the page's memory below */ }
+  return ageMemory;
+}
+
+/**
+ * Lock this tab's age answer and return the band that holds: the first answer is written and kept; any later answer
+ * is refused and the first one comes back. This is the one key written before a result.
+ */
+export function lockAge(s: StorageLike | null, band: AgeBand): AgeBand {
+  const had = readAge(s);
+  if (had) return had;
+  ageMemory = band;
+  try { s?.setItem(KEYS.age, band); } catch { /* refused: the page's memory holds it */ }
+  return band;
+}
+
+/** Tests only: a new tab (a fresh page's memory). */
+export function forgetAgeForTests(): void { ageMemory = null; }
+
+// ── the result ──
+
+/** Keep the gate record and the result, after the grown-up step. Returns whether it wrote (false: refused, or no storage). */
 export function writeResult(s: StorageLike | null, gate: GateRecord | null, summary: ScreenSummary): boolean {
   if (!s || !mayPersist(gate)) return false;
   try {
@@ -92,7 +125,7 @@ export function writeResult(s: StorageLike | null, gate: GateRecord | null, summ
   } catch { return false; }
 }
 
-/** The takeoff leg, asked once per screen: kept only after consent. */
+/** The takeoff leg, asked once per screen: kept only after the grown-up step. */
 export function writeTakeoff(s: StorageLike | null, gate: GateRecord | null, side: 'left' | 'right'): boolean {
   if (!s || !mayPersist(gate)) return false;
   try { s.setItem(KEYS.takeoff, side); return true; } catch { return false; }
@@ -120,13 +153,16 @@ export function recall(s: StorageLike | null): { gate: GateRecord; summary: Scre
   return memory ?? readResult(s);
 }
 
-/** Every screen key in this tab (and PR #20's old localStorage keys), gone, and the page's memory of them. */
+/**
+ * Every screen key in this tab (and PR #20's old localStorage keys), gone, and the page's memory of them: all but the
+ * age answer, which stays locked until the tab closes (clearing is not a way to answer again).
+ */
 export function clearScreen(s: StorageLike | null, local?: Pick<Storage, 'removeItem'> | null): void {
   memory = null;
   try {
     if (s) {
       const keys: string[] = [];
-      for (let i = 0; i < s.length; i++) { const k = s.key(i); if (k && k.startsWith(SCREEN_PREFIX)) keys.push(k); }
+      for (let i = 0; i < s.length; i++) { const k = s.key(i); if (k && k.startsWith(SCREEN_PREFIX) && k !== KEYS.age) keys.push(k); }
       for (const k of keys) s.removeItem(k);
     }
   } catch { /* no storage: nothing to clear */ }

@@ -34,13 +34,22 @@ export interface FakeStart {
 /** MUSIC-SUITE P4: one stop() on a source — when it was told to stop, on its context's clock. */
 export interface FakeStop { at: number; src: FakeScheduledSource }
 
+/** MUSIC-SUITE P7 FIX (2026-09-29): one automation call on a FakeAudioParam, in call order — added so a test can
+ *  prove a SEQUENCE of moves (a fade-out-then-stop, a fade-in-from-0), not just the value the param settled on
+ *  (`.value` alone can't tell a snap from a ramp that happened to finish at the same number: SongStemBand's
+ *  click-fix review found exactly that gap — the class's own cancelFrom/rewind test only ever checked stop()/
+ *  start() offsets, never whether the gain moved through the click-causing snap it was fixed to stop doing). */
+export interface FakeParamCall { method: 'setValueAtTime' | 'linearRampToValueAtTime' | 'exponentialRampToValueAtTime' | 'setTargetAtTime' | 'cancelScheduledValues'; value?: number; time?: number }
+
 export class FakeAudioParam {
+  /** Every automation call on this param, in order — see FakeParamCall. */
+  readonly history: FakeParamCall[] = [];
   constructor(public value = 0) {}
-  setValueAtTime(v: number, _t?: number): this { this.value = v; return this; }
-  linearRampToValueAtTime(v: number, _t?: number): this { this.value = v; return this; }
-  exponentialRampToValueAtTime(v: number, _t?: number): this { this.value = v; return this; }
-  setTargetAtTime(v: number, _t?: number, _c?: number): this { this.value = v; return this; }
-  cancelScheduledValues(_t?: number): this { return this; }
+  setValueAtTime(v: number, t?: number): this { this.history.push({ method: 'setValueAtTime', value: v, time: t }); this.value = v; return this; }
+  linearRampToValueAtTime(v: number, t?: number): this { this.history.push({ method: 'linearRampToValueAtTime', value: v, time: t }); this.value = v; return this; }
+  exponentialRampToValueAtTime(v: number, t?: number): this { this.history.push({ method: 'exponentialRampToValueAtTime', value: v, time: t }); this.value = v; return this; }
+  setTargetAtTime(v: number, t?: number, _c?: number): this { this.history.push({ method: 'setTargetAtTime', value: v, time: t }); this.value = v; return this; }
+  cancelScheduledValues(t?: number): this { this.history.push({ method: 'cancelScheduledValues', time: t }); return this; }
 }
 
 export class FakeNode {

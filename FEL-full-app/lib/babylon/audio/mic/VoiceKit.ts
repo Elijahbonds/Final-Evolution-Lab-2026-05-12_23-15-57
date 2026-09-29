@@ -31,6 +31,11 @@ export const PA_PRESETS: Record<string, { slap: number[]; room: number; drive: n
   orbit: { slap: [], room: 1.2, drive: 1.8, roomWet: 0.2 },             // an arena under a dome: no slap, a long tail
   canopy: { slap: [0.06], room: 0.4, drive: 1.4, roomWet: 0.12 },       // the forest soaks it up
   rooftop: { slap: [0.16, 0.28], room: 0.9, drive: 1.9, roomWet: 0.14 }, // the towers answer, twice
+  // MUSIC-SUITE P8 (2026-09-25): Stoop's own PA — the Cypher is not one of THE MIC's five courts (it has no
+  // CourtLocationId), but VoiceKit.play needs SOME preset for role 'mc' (paFor falls back to `venice` for an unknown
+  // court, which reads too beachy-bright for a block party). A soft single slap and a short room: a stoop with a
+  // mic and a folding chair, not an arena.
+  cypher: { slap: [0.05], room: 0.5, drive: 1.7, roomWet: 0.12 },
 };
 
 class VoiceKitImpl {

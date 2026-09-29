@@ -94,6 +94,13 @@ export function installOpponentMotion(animator: CharacterAnimator, scene: Scene,
   animator.setPlaybackScale = (name: string, scale: number) => rawScale(variantFor(name, animator.clipNames), scale);
   // a mode paces a shot off `durationOf('jumpshot')` — it must read the clip that will actually play
   animator.durationOf = (name: string) => rawDur(variantFor(name, animator.clipNames));
+  // HOOPS MOTION phase 3 (S1): …and a held beat parks the clip that PLAYED. BeatOwner's holdEnd freezes by the name it asked for, and
+  // freezeAtEnd resolved that to the AUTHORED clip — so the capture ran to its end and the body snapped to the authored clip's last
+  // pose in one frame (measured: the 3v3 spin, bball_mc_spin → bball_spin, the held ball 0.70–0.74 m in a frame).
+  if (typeof animator.freezeAtEnd === 'function') {
+    const rawFreeze = animator.freezeAtEnd.bind(animator);
+    animator.freezeAtEnd = (name: string) => rawFreeze(variantFor(name, animator.clipNames));
+  }
   console.info(`[FEL-ANIM] opponent captures: ${installed.join(', ')}`);
   return installed;
 }

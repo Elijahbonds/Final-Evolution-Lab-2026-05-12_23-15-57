@@ -163,7 +163,8 @@ import {
 // MUSIC-SUITE P5 FIX PASS (2026-09-25): a render's Flip rows play the sounds handed to it (the working grid's for PUBLISH,
 // each bar's section's for RENDER SONG / STEMS) — never whatever song mode swapped into the engine last
 import { flipSoundMap, songBarSounds, songChops } from './studioEdit';
-import { danceSongAtTier, exportSongToDance, saveExportedTrack } from './DanceExport';
+import { danceSongAtTier, danceFloorOpenFor, DANCE_FLOOR_UPLOAD_LINE, exportSongToDance, saveExportedTrack, type ExportedTake } from './DanceExport';
+import { renderWalkOutLoopBlob, WALKOUT_LOOP_BARS } from './loopRender';   // MUSIC-SUITE P7: SET AS MY WALK-OUT's gap-free loop
 import { bakedBuffer, monoOf, sourceKey, type DecodedSource, type StepClock } from './FlipPad';
 // MUSIC-SUITE P5 (2026-09-25), phone-mpc: the phone's room lives at ROOM level, its pads play the room's bank on any tab
 // (the pad_N parse moved from Flip.padFromAction to phonePad.phoneCommand, which also reads PLAY / STOP / REC / BANK A–D)
@@ -232,6 +233,17 @@ import { TAKES_CHANNEL, anySolo, channelMix, gateOpen, scopeSolo, type ChannelMi
 import StepGrid, { type StepGridRow } from './ui/StepGrid';
 import NoteRow from './ui/NoteRow';
 import MixerPanel from './ui/MixerStrip';
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the same MUSIC/SFX/VOICE sliders the dance room's pause screen shows
+// (components/games/timing-babylon.tsx) — one component, lib/audio/ui/VolumeMixer.tsx, so the Academy and the
+// Cypher can never quietly drift onto two different ideas of "the volume settings".
+import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
+// MUSIC-SUITE P8 (2026-09-25), "…and Professor Okta on the mic": Okta's FIVE VOICED moments (first visit, first
+// beat, first PERFORM, the Flip lesson, a published song) — NOT THE MIC's hoops cast (lib/babylon/audio/mic/cast.ts
+// / MicDirector / ModeMic — court-scoped, a booth two voices share), the same "own contract" shape BRAINBRAWL-
+// RESIDUAL gave DOC VOLT. OKTA_TIPS (above) stays exactly as it was: a random rotation, captions only, never voiced.
+import { VoiceKit } from '../audio/mic/VoiceKit';
+import { OKTA, oktaLines } from '../audio/mic/script/okta';
+import { pickHostLine, mulberry32, newRunSeed, estimateSec, hostCaption, clipId, seenFirstTime, stillSpeaking } from '../audio/mic/hostVoice';
 import { KEY_HELP, cancelsKeyUp, keyTargetOf, studioKeyAction, type StudioKeyAction } from './ui/keys';
 import { PHONE_PAD_PX, gridLayout, moveCursor, pageOfStep, stepsOnPage, toastSpot } from './ui/gridMath';
 import { cellNoteLabel, nudgeNote, pickNote } from './ui/noteMath';
@@ -601,6 +613,13 @@ export default function StudioMode({
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [tip, setTip] = useState(OKTA_TIPS[0]);
+  // MUSIC-SUITE P8: Okta's own VOICED caption — separate from `toast`/`say` (a busy, general-purpose line that many
+  // unrelated messages already share) and from the rotating `tip` (captions-only, never voiced). {name:''} means
+  // nothing is showing (MicCaption already renders null on an empty `text`, this only needs to track the timeout).
+  const [oktaSay, setOktaSay] = useState<{ text: string; name: string }>({ text: '', name: '' });
+  const oktaRndRef = useRef(mulberry32(newRunSeed()));   // a fresh seed per mount — never a fixed one (hostVoice's own lesson)
+  const oktaLastRef = useRef(new Map<string, string>());   // never repeats a moment's line back to back
+  const oktaCaptionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [libraryRev, setLibraryRev] = useState(0);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -705,6 +724,34 @@ export default function StudioMode({
   }, []);
   /** A library failure, kept on screen until dismissed or the next library success (P3: a 2.2 s toast said it). */
   const [libraryLine, setLibraryLine] = useState<string | null>(null);
+  // MUSIC-SUITE P7 (2026-09-29): SET AS MY WALK-OUT. `lastPublishedId` lets the Studio's own PUBLISH row offer the
+  // button on the song you just published (the "current project" case), without waiting for a trip to the LIBRARY tab.
+  const [lastPublishedId, setLastPublishedId] = useState<string | null>(null);
+  const [walkOutBusy, setWalkOutBusy] = useState(false);
+  /**
+   * Render `rec`'s own arrangement as a fresh, tail-wrapped WALKOUT_LOOP_BARS-bar loop (loopRender.ts) and make it the
+   * walk-out. Independent of whatever kit/tempo THIS Studio session currently has loaded — `rec` carries its own (a
+   * library song set as the walk-out from the LIBRARY tab is very often not the one open in the grid right now) —
+   * loopRender.ts renders it standalone rather than through this room's own AudioEngine (AudioEngine.renderMixBuffer
+   * only ever renders at ITS OWN live bpm; see loopRender.ts's header for why that rules it out here).
+   */
+  const setAsWalkOut = async (rec: TrackRecord): Promise<void> => {
+    if (walkOutBusy) return;
+    setWalkOutBusy(true);
+    try {
+      const loop = await renderWalkOutLoopBlob(
+        { tracks: rec.sequencer.tracks, kit: rec.kit, bpm: rec.bpm, swing: rec.swing, steps: rec.sequencer.steps, bars: WALKOUT_LOOP_BARS, polished: rec.polished },
+        { sampleRate: engineRef.current?.renderRate },
+      );
+      const res = await StudioLibrary.setWalkOut(rec.id, { bars: WALKOUT_LOOP_BARS, loopAudio: loop });
+      setLibraryLine(res.line);
+      if (res.ok) { say(res.line); setLibraryRev((r) => r + 1); }
+    } catch (e) {
+      setLibraryLine(`Could not set the walk-out (${e instanceof Error ? e.name : 'error'}) — try again`);
+    } finally {
+      setWalkOutBusy(false);
+    }
+  };
   /** Where the transient line floats (ui/gridMath toastSpot): clear of the grid and the transport. */
   const [toastAt, setToastAt] = useState<'top' | 'bottom'>('bottom');
   const gridRef = useRef<HTMLDivElement>(null);
@@ -724,6 +771,79 @@ export default function StudioMode({
     setTimeout(() => setToast((t) => (t === msg ? '' : t)), 2200);
   }, []);
   sayLater.current = say;   // MUSIC-SUITE P3: the project hook speaks through the room's toast
+
+  /** MUSIC-SUITE P8 FIX (2026-09-29): wall-clock seconds (performance.now()/1000) when Okta's currently PLAYING line
+   *  is expected to finish. script/okta.ts's own file doc promises "one voice, no booth... one line at a time", but
+   *  that was never actually enforced: VoiceKit's channel:'player' cues never stop a still-playing one the way
+   *  channel:'booth' does for Stoop (VoiceKit.play only calls `this.stop('booth', ...)`, never 'player'), so a brand
+   *  new player's 'academy.firstvisit' line (fired on mount) and the very first grid tap's 'academy.firstbeat' line
+   *  (fired the moment that same new player explores the grid — seconds later, sometimes the same tick) played on
+   *  top of each other: the same single voice audibly talking over itself. Gated here instead of moving Okta onto
+   *  the 'booth' channel: that channel's stop-then-play was written for THE MIC's court MC/sidekick hand-off
+   *  (VoiceKit.ts's header), not for one mentor's own successive lines. */
+  const oktaSpeakingUntilRef = useRef(0);
+  /** At most one line waits for Okta to finish speaking — a newer moment wins (replaces the pending one), the same
+   *  "a newer event wins" convention hostVoice.SpeechQueue documents for Stoop's own queue, rather than a FIFO. */
+  const oktaPendingRef = useRef<{ moment: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+
+  /** Actually play a line right now — the whole body `speakOkta` used to run unconditionally before this fix. */
+  const speakOktaLine = useCallback((moment: string): void => {
+    const pool = oktaLines(moment);
+    if (!pool.length) return;
+    const line = pickHostLine(pool, oktaRndRef.current, oktaLastRef.current.get(moment));
+    oktaLastRef.current.set(moment, line.id);
+    const clip = clipId(OKTA, line);
+    const sec = VoiceKit.line(clip)?.sec ?? estimateSec(line.text);
+    const cap = hostCaption(OKTA, line, sec);
+    setOktaSay({ text: cap.mic, name: cap.micWho });
+    if (oktaCaptionTimer.current) clearTimeout(oktaCaptionTimer.current);
+    oktaCaptionTimer.current = setTimeout(() => setOktaSay({ text: '', name: '' }), cap.holdSec * 1000);
+    oktaSpeakingUntilRef.current = performance.now() / 1000 + sec;
+    void VoiceKit.play(
+      { cast: OKTA.id, role: 'coach', channel: 'player', clips: [clip], caption: line.text, speaker: OKTA.name, sec, priority: 1, interrupt: false, pan: 0, gain: 1 },
+      'academy',
+    ).catch(() => false);
+  }, []);
+
+  /**
+   * MUSIC-SUITE P8: speak an Okta line for `moment` — picked with hostVoice.pickHostLine (never the same line twice
+   * in a row), played through VoiceKit (the SAME voice bus the dance room's Stoop uses, SoundKit's voiceBus, and the
+   * SAME MC on/off switch), role 'coach' (VoiceKit.routeFor's dry path — no PA horn: a one-on-one mentor, not an
+   * announcer on a mic). No JUDGE window to duck under here — the Academy has no scored note reveal the way PERFORM's
+   * lanes or the dance floor's steps do — but Okta must still duck under HIMSELF (see oktaSpeakingUntilRef, above):
+   * a call that lands while the last line is still speaking is held until it clears, not started on top of it.
+   */
+  const speakOkta = useCallback((moment: string): void => {
+    const nowSec = performance.now() / 1000;
+    if (stillSpeaking(nowSec, oktaSpeakingUntilRef.current)) {
+      const waitSec = oktaSpeakingUntilRef.current - nowSec;
+      if (oktaPendingRef.current) clearTimeout(oktaPendingRef.current.timer);
+      const timer = setTimeout(() => { oktaPendingRef.current = null; speakOktaLine(moment); }, waitSec * 1000);
+      oktaPendingRef.current = { moment, timer };
+      return;
+    }
+    speakOktaLine(moment);
+  }, [speakOktaLine]);
+  useEffect(() => () => {
+    if (oktaCaptionTimer.current) clearTimeout(oktaCaptionTimer.current);
+    if (oktaPendingRef.current) clearTimeout(oktaPendingRef.current.timer);
+  }, []);
+  // The bank is fetched once, in the background — never awaited (a line said before it lands is caption-only).
+  useEffect(() => { void VoiceKit.load([{ cast: OKTA.id, group: OKTA.group }]); }, []);
+  /**
+   * MUSIC-SUITE P8: Okta's three "first ever" gates (visit / first beat / first PERFORM), device-local per player —
+   * flipPack.ts's own `<key>:<playerId>` convention (its Flip-lesson first-visit gate is exactly this shape, one
+   * directory up). One localStorage entry per player holds all three tokens (hostVoice.seenFirstTime's own CSV
+   * shape), so this is the one place any of them gets checked and marked.
+   */
+  const academyFirst = useCallback((token: string, moment: string): void => {
+    try {
+      const key = `fel:academy:seen:${me || 'guest'}`;
+      const seen = seenFirstTime(window.localStorage.getItem(key), token);
+      if (seen.first) { window.localStorage.setItem(key, seen.next); speakOkta(moment); }
+    } catch { /* storage blocked: no first-time line this session, never a crash */ }
+  }, [me, speakOkta]);
+  useEffect(() => { academyFirst('visited', 'academy.firstvisit'); }, [academyFirst]);
   // MUSIC-SUITE P4: the line moves as the page scrolls under it (it follows the free band, and never takes a tap)
   useEffect(() => {
     if (!toast) return;
@@ -1327,6 +1447,8 @@ export default function StudioMode({
     if (gridLock === 'song') { say(`SONG MODE is playing "${songSection?.name ?? 'the song'}" — turn it off to edit your own grid`); return; }
     if (gridLock === 'preview') { say("That's CELL's preview — BUY it or CANCEL to edit your grid"); return; }
     edit((p) => ({ ...p, tracks: toggleStep(p.tracks, sampleId, si) }));
+    academyFirst('firstBeat', 'academy.firstbeat');   // MUSIC-SUITE P8: assumption — "first ever grid edit", not
+                                                        // narrowed to "first step turned ON" (toggleCell can also turn one off)
   };
 
   // ── MUSIC-SUITE P4 (2026-09-25), grid-ui: the pocket studio's edits ──────────────────────────────────────────────
@@ -1342,6 +1464,7 @@ export default function StudioMode({
   const paintCells = (cells: readonly { row: string; step: number }[], value: boolean, stroke: number): void => {
     if (gridLock) { say(lockLine()); return; }
     edit((p) => ({ ...p, tracks: cells.reduce((t, c) => withTrackStep(t, c.row, c.step, { on: value }, p.key), p.tracks) }), `paint:${stroke}`);
+    academyFirst('firstBeat', 'academy.firstbeat');   // MUSIC-SUITE P8
   };
   /** A NoteRow tap (ui/noteMath pickNote): the step lights on that note, or goes off if it already plays it. Locked to the key. */
   const pickStepNote = (rowId: string, step: number, midi: number): void => {
@@ -1350,6 +1473,7 @@ export default function StudioMode({
       const t = p.tracks.find((x) => x.sampleId === rowId);
       return t ? { ...p, tracks: withTrackStep(p.tracks, rowId, step, pickNote(t, step, midi, p.key), p.key) } : p;
     });
+    academyFirst('firstBeat', 'academy.firstbeat');   // MUSIC-SUITE P8
   };
   /** THE KEY: every note row's notes move with it (StudioProject.setProjectKey); one undo step (the key is in the slice). */
   const changeKey = (k: SongKey): void => {
@@ -1429,7 +1553,16 @@ export default function StudioMode({
     danceExport: caps.danceExport, arrangement: caps.arrangement, chain: project.chain, sections: project.sections, grid: tracks,
     heard: (t) => shownIds.has(t.sampleId) && gateOpen(deskHeard, t.sampleId),
   }), [caps.danceExport, caps.arrangement, project.chain, project.sections, tracks, shownIds, deskHeard]);
-  const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong, project.key]);
+  // MUSIC-SUITE P7 ("your beat" item 1): the booth's takes, by REFERENCE (StudioLibrary.readDeviceAudio resolves the
+  // bytes when the Cypher renders) — never copied into the export. Which ones actually sound (best-of-N, loop bounds,
+  // trims) is decided later, the same way SongPanel already decides it (dance/yourSong.ts: takeCapture.pickedTakeIds).
+  const danceTakes = useMemo<ExportedTake[]>(() => project.takes.filter((t) => !t.muted).map((t) => ({
+    id: t.id, atBar: t.atBar, bars: t.bars, loopBars: t.loopBars, trimStart: t.trimStart, trimEnd: t.trimEnd,
+    gain: t.gain, muted: t.muted, pickedAt: t.pickedAt, audioKey: t.audio.key,
+  })), [project.takes]);
+  // MUSIC-SUITE P7 ("your beat"): + swing, kit and the takes reference — the export now carries the song's own
+  // audio, so a swing/kit/take change (not only a grid/chain/title/key change) makes the last SEND stale too.
+  const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong, project.key, swing, kit, danceTakes]);
   // MUSIC-SUITE P5 (2026-09-25), owner decision #15: a song that plays a YOUR FILE upload stays on this device; the line
   // says why. Before, the P3 mark (ProjectFlipSource.upload) was carried everywhere and read nowhere (uploadPrivacy.ts).
   // MUSIC-SUITE P5 FIX PASS (2026-09-25): "on this device" = never shared off it. P5 closed PUBLISH and SEND TO THE DANCE
@@ -1437,14 +1570,24 @@ export default function StudioMode({
   // server calls are unimplemented seams; the dance export is an audio-free chart), so decision #7 went for nothing. The
   // doors are uploadPrivacy.UPLOAD_DOORS (one switch back to the stricter reading); the rule counts what the SONG plays.
   const privacy = useMemo(() => projectUploadPrivacy(project), [project]);
-  const danceOpen = uploadDoorOpen('danceFloor', privacy);
+  // MUSIC-SUITE P7 ("your beat" contract item 4): the export now renders the song's OWN audio (per-part stems,
+  // dance/yourSong.ts) instead of P3/P5's audio-free chart, so a song that plays an upload can no longer go to the
+  // dance floor — DanceExport.danceFloorOpenFor, not uploadDoorOpen('danceFloor', …). UPLOAD_DOORS.danceFloor is left
+  // `true` (it is still the right answer for a hypothetically audio-free export); library and walk-out are unaffected.
+  const danceOpen = danceFloorOpenFor(privacy);
   const libraryOpen = uploadDoorOpen('library', privacy);
   const sendToDance = (): void => {
     if (!danceSong) return;
-    if (!danceOpen) { setLibraryLine(privacy.line); return; }
+    if (!danceOpen) { setLibraryLine(DANCE_FLOOR_UPLOAD_LINE); return; }
     // MUSIC-SUITE P4: the song's key rides on the dance floor's card ('Your song · Am · 64 hits')
     // MUSIC-SUITE P4 FIX PASS: the key in words ('A minor') — the Cypher's chip upper-cases the blurb ('Am' read 'AM')
-    const out = exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) });
+    // MUSIC-SUITE P7 ("your beat" item 1): + swing, kit and the takes reference — everything dance/yourSong.ts needs
+    // to render the song's own audio (songKey is the raw key, for a FEL-filled row's note; `key` above stays the
+    // display string the card already used).
+    const out = exportSongToDance({
+      id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key),
+      swing, kit, songKey: project.key, takes: danceTakes,
+    });
     if (!out) { say('nothing to dance to yet — put a hit in the grid first'); return; }
     // MUSIC-SUITE P3 FIX PASS: the write can fail (a full localStorage, private mode) — then it was NOT sent, and says so
     if (!saveExportedTrack(out)) { say("Not sent — this browser wouldn't keep the dance export (storage full or private mode). Free some space and send it again."); return; }
@@ -1805,6 +1948,8 @@ export default function StudioMode({
       // (UPLOAD_DOORS.offDevice) — a song that plays an upload never goes through it until FEL can review uploads online
       if (UPLOAD_DOORS.offDevice || !tracksHaveUpload(res.rec.sequencer.tracks)) onPublish?.(res.rec);
       setLibraryRev((r) => r + 1);
+      setLastPublishedId(res.rec.id);   // MUSIC-SUITE P7: the PUBLISH row's own SET AS MY WALK-OUT now has something to act on
+      speakOkta('academy.published');   // MUSIC-SUITE P8: every publish, not gated to the first (unlike the other four moments)
       const left = (pub.silent.length ? ` · ${pub.silent.length} Flip row${pub.silent.length === 1 ? '' : 's'} with no sound left out` : '')
         + (deskCut ? ` · as you hear it: ${deskCut} row${deskCut === 1 ? '' : 's'} muted or soloed out on the mixer left out` : '');
       say(res.line ? `"${res.rec.title}" published — ${res.line}${left}` : `"${res.rec.title}" published to the Academy library${left}`);
@@ -2006,6 +2151,15 @@ export default function StudioMode({
       padding: '8px 12px', borderRadius: 8, background: 'rgba(122,92,158,0.96)', color: '#fff', maxWidth: 'min(560px, calc(100vw - 24px))',
       boxShadow: '0 6px 20px rgba(0,0,0,0.35)', fontSize: 13,
     },
+    // MUSIC-SUITE P8: Okta's own voiced caption — "a small one in each room" (the task's own second option; S.root
+    // has no `position: relative` for the shared hoops <MicCaption> to anchor against, so this follows S.toast's own
+    // `position: fixed` convention instead of importing it). Top, clear of S.toast's own bottom/top float.
+    oktaCaption: {
+      position: 'fixed', left: '50%', transform: 'translateX(-50%)', zIndex: 61, pointerEvents: 'none',
+      top: 'calc(8px + env(safe-area-inset-top, 0px))',
+      padding: '8px 14px', borderRadius: 8, background: 'rgba(20,12,30,0.92)', color: '#f5ead9', maxWidth: 'min(560px, calc(100vw - 24px))',
+      boxShadow: '0 6px 20px rgba(0,0,0,0.35)', fontSize: 13, textAlign: 'center', border: '1px solid #ffb347',
+    },
   };
 
   // MUSIC-SUITE P4: THE KEY MAP's panel — the table ui/keys.ts answers from (P4 FIX PASS: drawn where it was asked for)
@@ -2032,6 +2186,7 @@ export default function StudioMode({
   // tapped PERFORM reported the whole ten minutes as their set. That is the "both" path,
   // and it is the normal one: the stage pick chooses where you land, not where you stay.
   const enterPerform = useCallback(() => {
+    academyFirst('firstPerform', 'academy.firstperform');   // MUSIC-SUITE P8: first ever, free play or Arena alike
     if (checkRef.current) finishCheckRef.current(true);   // MUSIC-SUITE P4: the timing check belongs to the studio floor
     setRef.current = freshPerformSet();                      // a fresh set: no notes, no score, nothing left over (P6 FIX PASS: on the song's own foundation)
     perfResumeBarRef.current = null;
@@ -2522,6 +2677,9 @@ export default function StudioMode({
           {/* M1b: pair a phone — its pad bank hits these pads. MUSIC-SUITE P5 (phone-mpc): the phone's room is mounted at
               ROOM level now (above the tabs), so leaving FLIP no longer closes it */}
           <FlipPad engine={engineRef.current} playing={playing} playhead={playhead} steps={STEPS} say={say} triggerRef={flipTrigger}
+            /* MUSIC-SUITE P8: CHOP THE FEL THEME opening for THIS player, for the first time — FlipPad already knows
+               (its own `lessonOpen` state, from flipPack's per-player lessonDismissed) and fires this once. */
+            onLesson={() => academyFirst('flipLesson', 'academy.fliplesson')}
             /* MUSIC-SUITE P5 (phone-mpc): the bank on the pads and ARM REC are the room's (a phone's BANK / REC, any tab) */
             bank={flipBank} onBank={setFlipBank} recArm={flipRecArm} onRecArm={setFlipRecArm}
             /* MUSIC-SUITE P3 (2026-09-25): the FLIP tab's source + chops are the project's (FlipPad remounts on every tab
@@ -2729,6 +2887,16 @@ export default function StudioMode({
             </button>
           </div>
 
+          {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: "reachable from... the Academy settings" — the same on-device
+              MUSIC/SFX/VOICE levels the dance room's pause screen offers (lib/audio/ui/VolumeMixer.tsx), so a player
+              never has to leave the Academy to set a balance that then follows them into the Cypher. A device
+              preference, not a song edit: shown at every tier, in both BUILD and PERFORM (unlike the MixerPanel just
+              below, this never touches the project or its mixdown). */}
+          <div style={{ ...S.card, flexDirection: 'column', alignItems: 'stretch' }}>
+            <span style={{ fontSize: 12, opacity: 0.8, fontWeight: 700 }}>SOUND — this device</span>
+            <VolumeMixer />
+          </div>
+
           {confirmClear && (
             <div data-qa="clear-confirm" role="group" aria-label="Clear the grid?" style={{ ...S.card, border: '1px solid #ffb4a2' }}>
               <span style={{ fontWeight: 700 }}>Clear all {gridHitCount(tracks)} hits from the grid?</span>
@@ -2821,6 +2989,19 @@ export default function StudioMode({
             <button style={{ ...S.btn, ...(!libraryOpen ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }} disabled={saving || !libraryOpen} onClick={() => void publishTrack()}>
               {saving ? 'RENDERING…' : 'PUBLISH TO LIBRARY'}
             </button>
+            {/* MUSIC-SUITE P7 (2026-09-29): the current project's own walk-out, right where you just published it — no
+                trip to the LIBRARY tab needed. Only appears once there is a published id this session to act on (walkOut
+                needs an existing library record — WalkOut.ts's own rule, resolveWalkOut). */}
+            {lastPublishedId && (() => {
+              const rec = StudioLibrary.get(lastPublishedId);
+              if (!rec) return null;
+              return (
+                <button data-qa="set-walkout-current" style={{ ...S.btnAlt, ...(rec.isWalkOut ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}) }}
+                  disabled={walkOutBusy} onClick={() => void setAsWalkOut(rec)}>
+                  {walkOutBusy ? 'RENDERING WALK-OUT…' : rec.isWalkOut ? '★ YOUR WALK-OUT' : 'SET AS MY WALK-OUT'}
+                </button>
+              );
+            })()}
           </div>
           {/* MUSIC-SUITE P5 (decision #15): a song with an upload stays on this device — the room says why, in one line */}
           {privacy.private && <div data-qa="upload-private" role="note" style={{ fontSize: 12, color: '#ffd75e', marginTop: 6 }}>{privacy.line}</div>}
@@ -2910,6 +3091,17 @@ export default function StudioMode({
               {(t.authorId === me || t.authorId === 'me') && (
                 <LibraryDelete track={t} btnStyle={S.btnAlt} onDone={(line, ok) => { setLibraryRev((r) => r + 1); if (ok) { say(line); setLibraryLine(null); } else setLibraryLine(line); }} />
               )}
+              {/* MUSIC-SUITE P7 (2026-09-29): SET AS MY WALK-OUT — the binding WalkOut.ts named and nothing ever produced a
+                  button for (understand-wf_3a55346f-032.json:403). On YOUR songs only, the same gate the delete button
+                  uses just above — a walk-out chosen on another author's song is not a thing this room's own UI offers,
+                  and a device-private (uploaded) song is refused with a line by StudioLibrary.setWalkOut itself rather than
+                  hidden here, the same way a full library refuses PUBLISH with a line instead of disabling the button. */}
+              {(t.authorId === me || t.authorId === 'me') && (
+                <button data-qa="set-walkout" style={{ ...S.btnAlt, ...(t.isWalkOut ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}) }}
+                  disabled={walkOutBusy} onClick={() => void setAsWalkOut(t)}>
+                  {walkOutBusy ? 'RENDERING WALK-OUT…' : t.isWalkOut ? '★ YOUR WALK-OUT' : 'SET AS MY WALK-OUT'}
+                </button>
+              )}
               {(t.streamingLinks ?? []).map((l) => (
                 <button key={l.url}
                   style={{ ...S.btnAlt, borderColor: PROVIDER_META[l.provider].color, color: PROVIDER_META[l.provider].color }}
@@ -2933,6 +3125,14 @@ export default function StudioMode({
       )}
 
       {toast && <div data-qa="toast" data-spot={toastAt} role="status" aria-live="polite" style={S.toast}>{toast}</div>}
+      {/* MUSIC-SUITE P8: Okta's voiced caption — up whether or not the clip itself plays (muted, no bank yet, no Web
+          Audio at all: VoiceKit.play resolves false and the words still land, same as ModeMic.showCaption). */}
+      {oktaSay.text && (
+        <div data-qa="okta-caption" role="status" aria-live="polite" style={S.oktaCaption}>
+          <span style={{ marginRight: 8, fontWeight: 800, letterSpacing: '0.08em', fontSize: 10, color: '#ffb347' }}>{oktaSay.name}</span>
+          {oktaSay.text}
+        </div>
+      )}
     </div>
   );
 }

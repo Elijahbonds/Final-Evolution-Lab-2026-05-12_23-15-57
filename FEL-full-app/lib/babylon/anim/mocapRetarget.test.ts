@@ -70,6 +70,39 @@ describe('mocapRetarget — any capture becomes body-local pose keys in the rig\
     expect(Math.abs(r.keys[0].bones!.Hips![1])).toBeLessThan(3);
   });
 
+  // HOOPS MOTION phase 3d (N4): a one-shot that turns keyed its turn about the window's MEDIAN facing, so its first key carried half the turn
+  // into the hand-over (and its last key the other half out of it). reRoot reads each key in a frame that turns with the capture.
+  it('reRoot: a whole-body turn keys NO hip yaw at the first and last keys (the root owns the turn); the body keeps its pose in the turning frame', () => {
+    // the whole body turns 0 → 120° to its right over the window (a spin, easing in and out), hand held out in front of the chest
+    const ease = (u: number) => u * u * (3 - 2 * u);
+    const n = 25, frames = Array.from({ length: n }, (_, i) => toSource(body({ rightHand: [20, 130, 40] }), 120 * ease(i / (n - 1)), false));
+    const o = { from: 0, to: (n - 1) / 30, smoothSec: 0, keyFps: 30 };
+    const plain = retargetToPoseKeys(stream(frames), o), re = retargetToPoseKeys(stream(frames), { ...o, reRoot: true });
+    const yaw = (k: (typeof plain.keys)[number]) => k.bones!.Hips![1];
+    expect(Math.abs(yaw(plain.keys[0]))).toBeGreaterThan(50);                    // median-framed: ±60° at the ends
+    expect(Math.abs(yaw(plain.keys[plain.keys.length - 1]))).toBeGreaterThan(50);
+    for (const k of re.keys) expect(Math.abs(yaw(k))).toBeLessThanOrEqual(1);     // a rigid turn on the trend's own ease: nothing left for the hips
+    const last = re.keys[re.keys.length - 1];
+    expect(last.hands!.Right![2]).toBeGreaterThan(0.3);                            // the hand still out in FRONT (it turned with the body)
+    expect(Math.abs(last.hands!.Right![0] - re.keys[0].hands!.Right![0])).toBeLessThan(0.02);
+    expect(Math.abs(plain.keys[plain.keys.length - 1].hands!.Right![0] - plain.keys[0].hands!.Right![0])).toBeGreaterThan(0.3);   // median-framed: it swept across
+  });
+  it('reRoot keeps the turn INSIDE the window (the hips\' own swing against the trend) and ends at 0, through a wrap past 180°', () => {
+    // the hips alone swing 40° right and back while the whole body turns 200° (unwrapped past ±180)
+    const n = 31, frames = Array.from({ length: n }, (_, i) => toSource(body({ hipTurnDeg: 40 * Math.sin((Math.PI * i) / (n - 1)) }), (200 * i) / (n - 1), false));
+    const re = retargetToPoseKeys(stream(frames), { from: 0, to: (n - 1) / 30, smoothSec: 0, keyFps: 30, reRoot: true });
+    const ys = re.keys.map((k) => k.bones!.Hips![1]);
+    expect(Math.abs(ys[0])).toBeLessThanOrEqual(1); expect(Math.abs(ys[ys.length - 1])).toBeLessThanOrEqual(1);
+    expect(Math.max(...ys.map(Math.abs))).toBeGreaterThan(25);                     // the swing is still there
+    expect(Math.max(...ys.map(Math.abs))).toBeLessThan(60);                        // and the 200° turn is not
+  });
+  it('reRoot is off by default: the same keys as before', () => {
+    const frames = [...hold(body(), 15), ...hold(body({ hipTurnDeg: 30 }), 5)];
+    const a = retargetToPoseKeys(stream(frames), { from: 0, to: 0.63, smoothSec: 0 });
+    const b = retargetToPoseKeys(stream(frames), { from: 0, to: 0.63, smoothSec: 0, reRoot: false });
+    expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+  });
+
   it('aim: a strike thrown off to the side of the hips is re-framed so it lands straight ahead', () => {
     // hips square to +z, the right hand reaching out at 70° to the right: the kick/punch direction becomes the front
     const b = body({ rightHand: [60 * Math.sin(1.22), 140, 60 * Math.cos(1.22)] });

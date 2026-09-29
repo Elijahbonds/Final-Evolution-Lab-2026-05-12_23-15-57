@@ -25,7 +25,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump, buildElbow, buildSpinElbow } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
+  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
   buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildLandAbsorb,   // HOOPS-DEPTH S4
@@ -180,6 +180,7 @@ export function registerAuthoredClips(
     // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,
     // block and steal used to alias onto run/guard/jumpshot.
     ['bball_dribble_idle', () => buildDribbleIdle(scene, skeleton)],
+    ['bball_idle_stand', () => buildIdleStandHoops(scene, skeleton)],   // HOOPS MOTION phase 3b (review): the watch with knees
     ['bball_crossover_left', () => buildCrossover(scene, skeleton, 'left')],
     ['bball_crossover_right', () => buildCrossover(scene, skeleton, 'right')],
     ['bball_hesi', () => buildHesi(scene, skeleton)],
