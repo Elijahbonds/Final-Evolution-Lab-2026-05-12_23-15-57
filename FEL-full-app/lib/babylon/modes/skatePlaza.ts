@@ -14,6 +14,15 @@
 // skater an obstacle is a thing you skate, not a thing that kills you. Everything here is real geometry —
 // rideable, collidable, grindable where a skater would grind it — never an entry in a hazard list.
 
+import type { CoinLook } from '../core/Pickups';
+
+/**
+ * SKATE-SCORE (SK-6, 2026-09-29): the plaza's coins. The shared coin (0.34 m, metal 0.9, glow 0.22) went dark olive in
+ * Venice's golden-hour haze, and its lines and arcs over the plaza read as "olive dot particles" (eye 9096d7cf, skate/100–111;
+ * the run collected none). Bigger, less mirror and more self-lit, it reads as gold across the park. Only skate asks for it.
+ */
+export const SKATE_COIN_LOOK: Readonly<CoinLook> = { diameter: 0.42, glow: 0.35, metallic: 0.65 };
+
 export type PlazaSolidKind =
   | 'spine' | 'pyramid' | 'pyramidBank' | 'gapLedge' | 'manualPad' | 'table' | 'bench' | 'wallride'
   | 'bin' | 'planter';

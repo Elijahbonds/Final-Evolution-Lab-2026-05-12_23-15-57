@@ -17,6 +17,9 @@
 // athlete under 18 or with no birth year on file, and the card says so (athletePlan's blocksNote). The FIX line stays.
 import type { ScreenId } from '@/lib/mirror/screen';
 import { athletePlan, outcomesFromGrades, type GradeLike, type YouthGate } from '@/lib/mirror/screenCorrectives';
+// SCREEN-SHIP (2026-09-29), label only: the grades and cues here rest on unsigned thresholds (listed in
+// lib/screen/PROPOSED-thresholds.ts MOVEMENT_SCREEN_REGISTER), so the card says so. No grading logic or value changed.
+import { PREVIEW_LINE, PROVISIONAL_LABEL } from '@/lib/screen/PROPOSED-thresholds';
 
 export interface ScreenNextStepsProps {
   /** The variant that ran (the runner's). */
@@ -32,6 +35,9 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
   return (
     <section aria-labelledby="screen-next-steps-heading" className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-5" data-next-steps>
       <h2 id="screen-next-steps-heading" className="fel-heading text-[15px] font-bold text-white/80">What to work on · estimated</h2>
+      <p className="mt-1 text-[11.5px] text-[#FFB020]/85" data-preview-label title={PREVIEW_LINE}>
+        <span className="font-bold uppercase tracking-[0.08em]">{PROVISIONAL_LABEL}</span> · {PREVIEW_LINE}.
+      </p>
       <p className="mt-1 text-[13px] leading-relaxed text-white/70">{plan.headline}</p>
 
       {plan.work.length > 0 && (
