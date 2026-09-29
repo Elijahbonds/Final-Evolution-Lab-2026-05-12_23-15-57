@@ -20,9 +20,16 @@
 // file that mentions the shoulder, when pulling is short of three for every two — a one-line suggestion says the
 // counts and what would balance them (lib/coach/coverage.ts pullPushCheck). It is a suggestion, never a block on
 // saving, and it counts tagged exercises only, saying so when untagged sets could change the answer.
+//
+// OFF DAYS (MIRROR-COACH P6, 2026-09-29). Under each training session, "Off day after this" adds FEL's off-day session
+// to the week right behind it (lib/coach/offDay.ts: an easy walk, three rock-and-hold stretches and the recovery
+// breath, 18 minutes; builderServer.ts add_off_day), stored as a session of kind 'recovery'. An off day reads as one
+// here — its own badge and line instead of one more "Session N" — and one the athlete has not started can be taken
+// back out. Its exercises are ordinary prescriptions from the coach's own catalogue, editable like any other.
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, KeyRound, Plus, Scale, Timer, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, KeyRound, Leaf, Plus, Scale, Timer, Trash2, TriangleAlert } from 'lucide-react';
+import { OFF_DAY_ADD_LINE, OFF_DAY_LINE, offDayWouldRewind } from '@/lib/coach/offDay';
 import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
 import type { ProgramTree, TreeExercise } from '@/lib/coach/loop';
 import { mentionsShoulder, pullPushCheck } from '@/lib/coach/coverage';
@@ -112,8 +119,19 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
             const warnings = sessionWarnings(s.exercises);
             const add = adding[s.id] ?? { exerciseId: catalogue[0]?.id ?? '', section: 'key' as SessionSection };
             return (
-              <div key={s.id} className="rounded-lg bg-white/[0.03] border border-white/6 p-3 space-y-2" data-session={s.id}>
-                <div className="text-xs text-white">{s.label} {done && <span className="text-[#7BD389]">· done</span>}</div>
+              <div key={s.id} className={`rounded-lg bg-white/[0.03] border p-3 space-y-2 ${s.kind === 'recovery' ? 'border-dashed border-[#7BD389]/30' : 'border-white/6'}`} data-session={s.id} data-kind={s.kind ?? 'training'}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 text-xs text-white">
+                    {s.kind === 'recovery' && <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-[#7BD389]/15 px-1 text-[10px] font-semibold text-[#7BD389]" data-off-day-badge><Leaf className="h-2.5 w-2.5" aria-hidden="true" />OFF DAY</span>}
+                    {s.label} {done && <span className="text-[#7BD389]">· done</span>}
+                    {s.kind === 'recovery' && <div className="mt-0.5 text-[11px] text-white/45">{OFF_DAY_LINE}</div>}
+                  </div>
+                  {s.kind === 'recovery' && !done && (
+                    <button disabled={busy} onClick={() => void call({ action: 'remove_off_day', sessionId: s.id })} className="shrink-0 text-white/30 hover:text-[#FF3366] disabled:opacity-30" aria-label="Remove this off day" data-remove-off-day>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
                 {warnings.map((w) => (
                   <div key={`${w.kind}-${'group' in w ? w.group : ''}`} className="flex items-center gap-1.5 text-[11px] text-[#FFD700]/85">
                     <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden="true" /> {warningText(w)}
@@ -169,6 +187,14 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                     aria-label="Add exercise"
                   ><Plus className="h-3.5 w-3.5" /></button>
                 </div>
+                {/* MIRROR-COACH P6 FIX (2026-09-29): not where the off day would land ahead of a session the athlete
+                   already did (Today would go back to it; the server refuses it too — offDayWouldRewind) */}
+                {s.kind !== 'recovery' && !offDayWouldRewind(tree.blocks, b.id, s.id, completedSessionIds) && (
+                  <button disabled={busy} onClick={() => void call({ action: 'add_off_day', blockId: b.id, afterSessionId: s.id })} title={OFF_DAY_ADD_LINE}
+                    className="inline-flex items-center gap-1 text-[11px] text-[#7BD389]/80 hover:text-[#7BD389] disabled:opacity-30" data-add-off-day>
+                    <Leaf className="h-3 w-3" aria-hidden="true" /> Off day after this
+                  </button>
+                )}
               </div>
             );
           })}

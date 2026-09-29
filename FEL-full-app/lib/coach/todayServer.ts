@@ -22,6 +22,7 @@ import { logEntryIsEmpty, summaryToWrite, type CleanSet } from './setLog';
 import { todayExercise, variationIds, type CatalogueCoachingRow, type TodayExercise } from './today';
 import { youthRules } from './taxonomy';
 import { isHardStopped, latestIntake, RED_FLAG_COPY } from '../health/intake';
+import { weekView, type WeekEntry } from './offDay';
 
 export type TodayDb = Pick<PrismaClient, 'coachingProgram' | 'user' | 'exerciseLog' | 'programExercise' | 'session' | 'clientSession' | 'setLog' | 'healthIntake' | '$transaction'>;
 
@@ -35,10 +36,17 @@ export interface TodayPayload {
   program: { id: string; name: string; coachName: string } | null;
   today: {
     block: { id: string; order: number; label: string; targetDate: string | null };
-    session: { id: string; order: number; label: string; exercises: TodayExercise[] };
+    /**
+     * MIRROR-COACH P6 (2026-09-29): `kind` — 'recovery' for an off day (lib/coach/offDay.ts): Today shows it as an off
+     * day, with no generated warm-up and no automatic cool-down (its own Cool-down section is both).
+     */
+    session: { id: string; order: number; label: string; kind: 'training' | 'recovery'; exercises: TodayExercise[] };
     index: number; total: number;
+    /** MIRROR-COACH P6: this week (today's block), every session in order with its state, off days named. */
+    week: { label: string; entries: WeekEntry[] };
   } | null;
-  open: { id: string; logs: OpenLog[] } | null;
+  /** `cooldownDone` (MIRROR-COACH P6): the open session's automatic cool-down was already tapped done. */
+  open: { id: string; logs: OpenLog[]; cooldownDone: boolean } | null;
   recentComments: { exercise: string; comment: string | null; at: Date | string | null }[];
   /**
    * MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
@@ -97,10 +105,14 @@ export async function loadToday(db: TodayDb, userId: string): Promise<TodayPaylo
       program: { id: p.id, name: p.name, coachName: coach?.name ?? coach?.email?.split('@')[0] ?? 'coach' },
       today: {
         block: { id: next.block.id, order: next.block.order, label: next.block.label, targetDate: next.block.targetDate },
-        session: { id: next.session.id, order: next.session.order, label: next.session.label, exercises: next.session.exercises.map((e) => todayExercise(e, rows.get(e.id), names, { youth })) },
+        session: {
+          id: next.session.id, order: next.session.order, label: next.session.label, kind: next.session.kind === 'recovery' ? 'recovery' : 'training',
+          exercises: next.session.exercises.map((e) => todayExercise(e, rows.get(e.id), names, { youth })),
+        },
         index: next.index, total: next.total,
+        week: { label: next.block.label, entries: weekView(next.block.sessions, done, next.session.id) },
       },
-      open: open ? { id: open.id, logs: open.exerciseLogs as unknown as OpenLog[] } : null,
+      open: open ? { id: open.id, logs: open.exerciseLogs as unknown as OpenLog[], cooldownDone: !!open.cooldownDoneAt } : null,
       recentComments: recentComments.map((l) => ({ exercise: l.sessionExercise.exercise.name, comment: l.coachComment, at: l.coachCommentAt })),
       hardStopped, redFlagCopy,
     };

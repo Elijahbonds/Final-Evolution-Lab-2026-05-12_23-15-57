@@ -24,6 +24,9 @@ const m = vi.hoisted(() => ({
     workoutScan: [] as Row[], coachClient: [] as Row[], coachingProgram: [] as Row[], programExercise: [] as Row[],
     prqEntry: [] as Row[], gameSession: [] as Row[], user: [] as Row[],
     healthIntake: [] as Row[], painCheckIn: [] as Row[], healthConsent: [] as Row[],
+    // MIRROR-COACH P6 (2026-09-29): readinessCheckIn added empty for the same reason — collectPrqExport now also
+    // hands over the daily readiness check-ins (lib/health/readiness.ts).
+    readinessCheckIn: [] as Row[],
   },
   grants: [] as unknown[],
   updates: 0,

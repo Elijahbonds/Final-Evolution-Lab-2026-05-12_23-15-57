@@ -135,10 +135,14 @@ export const PUBLIC_INTAKE_QUESTIONS: readonly PublicIntakeQuestion[] = INTAKE_Q
 
 /** What the consent screen shown BEFORE any question says (owner decision #4/#18): what's stored, why, who sees it,
  *  how to erase it. FEL's own words, opt-in only — nothing here is implied consent or a pre-checked box. */
+// MIRROR-COACH P6 (2026-09-29): the first bullet names the daily check-in (sleep, soreness, energy, mood —
+// lib/health/readiness.ts) because it is stored under this same 'health_data' consent. A consent screen that listed
+// only the intake and pain check-ins would have had people agreeing to less than FEL then kept. Nothing was stored
+// under the old wording yet (P5 has not shipped), so no earlier grant was given for a narrower list.
 export const HEALTH_DATA_CONSENT_COPY = {
   title: 'Before we ask anything health-related',
   bullets: [
-    'What we store: your answers here, plus any pain check-ins you log during training.',
+    'What we store: your answers here, any pain check-ins you log during training, and your daily check-in (sleep, soreness, energy, mood) if you fill it in.',
     "Why: so training can be told to ease up or stop when it should, and never further than that.",
     'Who sees it: only you, unless you separately let a specific coach view it — that choice is always yours and can be turned off.',
     'It is never sold, never used for ads, never scored, never paid, and never shown in anything you share with a link.',

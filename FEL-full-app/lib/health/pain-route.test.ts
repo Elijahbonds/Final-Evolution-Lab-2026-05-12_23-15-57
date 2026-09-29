@@ -130,9 +130,15 @@ describe('GET /api/health/pain', () => {
   });
 
   it('a flagged reading from yesterday surfaces as a pending follow-up', async () => {
+    // MIRROR-COACH P6 (2026-09-29, found by the review-fix gate at 20:13 UTC): the fixture was "20 hours ago", which is
+    // YESTERDAY only while the UTC clock reads before 20:00 — pendingNextMorningFollowUps (lib/health/pain.ts) compares
+    // UTC days — so this failed every evening from 1 pm PDT. The fixture is now 4 h before today's UTC midnight: always
+    // yesterday. Same assertion; only the clock-dependent fixture changed. (The UTC-day rule itself is P5's, noted in
+    // the P6 report: an athlete west of UTC who logs in the evening gets the follow-up the same evening.)
+    const todayUtc = new Date(); todayUtc.setUTCHours(0, 0, 0, 0);
     h.rows.push({
       id: 'seed', userId: 'client-1', programExerciseId: null, exerciseName: 'Goblet Squat', bodyArea: 'knee',
-      score: 6, kind: 'after', acute: [], note: null, decision: 'step_down_flag_coach', createdAt: new Date(Date.now() - 20 * 3_600_000),
+      score: 6, kind: 'after', acute: [], note: null, decision: 'step_down_flag_coach', createdAt: new Date(todayUtc.getTime() - 4 * 3_600_000),
     });
     const { json } = await get();
     expect(json.pendingFollowUps).toHaveLength(1);

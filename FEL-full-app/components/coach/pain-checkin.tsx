@@ -34,10 +34,14 @@ const GUARDIAN_LOCKED = 'guardian_consent_required';
  *  to happen inline, not just a link out. */
 const HEALTH_DATA_LOCKED = 'health_data_consent_required';
 
-/** Shown in place of the form once the server says a guardian's OK is needed — /consent/guardian is the same
+/** MIRROR-COACH P6 (2026-09-29): exported, with HealthConsentLockedNotice below, for the daily readiness check-in
+ *  (components/coach/readiness-checkin.tsx) — the same two 412s from app/api/health/readiness, so the same two
+ *  notices, never a second wording of either.
+ *
+ *  Shown in place of the form once the server says a guardian's OK is needed — /consent/guardian is the same
  *  screen the Mirror gates behind (app/play/mirror/_components/guardian-consent-gate.tsx), reached here as a link
  *  because a pain check-in has no session-level front door of its own to mount that gate inline in front of. */
-function GuardianLockedNotice() {
+export function GuardianLockedNotice() {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/60">
       <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
@@ -58,7 +62,7 @@ function GuardianLockedNotice() {
  * for this surface. `onGranted` re-runs whatever submission was waiting on this consent, so saying yes here does not
  * throw away the score the athlete already picked.
  */
-function HealthConsentLockedNotice({ onGranted }: { onGranted: () => void }) {
+export function HealthConsentLockedNotice({ onGranted }: { onGranted: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const grant = async () => {

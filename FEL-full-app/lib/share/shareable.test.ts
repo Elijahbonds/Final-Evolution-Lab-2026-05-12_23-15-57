@@ -137,6 +137,41 @@ describe('A SHARE NEVER CARRIES HEALTH DATA (Privacy §5)', () => {
   });
 });
 
+// MIRROR-COACH P6 (2026-09-29): the daily readiness check-in rides the same promise (Privacy §5 names it now). A
+// whole row, its answers, the export's key and the card's read all fail the guard; every built share still passes.
+describe('A SHARE NEVER CARRIES A READINESS CHECK-IN (Privacy §5, P6)', () => {
+  const READINESS_ROW = {
+    id: 'rc_1', userId: 'u1', date: '2026-09-29', sleep: 2, soreness: 4, energy: 2, mood: 3,
+    createdAt: '2026-09-29T07:00:00.000Z', updatedAt: '2026-09-29T07:00:00.000Z',
+  };
+  const READ = { level: 'low', warmupMinutes: 14, extraWarmupMinutes: 4, suggestion: 'Running low today.', answered: 4, lowItems: ['sleep', 'soreness'] };
+
+  it('each answer throws on its own, and so does the row, the export key and the read', () => {
+    for (const f of ['sleep', 'soreness', 'energy', 'mood']) {
+      expect(() => assertNoAthleteData({ [f]: 3 }), f).toThrow(ShareLeak);
+    }
+    expect(() => assertNoAthleteData({ readinessCheckIn: READINESS_ROW })).toThrow(ShareLeak);
+    expect(() => assertNoAthleteData({ readinessCheckIns: [READINESS_ROW] })).toThrow(ShareLeak);
+    expect(() => assertNoAthleteData({ readiness: READ })).toThrow(ShareLeak);
+    expect(() => assertNoAthleteData(READ)).toThrow(ShareLeak);   // lowItems
+  });
+
+  it('spread into an otherwise-clean share, it is caught', () => {
+    const sneaky = { ...shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, { now: NOW }).share, ...READINESS_ROW };
+    expect(() => assertNoAthleteData(sneaky)).toThrow(ShareLeak);
+  });
+
+  it('every built share still survives the sweep with the readiness names added', () => {
+    const shares = [
+      shareProgram(program(), PLATFORM_PROTOCOLS, BY, { forName: 'Ama', now: NOW }).share,
+      shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, { note: 'Quiet landings.', now: NOW }).share,
+      shareRecommendation('Ready to train unsupervised. Strong on the hinge.', BY, { now: NOW }).share,
+      shareSelection(['breath_reset', 'ankle_prep'], PLATFORM_PROTOCOLS, BY, { now: NOW }).share,
+    ];
+    for (const s of shares) expect(() => assertNoAthleteData(s)).not.toThrow();
+  });
+});
+
 describe('A FIRST NAME IS THE ONLY PERSONAL THING ALLOWED', () => {
   it('it is carried when the trainer types it', () => {
     const s = shareProgram(program(), PLATFORM_PROTOCOLS, BY, { forName: 'Ama', now: NOW }).share!;

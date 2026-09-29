@@ -25,18 +25,24 @@
 // consent ledger (HealthConsent) is erased by both — it is not "health data" a coach reads, it is the record of who
 // was allowed to, but an account-level "leave no trace" erase means the ledger as well, not just the data it gated.
 //
+// MIRROR-COACH P6 (2026-09-29): THE DAILY READINESS CHECK-IN RIDES ALONG TOO (schema.prisma ReadinessCheckIn, lib/health
+// /readiness.ts). Sleep, soreness, energy and mood are health-adjacent data collected under the same 'health_data'
+// consent, so they sit on the same promise: the export hands every row over, and BOTH erases delete them — the narrow
+// health-only one (a person erasing "my health data" means the check-ins as much as the pain log) and, through it, the
+// account-wide one.
+//
 // Kept out of the route files so it can be tested against a fake client (vitest does not collect app/).
 
 import type { Prisma } from '@/public/_prisma/client';
 
-type Db = Pick<Prisma.TransactionClient, 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent'>;
+type Db = Pick<Prisma.TransactionClient, 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn'>;
 
 /** What a movement-history row carries in an export: its kind, its numbers, and the avatar proportions made from it. */
 export const MOVEMENT_HISTORY_SELECT = { id: true, kind: true, metrics: true, avatarSpec: true, createdAt: true } as const;
 
 /** The JSON a Profile export downloads. */
 export async function collectPrqExport(db: Db, userId: string, now: Date = new Date()) {
-  const [entries, sessions, history, healthIntakes, painCheckIns, healthConsents] = await Promise.all([
+  const [entries, sessions, history, healthIntakes, painCheckIns, healthConsents, readinessCheckIns] = await Promise.all([
     db.prqEntry.findMany({
       where: { userId },
       orderBy: { measuredAt: 'desc' },
@@ -68,6 +74,8 @@ export async function collectPrqExport(db: Db, userId: string, now: Date = new D
     db.painCheckIn.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
     // the consent ledger itself: what was granted, to which coach, and when anything was revoked.
     db.healthConsent.findMany({ where: { userId }, orderBy: { grantedAt: 'desc' } }),
+    // MIRROR-COACH P6: every daily readiness check-in, whole — the four answers and the day they were for.
+    db.readinessCheckIn.findMany({ where: { userId }, orderBy: { date: 'desc' } }),
   ]);
 
   return {
@@ -79,6 +87,7 @@ export async function collectPrqExport(db: Db, userId: string, now: Date = new D
     healthIntakes,
     painCheckIns,
     healthConsents,
+    readinessCheckIns,
   };
 }
 
@@ -89,6 +98,8 @@ export interface HealthErasedCounts {
   painCheckIns: number;
   /** HealthConsent rows deleted (both scopes: health_data and every coach_view grant). */
   healthConsents: number;
+  /** ReadinessCheckIn rows deleted (MIRROR-COACH P6): every daily check-in. */
+  readinessCheckIns: number;
 }
 
 export interface ErasedCounts extends HealthErasedCounts {
@@ -99,26 +110,33 @@ export interface ErasedCounts extends HealthErasedCounts {
 }
 
 /**
- * Erase ONLY the health data: the intake, every pain check-in, and the consent ledger itself (both scopes). This is
- * the narrow action Health data in account settings offers next to "withdraw" — see the file header for why it has
- * to stay separate from `erasePrqData`. Idempotent, same as that function.
+ * Erase ONLY the health data: the intake, every pain check-in, every daily readiness check-in (MIRROR-COACH P6), and
+ * the consent ledger itself (both scopes). This is the narrow action Health data in account settings offers next to
+ * "withdraw" — see the file header for why it has to stay separate from `erasePrqData`. Idempotent, same as that
+ * function. The ledger goes LAST, so a failure part-way through (outside a transaction) never leaves health rows
+ * behind with no consent record explaining why they were collected.
  */
 export async function eraseHealthData(
-  db: Pick<Db, 'healthIntake' | 'painCheckIn' | 'healthConsent'>,
+  db: Pick<Db, 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn'>,
   userId: string,
 ): Promise<HealthErasedCounts> {
   const healthIntakes = await db.healthIntake.deleteMany({ where: { userId } });
   const painCheckIns = await db.painCheckIn.deleteMany({ where: { userId } });
+  const readinessCheckIns = await db.readinessCheckIn.deleteMany({ where: { userId } });
   const healthConsents = await db.healthConsent.deleteMany({ where: { userId } });
-  return { healthIntakes: healthIntakes.count, painCheckIns: painCheckIns.count, healthConsents: healthConsents.count };
+  return {
+    healthIntakes: healthIntakes.count, painCheckIns: painCheckIns.count, healthConsents: healthConsents.count,
+    readinessCheckIns: readinessCheckIns.count,
+  };
 }
 
 /**
- * Erase the user's PRQ entries, movement history and health data (intake, pain check-ins, consent records). Pass a
- * transaction client, so all five go together or not at all. Idempotent: a second call deletes nothing and says so.
+ * Erase the user's PRQ entries, movement history and health data (intake, pain check-ins, readiness check-ins,
+ * consent records). Pass a transaction client, so all six go together or not at all. Idempotent: a second call
+ * deletes nothing and says so.
  */
 export async function erasePrqData(
-  db: Pick<Db, 'prqEntry' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent'>,
+  db: Pick<Db, 'prqEntry' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn'>,
   userId: string,
 ): Promise<ErasedCounts> {
   const prq = await db.prqEntry.deleteMany({ where: { userId } });
@@ -129,7 +147,7 @@ export async function erasePrqData(
 
 /** The ledger line for an erasure (the wallet is untouched; the event is recorded). */
 export function erasureReason(c: ErasedCounts): string {
-  const health = c.healthIntakes + c.painCheckIns + c.healthConsents;
+  const health = c.healthIntakes + c.painCheckIns + c.healthConsents + c.readinessCheckIns;
   return `PRQ data erasure: ${c.prqEntries} entries, ${c.movementHistory} movement history rows and `
     + `${health} health record${health === 1 ? '' : 's'} deleted`;
 }

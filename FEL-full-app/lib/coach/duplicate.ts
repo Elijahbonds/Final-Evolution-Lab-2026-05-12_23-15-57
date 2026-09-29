@@ -29,7 +29,7 @@ export interface DuplicateSpec {
 
 export interface BlockDraft {
   order: number; label: string; targetDate: string | null;
-  sessions: { order: number; label: string; exercises: Omit<ProgramTree['blocks'][number]['sessions'][number]['exercises'][number], 'id'>[] }[];
+  sessions: { order: number; label: string; kind: 'training' | 'recovery'; exercises: Omit<ProgramTree['blocks'][number]['sessions'][number]['exercises'][number], 'id'>[] }[];
 }
 
 export interface ProgramDraft {
@@ -82,6 +82,8 @@ export function draftCopy(source: ProgramTree, clientId: string, spec: Duplicate
           .map((s) => ({
             order: s.order,
             label: s.label,
+            // MIRROR-COACH P6 (2026-09-29): an off day is copied as an off day (lib/coach/offDay.ts)
+            kind: s.kind === 'recovery' ? 'recovery' as const : 'training' as const,
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             exercises: [...s.exercises].sort((x, y) => x.order - y.order).map(({ id, ...rest }) => ({ ...rest })),
           })),

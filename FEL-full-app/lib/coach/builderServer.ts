@@ -9,12 +9,14 @@
 // session could hold two key sets.
 import type { PrismaClient } from '@/public/_prisma/client';
 import { accessRole, mergeSpecUpdate, validateExerciseSpec, type ProgramTree } from './loop';
+import { validateCatalogueCreate } from './catalogue';
+import { OFF_DAY_ITEMS, OFF_DAY_KIND, OFF_DAY_LABEL, offDayWouldRewind } from './offDay';
 import { TREE_INCLUDE, toTree } from './server';
 import { moveWithinSection, sessionWarnings, type SessionWarning } from './structure';
 import { EMPTY_LOG_WHERE, logHasContent } from './setLog';
 import { PIN_EXERCISE, bandAllowed, youthRules } from './taxonomy';
 
-export type BuilderDb = Pick<PrismaClient, 'coachingProgram' | 'programExercise' | 'session' | 'sessionExercise' | 'exerciseLog' | 'facilitatorProfile' | 'user'>;
+export type BuilderDb = Pick<PrismaClient, 'coachingProgram' | 'programExercise' | 'session' | 'sessionExercise' | 'exerciseLog' | 'facilitatorProfile' | 'user' | 'clientSession'>;
 export type BuilderResult<T> = ({ ok: true } & T) | { ok: false; status: number; error: string };
 
 const fail = (status: number, error: string) => ({ ok: false as const, status, error });
@@ -116,6 +118,62 @@ export async function builderAction(db: BuilderDb, userId: string, programId: st
     const order = (session.exercises.reduce((m, e) => Math.max(m, e.order), 0)) + 1;
     const created = await db.sessionExercise.create({ data: { sessionId: session.id, order, ...v.spec } });
     if (v.spec.isKeySet) await clearOtherKeySets(session.id, created.id);
+  } else if (body.action === 'add_off_day') {
+    // MIRROR-COACH P6 (2026-09-29): an OFF DAY into this week — FEL's template (lib/coach/offDay.ts: Easy Walk, three
+    // rock-and-hold stretches, the recovery breath; 18 minutes), stored as a session of kind 'recovery' so the client
+    // does and logs it like any session and P9 can count it. { blockId, afterSessionId? }: after that session (the ones
+    // behind it move down one), else at the end of the week. The template's rows come from the COACH'S OWN catalogue —
+    // a row they already have by that name is used as it is (their words stay theirs); a missing one is created from
+    // the template, through the catalogue's own validator. Everything is validated before the first write.
+    const tree = await db.coachingProgram.findUnique({ where: { id: programId }, include: TREE_INCLUDE });
+    const block = tree?.blocks.find((b) => b.id === String(body.blockId ?? ''));
+    if (!block) return fail(404, 'block_not_found');
+    const afterId = typeof body.afterSessionId === 'string' && body.afterSessionId ? body.afterSessionId : null;
+    const after = afterId ? block.sessions.find((x) => x.id === afterId) : null;
+    if (afterId && !after) return fail(404, 'session_not_found');
+    const order = after ? after.order + 1 : block.sessions.reduce((m, x) => Math.max(m, x.order), 0) + 1;
+    // MIRROR-COACH P6 FIX (2026-09-29, code review): never ahead of a session the client already completed — Today is
+    // the first not-done session, so an off day slotted before a done one rewound Today to it (offDay.ts
+    // offDayWouldRewind). Checked before anything is written.
+    const completed = await db.clientSession.findMany({
+      where: { programId, clientId: program.clientId, completedAt: { not: null } }, select: { sessionId: true },
+    });
+    if (offDayWouldRewind(tree!.blocks, block.id, after?.id ?? null, completed.map((c) => c.sessionId))) return fail(409, 'off_day_before_done');
+    const rows = OFF_DAY_ITEMS.map((i) => validateCatalogueCreate({ ...i.catalogue }));
+    const specs = OFF_DAY_ITEMS.map((i) => validateExerciseSpec({ exerciseId: 'template', ...i.prescription }));
+    if (rows.some((r) => !r.ok) || specs.some((v) => !v.ok)) return fail(500, 'off_day_template_invalid');
+    const exerciseIds: string[] = [];
+    for (const r of rows) {
+      if (!r.ok) continue;
+      const own = await db.programExercise.findFirst({ where: { coachId: userId, name: { equals: r.item.name, mode: 'insensitive' } }, select: { id: true } });
+      if (own) { exerciseIds.push(own.id); continue; }
+      try {
+        exerciseIds.push((await db.programExercise.create({ data: { coachId: userId, ...r.item, commonFaults: [] }, select: { id: true } })).id);
+      } catch (e) {
+        // a database still carrying the old FEL-wide name key (P2's held swap, decision #28) refuses a name another coach owns
+        if ((e as { code?: string } | null)?.code === 'P2002') return fail(409, 'name_taken_fel');
+        throw e;
+      }
+    }
+    if (after) await db.session.updateMany({ where: { blockId: block.id, order: { gte: order } }, data: { order: { increment: 1 } } });
+    const created = await db.session.create({ data: { blockId: block.id, order, label: OFF_DAY_LABEL, kind: OFF_DAY_KIND }, select: { id: true } });
+    for (const [k, v] of specs.entries()) {
+      if (!v.ok) continue;
+      await db.sessionExercise.create({ data: { sessionId: created.id, order: k + 1, ...v.spec, exerciseId: exerciseIds[k] } });
+    }
+  } else if (body.action === 'remove_off_day') {
+    // MIRROR-COACH P6: take an off day back out — only an off day, and only one the client has not started (a logged
+    // one is their work; ClientSession → Session is onDelete: Restrict, so the delete would throw anyway).
+    const x = await db.session.findUnique({ where: { id: String(body.sessionId ?? '') }, include: { block: true } });
+    if (!x || x.block.programId !== programId) return fail(404, 'session_not_found');
+    if (x.kind !== OFF_DAY_KIND) return fail(409, 'not_an_off_day');
+    if (await db.clientSession.count({ where: { sessionId: x.id } })) return fail(409, 'off_day_logged');
+    try {
+      await db.session.delete({ where: { id: x.id } });   // its prescriptions go with it (SessionExercise onDelete: Cascade)
+    } catch (e) {
+      if ((e as { code?: string } | null)?.code === 'P2003') return fail(409, 'off_day_logged');
+      throw e;
+    }
   } else return fail(400, 'unknown_action');
 
   const full = await db.coachingProgram.findUnique({ where: { id: programId }, include: TREE_INCLUDE });
