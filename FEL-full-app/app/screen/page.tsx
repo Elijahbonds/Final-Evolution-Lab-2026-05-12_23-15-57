@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 
 /**
- * /screen — the Quick Screen's one stable QR address (SCREEN-SHIP (d)). It sends the phone to /play/mirror/assess and
+ * /screen — the Quick Screen's one stable QR address (SCREEN-SHIP (d)). It sends the device to /play/mirror/assess and
  * keeps a harmless query string (e.g. ?src=qr). No sign-in and no middleware on the way.
  *
  * A TEMPORARY (307) redirect, on purpose: a QR code printed on paper should survive a later move of the flow. A 308 is

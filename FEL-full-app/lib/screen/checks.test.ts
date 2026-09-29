@@ -70,7 +70,7 @@ describe('one band per graded check, from the synthetic athlete', () => {
     expect(s).toMatchObject({ clean: false, lane: 'correctives', topFlag: 'ohs.kneeCave' });
   });
 
-  it('the single-leg left–right gap is computed on the phone from the per-side medians (degrees), worst gap graded', () => {
+  it('the single-leg left–right gap is computed on the device from the per-side medians (degrees), worst gap graded', () => {
     const r = session({ t3LeftKneeIn: 0.06 });                       // left FPPA ≈ 18°, right ≈ 0°
     const t3 = r.tests.find((t) => t.id === 'T3')!;
     const l = t3.sides.left!.metrics.find((m) => m.id === 'fppa')!.value!, rr = t3.sides.right!.metrics.find((m) => m.id === 'fppa')!.value!;
