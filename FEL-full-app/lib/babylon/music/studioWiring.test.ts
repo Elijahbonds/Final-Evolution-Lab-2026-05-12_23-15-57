@@ -102,10 +102,21 @@ describe('the room keeps its work in the project (source pins)', () => {
     // song panel is not mounted — and the song it sends is decided per tier (DanceExport.danceSongAtTier)
     // MUSIC-SUITE P4 (grid-ui): …and the song's key rides on the card ('Your song · Am · …')
     // MUSIC-SUITE P4 FIX PASS: the key in words (keyCardText) — the Cypher's chip upper-cases the blurb
-    expect(studio).toContain('exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) })');
+    // MUSIC-SUITE P7 ("your beat" item 1): + swing, kit and songKey — the project's own, never a fresh default
+    // (songKey is the RAW key for a FEL-filled row's note; `key` stays the display string the card already used)
+    expect(studio).toContain('id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key),');
+    expect(studio).toContain('swing, kit, songKey: project.key, takes: danceTakes,');
     expect(songPanel).not.toContain('exportSongToDance');
     expect(studio + songPanel).not.toContain("'My Track'");
     expect(songPanel).not.toMatch(/useRef\(`s\$\{Date\.now\(\)/);
+  });
+
+  it("the dance export is refused for a device-private song by DanceExport's own rule, not uploadDoorOpen('danceFloor', …)", () => {
+    // MUSIC-SUITE P7 ("your beat" contract item 4): the export now renders real audio, so a song with an upload can no
+    // longer go to the dance floor, whatever UPLOAD_DOORS.danceFloor says (kept true for a hypothetically audio-free
+    // reading; library and walk-out still read the door table).
+    expect(studio).toContain('const danceOpen = danceFloorOpenFor(privacy);');
+    expect(studio).not.toContain("uploadDoorOpen('danceFloor'");
   });
 
   it('the streak post is on only inside GameShell (the one host with ReplayInPlaceContext); /dev/music has none', () => {

@@ -162,11 +162,14 @@ function denseSong(id: string, onSlots: readonly string[], bpm = ACADEMY_BPM) {
 }
 
 function danceSection() {
-  // In node there is no window, so readExportedTrack() is null and allTracks() is the three shipped charts.
+  // In node there is no window, so readExportedTrack() is null and allTracks() is the six shipped FEL-song charts
+  // (MUSIC-SUITE P7). stepsFor(t) now answers every shipped track from its song's own section map (stepsForSong,
+  // danceTracks.ts) rather than falling through to generateRoutine, which is why the fallback below never actually
+  // runs for a shipped track any more (t.difficulty stays DanceTrack's own frozen 1..3 field either way).
   const tracks = allTracks().map((t) => {
     const mine = stepsFor(t);
-    const steps = mine ?? generateRoutine({ bars: t.bars, difficulty: t.difficulty, seed: t.seed });   // DanceMode.ts:271-272
-    return chartReport(t, steps, mine ? 'exported' : 'generateRoutine(bars, difficulty, seed) — DanceMode.ts:272');
+    const steps = mine ?? generateRoutine({ bars: t.bars, difficulty: t.difficulty, seed: t.seed });
+    return chartReport(t, steps, mine ? (t.song ? 'stepsForSong (its own section map)' : 'exported') : 'generateRoutine(bars, difficulty, seed) fallback — unreachable for a shipped track');
   });
 
   // THE 64-BAR EXPORT. SongPanel ids a song `s${Date.now()}` per mount (SongPanel.tsx:25), and the export's seed is

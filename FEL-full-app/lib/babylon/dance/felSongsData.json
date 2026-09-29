@@ -1,0 +1,848 @@
+[
+ {
+  "id": "warmup",
+  "title": "Morning Boardwalk",
+  "style": "lo-fi boom-bap",
+  "bpm": 88,
+  "key": "F major",
+  "timeSig": "4/4",
+  "bars": 36,
+  "durationSec": 98.181818,
+  "swing": 0.58,
+  "sections": [
+   {
+    "name": "intro",
+    "startBar": 1,
+    "bars": 4,
+    "energy": 1,
+    "stems": [
+     "bed",
+     "keys",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 5,
+    "bars": 8,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 13,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "break",
+    "startBar": 21,
+    "bars": 2,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "horns",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 23,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 27,
+    "bars": 8,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "outro",
+    "startBar": 35,
+    "bars": 2,
+    "energy": 1,
+    "stems": [
+     "bed",
+     "keys",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   }
+  ],
+  "breakBars": [
+   21,
+   22
+  ],
+  "difficulty": 1,
+  "targetTapsPerMin": 28.0,
+  "hookStem": "keys",
+  "preview": {
+   "file": "preview.mp3",
+   "startBar": 13,
+   "bars": 16
+  }
+ },
+ {
+  "id": "cypher",
+  "title": "Windward Circle",
+  "style": "slap-bass funk",
+  "bpm": 96,
+  "key": "E dorian",
+  "timeSig": "4/4",
+  "bars": 40,
+  "durationSec": 100.0,
+  "swing": 0.54,
+  "sections": [
+   {
+    "name": "intro",
+    "startBar": 1,
+    "bars": 4,
+    "energy": 1,
+    "stems": [
+     "bed",
+     "keys",
+     "perc",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 5,
+    "bars": 8,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "fx"
+    ],
+    "label": "verse1"
+   },
+   {
+    "name": "hook",
+    "startBar": 13,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook1"
+   },
+   {
+    "name": "break",
+    "startBar": 21,
+    "bars": 2,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "horns",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 23,
+    "bars": 6,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "verse2"
+   },
+   {
+    "name": "hook",
+    "startBar": 29,
+    "bars": 8,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook2"
+   },
+   {
+    "name": "outro",
+    "startBar": 37,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   }
+  ],
+  "breakBars": [
+   21,
+   22
+  ],
+  "difficulty": 2,
+  "targetTapsPerMin": 40.0,
+  "hookStem": "bass",
+  "preview": {
+   "file": "preview.mp3",
+   "startBar": 13,
+   "bars": 16
+  }
+ },
+ {
+  "id": "goldenhour",
+  "title": "Golden Hour Glide",
+  "style": "west-coast sunset groove",
+  "bpm": 104,
+  "key": "Bb dorian",
+  "timeSig": "4/4",
+  "bars": 44,
+  "durationSec": 101.538462,
+  "swing": 0.56,
+  "sections": [
+   {
+    "name": "intro",
+    "startBar": 1,
+    "bars": 4,
+    "energy": 1,
+    "stems": [
+     "bed",
+     "keys",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 5,
+    "bars": 8,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 13,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "break",
+    "startBar": 21,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "keys",
+     "horns",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 25,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 33,
+    "bars": 8,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "outro",
+    "startBar": 41,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "keys",
+     "lead",
+     "fx"
+    ]
+   }
+  ],
+  "breakBars": [
+   21,
+   23
+  ],
+  "difficulty": 3,
+  "targetTapsPerMin": 54.0,
+  "hookStem": "lead",
+  "preview": {
+   "file": "preview.mp3",
+   "startBar": 13,
+   "bars": 16
+  }
+ },
+ {
+  "id": "battle",
+  "title": "Breakwater",
+  "style": "b-boy breakbeat",
+  "bpm": 112,
+  "key": "G minor",
+  "timeSig": "4/4",
+  "bars": 48,
+  "durationSec": 102.857143,
+  "swing": 0.52,
+  "sections": [
+   {
+    "name": "intro",
+    "startBar": 1,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "perc",
+     "horns",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 5,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 13,
+    "bars": 8,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "break",
+    "startBar": 21,
+    "bars": 4,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "horns",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 25,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "build",
+    "startBar": 33,
+    "bars": 4,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 37,
+    "bars": 8,
+    "energy": 5,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "outro",
+    "startBar": 45,
+    "bars": 4,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   }
+  ],
+  "breakBars": [
+   22,
+   24
+  ],
+  "difficulty": 4,
+  "targetTapsPerMin": 68.0,
+  "hookStem": "horns",
+  "preview": {
+   "file": "preview.mp3",
+   "startBar": 13,
+   "bars": 16
+  }
+ },
+ {
+  "id": "canals",
+  "title": "Canal Lights",
+  "style": "house-hop",
+  "bpm": 118,
+  "key": "C minor",
+  "timeSig": "4/4",
+  "bars": 52,
+  "durationSec": 105.762712,
+  "swing": 0.55,
+  "sections": [
+   {
+    "name": "intro",
+    "startBar": 1,
+    "bars": 8,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "keys",
+     "perc",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 9,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "fx"
+    ],
+    "label": "verse 1"
+   },
+   {
+    "name": "build",
+    "startBar": 17,
+    "bars": 4,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "lead",
+     "fx"
+    ]
+   },
+   {
+    "name": "hook",
+    "startBar": 21,
+    "bars": 8,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook 1"
+   },
+   {
+    "name": "break",
+    "startBar": 29,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "horns",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 33,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "lead",
+     "fx"
+    ],
+    "label": "verse 2"
+   },
+   {
+    "name": "hook",
+    "startBar": 41,
+    "bars": 8,
+    "energy": 5,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook 2"
+   },
+   {
+    "name": "outro",
+    "startBar": 49,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "drums",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ]
+   }
+  ],
+  "breakBars": [
+   29,
+   31
+  ],
+  "difficulty": 5,
+  "targetTapsPerMin": 84.0,
+  "hookStem": "keys",
+  "preview": {
+   "file": "preview.mp3",
+   "startBar": 21,
+   "bars": 16
+  }
+ },
+ {
+  "id": "evolution",
+  "title": "Final Evolution",
+  "style": "electro-funk",
+  "bpm": 126,
+  "key": "F# minor",
+  "timeSig": "4/4",
+  "bars": 56,
+  "durationSec": 106.666667,
+  "swing": 0.5,
+  "sections": [
+   {
+    "name": "intro",
+    "startBar": 1,
+    "bars": 4,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "keys",
+     "fx"
+    ]
+   },
+   {
+    "name": "verse",
+    "startBar": 5,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "fx"
+    ],
+    "label": "verse 1"
+   },
+   {
+    "name": "build",
+    "startBar": 13,
+    "bars": 4,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "build 1"
+   },
+   {
+    "name": "hook",
+    "startBar": 17,
+    "bars": 8,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook 1"
+   },
+   {
+    "name": "break",
+    "startBar": 25,
+    "bars": 4,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "keys",
+     "horns",
+     "fx"
+    ],
+    "label": "break 1"
+   },
+   {
+    "name": "verse",
+    "startBar": 29,
+    "bars": 8,
+    "energy": 3,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "verse 2"
+   },
+   {
+    "name": "build",
+    "startBar": 37,
+    "bars": 4,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "build 2"
+   },
+   {
+    "name": "hook",
+    "startBar": 41,
+    "bars": 8,
+    "energy": 5,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook 2"
+   },
+   {
+    "name": "break",
+    "startBar": 49,
+    "bars": 2,
+    "energy": 4,
+    "stems": [
+     "bed",
+     "horns",
+     "fx"
+    ],
+    "label": "last freeze"
+   },
+   {
+    "name": "hook",
+    "startBar": 51,
+    "bars": 4,
+    "energy": 5,
+    "stems": [
+     "bed",
+     "drums",
+     "bass",
+     "keys",
+     "perc",
+     "horns",
+     "lead",
+     "fx"
+    ],
+    "label": "hook 3"
+   },
+   {
+    "name": "outro",
+    "startBar": 55,
+    "bars": 2,
+    "energy": 2,
+    "stems": [
+     "bed",
+     "keys",
+     "fx"
+    ]
+   }
+  ],
+  "breakBars": [
+   25,
+   27,
+   49,
+   50
+  ],
+  "difficulty": 6,
+  "targetTapsPerMin": 100.0,
+  "hookStem": "lead",
+  "preview": {
+   "file": "preview.mp3",
+   "startBar": 17,
+   "bars": 16
+  }
+ }
+]

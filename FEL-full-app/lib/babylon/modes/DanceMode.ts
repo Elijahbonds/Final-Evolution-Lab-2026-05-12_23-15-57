@@ -77,7 +77,28 @@ import {
 // a clean hit opens the chest and lifts the chin, a MISS closes them, and the finish holds the celebrate.
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { stagePose, STAGE_INPUT_IDLE, STAGE_BEAT_SEC, type StagePostureInput } from '../core/StagePosture';
-import { StemBand, CATEGORY_STEM } from '../audio/StemBand';
+import { StemBand, CATEGORY_STEM, type StemCategory } from '../audio/StemBand';
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: instrument chips replace the top-left MIX bar (energy/energyLabel).
+// Pure chip-state module (lib/babylon/dance/ui/InstrumentChips.ts); this file only decides WHICH categories the
+// loaded chart calls for (songCategories, read once at lock-in) and reads the band's live level per category —
+// the same two inputs onJudged already had for the "X JOINS THE MIX" banner.
+import { buildInstrumentChips, encodeInstrumentChips, songCategories } from '../dance/ui/InstrumentChips';
+// MUSIC-SUITE P7 (2026-09-29), "your beat" (owner decision #7): a player's exported song carries a real-audio
+// payload now (DanceExport.YourSongExport) — YourSongBand renders and plays IT, with FEL's kits filling only the
+// parts the song doesn't have, instead of the from-scratch funk band every OTHER track (shipped, or an export saved
+// before P7) still dances to.
+import { YourSongBand, renderYourSongParts, type YourSongRenderDeps } from '../dance/yourSong';
+import { readExportedTrack } from '../music/DanceExport';
+import { readDeviceAudio } from '../music/StudioLibrary';
+// MUSIC-SUITE P7 (2026-09-29), six-songs: every SHIPPED track now carries a real FEL song (danceTracks.ts reads
+// FEL_SONGS). SongStemBand plays its eight recorded stems through the SAME hit/miss gain math and the SAME public
+// shape (judge/level/mixLevel/setClock/start/update/rewind/cancelFrom/dispose) StemBand and YourSongBand already
+// have, so it drops into every `band?.…` call below with no new branching — only the instrument-family cat/level
+// calls in onJudged (already narrowed off YourSongBand by its own instanceof check) need it to match StemBand
+// exactly, which it does. songPreviewUrl feeds the pick screen's preview-on-focus; outroRange picks the results
+// screen's clip (its own song's last section).
+import { SongStemBand } from '../audio/SongStemBand';
+import { songPreviewUrl, outroRange } from '../dance/felSongs';
 import { KitPulse, kitPattern } from '../audio/KitPulse';
 import { SongClock, danceTap, tapLatencySec, type TriggerLatch } from '../audio/SongClock';
 import { loadRoomCalibration } from '@/lib/feel/rhythm-calibrate';
@@ -136,9 +157,23 @@ export const DanceMode: ModeDefinition = (() => {
   let countBackShown = false;
   /** MUSIC-SUITE P2 FIX PASS: gives back the 'playback' audio session this room claimed at load (lib/audio/session.ts). */
   let releaseSession: (() => void) | null = null;
-  /** The Class of 3000 layer: the band your dancing builds. */
-  let band: StemBand | null = null;
+  /** The Class of 3000 layer: the band your dancing builds. MUSIC-SUITE P7: a YourSongBand for YOUR exported song
+   *  (its own rendered audio), a SongStemBand for a SHIPPED FEL song (track.song — six-songs), else the synth
+   *  StemBand (a pre-P7 export with no real-audio payload). */
+  let band: StemBand | YourSongBand | SongStemBand | null = null;
   let bandJoined = new Set<string>();
+  /** MUSIC-SUITE P7 (six-songs): true while the locked-in track is one of the six FEL songs — CONTRACT.md §7: "the
+   *  rendered bed replaces KitPulse's 808 floor for these songs; with both, the kick doubles." Only gates the 808's
+   *  own continuous grid (start/update, below); its count-in clicks (countIn/rewind) stay on for every track, song
+   *  or not — the stems have no pre-roll of their own to click against. */
+  let isSongTrack = false;
+  /** MUSIC-SUITE P7 (2026-09-29): every stem id, in a fixed order (the chip row never reshuffles frame to frame). */
+  const STEM_ORDER = Object.keys(CATEGORY_STEM) as StemCategory[];
+  /** Which stem categories the CURRENT chart calls for (InstrumentChips.songCategories) — set once per track
+   *  lock-in (beginCountIn), from the exact routine handed to perf.setRoutine (a shipped seed or an exported "your
+   *  song" chart resolve through the same DANCE_LIBRARY lookup either way). A category outside this set is FEL's:
+   *  the player cannot earn it this run, because nothing in the chart ever asks for it. */
+  let inSongCats = new Set<string>();
   /** The floor: the FEL 808 kit at the track's tempo. */
   let kit: KitPulse | null = null;
   /** The clip currently dancing, so a judgement can re-speed it. */
@@ -160,6 +195,9 @@ export const DanceMode: ModeDefinition = (() => {
   const AUDIENCE = new Vector3(0, 1.7, -6);
   /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one results punch per routine. */
   let resultLatch = false;
+  /** MUSIC-SUITE P7 (six-songs): the pick screen's preview.mp3, playing while its song is focused (playPreview /
+   *  stopPreview, below). Plain HTMLAudioElement — see playPreview's own comment for why. */
+  let previewAudio: HTMLAudioElement | null = null;
 
   /** GREAT (stars >= 3): a latched match-class punch — hit-stop + shake + gold flash. GOOD: a softer shake only. No slowMo. */
   function resultBeat(ctx: ModeContext, great: boolean): void {
@@ -226,6 +264,31 @@ export const DanceMode: ModeDefinition = (() => {
 
   function clipSpeed(): number { return track.bpm / CLIP_REF_BPM; }
 
+  /** MUSIC-SUITE P7 (2026-09-29): the chip row, encoded for HudValue (a plain string — ModeHarness's HudValue union
+   *  is closed and held, so this rides through it the same way hud.kickZones/hud.rackets already do: the host,
+   *  components/games/timing-babylon.tsx, decodes it). `band` null (no AudioContext yet, or the pick screen) reads
+   *  every earnable category as ducked at level 0, which is the honest state before a note has ever been judged. */
+  function instrumentsHud(): string {
+    // MUSIC-SUITE P7 ("your beat"): YourSongBand's chip row is keyed by SONG PART (kick/snare/…), not by StemBand's
+    // dance-move categories — buildInstrumentChips takes both the same way (it only ever reads `order` back out of
+    // `labels`/`inSong`/`levels`), so the chip UI (InstrumentChips.ts, timing-babylon.tsx) needs no case for either.
+    if (band instanceof YourSongBand) {
+      const order = band.parts();
+      const labels: Record<string, string> = {};
+      const inSong = new Set<string>();
+      const levels: Record<string, number> = {};
+      for (const part of order) {
+        labels[part] = band.name(part);
+        levels[part] = band.level(part);
+        if (!band.isFel(part)) inSong.add(part);   // a FEL-filled part is always 'fel', whatever its level reads
+      }
+      return encodeInstrumentChips(buildInstrumentChips(order, labels, inSong, levels));
+    }
+    const levels: Record<string, number> = {};
+    for (const cat of STEM_ORDER) levels[cat] = band?.level(cat) ?? 0;
+    return encodeInstrumentChips(buildInstrumentChips(STEM_ORDER, CATEGORY_STEM, inSongCats, levels));
+  }
+
   function playStep(s: DanceStep): void {
     const id = resolveDanceClip(s.clipId, (x) => registered.has(x));
     // Mirrored steps play `<id>.M` — resolved via the merged DANCE_ALIASES
@@ -241,7 +304,19 @@ export const DanceMode: ModeDefinition = (() => {
     // banner says WHO walked in. The Class of 3000 fantasy: you are not
     // dancing TO a track, you are ASSEMBLING one.
     let joinBanner: string | null = null;
-    if (band && step) {
+    if (band instanceof YourSongBand) {
+      // MUSIC-SUITE P7 ("your beat"): a dance step carries no per-instrument lane the way a PERFORM note does, so
+      // every judged hit — whichever move it was — counts toward the next of YOUR song's own parts joining; a MISS
+      // counts toward the newest one dropping. FEL's filled parts are never touched here — they play from the first
+      // beat regardless (YourSongBand.has).
+      if (label === 'MISS') {
+        const dropped = band.miss();
+        if (dropped) joinBanner = `${band.name(dropped)} DROPS OUT`;
+      } else {
+        const joined = band.hit();
+        if (joined) joinBanner = `${band.name(joined)}${band.isFel(joined) ? ' · FEL' : ''} JOINS THE BAND`;
+      }
+    } else if (band && step) {
       const cat = DANCE_LIBRARY.find((c) => c.id === step.clipId)?.category;
       if (cat) {
         const before = band.level(cat);
@@ -262,8 +337,10 @@ export const DanceMode: ModeDefinition = (() => {
       banner: joinBanner ?? (combo >= 4 ? `${label}  ×${combo}` : `${label}${dirTag}`),
       score: perf.score,
       combo,
-      energy: band ? Math.round(band.mixLevel() * 100) : 0,
-      energyLabel: 'MIX',
+      // MUSIC-SUITE P7 (2026-09-29): instrument chips replace the one MIX bar (energy/energyLabel) — one chip per
+      // instrument in the current song, lit when earned, dim when ducked, FEL-labelled when the chart never asks
+      // for it this run (InstrumentChips.ts).
+      instruments: instrumentsHud(),
     });
 
     // THE BODY ANSWERS THE JUDGEMENT (A+ mission #1). A clean hit dances the
@@ -317,11 +394,22 @@ export const DanceMode: ModeDefinition = (() => {
     const mixPct = band ? Math.round(band.mixLevel() * 100) : 0;
     const accuracy = Math.round(r.accuracy * 100);
     const grade = gradeFor(r.accuracy);
+    // MUSIC-SUITE P7 (six-songs): the results screen plays a short outro — the song's own last section, at the full
+    // mastered mix, faded (SongStemBand.playOutro). Independent of anything earned this run: the results screen
+    // hears the song finish, not the run's own MIX %. Only for a shipped FEL song (track.song) whose band actually
+    // decoded the stems (SongStemBand) — an export's YourSongBand, or the exported track's synth StemBand, has no
+    // "song" to play an outro of.
+    if (track.song && band instanceof SongStemBand) {
+      const { startSec, endSec } = outroRange(track.song);
+      const MAX_OUTRO_SEC = 6;
+      band.playOutro(startSec, Math.min(endSec - startSec, MAX_OUTRO_SEC));
+    }
     resultBeat(ctx, r.stars >= 3);
     ctx.setHud({
       banner: `${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}  ${accuracy}%  ·  GRADE ${grade}  ·  MIX ${mixPct}%`,
       cues: [],
       nextStep: '',
+      instruments: '',   // MUSIC-SUITE P7: the chip row goes with the cue lane — the results screen has its own MIX %
     });
     // Results screen: the timing host reads outcome ('GREAT' => won),
     // stats.hits/stats.rounds for its headline, and score. The proof line
@@ -354,7 +442,34 @@ export const DanceMode: ModeDefinition = (() => {
     return saved === null ? 'Calibrate: /play/calibrate' : `Calibrate: /play/calibrate (now ${saved > 0 ? '+' : ''}${saved} ms)`;
   }
 
+  /**
+   * MUSIC-SUITE P7 (six-songs): the pick screen plays the focused song's own preview.mp3 (CONTRACT.md §3: 16 bars
+   * from its first hook, the full mix, mastered on its own). `stopPreview` is "blur" — called before every new
+   * focus (a browse) and on leaving the pick screen (a lock-in) or the room (dispose), so exactly one preview is
+   * ever playing. A plain HTMLAudioElement, not the Web Audio graph: it is a standalone clip with no judging to stay
+   * in sync with, and autoplay policy gates it on a user gesture the SAME way either way — the first call (from
+   * load(), before any gesture) fails silently and the very next real gesture (a browse, or A/B to lock in and
+   * re-focus after a wrapped-around cycle) retries and succeeds.
+   */
+  function stopPreview(): void {
+    if (previewAudio) { try { previewAudio.pause(); } catch { /* already gone */ } }
+    previewAudio = null;
+  }
+
+  function playPreview(t: DanceTrack): void {
+    stopPreview();
+    if (!t.song || typeof Audio === 'undefined') return;   // no song to preview, or a non-browser test/probe env
+    try {
+      const a = new Audio(songPreviewUrl(t.song.id));
+      a.volume = 0.55;
+      a.preload = 'auto';
+      void a.play().catch(() => { /* no gesture yet on this browse — the next one tries again */ });
+      previewAudio = a;
+    } catch { /* never let a broken preview take the pick screen down with it */ }
+  }
+
   function showPick(ctx: ModeContext): void {
+    playPreview(track);
     ctx.setHud({
       round: pickRound(),
       banner: pickBanner(track),
@@ -379,12 +494,21 @@ export const DanceMode: ModeDefinition = (() => {
   function beginCountIn(ctx: ModeContext): void {
     if (phase !== 'pick') return;
     phase = 'countin';
+    stopPreview();   // MUSIC-SUITE P7 (six-songs): "blur" — locking a track in leaves the pick screen
 
     perf = new DancePerformance(track.bpm);
     // A player's exported song carries its OWN steps — they are the song's drums, and re-rolling them from a
     // seed would discard the only thing the export exists to preserve. Shipped tracks generate as before.
     const mine = stepsFor(track);
-    perf.setRoutine(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }));
+    // MUSIC-SUITE P7 (six-songs): mine is non-null for every shipped track too now (stepsFor falls through to
+    // stepsForSong), so this generateRoutine call is unreachable for a shipped song — it only still runs for the
+    // rare pre-P7 export with steps but no real-audio payload.
+    const routine = mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed });
+    perf.setRoutine(routine);
+    // MUSIC-SUITE P7 (2026-09-29): which instruments THIS chart calls for, decided once, on the exact array perf
+    // just got — before any step fires, so the pick screen's follow-on chip row (instrumentsHud, at 'GO' below) is
+    // already right on the first frame of play rather than filling in as the player happens to hit each category.
+    inSongCats = songCategories(routine);
     perf.onStepFired = playStep;
     // pass ALL of onJudged's args through — a 3-arg arrow here silently
     // dropped the step (no band motion ever) and the delta (no EARLY/LATE)
@@ -392,7 +516,30 @@ export const DanceMode: ModeDefinition = (() => {
 
     SoundKit.unlock();   // the shared context: a no-op once running (the harness unlocks it on the first gesture)
     band?.dispose();
-    band = audioCtx && bus ? new StemBand(audioCtx, bus, track.bpm) : null;
+    isSongTrack = !!track.song;
+    // MUSIC-SUITE P7 ("your beat"): a track that IS your exported song, with a real-audio payload attached
+    // (DanceExport.YourSongExport — absent on an export saved before P7), dances to ITS OWN rendered stems
+    // (dance/yourSong.ts). MUSIC-SUITE P7 FIX (six-songs, 2026-09-29): gated on `!track.song`, not on `mine` —
+    // stepsFor(track) now ALSO answers every SHIPPED track (danceTracks.stepsForSong), so `mine` alone can no
+    // longer tell "an export" from "a shipped song" apart; a shipped track still never pays for the extra
+    // localStorage read, it just asks its own `song` field instead of asking `mine`.
+    const myExport = !track.song ? readExportedTrack() : null;
+    if (myExport?.song && audioCtx && bus) {
+      const ac = audioCtx;
+      const deps: YourSongRenderDeps = {
+        readTake: readDeviceAudio,
+        decode: (data) => ac.decodeAudioData(data),
+        sampleRate: ac.sampleRate,
+      };
+      band = new YourSongBand(audioCtx, bus, renderYourSongParts(myExport.song, deps));
+    } else if (track.song && audioCtx && bus) {
+      // MUSIC-SUITE P7 (six-songs): the shipped FEL song's own eight recorded stems, not a synthesized funk band.
+      const songBand = new SongStemBand(audioCtx, bus, track.song);
+      void songBand.load().catch(() => 0);   // a stem still decoding when start() fires joins later (update())
+      band = songBand;
+    } else {
+      band = audioCtx && bus ? new StemBand(audioCtx, bus, track.bpm) : null;
+    }
     band?.setClock((sec) => clock.audio(sec));
     bandJoined = new Set();
     kit?.retune(track.bpm, kitPattern(track.id));
@@ -483,6 +630,7 @@ export const DanceMode: ModeDefinition = (() => {
 
       ended = false; phase = 'pick'; pickSec = 0; stickLatch = false; currentClip = null; resultLatch = false;
       pickShownSec = 0; trig = 'up'; countArmed = false; countBackShown = false; latencySec = 0; latencyFrom = 'none';
+      inSongCats = new Set();   // MUSIC-SUITE P7: reset with everything else on load; beginCountIn fills it in per track
 
       // MUSIC-SUITE P2 (2026-09-25): ONE AUDIO CONTEXT. This built its own `new AudioContext()` as the song clock and
       // played the band and the kit into its destination: past SoundKit's master and limiter, 144–160 ms apart from the
@@ -611,14 +759,16 @@ export const DanceMode: ModeDefinition = (() => {
           // MUSIC-SUITE P2 FIX PASS: the judge starts NOW, on beat 0's future time (it fires nothing before it), so a tap
           // in beat 0's early window during the count-in can take it (onInput). It used to start at the flip below.
           perf.start(startAt);
-          kit?.countIn(clock.audio(now), 4);
+          kit?.countIn(clock.audio(now), 4);   // the 4-click pre-roll: every track gets it, song or not
           // MUSIC-SUITE P2: the grid starts now, so beat 0 is queued a lookahead ahead of when it sounds (it was handed
           // over on the first frame past it — up to a frame late, and KitPulse's past-time guard could drop it)
           band?.start(startAt);
-          kit?.start(startAt);
+          // MUSIC-SUITE P7 (six-songs): a shipped song's own bed+drums stems ARE the floor (CONTRACT.md §7) — the
+          // 808's own grid stays silent under it (isSongTrack), or its kick would double the song's own kick.
+          if (!isSongTrack) kit?.start(startAt);
         }
         band?.update(now);
-        kit?.update(now);
+        if (!isSongTrack) kit?.update(now);
         const remaining = startAt - now;
         if (remaining > 0) {
           ctx.setHud({ banner: `${Math.min(4, Math.ceil(remaining / bd))}` });
@@ -627,13 +777,20 @@ export const DanceMode: ModeDefinition = (() => {
         phase = 'playing';
         // (the judge was started when the count-in was armed, on the song clock's grid — starting it again here would
         // wipe a beat-0 step already taken early in the count-in)
-        ctx.setHud({ banner: 'GO', hint: 'Every move family is an instrument — hit on the beat and the band builds' });
+        // MUSIC-SUITE P7: the chip row shows from the first frame of play (every chip dim or FEL, nothing earned yet)
+        // rather than waiting for the player's first judged step to publish it at all.
+        // MUSIC-SUITE P7 ("your beat"): the hint names what is actually being earned — your song's own parts, not a
+        // generic "move family", when the room is playing YourSongBand.
+        const goHint = band instanceof YourSongBand
+          ? "Your song is the band — hit on the beat and each of your own parts joins it"
+          : 'Every move family is an instrument — hit on the beat and the band builds';
+        ctx.setHud({ banner: 'GO', hint: goHint, instruments: instrumentsHud() });
         setTimeout(() => ctx.setHud({ banner: '' }), 500);
       }
 
       perf.update(heard);
       band?.update(now);
-      kit?.update(now);
+      if (!isSongTrack) kit?.update(now);   // MUSIC-SUITE P7 (six-songs): the song's own bed+drums stems are the floor
 
       // the count back in after a pause (syncHold): the beats left to the pause point, then the banner clears once
       const hud: Parameters<ModeContext['setHud']>[0] = {};
@@ -668,6 +825,7 @@ export const DanceMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      stopPreview();   // MUSIC-SUITE P7 (six-songs): leaving the room is a blur too
       releaseSession?.(); releaseSession = null;   // MUSIC-SUITE P2 FIX PASS: the audio session goes back
       perf?.stop();
       crowd?.dispose(); crowd = null;
@@ -691,7 +849,8 @@ export const DanceMode: ModeDefinition = (() => {
 })();
 
 // HUD fields used: round, score, combo, banner (judgement + final grade),
-// beatPulse, energy/energyLabel (MIX), nextStep/nextStepIn, cues (the lane).
+// beatPulse, instruments (MUSIC-SUITE P7: the chip row — lib/babylon/dance/ui/InstrumentChips.ts encodes it, the
+// host decodes it; it replaced energy/energyLabel's one MIX bar), nextStep/nextStepIn, cues (the lane).
 //
 // The Creator Card `dance` payload (choreographyId + sequence) is already
 // defined in M28's CreatorCardTypes — `perf.setRoutine(card.sequence)` is all

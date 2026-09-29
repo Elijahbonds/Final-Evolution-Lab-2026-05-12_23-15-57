@@ -163,7 +163,8 @@ import {
 // MUSIC-SUITE P5 FIX PASS (2026-09-25): a render's Flip rows play the sounds handed to it (the working grid's for PUBLISH,
 // each bar's section's for RENDER SONG / STEMS) — never whatever song mode swapped into the engine last
 import { flipSoundMap, songBarSounds, songChops } from './studioEdit';
-import { danceSongAtTier, exportSongToDance, saveExportedTrack } from './DanceExport';
+import { danceSongAtTier, danceFloorOpenFor, DANCE_FLOOR_UPLOAD_LINE, exportSongToDance, saveExportedTrack, type ExportedTake } from './DanceExport';
+import { renderWalkOutLoopBlob, WALKOUT_LOOP_BARS } from './loopRender';   // MUSIC-SUITE P7: SET AS MY WALK-OUT's gap-free loop
 import { bakedBuffer, monoOf, sourceKey, type DecodedSource, type StepClock } from './FlipPad';
 // MUSIC-SUITE P5 (2026-09-25), phone-mpc: the phone's room lives at ROOM level, its pads play the room's bank on any tab
 // (the pad_N parse moved from Flip.padFromAction to phonePad.phoneCommand, which also reads PLAY / STOP / REC / BANK A–D)
@@ -232,6 +233,10 @@ import { TAKES_CHANNEL, anySolo, channelMix, gateOpen, scopeSolo, type ChannelMi
 import StepGrid, { type StepGridRow } from './ui/StepGrid';
 import NoteRow from './ui/NoteRow';
 import MixerPanel from './ui/MixerStrip';
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the same MUSIC/SFX/VOICE sliders the dance room's pause screen shows
+// (components/games/timing-babylon.tsx) — one component, lib/audio/ui/VolumeMixer.tsx, so the Academy and the
+// Cypher can never quietly drift onto two different ideas of "the volume settings".
+import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { KEY_HELP, cancelsKeyUp, keyTargetOf, studioKeyAction, type StudioKeyAction } from './ui/keys';
 import { PHONE_PAD_PX, gridLayout, moveCursor, pageOfStep, stepsOnPage, toastSpot } from './ui/gridMath';
 import { cellNoteLabel, nudgeNote, pickNote } from './ui/noteMath';
@@ -705,6 +710,34 @@ export default function StudioMode({
   }, []);
   /** A library failure, kept on screen until dismissed or the next library success (P3: a 2.2 s toast said it). */
   const [libraryLine, setLibraryLine] = useState<string | null>(null);
+  // MUSIC-SUITE P7 (2026-09-29): SET AS MY WALK-OUT. `lastPublishedId` lets the Studio's own PUBLISH row offer the
+  // button on the song you just published (the "current project" case), without waiting for a trip to the LIBRARY tab.
+  const [lastPublishedId, setLastPublishedId] = useState<string | null>(null);
+  const [walkOutBusy, setWalkOutBusy] = useState(false);
+  /**
+   * Render `rec`'s own arrangement as a fresh, tail-wrapped WALKOUT_LOOP_BARS-bar loop (loopRender.ts) and make it the
+   * walk-out. Independent of whatever kit/tempo THIS Studio session currently has loaded — `rec` carries its own (a
+   * library song set as the walk-out from the LIBRARY tab is very often not the one open in the grid right now) —
+   * loopRender.ts renders it standalone rather than through this room's own AudioEngine (AudioEngine.renderMixBuffer
+   * only ever renders at ITS OWN live bpm; see loopRender.ts's header for why that rules it out here).
+   */
+  const setAsWalkOut = async (rec: TrackRecord): Promise<void> => {
+    if (walkOutBusy) return;
+    setWalkOutBusy(true);
+    try {
+      const loop = await renderWalkOutLoopBlob(
+        { tracks: rec.sequencer.tracks, kit: rec.kit, bpm: rec.bpm, swing: rec.swing, steps: rec.sequencer.steps, bars: WALKOUT_LOOP_BARS, polished: rec.polished },
+        { sampleRate: engineRef.current?.renderRate },
+      );
+      const res = await StudioLibrary.setWalkOut(rec.id, { bars: WALKOUT_LOOP_BARS, loopAudio: loop });
+      setLibraryLine(res.line);
+      if (res.ok) { say(res.line); setLibraryRev((r) => r + 1); }
+    } catch (e) {
+      setLibraryLine(`Could not set the walk-out (${e instanceof Error ? e.name : 'error'}) — try again`);
+    } finally {
+      setWalkOutBusy(false);
+    }
+  };
   /** Where the transient line floats (ui/gridMath toastSpot): clear of the grid and the transport. */
   const [toastAt, setToastAt] = useState<'top' | 'bottom'>('bottom');
   const gridRef = useRef<HTMLDivElement>(null);
@@ -1429,7 +1462,16 @@ export default function StudioMode({
     danceExport: caps.danceExport, arrangement: caps.arrangement, chain: project.chain, sections: project.sections, grid: tracks,
     heard: (t) => shownIds.has(t.sampleId) && gateOpen(deskHeard, t.sampleId),
   }), [caps.danceExport, caps.arrangement, project.chain, project.sections, tracks, shownIds, deskHeard]);
-  const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong, project.key]);
+  // MUSIC-SUITE P7 ("your beat" item 1): the booth's takes, by REFERENCE (StudioLibrary.readDeviceAudio resolves the
+  // bytes when the Cypher renders) — never copied into the export. Which ones actually sound (best-of-N, loop bounds,
+  // trims) is decided later, the same way SongPanel already decides it (dance/yourSong.ts: takeCapture.pickedTakeIds).
+  const danceTakes = useMemo<ExportedTake[]>(() => project.takes.filter((t) => !t.muted).map((t) => ({
+    id: t.id, atBar: t.atBar, bars: t.bars, loopBars: t.loopBars, trimStart: t.trimStart, trimEnd: t.trimEnd,
+    gain: t.gain, muted: t.muted, pickedAt: t.pickedAt, audioKey: t.audio.key,
+  })), [project.takes]);
+  // MUSIC-SUITE P7 ("your beat"): + swing, kit and the takes reference — the export now carries the song's own
+  // audio, so a swing/kit/take change (not only a grid/chain/title/key change) makes the last SEND stale too.
+  const danceSig = JSON.stringify([project.id, project.title, bpm, danceSong, project.key, swing, kit, danceTakes]);
   // MUSIC-SUITE P5 (2026-09-25), owner decision #15: a song that plays a YOUR FILE upload stays on this device; the line
   // says why. Before, the P3 mark (ProjectFlipSource.upload) was carried everywhere and read nowhere (uploadPrivacy.ts).
   // MUSIC-SUITE P5 FIX PASS (2026-09-25): "on this device" = never shared off it. P5 closed PUBLISH and SEND TO THE DANCE
@@ -1437,14 +1479,24 @@ export default function StudioMode({
   // server calls are unimplemented seams; the dance export is an audio-free chart), so decision #7 went for nothing. The
   // doors are uploadPrivacy.UPLOAD_DOORS (one switch back to the stricter reading); the rule counts what the SONG plays.
   const privacy = useMemo(() => projectUploadPrivacy(project), [project]);
-  const danceOpen = uploadDoorOpen('danceFloor', privacy);
+  // MUSIC-SUITE P7 ("your beat" contract item 4): the export now renders the song's OWN audio (per-part stems,
+  // dance/yourSong.ts) instead of P3/P5's audio-free chart, so a song that plays an upload can no longer go to the
+  // dance floor — DanceExport.danceFloorOpenFor, not uploadDoorOpen('danceFloor', …). UPLOAD_DOORS.danceFloor is left
+  // `true` (it is still the right answer for a hypothetically audio-free export); library and walk-out are unaffected.
+  const danceOpen = danceFloorOpenFor(privacy);
   const libraryOpen = uploadDoorOpen('library', privacy);
   const sendToDance = (): void => {
     if (!danceSong) return;
-    if (!danceOpen) { setLibraryLine(privacy.line); return; }
+    if (!danceOpen) { setLibraryLine(DANCE_FLOOR_UPLOAD_LINE); return; }
     // MUSIC-SUITE P4: the song's key rides on the dance floor's card ('Your song · Am · 64 hits')
     // MUSIC-SUITE P4 FIX PASS: the key in words ('A minor') — the Cypher's chip upper-cases the blurb ('Am' read 'AM')
-    const out = exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) });
+    // MUSIC-SUITE P7 ("your beat" item 1): + swing, kit and the takes reference — everything dance/yourSong.ts needs
+    // to render the song's own audio (songKey is the raw key, for a FEL-filled row's note; `key` above stays the
+    // display string the card already used).
+    const out = exportSongToDance({
+      id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key),
+      swing, kit, songKey: project.key, takes: danceTakes,
+    });
     if (!out) { say('nothing to dance to yet — put a hit in the grid first'); return; }
     // MUSIC-SUITE P3 FIX PASS: the write can fail (a full localStorage, private mode) — then it was NOT sent, and says so
     if (!saveExportedTrack(out)) { say("Not sent — this browser wouldn't keep the dance export (storage full or private mode). Free some space and send it again."); return; }
@@ -1805,6 +1857,7 @@ export default function StudioMode({
       // (UPLOAD_DOORS.offDevice) — a song that plays an upload never goes through it until FEL can review uploads online
       if (UPLOAD_DOORS.offDevice || !tracksHaveUpload(res.rec.sequencer.tracks)) onPublish?.(res.rec);
       setLibraryRev((r) => r + 1);
+      setLastPublishedId(res.rec.id);   // MUSIC-SUITE P7: the PUBLISH row's own SET AS MY WALK-OUT now has something to act on
       const left = (pub.silent.length ? ` · ${pub.silent.length} Flip row${pub.silent.length === 1 ? '' : 's'} with no sound left out` : '')
         + (deskCut ? ` · as you hear it: ${deskCut} row${deskCut === 1 ? '' : 's'} muted or soloed out on the mixer left out` : '');
       say(res.line ? `"${res.rec.title}" published — ${res.line}${left}` : `"${res.rec.title}" published to the Academy library${left}`);
@@ -2729,6 +2782,16 @@ export default function StudioMode({
             </button>
           </div>
 
+          {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: "reachable from... the Academy settings" — the same on-device
+              MUSIC/SFX/VOICE levels the dance room's pause screen offers (lib/audio/ui/VolumeMixer.tsx), so a player
+              never has to leave the Academy to set a balance that then follows them into the Cypher. A device
+              preference, not a song edit: shown at every tier, in both BUILD and PERFORM (unlike the MixerPanel just
+              below, this never touches the project or its mixdown). */}
+          <div style={{ ...S.card, flexDirection: 'column', alignItems: 'stretch' }}>
+            <span style={{ fontSize: 12, opacity: 0.8, fontWeight: 700 }}>SOUND — this device</span>
+            <VolumeMixer />
+          </div>
+
           {confirmClear && (
             <div data-qa="clear-confirm" role="group" aria-label="Clear the grid?" style={{ ...S.card, border: '1px solid #ffb4a2' }}>
               <span style={{ fontWeight: 700 }}>Clear all {gridHitCount(tracks)} hits from the grid?</span>
@@ -2821,6 +2884,19 @@ export default function StudioMode({
             <button style={{ ...S.btn, ...(!libraryOpen ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }} disabled={saving || !libraryOpen} onClick={() => void publishTrack()}>
               {saving ? 'RENDERING…' : 'PUBLISH TO LIBRARY'}
             </button>
+            {/* MUSIC-SUITE P7 (2026-09-29): the current project's own walk-out, right where you just published it — no
+                trip to the LIBRARY tab needed. Only appears once there is a published id this session to act on (walkOut
+                needs an existing library record — WalkOut.ts's own rule, resolveWalkOut). */}
+            {lastPublishedId && (() => {
+              const rec = StudioLibrary.get(lastPublishedId);
+              if (!rec) return null;
+              return (
+                <button data-qa="set-walkout-current" style={{ ...S.btnAlt, ...(rec.isWalkOut ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}) }}
+                  disabled={walkOutBusy} onClick={() => void setAsWalkOut(rec)}>
+                  {walkOutBusy ? 'RENDERING WALK-OUT…' : rec.isWalkOut ? '★ YOUR WALK-OUT' : 'SET AS MY WALK-OUT'}
+                </button>
+              );
+            })()}
           </div>
           {/* MUSIC-SUITE P5 (decision #15): a song with an upload stays on this device — the room says why, in one line */}
           {privacy.private && <div data-qa="upload-private" role="note" style={{ fontSize: 12, color: '#ffd75e', marginTop: 6 }}>{privacy.line}</div>}
@@ -2909,6 +2985,17 @@ export default function StudioMode({
                   included); a legacy 'me' row is the device owner's until the per-player library split lands. */}
               {(t.authorId === me || t.authorId === 'me') && (
                 <LibraryDelete track={t} btnStyle={S.btnAlt} onDone={(line, ok) => { setLibraryRev((r) => r + 1); if (ok) { say(line); setLibraryLine(null); } else setLibraryLine(line); }} />
+              )}
+              {/* MUSIC-SUITE P7 (2026-09-29): SET AS MY WALK-OUT — the binding WalkOut.ts named and nothing ever produced a
+                  button for (understand-wf_3a55346f-032.json:403). On YOUR songs only, the same gate the delete button
+                  uses just above — a walk-out chosen on another author's song is not a thing this room's own UI offers,
+                  and a device-private (uploaded) song is refused with a line by StudioLibrary.setWalkOut itself rather than
+                  hidden here, the same way a full library refuses PUBLISH with a line instead of disabling the button. */}
+              {(t.authorId === me || t.authorId === 'me') && (
+                <button data-qa="set-walkout" style={{ ...S.btnAlt, ...(t.isWalkOut ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}) }}
+                  disabled={walkOutBusy} onClick={() => void setAsWalkOut(t)}>
+                  {walkOutBusy ? 'RENDERING WALK-OUT…' : t.isWalkOut ? '★ YOUR WALK-OUT' : 'SET AS MY WALK-OUT'}
+                </button>
               )}
               {(t.streamingLinks ?? []).map((l) => (
                 <button key={l.url}
