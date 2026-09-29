@@ -59,22 +59,18 @@
         },
         "frontLeg": "right",
         "maxDepth01": 0.86,
-        "faultFrames": {
-          "kneeIn": 28
-        },
-        "firstFaultFrame": {
-          "kneeIn": 53
-        },
-        "maxKneeIn": 0.41,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -172,22 +168,18 @@
         },
         "frontLeg": "right",
         "maxDepth01": 0.86,
-        "faultFrames": {
-          "kneeIn": 28
-        },
-        "firstFaultFrame": {
-          "kneeIn": 53
-        },
-        "maxKneeIn": 0.41,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -286,21 +278,21 @@
         "frontLeg": "right",
         "maxDepth01": 0.85,
         "faultFrames": {
-          "kneeIn": 52
+          "kneeIn": 42
         },
         "firstFaultFrame": {
-          "kneeIn": 41
+          "kneeIn": 46
         },
-        "maxKneeIn": 1.25,
+        "maxKneeIn": 0.84,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -399,21 +391,21 @@
         "frontLeg": "right",
         "maxDepth01": 0.85,
         "faultFrames": {
-          "kneeIn": 52
+          "kneeIn": 42
         },
         "firstFaultFrame": {
-          "kneeIn": 41
+          "kneeIn": 46
         },
-        "maxKneeIn": 1.25,
+        "maxKneeIn": 0.84,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -496,22 +488,18 @@
         },
         "frontLeg": "right",
         "maxDepth01": 0.86,
-        "faultFrames": {
-          "kneeIn": 28
-        },
-        "firstFaultFrame": {
-          "kneeIn": 53
-        },
-        "maxKneeIn": 0.41,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -596,16 +584,16 @@
         "maxDepth01": 0.87,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 0.2,
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -690,16 +678,16 @@
         "maxDepth01": 0.87,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 0.2,
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
       "framing": {
         "front": {
-          "ok": 80,
+          "ok": 112,
           "frames": 120,
           "worst": {
-            "tooFar": 40
+            "tooFar": 8
           },
           "say": "Good shot — start when you are ready.",
           "bodyFill": 0.59
@@ -776,13 +764,9 @@
         },
         "frontLeg": "left",
         "maxDepth01": 0.82,
-        "faultFrames": {
-          "kneeIn": 34
-        },
-        "firstFaultFrame": {
-          "kneeIn": 50
-        },
-        "maxKneeIn": 0.37,
+        "faultFrames": {},
+        "firstFaultFrame": {},
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
@@ -882,12 +866,12 @@
         "frontLeg": "right",
         "maxDepth01": 0.8,
         "faultFrames": {
-          "kneeIn": 59
+          "kneeIn": 42
         },
         "firstFaultFrame": {
-          "kneeIn": 38
+          "kneeIn": 46
         },
-        "maxKneeIn": 1.21,
+        "maxKneeIn": 0.77,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
@@ -958,7 +942,7 @@
         "maxDepth01": 0.11,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 20,
+        "maxKneeIn": 35.63,
         "maxHipDrop": 4.4,
         "maxTorsoDrift": 16.03
       },
@@ -1034,15 +1018,13 @@
         "maxDepth01": 0.64,
         "faultFrames": {
           "torsoDrift": 45,
-          "kneeIn": 27,
           "hipDrop": 27
         },
         "firstFaultFrame": {
           "torsoDrift": 42,
-          "kneeIn": 51,
           "hipDrop": 51
         },
-        "maxKneeIn": 95.92,
+        "maxKneeIn": 0,
         "maxHipDrop": 12.54,
         "maxTorsoDrift": 1.36
       },
@@ -1113,7 +1095,7 @@
         "maxDepth01": 0,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 0.05,
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
@@ -1180,7 +1162,7 @@
         "maxDepth01": 0,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 0.07,
+        "maxKneeIn": 0.01,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0
       },
@@ -1248,7 +1230,7 @@
         "maxDepth01": 0,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 9,
+        "maxKneeIn": 0,
         "maxHipDrop": 3.4,
         "maxTorsoDrift": 0
       },
@@ -1453,7 +1435,7 @@
         "maxDepth01": 0,
         "faultFrames": {},
         "firstFaultFrame": {},
-        "maxKneeIn": 0.34,
+        "maxKneeIn": 0,
         "maxHipDrop": 0,
         "maxTorsoDrift": 0.04
       },

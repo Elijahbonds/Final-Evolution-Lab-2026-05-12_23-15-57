@@ -35,6 +35,14 @@ const NOT_IMPORTED: Record<string, string> = {
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
+  // MIRROR-COACH P4 review (2026-09-29): patterns.ts's own PHASE-4 PATTERN CONTRACT calls this file's
+  // isMinorForMirror() "a single... stub... that phase 5 replaces" (owner decision #6) — it is a deliberately
+  // future-facing wrapper over screenCorrectives.ts's youthGateFor, written for whichever lane wires a pattern's
+  // youthSafe:false cues away from a minor. No pattern in MIRROR_PATTERNS is youthSafe:false yet (this review's own
+  // pass removed the two bracing cues that would have needed it), so there is genuinely nothing live to call it from
+  // today — the review that found this file missing entirely is the same one that wrote it and is naming it here
+  // rather than leaving a second silent gap behind it.
+  'lib/mirror/youth.ts': 'STAGED for phase 5 (owner decision #6) — isMinorForMirror() has no caller until a pattern goes youthSafe:false and something renders its cues live',
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */
@@ -73,6 +81,9 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
   'lib/locomotion/moves/MoveGraph.ts',
+  // MIRROR-COACH P4 (2026-09-25/29): the hinge-and-setup lane's own fixture builder for lib/mirror/hingeAudit.ts /
+  // setupLine.ts's tests, landed the same day as this line, not this lane's (registry-and-lunge) file to wire up.
+  'lib/mirror/fixtures/hingeSetupBuild.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',
