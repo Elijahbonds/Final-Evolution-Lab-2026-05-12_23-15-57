@@ -12,6 +12,9 @@ import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
 
+// the data file, as the other probes load app modules under tsx (a default-export fallback)
+const LM = await import('../../app/elijah/links.ts');
+const { ELIJAH_LINKS } = ((LM as unknown as { default?: typeof LM }).default ?? LM);
 const BASE = process.env.LINKS_BASE ?? 'http://127.0.0.1:3181';
 const ORIGIN = new URL(BASE).origin;
 const OUT = process.env.LINKS_SHOTS ?? join(process.env.HOME ?? '.', 'Claude/outbox/LINKS-PAGE-shots');
@@ -48,7 +51,7 @@ try {
     };
     if (tag === 'phone') {
       // the two internal buttons open signed out
-      for (const label of ['Free Jump Screen', 'Play the Game, Free']) {
+      for (const label of ELIJAH_LINKS.filter((b) => !b.external).map((b) => b.label)) {
         await page.goto(`${BASE}/elijah`);
         await page.waitForSelector('[data-links-page]');
         await page.click(`[data-link="${label}"]`);
@@ -64,4 +67,4 @@ try {
   await browser.close();
 }
 writeFileSync(join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-console.log(JSON.stringify({ get: report.get, hostCount: report.hostCount, phone: { ...report.phone, requests: report.phone.requests.length }, desktop: { title: report.desktop.title, requests: report.desktop.requests.length, api: report.desktop.api }, open: [report['open:Free Jump Screen'], report['open:Play the Game, Free']] }, null, 1));
+console.log(JSON.stringify({ get: report.get, hostCount: report.hostCount, phone: { ...report.phone, requests: report.phone.requests.length }, desktop: { title: report.desktop.title, requests: report.desktop.requests.length, api: report.desktop.api }, open: Object.fromEntries(Object.entries(report).filter(([k]) => k.startsWith('open:'))) }, null, 1));
