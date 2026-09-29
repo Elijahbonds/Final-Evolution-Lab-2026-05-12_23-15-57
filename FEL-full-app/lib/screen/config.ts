@@ -23,10 +23,12 @@ export const DEFAULT_FREE_GAME_ROUTE = '/try';
  *     is walled as a whole by app/play/page.tsx, which covers Brain Brawl (app/play/brain-brawl/page.tsx);
  *   · sign-in and sign-up themselves, accounts, the API, and the dev pages (a 404 outside `next dev`).
  * A route is refused even where one page under it might be open: a free-game button is not the place to guess.
+ * /consent/guardian is the signed-in minor's own "ask a parent or guardian" page (MIRROR-COACH P5); the guardian's
+ * link under it (/consent/guardian/<token>) is covered too, and is never a free game.
  */
 export const SIGNED_IN_ONLY_ROUTES: readonly string[] = [
   '/login', '/signup', '/account', '/api', '/dev',
-  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', '/creator', '/education', '/guidance', '/kitchens',
+  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', '/consent/guardian', '/creator', '/education', '/guidance', '/kitchens',
   '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/store',
   '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/workout',
 ];
