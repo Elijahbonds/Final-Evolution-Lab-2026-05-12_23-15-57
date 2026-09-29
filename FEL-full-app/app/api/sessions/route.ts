@@ -16,7 +16,7 @@ import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POW
 import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
-  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt,
+  ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
 } from '@/lib/session-payout';
 import { canonicalModeKey } from '@/lib/game-data';
 import { isExpired } from '@/lib/arena-reclaim';
@@ -338,7 +338,9 @@ export async function POST(req: Request) {
       // most what a flawless finite game does (ENDLESS_SESSION_CEILING); every game with an end of its own is paid as before.
       // (P2 FIX PASS: prorated by the session's length, so back-to-back 5 s sets no longer pay ~12× the ceiling's minute.)
       const endless = isEndlessSession(rulesMode, stats, duration, { arenaVerified });
-      const payout = sessionPayout({ score: payScore, won, endless, durationSec: duration });
+      // (FOLLOW-UP 2026-09-29: skateboarding and surfing are paid at most what 4 × their best run seen would pay —
+      // session-payout finitePayCapScore; the score itself is recorded as sent)
+      const payout = sessionPayout({ score: payScore, won, endless, durationSec: duration, payCapScore: finitePayCapScore(rulesMode) });
       // Distribute PRQ delta to mode-relevant attributes
       const attrData: Record<string, any> = {};
       for (const a of attrs) {
@@ -533,7 +535,8 @@ export async function POST(req: Request) {
     // PASS: an Arena plan that lost the pay-once claim was paid as free play)
     {
       const { payout, xp, shards } = committed.plan;
-      if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
+      if (payout.capped && finitePayCapScore(rulesMode) !== null) console.info('session payout capped (finite pay cap):', mode, `score ${paidScore} → ${xp} XP / ${shards} shards (paid as at most ${finitePayCapScore(rulesMode)})`);
+      else if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
     }
 
     // after the commit: idempotent tier rewards, announcements, telemetry (best-effort — the run is paid either way)
