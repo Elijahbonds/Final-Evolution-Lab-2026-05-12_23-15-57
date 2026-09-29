@@ -6,6 +6,11 @@ started blind to it — including the ones that changed tuned physics and propos
 
 The app is `FEL-full-app/` (Next.js 14 App Router + Babylon.js). Run commands from there.
 
+**Parallel lanes (owner, 2026-09-28).** Every lane works on its own branch in its own worktree, and each green phase
+reaches `lane/finish-release` through a PR that the owner merges. Nobody commits in the shared checkout
+`mode-lanes/wt-finish-release`. The lane rules, the registry of who owns which files and ports, and the deploy and
+capacity limits are in **`FEL-full-app/docs/LANES.md`**. Read it before you start or land lane work.
+
 ---
 
 ## When to ask, and when to just go (owner, 2026-09-28)

@@ -254,6 +254,10 @@ export interface FlipPadProps {
   stepClock?: () => StepClock | null;
   /** MUSIC-SUITE P5 (flip-content): who is playing — the FEL-theme lesson is remembered per player. */
   playerId?: string | null;
+  /** MUSIC-SUITE P8: fired once, the moment the lesson card shows AUTOMATICALLY on this player's first-ever FLIP
+   *  visit (never on a later manual reopen via THEME LESSON). StudioMode.tsx voices Okta's own first-time line off
+   *  it (academyFirst('flipLesson', …), its own separate remembered-once flag — independent of lessonDismissed). */
+  onLesson?: () => void;
 }
 
 declare global {
@@ -284,11 +288,14 @@ export function readQuantize(): boolean { try { return localStorage.getItem(QUAN
 function writeQuantize(on: boolean): void { try { localStorage.setItem(QUANTIZE_KEY, on ? '1' : '0'); } catch { /* storage blocked */ } }
 const groupLabel = (g: string): string => g.replace(/-/g, ' ').toUpperCase();
 
-export default function FlipPad({ engine, playing, playhead, steps, flip: flipAll, onFlipChange, loadSource, saveAudio, onAssign, onRecordHit, say, triggerRef, onRecording, projectId, rowSourceKeys, flipRows = NO_ROWS, trackIds = NO_IDS, stepClock, playerId = null, bank: bankHeld, onBank, recArm: recArmHeld, onRecArm }: FlipPadProps) {
+export default function FlipPad({ engine, playing, playhead, steps, flip: flipAll, onFlipChange, loadSource, saveAudio, onAssign, onRecordHit, say, triggerRef, onRecording, projectId, rowSourceKeys, flipRows = NO_ROWS, trackIds = NO_IDS, stepClock, playerId = null, bank: bankHeld, onBank, recArm: recArmHeld, onRecArm, onLesson }: FlipPadProps) {
   // MUSIC-SUITE P5 (flip-content): the FEL pack's index (the lesson reads it) and the lesson card, open on this player's
   // first visit; what the shelf offers (FEL's pack + owner-signed public-domain entries)
   const { pack, error: packError } = useFlipPack();
   const [lessonOpen, setLessonOpen] = useState(() => !lessonDismissed(lessonStore(), playerId));
+  // MUSIC-SUITE P8: onLesson fires once, only for the AUTOMATIC first-visit showing (the initial state above) — a
+  // later THEME LESSON reopen (setLessonOpen(true) at the bottom of this component) never fires it again.
+  useEffect(() => { if (lessonOpen) onLesson?.(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const lessonAutoLoadedRef = useRef(false);
   const offered = useMemo(() => shelfSources(), []);
   const [lit, setLit] = useState<number | null>(null);

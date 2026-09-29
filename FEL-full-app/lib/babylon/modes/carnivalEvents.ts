@@ -31,6 +31,8 @@ import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 import { dressBall } from '../visual/meshyProps';   // the hoops modes' Meshy ball (Slam Rush)
 import { attachBallToHand } from '../anim/ballRig';
+import { rightHandDunks } from '../anim/dunkHand';                           // HOOPS MOTION phase 3: right-handed on screen (Slam Rush)
+import { rightHandHoops, rightHandBall, hoopsHand } from '../anim/hoopsHand';
 
 export interface CarnivalEvent {
   id: string;
@@ -85,13 +87,17 @@ export function slamRush(): CarnivalEvent {
       VenueKit.buildCourt(ctx.scene, 'venice');
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
       neverBindPose(player.animator, SPORT_CLIP.idle); installSafePlay(player.animator, 'carnival-slam');
+      // HOOPS MOTION phase 3: the dunker is right-handed on screen like every hoops body — the dunk and hoops families mirrored onto
+      // the other side of the body, the ball in the hand drawn on his right (the hotfix put it in rig RightHand: the left on screen)
+      rightHandDunks(player.animator, player.skeleton); rightHandHoops(player.animator, player.skeleton);
       body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.idle);
       ctx.groundLock?.track(player.root, player.skeleton);
       ball = MeshBuilder.CreateSphere('carn_ball', { diameter: 0.24 }, ctx.scene);
       // HOTFIX (2026-09-24), owner: no untextured models. The ball was a bare grey sphere left at centre court, half through
       // the floor. It is the hoops modes' ball now: the Meshy leather rides the sphere, and the sphere rides the dunker's hand.
       void dressBall(ball, 'basketball');
-      attachBallToHand(ball, player.skeleton, 'RightHand');
+      rightHandBall(ball);
+      attachBallToHand(ball, player.skeleton, hoopsHand(player));
       makes = 0; charging = false; charge = 0; cooldown = 0; gathered = false;
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = rim;

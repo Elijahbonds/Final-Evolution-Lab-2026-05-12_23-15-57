@@ -77,3 +77,18 @@ describe('DribbleController change of pace', () => {
     expect(r.gear).toBe('sprint');
   });
 });
+
+describe('DribbleController step-back (HOOPS MOTION phase 3)', () => {
+  it('hops AWAY from the rim with the chest kept where it was — the body used to turn to face its travel in one frame', () => {
+    const d = new DribbleController();
+    d.setFacing(Math.PI);                                        // facing the rim (−z)
+    for (let i = 0; i < 30; i++) d.update(DT, 0, 0.4, false);   // a walk at the rim
+    const before = d.update(DT, 0, 0, false).facingRad;
+    d.stepBack(0, -1, false);                                    // the rim is toward −z
+    const after = d.update(DT, 0, 0, false);
+    let turn = Math.abs(after.facingRad - before); if (turn > Math.PI) turn = 2 * Math.PI - turn;
+    expect(turn).toBeLessThan(0.05);
+    for (let i = 0; i < 6; i++) d.update(DT, 0, 0, false);
+    expect(d.vel.z).toBeGreaterThan(0.5);                        // the hop carries him back, away from the rim
+  });
+});

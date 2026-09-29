@@ -101,51 +101,15 @@ export function limitElbowSwing(arm: ArmChain, dt: number, stamp: number, rateDe
   swingMemo.set(arm.shoulder, { side, stamp });
 }
 
-// DUNK MOTION phase 8 (2026-09-23; owner: "fix the off arm on all the dunks" · "fix the orientation of the joints"). THE UPPER ARM
-// ROLLED 90° ABOUT ITS OWN AXIS IN ONE FRAME with the elbow and the hand still (the off arm reaching across the body to the ball:
-// 5600°/s). limitElbowSwing cannot see it — that is a turn about the shoulder→hand line, which moves the elbow; this is the bone
-// spinning on itself while the forearm counter-turns so the hand stays, which reads as the skin twisting round the arm. The solver
-// aims the arm with a from-to rotation, so its roll is whatever that minimal arc leaves, and the arc's axis flips when the pose it
-// starts from points far from the target. After everything has written the arm: the upper arm's roll about its own bone is limited
-// to `rateDeg`/s from last drawn frame, and the forearm is counter-turned by exactly the correction, so the elbow, the forearm and
-// the hand are where they were drawn. Pure local-space math: qU' = qU ∘ R(axis, −excess), qF' = R(axis, excess) ∘ qF, where axis
-// is where the forearm sits on the upper arm (its local position).
-// MEASURED, NOT WIRED (p8f): limiting the roll alone moves the discontinuity to the ELBOW — the forearm takes up the difference
-// locally and the skin twists there instead (off-forearm spikes 5000–8400°/s). The fix is a hinge: the elbow bends about its own
-// axis only, and the roll lives in the upper arm and the forearm's pronation. This stays as that work's building block.
-type TwistMemo = { q: Quaternion; stamp: number };
-const twistMemo = new WeakMap<TransformNode, TwistMemo>();
+// THE ROLL OF A ROTATION ABOUT AN AXIS (the twist of a swing–twist decomposition) — the hinged arm below reads the forearm's pronation
+// with it. (HOOPS MOTION phase 3c: limitArmTwist, the roll limiter that stood here "measured, not wired" since DUNK MOTION p8f, is gone —
+// limiting the roll alone moved the discontinuity to the elbow; the hinge replaced it and is the last writer of every hoops arm.)
 /** The roll (radians) of `delta` about unit `axis`: the twist of a swing–twist decomposition. */
 export function twistAbout(delta: Quaternion, axis: Vector3): number {
   let w = delta.w, v = delta.x * axis.x + delta.y * axis.y + delta.z * axis.z;
   if (w < 0) { w = -w; v = -v; }
   return 2 * Math.atan2(v, w);
 }
-/** Call after the arm's last writer this frame. `stamp` counts drawn frames (a gap starts free). Returns the roll removed (rad). */
-export function limitArmTwist(arm: ArmChain, dt: number, stamp: number, rateDeg: number): number {
-  const u = arm.shoulder, f = arm.elbow;
-  const qU = u.rotationQuaternion, qF = f.rotationQuaternion;
-  if (!qU || !qF) return 0;
-  const memo = twistMemo.get(u);
-  let removed = 0;
-  if (memo && memo.stamp === stamp - 1 && dt > 0 && f.position.lengthSquared() > 1e-10) {
-    const axis = f.position.clone().normalize();                       // the upper arm's own axis, in its local frame
-    // this frame's local rotation against last frame's, expressed about the bone's own axis: d = qPrev⁻¹ ∘ qU (local delta)
-    const d = Quaternion.Inverse(memo.q).multiply(qU);
-    const roll = twistAbout(d, axis), maxRad = (rateDeg * Math.PI / 180) * dt;
-    if (Math.abs(roll) > maxRad) {
-      removed = roll - Math.sign(roll) * maxRad;
-      const fix = Quaternion.RotationAxis(axis, -removed);
-      qU.copyFrom(qU.multiply(fix));                                     // the bone turned back on itself: the elbow does not move
-      qF.copyFrom(Quaternion.Inverse(fix).multiply(qF));                // the forearm keeps its world pose: the hand does not move
-      u.computeWorldMatrix(true); f.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
-    }
-  }
-  twistMemo.set(u, { q: qU.clone(), stamp });
-  return removed;
-}
-/** Forget an arm's last drawn roll (a teleport, a respawn). */
-export function forgetArmTwist(arm: ArmChain): void { twistMemo.delete(arm.shoulder); }
 
 // DUNK MOTION phase 9 (2026-09-23; owner: "fix the orientation of the joints and proper biomechanics … analyze it"). WHERE AN ELBOW
 // MAY POINT. An elbow bends toward the FRONT of the upper arm, so its point — the bulge the pole aims — is the upper arm's BACK (the
@@ -174,6 +138,35 @@ export function anatomicalElbowPole(pole: Vector3, shoulder: Vector3, hand: Vect
   if (Vector3.Dot(pp, dir) >= minDot) return pole.clone();
   for (let t = 0.05; t < 40; t *= 1.25) { const c = pp.add(dir.scale(t)).normalize(); if (Vector3.Dot(c, dir) >= minDot + 0.05) return c; }
   return dir.clone();
+}
+
+// HOOPS MOTION phase 3c: THE BODY'S FRONT AND AN ARM'S OWN OUTSIDE, READ OFF THE BODY. The rim reach picked its elbow side by the arm's
+// bone NAME (`side === 'Left' ? −0.7 : 0.7`, turned by the root): on the runtime rig the bone named RightArm draws on the body's LEFT
+// (groupMirror), so that pole pointed the elbow across the chest (S26). Its front was the root's +z, which is only the body's front for a
+// root that is not reflected. Both are read off the skeleton instead.
+/** The body's front in world, level: heel → toe of both feet (the toes settle it whatever the rig's naming or the root's handedness); the
+ *  root's +z when the rig has no toes. */
+export function bodyFrontWorld(skeleton: Skeleton, root: TransformNode): Vector3 {
+  const acc = Vector3.Zero(); let n = 0;
+  for (const sd of ['Left', 'Right']) {
+    const f = findBone(skeleton, `${sd}Foot`)?.getTransformNode(), t = findBone(skeleton, `${sd}ToeBase`)?.getTransformNode();
+    if (!f || !t) continue;
+    f.computeWorldMatrix(true); t.computeWorldMatrix(true);
+    const d = t.getAbsolutePosition().subtract(f.getAbsolutePosition()); d.y = 0;
+    if (d.lengthSquared() > 1e-8) { acc.addInPlace(d.normalize()); n++; }
+  }
+  if (n && acc.lengthSquared() > 1e-8) return acc.normalize();
+  root.computeWorldMatrix(true);
+  const z = Vector3.TransformNormal(new Vector3(0, 0, 1), root.getWorldMatrix()); z.y = 0;
+  return z.lengthSquared() > 1e-8 ? z.normalize() : new Vector3(0, 0, 1);
+}
+/** The elbow pole a reach starts from: out to THIS arm's own side (away from the other shoulder, however the bones are named), a touch
+ *  down and back — the dunk reach's [±0.7, −0.2, −0.5] in body terms — then held to the arm's anatomy for the target (anatomicalElbowPole). */
+export function reachElbowPole(shoulder: Vector3, otherShoulder: Vector3, target: Vector3, front: Vector3, up: Vector3 = Vector3.Up()): Vector3 {
+  const out = shoulder.subtract(otherShoulder); out.subtractInPlace(up.scale(Vector3.Dot(out, up)));
+  if (out.lengthSquared() < 1e-8) out.copyFrom(Vector3.Cross(up, front)); out.normalize();
+  const pole = out.scale(0.7).addInPlace(up.scale(-0.2)).addInPlace(front.scale(-0.5)).normalize();
+  return anatomicalElbowPole(pole, shoulder, target, up, front);
 }
 
 // DUNK MOTION phase 9 (2026-09-23; owner: "fix the orientation of the joints" · "fix the off arm on all the dunks"). THE HINGED ARM.

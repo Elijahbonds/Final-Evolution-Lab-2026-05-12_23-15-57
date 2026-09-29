@@ -1,0 +1,517 @@
+{
+ "schema": "fel-musicsuite-songs-provenance/1",
+ "date": "2026-09-29",
+ "licence": "FEL original, generated",
+ "statement": "All audio in public/audio/songs/ is 100% original and generated from code by FEL: numpy oscillators, FM synthesis, filtered seeded noise and synthetic reverb impulse responses (fel_synth.py, library 1.0.0), driven by one composition script per song (scripts/music/songs/song_<id>.py). No samples, no loops, no recordings, no third-party audio, and no vocals other than the wordless formant synth (\"ooh\"/\"aah\" vowels, no words) heard in warmup, goldenhour and canals. Rendering is deterministic: the same script, library and seed give byte-identical files (see scripts/music/songs/README.md to re-render and compare).",
+ "library": {
+  "path": "scripts/music/songs/fel_synth.py",
+  "sha256": "4a228fbface1c99b8dffcaa302d0834872540703e2c4c8410c088af150bbdab2",
+  "version": "1.0.0"
+ },
+ "validator": {
+  "path": "scripts/music/songs/validate.py",
+  "sha256": "4fe5198f81d0caa48013496ff58f0eef8db1d7f9689975fe07b011056d246495"
+ },
+ "files": [
+  {
+   "file": "warmup/map.json",
+   "sha256": "2c0f9e94cb829c9e16c558acdf3de324c860f06c82296772d6a8d2c538da2985",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/preview.mp3",
+   "sha256": "cbeb5764702d984a1404d18ba31ec729b23eaaa83d77b43e31aa923056ef51cc",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/bed.mp3",
+   "sha256": "ff96fd5e62b5a91f175737732f4f90e8e1904ad97a55cbd7b41ec1ac080fd228",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/drums.mp3",
+   "sha256": "76a9fbfa96c149f5e5d1cf6a50df3b858bede84835411ffb600a0f7bb5bfe2c3",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/bass.mp3",
+   "sha256": "9ce1b3edfcf76e1c8402e6f245aa84950686407b7bba05ce188fdfc0f03a08d0",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/keys.mp3",
+   "sha256": "dceef1ae4f9ff6feb8260952d020532ca7a6f26ab192f95aea74e0eaa59ac011",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/perc.mp3",
+   "sha256": "e67e329197c7a3daf39e38cc1d12cecb3b343e9cc195c0bea905ca142d6574fd",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/horns.mp3",
+   "sha256": "54a355adb12d4210d376dc0f91ed6d629ff595560d88e2864e61496f863acc6f",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/lead.mp3",
+   "sha256": "bb5d61fdbe5de306199b90efad7aaead3984356ef3703bd064b55133e61e37cb",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "warmup/stems/fx.mp3",
+   "sha256": "b7aa9e40c5fae56f865f8050ce3e0c96e60a9237d043f373ee4b8505c8401b1c",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_warmup.py",
+   "scriptSha256": "109a50a22c429de35bff1d444323c18113a152af03e417d18b3dfb24c849b125"
+  },
+  {
+   "file": "cypher/map.json",
+   "sha256": "dd2288020423cb79876e59ca79fe8c5342bec94e4632bfe8413264eee9aab423",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/preview.mp3",
+   "sha256": "1baf2fcd9f242e3555a7a06cab2c5ac8de8253d871d0bef51c9fc6e8079a7874",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/bed.mp3",
+   "sha256": "109dab69144d1ec408e87bc2ed8a10aa223c07a5f51984b24c4c38ff17f48063",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/drums.mp3",
+   "sha256": "43eab1021ff320ff4cc0fecde1c07af7b695f4a6d74bfe760fa4babaf6c8c124",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/bass.mp3",
+   "sha256": "ffb53a3c0ef66753c78698162b6f4233d686f4af1b73e5d308082a8a940bae2b",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/keys.mp3",
+   "sha256": "833725df9110e710afdc3b42566970a9c8df557d017ab3a6592260dbae02f610",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/perc.mp3",
+   "sha256": "7ffbdb1d45899963e273d5145a07bb04f75e7892c33a5451806c16501c20925f",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/horns.mp3",
+   "sha256": "ce1b744b7f4860be59c9273cb77bc34976d0e7ca7160d007e386e500b32dc104",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/lead.mp3",
+   "sha256": "0b463bae1f0f4f92c35996a73bbba12e7471511b8ae28d47ca1e734c95b4487b",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "cypher/stems/fx.mp3",
+   "sha256": "41fb764d70bc591469764b887ce68d64d8a657202557600804894c34ad5bef0d",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_cypher.py",
+   "scriptSha256": "9b7358694c334d90260ebcae4db811844a1dc37522092fc2cd32d8026352da51",
+   "dsp": {
+    "script": "scripts/music/songs/voices_cypher.py",
+    "sha256": "010031362a8c9269bced5368af2dddb1f0e6550987f7389fc8a2a47c6031a08e"
+   }
+  },
+  {
+   "file": "goldenhour/map.json",
+   "sha256": "afa2d9abceb415c144b1a32a743481dff213f61e46885b68a496c9bcd6d9d9aa",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/preview.mp3",
+   "sha256": "09127b6f1f3dea76dfc1048c58865f25368356d4f802dc7a7dc5842c54a6124b",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/bed.mp3",
+   "sha256": "9c93dc22aded85c0e0a8b34d3429a8d886c389496d51b685b340822f858f2764",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/drums.mp3",
+   "sha256": "697f5d3bcefee22daf72474a48d3fda21ba167dacc84fad3aace5a5975f3aaeb",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/bass.mp3",
+   "sha256": "0c431ea2bdbd666b583de2fa88e9e7eaf55f8d02e6d33a28f7ec5958bb9a5187",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/keys.mp3",
+   "sha256": "61f72edafcacacf02213a2f43c328badbe9f2e3c7cc1bb39dea47fe1b8ca5656",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/perc.mp3",
+   "sha256": "f73b640bc37384ab3336c17cce401bc9424090e64fc8950e383e6516d643cb94",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/horns.mp3",
+   "sha256": "facf7b4eb61dbe70a7c6407f1df4956ea0ac3f63062a9b8570fef69bf7a0a6ce",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/lead.mp3",
+   "sha256": "fdea1077a3b22be94455c1b0c4908594f75b84ba02ba573bc62e79d619efac69",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "goldenhour/stems/fx.mp3",
+   "sha256": "c9f0023e03b834fbd6f083c71bedd090312f103e98de7999b1cd4dc5dbfefca6",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_goldenhour.py",
+   "scriptSha256": "7445ddddeb356642d247b4cd69a5b8990919e53adeba8af84fbe1af416100080"
+  },
+  {
+   "file": "battle/map.json",
+   "sha256": "ae6d933c5047e1aa30743f7b9fcfe09244e5706fed305d3aa27a5ebed09c9695",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/preview.mp3",
+   "sha256": "e349d794f546c540aab3b10a7da05dda8fb4ee1cd5eb9af15d3bd1e8f6d0d099",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/bed.mp3",
+   "sha256": "5232c6b2a321e310027a675d6f2084f0ab3525015e391f50ca681e245de47c93",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/drums.mp3",
+   "sha256": "57c11280f3e1efcc358b76d7ffe5d6f3bf3f29f9d320e5a599178eee381ab899",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/bass.mp3",
+   "sha256": "86b1d1d4a16c34634e80f234974977d08493be99b0729085a512b5432ac36ca3",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/keys.mp3",
+   "sha256": "5c5bc2a72668e44f5bbf6939f7d6878e5e82ac9e7a1b004ef1b509856b04d06d",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/perc.mp3",
+   "sha256": "42808cbf27dd9fa3772cce7f305d009f66424ff38f389ad91ed345e7d6299071",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/horns.mp3",
+   "sha256": "314b4b65f5e342b39a1fc7b4bbcf1ac30cd6bd13da8498955adff8c6f0daac46",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/lead.mp3",
+   "sha256": "bf7efa950f4c8cfdb0ca0ad539becc40c7c975e804db407d973ada15b346bd18",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "battle/stems/fx.mp3",
+   "sha256": "e8687a92946d40feab8ff6004c8046eada1ba8c2fa0e2321e7e058d2fc259ae3",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_battle.py",
+   "scriptSha256": "11a4bcc9bb937aa9488b82e93446a9b69f3c73bbded915822bba79e0693664a0"
+  },
+  {
+   "file": "canals/map.json",
+   "sha256": "9ba41a779fa32c76de6dd5469d7b97ad7726613c3ee0938ebbb6ba51965b2461",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/preview.mp3",
+   "sha256": "e808e215c9f51d56db80e768def2948909438c77a4e56dd5e2182f6639a24771",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/bed.mp3",
+   "sha256": "2720f06d14782172f233718ef50cb1cdae9043c8f24adf643ac7abca6be0afe2",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/drums.mp3",
+   "sha256": "011787bbeefc31f3d8fc0eb7a0337b15a4982e4d1c0fef69ddc9f1efae0d634c",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/bass.mp3",
+   "sha256": "944f59e8d26f6031d4fd8ec16f12d6a6d36fa51e37cc02951231818402ed8d82",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/keys.mp3",
+   "sha256": "b0fdb54ba4dc5458f6971438beb50ba789eecf64195ecdf00e9243d09341690c",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/perc.mp3",
+   "sha256": "b0719f6176ebb3a79afa7eaaf6569854ad55bd9d8567b8d68669a2b8523c6398",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/horns.mp3",
+   "sha256": "c491d7e02dc36322aba127f890bc3896c93a45619c39e40c3c8cce792e4ededc",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/lead.mp3",
+   "sha256": "b4b8eb265a96d19a30e61c96e346e6c6a97141ff134052618cdfb92c69176bc0",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "canals/stems/fx.mp3",
+   "sha256": "f0f515abe51f0f4b7420814b7ea66618c9cfb931cb7164c601dce496fea22fc5",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_canals.py",
+   "scriptSha256": "a6117fe2d0e4caf57db63b31ac3bbc573943a8c6257b12d5e4b9e2a550cd7ffa",
+   "dsp": {
+    "script": "scripts/music/songs/voices_canals.py",
+    "sha256": "ec122dc78e3c317fa3ed15f94a570f4ca7bf954c5e60b61ab4af556394e39c69"
+   }
+  },
+  {
+   "file": "evolution/map.json",
+   "sha256": "c06fe0bd90a0f7fedc091dfef356146f2cd17d7e233f14fb0c1355a8058cd693",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/preview.mp3",
+   "sha256": "33aba6dcc09aaf191837b05bffa8a90aed45b8e6e8186845d69321fe6cce82b2",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/bed.mp3",
+   "sha256": "b183d528183baddbccb14854ba8453453e8d52c81347b8653052db4247cff80e",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/drums.mp3",
+   "sha256": "d3b0b53fa75cd8bf91f7945973362ae46e942d1337ea5dabcce03b4e26d33a9e",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/bass.mp3",
+   "sha256": "c84a28c43d9923868b94423df5f5abdca0a746679112eefaf34034c7cdbb5799",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/keys.mp3",
+   "sha256": "462a4804b1c0117de15f23762193193d1c69e6eb74dd559c31d8fff69a42a036",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/perc.mp3",
+   "sha256": "c55e1f299f60f7582ac9584c55daa0863b45ced1426205902b3c29ee62e48793",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/horns.mp3",
+   "sha256": "0546e056e922c94c72be912c884c4c73d748e8a38d02bd966f6f83b0fd0e7205",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/lead.mp3",
+   "sha256": "f1c4fdd6cffb774d3f811072d58c3b52426fb440b3e558de3196e8a4829a1a6d",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  },
+  {
+   "file": "evolution/stems/fx.mp3",
+   "sha256": "d6014caf96ee240ad71863897fbcc38284300a4411b62a2cb9ecf57aba43ab93",
+   "licence": "FEL original, generated",
+   "script": "scripts/music/songs/song_evolution.py",
+   "scriptSha256": "f1016ec7d237b94669848ae099a048a41b53dbf4e9a8d43836eeeb8e03a0ac10"
+  }
+ ]
+}
