@@ -465,7 +465,8 @@ export function moveClipsAfter(win: H4Frame[], S: string, A0: number, postMs: nu
  *  spin entered through a feint clip are G11 fails whatever the body did. */
 export const CLIP_FAMILY: readonly [RegExp, RegExp][] = [
   [/double_cross/, /double_cross/], [/shammgod/, /shammgod/], [/between/, /between/], [/behind|momentum_btb|steezo/, /behind/],
-  [/crossover|momentum_cross/, /crossover/], [/snatch/, /snatch/], [/hesi/, /hesi/], [/in_and_out|slip_slide/, /in_and_out|feint/],
+  // (phase 4c: the momentum cross's own clip, bball_momentum_cross_*, is the crossover's family)
+  [/crossover|momentum_cross/, /crossover|momentum_cross/], [/snatch/, /snatch/], [/hesi/, /hesi/], [/in_and_out|slip_slide/, /in_and_out|feint/],
   [/yoyo/, /yoyo/], [/^spin$|(^|_)spin$/, /spin/], [/jab/, /jab/], [/stepback/, /stepback/], [/shimmy/, /shimmy/], [/pivot/, /pivot/],
 ];
 /** The window's move clip for the name check: the first move clip after the anchor that is not an EARLIER input's (HOOPS MOTION 4b review
@@ -481,6 +482,42 @@ export function clipFamilyOk(move: string, clip: string): boolean | null {
   if (!clip) return null;
   const su = /^size_up:(.+)$/.exec(move); if (su) return clipName(su[1]) === clip;
   const row = CLIP_FAMILY.find(([mv]) => mv.test(move)); return row ? row[1].test(clip) : null;
+}
+
+// ── HOOPS MOTION phase 4c: THE WINDOW'S OWN MOVE (the name check reads what THIS move's ball did) ─────────────────────────────────────
+// The name check counted every crossing in the window (400 ms before the anchor to its end), so a move asked while another ran was named
+// by both balls: 4c's double cross read 3 crossings on 5/5 attempts — the running crossover's (it crosses 68 ms after the double's input,
+// its ball still in flight) and the double's two (369 / 682 ms) — and a Shammgod queued behind a between-the-legs read the between's
+// crossing as its own (196 ms; its own at 622). A request made while a move runs is QUEUED in the carry and starts at that move's catch, its
+// clip with it (4b review F2), so the move's own ball runs from its clip's first frame to the next request's start. A same-hand twin is
+// named by the move it rendered (the Shammgod asked with the ball already on its end side plays the in-and-out, plan §4.1 / Q4), and a
+// queued request a later one replaced never starts (4b review F2: it renders nothing) — it has no name to check.
+/** A mode's move request line: `[1V1-HANDLE] move shammgod left → bball_in_and_out_left rate 1.00 (chain 3, handle 100) (same-hand twin
+ *  in_and_out) ball queued L→L` (3v3: the same, without the rate / chain). */
+const MOVE_REQ = /HANDLE\] move (\w+) (?:left|right) → (\S+)(?:.*?\(same-hand twin (\w+)\))?.*? ball (started|queued) /;
+export interface H4Own { move: string; rendered: string; clip: string; ball: 'started' | 'queued'; startMs: number | null; endMs: number; replaced: boolean }
+export function ownMove(win: H4Frame[], S: string, marks: H4Mark[], A0: number, anchorClip: string, postMs: number): H4Own | null {
+  const L = moveLine(marks, A0, anchorClip); if (!L) return null;
+  const q = MOVE_REQ.exec(L.msg); if (!q) return null;
+  const [, move, clip, twin, ball] = q as unknown as [string, string, string, string | undefined, 'started' | 'queued'];
+  const wOf = (f: H4Frame, c: string) => (f.B[S]?.c ?? []).reduce((a, x) => (clipName(x[0]) === c ? Math.max(a, x[1]) : a), 0);
+  // a queued move starts where its clip does: the first frame after the request its clip rises from 0 (the running move's own clip, when it
+  // is the same one, is at > 0 already: then from its next rise off a dip, else the request itself)
+  const startOf = (t: number, c: string, kind: string): number | null => {
+    if (kind === 'started') return t;
+    const after = win.filter((f) => f.t >= t - 1e-6 && f.t <= A0 + postMs);
+    for (let i = 1; i < after.length; i++) if (wOf(after[i], c) > 0 && wOf(after[i], c) > wOf(after[i - 1], c) + 1e-3 && wOf(after[i - 1], c) < 0.02) return after[i].t;
+    return after.length && wOf(after[0], c) > 0 ? t : null;
+  };
+  const startT = startOf(L.t, clipName(clip), ball);
+  // the next request's start ends this move's ball (a queued one that never starts ends nothing)
+  let endT = A0 + postMs;
+  for (const m of marks) {
+    if (m.t <= L.t || m.t > A0 + postMs) continue;
+    const r = MOVE_REQ.exec(m.msg); if (!r) continue;
+    const s2 = startOf(m.t, clipName(r[2]), r[4]); if (s2 != null && (startT == null || s2 > startT)) { endT = Math.min(endT, s2); break; }
+  }
+  return { move, rendered: twin ?? move, clip: clipName(clip), ball, startMs: startT != null ? Math.round(startT - A0) : null, endMs: Math.round(endT - A0), replaced: ball === 'queued' && startT == null };
 }
 export function nameOkH4(move: string, m: { crossings: H4Crossing[]; between: H4Between; behind: H4Behind; hesi: H4Hesi; inout: H4InOut; spin: H4Spin | null; shimmy: H4Shimmy; fwdExcursionM: number | null; footOutM: number | null; backStepM: number | null; topsDiffM: number | null }, clip = '', line = ''): H4Name {
   const n = m.crossings.length;
@@ -508,6 +545,8 @@ export interface H4 {
   crossings: H4Crossing[]; nCross: number; cross: { midY: number | null; farLat: number | null } ; between: H4Between; behind: H4Behind; flagsV1: { underLegs: boolean; behindBack: boolean };
   spin: H4Spin | null; hesi: H4Hesi; inout: H4InOut; shimmy: H4Shimmy; bounceRate: H4BounceRate[]; leftDribble: H4Left; latency: H4Latency; read: H4Read; path: H4Path;
   fwdExcursionM: number | null; footOutM: number | null; backStepM: number | null; topsDiffM: number | null; moves: string[]; nameOk: H4Name;
+  /** phase 4c: the window's own move (ownMove) — the name check reads its ball, not every crossing in the window. */
+  own: H4Own | null;
 }
 /** h4 for one window (`win`: the frames of the window, the subject on each; `A0` the anchor; `marks` the recording's marks; `all` the whole
  *  recording's frames with the subject — the bounce rate reads the bounces after a crossing past the window's end: a crossing ~0.2 s in
@@ -517,9 +556,13 @@ export function measureH4(win: H4Frame[], S: string, A0: number, marks: H4Mark[]
   const between = betweenH4(win, S, A0, crossings), behind = behindH4(crossings);
   const first = crossings.find((c) => c.atMs >= -100) ?? crossings[0];
   // the ball's forward excursion (the Shammgod's push-out), the jab foot, the step-back foot, the yoyo's two tops
-  const loc = win.filter((f) => f.t >= A0 && f.t <= A0 + 800 && mine(f, S)).map((f) => ({ f, l: ballLocal(f.B[S], f.ball!) })).filter((x) => x.l);
-  const l0 = win.filter((f) => f.t <= A0 && mine(f, S)).map((f) => ballLocal(f.B[S], f.ball!)).filter(Boolean).pop();
-  const fwdExc = loc.length && l0 ? r3(Math.max(...loc.map((x) => x.l!.fwd)) - l0.fwd) : null;
+  const fwdExcFrom = (A: number): number | null => {
+    const loc = win.filter((f) => f.t >= A && f.t <= A + 800 && mine(f, S)).map((f) => ({ f, l: ballLocal(f.B[S], f.ball!) })).filter((x) => x.l);
+    const l0 = win.filter((f) => f.t <= A && mine(f, S)).map((f) => ballLocal(f.B[S], f.ball!)).filter(Boolean).pop();
+    return loc.length && l0 ? r3(Math.max(...loc.map((x) => x.l!.fwd)) - l0.fwd) : null;
+  };
+  const fwdExc = fwdExcFrom(A0);
+  const own = ownMove(win, S, marks, A0, anchorClip, postMs);
   const b0 = win.filter((f) => f.t <= A0).pop()?.B[S];
   const footMove = (dirSign: number) => {
     if (!b0) return null; let best = 0;
@@ -535,10 +578,18 @@ export function measureH4(win: H4Frame[], S: string, A0: number, marks: H4Mark[]
   return {
     ...base, nCross: crossings.length, cross: { midY: first ? first.midY : null, farLat: first ? first.farLat : null }, flagsV1: flagsV1(win, S, A0),
     bounceRate: bounceRateH4(all ?? win, S, A0, crossings), leftDribble: leftDribbleH4(win, S, marks), latency: latencyH4(win, S, A0, marks), read: readH4(win, S, A0, crossings), path: pathH4(win, S, A0),
-    moves, nameOk: (() => {
-      const mv = playedMove(marks, A0, anchorClip);
-      const earlier = marks.filter((m) => m.t < A0 && m.t >= A0 - 1000 && /HANDLE\] move \w+/.test(m.msg)).map((m) => /HANDLE\] move (\w+)/.exec(m.msg)![1]);
-      return nameOkH4(mv, base, windowMoveClip(mv, moveClipsAfter(win, S, A0, postMs), earlier), (moveLine(marks, A0, anchorClip)?.msg ?? '').slice(0, 90));
+    moves, own, nameOk: (() => {
+      const line = (moveLine(marks, A0, anchorClip)?.msg ?? '').slice(0, 90);
+      // phase 4c: the move it RENDERED (a same-hand twin is its twin), read on its own ball (see ownMove)
+      const mv = own?.rendered ?? playedMove(marks, A0, anchorClip);
+      if (own?.replaced) return { move: mv, expect: '(replaced before it started)', ok: null, why: 'a later request replaced it in the carry\'s queue (4b review F2): no ball of its own', clip: '', clipOk: null, line };
+      const earlier = marks.filter((m) => m.t < A0 && m.t >= A0 - 1000 && /HANDLE\] move \w+/.test(m.msg)).map((m) => { const r = MOVE_REQ.exec(m.msg); return r?.[3] ?? /HANDLE\] move (\w+)/.exec(m.msg)![1]; });
+      let nb = base;
+      if (own && own.startMs != null) {
+        const A1 = A0 + own.startMs, cr = crossings.filter((c) => c.atMs >= own.startMs! - 20 && c.atMs < own.endMs);
+        nb = { ...base, crossings: cr, between: betweenH4(win, S, A0, cr), behind: behindH4(cr), inout: inoutH4(win, S, A1), fwdExcursionM: fwdExcFrom(A1) };
+      }
+      return nameOkH4(mv, nb, windowMoveClip(mv, moveClipsAfter(win, S, A0, postMs), earlier), line);
     })(),
   };
 }

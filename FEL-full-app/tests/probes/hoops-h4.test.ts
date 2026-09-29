@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  measureH4, crossingsH4, betweenH4, behindH4, flagsV1, spinH4, hesiH4, shimmyH4, pathH4, latencyH4, leftDribbleH4, playedMove, JN, J, windowMoveClip,
+  measureH4, crossingsH4, betweenH4, behindH4, flagsV1, spinH4, hesiH4, shimmyH4, pathH4, latencyH4, leftDribbleH4, playedMove, JN, J, windowMoveClip, clipFamilyOk,
   type H4Body, type H4Frame, type H4Mark,
 } from '../../scripts/probes/_hoops-h4.mts';
 import { pathFor, pathAt, mirrorPath, type HandlePath } from '../../lib/babylon/anim/handlePaths';
@@ -264,6 +264,54 @@ describe('the rest of h4, on the same bodies', () => {
     // …but a clip nobody asked for before the anchor counts against the move (the rotation's entry flick 17 ms after a sweep)
     expect(windowMoveClip('spin', ['bball_in_and_out_right', 'bball_spin'], [])).toBe('bball_in_and_out_right');
     expect(windowMoveClip('crossover', [], ['between_legs'])).toBe('');
+    // (phase 4c) the momentum cross's own clip is its family
+    expect(clipFamilyOk('momentum_cross', 'bball_momentum_cross_left')).toBe(true); expect(clipFamilyOk('crossover', 'bball_crossover_right')).toBe(true);
+    // …and the hesi's and the in-and-out's rows are still there (4c's edit had commented them out: every hesi / in-and-out clipOk read null)
+    expect(clipFamilyOk('hesi', 'bball_hesi')).toBe(true); expect(clipFamilyOk('hesi', 'bball_mc_jab')).toBe(false);
+    expect(clipFamilyOk('in_and_out', 'bball_in_and_out_right')).toBe(true); expect(clipFamilyOk('in_and_out', 'bball_mc_feint_right')).toBe(true);
+    expect(clipFamilyOk('in_and_out', 'bball_crossover_left')).toBe(false);
+  });
+
+  describe('phase 4c: a move is named by its OWN ball (ownMove), not by every crossing in the window', () => {
+    // the 4c probe's double cross: a crossover (started R→L at 500), the double asked 37 ms later while it runs (queued L→L: it starts
+    // at the crossover's catch, its clip with it) — the window reads the crossover's crossing and the double's two
+    const cross = need(pathFor('crossover', 'right')), dbl = need(pathFor('double_cross', 'left'));
+    const t1 = 500 + Math.round((cross.duration * 1000) / DT) * DT;
+    const pre = dribbleFrames(0, 0.5, still, 0, 'R', {}, 2.0).slice(0, -1);
+    const a = moveFrames(500, cross, still, () => 0, { clip: 'bball_crossover_left' }).slice(0, -1);
+    const chain = (second: HandlePath, clip: string): H4Frame[] => [...pre, ...a, ...moveFrames(t1, second, still, () => 0, { clip }).slice(0, -1),
+      ...dribbleFrames(t1 + second.duration * 1000, 0.8, still, 0, second.endHand === 'right' ? 'R' : 'L', {}, 2.0)];
+    const CROSS_LINE: H4Mark = { t: 500, msg: '[1V1-HANDLE] move crossover left → bball_crossover_left rate 1.00 (chain 1, handle 100) ball started R→L' };
+    const INPUT: H4Mark = { t: 520, msg: '[HM-INPUT] lcross rim 0.85' };
+    it('the double cross queued behind a crossover: 3 crossings in the window, 2 of its own — crossed twice', () => {
+      const marks = [CROSS_LINE, INPUT, { t: 537, msg: '[1V1-HANDLE] move double_cross left → bball_double_cross_left rate 1.00 (chain 2, handle 100) ball queued L→L' }];
+      const m = measureH4(chain(dbl, 'bball_double_cross_left'), 'me', 520, marks, 'mark: [HM-INPUT] lcross rim 0.85', 1100);
+      expect(m.nCross).toBe(3);   // (the window's reads are unchanged: G1 / G5 read them)
+      expect(m.own).toMatchObject({ move: 'double_cross', rendered: 'double_cross', ball: 'queued', replaced: false, startMs: Math.round(t1 - 520) });
+      expect(m.nameOk).toMatchObject({ move: 'double_cross', ok: true, why: 'crossings 2' });
+    });
+    it('a STARTED move owns its crossings from its own line: a crossover after a move that crossed before it reads 1', () => {
+      const m = measureH4(chain(need(pathFor('crossover', 'left')), 'bball_crossover_right'), 'me', 520, [CROSS_LINE, INPUT, { t: t1, msg: '[1V1-HANDLE] move crossover right → bball_crossover_right rate 1.00 (chain 2, handle 100) ball started L→R' }], 'mark: [HM-INPUT] lcross rim 0.85', 1100);
+      expect(m.own).toMatchObject({ ball: 'started', startMs: Math.round(t1 - 520) });
+      expect(m.nameOk).toMatchObject({ move: 'crossover', ok: true, why: 'crossings 1' });
+    });
+    it('a same-hand twin is named by the move it rendered (a Shammgod asked with the ball on its end side plays the in-and-out)', () => {
+      const marks = [CROSS_LINE, INPUT, { t: 537, msg: '[1V1-HANDLE] move shammgod left → bball_in_and_out_left rate 1.00 (chain 3, handle 100) (same-hand twin in_and_out) ball queued L→L' }];
+      const m = measureH4(chain(need(pathFor('in_and_out', 'left')), 'bball_in_and_out_left'), 'me', 520, marks, 'mark: [HM-INPUT] lcross rim 0.85', 1100);
+      expect(m.own).toMatchObject({ move: 'shammgod', rendered: 'in_and_out', clip: 'bball_in_and_out_left' });
+      expect(m.nameOk).toMatchObject({ move: 'in_and_out', expect: 'faked, kept the hand', clip: 'bball_in_and_out_left', clipOk: true });
+      expect(m.nameOk.why).toMatch(/^crossings 0,/);   // the running crossover's crossing is not the in-and-out's
+    });
+    it('a queued request a later one REPLACED never starts: no name to check (not a fail)', () => {
+      const marks = [CROSS_LINE, INPUT, { t: 537, msg: '[1V1-HANDLE] move between_legs right → bball_between_legs_right rate 1.00 (chain 2, handle 100) ball queued L→R' }];
+      const m = measureH4(chain(dbl, 'bball_double_cross_left'), 'me', 520, marks, 'mark: [HM-INPUT] lcross rim 0.85', 1100);
+      expect(m.own).toMatchObject({ move: 'between_legs', replaced: true, startMs: null });
+      expect(m.nameOk).toMatchObject({ ok: null, expect: '(replaced before it started)' });
+    });
+    it('no request line (a clip anchor, the size-up, the jab): the window reads as before', () => {
+      const ok = play('crossover');
+      expect(measureH4(ok.win, 'me', ok.A0, [], 'bball_crossover_left', 1000)).toMatchObject({ own: null, nameOk: { ok: true } });
+    });
   });
 
   it("a SWEEP's window is named by its spin / roll line, not the rotation's entry flick 17 ms after the input (4a review F2)", () => {

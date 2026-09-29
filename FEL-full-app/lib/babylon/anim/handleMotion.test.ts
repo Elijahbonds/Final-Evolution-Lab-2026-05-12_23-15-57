@@ -4,7 +4,7 @@
 // way each mode builds them (the contract half at the end reads the modes' source for the same shapes).
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { requestMove, resolveSides, sizeUpMoveOf, SAME_HAND_TWIN, type HandleHost, type HandleRequest, type Side } from './handleMotion';
+import { requestMove, resolveSides, sizeUpMoveOf, SAME_HAND_TWIN, crossClip, crossSourceOverride, type HandleHost, type HandleRequest, type Side } from './handleMotion';
 import { resolveHandleMove, pushChain, CHAIN_IDLE, MOVE_SHAPE, MOVE_TURBO_REAL, moveRate, type ChainState, type HandleMove, type DefenderRead } from '../core/HandleSystem';
 
 /** A body for the renderer: a carry that records what it is asked to play, a tree that records its beats, an impulse sink. */
@@ -222,6 +222,24 @@ describe('the sides: one value for the clip and the ball (S31 / U10), and the re
   it('every HandleMove the renderer can be asked for has its shape (MOVE_SHAPE) and every crossing move a twin', () => {
     for (const m of Object.keys(MOVE_SHAPE) as HandleMove[]) { const s = resolveSides(m, 'right'); expect(s.endHand).toMatch(/left|right/); }
     for (const m of Object.keys(MOVE_SHAPE) as HandleMove[]) if (MOVE_SHAPE[m].crosses === 1 && MOVE_SHAPE[m].owner === 'motion' && m !== 'spin') expect(SAME_HAND_TWIN[m], m).toBe('in_and_out');
+  });
+});
+
+describe('HOOPS MOTION phase 4c: the crossover\'s A/B (plan §4.1 — ?hm4cross=cap|auth, decided on pops and the name verdict)', () => {
+  it('the authored v2 clip by default; the capture by its own name under cap (dev only) — the crossover and the momentum cross, nothing else', () => {
+    expect(crossSourceOverride('?agent=1&hm4cross=cap', true)).toBe('cap');
+    expect(crossSourceOverride('?agent=1&hm4cross=cap', false)).toBe('auth');   // never in a production build
+    expect(crossSourceOverride('?agent=1', true)).toBe('auth'); expect(crossSourceOverride(null, true)).toBe('auth');
+    expect(crossClip('bball_crossover_left', 'auth')).toBe('bball_crossover_left');
+    expect(crossClip('bball_crossover_right', 'cap')).toBe('bball_mc_crossover_right');
+    expect(crossClip('bball_momentum_cross_left', 'cap')).toBe('bball_mc_crossover_left');
+    expect(crossClip('bball_between_legs_left', 'cap')).toBe('bball_between_legs_left');
+    expect(crossClip(null, 'cap')).toBeNull();
+  });
+  it('the momentum cross plays its OWN clip (its path is wider and further ahead than the crossover\'s)', () => {
+    const { host, log } = body('Right');
+    requestMove(host, { move: 'momentum_cross', turbo: true, decide: { kind: 'none' } });
+    expect(log.beats[0].clip).toBe('bball_momentum_cross_left'); expect(log.runs[0].move).toBe('momentum_cross');
   });
 });
 

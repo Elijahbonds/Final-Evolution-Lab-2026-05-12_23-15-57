@@ -2139,7 +2139,12 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_hesi', { fadeSec: 0.1 }); }   // the step-back reads as a check: the body loads
           if (dec.crossover) {
             // the ball SWITCHES hands — the read. A same-hand shuffle (dec.step without a crossover) keeps the dribble loop.
-            foeAnimTree.beat(dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', { fadeSec: 0.12 });
+            // HOOPS MOTION phase 4c: HIS crossover keeps the CAPTURE (06_13) it played through opponentMotion's swap until 4f routes him through
+            // HandleMotion (plan §4.20). The v2 authored crossover is keyed on the hero's ball PATH, and his ball is held (4b review F4), so
+            // its hands would reach for a ball that is not there; the capture no longer stands in for bball_crossover_* (it plays by its own
+            // name), so he names it — the authored clip only on a rig that did not build the capture.
+            const cap = `bball_mc_crossover_${dec.crossover === 'left' ? 'left' : 'right'}`;
+            foeAnimTree.beat(foe.animator.clipNames.has(cap) ? cap : dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', { fadeSec: 0.12 });
             // (4b review F4) HIS BALL STAYS IN HIS HAND UNTIL 4f routes him through HandleMotion (plan §4.20: a path timed inside his poke
             // window). 4b ran the hero's crossover path here (toSide → runMove): the ledger's L1 (his crossover's foot slide p90, the mean of
             // the attempts, ≤ 13.78 cm) read 15.61 | 15.04 against base 12.54 | 13.73; with his ball held it reads 13.0 | 13.05, and

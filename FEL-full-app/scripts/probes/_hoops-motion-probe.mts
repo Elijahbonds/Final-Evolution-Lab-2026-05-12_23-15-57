@@ -287,7 +287,7 @@ const CATALOGUE: ActionDef[] = [
   A('hero_1v1_layup', 'driving layup (in from the wing)', 'layups/floaters/hooks', 'finish', '1v1-off', withReps(['o_layup', 'o_layup2', 'o_layup3', 'o_layup4', 'o_layup5', 'o_layup6', 'o_layup7', 'o_layup8', 'o_layup9']), { body: 'me', clip: FINISH }, 600, 1600),
   A('hero_1v1_floater', 'floater (2.2–3.4 m, not at speed)', 'layups/floaters/hooks', 'finish', '1v1-off', withReps(['o_floater']), { body: 'me', clip: /floater|layup|finger_roll|mikan|jumpshot|pullup_gather/ }, 600, 1600),
   A('hero_1v1_dunk', 'game dunk off the drive', 'game dunks', 'dunk', '1v1-off', withReps(['o_dunk', 'o_dunk_base', 'o_dunk_wing', 'o_dunk_slow', 'o_dunk_jog', 'o_dunk_poster', 'o_dunk_standing', 'o_dunk_spin']), { body: 'me', clip: DUNK }, 700, 2000),
-  A('hero_1v1_cross', 'crossover (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_cross', 'o_crossover_stand', 'o_crossover_fast']), { body: 'me', clip: /crossover/ }, 400, 1000),
+  A('hero_1v1_cross', 'crossover (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_cross', 'o_crossover_stand', 'o_crossover_fast']), { body: 'me', clip: /crossover|momentum_cross/ }, 400, 1000),   // (4c: the crossover at a run is the momentum cross, its own clip since 4c)
   A('hero_1v1_between', 'between the legs (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_between', 'o_between_stand', 'o_between_fast']), { body: 'me', clip: /between/ }, 400, 1000),
   A('hero_1v1_behind', 'behind the back (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_behind', 'o_behind_stand', 'o_behind_fast']), { body: 'me', clip: /behind/ }, 400, 1000),
   A('hero_1v1_spin', 'spin move (R stick sweep)', 'handles', 'handle', '1v1-off', withReps(['o_spin', 'o_spin_stand', 'o_spin_fast']), { body: 'me', clip: /spin(?!_layup)/ }, 400, 1100),
@@ -334,7 +334,7 @@ const CATALOGUE: ActionDef[] = [
   A('hero_3v3_jumper_set', 'set jumper', 'jumpers', 'shot', '3v3-off', withReps(['t_set']), { body: 'me', clip: SHOT_START }, 450, 1700),
   A('hero_3v3_layup', 'driving layup (in from the wing)', 'layups/floaters/hooks', 'finish', '3v3-off', '*', { body: 'me', clip: FINISH }, 600, 1600),
   A('hero_3v3_dunk', 'game dunk', 'game dunks', 'dunk', '3v3-off', '*', { body: 'me', clip: DUNK }, 700, 2000),
-  A('hero_3v3_cross', 'crossover (R stick)', 'handles', 'handle', '3v3-off', withReps(['t_cross', 't_crossover_stand', 't_crossover_fast']), { body: 'me', clip: /crossover/ }, 400, 1000),
+  A('hero_3v3_cross', 'crossover (R stick)', 'handles', 'handle', '3v3-off', withReps(['t_cross', 't_crossover_stand', 't_crossover_fast']), { body: 'me', clip: /crossover|momentum_cross/ }, 400, 1000),   // (4c: the crossover at a run is the momentum cross, its own clip since 4c)
   A('hero_3v3_pass', 'pass (the ball leaves my hands)', 'passes/catches', 'pass', '3v3-off', withReps(['t_pass', 't_pass2', 't_pass3', 't_oop', 't_passlong1']), { body: 'me', ballFrom: true }, 600, 900),
   A('hero_3v3_catch', 'catch (a pass from a teammate comes to me)', 'passes/catches', 'catch', '3v3-off', '*', { body: 'me', ballTo: true, from: 'mate*', minFree: 3, arrives: true }, 600, 800),
   A('hero_3v3_rebound', 'rebound', 'rebounds/box-out', 'rebound', '3v3-off', withReps(['t_rebound', 't_rebound2', 't_rebound3', 't_rebound4']), { body: 'me', ballTo: true, minFree: 20, still: true }, 900, 700),

@@ -106,7 +106,7 @@ export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => 
   snatch_back: () => 'bball_snatch_back',
   shammgod: (d) => `bball_shammgod_${d}`,
   off_the_head: null,     // the ball leaves your hands; the mode owns that one entirely
-  momentum_cross: (d) => `bball_crossover_${d}`,     // the capture's cross, played FAST and wide by the movement
+  momentum_cross: (d) => `bball_momentum_cross_${d}`,   // HOOPS MOTION phase 4c (plan §4.2): its own clip on its own wider path (it played the crossover's)
   momentum_btb: (d) => `bball_behind_back_${d}`,
   steezo_roll: (d) => `bball_behind_back_${d}`,      // the wrap; the mode's spin follows
   stepback: () => 'bball_stepback_gather',             // the hop off the rim; the mode moves the feet

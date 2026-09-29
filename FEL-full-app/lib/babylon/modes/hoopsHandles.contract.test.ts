@@ -41,8 +41,19 @@ describe('4b review F4: the rival\'s crossover plays its clip and runs no crossi
   it('1v1: the beat stays; foeCarry.toSide is not called', () => {
     const one = src('OneVOneMode.ts');
     const at = one.indexOf("if (dec.crossover) {");
-    const block = one.slice(at, at + 1600);
-    expect(block).toMatch(/foeAnimTree\.beat\(dec\.crossover === 'left' \? 'bball_crossover_left' : 'bball_crossover_right', \{ fadeSec: 0\.12 \}\);/);
+    const block = one.slice(at, at + 2400);
+    // (phase 4c) the beat names the CAPTURE he played before 4c (opponentMotion swapped it in for bball_crossover_*; since 4c the hero's
+    // crossover is the v2 clip keyed on a ball path his held ball does not run) — the authored clip only on a rig without the capture
+    expect(block).toMatch(/const cap = `bball_mc_crossover_\$\{dec\.crossover === 'left' \? 'left' : 'right'\}`;/);
+    expect(block).toMatch(/foeAnimTree\.beat\(foe\.animator\.clipNames\.has\(cap\) \? cap : dec\.crossover === 'left' \? 'bball_crossover_left' : 'bball_crossover_right', \{ fadeSec: 0\.12 \}\);/);
     expect(one).not.toMatch(/^\s*foeCarry\?\.toSide\(/m);
+  });
+  it('(phase 4c) the capture he names is the one that stood in for the authored crossover before 4c, and still builds by that name', async () => {
+    const { MOCAP_OPPONENT_CLIPS } = await import('../anim/authored/mocapOpponents');
+    for (const d of ['left', 'right'] as const) {
+      const c = MOCAP_OPPONENT_CLIPS.find((x) => x.name === `bball_mc_crossover_${d}`);
+      expect(c?.source).toMatch(/06_13\.bvh 6\.20–6\.68s/);
+      expect(c?.replaces).not.toBe(`bball_crossover_${d}`);   // the hero's authored crossover is not swapped out any more
+    }
   });
 });

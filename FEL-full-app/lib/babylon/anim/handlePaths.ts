@@ -32,8 +32,12 @@ export interface V3 { x: number; y: number; z: number }
 export interface HandleStance { P: number; r: number; S: number; F: number }
 export const DEFAULT_STANCE: Readonly<HandleStance> = { P: HOOPS_DRIBBLE.palmY, r: HOOPS_DRIBBLE.ballR, S: HOOPS_DRIBBLE.side, F: HOOPS_DRIBBLE.forward };
 export type PathSegKind = 'push' | 'flight' | 'catch' | 'hold' | 'float' | 'pound';
-/** The moves with a path, plus the two that are not HandleMoves: the triple threat's jab and PAUSIN' (its hold, and its release). */
-export type PathMove = HandleMove | 'jab' | 'pausin' | 'pausin_release';
+/** The family (MOVE_SHAPE.path) of the moves with a path that are not HandleMoves: the triple threat's jab and PAUSIN' (its hold, and
+ *  its release). Keyed, not quoted: this module is in every mode's import closure since 4c (the v2 handle clips build on it), and the clip
+ *  scope's scan reads a quoted 'jab' as the karate clip. */
+const EXTRA_FAMILY = { jab: 'pound', pausin: 'hold', pausin_release: 'pound' } as const satisfies Record<string, MovePath>;
+/** The moves with a path: every HandleMove, plus EXTRA_FAMILY's (the jab, PAUSIN' and its release). */
+export type PathMove = HandleMove | keyof typeof EXTRA_FAMILY;
 
 /** Gravity on a flight (m/s²). */
 export const PATH_G = 9.81;
@@ -166,8 +170,6 @@ const AUTHORED: Partial<Record<PathMove, Authored>> = {
 };
 AUTHORED.momentum_btb = AUTHORED.behind_back;   // the same path at pace (DribbleController.momentumBtb)
 AUTHORED.slip_slide = AUTHORED.in_and_out;      // the slip IS an in-and-out taken past his hip: same hands, the mode moves the feet
-/** The family (MOVE_SHAPE.path) of the moves that are not HandleMoves. */
-const EXTRA_FAMILY: Record<'jab' | 'pausin' | 'pausin_release', MovePath> = { jab: 'pound', pausin: 'hold', pausin_release: 'pound' };
 
 // ── building ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });

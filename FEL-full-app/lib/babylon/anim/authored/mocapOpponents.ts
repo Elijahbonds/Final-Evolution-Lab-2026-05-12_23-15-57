@@ -42,7 +42,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_crossover_right', replaces: 'bball_crossover_right', duration: 0.45, loop: false,
+    name: 'bball_mc_crossover_right', replaces: 'bball_crossover_capture_right', duration: 0.45, loop: false,
     source: 'cmu:06_13.bvh 6.20–6.68s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [25,1,0]},hands: {Left: [-0.27,1.17,0.32],Right: [0.19,1,0.16]},poles: {Left: [-0.13,-0.68,-0.72],Right: [0.08,-0.13,-0.99]},feet: {Left: [-0.01,0.32,0.29],Right: [0.08,0.31,-0.21]},hipsY: -0.24},
@@ -58,7 +58,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_crossover_left', replaces: 'bball_crossover_left', duration: 0.45, loop: false,
+    name: 'bball_mc_crossover_left', replaces: 'bball_crossover_capture_left', duration: 0.45, loop: false,
     source: 'cmu:06_13.bvh 6.20–6.68s mirrored', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [25,-1,0]},hands: {Left: [-0.19,1,0.16],Right: [0.27,1.17,0.32]},poles: {Left: [-0.08,-0.13,-0.99],Right: [0.13,-0.68,-0.72]},feet: {Left: [-0.08,0.31,-0.21],Right: [0.01,0.32,0.29]},hipsY: -0.24},
@@ -815,7 +815,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_feint_right', replaces: 'bball_in_and_out_right', duration: 0.55, loop: false,
+    name: 'bball_mc_rip_right', replaces: 'bball_rip_right', duration: 0.55, loop: false,
     source: 'cmu:78_20.bvh 0.35–1.05s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [15,11,0]},hands: {Left: [-0.25,1.51,0.49],Right: [-0.15,1.51,0.46]},poles: {Left: [-0.15,-0.92,0.36],Right: [0.2,-0.84,0.51]},feet: {Left: [-0.22,0.27,-0.06],Right: [0.16,0.32,-0.31]},hipsY: -0.2},
@@ -833,7 +833,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_feint_left', replaces: 'bball_in_and_out_left', duration: 0.55, loop: false,
+    name: 'bball_mc_rip_left', replaces: 'bball_rip_left', duration: 0.55, loop: false,
     source: 'cmu:78_20.bvh 0.35–1.05s mirrored', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [15,-11,0]},hands: {Left: [0.15,1.51,0.46],Right: [0.25,1.51,0.49]},poles: {Left: [-0.2,-0.84,0.51],Right: [0.15,-0.92,0.36]},feet: {Left: [-0.16,0.32,-0.31],Right: [0.22,0.27,-0.06]},hipsY: -0.2},
@@ -1060,6 +1060,6 @@ export const MOCAP_REAL_SEC: Readonly<Record<string, number>> = {
   bball_mc_pivot: 1.1,
   bball_mc_layup_gather_left: 0.95,
   bball_mc_pullup_gather: 0.45,
-  bball_mc_feint_right: 0.7,
-  bball_mc_feint_left: 0.7,
+  bball_mc_rip_right: 0.7,
+  bball_mc_rip_left: 0.7,
 };

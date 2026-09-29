@@ -75,6 +75,23 @@ export interface HandleResult {
   impulse: MoveImpulse | null;
 }
 
+/**
+ * HOOPS MOTION phase 4c (plan §4.1): THE CROSSOVER'S A/B. The crossover (and the momentum cross) play the v2 AUTHORED clip — built on its
+ * own path (anim/authored/basketball.ts buildHandleV2) — by default; `?hm4cross=cap` (dev) plays the phase-1 capture (CMU 06_13, by its own
+ * name: it no longer stands in for the authored clip) so the two are measured on the same takes (pops, the name verdict).
+ */
+export type CrossSource = 'auth' | 'cap';
+export function crossSourceOverride(search: string | null | undefined, dev: boolean): CrossSource {
+  return dev && !!search && /[?&]hm4cross=cap\b/.test(search) ? 'cap' : 'auth';
+}
+const CROSS_SOURCE: CrossSource = crossSourceOverride(typeof location !== 'undefined' ? location.search : null, process.env.NODE_ENV === 'development');
+/** The clip a crossover plays under the A/B: the capture by its own name, or the clip asked for. */
+export function crossClip(clip: string | null, src: CrossSource = CROSS_SOURCE): string | null {
+  if (!clip || src !== 'cap') return clip;
+  const m = /^bball_(crossover|momentum_cross)_(left|right)$/.exec(clip);
+  return m ? `bball_mc_crossover_${m[2]}` : clip;
+}
+
 /** The same-hand twin of a crossing move (plan §4.1, owner Q4: a crossing pick toward the ball's own side fakes and keeps the hand). */
 export const SAME_HAND_TWIN: Readonly<Partial<Record<HandleMove, HandleMove>>> = {
   crossover: 'in_and_out', momentum_cross: 'in_and_out', between_legs: 'in_and_out', behind_back: 'in_and_out', momentum_btb: 'in_and_out',
@@ -119,7 +136,7 @@ export function requestMove(host: HandleHost, req: HandleRequest): HandleResult 
   const sides = resolveSides(req.move, startHand, { hint: req.hint, cutSide: req.cutSide, path: req.path });
   const { rendered, twin, endHand, clipDir } = sides;
   const turbo = !!req.turbo;
-  const clip = req.clip !== undefined && !twin ? req.clip : rendered === 'jab' ? null : req.flick ? flickClip(rendered, clipDir) : moveClip(rendered, clipDir);
+  const clip = crossClip(req.clip !== undefined && !twin ? req.clip : rendered === 'jab' ? null : req.flick ? flickClip(rendered, clipDir) : moveClip(rendered, clipDir));
   const beat = (): void => { if (clip) host.beat(clip, { fadeSec: req.fadeSec ?? moveFadeSec(turbo), speedRatio: req.speedRatio ?? moveRate(turbo) }); };
   // the ball: now, or at the running move's catch (a double request: the double cross); a move with no path of its own bounces through
   let ball: HandleResult['ball'] = 'none', clipAt: HandleResult['clipAt'] = clip ? 'now' : 'none';
