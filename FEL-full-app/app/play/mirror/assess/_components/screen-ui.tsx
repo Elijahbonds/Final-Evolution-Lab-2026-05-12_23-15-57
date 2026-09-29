@@ -47,7 +47,7 @@ export function PreviewLabel({ line = true }: { line?: boolean }) {
 
 /** A small "Early version" tag for a cue. */
 export const EarlyTag = () => (
-  <span data-early-tag title={EARLY_VERSION_LINE} className="ml-1.5 rounded border border-[#FFB020]/50 px-1.5 py-px align-middle text-[11px] font-bold text-[#FFB020]">{EARLY_VERSION}</span>
+  <span data-early-tag title={EARLY_VERSION_LINE} className="ml-1.5 whitespace-nowrap rounded border border-[#FFB020]/50 px-1.5 py-px align-middle text-[11px] font-bold text-[#FFB020]">{EARLY_VERSION}</span>
 );
 
 /** "Not a medical exam. If anything hurts, stop." On the results and the program page (owner, 2026-09-29). */

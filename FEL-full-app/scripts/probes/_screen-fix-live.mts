@@ -54,7 +54,9 @@ const allLines = new Set<string>();
 
 const browser = await chromium.launch({
   executablePath: chromiumExe(), headless: true,
-  args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+  // the GL flags are the capture scripts' (scripts/capture-mode-audit.mts): without them headless Chromium has no WebGL, and /try's dunk cannot boot
+  args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
+    '--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 
 async function open(tag: string): Promise<Probe> {
@@ -209,15 +211,20 @@ try {
       p.phase.v = 'left-screen';
       await game.click();
       await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-      await sleep(2500);
+      await sleep(8000);                                       // the arena boots
       out.game = {
         href: await page.evaluate('location.pathname'), url: page.url(), urls: p.urls.slice(-4),
         login: /\/login/.test(page.url()) || p.urls.some((u) => /\/login/.test(u)),
         passwordInputs: await page.locator('input[type="password"]').count(),
         canvases: await page.locator('canvas').count(), cookiesBefore: before.cookies, cookiesAfter: (await jar(p)).cookies,
+        bootFailed: p.consoleErrors.filter((e) => /boot failed/i.test(e)).map((e) => e.split('\n')[0]),
+        guestBadge: await page.getByText(/no account needed/i).count(),
         shot: await p.shot('game'),
       };
     } else out.game = 'no game link';
+    // every /api request, split by where it came from: the screen itself, or the page the free game opened
+    out.apiOnScreen = p.reqs.filter((r) => r.phase !== 'left-screen' && new URL(r.url).pathname.startsWith('/api/')).map((r) => `${r.method} ${new URL(r.url).pathname}`);
+    out.apiAfterLeaving = p.reqs.filter((r) => r.phase === 'left-screen' && new URL(r.url).pathname.startsWith('/api/')).map((r) => `${r.method} ${new URL(r.url).pathname}`);
     out.urls = p.urls; out.errors = p.errors; out.consoleErrors = p.consoleErrors.slice(0, 20);
     report.runs[tag] = out;
     save(`${PHASE}-report`, report);
