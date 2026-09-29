@@ -971,21 +971,6 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     return { house, body: { mode: 'music', score: house, won: true, duration: 66, arenaMatchId: id, stats: musicSet({ bars: 32, notes: 192, arena: true }) } };
   }
 
-  it('while music is FAIL CLOSED (no MEASURED_RUNS row) nothing of it pays: no claim, no lock, no ledger — free play neither', async () => {
-    expect(MODE_SCORE_RULES).not.toHaveProperty('music');          // as landed: music is one of the 22 unmeasured keys
-    h.rules = MODE_SCORE_RULES as Record<string, unknown>;          // the real table, not the open one
-    const { body } = arenaSet('m1');
-    const r = await post(body);
-    expect(r.status).toBe(422);
-    expect(r.body).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'no_rules' });
-    expect(h.runs[r.runId!]).toMatchObject({ status: 'rejected' });
-    expect(h.locks).toEqual([]);
-    expect(h.matchEvents.filter(PAID)).toEqual([]);
-    const free = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
-    expect(free.body).toMatchObject({ paid: false, reason: 'SCORE_INVALID', detail: 'no_rules' });
-    expectNothingPaid();
-  });
-
   it('on the real table — music fail closed as landed, or its derived row since owner decision #2 — a creation session still keeps the streak: it needs no run, and pays nothing', async () => {
     h.rules = MODE_SCORE_RULES as Record<string, unknown>;
     streakedAgo(25);
@@ -996,11 +981,13 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     expectNothingPaid();
   });
 
-  // REVIEW FOLLOW-UP (2026-09-29): the red test above pins the AS-LANDED table (music one of the unmeasured keys; a
-  // rule-less run 422 no_rules). Owner decision #2 gave music a derived row and decision #1 records a rule-less run unpaid,
-  // so no code satisfies both; its assertions are left for the owner. This is what the real table does now, so the P6
-  // Arena pay path — live again with music's row — is held on the REAL table, not only on the open one or a synthetic
-  // rules() row. If the owner keeps decision #2, this replaces the red test; if not, this one goes.
+  // OWNER RULING (2026-09-29): this REPLACES d31eba5d's "while music is FAIL CLOSED (no MEASURED_RUNS row) nothing of it
+  // pays". That test pinned the as-landed a1a1c5f9 table (music one of the unmeasured keys; a rule-less run 422 no_rules,
+  // run 'rejected'). Owner decision #2 (2026-09-28) gave music a derived row and decision #1 records a rule-less run unpaid,
+  // so no code could satisfy both; asked, the owner kept the decisions and had the old test replaced. What the real table
+  // does now is held here, so the P6 Arena pay path — live with music's row — is tested on the REAL table, not only on
+  // the open one or a synthetic rules() row. (A rule-less run recorded unpaid is held below: NO_RULES, and the NO_RULES
+  // Arena set that never makes the pay-once claim.)
   it('OWNER DECISIONS #1 + #2 on the REAL table: music has its derived row, a verified Arena set pays once, and a second post or free play is held by the endless ceiling', async () => {
     expect(MODE_SCORE_RULES.music).toMatchObject({ maxScoreFrom: 'derived', maxScore: SCORE_COLUMN_MAX, enabled: true });
     h.rules = MODE_SCORE_RULES as Record<string, unknown>;          // the real table, not the open one

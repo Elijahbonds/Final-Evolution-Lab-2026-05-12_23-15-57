@@ -26,7 +26,8 @@
  * stake models (435,544,000 / 5,866,322) and are NOT endless (lib/session-payout.ts ENDLESS_MODES), so for those two the
  * row is also the only payout cap: XP = 1.5 × score up to ~653M a run. karateEndless and music are held by the endless
  * ceiling. (Review 2026-09-29: four maximal skate runs overflow the int4 PlayerProfile.xp, after which that player's
- * paying sessions 500; forged rows also feed the Arena's cold-start house median, lib/arena-ghost.ts.)
+ * paying sessions 500; forged rows also feed the Arena's cold-start house median, lib/arena-ghost.ts.) Re-asked on
+ * 2026-09-29 with those knock-ons in front of him, the owner kept it: ship as is, a payout-grade bound is the fast-follow.
  *
  * WHERE THE NUMBERS COME FROM (the tip's rule: real measured TRUE :3000 runs with headroom, not guesses). MEASURED_RUNS
  * lists, per session key, every completed run the TRUE :3000 stamp recorded in ~/Claude/outbox (the eye, Features UX and
