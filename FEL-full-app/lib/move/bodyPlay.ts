@@ -196,6 +196,9 @@ export function createBodyPlay(deps: BodyPlayDeps): BodyPlay {
     if (stage === 'set' && (unfed || f.t - fedAt > RATE_WINDOW_MS)) restand();
     unfed = false;
     fedAt = f.t;
+    // MOVEMENT PLAY P8: a board game's READY asks for a side-on stance after "All set" — the check keeps `ready` through the
+    // turn into it (the session carries a stance only for a row that steers with the carve)
+    check.setStanceGame(deps.session.view().stance !== undefined);
     const s = check.push(f);
     if (!last) since = s.t;
     last = s;

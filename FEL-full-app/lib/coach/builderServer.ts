@@ -12,7 +12,7 @@ import { accessRole, mergeSpecUpdate, validateExerciseSpec, type ProgramTree } f
 import { TREE_INCLUDE, toTree } from './server';
 import { moveWithinSection, sessionWarnings, type SessionWarning } from './structure';
 import { EMPTY_LOG_WHERE, logHasContent } from './setLog';
-import { bandAllowed, youthRules } from './taxonomy';
+import { PIN_EXERCISE, bandAllowed, youthRules } from './taxonomy';
 
 export type BuilderDb = Pick<PrismaClient, 'coachingProgram' | 'programExercise' | 'session' | 'sessionExercise' | 'exerciseLog' | 'facilitatorProfile' | 'user'>;
 export type BuilderResult<T> = ({ ok: true } & T) | { ok: false; status: number; error: string };
@@ -29,8 +29,18 @@ export async function builderAction(db: BuilderDb, userId: string, programId: st
 
   /** The coach's own catalogue row, or null — another coach's row is "not found", never "forbidden". */
   const ownExercise = async (exerciseId: string) => {
-    const ex = await db.programExercise.findUnique({ where: { id: exerciseId }, select: { id: true, coachId: true } });
+    const ex = await db.programExercise.findUnique({ where: { id: exerciseId }, select: { id: true, coachId: true, name: true } });
     return ex && ex.coachId === userId ? ex : null;
+  };
+  /**
+   * MIRROR-COACH P3 review (2026-09-26), owner decisions #6 and #20: a row that pins (taxonomy.ts PIN_EXERCISE) is not
+   * prescribed to a client under youth rules — the Mirror draft's one-tap add came through here with a coach's "Calf pin
+   * and stretch" for a 15-year-old's heel-line flag, and so does any manual add.
+   */
+  const pinRefused = async (name: string | null | undefined) => {
+    if (!name || !PIN_EXERCISE.test(name)) return false;
+    const client = await db.user.findUnique({ where: { id: program.clientId }, select: { dobYear: true } });
+    return youthRules(client?.dobYear);
   };
   /** One key set per session: the one just marked keeps it. */
   const clearOtherKeySets = (sessionId: string, keep: string) =>
@@ -78,7 +88,11 @@ export async function builderAction(db: BuilderDb, userId: string, programId: st
     const v = validateExerciseSpec(mergeSpecUpdate(se, body));
     if (!v.ok) return fail(400, v.error);
     if (v.spec.effortBand !== se.effortBand && await bandRefused(v.spec.effortBand)) return fail(400, 'effort_band_adults_only');
-    if (v.spec.exerciseId !== se.exerciseId && !(await ownExercise(v.spec.exerciseId))) return fail(404, 'exercise_not_found');
+    if (v.spec.exerciseId !== se.exerciseId) {
+      const ex = await ownExercise(v.spec.exerciseId);
+      if (!ex) return fail(404, 'exercise_not_found');
+      if (await pinRefused(ex.name)) return fail(400, 'pin_not_for_youth');
+    }
     await db.sessionExercise.update({ where: { id: se.id }, data: { ...v.spec } });
     if (v.spec.isKeySet) await clearOtherKeySets(se.sessionId, se.id);
   } else if (body.action === 'move') {
@@ -96,7 +110,9 @@ export async function builderAction(db: BuilderDb, userId: string, programId: st
     if (!v.ok) return fail(400, v.error);
     if (await bandRefused(v.spec.effortBand)) return fail(400, 'effort_band_adults_only');
     // the catalogue row's coachId was loaded and never compared: any coach could prescribe another's private row
-    if (!(await ownExercise(v.spec.exerciseId))) return fail(404, 'exercise_not_found');
+    const ex = await ownExercise(v.spec.exerciseId);
+    if (!ex) return fail(404, 'exercise_not_found');
+    if (await pinRefused(ex.name)) return fail(400, 'pin_not_for_youth');
     const order = (session.exercises.reduce((m, e) => Math.max(m, e.order), 0)) + 1;
     const created = await db.sessionExercise.create({ data: { sessionId: session.id, order, ...v.spec } });
     if (v.spec.isKeySet) await clearOtherKeySets(session.id, created.id);

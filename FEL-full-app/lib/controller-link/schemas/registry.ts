@@ -27,6 +27,9 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     title: 'The Flip',
     maxPlayers: 1,
     askName: false,
+    // MUSIC-SUITE P6 phone-replay (2026-09-26): the phone SEES the room — the live bank lit, PLAY lit while the transport
+    // runs, REC lit while armed, and chips saying so (types.ts roomState; phonePad.ts phoneRoomState builds it)
+    roomState: true,
     schemas: [
       { kind: 'button', columns: 4, compact: true, haptics: true, buttons: (['A', 'B', 'C', 'D'] as const).map((b) => ({ action: `bank_${b}`, label: `BANK ${b}`, color: '#e8d9c2' })) },
       { kind: 'button', columns: 4, haptics: true, velocity: true, buttons: Array.from({ length: 16 }, (_, i) => ({ action: `pad_${i}`, label: String(i + 1), color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][Math.floor(i / 4)] })) },
@@ -35,6 +38,28 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
         { action: 'stop', label: '■ STOP', color: '#e8d9c2' },
         { action: 'rec', label: '● REC', color: '#ff5c5c' },
       ] },
+    ],
+  },
+
+  // ── PERFORM (Music Academy, MUSIC-SUITE P6, 2026-09-25) ───────────────────
+  // Owner decision #11: PERFORM plays your song in four lanes — KICK · SNARE · HATS · FLIP — on keyboard, pad AND phone. The
+  // phone's PERFORM page is four big lane buttons in one row (left to right as the screen draws the lanes, in the lanes'
+  // colours — lib/babylon/music/performSet.ts PERFORM_LANE_COLORS, which are music_flip's row colours) and PAUSE under them.
+  // Actions lane_0 … lane_3 and pause, parsed on the host by lib/babylon/music/performInput.ts performPhoneCommand (its
+  // test pins that every action here parses). The lanes buzz (the opt-in `haptics` hint — it also gives the buttons
+  // touch-action / select-none, so a fast double tap is two taps, not a zoom); no velocity (a lane is hit or not). In an
+  // Arena set the room judges a phone tap as it ARRIVES (P5's rule: the phone answers its own timing pings); in free play
+  // the arrival is moved back by half the measured round trip. music_flip above is unchanged (P5), and a phone paired as
+  // the MPC plays PERFORM too: a pad's row is a lane.
+  music_perform: {
+    modeId: 'music_perform',
+    title: 'PERFORM',
+    maxPlayers: 1,
+    askName: false,
+    roomState: true,   // MUSIC-SUITE P6 phone-replay: the same room chips as the MPC page (bank, PLAYING, REC)
+    schemas: [
+      { kind: 'button', columns: 4, haptics: true, buttons: (['KICK', 'SNARE', 'HATS', 'FLIP'] as const).map((label, i) => ({ action: `lane_${i}`, label, color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][i] })) },
+      { kind: 'button', columns: 1, compact: true, haptics: true, buttons: [{ action: 'pause', label: '❚❚ PAUSE', color: '#e8d9c2' }] },
     ],
   },
 

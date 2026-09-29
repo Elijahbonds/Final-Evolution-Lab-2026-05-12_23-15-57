@@ -72,6 +72,32 @@ export interface ModeControllerConfig {
   /** Whether the join flow should ask for a display name. */
   askName?: boolean;
   schemas: SchemaSpec[];
+  /**
+   * OPT-IN (MUSIC-SUITE P6 phone-replay, 2026-09-26): the host may send its live state to the phone (a RoomState — which
+   * of the mode's buttons are lit, and a few short status chips), and the phone page draws it. A config without it is
+   * never sent one (HostSession.sendState refuses) and never draws one (SchemaControls ignores it): every other mode's
+   * wire and page are exactly what they were. roomState.ts has the rules.
+   */
+  roomState?: boolean;
+}
+
+/** One status chip on the phone ('BANK B · Pocket Bass', '▶ PLAYING', '● REC ARMED'). The page never learns what it means. */
+export interface RoomStateChip {
+  text: string;
+  /** A #rrggbb colour (anything else is dropped by parseRoomState). */
+  tone?: string;
+  /** Drawn filled (an active state) rather than outlined. */
+  on?: boolean;
+}
+
+/**
+ * The host's live state, as the phone draws it (MUSIC-SUITE P6 phone-replay). Mode-agnostic on purpose — the controller
+ * page has no per-mode knowledge and must never gain any: `lit` names the mode's OWN actions whose buttons show as on
+ * (the live bank, PLAY while the transport runs, REC while armed), and `chips` are words the host chose.
+ */
+export interface RoomState {
+  lit: string[];
+  chips: RoomStateChip[];
 }
 
 /** One input from a phone. Deliberately small — this is the hot path. */
@@ -92,7 +118,9 @@ export type LinkMessage =
   | { type: 'ping'; t: number }
   | { type: 'pong'; t: number }
   | { type: 'lobby'; peers: LobbyPeer[]; config: ModeControllerConfig }
-  | { type: 'assign'; slot: number };
+  | { type: 'assign'; slot: number }
+  /** host → phone, reliable channel, only for a config with `roomState: true` (MUSIC-SUITE P6 phone-replay) */
+  | { type: 'state'; state: RoomState };
 
 export interface LobbyPeer {
   peerId: PeerId;

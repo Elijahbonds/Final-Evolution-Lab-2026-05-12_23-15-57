@@ -211,6 +211,9 @@ describe('AFTER (P3 seam) — the same reads through the per-mode profiles', () 
       for (const name of ['run_in_place', 'shuffle_lateral', 'jump_two_foot_high']) {
         const ys = seam(name, p.key).events.flatMap((x) => (x.e.t === 'stick' ? [x.e.y] : []));
         if (p.key === 'freerun') expect(ys.every((y) => y <= 0), `${p.key} on ${name}: forward only`).toBe(true);
+        // MOVEMENT PLAY P8: surf's TRIM is the crouch's rhythm, and a jump's gather is a compress and an extend (a surfer's
+        // pump into the pop) — never while stepping (the jog, the shuffle), never changed in the air (bodyGate's JUMP row)
+        else if (p.key === 'surf' && name === 'jump_two_foot_high') continue;
         else expect(ys.filter((y) => y !== 0), `${p.key} on ${name}`).toEqual([]);
       }
     }

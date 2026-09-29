@@ -28,6 +28,9 @@ export interface BoardHostOpts {
   tricks: [string, string, string];
   /** Log tag for boot errors. */
   tag: string;
+  /** The splash title (GATE-CRASHER-MAJOR): the mode's NAME. It was the registry key upper-cased — "SNOWBOARD SLALOM" on a
+   *  route whose shell says GATE CRASHER. */
+  title?: string;
 }
 
 /** A labelled 0..max bar. Board sports live on their meters. */
@@ -42,6 +45,9 @@ function Meter({ label, value, max, color }: { label: string; value: number; max
     </div>
   );
 }
+
+/** A mode's NAME on the splash when the route does not pass one (GATE-CRASHER-MAJOR: every host of the slalom says what it is). */
+const HOST_TITLE: Record<string, string> = { snowboard_slalom: 'GATE CRASHER' };
 
 /** Build a GameShell-compatible board host bound to a specific registry mode. */
 export function makeBoardHost(opts: BoardHostOpts) {
@@ -74,7 +80,11 @@ export function makeBoardHost(opts: BoardHostOpts) {
         const won = r.outcome === 'win';
         const combo = n('bestCombo', 1);
         const headline = modeKey === 'snowboard_slalom'
-          ? `${won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)} GATES · ${n('tricksLanded')} TRICKS · x${combo} BEST`
+          // GATE-CRASHER-POLISH-2 (GC-11): ONE LINE. The title carried the whole run — "GATE CRASHER · 27/30 GATES · +0 TIME · 6
+          // TRICKS · X1 BEST" — and wrapped onto three lines of the card's 4xl heading. The verdict and the gates stay here (20
+          // characters, the heading's one line); the time bonus rides the proof line under it (lib/proofLine, "+260 TIME"),
+          // and the score line is the shell's. A run the stall watchdog ended says so (GC-F1).
+          ? `${n('stalled') ? 'RUN STALLED' : won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)}`
           : modeKey === 'surf'
             ? `${won ? 'EPIC SESSION' : 'SESSION OVER'} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`
             : `${won ? 'LEGENDARY RUN' : 'RUN OVER'} · x${combo} BEST CHAIN · ${n('tricksLanded')} TRICKS · ${n('coinsCollected')} COINS`;
@@ -166,12 +176,20 @@ export function makeBoardHost(opts: BoardHostOpts) {
             needs to know which sport it is. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3 font-mono text-xs">
           <div className="flex items-center gap-2">
-            <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">{Math.max(0, Number(hud.time ?? 0))}s</span>
+            <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">
+              {Math.max(0, Number(hud.time ?? 0))}s
+              {/* GATE-CRASHER-POLISH-2 (GC-F1): the par the time bonus counts from, beside the clock (a mode that publishes one) */}
+              {hud.par != null && <span className={Number(hud.time ?? 0) > Number(hud.par) ? 'text-[var(--fel-gold)]' : 'text-white/70'}> · PAR {hnode(hud.par)}</span>}
+            </span>
             {hud.coins != null && (
               <span className="fel-panel px-3 py-1 text-[var(--fel-gold)]">◈ {hnode(hud.coins, 0)}</span>
             )}
             {hud.gates != null && (
               <span className="fel-panel px-3 py-1 text-white/80">GATES {hnode(hud.gates)}</span>
+            )}
+            {/* GATE-CRASHER-MAJOR: the win, in the bezel — the target before it is reached, the verdict after */}
+            {typeof hud.target === 'string' && hud.target && (
+              <span className={`fel-panel px-3 py-1 font-bold ${hud.target.includes('✓') ? 'text-[var(--fel-emerald)]' : 'text-[var(--fel-gold)]'}`}>{hud.target}</span>
             )}
             {hud.goals != null && (
               <span className="fel-panel px-3 py-1 text-white/80">GOALS {hnode(hud.goals)}</span>
@@ -222,7 +240,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
 
         <BootSplash
           modeId={modeKey}
-          title={modeKey.replace(/_/g, ' ').toUpperCase()}
+          title={opts.title ?? HOST_TITLE[modeKey] ?? modeKey.replace(/_/g, ' ').toUpperCase()}
+          goal={typeof hud.goal === 'string' && hud.goal ? hud.goal : undefined}
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
           onStart={tapStart}

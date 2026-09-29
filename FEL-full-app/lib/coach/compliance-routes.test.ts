@@ -95,6 +95,7 @@ import { GET as inviteGET } from '@/app/api/coach/invite/route';
 import { GET as prescribeGET } from '@/app/api/coach/prescribe/route';
 import { MIRROR_SCREEN_KIND, scoreScreen } from '@/lib/mirror/screen';
 import { storedScreen } from '@/lib/mirror/screenStore';
+import { serverRow } from '@/lib/mirror/fixtures/storedRows';
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -192,11 +193,19 @@ describe('GET /api/coach/attention — coached work counts, games are a separate
     expect(b.headline).toBe('3 athletes have not logged any coached work yet.');
   });
 
-  it('control: a GRADED Mirror screen yesterday is current data (F7): no "ask for a System Scan"', async () => {
-    const results = [{ checkId: 'heelLine', grade: 'stable', source: 'camera' }] as Parameters<typeof scoreScreen>[1];
-    m.db.workoutScan = [{ id: 'scan-mira', userId: 'mira', kind: MIRROR_SCREEN_KIND, createdAt: ago(1), metrics: storedScreen('g1', 'modified', results, scoreScreen('modified', results)) as unknown as Row }];
+  // MIRROR-COACH P3 (2026-09-26): "graded" is the SERVER's grading, of a screen that read at least three camera checks
+  // (lib/coach/attention.ts isScanEquivalentScreen) — the row the screen route stores. The same results with no server
+  // stamp (the posting phone's word, every graded row before P3) are not current data.
+  it('control: a SERVER-GRADED Mirror screen yesterday is current data (F7): no "ask for a System Scan"', async () => {
+    const results = (['heelLine', 'hipLevel', 'headFloat'] as const).map((checkId) => ({ checkId, grade: 'stable', source: 'camera' })) as Parameters<typeof scoreScreen>[1];
+    const summary = scoreScreen('modified', results);
+    m.db.workoutScan = [{ id: 'scan-mira', userId: 'mira', kind: MIRROR_SCREEN_KIND, createdAt: ago(1), metrics: serverRow('g1', 'modified', results) as unknown as Row }];
     const b = await get<Board>(attentionGET);
     expect(b.triage.flags.find((f) => f.clientId === 'mira')).toBeUndefined();
+
+    m.db.workoutScan = [{ id: 'scan-mira', userId: 'mira', kind: MIRROR_SCREEN_KIND, createdAt: ago(1), metrics: storedScreen('g1', 'modified', results, summary) as unknown as Row }];
+    const phone = await get<Board>(attentionGET);
+    expect(phone.triage.flags.find((f) => f.clientId === 'mira')).toMatchObject({ kind: 'stale-scan', observed: 'No PRQ System Scan on file; no graded Mirror screen; no coached work logged.' });
   });
 
   // MIRROR-COACH P2 review (2026-09-26): Today's Save wrote an EMPTY ExerciseLog for every untouched exercise, and this

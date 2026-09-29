@@ -68,7 +68,8 @@ export interface PoseSourceStartOptions { autoCalibrate?: boolean }
 export class PoseSource {
   private active = false;
   private reader = new BodyReader({ autoCalibrate: false });
-  private readonly channels = new ChannelReader();
+  // MOVEMENT PLAY P8 (2026-09-26): the channels' ride read takes the reader's calibration (its lens pitch) every frame
+  private readonly channels = new ChannelReader({ calibration: () => this.reader.calibration });
   /** A packet has gone out since the last final one: a stop or a re-centre must tell the running mode to let go. */
   private published = false;
   /** The capture time of the last frame read (the final packet's read carries it). */
@@ -173,7 +174,7 @@ export class PoseSource {
   private onFrame = (f: PoseFrame): void => {
     if (!this.active) return;
     const { read, events } = this.reader.read(f);
-    const channels = this.channels.step(read, events);
+    const channels = this.channels.step(read, events, f);   // MOVEMENT PLAY P8: the frame, for the ride read
     this.lastT = read.t;
     this.published = true;
     try {

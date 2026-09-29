@@ -147,6 +147,14 @@ export function youthRules(dobYear: number | null | undefined, now: Date = new D
   return !(now.getFullYear() - dobYear > 18);
 }
 
+/**
+ * A catalogue row that PINS — a pin-and-stretch, a pinned release (MIRROR-COACH P3 review, 2026-09-26). Owner decision
+ * #6: no pin-and-stretch under 18. The Mirror's own corrective mapping holds no pin, but the coach's draft matched a
+ * coach's "Calf pin and stretch" (tagged 'joints') to a heel-line flag and put it in a youth client's Prep in one tap;
+ * the draft now skips such rows for a youth client and the builder refuses to add one (builderServer.ts).
+ */
+export const PIN_EXERCISE = /\bpin(?:s|ned|ning)?\b/i;
+
 /** A band may be prescribed to (and shown to) this client: no band, a youth-allowed band, or an adult client. */
 export function bandAllowed(id: string | null | undefined, youth: boolean): boolean {
   const b = effortBand(id);

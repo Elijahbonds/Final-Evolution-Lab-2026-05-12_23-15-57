@@ -285,7 +285,9 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
     });
     applyFloorDetailToMesh(ctx.scene, plane, { kind: 'grass', blend: 0.35 }, fieldPaint.size);
   }
-  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ);   // owner 2026-09-05: the concept photo rebuilt as scenery
+  // owner 2026-09-05: the concept photo rebuilt as scenery. DUNK-VENICE-ENV-RENDER (2026-09-28): the dunk (and the duel, which
+  // mounts the same venue) stands in its own Venice — beach, bike path and promenade, no lawn; the other hoops courts keep theirs.
+  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' ? 'venice-dunk' : 'lawn');
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   // HIDE THE STUBS WHEN THE KIT IS ON (SHARED-PLACE-FLOOR). A spec's 'palm' is a cylinder under a six-sided cone and its

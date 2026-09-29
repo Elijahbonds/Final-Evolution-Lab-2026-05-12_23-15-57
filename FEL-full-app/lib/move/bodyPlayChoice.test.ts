@@ -51,9 +51,9 @@ describe('the choice is remembered per game', () => {
 });
 
 describe('which games offer body play', () => {
-  it('exactly the nine games the body drives today (P3\'s binds)', () => {
+  it('exactly the games the body drives today (P3\'s nine binds, and P8\'s kart and plane on the live probe\'s word)', () => {
     const play = cards.filter((c) => bodyPlayOffer(c.card) === 'play').map((c) => c.key).sort();
-    expect(play).toEqual(['bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf']);
+    expect(play).toEqual(['aeroaces', 'bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf', 'velocitykart']);
   });
 
   it('a game with a later phase says it is coming; one with none (L, a quiz) says nothing', () => {

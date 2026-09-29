@@ -68,6 +68,11 @@ export const REASON = {
   // Owner decision 2026-09-24: a purchase that took a balance and delivered nothing is paid back, in its own currency,
   // the next time the wallet is read (lib/wallet/dead-buys.ts). Not an earn: it never counts against a daily cap.
   DEAD_BUY_REFUND: 'DEAD_BUY_REFUND',
+  // MUSIC-SUITE P6 (2026-09-25), owner decision #23: a Music Room kit the room handed out for free before the shards seam
+  // was closed (4b766804, 2026-09-20) is granted to the account once, on a zero-delta row under this reason
+  // (lib/wallet/kit-grandfather.ts). Not a purchase and not an earn: no balance moves, the dead-buy sweep never reads it
+  // (dead-buys.ts DEAD_BUY_REASONS), and the owned-kits read counts it as backing the kit (dead-buys.ts backedEntitlements).
+  KIT_GRANDFATHER_2026_09: 'KIT_GRANDFATHER_2026_09',
 } as const;
 
 export type ReasonCode = (typeof REASON)[keyof typeof REASON];
@@ -87,6 +92,17 @@ export const EVENT_REASON: Record<string, ReasonCode> = {
   // Phase 2 Scene It free-use identification.
   sceneit_freeuse_identified: REASON.SCENEIT_FREEUSE_IDENTIFIED,
 };
+
+// DAILY-KEY-HOTFIX (2026-09-28): the event types paid at most once per player per America/Los_Angeles calendar day.
+// earn() keys them itself (lib/wallet/dailyKey.ts dailyKey) and ignores the client's idempotency_key: the client built
+// that key, and any new string paid the daily reward again (eye a1a1c5f9 5b; production at 3a0f4edf).
+// DERIVED from EVENT_REASON, not listed: an event type named daily_* or paying a DAILY_* reason is one, so a daily
+// added to EVENT_REASON later is keyed per day without anyone remembering this set.
+export const DAILY_EVENT_TYPES: ReadonlySet<string> = new Set(
+  Object.entries(EVENT_REASON)
+    .filter(([eventType, reasonCode]) => eventType.startsWith('daily_') || reasonCode.startsWith('DAILY_'))
+    .map(([eventType]) => eventType),
+);
 
 // Reasons whose currency is shards — asserted at multiple layers so a purchase
 // path can NEVER mint shards (permanent design constraint, §1).

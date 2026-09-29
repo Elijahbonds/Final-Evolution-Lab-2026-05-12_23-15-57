@@ -1,0 +1,350 @@
+{
+ "license": "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+ "labeller": "eye",
+ "takes": [
+  {
+   "name": "cmu_134_03_lean_turn_right",
+   "file": "cmu/134/134_03.bvh",
+   "seconds": 2.67,
+   "kb": 28,
+   "family": "board",
+   "kind": "positive",
+   "controls": [
+    "carve"
+   ]
+  },
+  {
+   "name": "cmu_134_15_lean_turn_left",
+   "file": "cmu/134/134_15.bvh",
+   "seconds": 1.87,
+   "kb": 19,
+   "family": "board",
+   "kind": "positive",
+   "controls": [
+    "carve"
+   ]
+  },
+  {
+   "name": "cmu_134_05_pump_jump",
+   "file": "cmu/134/134_05.bvh",
+   "seconds": 2.37,
+   "kb": 24,
+   "family": "board",
+   "kind": "positive",
+   "controls": [
+    "pop",
+    "carve"
+   ]
+  },
+  {
+   "name": "cmu_134_08_push_turn_right",
+   "file": "cmu/134/134_08.bvh",
+   "seconds": 1.87,
+   "kb": 19,
+   "family": "board",
+   "kind": "positive",
+   "controls": [
+    "carve",
+    "push"
+   ]
+  },
+  {
+   "name": "cmu_79_76_driving",
+   "file": "cmu/79/79_76.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "wheel",
+    "grip"
+   ]
+  },
+  {
+   "name": "cmu_80_38_driving",
+   "file": "cmu/80/80_38.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "wheel",
+    "grip"
+   ]
+  },
+  {
+   "name": "cmu_79_58_bird",
+   "file": "cmu/79/79_58.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "spread",
+    "bank"
+   ]
+  },
+  {
+   "name": "cmu_80_62_bird",
+   "file": "cmu/80/80_62.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "spread",
+    "bank"
+   ]
+  },
+  {
+   "name": "cmu_132_01_arms_out",
+   "file": "cmu/132/132_01.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "spread",
+    "bank",
+    "stride"
+   ]
+  },
+  {
+   "name": "cmu_132_05_arms_out",
+   "file": "cmu/132/132_05.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "spread",
+    "bank",
+    "stride"
+   ]
+  },
+  {
+   "name": "cmu_132_09_arms_out",
+   "file": "cmu/132/132_09.bvh",
+   "seconds": 4.5,
+   "kb": 45,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "spread",
+    "bank",
+    "stride"
+   ]
+  },
+  {
+   "name": "cmu_91_56_jump_turn_90",
+   "file": "cmu/91/91_56.bvh",
+   "seconds": 2.9,
+   "kb": 29,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_91_46_jump_turn",
+   "file": "cmu/91/91_46.bvh",
+   "seconds": 2.4,
+   "kb": 24,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_83_51_hop_turn_90",
+   "file": "cmu/83/83_51.bvh",
+   "seconds": 2.5,
+   "kb": 25,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_83_54_hop_turn_180",
+   "file": "cmu/83/83_54.bvh",
+   "seconds": 2.5,
+   "kb": 26,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_83_58_hop_turn_270",
+   "file": "cmu/83/83_58.bvh",
+   "seconds": 2.5,
+   "kb": 26,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_83_61_hop_turn_360",
+   "file": "cmu/83/83_61.bvh",
+   "seconds": 2.77,
+   "kb": 28,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_83_64_hop_turn_360_right",
+   "file": "cmu/83/83_64.bvh",
+   "seconds": 2.5,
+   "kb": 25,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "quarter",
+    "pop"
+   ]
+  },
+  {
+   "name": "cmu_69_16_turn_in_place",
+   "file": "cmu/69/69_16.bvh",
+   "seconds": 3,
+   "kb": 30,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "turn"
+   ]
+  },
+  {
+   "name": "cmu_69_18_turn_in_place_other",
+   "file": "cmu/69/69_18.bvh",
+   "seconds": 2.77,
+   "kb": 28,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "turn"
+   ]
+  },
+  {
+   "name": "cmu_143_04_jog",
+   "file": "cmu/143/143_04.bvh",
+   "seconds": 4,
+   "kb": 40,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "stride"
+   ]
+  },
+  {
+   "name": "cmu_91_19_march",
+   "file": "cmu/91/91_19.bvh",
+   "seconds": 5,
+   "kb": 50,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "stride"
+   ]
+  },
+  {
+   "name": "cmu_132_37_march",
+   "file": "cmu/132/132_37.bvh",
+   "seconds": 3.77,
+   "kb": 38,
+   "family": "facing",
+   "kind": "positive",
+   "controls": [
+    "stride"
+   ]
+  },
+  {
+   "name": "cmu_141_16_wave",
+   "file": "cmu/141/141_16.bvh",
+   "seconds": 4.27,
+   "kb": 43,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_113_27_wave",
+   "file": "cmu/113/113_27.bvh",
+   "seconds": 2.7,
+   "kb": 27,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_143_25_wave",
+   "file": "cmu/143/143_25.bvh",
+   "seconds": 4,
+   "kb": 41,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_141_13_stretch",
+   "file": "cmu/141/141_13.bvh",
+   "seconds": 4.5,
+   "kb": 46,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_143_30_stretch",
+   "file": "cmu/143/143_30.bvh",
+   "seconds": 5,
+   "kb": 50,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_113_23_stretch",
+   "file": "cmu/113/113_23.bvh",
+   "seconds": 5,
+   "kb": 50,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_77_21_stretch",
+   "file": "cmu/77/77_21.bvh",
+   "seconds": 5,
+   "kb": 50,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  },
+  {
+   "name": "cmu_83_22_stretch",
+   "file": "cmu/83/83_22.bvh",
+   "seconds": 5,
+   "kb": 49,
+   "family": "facing",
+   "kind": "negative",
+   "controls": []
+  }
+ ]
+}

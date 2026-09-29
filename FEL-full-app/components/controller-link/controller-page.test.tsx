@@ -47,7 +47,7 @@ describe('controller page: a schema without hints renders exactly as before P5',
 
   it('no other mode picks up a hint\'s markup (no select-none, touch-action, compact row, or feel line)', () => {
     for (const [id, c] of Object.entries(MODE_CONTROLLERS)) {
-      if (id === 'music_flip') continue;
+      if (id === 'music_flip' || id === 'music_perform') continue;   // MUSIC-SUITE P6: the Academy's two pages ask for hints
       const html = page(c);
       expect(html, id).not.toMatch(/select-none|touch-action|py-3 text-sm|data-testid="pad-feel"/);
       // and the same schemas with every hint explicitly OFF render the same
@@ -65,6 +65,23 @@ describe('controller page: a schema without hints renders exactly as before P5',
     press(bs.find((b) => b.label === 'RUN')!);
     expect(sent).toEqual([['A'], ['charge:down']]);
     expect(vibrate).not.toHaveBeenCalled();
+  });
+});
+
+describe('controller page: PERFORM\'s four lanes (MUSIC-SUITE P6)', () => {
+  it('KICK · SNARE · HATS · FLIP in one row, PAUSE under them; touch-safe, and a lane press sends its bare action (no velocity)', () => {
+    const html = page(MODE_CONTROLLERS.music_perform);
+    const labels = [...html.matchAll(/<button[^>]*>([^<]+)<\/button>/g)].map((m) => m[1]);
+    expect(labels).toEqual(['KICK', 'SNARE', 'HATS', 'FLIP', '❚❚ PAUSE']);
+    expect(html).toContain('touch-action:manipulation');
+    const vibrate = vi.fn(() => true);
+    vi.stubGlobal('navigator', { vibrate });
+    const { client, sent } = fakeClient();
+    const bs = buttonsOf(MODE_CONTROLLERS.music_perform, client);
+    press(bs.find((b) => b.label === 'HATS')!, { pointerType: 'touch', pressure: 0.9, width: 40, height: 40 });
+    press(bs.find((b) => b.label === '❚❚ PAUSE')!);
+    expect(sent).toEqual([['lane_2'], ['pause']]);
+    expect(vibrate).toHaveBeenCalledTimes(2);
   });
 });
 

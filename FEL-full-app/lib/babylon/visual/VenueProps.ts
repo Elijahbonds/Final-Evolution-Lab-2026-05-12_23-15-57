@@ -108,11 +108,13 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
     holder.position.set(px, p.at[1], pz);
     if (opts.snapToGround) { const gy = groundYAt(px, pz); if (gy !== null) { holder.position.y = gy + p.at[1]; snapped++; } else missed++; }
     holder.rotation.y = p.yaw ?? 0;
-    const s = p.scale ?? 1; holder.scaling.set(s, s, s);
+    const s = p.scale ?? 1, [sx, sy, sz] = p.stretch ?? [1, 1, 1]; holder.scaling.set(s * sx, s * sy, s * sz);
     for (const src of meshes) {
       // a tinted placement instances a TINTED MASTER (one hidden clone per source × tint, shared by every placement with that
-      // tint — the slope's 60 green pines were 60 clones = 60 draws, measured 2026-09-06); untinted ones instance the source
-      const master = p.tint ? tintedMaster(scene, src, p.tint) : src;
+      // tint — the slope's 60 green pines were 60 clones = 60 draws, measured 2026-09-06); untinted ones instance the source.
+      // A per-material tint ({ woodBark: …, leafsGreen: … }) tints each part by its own material and leaves the rest alone.
+      const hex = tintFor(p.tint, src.material?.name);
+      const master = hex ? tintedMaster(scene, src, hex) : src;
       // receiveShadows lives on the SOURCE — an InstancedMesh only reads its source's flag, and setting it on the instance
       // is a no-op that logs a BJS warning per instance (217 per /try boot, measured 2026-09-07)
       master.receiveShadows = true;
@@ -163,10 +165,18 @@ export async function mountVenueProps(scene: Scene, venueKey: string, parent?: T
   };
 }
 
+/** The tint a placement gives one part of its model: a plain hex tints every part, a map tints by the part's material name. */
+export function tintFor(tint: PropPlacement['tint'], materialName: string | undefined): string | undefined {
+  if (!tint) return undefined;
+  if (typeof tint === 'string') return tint;
+  return materialName ? tint[materialName] : undefined;
+}
+
 /** For a spec venue: the root is the built scene's root; the venue key comes from the spec's venue name map. */
 export function propSetFor(specVenueId: string): string | null {
   const map: Record<string, string> = {
-    basketball_dunk: 'venice-court-meshy', basketball_h2h: 'venice-court-meshy', basketball_3v3: 'venice-court-meshy', court_carnival: 'venice-court',
+    // DUNK-VENICE-ENV-RENDER: the dunk (and the duel, same venue) has its own Venice; the other hoops courts keep theirs
+    basketball_dunk: 'venice-dunk', basketball_h2h: 'venice-court-meshy', basketball_3v3: 'venice-court-meshy', court_carnival: 'venice-court',
     karate_h2h: 'dojo', karate_endless: 'dojo', golf_loop: 'links', derby: 'ballpark', penalty: 'stadium', football_rush: 'gridiron',
     tennis: 'venice-court', volleyball: 'beach-court', gymnastics: 'gym', dance: 'dojo',   // P5: volleyball had the SURF set (authored for a 90 m water strip — the bus 60 m out over nothing)
   };

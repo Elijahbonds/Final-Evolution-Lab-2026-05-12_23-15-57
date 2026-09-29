@@ -27,6 +27,7 @@
 import type { DbClient } from '@/lib/ledger';
 import { applyLc, getOrCreateWallet } from '@/lib/wallet/wallet-service';
 import { canonicalModeKey, LEGACY_MODE_KEYS } from '@/lib/game-data';
+import { MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
 
 // ---------------------------------------------------------------------------
 // House rival roster
@@ -176,7 +177,18 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
   carnival: 300,
   mixedcombat: 100,
   dunkduel: 90,
-  music: 5000,
+  // MUSIC-SUITE P6 (2026-09-26, owner decision #12): every Arena set is now on the one house-beat scale
+  // (lib/babylon/music/houseBeat.ts, ceiling 378,300), and the pre-P6 scores that set the rival before are no longer read
+  // (RIVAL_SCORE_EVENT).
+  // MUSIC-SUITE P6 FIX PASS (2026-09-26): 5,000 → 12,000. #12 said "5,000 baseline kept until real scores exist", but
+  // 5,000 was a number on the OLD scale, and on the house beat it is a set nobody has to play: measured over 200 house
+  // beats (outbox musicsuite/p6/arena-music-proof.json and this pass's re-measure), four keys pressed together on every
+  // 8th — grade D, 9 % accuracy — scored 9,350–9,600, and kick-on-quarters (grade D) 6,000–6,800, against a cold-start
+  // band of 4,100–5,900: every account's first music Quick Match was won by mashing, at up to 500 LC. 12,000 puts the
+  // band at 9,840–14,160 — above every mash measured and where a grade-C set lands (right lanes on the quarter notes:
+  // 12,400–13,200; a beginner at ±90 ms: median 14,950) — so the house plays a grade-C set, the line owner decision #13
+  // already draws for a music win. TUNE(elijah).
+  music: 12_000,
   dance: 5000,
   training: 50,
 };
@@ -184,6 +196,16 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
 /** Symmetric skill-band half-width: the rival scores within ±18% of the
  *  band center. TUNE(elijah). */
 export const RIVAL_BAND = 0.18;
+
+/**
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26): modes whose band never centres BELOW the cold-start baseline. Music: the band
+ * centres on the player's own median, and a finished attempt with no taps is a real (rejudged) 0 — so one empty finish
+ * drew a ghost of 0, a history of [9600 ×4, 0 ×6] drew 0 too, and 0-vs-0 ties (refunded, free) could fill the history
+ * with zeros: then every 500 LC Quick Match had a ghost of 0 and any tap won 900 LC. With the floor, a player's own
+ * history can only RAISE the house above the grade-C baseline, never lower it: the least a music win takes is a grade-C
+ * set (decision #13's line), whatever the history holds.
+ */
+export const RIVAL_BASELINE_FLOOR: ReadonlySet<string> = new Set(['music']);
 
 /**
  * Modes whose sessions are not on the scale of a staked run, so the rival is banded on the player's own past Arena
@@ -195,6 +217,16 @@ export const RIVAL_BAND = 0.18;
  */
 export const RIVAL_FROM_DUEL_SCORES: ReadonlySet<string> = new Set(['music']);
 
+/**
+ * MUSIC-SUITE P6 (2026-09-26, owner decision #12: "old music duel scores stop counting; 5,000 baseline kept until real
+ * scores exist"). A past duel score in one of these modes bands the rival only when that duel carries this event BY THE
+ * PLAYER: for music, a FINISHED house-beat attempt (lib/arena-music.ts), so the score is one the server rejudged from
+ * the taps. Every music score from before phase 6 was the player's own grid on an open scale (up to 2,647,100) and has
+ * no such event, so it no longer counts; nor does a forfeit (started, never finished: it submits 0 and is no measure of
+ * the player). With none left, the draw falls to the 5,000 baseline.
+ */
+export const RIVAL_SCORE_EVENT: Readonly<Record<string, string>> = { music: MUSIC_ATTEMPT_FINISH };
+
 /** Every key a duel of this mode may be stored under: the current one and its old spellings (LEGACY_MODE_KEYS). */
 export function storedModeKeys(mode: string): string[] {
   return [mode, ...Object.keys(LEGACY_MODE_KEYS).filter((k) => LEGACY_MODE_KEYS[k] === mode)];
@@ -203,13 +235,15 @@ export function storedModeKeys(mode: string): string[] {
 /**
  * The player's own scores from their past duels, in the order given (newest first from the query), from CompetitionMatch
  * rows on either side. A score above `max` is dropped: it came from before the mode's ceiling, and no staked run can
- * reach it now.
+ * reach it now. MUSIC-SUITE P6: with `requireEvent` (RIVAL_SCORE_EVENT), a row counts only if its `events` hold that
+ * event by this player — a row that does not carry its events at all counts for nothing.
  */
 export function ownDuelScores(
-  rows: readonly { player1Id: string; player1Score: number | null; player2Score: number | null }[],
-  userId: string, max = Infinity,
+  rows: readonly { player1Id: string; player1Score: number | null; player2Score: number | null; events?: readonly { eventType: string; userId: string | null }[] }[],
+  userId: string, max = Infinity, requireEvent?: string,
 ): number[] {
   return rows
+    .filter((r) => !requireEvent || (r.events ?? []).some((e) => e.eventType === requireEvent && e.userId === userId))
     .map((r) => (r.player1Id === userId ? r.player1Score : r.player2Score))
     .filter((s): s is number => typeof s === 'number' && Number.isFinite(s) && s >= 0 && s <= max);
 }
@@ -248,6 +282,13 @@ export function drawRivalScore(opts: {
   } else {
     // HOTFIX (2026-09-24): a duel stored as 'musicAcademy' has to find the music baseline, not the default of 100.
     center = ARENA_SCORE_BASELINES[canonicalModeKey(opts.mode)] ?? 100;
+    source = 'baseline';
+  }
+  // MUSIC-SUITE P6 FIX PASS: never below the baseline in a floored mode (RIVAL_BASELINE_FLOOR)
+  const key = canonicalModeKey(opts.mode);
+  const floor = ARENA_SCORE_BASELINES[key];
+  if (RIVAL_BASELINE_FLOOR.has(key) && typeof floor === 'number' && !(center >= floor)) {
+    center = floor;
     source = 'baseline';
   }
   const u = seedU(opts.seed, 'rival-score');

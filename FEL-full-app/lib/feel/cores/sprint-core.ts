@@ -19,7 +19,15 @@
  */
 
 import { RhythmCadence, SensoryBus } from '../index';
-import type { SensoryEvent } from '../index';
+import type { SensoryEvent, CadenceQuality } from '../index';
+
+/**
+ * MOVEMENT PLAY P8 (2026-09-26): a stride graded somewhere else. A body running in place is graded on the camera's capture
+ * clock against a body's cadence (lib/babylon/core/rideBody BodyStride) — a thumb's 5 taps a second is not a jog's 3 —
+ * and a step CAPTURED before the gun is a false start even when it arrives after it (`early`). Omitted, the core grades
+ * the tap itself on its own clock, exactly as before (the pad path is unchanged).
+ */
+export interface SprintStepOpts { quality?: CadenceQuality; early?: boolean }
 
 export type SprintPhase = 'Ready' | 'Set' | 'Go' | 'Run' | 'Finish';
 
@@ -114,9 +122,9 @@ export class SprintCore {
     this.skin.onPhase?.(next, prev);
   }
 
-  /** Feed an alternating footstrike tap. */
-  step(side: 'L' | 'R'): void {
-    if (this.phase === 'Ready' || this.phase === 'Set') {
+  /** Feed an alternating footstrike tap (MOVEMENT PLAY P8: or a body stride graded elsewhere, `opts`). */
+  step(side: 'L' | 'R', opts?: SprintStepOpts): void {
+    if (this.phase === 'Ready' || this.phase === 'Set' || (opts?.early && (this.phase === 'Go' || this.phase === 'Run'))) {
       // REAL false start — back to the blocks.
       this._falseStarts += 1;
       this._lastStep = 'FALSE START';
@@ -129,7 +137,8 @@ export class SprintCore {
     if (this.phase === 'Go') this._setPhase('Run');
 
     const k = this.skin.tuning;
-    const quality = this.cadence.tap(side);
+    const quality = opts?.quality ?? this.cadence.tap(side);
+    if (opts?.quality && opts.quality !== 'first') this.cadence.stats[opts.quality]++;   // the stats count a body's strides too
     if (quality === 'fault') {
       this._speed *= k.stumblePenalty;
       this._lastStep = 'STUMBLE';

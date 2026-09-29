@@ -26,6 +26,10 @@
  *      from its attempts, checks every attempt against what its own judges could have given it, and refuses a score
  *      that is not the card's total.
  *
+ *   3. MUSIC-SUITE P6 (2026-09-26): A MUSIC SCORE IS THE SERVER'S OWN. An Arena music set is played on the duel's house
+ *      beat and its taps are recorded (lib/arena-music.ts); the route rejudges them with the room's judge and passes the
+ *      result in as `rejudged`, and a posted score that is not exactly it is refused (REJUDGED_STAKE_MODES).
+ *
  * Constants that live in pure modules are IMPORTED, so a tuning change moves the ceiling with it. Constants that live
  * inside a Babylon mode file (which a server route must not import) are MIRRORED below with the file they come from;
  * the test reads those files and fails the moment one drifts.
@@ -44,7 +48,7 @@ import { WHO_SCENE_IT, scoreAnswer } from '@/lib/babylon/core/QuizCore';
 import { SCENE_CATEGORIES } from '@/lib/babylon/core/SceneBuzz';
 import { JUDGE_WINDOWS, DANCE_LIBRARY } from '@/lib/babylon/core/DanceCore';
 import { MAX_SONG_BARS } from '@/lib/babylon/music/Song';
-import { performSetMax, PERFORM_SET_BARS, PERFORM_SET_NOTES } from '@/lib/babylon/music/performSet';
+import { HOUSE_SET_MAX, HOUSE_SET_BARS, HOUSE_SET_NOTES } from '@/lib/babylon/music/houseBeat';
 import { EVENTS_PER_NIGHT } from '@/lib/babylon/core/CarnivalNight';
 import { REPEAT_NO_MULT } from '@/lib/babylon/core/ComboChain';
 import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, basePts } from '@/lib/babylon/core/BoardTricks';
@@ -512,10 +516,15 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   // Only an Arena set has an end (owner, 2026-09-24: "Cap only Arena sets"): a duel launches the Academy with ?arena=,
   // and that run's PERFORM set is `new PerformSet({ arena: true })`. Free play runs until END SET and is never staked, and
   // its sessions never set a staked rival either: a music rival is banded on past Arena scores (RIVAL_FROM_DUEL_SCORES).
+  // MUSIC-SUITE P6 (2026-09-26, owner decision #12): an Arena set is played on the duel's HOUSE BEAT
+  // (lib/babylon/music/houseBeat.ts), not the player's grid, and every house beat charts exactly HOUSE_SET_NOTES = 192
+  // notes — so the ceiling is that set's maximum, 378,300, not performSetMax() = 2,647,100 (all 512 steps a note, a set no
+  // real beat plays). The score is also REJUDGED (REJUDGED_STAKE_MODES below): it must equal what the server's
+  // judgeHouseSet makes of the attempt's recorded taps.
   music: {
-    max: performSetMax(), kind: 'rules', swapsUnderKillSwitch: false,
-    why: `a ${PERFORM_SET_BARS}-bar Arena set, every one of its ${PERFORM_SET_NOTES} notes hit PERFECT in one combo`,
-    basis: 'performSet PERFORM_SET_NOTES (PERFORM_SET_BARS × 16 steps, every step a note), each performHitPoints(PERFECT, combo) = 100 × (1 + floor(combo / 5)); an Arena set ends itself after its last note',
+    max: HOUSE_SET_MAX, kind: 'rules', swapsUnderKillSwitch: false,
+    why: `a ${HOUSE_SET_BARS}-bar Arena set on the duel's house beat, every one of its ${HOUSE_SET_NOTES} notes hit PERFECT in one combo`,
+    basis: 'houseBeat HOUSE_SET_NOTES (HOUSE_BAR_NOTES: 48 charted notes per 8-bar pass × 4 passes, the same for every seed), each performHitPoints(PERFECT, combo) = 100 × (1 + floor(combo / 5)) = performSetMax(192); the server rejudges the recorded taps (judgeHouseSet) and the score must equal it',
   },
   // ── bound: the rules set no maximum (see the header) ──────────────────────────────────────────────────────────────
   skateboarding: {
@@ -601,6 +610,8 @@ export type StakeRefusal =
   | 'SCORE_INVALID'
   | 'NO_SCORE_CEILING'
   | 'SCORE_ABOVE_CEILING'
+  | 'SCORE_NOT_REJUDGED'
+  | 'SCORE_MISMATCH'
   | 'CARD_TOO_MANY_ATTEMPTS'
   | 'CARD_ATTEMPT_INVALID'
   | 'CARD_TOTAL_MISMATCH'
@@ -666,11 +677,33 @@ export function checkDunkCard(score: number, raw: unknown): { ok: true; card: Du
 }
 
 /**
+ * MUSIC-SUITE P6 (2026-09-26): modes whose staked score is not the client's number but the server's own REJUDGE of a
+ * recorded attempt — music: /api/arena/submit-score reads the player's attempt (lib/arena-music.ts), runs judgeHouseSet
+ * on its taps and passes the result as `rejudged`. A route that has no rejudge to pass (the dark competition engine's
+ * submit-score, which knows no attempts) is refused: a music score it cannot check is never settled.
+ */
+export const REJUDGED_STAKE_MODES: ReadonlySet<string> = new Set(['music']);
+
+/** Is this mode (any spelling a row or a client carries) one whose stake only the Arena can settle? */
+export function isRejudgedStakeMode(mode: string | null | undefined): boolean {
+  return REJUDGED_STAKE_MODES.has(canonicalStakeMode(String(mode ?? '')));
+}
+/**
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26): the dark real-money engine's refusal for a REJUDGED_STAKE_MODES mode — at create
+ * and join, before any escrow is locked (its submit-score cannot rejudge, so such a match could never settle).
+ */
+export const NOT_STAKEABLE_HERE = {
+  code: 'NOT_STAKEABLE_HERE',
+  detail: (mode: string | null | undefined): string => `A ${canonicalStakeMode(String(mode ?? ''))} stake is settled only in the Arena, from a recorded attempt — it can't be staked here.`,
+} as const;
+
+/**
  * Everything a staked score must pass before it is written. `killSwitch` is NEXT_PUBLIC_DISABLE_3D: with it on, a mode
  * whose route mounts a fallback game on another scale is not held to the table (the ceiling describes the Babylon game);
- * the result says whether the ceiling applied so the route can log it.
+ * the result says whether the ceiling applied so the route can log it. `rejudged`: the server's own score for the run,
+ * required for a REJUDGED_STAKE_MODES mode (the posted score must equal it) and ignored for every other mode.
  */
-export function checkStakeScore(input: { mode: string; score: unknown; card?: unknown; killSwitch?: boolean }): StakeCheck {
+export function checkStakeScore(input: { mode: string; score: unknown; card?: unknown; killSwitch?: boolean; rejudged?: number }): StakeCheck {
   const { score } = input;
   if (typeof score !== 'number' || !Number.isInteger(score) || score < 0) {
     return { ok: false, code: 'SCORE_INVALID', detail: 'score must be a non-negative integer' };
@@ -683,6 +716,15 @@ export function checkStakeScore(input: { mode: string; score: unknown; card?: un
   const ceilingApplied = !(input.killSwitch && ceiling.swapsUnderKillSwitch);
   if (ceilingApplied && score > ceiling.max) {
     return { ok: false, code: 'SCORE_ABOVE_CEILING', detail: aboveCeilingDetail(score, ceiling) };
+  }
+  if (REJUDGED_STAKE_MODES.has(key)) {
+    const r = input.rejudged;
+    if (typeof r !== 'number' || !Number.isInteger(r) || r < 0) {
+      return { ok: false, code: 'SCORE_NOT_REJUDGED', detail: `A ${key} score counts only from its recorded attempt, and this one could not be checked. ${NOT_RECORDED}` };
+    }
+    if (score !== r) {
+      return { ok: false, code: 'SCORE_MISMATCH', detail: `The score (${score}) is not what your recorded set scores (${r}). ${NOT_RECORDED}` };
+    }
   }
   let card: DunkCard | null = null;
   if (key === 'dunkContest') {

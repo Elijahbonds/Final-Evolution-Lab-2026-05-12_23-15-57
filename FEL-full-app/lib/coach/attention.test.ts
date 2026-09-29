@@ -183,14 +183,78 @@ describe('gradedScreenTimes: only a screen the coach can read counts', () => {
     const { gradedScreenTimes } = await import('./attention');
     const { storedScreen } = await import('../mirror/screenStore');
     const { scoreScreen } = await import('../mirror/screen');
-    const results = [{ checkId: 'heelLine', grade: 'stable', source: 'camera' }] as Parameters<typeof scoreScreen>[1];
+    const { serverRow } = await import('../mirror/fixtures/storedRows');
+    // (P3 review: three checks from more than one station — the screen bar the payout uses — as the route stores them)
+    const results = (['heelLine', 'hipLevel', 'headFloat'] as const).map((checkId) => ({ checkId, grade: 'stable', source: 'camera' })) as Parameters<typeof scoreScreen>[1];
     const t = (d: number) => new Date(ago(d));
+    // (MIRROR-COACH P3: "graded" is the SERVER's grading now — `extras` is what the screen route stores with it)
+    const server = { camera: [], provisional: false };
     expect(gradedScreenTimes([
-      { createdAt: t(1), metrics: storedScreen('ungraded', 'modified', [], scoreScreen('modified', [])) },
+      { createdAt: t(1), metrics: storedScreen('ungraded', 'modified', [], scoreScreen('modified', []), server) },
       { createdAt: t(2), metrics: { screenId: 'legacy', screen: 'full', results: [], summary: { score: 100 } } },
       { createdAt: t(3), metrics: {} },
       { createdAt: t(4), metrics: null },
-      { createdAt: t(5), metrics: storedScreen('graded', 'modified', results, scoreScreen('modified', results)) },
+      { createdAt: t(5), metrics: serverRow('graded', 'modified', results) },
     ])).toEqual([ago(5)]);
+  });
+});
+
+// MIRROR-COACH P3 (2026-09-26): the screen grades for real now, so a Mirror screen is a scan-equivalent signal only once
+// the SERVER graded it — and only when it read enough to be a screen (not provisional: three camera checks, the payout's
+// own bar). Before P3 any row with results counted, and the only rows with results were the posting phone's own word.
+describe('isScanEquivalentScreen: graded by the server, and not provisional', () => {
+  it('a phone-graded row (stored before P3, no gradedBy) is not current data; the same results server-graded are', async () => {
+    const { gradedScreenTimes, isScanEquivalentScreen } = await import('./attention');
+    const { storedScreen } = await import('../mirror/screenStore');
+    const { scoreScreen } = await import('../mirror/screen');
+    const results = [
+      { checkId: 'heelLine', grade: 'stable', source: 'camera' },
+      { checkId: 'hipLevel', grade: 'stable', source: 'camera' },
+      { checkId: 'headFloat', grade: 'fail', source: 'camera' },
+    ] as Parameters<typeof scoreScreen>[1];
+    const summary = scoreScreen('modified', results);
+    const { serverRow } = await import('../mirror/fixtures/storedRows');
+    const phone = storedScreen('phone', 'modified', results, summary);
+    const server = serverRow('server', 'modified', results);
+    const thin = serverRow('thin', 'modified', results.slice(0, 2));
+    expect([phone, server, thin].map(isScanEquivalentScreen)).toEqual([false, true, false]);
+    // MIRROR-COACH P3 review (2026-09-26): the marker alone is not enough — a row with gradedBy: 'server' and no evidence
+    // behind its results (what POST /api/v1/workout/scan could store), or a stored provisional: false over too little
+    const bare = storedScreen('bare', 'modified', results, summary, { camera: [], provisional: false });
+    expect(isScanEquivalentScreen(bare)).toBe(false);
+    const oneStation = (['kneeWindow', 'hipLevel', 'shoulderLevel'] as const).map((checkId) => ({ checkId, grade: 'stable', source: 'camera' })) as Parameters<typeof scoreScreen>[1];
+    const frontOnly = { ...serverRow('front', 'modified', oneStation), provisional: false };
+    expect(isScanEquivalentScreen(frontOnly)).toBe(false);
+    const t = (d: number) => new Date(ago(d));
+    expect(gradedScreenTimes([{ createdAt: t(1), metrics: thin }, { createdAt: t(2), metrics: phone }, { createdAt: t(3), metrics: server }])).toEqual([ago(3)]);
+  });
+
+  it('a real screen stored by the route counts: the claims re-checked, three or more checks read', async () => {
+    const { isScanEquivalentScreen } = await import('./attention');
+    const { decideScreenPost } = await import('../mirror/screenClaims');
+    const { storedScreen } = await import('../mirror/screenStore');
+    const { regradeFromSummary } = await import('../mirror/stationGraders');
+    const summaries = [
+      { checkId: 'hipLevel', value: 0.01, unit: 'ratio', frames: 420, readableFrames: 420, uncertainty: 0.005, spread: 0.02, stationId: 'frontStack' },
+      { checkId: 'shoulderLevel', value: -0.01, unit: 'ratio', frames: 420, readableFrames: 420, uncertainty: 0.005, spread: 0.02, stationId: 'frontStack' },
+      { checkId: 'headFloat', value: 0.02, unit: 'ratio', frames: 300, readableFrames: 300, uncertainty: 0.005, spread: 0.02, stationId: 'profile' },
+    ];
+    const store = (n: number) => {
+      const checks = summaries.slice(0, n).map((x) => ({ ...x, status: regradeFromSummary(x)!.status }));
+      const d = decideScreenPost({ screenId: `r${n}`, screen: 'modified', checks }, 'a1');
+      if (!d.ok) throw new Error('refused');
+      return JSON.parse(JSON.stringify(storedScreen(d.screenId, d.screen, d.outcome.results, d.summary, { camera: d.outcome.camera, provisional: d.outcome.provisional })));
+    };
+    expect(isScanEquivalentScreen(store(3))).toBe(true);
+    expect(isScanEquivalentScreen(store(2))).toBe(false);     // provisional: two checks read
+    // the front stack alone — three checks, one station (P3 review): stored, never current data
+    const front = [
+      summaries[0], summaries[1],
+      { checkId: 'kneeWindow', value: 0.05, bySide: { left: 0.05, right: 0.02 }, unit: 'ratio', frames: 420, readableFrames: 420, uncertainty: 0.01, spread: 0.1, stationId: 'frontStack' },
+    ].map((x) => ({ ...x, status: regradeFromSummary(x)!.status }));
+    const d = decideScreenPost({ screenId: 'front', screen: 'modified', checks: front }, 'a1');
+    if (!d.ok) throw new Error('refused');
+    expect(d.outcome).toMatchObject({ readableChecks: 3, readableStations: 1, provisional: true });
+    expect(isScanEquivalentScreen(JSON.parse(JSON.stringify(storedScreen(d.screenId, d.screen, d.outcome.results, d.summary, { camera: d.outcome.camera, provisional: d.outcome.provisional }))))).toBe(false);
   });
 });

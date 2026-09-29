@@ -95,7 +95,15 @@ export async function reportEarnGrant(report: EarnReport): Promise<EarnGrant | n
   return r && !r.rejected ? { ...r.granted, capped: r.capped } : null;
 }
 
-/** One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws. */
+/**
+ * One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws.
+ *
+ * ECONOMY-SESSIONS-HARDEN (2026-09-28): what it resolves to and broadcasts is what was credited NOW. The server answers a
+ * key already in the ledger with that key's original grant and `replayed: true` (nothing moved); that is reported here
+ * as a zero grant, so no HUD toasts it and no card adds it. The eye saw exactly that answer at 46a8dc6a — the wallet
+ * chip's daily_first_session re-sent from a fresh browser, "granted 100 coins", balance unchanged — and a "+100" shown
+ * for it would be a reward the server correctly did not pay.
+ */
 async function postEarn(report: EarnReport): Promise<{ granted: { coins: number; shards: number }; capped: boolean; rejected: string | null } | null> {
   try {
     const res = await fetch('/api/v1/wallet/earn', {
@@ -109,7 +117,8 @@ async function postEarn(report: EarnReport): Promise<{ granted: { coins: number;
     const out = { granted: { coins: 0, shards: 0 }, capped: false, rejected: null as string | null };
     try {
       const data = await res.json();
-      out.granted = {
+      const replayed = data?.replayed === true;
+      out.granted = replayed ? { coins: 0, shards: 0 } : {
         coins: Number(data?.granted?.coins ?? 0),
         shards: Number(data?.granted?.shards ?? 0),
       };

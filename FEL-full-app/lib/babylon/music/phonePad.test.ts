@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_ONE_WAY_MS, PAD_GAIN, PHONE_BANKS, RTT_WINDOW, medianRtt, oneWaySec, padGain, padVelocity, phoneBadgeShown, phoneCommand,
   phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, judgesPhoneTap,
+  phonePadRole,
 } from './phonePad';
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 import { tapStep, type StepClock } from './FlipPad';
@@ -190,19 +191,24 @@ describe('the room\'s wiring (source pins)', () => {
     expect(lobby).toBeGreaterThan(0);
     expect(room.indexOf('<HostLobby ', lobby + 1)).toBe(-1);                    // one room, not one per tab
     expect(lobby).toBeLessThan(flipTab);
-    expect(room).toMatch(/\{phoneRoom && \(\s*<div data-qa="phone-room"[^>]*>\s*<HostLobby config=\{MODE_CONTROLLERS\.music_flip\} collapsed onInput=\{phoneInput\} onPeers=\{phonePeers\} \/>/);
+    // MUSIC-SUITE P6 phone-replay: + the room's live state for the phone (roomState, phonePad.phoneRoomState)
+    expect(room).toMatch(/\{phoneRoom && \(\s*<div data-qa="phone-room"[^>]*>\s*<HostLobby config=\{MODE_CONTROLLERS\.music_flip\} collapsed onInput=\{phoneInput\} onPeers=\{phonePeers\} roomState=\{phoneState\} \/>/);
     expect(room).toContain('useEffect(() => { setPhoneRoom((on) => phoneRoomOpen(on, view)); }, [view]);');
   });
   it('the bank and ARM REC are the room\'s; a phone pad is judged in PERFORM at its corrected time; FLIP records through the room', () => {
     expect(room).toContain('bank={flipBank} onBank={setFlipBank} recArm={flipRecArm} onRecArm={setFlipRecArm}');
     expect(room).toContain('atSec: phoneTapSec(arrival, rttMs)');
     // MUSIC-SUITE P5 FIX PASS: only where a screen tap counts (judgesPhoneTap: PERFORM on the STUDIO view)
-    expect(room).toContain('if (judgesPhoneTap({ mode: modeRef.current, view }) && hit.atSec !== undefined) performTapAt(hit.atSec);');
+    // MUSIC-SUITE P6 (2026-09-25): …in the lane of the pad's ROW (performInput.performPhoneCommand)
+    expect(room).toContain('const performing = judgesPhoneTap({ mode: modeRef.current, view });');
+    expect(room).toContain("if (performing && hit.atSec !== undefined && perf?.kind === 'lane') performLaneTap(perf.lane, hit.atSec);");
     expect(room).toContain('onRecordHit={recordFlipHit} />');
     expect(room).toContain('if (fx === \'start\' || fx === \'stop\') playOrStop(true, fx);');
   });
   it('an Arena (staked) set judges a phone tap as it ARRIVES — a round trip the phone answers is not trusted with a stake', () => {
-    expect(room).toContain('if (at === undefined || arenaSet) set.tap(eng.context.currentTime); else set.tap(at);');
+    // MUSIC-SUITE P6 (2026-09-25): every tap is a LANE tap now (performLaneTap); the same rule, and the Arena records the arrival
+    expect(room).toContain('const now = at === undefined || arenaSet ? eng.context.currentTime : at;');
+    expect(room).toContain('set.tap(now, lane);');
   });
 });
 
@@ -213,5 +219,27 @@ describe('which phone hits a PERFORM set judges', () => {
     expect(judgesPhoneTap({ mode: 'perform', view: 'studio' })).toBe(true);
     for (const view of ['flip', 'library', 'creator', 'listen']) expect(judgesPhoneTap({ mode: 'perform', view }), view).toBe(false);
     expect(judgesPhoneTap({ mode: 'build', view: 'studio' })).toBe(false);
+  });
+});
+
+// MUSIC-SUITE P6 FIX PASS (2026-09-26): a phone PAD in PERFORM is a lane tap only; REC is refused in PERFORM; a phone can be
+// paired from PERFORM (and the Arena panel) — the badge shows where the player asked.
+describe('P6 fix pass: the phone in PERFORM', () => {
+  it('where a tap is judged (PERFORM on STUDIO) a pad is a LANE, never the Flip chop; elsewhere it is the MPC', () => {
+    expect(phonePadRole({ mode: 'perform', view: 'studio' })).toBe('lane');
+    expect(phonePadRole({ mode: 'perform', view: 'flip' })).toBe('instrument');
+    expect(phonePadRole({ mode: 'build', view: 'studio' })).toBe('instrument');
+  });
+  it('REC: refused while performing (disarm still works); unchanged everywhere else', () => {
+    expect(transportEffect('rec', { running: true, recArm: false, perform: true })).toBe('rec-refused');
+    expect(transportEffect('rec', { running: false, recArm: true, perform: true })).toBe('disarm');
+    expect(transportEffect('rec', { running: true, recArm: false })).toBe('arm');
+    expect(transportEffect('play', { running: false, recArm: false, perform: true })).toBe('start');
+  });
+  it('the pairing badge shows where the player asked to pair (PERFORM / the Arena panel), as well as on FLIP and while paired', () => {
+    expect(phoneBadgeShown('studio', 0)).toBe(false);
+    expect(phoneBadgeShown('studio', 0, true)).toBe(true);
+    expect(phoneBadgeShown('flip', 0)).toBe(true);
+    expect(phoneBadgeShown('library', 1)).toBe(true);
   });
 });

@@ -18,7 +18,8 @@ import { PRQ_ATTRS } from '../prq';
 import { emptyProfile, type PRQSnapshot, type SharedProfile } from '../profile/sharedProfile';
 import { driftBoard, driftHeadline, type ClientActivity, type DriftRow } from './compliance';
 import { triageRoster, type AthleteRow, type TriageBoard } from './triage';
-import { readStoredScreen } from '../mirror/screenStore';
+import { isServerGradedScreen, readStoredScreen } from '../mirror/screenStore';
+import { isScreenNotStation, screenCoverage } from '../mirror/screenClaims';
 
 const DAY = 86_400_000;
 
@@ -45,7 +46,8 @@ export interface ClientFacts {
   gameTimesMs?: readonly number[];
   /**
    * GRADED Mirror movement screens (WorkoutScan kind mirror_screen that readStoredScreen can read), epoch ms: current
-   * data for triage's stale-scan. P2; GRADED since the P2 review (2026-09-26) — see gradedScreenTimes.
+   * data for triage's stale-scan. P2; GRADED since the P2 review (2026-09-26); server-graded and not provisional since
+   * MIRROR-COACH P3 — see gradedScreenTimes.
    */
   screenTimesMs?: readonly number[];
   prq: readonly PrqFact[];
@@ -105,9 +107,25 @@ export function prqSnapshots(entries: readonly PrqFact[]): PRQSnapshot[] {
  * Counted, the day after a client ran one the coach's "Needs you today" dropped "nothing current to program from" while
  * the same client's prescriptions panel said the screen was not graded. Only a row readStoredScreen can read (graded
  * results, lib/mirror/screenStore.ts) counts; an ungraded or unreadable row is not data.
+ *
+ * MIRROR-COACH P3 (2026-09-26): the screen grades for real now, and "graded" means GRADED BY THE SERVER. Until today
+ * any row with results counted — and the only rows with results were the posting phone's own word, since no grader
+ * existed (lib/mirror/screenStore.ts isServerGradedScreen). A screen is a scan-equivalent signal (isScanEquivalentScreen)
+ * when the server re-checked its grades AND read at least three camera checks: a PROVISIONAL screen (one or two checks
+ * read — lib/mirror/screenClaims.ts MIN_READABLE_CAMERA_CHECKS, the bar the payout uses) is a station or two, not a
+ * screen, and the coach's panel asks for a re-run of it rather than drafting a program from it alone.
  */
+export function isScanEquivalentScreen(metrics: unknown): boolean {
+  const s = readStoredScreen(metrics);
+  // MIRROR-COACH P3 review (2026-09-26): the bar is RE-DERIVED from the row's own results (lib/mirror/screenClaims.ts
+  // screenCoverage — three different checks from at least two stations), not read from its stored `provisional`, which
+  // is a field anybody who could write a row could set; and one station (the front stack's three checks) is not a screen.
+  return !!s && isServerGradedScreen(metrics) && s.provisional !== true && isScreenNotStation(screenCoverage(s.screen, s.results));
+}
+
+/** When each of a client's scan-equivalent screens (above) ran, epoch ms — triage's `lastScreenAt` source. */
 export function gradedScreenTimes(rows: readonly { createdAt: Date; metrics: unknown }[]): number[] {
-  return rows.filter((r) => readStoredScreen(r.metrics) !== null).map((r) => r.createdAt.getTime());
+  return rows.filter((r) => isScanEquivalentScreen(r.metrics)).map((r) => r.createdAt.getTime());
 }
 
 /** The shape compliance.ts reads: coached sessions, logged coached work and games, kept apart. */

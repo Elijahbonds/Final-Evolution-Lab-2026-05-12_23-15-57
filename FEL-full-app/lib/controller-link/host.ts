@@ -8,9 +8,10 @@
 import { PeerLink } from './transport/webrtc';
 import { createRoom, pollSignals, postSignal } from './transport/signaling';
 import { getOrCreatePeerId, joinUrl } from './codes';
-import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId } from './types';
+import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId, RoomState } from './types';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 import { HostInput, type LinkStats } from './hostInput';
+import { parseRoomState, roomStateOptIn, sameRoomState } from './roomState';
 
 export interface HostSessionOpts {
   config: ModeControllerConfig;
@@ -73,8 +74,24 @@ export class HostSession {
   private stopPoll: (() => void) | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private disposed = false;
+  /** MUSIC-SUITE P6 phone-replay: the last room state sent (re-sent to a phone whose link comes up). Null = never sent. */
+  private roomState: RoomState | null = null;
 
   constructor(opts: HostSessionOpts) { this.opts = opts; }
+
+  /**
+   * MUSIC-SUITE P6 phone-replay (2026-09-26): send the room's live state to every connected phone (roomState.ts). OPT-IN:
+   * refused (false) for a config without `roomState: true`, so no other mode ever puts a 'state' on the wire. Bounded by
+   * parseRoomState; an unchanged state is not re-sent. Kept, so a phone that joins or reconnects later is sent it too.
+   */
+  sendState(state: RoomState): boolean {
+    if (this.disposed || !roomStateOptIn(this.opts.config)) return false;
+    const s = parseRoomState(state);
+    if (!s || sameRoomState(this.roomState, s)) return false;
+    this.roomState = s;
+    for (const p of this.peers.values()) if (p.connected) p.link.sendSafe({ type: 'state', state: s });
+    return true;
+  }
 
   get joinUrl(): string { return joinUrl(this.code); }
 
@@ -128,6 +145,8 @@ export class HostSession {
           // Re-send the lobby so a reconnected phone re-renders the right UI.
           p.link.sendSafe({ type: 'lobby', peers: this.lobby(), config: this.opts.config });
           if (p.slot !== null) p.link.sendSafe({ type: 'assign', slot: p.slot });
+          // MUSIC-SUITE P6 phone-replay: …and the room as it is now (only an opted-in config ever has one — sendState)
+          if (this.roomState) p.link.sendSafe({ type: 'state', state: this.roomState });
         }
         this.emitLobby();
       },
