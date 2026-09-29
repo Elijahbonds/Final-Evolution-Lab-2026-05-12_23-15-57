@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   flagsFor, triageRoster, progressionsOnly, dataOnFile,
-  TOP_N, STALE_SCAN_DAYS, QUIET_DAYS, OFF_BASELINE_DROP, PROGRESSION_COMPOSITE,
+  TOP_N, STALE_SCAN_DAYS, QUIET_DAYS, OFF_BASELINE_DROP, PROGRESSION_COMPOSITE, STALE_SCAN_ACTION,
   type AthleteRow,
 } from './triage';
 import { emptyProfile, type SharedProfile } from '../profile/sharedProfile';
@@ -201,8 +201,10 @@ describe('CURRENT DATA IS ANY OF THREE: a PRQ System Scan, a Mirror screen, coac
   it('when nothing is current, the flag says what IS on file, source by source', () => {
     const f = flagsFor(noPrq({ lastScreenAt: ago(STALE_SCAN_DAYS + 6), lastCoachedAt: null }), NOW).find((x) => x.kind === 'stale-scan')!;
     expect(f.observed).toBe('No PRQ System Scan on file; last graded Mirror screen 20 days ago; no coached work logged.');
-    expect(f.action).toBe('Ask for a System Scan — there is nothing current to program from.');
-    expect(f.action).not.toMatch(/Mirror screen/);          // no screen can be graded before P3
+    // FLIPPED IN MIRROR-COACH P3 (2026-09-26): the P2 review took "or a Mirror screen" out because nothing could grade
+    // one; the graders exist now, and a server-graded screen is current data (lib/coach/attention.ts), so it is back
+    expect(f.action).toBe('Ask for a System Scan or a Mirror movement screen — there is nothing current to program from.');
+    expect(f.action).toBe(STALE_SCAN_ACTION);
     const g = flagsFor(row({ profile: profile([{ composite: 60, daysAgo: 30 }]), lastScreenAt: null, lastCoachedAt: ago(16) }), NOW).find((x) => x.kind === 'stale-scan')!;
     expect(g.observed).toBe('Last PRQ System Scan 30 days ago; no graded Mirror screen; last coached work 16 days ago.');
   });

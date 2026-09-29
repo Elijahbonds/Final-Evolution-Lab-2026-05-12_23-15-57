@@ -99,6 +99,12 @@ const SAY: Record<FramingIssue, string> = {
   dim: 'More light, or a plainer background — I am losing track of you.',
 };
 
+/** The one line said for an issue (the front view's line for 'turned'). Read-only: lib/mirror/screenRunner.ts names the
+ *  fix a stalled station asked for most (MIRROR-COACH P3 follow-up review, 2026-09-28). */
+export function framingLine(issue: FramingIssue): string {
+  return SAY[issue];
+}
+
 /** What a side station says when the athlete is not side-on yet. */
 export const SIDE_TURNED = 'Turn side-on to the camera.';
 

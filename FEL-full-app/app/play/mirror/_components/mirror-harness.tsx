@@ -54,8 +54,22 @@ import { KNEE_OVERLAY_LINE, kneeArrows } from '@/lib/mirror/kneeOverlay';
 import { chipLabel } from '@/lib/mirror/hudChip';
 // THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
 // reward and the scoring sat in lib/mirror with no importer at all. lib/nav/modules.test.ts is what found them.
-import { ScreenRunner, type RunnerState } from '@/lib/mirror/screenRunner';
-import { NOT_GRADED_LINE, scoreScreen, type ScreenId, type CheckResult, type ScreenResultSummary } from '@/lib/mirror/screen';
+import { ScreenRunner, spokenKey, type RunnerState, type StationRecord } from '@/lib/mirror/screenRunner';
+import { selfReportReached } from '@/lib/mirror/selfReport';
+import {
+  NOT_GRADED_LINE, cameraChecksRead, notReadLines, scoreLine, scoreScreen, type ScreenId, type CheckResult, type ScreenResultSummary,
+} from '@/lib/mirror/screen';
+// MIRROR-COACH P3 (2026-09-26): the screen GRADES now — the runner grades each station over the frames its hold clock ran
+// on (lib/mirror/stationGraders.ts) and keeps every grade, unreadable included; the card says what each check read.
+import type { StationGrade } from '@/lib/mirror/stationGraders';
+import { StationResults } from './station-results';
+// MIRROR-COACH P3 (2026-09-25): the breath station's answers (asked after the screen, by tap) and the coach's stations
+// named as the coach's — never graded, never scored (lib/mirror/selfReport.ts).
+import { ScreenSelfReport } from '@/components/mirror/screen-self-report';
+// MIRROR-COACH P3 (2026-09-26): what to work on after the screen — the same flag → FIX line + corrective block mapping the
+// coach's draft uses (lib/mirror/screenCorrectives.ts), in plain words, "what the camera saw, not a diagnosis".
+import { ScreenNextSteps } from '@/components/mirror/screen-next-steps';
+import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -79,7 +93,12 @@ const BONES: [number, number][] = [
   [23, 25], [25, 27], [24, 26], [26, 28],              // legs
 ];
 
-export function MirrorHarness() {
+/**
+ * `youth` (MIRROR-COACH P3 review, 2026-09-26): the athlete's youth gate from their birth year (app/play/mirror/page.tsx
+ * youthGateFor) — under 18 or no birth year on file, the screen's written corrective blocks are off (PLAN item 9).
+ * Absent → youth rules, the conservative side (decision #20: blank = youth until answered).
+ */
+export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = {}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -142,6 +161,14 @@ export function MirrorHarness() {
   const [runner, setRunner] = useState<RunnerState | null>(null);
   const [screenSummary, setScreenSummary] = useState<ScreenResultSummary | null>(null);
   const [screenMessage, setScreenMessage] = useState<string>('');
+  /** The id the finished screen was SAVED under (the answers card PATCHes it); 'unsaved' when the save failed. */
+  const [savedScreenId, setSavedScreenId] = useState<string | null | 'unsaved'>(null);
+  /**
+   * What End posted (ScreenRunner.readSoFar): the cards below are drawn from THIS after End, not from the last runner
+   * state (MIRROR-COACH P3 follow-up review, 2026-09-28) — runner.grades holds only FINISHED stations, so End during a
+   * pending retest posted a hip flag the panel headlined while "What to work on" said nothing was flagged.
+   */
+  const [endedWith, setEndedWith] = useState<{ grades: StationGrade[]; stations: StationRecord[] } | null>(null);
   const lastSaidRef = useRef('');
   const screenSentRef = useRef(false);
   const voiceRef = useRef(true);
@@ -255,7 +282,7 @@ export function MirrorHarness() {
       runnerRef.current = new ScreenRunner(screenIdRef.current);
       screenSentRef.current = false;
       lastSaidRef.current = '';
-      setRunner(null); setScreenSummary(null); setScreenMessage('');
+      setRunner(null); setScreenSummary(null); setScreenMessage(''); setSavedScreenId(null); setEndedWith(null);
     }
     setError('');
     setJumps([]);
@@ -291,6 +318,9 @@ export function MirrorHarness() {
       const v = videoRef.current!;
       v.srcObject = stream;
       await v.play();
+      // the graders take lengths and angles in pixels, so they need the frame's shape (MediaPipe reads the raw frame; the
+      // stage's object-cover crop is display only)
+      if (v.videoWidth > 0 && v.videoHeight > 0) runnerRef.current?.setAspect(v.videoWidth / v.videoHeight);
 
       setStatus('loading-model');
       const { NeuroMirror } = await loadMirror();
@@ -307,17 +337,26 @@ export function MirrorHarness() {
           // THE GUIDED SCREEN. The runner owns the protocol: it says the turn, holds the clock only while the
           // shot is good, and pauses rather than fails when somebody steps out to move a chair.
           if (patternRef.current === 'screen' && runnerRef.current) {
-            const st = runnerRef.current.tick(
-              { landmarks: pose.landmarks, present: pose.present },
-              pose.timestampMs,
-            );
+            // MIRROR-COACH P3 (2026-09-26): the whole pose frame — the graders read z and visibility, and a frame the hold
+            // clock runs on is kept for the station's grade (one per camera frame: render/pose-frame-gate.ts)
+            // P3 review (2026-09-26): the camera's shape re-read every frame — it was read once after play(), so a phone
+            // turned between portrait and landscape after Start graded every length at the wrong aspect (a 2.5 cm shoulder
+            // raise read as a flag). The runner stamps it on each frame it keeps; a station held across a turn reads
+            // 'cameraMoved' (lib/mirror/stationGraders.ts).
+            if (v.videoWidth > 0 && v.videoHeight > 0) runnerRef.current.setAspect(v.videoWidth / v.videoHeight);
+            const st = runnerRef.current.tick(pose, pose.timestampMs);
             setRunner(st);
             paintSkeleton(pose, p);
             // Said once per change, because the athlete is across the room and cannot read the phone — and
-            // because repeating a cue every frame would be unusable.
-            if (st.say && st.say !== lastSaidRef.current) {
-              lastSaidRef.current = st.say;
-              speak(st.say);
+            // because repeating a cue every frame would be unusable. MIRROR-COACH P3 follow-up (2026-09-28): a change is
+            // the line OR the runner's reminder count (spokenKey) — the turn line is said again at spaced intervals while
+            // the view is wrong (STATION_THRESHOLDS.wrongView), where it used to be said once and never again.
+            if (st.say && spokenKey(st) !== lastSaidRef.current) {
+              lastSaidRef.current = spokenKey(st);
+              // MIRROR-COACH P3 (2026-09-26): the retest line is PROTECTED (P2's mechanism, PROTECT_MAX_MS): it runs up to
+              // ~7 s and the station cue comes back after RETEST_PAUSE_MS, which cancelled it mid-sentence in the live proof
+              // — the "why" and the "what to change" are the half that got cut. The cue is still shown on the stage.
+              speak(st.say, { protect: st.phase === 'retest' });
             }
           }
 
@@ -416,7 +455,9 @@ export function MirrorHarness() {
     }
   }, []);
 
-  const endSession = useCallback(() => {
+  // What End does to the camera and the press/row zone summary. endSession (below submitScreen) wraps it: End also posts
+  // the screen read so far — MIRROR-COACH P3 follow-up, 2026-09-28.
+  const endZoneSession = useCallback(() => {
     const rt = runtimeRef.current;
     // the module is necessarily loaded by now (a runtime only exists after session() resolved),
     // but this stays async-safe rather than assuming it
@@ -500,10 +541,17 @@ export function MirrorHarness() {
    * ungraded screen is decided by the server from its zero results (NOT_GRADED_LINE); provisional is left for a
    * grader that reports low confidence, when one exists.
    */
-  const submitScreen = useCallback(async (results: CheckResult[], ran: ScreenId) => {
+  // MIRROR-COACH P3 (2026-09-26): the grades ride with the results — every camera check's summary numbers, unreadable
+  // included — so the server can re-decide each one against the same table (lib/mirror/stationGraders.ts
+  // regradeFromSummary) instead of taking the client's pass/flag on trust.
+  // MIRROR-COACH P3 follow-up review (2026-09-28): `ended` marks what End posts — kept and scored, and not paid unless every
+  // camera station was attempted (lib/mirror/screenReward.ts ENDED_EARLY_LINE, until the owner decides).
+  const submitScreen = useCallback(async (results: CheckResult[], ran: ScreenId, grades: StationGrade[] = [], opts: { ended?: boolean } = {}) => {
     if (screenSentRef.current) return;
     screenSentRef.current = true;
-    setScreenSummary(scoreScreen(ran, results));   // shown immediately; the server's is authoritative
+    // shown immediately; the server's is authoritative. attempted: the camera sent grades — a screen it read none of says
+    // so (NOT_READ_LINE), not "not graded yet" (P3 review)
+    setScreenSummary(scoreScreen(ran, results, { attempted: grades.length > 0 }));
     try {
       const res = await fetch('/api/mirror/screen', {
         method: 'POST',
@@ -516,17 +564,27 @@ export function MirrorHarness() {
           screenId: crypto.randomUUID(),
           screen: ran,
           results,
+          ...(opts.ended ? { ended: true } : {}),
+          grades,
         }),
       });
       // A refused post (signed out, a server error) is not saved either, and says so like a network failure does
       // (MIRROR-COACH P1 review, 2026-09-25: it said nothing, and the ungraded panel hid even the network line).
-      if (!res.ok) { setScreenMessage(SCREEN_NOT_SAVED); return; }
+      // MIRROR-COACH P3 (2026-09-25): a screen the server refused to check (422) says the server's own line.
+      if (!res.ok) {
+        const refusal = res.status === 422 ? await res.json().then((x: { message?: unknown }) => x?.message).catch(() => null) : null;
+        setScreenMessage(typeof refusal === 'string' && refusal ? refusal : SCREEN_NOT_SAVED);
+        setSavedScreenId('unsaved');
+        return;
+      }
       const j = await res.json().catch(() => null);
       if (j?.summary) setScreenSummary(j.summary);
       if (j?.message) setScreenMessage(j.message);
       if (j?.message) speak(j.message);
+      setSavedScreenId(typeof j?.screenId === 'string' && j.screenId ? j.screenId : 'unsaved');
     } catch {
       setScreenMessage(SCREEN_NOT_SAVED);
+      setSavedScreenId('unsaved');
     }
   }, [speak]);
 
@@ -539,12 +597,29 @@ export function MirrorHarness() {
   // says nothing about a screen.
   useEffect(() => {
     if (pattern !== 'screen' || runner?.phase !== 'complete') return;
-    void submitScreen(runner.results, runner.screen);
+    void submitScreen(runner.results, runner.screen, runner.grades);
     if (runtimeRef.current || streamRef.current) {
       stop();
       setStatus('idle');
     }
   }, [pattern, runner, submitScreen, stop]);
+
+  // END POSTS WHAT WAS READ (MIRROR-COACH P3 follow-up, 2026-09-28). The screen was posted only at 'complete', so End —
+  // the only way out of a station that never started (the P3 live proof's row 5) — threw away every station already
+  // read. Now End posts the runner's readSoFar(): the finished stations' grades, and a station waiting on its retest with
+  // its first run's grades, through the same submitScreen (the server regrades, scores what was read, and decides pay by
+  // the unchanged bar). A screen that never finished a station has no grade to post, and is not stored as a run.
+  // Its review (2026-09-28): the post is marked `ended`, and the cards are drawn from what was posted (endedWith).
+  const endSession = useCallback(() => {
+    if (patternRef.current === 'screen' && runnerRef.current && !screenSentRef.current) {
+      const soFar = runnerRef.current.readSoFar();
+      if (soFar.grades.length) {
+        setEndedWith({ grades: soFar.grades, stations: soFar.stations });
+        void submitScreen(soFar.results, soFar.screen, soFar.grades, { ended: true });
+      }
+    }
+    endZoneSession();
+  }, [endZoneSession, submitScreen]);
 
   /** The short label on the control, beside the full one it is announced by. A ternary here silently labelled
    *  the new pattern "Jump" — a map cannot, because TypeScript makes it name every case. */
@@ -726,7 +801,7 @@ export function MirrorHarness() {
                         {Math.ceil(runner.remainingSec)}
                       </span>
                       <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/50">
-                        {runner.phase === 'holding' ? 'Hold' : 'Get set'} · station {runner.stationIndex + 1}
+                        {runner.phase === 'holding' ? 'Hold' : runner.phase === 'retest' ? 'Once more' : 'Get set'} · station {runner.stationIndex + 1}
                       </span>
                     </div>
                   )}
@@ -737,10 +812,13 @@ export function MirrorHarness() {
                 {pattern === 'screen' ? (
                   runner && (
                     <>
+                      {/* MIRROR-COACH P3: the checks the camera READ (a pass or a flag); a check it could not read is not one.
+                          P3 follow-up (2026-09-28): counted the server's way (cameraChecksRead — both legs are one check);
+                          it counted results, so both legs read as two */}
                       <p className="fel-heading text-[40px] font-black leading-none text-white">
-                        {runner.results.length}
+                        {cameraChecksRead(runner.screen, runner.results).readCount}
                       </p>
-                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Checks</p>
+                      <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Checks read</p>
                     </>
                   )
                 ) : pattern === 'jump' ? (
@@ -810,6 +888,17 @@ export function MirrorHarness() {
                 >
                   End session
                 </button>
+                {/* MIRROR-COACH P3: the station's ONE retest runs by itself (the athlete is across the room); someone at the
+                    phone can decline it, and the check is then kept as not read */}
+                {pattern === 'screen' && runner?.stations.some((r) => r.retesting) && (
+                  <button
+                    onClick={() => runnerRef.current?.skipRetest()}
+                    className="rounded-2xl border border-white/20 bg-black/50 px-5 py-3 text-[13px] font-bold text-white/80
+                               backdrop-blur-md transition-colors hover:border-white/40"
+                  >
+                    Skip the retest
+                  </button>
+                )}
                 {pattern === 'squat' && (
                   <button
                     onClick={() => setVoiceOn((v) => !v)}
@@ -885,6 +974,12 @@ export function MirrorHarness() {
           </div>
         )}
 
+        {/* STATION BY STATION (MIRROR-COACH P3, 2026-09-26): each graded station's card as it finishes — the value and
+            its unit, pass / flagged for a closer look / not read, one fix line under a flag, and the one retest. */}
+        {pattern === 'screen' && runner && (endedWith?.stations ?? runner.stations).length > 0 && (
+          <StationResults screen={runner.screen} stations={endedWith?.stations ?? runner.stations} />
+        )}
+
         {/* What the screen found. The book counts movement flags and ranks the one-sided ones above the rest.
             MIRROR-COACH P1 (2026-09-25): "Movement flags", not "Red flags" — red flags are clinical warning signs
             and will mean that in the health intake; a kneecap pointing in is a movement finding. The stored key
@@ -899,8 +994,20 @@ export function MirrorHarness() {
                   <Figure label="Score" value={String(screenSummary.score ?? '—')} accent="#00FF9D" />
                   <Figure label="Movement flags" value={String(screenSummary.movementFlags)} accent={screenSummary.movementFlags > 0 ? '#FF3366' : undefined} />
                   <Figure label="One-sided" value={String(screenSummary.asymmetries)} accent={screenSummary.asymmetries > 0 ? '#FFD700' : undefined} />
-                  <Figure label="Checks" value={String(runner?.results.length ?? 0)} />
+                  {/* MIRROR-COACH P3 follow-up (2026-09-28): the summary's readCount — the server's readableCameraChecks, one
+                      definition (screen.ts cameraChecksRead). It showed runner.results.length: "Checks 6" beside the server's 5 */}
+                  <Figure label="Checks read" value={`${screenSummary.readCount ?? 0} of ${screenSummary.totalCount ?? 0}`} />
                 </div>
+                {/* OWNER DECISION #31: the score is over what was read, so it is said with the count, and what was not read
+                    is listed as not read ("Score 78 · from 5 of 6 checks read" · "Head float · not read") */}
+                {scoreLine(screenSummary) && (
+                  <p className="mt-4 text-[13px] font-semibold leading-relaxed text-white/80" data-score-line>{scoreLine(screenSummary)}</p>
+                )}
+                {notReadLines(screenSummary).length > 0 && (
+                  <ul className="mt-1 text-[12.5px] leading-relaxed text-white/55" data-not-read>
+                    {notReadLines(screenSummary).map((line) => <li key={line}>{line}</li>)}
+                  </ul>
+                )}
                 {/* the headline says what the numbers mean — and, for a partly graded screen, that it is not clear */}
                 <p className="mt-4 text-[13px] leading-relaxed text-white/70">{screenSummary.headline}</p>
                 {screenMessage && <p className="mt-2 text-[13px] leading-relaxed text-white/60">{screenMessage}</p>}
@@ -910,13 +1017,32 @@ export function MirrorHarness() {
               // MIRROR-COACH P1 (2026-09-25): a save failure is said here too. Every screen is ungraded today, and this
               // branch showed only the not-graded line, so an athlete whose run was never kept was never told.
               <>
-                <p className="mt-3 text-[14px] leading-relaxed text-white/70">{NOT_GRADED_LINE}</p>
-                {screenMessage && screenMessage !== NOT_GRADED_LINE && (
+                {/* P3 review (2026-09-26): the summary's own line — NOT_READ_LINE when the camera tried and read nothing,
+                    NOT_GRADED_LINE when there were no grades at all */}
+                <p className="mt-3 text-[14px] leading-relaxed text-white/70">{screenSummary.headline || NOT_GRADED_LINE}</p>
+                {screenMessage && screenMessage !== (screenSummary.headline || NOT_GRADED_LINE) && (
                   <p className="mt-2 text-[13px] leading-relaxed text-white/60">{screenMessage}</p>
                 )}
               </>
             )}
           </section>
+        )}
+
+        {/* WHAT TO WORK ON (MIRROR-COACH P3, 2026-09-26): each flag's FIX line and corrective block, what to run again,
+            and "what the camera saw, not a diagnosis" — from the runner's final grades, once a station has one. */}
+        {pattern === 'screen' && screenSummary && runner && (endedWith?.grades ?? runner.grades).length > 0 && (
+          <ScreenNextSteps screen={runner.screen} grades={endedWith?.grades ?? runner.grades} youth={youth} />
+        )}
+
+        {/* THE BREATH STATION'S ANSWERS, and the coach's stations (MIRROR-COACH P3, 2026-09-25). Asked once the screen is
+            over — the athlete was across the room during it — and saved to the screen that ran; not graded, not scored. */}
+        {/* …only when the station they ask about was HELD (MIRROR-COACH P3 follow-up review, 2026-09-28): End before it, or a
+            breath station the runner ended because the shot never came good, has no breath to ask about */}
+        {pattern === 'screen' && screenSummary && runner && (
+          <ScreenSelfReport
+            screen={runner.screen} screenId={savedScreenId}
+            asked={selfReportReached(runner.screen, endedWith?.stations ?? runner.stations)}
+          />
         )}
 
         {/* THE READOUT, under the stage and across the full width. It was a 260px column of 11px bullet lists

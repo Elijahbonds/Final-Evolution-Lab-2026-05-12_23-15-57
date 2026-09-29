@@ -1500,7 +1500,7 @@
           "seconds": 12,
           "positioningFrames": 0,
           "holdingFrames": 360,
-          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width. Look straight ahead.",
+          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width, toes pointing straight ahead. Look straight ahead.",
           "heldBy": null
         },
         {
@@ -1520,7 +1520,7 @@
           "seconds": 7.97,
           "positioningFrames": 0,
           "holdingFrames": 239,
-          "firstSay": "Stay facing me. Take one easy breath in and out.",
+          "firstSay": "Stay facing me. Hands on the sides of your lower ribs, and take one easy breath in and out. Two quick questions about it at the end.",
           "heldBy": null
         },
         {
@@ -1554,69 +1554,116 @@
           "heldBy": null
         }
       ],
-      "resultsRecorded": 0,
+      "resultsRecorded": 7,
       "onComplete": {
         "posted": true,
         "summary": {
           "screen": "modified",
-          "graded": false,
+          "graded": true,
           "movementFlags": 0,
           "redFlags": 0,
           "asymmetries": 0,
-          "score": null,
-          "triage": "notGraded",
-          "headline": "Not graded yet: the camera can't score this screen.",
+          "score": 100,
+          "triage": "proceed",
+          "headline": "Nothing flagged. That is a platform you can load.",
           "meaning": [],
           "suggestions": [],
-          "programming": [],
-          "notMeasured": [
-            "Heel line and Achilles",
-            "Knee window",
-            "Hip points level",
-            "Shoulder height",
-            "Rib angle and breath",
-            "Head float",
-            "Single-leg stance, 30 seconds a side"
+          "programming": [
+            "Train normally.",
+            "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
           ],
-          "ranAll": false
+          "notMeasured": [],
+          "notScored": [
+            "Rib angle and breath"
+          ],
+          "ranAll": true,
+          "readCount": 6,
+          "totalCount": 6,
+          "notRead": []
         },
         "stored": {
           "screenId": "fixture-modified",
           "screen": "modified",
-          "graded": false,
-          "results": [],
+          "graded": true,
+          "results": [
+            {
+              "checkId": "heelLine",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "heel lines L 1° · R 1° from vertical (+ = heel outside the ankle) · estimated"
+            },
+            {
+              "checkId": "kneeWindow",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "knee against its hip–ankle line, in hip half-widths: L 0.01 out · R 0.01 out · estimated"
+            },
+            {
+              "checkId": "hipLevel",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "0.00 of a shoulder width apart in height · estimated"
+            },
+            {
+              "checkId": "shoulderLevel",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "0.00 of a shoulder width apart in height · estimated"
+            },
+            {
+              "checkId": "headFloat",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "ear 0.01 torso lengths ahead of the shoulder · estimated"
+            },
+            {
+              "checkId": "singleLeg",
+              "grade": "stable",
+              "source": "camera",
+              "side": "left",
+              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+            },
+            {
+              "checkId": "singleLeg",
+              "grade": "stable",
+              "source": "camera",
+              "side": "right",
+              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+            }
+          ],
           "summary": {
             "screen": "modified",
-            "graded": false,
+            "graded": true,
             "movementFlags": 0,
             "redFlags": 0,
             "asymmetries": 0,
-            "score": null,
-            "triage": "notGraded",
-            "headline": "Not graded yet: the camera can't score this screen.",
+            "score": 100,
+            "triage": "proceed",
+            "headline": "Nothing flagged. That is a platform you can load.",
             "meaning": [],
             "suggestions": [],
-            "programming": [],
-            "notMeasured": [
-              "Heel line and Achilles",
-              "Knee window",
-              "Hip points level",
-              "Shoulder height",
-              "Rib angle and breath",
-              "Head float",
-              "Single-leg stance, 30 seconds a side"
+            "programming": [
+              "Train normally.",
+              "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
             ],
-            "ranAll": false
+            "notMeasured": [],
+            "notScored": [
+              "Rib angle and breath"
+            ],
+            "ranAll": true,
+            "readCount": 6,
+            "totalCount": 6,
+            "notRead": []
           }
         },
         "reward": {
-          "pay": false,
+          "pay": true,
           "reasonCode": "MOVEMENT_SCREEN_COMPLETED",
           "idempotencyKey": "screen:fixture-athlete:fixture-modified",
-          "message": "Not graded yet: the camera can't score this screen."
+          "message": "Screen logged. Shards are in your wallet."
         },
-        "prescribeReason": "ungraded_screen",
-        "athletePanel": "Not graded yet: the camera can't score this screen."
+        "prescribeReason": null,
+        "athletePanel": "Score 100 · from 6 of 6 checks read · Movement flags 0 · One-sided 0 · Checks read 6 of 6"
       }
     },
     "full": {
@@ -1632,7 +1679,7 @@
           "seconds": 12,
           "positioningFrames": 0,
           "holdingFrames": 360,
-          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width. Look straight ahead.",
+          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width, toes pointing straight ahead. Look straight ahead.",
           "heldBy": null
         },
         {
@@ -1652,7 +1699,7 @@
           "seconds": 7.97,
           "positioningFrames": 0,
           "holdingFrames": 239,
-          "firstSay": "Stay facing me. Take one easy breath in and out.",
+          "firstSay": "Stay facing me. Hands on the sides of your lower ribs, and take one easy breath in and out. Two quick questions about it at the end.",
           "heldBy": null
         },
         {
@@ -1706,73 +1753,120 @@
           "heldBy": null
         }
       ],
-      "resultsRecorded": 0,
+      "resultsRecorded": 7,
       "onComplete": {
         "posted": true,
         "summary": {
           "screen": "full",
-          "graded": false,
+          "graded": true,
           "movementFlags": 0,
           "redFlags": 0,
           "asymmetries": 0,
-          "score": null,
-          "triage": "notGraded",
-          "headline": "Not graded yet: the camera can't score this screen.",
+          "score": 100,
+          "triage": "proceed",
+          "headline": "Nothing flagged. That is a platform you can load.",
           "meaning": [],
           "suggestions": [],
-          "programming": [],
-          "notMeasured": [
-            "Heel line and Achilles",
-            "Knee window",
-            "Hip points level",
-            "Shoulder height",
-            "Rib angle and breath",
-            "Head float",
-            "Pelvic tilt (hands on the hip points)",
-            "Seated rotation, each side",
-            "Single-leg stance, 30 seconds a side"
+          "programming": [
+            "Train normally.",
+            "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
           ],
-          "ranAll": false
+          "notMeasured": [],
+          "notScored": [
+            "Rib angle and breath",
+            "Pelvic tilt (hands on the hip points)",
+            "Seated rotation, each side"
+          ],
+          "ranAll": true,
+          "readCount": 6,
+          "totalCount": 6,
+          "notRead": []
         },
         "stored": {
           "screenId": "fixture-full",
           "screen": "full",
-          "graded": false,
-          "results": [],
+          "graded": true,
+          "results": [
+            {
+              "checkId": "heelLine",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "heel lines L 1° · R 1° from vertical (+ = heel outside the ankle) · estimated"
+            },
+            {
+              "checkId": "kneeWindow",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "knee against its hip–ankle line, in hip half-widths: L 0.01 out · R 0.01 out · estimated"
+            },
+            {
+              "checkId": "hipLevel",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "0.00 of a shoulder width apart in height · estimated"
+            },
+            {
+              "checkId": "shoulderLevel",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "0.00 of a shoulder width apart in height · estimated"
+            },
+            {
+              "checkId": "headFloat",
+              "grade": "stable",
+              "source": "camera",
+              "detail": "ear 0.01 torso lengths ahead of the shoulder · estimated"
+            },
+            {
+              "checkId": "singleLeg",
+              "grade": "stable",
+              "source": "camera",
+              "side": "left",
+              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+            },
+            {
+              "checkId": "singleLeg",
+              "grade": "stable",
+              "source": "camera",
+              "side": "right",
+              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+            }
+          ],
           "summary": {
             "screen": "full",
-            "graded": false,
+            "graded": true,
             "movementFlags": 0,
             "redFlags": 0,
             "asymmetries": 0,
-            "score": null,
-            "triage": "notGraded",
-            "headline": "Not graded yet: the camera can't score this screen.",
+            "score": 100,
+            "triage": "proceed",
+            "headline": "Nothing flagged. That is a platform you can load.",
             "meaning": [],
             "suggestions": [],
-            "programming": [],
-            "notMeasured": [
-              "Heel line and Achilles",
-              "Knee window",
-              "Hip points level",
-              "Shoulder height",
-              "Rib angle and breath",
-              "Head float",
-              "Pelvic tilt (hands on the hip points)",
-              "Seated rotation, each side",
-              "Single-leg stance, 30 seconds a side"
+            "programming": [
+              "Train normally.",
+              "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
             ],
-            "ranAll": false
+            "notMeasured": [],
+            "notScored": [
+              "Rib angle and breath",
+              "Pelvic tilt (hands on the hip points)",
+              "Seated rotation, each side"
+            ],
+            "ranAll": true,
+            "readCount": 6,
+            "totalCount": 6,
+            "notRead": []
           }
         },
         "reward": {
-          "pay": false,
+          "pay": true,
           "reasonCode": "MOVEMENT_SCREEN_COMPLETED",
           "idempotencyKey": "screen:fixture-athlete:fixture-full",
-          "message": "Not graded yet: the camera can't score this screen."
+          "message": "Screen logged. Shards are in your wallet."
         },
-        "prescribeReason": "ungraded_screen",
-        "athletePanel": "Not graded yet: the camera can't score this screen."
+        "prescribeReason": null,
+        "athletePanel": "Score 100 · from 6 of 6 checks read · Movement flags 0 · One-sided 0 · Checks read 6 of 6"
       }
     }
   }
