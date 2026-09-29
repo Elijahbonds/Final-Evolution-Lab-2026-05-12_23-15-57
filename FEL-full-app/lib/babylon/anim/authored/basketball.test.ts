@@ -20,13 +20,20 @@ import {
   buildShimmy, buildDropStep,                        // 2026-09-18: the post game
   buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildSnatchBack,
   buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip,   // 2026-09-16: the handle, and the ankles
+  buildIdleStandHoops,   // HOOPS MOTION phase 3b (review): the ball-less watch with knees
 } from './basketball';
+import { basketballClipTable } from '../basketballTree';
+import { HOOPS_OVERHEAD_CLIPS, anatomicalByDefault, closesLoop, withOverheadTransitions } from '../poseClip';
+import { mirrorGroupsInPlace } from '../groupMirror';
+import { MOCAP_OPPONENT_CLIPS, buildMocapOpponentClip } from './mocapOpponents';
+import { CLIP_ALIASES } from '../clipAliases';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>(); let root: TransformNode;
 
 beforeAll(async () => {
   scene = new Scene(new NullEngine());
+  scene.metadata = { felModeId: 'onevone' };   // HOOPS MOTION phase 3c: a hoops mode's bodies (the smoothing and the overhead pole rule are theirs)
   new FreeCamera('c', new Vector3(0, 1, -3), scene);
   const b64 = readFileSync(process.env.FEL_HERO_GLB ?? 'public/models/fel-hero.glb').toString('base64');
   const r = await SceneLoader.ImportMeshAsync('', '', 'data:model/gltf-binary;base64,' + b64, scene, undefined, '.glb');
@@ -48,6 +55,27 @@ function pos(name: string): Vector3 {
 }
 
 describe('basketball packages on the forge rig', () => {
+  // HOOPS MOTION phase 3b (review): the tree's `watch` played idle_stand, which keys no leg — its knees were the previous clip's (21–95°
+  // across takes: the 1v1 hero 63.4 → 28.2° in a session). The hoops watch keys both legs on every key, so the knees are its own.
+  it('the ball-less watch (bball_idle_stand) keys its own knees: the same bend on every key, whatever clip came before', () => {
+    rest(); const watch = buildIdleStandHoops(scene, sk)!, slide = buildDefendSlide(scene, sk, 'left')!;
+    const knee = () => { const a = pos('LeftUpLeg'), k = pos('LeftLeg'), f = pos('LeftFoot'); const u = a.subtract(k).normalize(), v = f.subtract(k).normalize(); return 180 - Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(u, v)))) * 180 / Math.PI; };
+    const bends: number[] = [];
+    for (const t of [0, 1.5, 3]) { at(watch, t); bends.push(knee()); }
+    expect(Math.max(...bends) - Math.min(...bends)).toBeLessThan(1.5);
+    expect(bends[0]).toBeGreaterThan(15); expect(bends[0]).toBeLessThan(40);   // soft athletic knees, not locked, not a crouch
+    // after the deep slide stance (no reset to bind between them): the same knees
+    at(slide, 0.25); const deep = knee();
+    watch.start(true, 1, watch.from, watch.to, false); watch.goToFrame(0); scene.render();
+    for (const x of scene.animationGroups) if (x !== watch) x.stop();
+    scene.render();
+    expect(Math.abs(deep - bends[0])).toBeGreaterThan(5);                       // (the slide really is a different bend)
+    expect(Math.abs(knee() - bends[0])).toBeLessThan(1.5);
+    watch.stop();
+    // the tree's watch asks for it, and a rig that did not build it falls back to the base idle
+    expect(basketballClipTable().watch.clip).toBe('bball_idle_stand');
+    expect(CLIP_ALIASES.bball_idle_stand?.[0]).toBe('idle_stand');
+  });
   it('dribble idle keeps the ball hand low and in front', () => {
     at(buildDribbleIdle(scene, sk)!, 0.4);
     const h = pos('RightHand'), head = pos('Head');
@@ -400,20 +428,23 @@ describe('basketball packages on the forge rig', () => {
   it('the SHIMMY sells both ways with the ball tight at the chest and the feet planted', () => {
     rest(); const g = buildShimmy(scene, sk)!;
     const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
-    at(g, 0); const f0 = fwd(); const lf0 = pos('LeftFoot'), rf0 = pos('RightFoot');
+    at(g, 0); const f0 = fwd(); const lf0 = pos('LeftFoot').clone(), rf0 = pos('RightFoot').clone();
     at(g, 0.1); const a = Vector3.Cross(f0, fwd()).y;
     at(g, 0.2); const b = Vector3.Cross(f0, fwd()).y;
     expect(Math.sign(a)).not.toBe(Math.sign(b)); expect(Math.abs(a)).toBeGreaterThan(0.1); expect(Math.abs(b)).toBeGreaterThan(0.1);   // one way, then the other
     expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on the ball
     expect(Vector3.Distance(pos('LeftFoot'), lf0)).toBeLessThan(0.12); expect(Vector3.Distance(pos('RightFoot'), rf0)).toBeLessThan(0.12);   // the feet never move
   });
-  it('the DROP STEP turns the hips well past 90° from the seal and ends with the ball at the chest, loaded', () => {
+  // HOOPS MOTION phase 3d (one owner per body): the drop step's turn is the ROOT's — the mode squares the gather to the rim — so the clip
+  // keys none. Its 130° hip turn ran against that slew (rG: the world hips still through the step, then a 153° whip into the gather).
+  it('the DROP STEP keys no turn (the root owns it), steps the right foot round, and ends with the ball at the chest, loaded', () => {
     rest(); const g = buildDropStep(scene, sk)!;
     const fwd = () => { const h = boneNode(sk, 'Hips')!; h.computeWorldMatrix(true); return Vector3.TransformNormal(Vector3.Forward(), h.getWorldMatrix()).normalize(); };
-    at(g, 0); const f0 = fwd(); const ballLow = pos('RightHand').y;
+    at(g, 0); const f0 = fwd(); const ballLow = pos('RightHand').y; const rf0 = pos('RightFoot').clone();   // (a copy: getAbsolutePosition is the node's own vector)
     expect(ballLow).toBeLessThan(1.1);                                             // the seal: the ball low on the ball side
+    for (const t of [0.085, 0.17, 0.255, 0.34]) { at(g, t); expect(Vector3.Dot(fwd(), f0), `t ${t}`).toBeGreaterThan(Math.cos((5 * Math.PI) / 180)); }   // the hips never leave the root's facing
+    at(g, 0.17); expect(Vector3.Distance(pos('RightFoot'), rf0)).toBeGreaterThan(0.1);   // the step: the right foot swings off its spot
     at(g, 0.34);
-    expect(Vector3.Dot(fwd(), f0)).toBeLessThan(-0.1);                             // turned past 90°
     expect(Vector3.Distance(pos('RightHand'), pos('LeftHand'))).toBeLessThan(0.36);   // both hands on it, at the chest
     expect(pos('RightHand').y).toBeGreaterThan(pos('Hips').y + 0.05);
   });
@@ -449,11 +480,16 @@ describe('basketball packages on the forge rig', () => {
   it('…and that is what tells it apart from a LAYUP, which folds the arm and keeps the ball close', () => {
     rest(); const roll = buildFingerRoll(scene, sk)!;
     at(roll, 0.38);
-    const rollReach = Vector3.Distance(pos('RightArm'), pos('RightHand'));
+    const flat = (a: Vector3, b: Vector3) => Math.hypot(a.x - b.x, a.z - b.z);
+    const rollReach = Vector3.Distance(pos('RightArm'), pos('RightHand')), rollOut = flat(pos('RightArm'), pos('RightHand'));
     rest(); const lay = buildLayupGather(scene, sk)!;
     at(lay, 0.3);
-    const layReach = Vector3.Distance(pos('RightArm'), pos('RightHand'));
-    expect(rollReach).toBeGreaterThan(layReach);                                 // the reach IS the shot
+    const layReach = Vector3.Distance(pos('RightArm'), pos('RightHand')), layOut = flat(pos('RightArm'), pos('RightHand'));
+    // HOOPS MOTION phase 3c: both release keys are now reached exactly (the cubic passes through every key, and each is a held accent),
+    // and at the release both arms are at full stretch — so the reach is measured OUT, in front: the finger roll's ball goes out toward
+    // the rim, the layup's straight up (the straight-line reaches tie within the solver's own precision: 0.48543 against 0.48550 m)
+    expect(rollReach).toBeGreaterThan(layReach - 1e-3);                          // the reach IS the shot
+    expect(rollOut).toBeGreaterThan(layOut + 0.15);                              // …out in front of the head, not over it
   });
 
   it('the FLOATER has a left hand now — it used to push the ball up with the right one going either way', () => {
@@ -582,4 +618,86 @@ describe('basketball packages on the forge rig', () => {
     expect(Math.abs(pos('LeftFoot').y - pos('RightFoot').y)).toBeLessThan(0.2);  // planted, loaded to finish
   });
 
+});
+
+// HOOPS MOTION phase 3c (plan §3 "Anatomical elbow poles"; the gate: wrong-way elbow frames ≤ 1 per window on the overhead clips). The
+// probe's own test (_hoops-motion-probe elbowBad): the elbow's direction off the shoulder→hand line — BACK with the hand over the shoulder
+// (high), FORWARD with it below (low) — on every 30 fps frame of each overhead clip, built on this rig and mirrored in place the way the
+// hoops modes play it (hoopsHand.rightHandHoops → groupMirror).
+describe('the overhead families point their elbows where an elbow can (HOOPS MOTION 3c)', () => {
+  const wrongWay = (): number => {
+    const lu = pos('LeftUpLeg'), ru = pos('RightUpLeg'), lf = pos('LeftFoot'), lt = pos('LeftToeBase');
+    const across = ru.subtract(lu); across.y = 0; across.normalize();
+    let fwd = new Vector3(across.z, 0, -across.x); if (Vector3.Dot(fwd, lt.subtract(lf)) < 0) fwd = fwd.scale(-1);
+    let n = 0;
+    for (const sd of ['Left', 'Right']) {
+      const S = pos(sd + 'Arm'), E = pos(sd + 'ForeArm'), H = pos(sd + 'Hand');
+      const ax = H.subtract(S), al = ax.length(); if (al < 1e-3) continue;
+      const u = S.subtract(E).normalize(), v = H.subtract(E).normalize(); if (Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(u, v)))) * 180 / Math.PI > 160) continue;
+      const axn = ax.scale(1 / al), e = E.subtract(S), pe = e.subtract(axn.scale(Vector3.Dot(e, axn))); if (pe.length() < 1e-3) continue;
+      const p = pe.normalize(), pf = Vector3.Dot(p, fwd), handUp = H.y - S.y;
+      if ((handUp > 0.15 && pf < -0.5 && p.y < 0.3) || (handUp < -0.1 && pf > 0.6)) n++;
+    }
+    return n;
+  };
+  const BUILD: Record<string, () => AnimationGroup | null> = {
+    bball_floater: () => buildFloater(scene, sk), bball_floater_left: () => buildFloater(scene, sk, 'left'),
+    bball_hook: () => buildHook(scene, sk), bball_hook_left: () => buildHook(scene, sk, 'left'),
+    bball_layup_reverse: () => buildReverseLayup(scene, sk), bball_layup_reverse_left: () => buildReverseLayup(scene, sk, 'left'),
+    bball_finger_roll: () => buildFingerRoll(scene, sk), bball_finger_roll_left: () => buildFingerRoll(scene, sk, 'left'),
+    bball_mikan: () => buildMikan(scene, sk), bball_mikan_left: () => buildMikan(scene, sk, 'left'),
+    bball_up_and_under: () => buildUpAndUnder(scene, sk), bball_up_and_under_left: () => buildUpAndUnder(scene, sk, 'left'),
+    bball_layup_spin: () => buildSpinLayup(scene, sk), bball_layup_spin_left: () => buildSpinLayup(scene, sk, 'left'),
+    bball_layup_hang: () => buildHangLayup(scene, sk), bball_layup_hang_left: () => buildHangLayup(scene, sk, 'left'),
+    bball_fadeaway: () => buildFadeaway(scene, sk), bball_block_reach: () => buildBlockReach(scene, sk),
+    bball_hand_up: () => buildHandUp(scene, sk), bball_follow_through_late: () => buildFollowThroughLate(scene, sk),
+    bball_mc_layup_gather: () => buildMocapOpponentClip(scene, sk, MOCAP_OPPONENT_CLIPS.find((c) => c.name === 'bball_mc_layup_gather')!),
+    bball_mc_layup_gather_left: () => buildMocapOpponentClip(scene, sk, MOCAP_OPPONENT_CLIPS.find((c) => c.name === 'bball_mc_layup_gather_left')!),
+  };
+  it('the overhead families are the plan\'s list — twenty clips with their _left versions — and get the rule on their overhead keys', () => {
+    expect(HOOPS_OVERHEAD_CLIPS.length).toBe(20);
+    for (const n of HOOPS_OVERHEAD_CLIPS) { expect(anatomicalByDefault(n, 'onevone'), n).toBe('overhead'); expect(anatomicalByDefault(n, 'dunk'), n).toBe(false); expect(BUILD[n], n).toBeDefined(); }
+    for (const n of ['bball_dribble_idle', 'bball_crossover_left', 'bball_layup_gather', 'bball_pullup_gather', 'bball_stepback_gather', 'bball_spin', 'bball_hesi']) expect(anatomicalByDefault(n, 'threevthree'), n).toBe(false);   // the low handle and gather clips stay as they are
+    expect(anatomicalByDefault('dunk_finish_windmill', 'dunk')).toBe(true); expect(anatomicalByDefault('dunk_gather_push1', 'dunk')).toBe(false);   // (the dunk family's rule, unchanged)
+    // the captured layup's extension pole points where an overhead elbow can (forward and out), no longer out and BACK
+    for (const n of ['bball_mc_layup_gather', 'bball_mc_layup_gather_left']) {
+      const c = MOCAP_OPPONENT_CLIPS.find((x) => x.name === n)!;
+      const ext = c.keys.filter((k) => (k.hands?.Right?.[1] ?? 0) > 2.0 || (k.hands?.Left?.[1] ?? 0) > 2.0);
+      expect(ext.length, n).toBeGreaterThan(3);
+      for (const k of ext) { const hi = (k.hands?.Right?.[1] ?? 0) > (k.hands?.Left?.[1] ?? 0) ? 'Right' : 'Left'; expect(k.poles?.[hi]?.[2] ?? 0, `${n} t${k.t}`).toBeGreaterThan(0.3); }
+    }
+  });
+  it('the overhead keys\' wrong-way elbows are gone, as the hoops modes play the clips (mirrored): ≤ 1 a play on the Mikan, the up-and-under and the fadeaway (5 / 5 / 2 before), ≤ 2 on every authored overhead clip, the captured layup no worse', () => {
+    // what is left (measured here, 30 fps): one or two frames IN TRANSIT (the reverse's descent: 2, from 5) and the LOW keys the rule leaves
+    // alone — the spin layup's two-hand tuck, the captured layup's gather (the plan: the low handle and gather poses stay as they are). In
+    // the game the descents' transition keys took the fadeaway's follow-through from 8 wrong-way frames to 1, the shimmy fade's 8 to 1
+    // and the drive finish's 6 to 0 (smoke1 → smoke2, attempt 1 each)
+    const LIMIT: Record<string, number> = { bball_mikan: 1, bball_mikan_left: 1, bball_up_and_under: 1, bball_up_and_under_left: 1, bball_fadeaway: 1, bball_mc_layup_gather: 3, bball_mc_layup_gather_left: 9 };
+    const rows: string[] = [];
+    for (const [name, build] of Object.entries(BUILD)) {
+      rest(); const g = build()!; mirrorGroupsInPlace([g], sk);
+      const dur = (g.to - g.from) / 30; let bad = 0;
+      for (let t = 0; t <= dur + 1e-6; t += 1 / 30) {
+        for (const x of scene.animationGroups) x.stop();
+        for (const [n, tr] of bind) { n.position.copyFrom(tr.p); n.rotationQuaternion = tr.q.clone(); }
+        g.start(false, 1, g.from, g.to, false); g.goToFrame(g.from + t * 30); scene.render();
+        bad += wrongWay();
+      }
+      g.stop(); g.dispose();
+      if (bad > (LIMIT[name] ?? 2)) rows.push(`${name}: ${bad}`);
+    }
+    expect(rows, rows.join(' · ')).toEqual([]);   // base (3b tree, the same count): the reverse 5, the Mikan 5, the up-and-under 5, the fadeaway 2, the spin layup 1, the captured layup 3 / 9
+  });
+  it('a descent from an overhead key to a low one gets a transition key half-way, solved under the rule; an ascent does not', () => {
+    const down = withOverheadTransitions([{ t: 0.4, hands: { Right: [0.2, 2.0, 0.2] }, bones: { Spine: [-6, 0, 0] } }, { t: 0.8, hands: { Right: [0.24, 1.1, 0.3] }, bones: { Spine: [10, 0, 0] } }]);
+    expect(down.length).toBe(3); expect(down[1].t).toBeCloseTo(0.6, 9); expect(down[1].transition).toBe(true);
+    expect(down[1].hands?.Right).toEqual([0.22, 1.55, 0.25]); expect(down[1].bones?.Spine).toEqual([2, 0, 0]);
+    expect(withOverheadTransitions([{ t: 0, hands: { Right: [0.24, 1.1, 0.3] } }, { t: 0.3, hands: { Right: [0.2, 2.0, 0.2] } }]).length).toBe(2);
+    expect(withOverheadTransitions([{ t: 0, hands: { Right: [0.2, 2.0, 0.2] } }, { t: 0.3, hands: { Right: [0.2, 1.9, 0.3] } }]).length).toBe(2);   // both overhead
+  });
+  it('a looping clip is smoothed as one (poseClip closesLoop): the dribble idle, the hand up, the watch, idle_stand\'s own keys', () => {
+    expect(closesLoop([{ t: 0, hipsY: -0.05, bones: { Spine: [14, 0, 0] } }, { t: 0.4, hipsY: -0.07 }, { t: 0.8, hipsY: -0.05, bones: { Spine: [14, 0, 0] } }], 0.8)).toBe(true);
+    expect(closesLoop([{ t: 0, hipsY: 0 }, { t: 0.4, hipsY: -0.07 }, { t: 0.8, hipsY: -0.05 }], 0.8)).toBe(false);
+    expect(closesLoop([{ t: 0, hipsY: 0 }, { t: 0.4, hipsY: -0.07 }, { t: 0.7, hipsY: 0 }], 0.8)).toBe(false);   // not at the clip's end
+  });
 });

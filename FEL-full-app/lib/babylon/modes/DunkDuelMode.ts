@@ -52,6 +52,7 @@ import { EASTBAY_TIMING } from '../anim/authored/timing';
 import { armChain, reachArm, shapeReach, type ArmChain } from '../anim/HandIK';   // A+ P8 H1 (dunk mirror): the hang wrist reach
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3 (dunk mirror)
 import { PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the contest's Posture Poses, shared
+import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the hinged arm, the arms' last writer
 import { posturePose, type PostureInput } from '../core/DunkPosture';
 import { legPose, arcHeight } from '../core/DunkLegs';
 import { mirrorGroupsInPlace, mirrorSide } from '../anim/groupMirror';
@@ -152,6 +153,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const armsOf = new WeakMap<SpawnedCharacter, { Left: ArmChain | null; Right: ArmChain | null }>();   // H1: per body, built once
   let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
   let handIkObs: Observer<Scene> | null = null, ikScene: Scene | null = null;
+  let hinges: MotionMount[] = [];   // HOOPS MOTION phase 3c: each duellist's hinged arm, after the reach
   const handIkTarget = new Vector3(), handIkPole = new Vector3();
   let clipToken = 0;                          // H5: a superseded clip's onEnd chain is dead (Babylon fires it on stop() too)
   let airHeld = false;                        // H5: the aerial clip holds its last frame until feet-down
@@ -615,6 +617,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
       }
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1: the reach, after the clips
       ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
+      // HOOPS MOTION phase 3c (plan §3: "hingeArmApply is the last writer on every hoops body, and on Dunk Duel"): after the reach — the
+      // elbow bends about its hinge, the forearm's twist no faster than a forearm turns (the contest's phase-9 layer; the duel had none)
+      for (const h of hinges) h.dispose();
+      hinges = [p1, p2].map((c) => mountMotionLayers({ scene: ctx.scene, skeleton: c.skeleton, root: c.root, drag: false, lean: false }));
       // BIOMECH-HOOPS-WAVE1: one Posture Poses layer per body; the layer owns the eyes (the secondary head-look stands down)
       postureOf.set(p1, new PostureLayer(p1.skeleton, p1.root, 'DUEL-PP-P1')); postureOf.set(p2, new PostureLayer(p2.skeleton, p2.root, 'DUEL-PP-P2'));
       p1.secondary?.setLookTarget(() => null); p2.secondary?.setLookTarget(() => null);
@@ -861,6 +867,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       modeVenue?.dispose?.(); modeVenue = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       handIkObs = null; ikScene = null; handIkT = 0;
+      for (const h of hinges) h.dispose(); hinges = [];   // HOOPS MOTION phase 3c
       p1?.dispose(); p2?.dispose(); ball?.dispose();
       obstacle?.dispose(); obstacle = null; obstacleToken++;
       SoundKit.stopAmbient();

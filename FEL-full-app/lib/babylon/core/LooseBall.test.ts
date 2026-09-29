@@ -300,8 +300,12 @@ describe('3v3: one owner for a miss, and a possession change ends the board', ()
 
   it('while their miss is live, the pokes need a man WITH the ball (no strip of the empty-handed shooter)', () => {
     // the parry-vault / drive-by press and the poke / reach-in: both read `driver`, who stays set until the next possession
-    expect(CODE.match(/driver && ball\.parent && !driveStolen/g) ?? []).toHaveLength(2);
+    // HOOPS MOTION phase 3: their driver DRIBBLES now (the ball un-parented on his carry), so "with the ball" is driverHasBall(): the
+    // ball in his hand, or on his live carry and not released — a released shot is neither
+    expect(CODE.match(/driver && driverHasBall\(\) && !driveStolen/g) ?? []).toHaveLength(2);
     expect(CODE).not.toMatch(/driver && !driveStolen/);
+    expect(fn('driverHasBall')).toMatch(/if \(ball\.parent\) return true;/);
+    expect(fn('driverHasBall')).toMatch(/carries\.get\(driver\)\?\.active && !\(ball\.metadata as \{ felReleased\?: boolean \} \| undefined\)\?\.felReleased/);
   });
 
   it('the miss that flies still sets the live board (the owner this defers to)', () => {

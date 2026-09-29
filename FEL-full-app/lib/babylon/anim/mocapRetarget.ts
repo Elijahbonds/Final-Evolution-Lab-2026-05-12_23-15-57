@@ -64,6 +64,16 @@ export interface RetargetOpts {
    * — an upright body the root layer turns over. See anim/MoveRootLayer.ts.
    */
   rootTrack?: boolean;
+  /**
+   * HOOPS MOTION phase 3d (N4): RE-ROOT A ONE-SHOT. The baseline facing is the window's MEDIAN hip yaw, so a capture that turns keys its
+   * turn about that median: its first key already carries half of it (the generator's "facing": pivot +83°, spin +88°, jumpshot −46°,
+   * layup gather −33°, feint ±41°, step-through +27°, hesi +24°, crossover −20°) and the hips swung that far across the fade from the loop
+   * before it — and back again at its end. With reRoot every key is read in a frame that TURNS WITH the capture's own hip yaw, from the
+   * window's first frame to its last (a smoothstep, so the turn taken off adds nothing to the hips' rate at either end): the first and last
+   * keys carry no hip yaw, and the mode's root owns the turn. Hands, feet and poles are read in the same turning frame. Default off: this
+   * retarget also feeds the style clips and the capture tools (find-strikes, take-timeline, hoops-timeline, …).
+   */
+  reRoot?: boolean;
 }
 
 /** One sample of a root track: t (s), the pelvis orientation as a quaternion [x, y, z, w] in the rig's axes (+x right,
@@ -171,7 +181,21 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
       base.front = f2; base.right = r2;
     }
   }
-  const local = (v: V3): V3 => [dot(v, base.right), dot(v, up), dot(v, base.front)];
+  type Basis = { front: V3; right: V3; up: V3 };
+  const local = (v: V3, B: Basis = base): V3 => [dot(v, B.right), dot(v, up), dot(v, B.front)];
+  /** N4 re-root: the capture's hip yaw against the baseline (radians, + toward its right), unwrapped over the window's frames, and the
+   *  baseline turned by the smoothstep between its first and last value at key fraction u. */
+  const hipYawOf = (fr: Record<Canon, V3>): number => { const ax = bodyAxes(fr, up, frontSign); return Math.atan2(dot(ax.front, base.right), dot(ax.front, base.front)); };
+  let yaw0 = 0, yaw1 = 0;
+  if (o.reRoot && !o.rootTrack) {
+    yaw0 = hipYawOf(s.frames[f0]); yaw1 = yaw0;
+    for (let f = f0 + 1; f <= f1; f++) { let d = hipYawOf(s.frames[f]) - hipYawOf(s.frames[f - 1]); d -= 2 * Math.PI * Math.round(d / (2 * Math.PI)); yaw1 += d; }
+  }
+  const basisAt = (u: number): Basis => {
+    if (!o.reRoot || o.rootTrack) return base;
+    const k = u * u * (3 - 2 * u), th = yaw0 + (yaw1 - yaw0) * k;
+    return { front: norm(add(scl(base.front, Math.cos(th)), scl(base.right, Math.sin(th)))), right: norm(sub(scl(base.right, Math.cos(th)), scl(base.front, Math.sin(th)))), up };
+  };
 
   // SCALE — the source LEG (hip→knee→ankle) to the reference hero's 0.82 m (poseClip REF_LEG_LEN), over the whole stream.
   // It was the torso (hips→head) first, and that planted nothing: Meshy's rig puts Head far higher up the skull than
@@ -236,12 +260,12 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
       hipsY: 0,
     };
   };
-  const keyOf = (fr: Record<Canon, V3>, t: number): PoseKey => {
+  const keyOf = (fr: Record<Canon, V3>, t: number, B: Basis = base): PoseKey => {
     if (o.rootTrack) return rootKeyOf(fr, t);
     const ax = bodyAxes(fr, up, frontSign);
     // the rig's yaw convention (basketball.ts, measured): +yaw turns the RIGHT shoulder forward, i.e. the front toward
     // the body's LEFT — so a front that has turned toward +right is a NEGATIVE yaw
-    const hipYaw = -Math.atan2(dot(ax.front, base.right), dot(ax.front, base.front)) * DEG;
+    const hipYaw = -Math.atan2(dot(ax.front, B.right), dot(ax.front, B.front)) * DEG;
     const shoulder = sub(fr.RightArm, fr.LeftArm);
     const shoulderFront = norm(cross(norm(sub(shoulder, scl(up, dot(shoulder, up)))), up));
     const sf = dot(shoulderFront, ax.front) < 0 ? scl(shoulderFront, -1) : shoulderFront;
@@ -252,11 +276,11 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
     // Targets are relative to the UN-lowered hips: buildPoseClip solves every key with the hips at bind and applies hipsY
     // afterwards as a translation of the whole solved body (poseClip.ts). Folding hY into the targets as well counted the
     // crouch twice — the rig measured the ankles 0.15 m under the floor the moment the crouch was keyed correctly.
-    const P = (j: Canon): V3 => { const v = local(sub(fr[j], fr.Hips)); return [R2(v[0] * S), R2(REF_HIPS + v[1] * S), R2(v[2] * S)]; };
+    const P = (j: Canon): V3 => { const v = local(sub(fr[j], fr.Hips), B); return [R2(v[0] * S), R2(REF_HIPS + v[1] * S), R2(v[2] * S)]; };
     const pole = (sh: Canon, el: Canon, wr: Canon): V3 | undefined => {
       const mid = scl(add(fr[sh], fr[wr]), 0.5), d = sub(fr[el], mid);
       if (len(d) < 0.02 * (1 / S)) return undefined;   // nearly straight: the solver's default pole
-      const v = norm(local(d)); return [R2(v[0]), R2(v[1]), R2(v[2])];
+      const v = norm(local(d, B)); return [R2(v[0]), R2(v[1]), R2(v[2])];
     };
     const poles: PoseKey['poles'] = {};
     const pl = pole('LeftArm', 'LeftForeArm', 'LeftHand'), pr = pole('RightArm', 'RightForeArm', 'RightHand');
@@ -270,7 +294,7 @@ export function retargetToPoseKeys(stream: JointStream, o: RetargetOpts): Retarg
       hipsY: R2(hY),
     };
   };
-  let keys = Array.from({ length: nKeys }, (_, k) => keyOf(sampleAt(k / (nKeys - 1)), (k / (nKeys - 1)) * dur));
+  let keys = Array.from({ length: nKeys }, (_, k) => keyOf(sampleAt(k / (nKeys - 1)), (k / (nKeys - 1)) * dur, basisAt(k / (nKeys - 1))));
   if (o.loop) keys = closeLoop(keys);
   if (o.mirror) keys = keys.map(mirrorKey);
   let root = o.rootTrack ? unwindQuats(rootKeys) : undefined;

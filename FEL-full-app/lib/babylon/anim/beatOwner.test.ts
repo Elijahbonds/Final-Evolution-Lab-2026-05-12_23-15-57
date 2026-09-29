@@ -80,3 +80,32 @@ describe('a held beat', () => {
     expect(body.busy).toBe(false);
   });
 });
+
+// HOOPS MOTION phase 3d: the 3PT shooter's raw onEnd chains (follow-through → absorb → idle; the make's celebrate → idle) moved onto a
+// BeatOwner: a chain is a beat started from onSettle, and the loop waits for the chain's last link
+describe('a chained beat', () => {
+  it('a beat started from onSettle plays — the loop is not played over it — and the chain settles into the loop at its end', () => {
+    const f = fakeAnimator();
+    const body = new BeatOwner(f.animator);
+    body.loop('idle', { fadeSec: 0.2 });
+    body.beat('follow', { onSettle: () => body.beat('absorb', { fadeSec: 0.1 }) });
+    f.end('follow');
+    expect(f.plays.at(-1)).toMatchObject({ clip: 'absorb', loop: false });   // HEAD: idle, played after the absorb in the same callback
+    expect(body.current).toBe('absorb');
+    f.end('absorb');
+    expect(f.plays.at(-1)).toMatchObject({ clip: 'idle', loop: true });
+    expect(body.busy).toBe(false);
+  });
+  it('a link cut by a newer beat never resurrects the chain (the make\'s celebrate cuts the absorb: the absorb\'s end is ignored)', () => {
+    const f = fakeAnimator();
+    const body = new BeatOwner(f.animator);
+    body.loop('idle');
+    body.beat('follow', { onSettle: () => body.beat('absorb') });
+    body.beat('celebrate');           // the ball went through while the follow-through played
+    f.end('follow');                  // Babylon raises the cut follow-through's end from stop()
+    expect(f.plays.at(-1)?.clip).toBe('celebrate');
+    f.end('celebrate');
+    expect(f.plays.at(-1)).toMatchObject({ clip: 'idle', loop: true });
+    expect(f.plays.filter((p) => p.clip === 'absorb')).toHaveLength(0);
+  });
+});

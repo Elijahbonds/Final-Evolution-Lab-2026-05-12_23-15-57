@@ -10,6 +10,7 @@
 //      hoops rig (scripts/mocap/clip-strides.mts prints CLIP_SPEED and says MATCH), and a state that plays an AUTHORED clip
 //      keeps the authored reference.
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { MOCAP_OPPONENT_CLIPS } from './mocapOpponents';
 import { MOCAP_STYLE_CLIPS } from './mocapStyles';
@@ -18,7 +19,7 @@ import { basketballClipTable } from '../basketballTree';
 import { variantFor } from '../opponentMotion';
 import { scopeAllows, scopeForMode } from '../clipScope';
 
-interface Manifest { clips: { name: string; file: string; from: number; to: number; duration?: number; loop?: boolean; pin?: string; smoothSec?: number }[] }
+interface Manifest { clips: { name: string; file: string; from: number; to: number; duration?: number; loop?: boolean; pin?: string; smoothSec?: number; reRoot?: boolean }[] }
 const opponents = JSON.parse(readFileSync('scripts/mocap/opponent-clips.json', 'utf8')) as Manifest;
 const styles = JSON.parse(readFileSync('scripts/mocap/style-clips.json', 'utf8')) as Manifest;
 const entry = (name: string) => opponents.clips.find((c) => c.name === name) ?? styles.clips.find((c) => c.name === name);
@@ -158,5 +159,64 @@ describe('HOOPS_STRIDE_CAPTURE: each state paces against the clip it plays (scri
   });
   it('the authored table is untouched (no sprint, no per-state numbers): an authored rig paces as it did', () => {
     expect(HOOPS_STRIDE).toEqual({ run: 3.6, slide: 2.0, walk: 0.72, jog: 2.8 });
+  });
+});
+
+// HOOPS MOTION phase 3d (N4): the hoops one-shots are re-rooted in the generator (mocapRetarget reRoot) so their first and last keys hand over
+// with no hip yaw — the baked yaw (pivot +83°, spin +88°, jumpshot −46°, layup gather −33°, feint ±41°, step-through +27°, hesi +24°,
+// crossover ±20°) swung the hips across every fade into and out of them. The regeneration rewrites the whole module: every other row must
+// come out byte-identical, the seven TEMP pins above included.
+describe('N4: the re-rooted hoops one-shots, and the regeneration leaves every other clip byte-identical', () => {
+  const ONE_SHOTS = opponents.clips.filter((c) => c.name.startsWith('bball_mc_') && !c.loop).map((c) => c.name);
+  it('reRoot is set on exactly the hoops one-shots (per entry, default off)', () => {
+    expect(opponents.clips.filter((c) => c.reRoot).map((c) => c.name).sort()).toEqual([...ONE_SHOTS].sort());
+    expect(ONE_SHOTS).toHaveLength(14);
+    expect(styles.clips.some((c) => c.reRoot)).toBe(false);
+  });
+  it.each(ONE_SHOTS)('%s: the first and last keys carry no hip yaw (the root owns the turn)', (name) => {
+    const k = built(name)!.keys, yaw = (i: number) => k[i].bones?.Hips?.[1] ?? 0;
+    expect(Math.abs(yaw(0))).toBeLessThanOrEqual(1);
+    expect(Math.abs(yaw(k.length - 1))).toBeLessThanOrEqual(1);
+  });
+  // sha1 (16 hex) of each clip's generated object, taken from the module before N4 (fa533d86)
+  const BEFORE: Record<string, string> = {
+    karate_mc_hit_react: '3eef3ce3cc97e688',
+    karate_mc_knockdown: '177456d1e0c1bcf9',
+    karate_mc_get_up: '184ac2f09b3f3788',
+    dunk_mc_celebrate_big: '802548fe3331e289',
+    karate_mc_jab: 'b7c2d8df2e1534a2',
+    karate_mc_hook: '920872e596d89454',
+    karate_mc_roundhouse: 'e26e67ba5a9b9cc6',
+    karate_mc_high_kick: '6aeb91fa22ec6a0f',
+    football_mc_run: '31238b5df9b803bf',
+    karate_mc_cross: 'becb426644ca7061',
+    karate_mc_uppercut: 'a39d1d3c5a3d25cb',
+    karate_mc_whirl: '6f599f42fd453a4b',
+    karate_mc_backspin: 'fbda55c2fdb17ca5',
+    karate_mc_typhoon: 'bc2cdcd77f36987b',
+    karate_mc_hammer: '47005ec20990058c',
+    karate_mc_heavy: '08ee2e3c26b887b7',
+    karate_mc_rush: '0f24a1d1e2e57ed5',
+    karate_mc_stagger: 'fefc7ee2caea9de8',
+    dunk_mc_tomahawk: '18a22ea89a630924',
+    dunk_mc_windmill: '8c824da6ee4948d7',
+    dunk_mc_windmill_air: '7d3eb053ffe81af3',
+    dunk_mc_tomahawk_air: 'cb7bbe251daa3d25',
+    dunk_mc_power: 'cc23af8693b79195',
+    dunk_mc_reverse: 'd9cd6d81616b042f',
+    dunk_mc_two_hand: '3838801937b36b27',
+    trick_jump_spin_kick: '93ad057de3006ca8',
+    trick_cartwheel: '50d0df98478a59b9',
+    cap_escape: '169d7efd3e328ad4',
+    pk_backflip: '6905f185752a9166',
+    pk_360_jump: '27c511c44fe10f41',
+  };
+  it.each(Object.keys(BEFORE))('%s is byte-identical to the module before the re-root', (name) => {
+    const c = built(name)!;
+    expect(createHash('sha1').update(JSON.stringify(c)).digest('hex').slice(0, 16)).toBe(BEFORE[name]);
+  });
+  it('the byte-identical list is every non-hoops capture plus the style pins', () => {
+    expect(MOCAP_OPPONENT_CLIPS.filter((c) => !c.name.startsWith('bball_mc_')).every((c) => c.name in BEFORE)).toBe(true);
+    for (const n of ['football_mc_run', 'karate_mc_uppercut', 'trick_jump_spin_kick', 'trick_cartwheel', 'cap_escape', 'pk_backflip', 'pk_360_jump']) expect(BEFORE).toHaveProperty(n);
   });
 });

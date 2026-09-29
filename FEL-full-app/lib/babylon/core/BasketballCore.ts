@@ -20,6 +20,7 @@
 
 import { Vector3, type AbstractMesh } from '@babylonjs/core';
 import { spinBackspin } from '../visual/BallSpin';
+import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the one visual-side helper (the rival's crossover side)
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
@@ -118,11 +119,11 @@ export class DribbleController {
   /** Phase 5 dev readout: cuts the movement has charged for, and the last one. */
   get cuts(): { paid: number; last: { cost: number; deg: number; speed: number } } { return { paid: this.movement.cutsPaid, last: this.movement.lastCut }; }
   set speedScale(v: number) { this.movement.speedScale = v; }
-  private cutTo(dx: number, dz: number, speed: number): void {
+  private cutTo(dx: number, dz: number, speed: number, face = true): void {
     this.movement.cutGrace(DribbleController.CUT_BLEND_SEC + 0.2);   // Phase 5: an authored redirect keeps the speed it wrote (the drift, the momentum cross, the step-back)
     const n = Math.hypot(dx, dz) || 1;
     this.pendingCut = { x: dx / n, z: dz / n, speed, left: DribbleController.CUT_BLEND_SEC };
-    this.movement.facing = Math.atan2(dx / n, dz / n);
+    if (face) this.movement.facing = Math.atan2(dx / n, dz / n);
   }
   /** The body's forward / right on the floor from its facing. */
   private frame(): { fx: number; fz: number; rx: number; rz: number } {
@@ -163,7 +164,10 @@ export class DribbleController {
   static readonly STEPBACK_HOP_SPEED = 3.6;
   stepBack(tx: number, tz: number, sprint: boolean): void {
     const n = Math.hypot(tx, tz) || 1;
-    this.cutTo(-tx / n, -tz / n, DribbleController.STEPBACK_HOP_SPEED + (sprint ? 0.4 : 0));
+    // HOOPS MOTION phase 3 (measured, 3a smoke + base2): the hop AWAY from the rim turned the body to face its travel — the root's yaw
+    // went π → −0.07 in ONE frame (the whole body, and the live dribble with it: the ball 0.64 m in a frame, every step-back). A
+    // step-back keeps the chest where it is (on the man, the rim); the body hops backwards.
+    this.cutTo(-tx / n, -tz / n, DribbleController.STEPBACK_HOP_SPEED + (sprint ? 0.4 : 0), false);
     this.movement.launchFor(0.35); this.movement.noteBurst(0.35);
   }
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
@@ -1245,11 +1249,10 @@ export class AttackerBrain {
     return { wish, phase: this.phase, contained: inLane, exposure, step, crossover, shot: null };
   }
 }
-/** Which side of the body a lateral vector is on. Body-right for a facing (measured, MODE-STICK-FACE): (cos yaw, 0, −sin yaw). */
-function bodySide(facing: Vector3, lateral: Vector3): 'left' | 'right' {
-  const yaw = Math.atan2(facing.x, facing.z);
-  const right = new Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-  return Vector3.Dot(lateral, right) > 0 ? 'right' : 'left';
+/** Which side of the body a lateral vector is on — the athlete's DRAWN side, through the one helper (athleteSide.ts; HOOPS MOTION
+ *  phase 3). The crossover's side is where the ball ENDS: the mode hands the carry to that side, not a toggle. */
+export function bodySide(facing: Vector3, lateral: Vector3): 'left' | 'right' {
+  return sideOfVector(Math.atan2(facing.x, facing.z), lateral);
 }
 /** The rival's make chance: a layup is the best shot, a contested pull-up from range the worst — the same contest that
  *  grades your jumper grades theirs (contestLevel), plus a hand up (handUpContest). */
