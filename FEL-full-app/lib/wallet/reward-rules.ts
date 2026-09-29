@@ -93,6 +93,17 @@ export const EVENT_REASON: Record<string, ReasonCode> = {
   sceneit_freeuse_identified: REASON.SCENEIT_FREEUSE_IDENTIFIED,
 };
 
+// DAILY-KEY-HOTFIX (2026-09-28): the event types paid at most once per player per America/Los_Angeles calendar day.
+// earn() keys them itself (lib/wallet/dailyKey.ts dailyKey) and ignores the client's idempotency_key: the client built
+// that key, and any new string paid the daily reward again (eye a1a1c5f9 5b; production at 3a0f4edf).
+// DERIVED from EVENT_REASON, not listed: an event type named daily_* or paying a DAILY_* reason is one, so a daily
+// added to EVENT_REASON later is keyed per day without anyone remembering this set.
+export const DAILY_EVENT_TYPES: ReadonlySet<string> = new Set(
+  Object.entries(EVENT_REASON)
+    .filter(([eventType, reasonCode]) => eventType.startsWith('daily_') || reasonCode.startsWith('DAILY_'))
+    .map(([eventType]) => eventType),
+);
+
 // Reasons whose currency is shards — asserted at multiple layers so a purchase
 // path can NEVER mint shards (permanent design constraint, §1).
 export const SHARD_REASONS: ReadonlySet<string> = new Set([

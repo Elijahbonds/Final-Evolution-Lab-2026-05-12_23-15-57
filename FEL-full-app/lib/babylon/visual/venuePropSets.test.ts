@@ -1,7 +1,12 @@
 // venuePropSets — every prop stands outside its play area and every model it names ships.
 import { describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
-import { VENUE_PROP_SETS, VENICE_PALM_TINT, surroundSize, surroundCovers, surroundColor, SURROUND_MARGIN, SURROUND_KIND } from './venuePropSets';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import {
+  VENUE_PROP_SETS, surroundSize, surroundCovers, surroundColor, SURROUND_MARGIN, SURROUND_KIND,
+  DUNK_BACKBOARD_Z, HERO_PALM_M, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS,
+  heroPalmLean, heroPalmScale,
+} from './venuePropSets';
 import { propSetFor, tintFor } from './VenueProps';
 
 // Play areas (x half-width, z range) the props must clear — from the modes' own venues.
@@ -137,8 +142,6 @@ describe('THE SURROUND — every prop stands on something', () => {
 
 describe('DUNK-VENICE-ENV-RENDER — the Venice dunk dresses as Venice', () => {
   const set = VENUE_PROP_SETS['venice-dunk'];
-  /** the kit's detailed palm is 1.43 units to the top of its crown */
-  const heightOf = (p: (typeof set)[number]) => 1.43 * (p.scale ?? 1) * (p.stretch?.[1] ?? 1);
 
   it('is the dunk\'s set (and the duel\'s — same venue), while the other Venice courts keep theirs', () => {
     expect(propSetFor('basketball_dunk')).toBe('venice-dunk');
@@ -153,18 +156,21 @@ describe('DUNK-VENICE-ENV-RENDER — the Venice dunk dresses as Venice', () => {
     expect(green.map((p) => p.model)).toEqual([]);
   });
 
-  it('stands tall Venice palms — 11 m and up, on a slender trunk, bark and fronds in their own colours', () => {
-    const palms = set.filter((p) => p.model === 'tree_palmDetailedTall');
-    expect(palms.length).toBeGreaterThanOrEqual(24);
-    for (const p of palms) {
-      expect(heightOf(p)).toBeGreaterThanOrEqual(11);
-      expect(0.2 * (p.scale ?? 1) * (p.stretch?.[0] ?? 1)).toBeLessThan(0.8);   // the 0.2-unit trunk, drawn under 0.8 m
-      expect(p.tint).toEqual(VENICE_PALM_TINT);
+  it('stands tall Venice palms — 11 m and up, on a slender trunk (the baked palm since DUNK-VENICE-ENV-2)', () => {
+    // DUNK-VENICE-ENV-2: this counted the kit's tinted detailed palms; the rows are the baked palm GLB now (textured, leaflet
+    // alpha), in the same places at the same heights. The count, the height and the trunk hold as they did.
+    expect(set.filter((p) => /^tree_palm/.test(p.model)).map((p) => p.model)).toEqual([]);   // no kit palm of any kind left
+    expect(VENICE_ROW_PALMS.length).toBeGreaterThanOrEqual(24);
+    for (const p of VENICE_ROW_PALMS) {
+      const [sxz, sy] = heroPalmScale(p.h);
+      expect(HERO_PALM_M * sy).toBeGreaterThanOrEqual(11);
+      expect(0.56 * sxz).toBeLessThan(0.8);   // the baked trunk is 0.56 m at its foot
     }
   });
 
-  it('keeps the sea open behind the hoop — nothing past the backboard palms inside the court\'s width', () => {
-    // the side rows (x ±12.3 and out) are the frame's edges by design; the camera's own backdrop is x ±11
+  it('stands no kit prop behind the boardwalk row inside the court\'s width', () => {
+    // DUNK-VENICE-ENV-2: this was "keeps the sea open behind the hoop"; the boardwalk row (eye VE-6) is the backdrop there now,
+    // and the sea shows past its ends. The assertion is unchanged. The side rows (x ±12.3 and out) are the frame's edges.
     const blocking = set.filter((p) => Math.abs(p.at[0]) < 11 && p.at[2] < -30);
     expect(blocking.map((p) => `${p.model} ${p.at}`)).toEqual([]);
   });
@@ -173,6 +179,74 @@ describe('DUNK-VENICE-ENV-RENDER — the Venice dunk dresses as Venice', () => {
     const boats = set.filter((p) => /^sail_billboard/.test(p.model));
     expect(boats.length).toBeGreaterThan(0);
     for (const b of boats) expect(b.at[0] < -50 || b.at[2] < -71, `${b.model} at ${b.at}`).toBe(true);
+  });
+});
+
+describe('DUNK-VENICE-ENV-2 — the Venice dunk\'s baked dressing', () => {
+  const set = VENUE_PROP_SETS['venice-dunk'];
+  const R = VENICE_BOARDWALK_ROW;
+
+  it('ships the five GLBs byte for byte — the asset drop, never re-exported', () => {
+    const drop: Record<string, string> = {
+      'palm_hero_lod0.glb': '03109df70554bc2e8c730f9c7a5df3cdfe8ff38bf46a3a499f74376204c3f99a',
+      'palm_hero_lod1.glb': 'd9acd04d1261461dbefbbb7ce74eb636480fa48784c056f46af88951115e3299',
+      'palm_hero_lod2.glb': '8df995989a580b7a60d27ea0f8baa38c3e62949ac152e7f996855695da00f3d6',
+      'venice_boardwalk_kit.glb': '534acabd6d0d973bbcffe60fe46c08aa8d62946851caeb53bf7bbd98debdc96f',
+      'venice_crowd_cards.glb': 'de1569f028d459b79cf0cb6d78ceab727a87bf0d087b774e12a2073b0c7a88bc',
+    };
+    for (const [f, sha] of Object.entries(drop)) {
+      expect(createHash('sha256').update(readFileSync(`public${VENICE_ENV2_DIR}${f}`)).digest('hex'), f).toBe(sha);
+    }
+    for (const f of VENICE_PALM_LODS.files) expect(drop[f], f).toBeTruthy();
+  });
+
+  it('switches the palm\'s LODs at 25 m and 60 m (the asset README\'s bands)', () => {
+    expect([...VENICE_PALM_LODS.switchM]).toEqual([25, 60]);
+  });
+
+  it('stands the hero palm 2–4 m behind the backboard and 1.5–3 m off the rim\'s line, leaning away from the court', () => {
+    const [hero] = VENICE_HERO_PALMS;
+    const behind = DUNK_BACKBOARD_Z - hero.at[2];
+    expect(behind).toBeGreaterThanOrEqual(2); expect(behind).toBeLessThanOrEqual(4);
+    expect(Math.abs(hero.at[0])).toBeGreaterThanOrEqual(1.5); expect(Math.abs(hero.at[0])).toBeLessThanOrEqual(3);
+    const [lx, lz] = heroPalmLean(hero.yaw);
+    expect(Math.sign(lx)).toBe(Math.sign(hero.at[0]));   // off to its own side, not over the rim
+    expect(lz).toBeLessThanOrEqual(0);                    // and away from the court (north)
+  });
+
+  it('keeps the rows where they stood, one hero palm in for the two that framed the backboard, the near rows casting', () => {
+    // the two kit palms at (−9.5, −23) and (11.5, −25) were the faceted crowns in the slam cam and the replays
+    const near = VENICE_ROW_PALMS.filter((p) => Math.abs(p.at[0]) < 12 && p.at[2] > -30 && p.at[2] < -14);
+    expect(near.map((p) => `${p.at}`)).toEqual([]);
+    // the shadows that reach the court: the near rows cast their trunks (as the kit rows did — never their leaves), the heroes whole
+    for (const p of VENICE_ROW_PALMS) expect(p.casts, `${p.at}`).toBe(Math.abs(p.at[0]) < 15 ? 'trunk' : undefined);
+    for (const p of VENICE_HERO_PALMS) expect(p.casts).toBe('whole');
+  });
+
+  it('puts the boardwalk row 15–35 m from the run-up camera, outside the court, unturned, the crowd between it and the court', () => {
+    const origin = R.runupCamZ - R.at[2], face = R.runupCamZ - (R.at[2] + R.depth[1]);
+    for (const d of [origin, face]) { expect(d).toBeGreaterThanOrEqual(15); expect(d).toBeLessThanOrEqual(35); }
+    const courtEdge = -14 - 3;                              // the slab's north edge and its apron
+    expect(R.at[2] + R.depth[1]).toBeLessThan(courtEdge);
+    // the crowd strip stands 4 m in front of its file origin, ±1.2 m deep: between the awnings and the apron
+    expect(R.crowdAt[2] + 4 - 1.2).toBeGreaterThan(R.at[2] + R.depth[1]);
+    expect(R.crowdAt[2] + 4 + 1.2).toBeLessThan(courtEdge);
+    expect(Math.abs(R.crowdAt[0] - R.at[0])).toBeLessThan(R.halfWidth);
+  });
+
+  it('keeps every prop and palm out of the row\'s footprint (the facades, the stalls and the crowd, plus a trunk\'s or pole\'s radius)', () => {
+    const all = [...set.map((p) => ({ what: p.model, at: p.at })), ...[...VENICE_HERO_PALMS, ...VENICE_ROW_PALMS].map((p) => ({ what: 'palm', at: p.at }))];
+    const inRow = all.filter((p) => Math.abs(p.at[0] - R.at[0]) < R.halfWidth + 0.5 && p.at[2] > R.at[2] + R.depth[0] - 0.5 && p.at[2] < R.crowdAt[2] + 5.5);
+    expect(inRow.map((p) => `${p.what} ${p.at}`)).toEqual([]);
+  });
+
+  it('drops the boat that read as a sign on a pole right of the hoop (eye VE-8)', () => {
+    expect(set.filter((p) => p.model === 'sail_billboard_2')).toEqual([]);
+    // what is left of the kit's sails stands wide of the hoop's sightline from the run-up camera (x 0, z 8)
+    for (const b of set.filter((p) => /^sail_billboard/.test(p.model))) {
+      const deg = (Math.atan2(Math.abs(b.at[0]), 8 - b.at[2]) * 180) / Math.PI;
+      expect(deg, b.model).toBeGreaterThan(25);
+    }
   });
 });
 
