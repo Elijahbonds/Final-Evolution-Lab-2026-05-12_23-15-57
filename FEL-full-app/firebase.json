@@ -2,6 +2,6 @@
   "hosting": {
     "source": ".",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "frameworksBackend": { "region": "us-central1", "memory": "1GiB" }
+    "frameworksBackend": { "region": "us-central1", "memory": "1GiB", "minInstances": 1 }
   }
 }
