@@ -1,4 +1,4 @@
-import { Barlow_Condensed, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
+import { Barlow_Condensed, Chakra_Petch, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
 import { TabBar } from '@/components/shell/tab-bar'
 import { StatusRail } from '@/components/shell/status-rail'
 import './globals.css'
@@ -13,9 +13,20 @@ import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 
 export const dynamic = 'force-dynamic'
 
-const barlow = Barlow_Condensed({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-display' })
-const plexSans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-sans' })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
+// THE APP'S FONTS, LOADED ONCE (FONT-SHARED, 2026-09-29). next/font self-hosts every face at build time (no font CDN
+// at run time) and names it by a hash, so a family name written in CSS ('Chakra Petch', 'JetBrains Mono') never
+// matches: the READY cards, TAP TO START and the JuiceKit banners asked for exactly that and got Courier.
+// app/theme.css builds --fel-font-display from the variables below instead, and the variables sit on <html> so its
+// :root tokens can see them.
+// preload: false (owner, 2026-09-29): a face downloads only where text is set in it, so a page that never uses one
+// (the Quick Screen draws in the system stack) loads none. The first visit to a page may swap from next/font's
+// metric-matched fallback once; the file is cached after that.
+const barlow = Barlow_Condensed({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-display', preload: false })
+const plexSans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-sans', preload: false })
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', preload: false })
+// The display face (owner, 2026-09-29: Chakra Petch, the face the token was written for). Its heaviest cut is 700; the
+// 800/900 the display rules ask for draw at 700.
+const chakraPetch = Chakra_Petch({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-chakra', preload: false })
 
 // A shared link is the product's first impression, so the card carries the page's own
 // promise. It used to read "Premium athlete-development game — train, compete, evolve":
@@ -50,8 +61,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-[#050505]`}>
+    <html lang="en" className={`dark ${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} ${chakraPetch.variable}`} suppressHydrationWarning>
+      <body className="font-sans min-h-screen bg-[#050505]">
         <Providers>
           {/* THE ONE BAR (2026-09-20). Above the page, not inside it: thirty-three routes each mounted their own
               AppHeader and BottomNav, which meant nine chips at the top and, once the tabs arrived, two navigation
