@@ -35,6 +35,7 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/thresholds.ts': [],
   'lib/screen/checks.ts': [], 'lib/screen/store.ts': [], 'lib/screen/flow.ts': [], 'lib/screen/copy.ts': [], 'lib/screen/PROPOSED-program-lanes.ts': [],
   'lib/screen/age.ts': [], 'lib/screen/routes.ts': [],
+  'lib/screen/kid.ts': [[['10'], 'one decimal of rounding for the change line (as lib/assess/why.ts rounds the jump)']],
   'lib/screen/config.ts': [[['9'], 'a regex character class (a-z0-9)']],
   'lib/screen/ui.ts': [[['16', '3', '0.5', '6', '1200'], 'UI constants: the skeleton\'s One Euro (1, 16, 3), its visibility floor, the tracking-loss window and the Done beat — grade nothing (gate 2)'], [LANDMARKS, 'landmark indices and count']],
   'app/play/mirror/assess/_components/assess-app.tsx': [[['33'], 'the landmark count'], [['500'], 'how often the camera check re-reads the pose rate (UI)'], [['4', '3'], 'the 4:3 default picture aspect'], [['60'], 'the camera frame-rate asked for on the jump (spec §3.1)']],
@@ -48,6 +49,9 @@ const NONE = [
   'app/play/mirror/assess/_components/results-view.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx', 'app/play/mirror/assess/page.tsx',
   'app/play/mirror/assess/results/page.tsx', 'app/screen/page.tsx', 'app/screen/program/[lane]/page.tsx', 'app/screen/program/[lane]/program-lane.tsx',
   'app/screen/privacy/page.tsx', 'app/screen/privacy/clear-results.tsx', 'app/play/mirror/assess/_components/use-leave-guard.ts',
+  // SCREEN-FIX-2
+  'app/play/mirror/assess/_components/kid-results.tsx', 'app/play/mirror/assess/_components/screen-pose.ts',
+  'app/play/mirror/assess/_components/screen-error-boundary.tsx', 'app/play/mirror/assess/layout.tsx', 'app/screen/layout.tsx',
 ];
 /** lib/assess/replay.ts is the synthetic athlete (QA data for tests and probes): it grades nothing. */
 const EXEMPT = ['lib/assess/replay.ts', 'lib/screen/PROPOSED-thresholds.ts', 'lib/screen/PROPOSED-program-lanes.ts'];

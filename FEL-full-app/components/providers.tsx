@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { SessionContext, SessionProvider } from 'next-auth/react';
 import { agentEnabled } from '@/lib/babylon/core/AgentBridge';
+import { isQuickScreenPath } from '@/lib/screen/routes';
 
 /**
  * QA SESSIONS SURVIVE A NAVIGATION (2026-09-15).
@@ -31,9 +32,10 @@ function AgentFlag() {
  * a fixed signed-out session from the context itself: no fetch, no broadcast, no storage. The rail and the tab bar
  * render nothing when signed out, as they already do for a guest. Every other path keeps the same SessionProvider,
  * unchanged; moving between the two remounts the provider, so the first page after the screen fetches its session
- * as any page load does. (components/providers.test.tsx pins both.)
+ * as any page load does. (components/providers.test.tsx pins both.) The rule itself lives in lib/screen/routes.ts
+ * (SCREEN-FIX-2: the crash screen reads it too), re-exported here unchanged.
  */
-export const isQuickScreenPath = (p: string): boolean => /^\/(screen|play\/mirror\/assess)(\/|$)/.test(p);
+export { isQuickScreenPath };
 
 const SIGNED_OUT = { data: null, status: 'unauthenticated' as const, update: async () => null };
 
