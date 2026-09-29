@@ -1,5 +1,5 @@
-// The Quick Screen's routes at render level (SCREEN-SHIP (a), (d), A3-4, gates 1 and 4). vitest does not collect app/**,
-// so the pages are pinned from here (the lib/mirror/screen-route.test.ts pattern).
+// The Quick Screen's routes at render level (SCREEN-SHIP (a), (d), A3-4, gates 1 and 4; SCREEN-FIX S-2, the privacy
+// page). vitest does not collect app/**, so the pages are pinned from here (the lib/mirror/screen-route.test.ts pattern).
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -10,16 +10,22 @@ vi.mock('next/navigation', async (orig) => ({
   usePathname: () => '/play/mirror/assess',
 }));
 
-const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 
 describe('(a) /play/mirror/assess renders for a guest', () => {
-  it('no session read, no sign-in wall: the start step, the disclaimer, the preview label and Start', async () => {
+  it('no session read, no sign-in wall: the start step, the disclaimer, the "Early version" label and Start', async () => {
     const { default: Page } = await import('@/app/play/mirror/assess/page');
     const h = renderToStaticMarkup(createElement(Page));
     const t = text(h);
     expect(t).toContain('Quick Screen');
     expect(t).toContain('This is a free movement check, not a medical exam.');
-    expect(t).toContain('PROPOSED · preview');
+    expect(t).toContain('Early version');                       // CHANGED (S-7): was 'PROPOSED · preview'
+    expect(t).not.toMatch(/PROPOSED|preview/i);
+    // S-7: the checks in plain words, and the privacy page linked from the start card
+    expect(t).toContain('Ankle bend (knee-to-wall)');
+    expect(t).toContain('Hands-on-hips jump');
+    expect(t).not.toMatch(/dorsiflexion|countermovement/i);
+    expect(h).toMatch(/<a[^>]*href="\/screen\/privacy"/);
     expect(h).toMatch(/<button[^>]*data-primary[^>]*>Start<\/button>/);
     expect(t).not.toMatch(/sign in|log in|create an account/i);
     // the page module reads no session any more
@@ -76,8 +82,79 @@ describe('the results address carries no data and reads the tab', () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const src = readFileSync(join(__dirname, '../../app/play/mirror/assess/_components/results-page.tsx'), 'utf8');
-    expect(src).toMatch(/recall\(tabStorage\(\)\)/);
+    // CHANGED (SCREEN-FIX): was recall(tabStorage()); the tab is read once for the result and its age answer
+    expect(src).toMatch(/const tab = tabStorage\(\);\s+const r = recall\(tab\);/);
     expect(src).not.toMatch(/searchParams|useSearchParams|fetch\(/);
+  });
+});
+
+describe('S-2: the back arrow never leaves the screen', () => {
+  const backHref = (h: string) => { const m = /<a[^>]*data-back[^>]*>/.exec(h) ?? /<a[^>]*aria-label="Back"[^>]*>/.exec(h); return m ? /href="([^"]+)"/.exec(m[0])![1] : null; };
+  it('every back target the screen renders is a quick-screen path, and none is /login, /play/mirror or /try', async () => {
+    const { isQuickScreenPath } = await import('@/components/providers');
+    const { ScreenFrame } = await import('@/app/play/mirror/assess/_components/screen-ui');
+    const { ProgramLane } = await import('@/app/screen/program/[lane]/program-lane');
+    const pages = {
+      frameDefault: renderToStaticMarkup(createElement(ScreenFrame, null, 'x')),
+      start: renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/page')).default)),
+      results: renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/results/page')).default)),
+      program: renderToStaticMarkup(createElement(ProgramLane, { lane: 'dunking' })),
+      privacy: renderToStaticMarkup(createElement((await import('@/app/screen/privacy/page')).default)),
+    };
+    const got = Object.fromEntries(Object.entries(pages).map(([k, h]) => [k, backHref(h)]));
+    expect(got).toEqual({ frameDefault: '/screen', start: '/screen', results: '/screen', program: '/play/mirror/assess/results', privacy: '/screen' });
+    for (const [k, href] of Object.entries(got)) {
+      expect(isQuickScreenPath(href!), k).toBe(true);
+      expect(href, k).not.toMatch(/^\/(login|try)\b|^\/play\/mirror$/);
+    }
+    for (const h of Object.values(pages)) expect(h).not.toMatch(/aria-label="Back to the Mirror"|>The Mirror</);
+  });
+
+  it('every route the screen links back to is a quick-screen path', async () => {
+    const { isQuickScreenPath } = await import('@/components/providers');
+    const R = await import('./routes');
+    const { LANE_SLUGS } = await import('./PROPOSED-program-lanes');
+    for (const r of [R.SCREEN_HOME, R.ASSESS_PATH, R.RESULTS_PATH, R.PRIVACY_PATH, ...LANE_SLUGS.map(R.programPath)]) expect(isQuickScreenPath(r), r).toBe(true);
+  });
+
+  it('a static scan: every `back=` in the screen is a routes constant or the flow\'s own step back; no /play/mirror or /login literal', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const root = join(__dirname, '../..');
+    const files = ['app/play/mirror/assess/_components/assess-app.tsx', 'app/play/mirror/assess/_components/results-page.tsx',
+      'app/screen/program/[lane]/program-lane.tsx', 'app/screen/privacy/page.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx'];
+    const backs = new Set<string>();
+    for (const f of files) {
+      const src = readFileSync(join(root, f), 'utf8');
+      for (const m of src.matchAll(/\bback=\{([^}]+)\}/g)) backs.add(m[1]);
+      expect(src, f).not.toMatch(/['"`]\/play\/mirror['"`]|['"`]\/login|['"`]\/try['"`]/);
+    }
+    expect([...backs].sort()).toEqual(['RESULTS_PATH', 'SCREEN_HOME', 'back']);
+    // the page's own `back`: the flow's step back, and /screen from the start card
+    const app = readFileSync(join(root, 'app/play/mirror/assess/_components/assess-app.tsx'), 'utf8');
+    expect(app).toMatch(/const back: string \| \(\(\) => void\) = phase === 'intro' \|\| phase === 'toResults' \? SCREEN_HOME/);
+    expect(readFileSync(join(root, 'app/play/mirror/assess/_components/screen-ui.tsx'), 'utf8')).toMatch(/back = SCREEN_HOME/);
+  });
+});
+
+describe('/screen/privacy: plain words, no request, no form', () => {
+  it('renders what the screen keeps and where, the clear button, the contact address and the stop line', async () => {
+    const { default: Page } = await import('@/app/screen/privacy/page');
+    const { SCREEN_CONTACT_EMAIL, PRIVACY_POINTS, DONE_CLEAR, STOP_LINE } = await import('./copy');
+    const h = renderToStaticMarkup(createElement(Page));
+    const t = text(h);
+    for (const p of PRIVACY_POINTS) expect(t).toContain(p);
+    expect(t).toMatch(/Nothing leaves this device/);
+    expect(t).toMatch(/never recorded and never sent/);
+    expect(t).toMatch(/session storage until you clear them or close the tab/);
+    expect(h).toMatch(/<button[^>]*data-done-clear[^>]*>Done, clear my results</);
+    expect(t).toContain(DONE_CLEAR);
+    expect(t).toContain(STOP_LINE);
+    expect(SCREEN_CONTACT_EMAIL).toBe('FinalEvolution.us@gmail.com');
+    expect(h).toContain(`href="mailto:${SCREEN_CONTACT_EMAIL}"`);
+    expect(t).toContain(SCREEN_CONTACT_EMAIL);
+    expect(h).not.toMatch(/<form|<input|CONTACT_EMAIL/);
+    expect(h).toMatch(/href="\/privacy"/);                      // the app-wide policy, linked, not changed
   });
 });
 

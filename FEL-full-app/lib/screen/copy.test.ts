@@ -15,6 +15,7 @@ const SCREEN_FILES = [
   ...readdirSync(join(ROOT, 'app/play/mirror/assess/_components')).filter((f) => /\.tsx?$/.test(f)).map((f) => `app/play/mirror/assess/_components/${f}`),
   'app/play/mirror/assess/page.tsx', 'app/play/mirror/assess/results/page.tsx', 'app/screen/page.tsx',
   'app/screen/program/[lane]/page.tsx', 'app/screen/program/[lane]/program-lane.tsx',
+  'app/screen/privacy/page.tsx', 'app/screen/privacy/clear-results.tsx',
   ...readdirSync(join(ROOT, 'lib/screen')).filter((f) => /\.ts$/.test(f) && !f.endsWith('.test.ts')).map((f) => `lib/screen/${f}`),
 ];
 /** The string literals a file can show (quotes and template text, comments dropped). */
@@ -33,6 +34,8 @@ describe('the safety copy (the research draft, verbatim)', () => {
     expect(COPY.SCREENSHOT_LINE).toBe('Screenshot this to keep your results.');
     expect(COPY.DONE_CLEAR).toBe('Done, clear my results');
     expect(COPY.BUILD_PROGRAM).toBe('Build my Dunk Program');
+    expect(COPY.FREE_GAME).toBe('Play the Dunk Game, free');           // SCREEN-FIX S-1: the button opens /try
+    expect(COPY.STOP_LINE).toBe('Not a medical exam. If anything hurts, stop.');
     expect(COPY.WIN_LINE).toBe('Clean screen. You\'re ready for Dunking & Plyometrics.');
     expect(COPY.NOT_SAVED_TITLE).toBe('Your results aren\'t saved. Run the screen again');
     expect(COPY.TRACKING_LOSS_PROMPT).toBe('Step back into the light');

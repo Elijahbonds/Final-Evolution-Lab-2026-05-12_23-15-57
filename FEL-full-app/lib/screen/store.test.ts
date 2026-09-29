@@ -1,13 +1,14 @@
-// Where the result lives (SCREEN-SHIP A4-6, Squad gate 5): this tab's sessionStorage only, only after the age answer and
-// (under 18, or no age) a parent's consent; never localStorage; "Done, clear" removes every screen key.
+// Where the result lives (SCREEN-SHIP A4-6, Squad gate 5; SCREEN-FIX Cyber 1–2): this tab's sessionStorage only; the
+// age answer written once and locked; everything else only after the age answer and (under 18, or no age) "A grown-up
+// is with me"; never localStorage; "Done, clear" removes every screen key but the age lock.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CONSENT_TEXT_VERSION } from './copy';
+import { GROWN_UP_TEXT_VERSION } from './copy';
 import { summarize } from './checks';
 import { gradeSession } from '@/lib/assess/runner';
 import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, syntheticCalibration } from '@/lib/assess/replay';
 import {
-  KEYS, LEGACY_LOCAL_KEYS, SCREEN_PREFIX, clearScreen, gateRecord, mayPersist, readResult, recall, remember, writeResult, writeTakeoff,
-  type GateRecord, type StorageLike,
+  KEYS, LEGACY_LOCAL_KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, gateRecord, lockAge, mayPersist, readAge, readResult, recall,
+  remember, writeResult, writeTakeoff, type GateRecord, type StorageLike,
 } from './store';
 
 /** A Storage that records every write. */
@@ -29,17 +30,55 @@ const SUMMARY = summarize(gradeSession({
 }))!;
 
 let s: MemStore;
-beforeEach(() => { s = new MemStore(); clearScreen(null); });
+beforeEach(() => { s = new MemStore(); clearScreen(null); forgetAgeForTests(); });
 
-describe('the consent gate comes first', () => {
+describe('the age answer: written once, then locked for the tab', () => {
+  it('the first answer is written under the screen prefix, and read back', () => {
+    expect(readAge(s)).toBeNull();
+    expect(lockAge(s, '13-17')).toBe('13-17');
+    expect(s.writes).toEqual([KEYS.age]);
+    expect(KEYS.age.startsWith(SCREEN_PREFIX)).toBe(true);
+    expect(readAge(s)).toBe('13-17');
+  });
+
+  it('a second answer in the same tab is refused: the first one comes back and nothing is written', () => {
+    lockAge(s, 'under-13');
+    expect(lockAge(s, '18+')).toBe('under-13');
+    expect(lockAge(s, '13-17')).toBe('under-13');
+    expect(s.writes).toEqual([KEYS.age]);
+    expect(readAge(s)).toBe('under-13');
+  });
+
+  it('a hand-edited answer that is not a band reads as none', () => {
+    s.setItem(KEYS.age, 'adult');
+    expect(readAge(s)).toBeNull();
+  });
+
+  it('a browser that refuses sessionStorage still holds the lock for the page\'s life', () => {
+    const refusing: StorageLike = { length: 0, key: () => null, getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); }, removeItem: () => { throw new Error('denied'); } };
+    expect(lockAge(refusing, 'unknown')).toBe('unknown');
+    expect(lockAge(refusing, '18+')).toBe('unknown');
+    expect(readAge(null)).toBe('unknown');
+  });
+
+  it('"Done, clear my results" keeps the lock; everything else goes', () => {
+    lockAge(s, 'under-13');
+    writeResult(s, gateRecord('under-13', true), SUMMARY);
+    clearScreen(s);
+    expect([...s.m.keys()]).toEqual([KEYS.age]);
+    expect(readAge(s)).toBe('under-13');
+  });
+});
+
+describe('the grown-up step comes first', () => {
   it('with no age answered, nothing is written', () => {
     expect(writeResult(s, null, SUMMARY)).toBe(false);
     expect(writeTakeoff(s, null, 'left')).toBe(false);
     expect(s.writes).toEqual([]);
   });
 
-  it('under 18, or an age not given, writes nothing before a parent\'s consent', () => {
-    for (const age of ['under-18', 'unknown'] as const) {
+  it('under 18, or an age not given, writes nothing before "A grown-up is with me"', () => {
+    for (const age of ['under-13', '13-17', 'unknown'] as const) {
       const g = gateRecord(age, false);
       expect(mayPersist(g), age).toBe(false);
       expect(writeResult(s, g, SUMMARY), age).toBe(false);
@@ -48,29 +87,37 @@ describe('the consent gate comes first', () => {
     expect(s.writes).toEqual([]);
   });
 
-  it('after consent (or for an adult) the result goes to this tab\'s sessionStorage, under screen keys only', () => {
-    expect(writeResult(s, gateRecord('under-18', true), SUMMARY)).toBe(true);
+  it('after the grown-up step (or for an adult) the result goes to this tab\'s sessionStorage, under screen keys only', () => {
+    expect(writeResult(s, gateRecord('13-17', true), SUMMARY)).toBe(true);
     expect(s.writes.every((k) => k.startsWith(SCREEN_PREFIX))).toBe(true);
     const adult = new MemStore();
     expect(writeResult(adult, gateRecord('18+', false), SUMMARY)).toBe(true);
     expect(readResult(adult)!.summary).toEqual(SUMMARY);
   });
 
-  it('the consent record holds exactly the age band, the parent checkbox, a timestamp and the text version', () => {
-    const g = gateRecord('under-18', true, new Date('2026-09-29T12:00:00Z'));
-    expect(g).toEqual({ ageBand: 'under-18', parentCheckbox: true, at: '2026-09-29T12:00:00.000Z', textVersion: CONSENT_TEXT_VERSION });
+  it('the gate record holds exactly the age band, the grown-up checkbox, a timestamp and the text version', () => {
+    const g = gateRecord('under-13', true, new Date('2026-09-29T12:00:00Z'));
+    expect(g).toEqual({ ageBand: 'under-13', grownUp: true, at: '2026-09-29T12:00:00.000Z', textVersion: GROWN_UP_TEXT_VERSION });
     writeResult(s, g, SUMMARY);
-    expect(Object.keys(JSON.parse(s.getItem(KEYS.gate)!)).sort()).toEqual(['ageBand', 'at', 'parentCheckbox', 'textVersion']);
+    expect(Object.keys(JSON.parse(s.getItem(KEYS.gate)!)).sort()).toEqual(['ageBand', 'at', 'grownUp', 'textVersion']);
   });
 
-  it('a crafted result cannot skip consent: a minor\'s record without the checkbox reads as nothing', () => {
-    s.setItem(KEYS.gate, JSON.stringify({ ageBand: 'under-18', parentCheckbox: false, at: 'x', textVersion: CONSENT_TEXT_VERSION }));
+  it('a crafted result cannot skip the grown-up step: a minor\'s record without the checkbox reads as nothing', () => {
+    s.setItem(KEYS.gate, JSON.stringify({ ageBand: '13-17', grownUp: false, at: 'x', textVersion: GROWN_UP_TEXT_VERSION }));
     s.setItem(KEYS.summary, JSON.stringify(SUMMARY));
     expect(readResult(s)).toBeNull();
-    s.setItem(KEYS.gate, JSON.stringify({ ageBand: 'under-18', parentCheckbox: true, at: 'x', textVersion: 'old' }));
+    s.setItem(KEYS.gate, JSON.stringify({ ageBand: '13-17', grownUp: true, at: 'x', textVersion: 'old' }));
     expect(readResult(s)).toBeNull();
-    s.setItem(KEYS.gate, JSON.stringify({ ageBand: '18+', parentCheckbox: false, at: 'x', textVersion: CONSENT_TEXT_VERSION, name: 'extra' }));
+    s.setItem(KEYS.gate, JSON.stringify({ ageBand: '18+', grownUp: false, at: 'x', textVersion: GROWN_UP_TEXT_VERSION, name: 'extra' }));
     expect(readResult(s)).toBeNull();                          // an extra field is refused: the record holds four
+  });
+
+  it('the text version was bumped: a gate record from the screen-v1 wording no longer reads', () => {
+    expect(GROWN_UP_TEXT_VERSION).toBe('screen-grown-up-v2-2026-09-29');
+    // the v1 record's own shape (its checkbox field and version), as a tab from before this change holds it
+    s.setItem(KEYS.gate, JSON.stringify({ ageBand: 'under-18', parentCheckbox: true, at: 'x', textVersion: 'screen-v1' }));
+    s.setItem(KEYS.summary, JSON.stringify(SUMMARY));
+    expect(readResult(s)).toBeNull();
   });
 
   it('a result with no gate record, a bad summary, or an old version is nothing', () => {
@@ -87,7 +134,7 @@ describe('the consent gate comes first', () => {
 });
 
 describe('clearing, and a new screen', () => {
-  it('"Done, clear my results" removes every screen key, keeps the rest, and PR #20\'s old localStorage keys go too', () => {
+  it('"Done, clear my results" removes every screen key but the age lock, keeps the rest, and PR #20\'s old localStorage keys go too', () => {
     writeResult(s, gateRecord('18+', false), SUMMARY);
     writeTakeoff(s, gateRecord('18+', false), 'left');
     s.setItem('fel.agent', '1');
@@ -130,7 +177,7 @@ describe('never localStorage', () => {
     expect(src).not.toMatch(/local\??\.setItem|localStorage\.setItem|indexedDB|document\.cookie/);
   });
   it('a record for the gate type-checks as exactly four fields', () => {
-    const g: GateRecord = { ageBand: '18+', parentCheckbox: false, at: '', textVersion: '' };
+    const g: GateRecord = { ageBand: '18+', grownUp: false, at: '', textVersion: '' };
     expect(Object.keys(g)).toHaveLength(4);
   });
 });
