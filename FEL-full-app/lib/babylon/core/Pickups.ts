@@ -21,6 +21,21 @@ export const COIN_RUN_CAP = 60;      // must match server-side validation
 /** A coin the player can still take. Position is authoritative; the matrix is derived from it each frame. */
 interface Coin { pos: Vector3; taken: boolean }
 
+/**
+ * How a field's coins look (SKATE-SCORE SK-6, 2026-09-29). The defaults are every mode's coin, unchanged; a mode may ask for
+ * its own. Skate's golden-hour haze turned the metal coin dark olive — 0.34 m discs of it over the plaza read as "olive dot
+ * particles" to the eye (9096d7cf skate/100–111), not as coins — so the skate plaza asks for a bigger, self-lit gold.
+ */
+export interface CoinLook {
+  /** Disc diameter, metres. */
+  diameter?: number;
+  /** Emissive share of the gold (VenueKit.paint's `emissive`): the colour a coin keeps in shade and haze. */
+  glow?: number;
+  /** PBR metallic, 0..1: how much of the coin is the environment's reflection rather than its own gold. */
+  metallic?: number;
+}
+export const COIN_LOOK_DEFAULT: Readonly<Required<CoinLook>> = { diameter: 0.34, glow: 0.22, metallic: 0.9 };
+
 export class CoinField {
   private coins: Coin[] = [];
   public collected = 0;
@@ -30,7 +45,7 @@ export class CoinField {
   /** Reused so the per-frame rebuild allocates nothing. */
   private scratch = { m: Matrix.Identity(), q: Quaternion.Identity(), s: new Vector3(1, 1, 1) };
 
-  constructor(private scene: Scene) {}
+  constructor(private scene: Scene, private look: CoinLook = {}) {}
 
   /** Straight line of coins between two points. */
   line(from: Vector3, to: Vector3, count: number): void {
@@ -57,7 +72,8 @@ export class CoinField {
   /** Build (or rebuild) the master and its buffer. Idempotent. */
   private ensure(): void {
     if (!this.master) {
-      const m = MeshBuilder.CreateCylinder('coin', { diameter: 0.34, height: 0.05, tessellation: 16 }, this.scene);
+      const look = { ...COIN_LOOK_DEFAULT, ...this.look };
+      const m = MeshBuilder.CreateCylinder('coin', { diameter: look.diameter, height: 0.05, tessellation: 16 }, this.scene);
       // PBR, AND A COIN IS THE CASE THAT MAKES THE POINT. This was a StandardMaterial with a bright gold
       // diffuse (#f5b91a) — under a rig running hemispheric 0.85 plus a directional at 2.60 that clips to
       // white, so every coin in FIVE modes was a pale blob rather than gold. Fifth occurrence of this bug
@@ -66,8 +82,8 @@ export class CoinField {
       // The upgrade is not only the clipping. A coin is METAL, and metalness is a thing StandardMaterial
       // cannot express at all: as PBR it catches the venue's own light and the environment, so a coin
       // reads as gold in sun and as dull brass in shade instead of being one flat colour everywhere.
-      const mat = VenueKit.paint(this.scene, 'coinMat', '#f5b91a', 0.22, 0.34);
-      mat.metallic = 0.9;
+      const mat = VenueKit.paint(this.scene, 'coinMat', '#f5b91a', look.glow, 0.34);
+      mat.metallic = look.metallic;
       mat.freeze();                     // one material, and it never changes
       m.material = mat;
       m.isPickable = false;
