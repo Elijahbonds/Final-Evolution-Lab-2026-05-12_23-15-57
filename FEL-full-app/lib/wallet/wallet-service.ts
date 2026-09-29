@@ -5,6 +5,10 @@
  *   - Balance is reconstructable from WalletLedgerEntry.delta alone.
  *   - Every mutating op is idempotent via a unique idempotencyKey. A replay
  *     returns the ORIGINAL result and never double-grants / double-spends.
+ *     An earn replay is marked `replayed`; the daily first-session reward's
+ *     replay answers granted 0 with `alreadyClaimed` (ECONOMY-SESSIONS-HARDEN).
+ *   - A daily reward (DAILY_EVENT_TYPES) pays once per player per America/Los_Angeles day under a key the SERVER
+ *     builds (dailyKey); the client's key is ignored (DAILY-KEY-HOTFIX, earnDaily).
  *     Only the wallet whose row it is gets that result: another wallet's row
  *     is never replayed (isOwnEntry) and a write reusing its key is refused
  *     (REPLAYED_KEY), and so is a spend key of another purchase (spendReplay).
@@ -25,6 +29,7 @@
 
 import { Prisma, type PrismaClient, type WalletLedgerEntry } from '@/public/_prisma/client';
 import {
+  DAILY_EVENT_TYPES,
   DEFAULT_REWARD_RULES,
   EVENT_REASON,
   REASON,
@@ -38,6 +43,7 @@ import { postLc } from '../ledger';
 import { payloadHash, validateDunkAttempt } from './validation';
 import { refundDeadBuysOnRead, type DeadBuyCredit } from './dead-buy-refunds';
 import { DEAD_BUY_GRACE_MS, deadBuyOf, refundKey } from './dead-buys';
+import { dailyKey, isReservedDailyKey, ptDayBounds } from './dailyKey';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -55,6 +61,16 @@ export interface EarnResult {
   entry_id: string | null;
   capped: boolean;
   rejected?: string;
+  /**
+   * ECONOMY-SESSIONS-HARDEN (2026-09-28): this answer is the ORIGINAL grant of a key already in the ledger, and nothing
+   * was credited now. `granted` still names what that key paid when it was first used (the replay guarantee above); a
+   * display must show a replay as nothing new. The eye's 46a8dc6a finding: the wallet chip's daily_first_session earn,
+   * re-sent from a fresh browser, answered "granted 100 coins" with an unchanged balance — the correct replay, which
+   * read as a payout because nothing said it was one.
+   */
+  replayed?: boolean;
+  /** The daily first-session reward was already claimed under this key: `granted` is 0 (PM note, QA acceptance #5). */
+  alreadyClaimed?: boolean;
 }
 export interface SpendResult {
   spent: { currency: WalletCurrency; amount: number };
@@ -63,6 +79,14 @@ export interface SpendResult {
 }
 
 const n = (b: bigint | number): number => (typeof b === 'bigint' ? Number(b) : b);
+
+/**
+ * A unique-key refusal (P2002), read by its code rather than by instanceof (DAILY-KEY-HOTFIX, 2026-09-28). Under next
+ * dev, lib/db's client is cached on globalThis and each route compiles its own copy of the generated client, so the
+ * error came from another copy's class. The instanceof missed it, and the losing claim of two sent together was a 500
+ * (measured on :3100). Only a Prisma known-request error carries a P code, so the code alone is the same test.
+ */
+const isUniqueViolation = (e: unknown): boolean => (e as { code?: unknown } | null)?.code === 'P2002';
 
 /**
  * Is this ledger row in the player's own wallet? An idempotency key is unique across the WHOLE ledger, and a route that
@@ -85,7 +109,7 @@ export async function getOrCreateWallet(db: Db, playerId: string) {
   try {
     return await (db as any).wallet.create({ data: { playerId } });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+    if (isUniqueViolation(e)) {
       return (db as any).wallet.findUnique({ where: { playerId } });
     }
     throw e;
@@ -190,8 +214,11 @@ export async function resolveRule(db: Db, reasonCode: string): Promise<RewardRul
 // ---------------------------------------------------------------------------
 export async function earn(
   prisma: PrismaClient,
-  args: { playerId: string; idempotencyKey: string; eventType: string; payload: Record<string, unknown> }
+  /** `now` is the server's clock (a test may pass one); nothing in the request reaches it. */
+  args: { playerId: string; idempotencyKey: string; eventType: string; payload: Record<string, unknown>; now?: Date }
 ): Promise<EarnResult> {
+  // DAILY-KEY-HOTFIX (2026-09-28): a daily event is keyed by the server, whatever key (or none) the client sent.
+  if (DAILY_EVENT_TYPES.has(args.eventType)) return earnDaily(prisma, args);
   const { playerId, idempotencyKey, eventType, payload } = args;
   const hash = payloadHash(payload);
 
@@ -205,6 +232,16 @@ export async function earn(
   const priorByKey = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey } });
   if (priorByKey && (await isOwnEntry(prisma, playerId, priorByKey))) {
     const bal = await readWallet(prisma, playerId);
+    // ECONOMY-SESSIONS-HARDEN (PM note, QA acceptance #5): the daily first-session reward already claimed answers
+    // granted 0 and says so — nothing was paid now, and "granted 100 coins" on an unchanged balance read as a payout.
+    // Judged from the ledger row itself (its reason), never the request. Every other replay keeps the original grant
+    // (a retry whose first answer was lost still learns what it was paid), marked replayed.
+    if (priorByKey.reasonCode === REASON.DAILY_FIRST_SESSION) {
+      return {
+        granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc },
+        entry_id: priorByKey.id, capped: false, replayed: true, alreadyClaimed: true,
+      };
+    }
     const amt = n(priorByKey.delta);
     return {
       granted: {
@@ -214,6 +251,7 @@ export async function earn(
       balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc },
       entry_id: priorByKey.id,
       capped: false,
+      replayed: true,
     };
   }
 
@@ -222,12 +260,12 @@ export async function earn(
     data: { playerId, eventType, payload: payload as any, payloadHash: hash },
   });
 
-  const reject = async (reason: string): Promise<EarnResult> => {
-    await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { rejectedReason: reason } });
-    console.warn(`[wallet/earn] rejected event ${eventType} for ${playerId}: ${reason}`);
-    const bal = await readWallet(prisma, playerId);
-    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped: false, rejected: reason };
-  };
+  const reject = rejecter(prisma, evt.id, playerId, eventType);
+
+  // 1b. DAILY-KEY-HOTFIX: a daily event type's key space belongs to the server's daily path (isReservedDailyKey). Filed
+  //     here, `daily_first_session:<a day>:<someone's id>` would sit on that player's daily key, and their claim that
+  //     day would be refused on it.
+  if (isReservedDailyKey(idempotencyKey)) return reject('reserved_key');
 
   // 2. Resolve reason from event type.
   const reasonCode = EVENT_REASON[eventType];
@@ -239,21 +277,11 @@ export async function earn(
     if (!v.ok) return reject(v.reason ?? 'validation_failed');
   }
 
-  // 3b. FEATURES-UX-SHOP (2026-09-08): the cross-mode session earns are only as real as the session behind them. The shell
-  //     posts /api/sessions first and an idle run records none, so run_id must name a GameSession this player owns, a
-  //     "won" earn needs that session to be a win, and each run pays each event type once whatever idempotency key it
-  //     arrives under (the same run resubmitted under a fresh key used to pass replay detection after 30 s).
-  if (reasonCode === REASON.MODE_SESSION_COMPLETED || reasonCode === REASON.MODE_SESSION_WON) {
-    const runId = typeof payload?.run_id === 'string' ? payload.run_id : '';
-    if (!runId) return reject('no_session');
-    const sess = await prisma.gameSession.findFirst({ where: { id: runId, userId: playerId }, select: { won: true } });
-    if (!sess) return reject('no_session');
-    if (reasonCode === REASON.MODE_SESSION_WON && !sess.won) return reject('session_not_won');
-    const paid = await prisma.perfEarnEvent.count({
-      where: { playerId, eventType, resolvedEntryId: { not: null }, payload: { path: ['run_id'], equals: runId } },
-    });
-    if (paid > 0) return reject('run_already_paid');
-  }
+  // 3b. ECONOMY-SESSIONS-HARDEN (2026-09-28): the cross-mode session earns are paid by the session run itself now —
+  //     POST /api/sessions writes them inside the run's one transaction, filed under the server's run id
+  //     (sessionWalletGrant below). A client report of either is refused, so a run cannot be paid again from here
+  //     under a fresh key. (FEATURES-UX-SHOP's run_id / won / once-per-run checks lived here; the run owns them now.)
+  if (reasonCode === REASON.MODE_SESSION_COMPLETED || reasonCode === REASON.MODE_SESSION_WON) return reject('paid_by_session_run');
 
   // 4. Replay detection: an identical payload (different idempotency key) within
   //    a short band is a resubmitted run — flag + reject. Exact idempotency-key
@@ -264,33 +292,10 @@ export async function earn(
   });
   if (dupes > 0) return reject('replay_detected');
 
-  // 5. Rule lookup.
-  const rule = await resolveRule(prisma, reasonCode);
-  if (!rule || !rule.active) return reject('rule_inactive');
-
-  // 6. Compute grant.
-  let grant = computeGrant(rule, payload);
-  let capped = false;
-
-  // 7. Per-minute EVENT cap for this reason.
-  if (rule.perMinuteCap > 0) {
-    const recent = await prisma.walletLedgerEntry.count({
-      where: { wallet: { playerId }, reasonCode, createdAt: { gte: new Date(Date.now() - 60_000) } },
-    });
-    if (recent >= rule.perMinuteCap) { grant = 0; capped = true; }
-  }
-
-  // 8. Rolling-24h currency cap.
-  if (grant > 0 && rule.perDayCurrencyCap > 0) {
-    const agg = await prisma.walletLedgerEntry.aggregate({
-      // a dead-buy refund gives back what was spent; it is not an earn, so it must not eat today's cap
-      where: { wallet: { playerId }, currency: rule.currency, delta: { gt: 0 }, reasonCode: { not: REASON.DEAD_BUY_REFUND }, createdAt: { gte: new Date(Date.now() - 86_400_000) } },
-      _sum: { delta: true },
-    });
-    const earnedToday = n((agg._sum.delta as bigint | null) ?? BigInt(0));
-    const headroom = Math.max(0, rule.perDayCurrencyCap - earnedToday);
-    if (grant > headroom) { grant = headroom; capped = true; }
-  }
+  // 5-8. The rule, the grant and its caps (capGrant, shared with the session run's wallet grants).
+  const priced = await capGrant(prisma, playerId, reasonCode, payload);
+  if (!priced) return reject('rule_inactive');
+  const { rule, grant, capped } = priced;
 
   // 9. Zero grant (fully capped) — successful response, no ledger noise (§7:
   //    caps return capped:true, NOT a hard error).
@@ -319,7 +324,169 @@ export async function earn(
   return {
     granted: { coins: grantedCoins, shards: grantedShards },
     balances: applied.balances, entry_id: applied.entryId, capped,
+    ...(applied.replayed ? { replayed: true } : {}),
   };
+}
+
+/** A recorded earn event's refusal: the reason goes on the event, and the answer grants nothing. */
+function rejecter(prisma: PrismaClient, evtId: string, playerId: string, eventType: string) {
+  return async (reason: string): Promise<EarnResult> => {
+    await prisma.perfEarnEvent.update({ where: { id: evtId }, data: { rejectedReason: reason } });
+    console.warn(`[wallet/earn] rejected event ${eventType} for ${playerId}: ${reason}`);
+    const bal = await readWallet(prisma, playerId);
+    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped: false, rejected: reason };
+  };
+}
+
+/**
+ * DAILY-KEY-HOTFIX (2026-09-28): a daily event (DAILY_EVENT_TYPES) pays at most once per player per America/Los_Angeles
+ * calendar day. The client's idempotency_key is never the ledger key. The client built it, so `…:qa-forged`, a key of
+ * any other shape, or no key at all each paid the reward again: the eye's a1a1c5f9 item 5b, and +100 in production at
+ * 3a0f4edf. The claim is filed under dailyKey(eventType, playerId, now). A second claim that day answers granted 0 with
+ * alreadyClaimed and writes no ledger row.
+ *
+ *   0.  Today's key is already in this player's ledger: already claimed.
+ *   0b. A row of the daily's reason was written in this PT day under any OTHER key: already claimed. These are the
+ *       claims made before this fix under the chip's own key (`daily_first_session:<browser day>:<id or email>`), and
+ *       anything forged beside them. They are judged by createdAt, because their key's day was the browser's.
+ *   There is no payload-hash replay check (earn step 4); the day's key is the dedupe. Step 4 ran before the key was
+ *   tried, so two tabs opening together were both refused replay_detected and nothing was credited (the
+ *   ECONOMY-SESSIONS-HARDEN addendum). Now the unique key settles it: one claim is credited, and the other loses the
+ *   insert, finds the winner's row and answers already claimed.
+ */
+async function earnDaily(
+  prisma: PrismaClient,
+  a: { playerId: string; idempotencyKey: string; eventType: string; payload: Record<string, unknown>; now?: Date },
+): Promise<EarnResult> {
+  const { playerId, eventType, payload } = a;
+  const now = a.now ?? new Date();
+  const reasonCode = EVENT_REASON[eventType];   // DAILY_EVENT_TYPES is derived from EVENT_REASON, so this is always set
+  const key = dailyKey(eventType, playerId, now);
+  const { day, start, end } = ptDayBounds(now);
+  const claimed = async (entryId: string): Promise<EarnResult> => {
+    const bal = await readWallet(prisma, playerId);
+    return {
+      granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc },
+      entry_id: entryId, capped: false, replayed: true, alreadyClaimed: true,
+    };
+  };
+
+  // 0. Today's claim, under today's key.
+  const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: key } });
+  if (prior && (await isOwnEntry(prisma, playerId, prior))) return claimed(prior.id);
+  // 0b. Today's claim, under any other key.
+  const earlier = await prisma.walletLedgerEntry.findFirst({
+    where: { wallet: { playerId }, reasonCode, createdAt: { gte: start, lt: end } }, select: { id: true },
+  });
+  if (earlier) return claimed(earlier.id);
+
+  // 1. Record the raw event, as every earn does.
+  const hash = payloadHash(payload);
+  const evt = await prisma.perfEarnEvent.create({
+    data: { playerId, eventType, payload: payload as any, payloadHash: hash },
+  });
+  const reject = rejecter(prisma, evt.id, playerId, eventType);
+
+  // 5-8. The rule, the grant and its caps.
+  const priced = await capGrant(prisma, playerId, reasonCode, payload);
+  if (!priced) return reject('rule_inactive');
+  const { rule, grant, capped } = priced;
+  if (grant <= 0) {
+    await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { rejectedReason: capped ? 'rate_capped' : 'zero_grant' } });
+    const bal = await readWallet(prisma, playerId);
+    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped };
+  }
+
+  // 10. The claim, under the day's key. The client's key is kept for the audit and keys nothing.
+  // The wallet row is made first, outside the transaction. Inside it, getOrCreateWallet cannot survive losing its own
+  // create race: Postgres aborts the transaction (25P02), so a second claim sent with a player's very first claim was a
+  // 500 (measured on a throwaway Postgres).
+  await getOrCreateWallet(prisma, playerId);
+  let applied: Awaited<ReturnType<typeof applyDelta>>;
+  try {
+    applied = await applyDelta(prisma, {
+      playerId, currency: rule.currency, delta: grant, reasonCode, source: SHARD_REASONS.has(reasonCode) ? 'milestone' : 'gameplay',
+      idempotencyKey: key,
+      metadata: { eventType, perfEventId: evt.id, payloadHash: hash, day, clientKey: a.idempotencyKey ? a.idempotencyKey.slice(0, 200) : null },
+    });
+  } catch (e) {
+    // Today's key is held by another wallet. Before this fix a client could file any key, this one included.
+    if (e instanceof WalletError && e.code === 'REPLAYED_KEY') return reject('replayed_key');
+    throw e;
+  }
+  // A claim racing this one (a second tab) wrote the day's row first. Its row refused our insert, and nothing moved.
+  await prisma.perfEarnEvent.update({
+    where: { id: evt.id }, data: { resolvedEntryId: applied.entryId, ...(applied.replayed ? { rejectedReason: 'already_claimed' } : {}) },
+  });
+  if (applied.replayed) return claimed(applied.entryId);
+  return {
+    granted: { coins: rule.currency === 'coins' ? grant : 0, shards: rule.currency === 'shards' ? grant : 0 },
+    balances: applied.balances, entry_id: applied.entryId, capped,
+  };
+}
+
+/**
+ * Steps 5-8 of earn(): the reason's rule (a DB row wins over the default), the grant it computes for this payload, and
+ * the rule's per-minute event cap and rolling-24h currency cap. null = no active rule. `db` may be a transaction.
+ */
+async function capGrant(db: Db, playerId: string, reasonCode: string, payload: Record<string, unknown>): Promise<{ rule: RewardRuleConfig; grant: number; capped: boolean } | null> {
+  // 5. Rule lookup.
+  const rule = await resolveRule(db, reasonCode);
+  if (!rule || !rule.active) return null;
+
+  // 6. Compute grant.
+  let grant = computeGrant(rule, payload);
+  let capped = false;
+
+  // 7. Per-minute EVENT cap for this reason.
+  if (rule.perMinuteCap > 0) {
+    const recent = await (db as any).walletLedgerEntry.count({
+      where: { wallet: { playerId }, reasonCode, createdAt: { gte: new Date(Date.now() - 60_000) } },
+    });
+    if (recent >= rule.perMinuteCap) { grant = 0; capped = true; }
+  }
+
+  // 8. Rolling-24h currency cap.
+  if (grant > 0 && rule.perDayCurrencyCap > 0) {
+    const agg = await (db as any).walletLedgerEntry.aggregate({
+      // a dead-buy refund gives back what was spent; it is not an earn, so it must not eat today's cap
+      where: { wallet: { playerId }, currency: rule.currency, delta: { gt: 0 }, reasonCode: { not: REASON.DEAD_BUY_REFUND }, createdAt: { gte: new Date(Date.now() - 86_400_000) } },
+      _sum: { delta: true },
+    });
+    const earnedToday = n((agg._sum.delta as bigint | null) ?? BigInt(0));
+    const headroom = Math.max(0, rule.perDayCurrencyCap - earnedToday);
+    if (grant > headroom) { grant = headroom; capped = true; }
+  }
+  return { rule, grant, capped };
+}
+
+/**
+ * ECONOMY-SESSIONS-HARDEN (2026-09-28): a session run's wallet earn — the completed coins (MODE_SESSION_COMPLETED) or the
+ * won shards (MODE_SESSION_WON) the shell used to report through POST /v1/wallet/earn — priced by the same rule and
+ * caps (capGrant), and written INSIDE the run's transaction `tx`: the balance and its WalletLedgerEntry move together,
+ * under `idempotencyKey` (run:<runId>:<grant>). A key already in the ledger fails the insert and rolls the whole run
+ * back, which is what the run wants: its stored result is returned instead. A zero or capped-out grant writes nothing.
+ */
+export async function sessionWalletGrant(
+  tx: Prisma.TransactionClient,
+  a: { playerId: string; reasonCode: typeof REASON.MODE_SESSION_COMPLETED | typeof REASON.MODE_SESSION_WON; payload: Record<string, unknown>; idempotencyKey: string; metadata?: Record<string, unknown> },
+): Promise<{ currency: WalletCurrency; granted: number; capped: boolean; entryId: string | null }> {
+  const priced = await capGrant(tx, a.playerId, a.reasonCode, a.payload);
+  const currency = (priced?.rule.currency ?? (a.reasonCode === REASON.MODE_SESSION_WON ? 'shards' : 'coins')) as WalletCurrency;
+  if (!priced || priced.grant <= 0) return { currency, granted: 0, capped: priced?.capped ?? false, entryId: null };
+  const wallet = await getOrCreateWallet(tx, a.playerId);
+  const after = await (tx as any).wallet.update({
+    where: { id: wallet.id },
+    data: { [currency]: { increment: BigInt(priced.grant) }, version: { increment: BigInt(1) } },
+  });
+  const entry = await (tx as any).walletLedgerEntry.create({
+    data: {
+      walletId: wallet.id, currency, delta: BigInt(priced.grant), balanceAfter: (after as Record<string, unknown>)[currency] as bigint,
+      reasonCode: a.reasonCode, source: SHARD_REASONS.has(a.reasonCode) ? 'milestone' : 'gameplay',
+      idempotencyKey: a.idempotencyKey, metadata: (a.metadata ?? {}) as any,
+    },
+  });
+  return { currency, granted: priced.grant, capped: priced.capped, entryId: entry.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -554,7 +721,7 @@ async function applyDelta(
       return { entryId: entry.id, delta: effectiveDelta, balances: { coins: n(after.coins), shards: n(after.shards), lc: n(after.lc) }, replayed: false };
     });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+    if (isUniqueViolation(e)) {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
       if (original && !(await isOwnEntry(prisma, a.playerId, original))) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
       const bal = await readWallet(prisma, a.playerId);

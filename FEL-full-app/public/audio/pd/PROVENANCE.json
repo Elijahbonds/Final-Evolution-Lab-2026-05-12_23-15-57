@@ -1,0 +1,242 @@
+{
+  "pack": "pd-shelf",
+  "version": "1.0.0",
+  "date": "2026-09-29",
+  "statement": "MUSIC-SUITE P7, owner decision #37 (signed 2026-09-26): six public-domain US sound recordings on the Flip's shelf. Each is a US sound recording published before 1925 (public domain under the Music Modernization Act, 2018) of a composition also out of copyright, downloaded from the exact page and file decision #37 names, with the three checks (transfer from the original disc, the archive's terms, the matrix/take) confirmed and recorded under `checks`. Trimmed for leading/trailing silence only (scripts/music/pd-shelf/trim_convert.py) and converted to MP3; nothing else in the audio was changed. The composition-side public-domain reasoning for each recording lives in lib/babylon/music/pdShelf.ts (PD_SHELF[].whyFree), not repeated here.",
+  "indexFiles": {
+    "PROVENANCE.json": "this record"
+  },
+  "files": [
+    {
+      "id": "odjb_livery_stable_1917",
+      "file": "odjb_livery_stable_1917.mp3",
+      "title": "Livery Stable Blues",
+      "performer": "Original Dixieland Jass Band",
+      "year": 1917,
+      "sha256": "ccfa206c7a65b46a79dc86e8230355d7d481b364a8b7a355527a9b561869e222",
+      "bytes": 1729110,
+      "licence": "Public domain (US), sound recording published 1917",
+      "sourceUrl": "https://www.loc.gov/item/jukebox-186254/",
+      "downloadUrl": "https://tile.loc.gov/streaming-services/iiif/service:mbrsrs:mbrsjukebox:dlc_victor_18255_01_b19331_01:dlc_victor_18255_01_b19331_01/full/full/0/full/default.mp3",
+      "original": {
+        "sha256": "820d4b1b07966a79ce174336f3e619a6cca39a99b81b921041b1dfc8021f056b",
+        "bytes": 1501121,
+        "format": "MP3"
+      },
+      "checks": {
+        "transfer": "LOC National Jukebox item page: 'Recording Repository: Source of original recording: Recorded Sound Section, Library of Congress' -- a transfer of the physical Victor 18255 disc, not a reissue.",
+        "terms": "The item page's own National Jukebox notice: recordings published before 1923 are public domain under the Music Modernization Act and free to copy, modify, distribute and perform, even commercially, without permission.",
+        "matrixTake": "Item page: 'Victor 18255. Matrix/Take: B-19331/1.' -- matches Victor 18255-B (the file_id is dlc_victor_18255_01_b19331_01)."
+      },
+      "trim": {
+        "startSec": 0.6,
+        "endSec": 1.984,
+        "origDurationSec": 187.534,
+        "storedDurationSec": 184.95
+      },
+      "script": "scripts/music/pd-shelf/trim_convert.py",
+      "scriptSha256": "e5f2698073a8f2c538183f606902f3273a2ac4ab51701c71a7d7bd3bcfd70c5b",
+      "tools": {
+        "python": "3.12.13",
+        "numpy": "2.5.3",
+        "soundfile": "0.14.0",
+        "libsndfile": "1.2.2"
+      },
+      "downloadedAt": "2026-09-29",
+      "ownerSignedAt": "2026-09-26T00:00:00Z",
+      "accessNote": "www.loc.gov/item/jukebox-186254/ itself served a Cloudflare 'verify you are human' challenge, which was not attempted or solved. The item's own facts (repository, rights notice, matrix/take) were read from a Wayback Machine capture of that page (web.archive.org/web/20250203061733), and the audio was fetched directly from the media file that page embeds, tile.loc.gov (a plain 200 response, audio/mpeg, no challenge)."
+    },
+    {
+      "id": "europe_castle_house_rag_1914",
+      "file": "europe_castle_house_rag_1914.mp3",
+      "title": "The Castles in Europe (Castle House Rag)",
+      "performer": "Europe's Society Orchestra (James Reese Europe)",
+      "year": 1914,
+      "sha256": "1ce347bbcd632aa905df59b2aacbd67a78b987b95a0fc47326d791110b84ede2",
+      "bytes": 2605145,
+      "licence": "Public domain (US), sound recording published 1914",
+      "sourceUrl": "https://www.loc.gov/item/jukebox-134538/",
+      "downloadUrl": "https://tile.loc.gov/streaming-services/iiif/service:mbrsrs:mbrsjukebox:dlc_victor_35372_01_c14433_03:dlc_victor_35372_01_c14433_03/full/full/0/full/default.mp3",
+      "original": {
+        "sha256": "2461e3b2ca578eaa918720d157d4794ddbdbeda9bb98e4f1a05c13e87a4f2c29",
+        "bytes": 3523029,
+        "format": "MP3"
+      },
+      "checks": {
+        "transfer": "LOC National Jukebox item page: 'Recording Repository: Source of original recording: Recorded Sound Section, Library of Congress' -- a transfer of the physical Victor 35372 disc, not a reissue.",
+        "terms": "The item page's own National Jukebox notice: recordings published before 1923 are public domain under the Music Modernization Act and free to copy, modify, distribute and perform, even commercially, without permission.",
+        "matrixTake": "Item page: 'Victor 35372. Matrix/Take: C-14433/3.' -- matches Victor 35372 (the file_id is dlc_victor_35372_01_c14433_03)."
+      },
+      "trim": {
+        "startSec": 0.0,
+        "endSec": 1.971,
+        "origDurationSec": 220.121,
+        "storedDurationSec": 218.15
+      },
+      "script": "scripts/music/pd-shelf/trim_convert.py",
+      "scriptSha256": "e5f2698073a8f2c538183f606902f3273a2ac4ab51701c71a7d7bd3bcfd70c5b",
+      "tools": {
+        "python": "3.12.13",
+        "numpy": "2.5.3",
+        "soundfile": "0.14.0",
+        "libsndfile": "1.2.2"
+      },
+      "downloadedAt": "2026-09-29",
+      "ownerSignedAt": "2026-09-26T00:00:00Z",
+      "accessNote": "www.loc.gov/item/jukebox-134538 itself served a Cloudflare 'verify you are human' challenge, which was not attempted or solved. The item's own facts were read from a Wayback Machine capture of that page (web.archive.org/web/20260307191905), and the audio was fetched directly from the media file that page embeds, tile.loc.gov (a plain 200 response, audio/mpeg, no challenge)."
+    },
+    {
+      "id": "fisk_swing_low_1909",
+      "file": "fisk_swing_low_1909.mp3",
+      "title": "Swing Low, Sweet Chariot",
+      "performer": "Fisk University Jubilee Quartet",
+      "year": 1909,
+      "sha256": "aa697f36100a9a71858b88309201a8557f01fadde834e2a281761b7ebe17b40e",
+      "bytes": 2033350,
+      "licence": "Public domain (US), sound recording published 1909",
+      "sourceUrl": "https://www.loc.gov/item/jukebox-128141/",
+      "downloadUrl": "https://tile.loc.gov/streaming-services/iiif/service:mbrsrs:mbrsjukebox:dlc_victor_16453_01_b8420_03:dlc_victor_16453_01_b8420_03/full/full/0/full/default.mp3",
+      "original": {
+        "sha256": "10f612148f5a9f89bae98b77a01f74fd60524ba5805ba3a076be36f0639185ca",
+        "bytes": 2885636,
+        "format": "MP3"
+      },
+      "checks": {
+        "transfer": "LOC National Jukebox item page: 'Recording Repository: Source of original recording: Recorded Sound Section, Library of Congress' -- a transfer of the physical Victor 16453 disc, not a reissue.",
+        "terms": "The item page's own National Jukebox notice: recordings published before 1923 are public domain under the Music Modernization Act and free to copy, modify, distribute and perform, even commercially, without permission.",
+        "matrixTake": "Item page: 'Victor 16453. Matrix/Take: B-8420/3.' -- matches Victor 16453 (the file_id is dlc_victor_16453_01_b8420_03). Recording date 1909-12-01, Camden NJ, matches the candidate table."
+      },
+      "trim": {
+        "startSec": 0.0,
+        "endSec": 0.691,
+        "origDurationSec": 180.291,
+        "storedDurationSec": 179.6
+      },
+      "script": "scripts/music/pd-shelf/trim_convert.py",
+      "scriptSha256": "e5f2698073a8f2c538183f606902f3273a2ac4ab51701c71a7d7bd3bcfd70c5b",
+      "tools": {
+        "python": "3.12.13",
+        "numpy": "2.5.3",
+        "soundfile": "0.14.0",
+        "libsndfile": "1.2.2"
+      },
+      "downloadedAt": "2026-09-29",
+      "ownerSignedAt": "2026-09-26T00:00:00Z",
+      "accessNote": "www.loc.gov/item/jukebox-128141/ itself served a Cloudflare 'verify you are human' challenge, which was not attempted or solved. The item's own facts were read from a Wayback Machine capture of that page (web.archive.org/web/20260120072851), and the audio was fetched directly from the media file that page embeds, tile.loc.gov (a plain 200 response, audio/mpeg, no challenge)."
+    },
+    {
+      "id": "mamie_smith_crazy_blues_1920",
+      "file": "mamie_smith_crazy_blues_1920.mp3",
+      "title": "Crazy Blues",
+      "performer": "Mamie Smith & Her Jazz Hounds",
+      "year": 1920,
+      "sha256": "d139cd334f8d463c1f95792779bd15afb41a2debff2b41f90be72d86f0efaab7",
+      "bytes": 2249285,
+      "licence": "Public domain (US), sound recording published 1920",
+      "sourceUrl": "https://archive.org/details/MamieSmithHerJazzHounds",
+      "downloadUrl": "https://archive.org/download/MamieSmithHerJazzHounds/MamieSmithHerJazzHounds-CrazyBlues.mp3",
+      "original": {
+        "sha256": "4bd5651d153a45242adc0cc62f259076f7388e7632826a473667ea475d878884",
+        "bytes": 3376778,
+        "format": "MP3"
+      },
+      "checks": {
+        "transfer": "archive.org item metadata: collection ['78rpm','audio_music'], source '78' -- a transfer of the physical 78rpm disc, uploaded 2004 (predating archive.org's Great 78 Project and the post-2023 major-label agreement that restricts some of that project's later uploads).",
+        "terms": "No licenseurl or restrictive rights statement on the item; a US sound recording published in 1920 is public domain since 2022-01-01 under the Music Modernization Act regardless.",
+        "matrixTake": "Item notes: 'Okeh-4169 (7529 take C)', matching OKeh 4169 take C in the candidate table; corroborated by the Wikimedia Commons file (commons.wikimedia.org/wiki/File:Mamie_Smith,_Crazy_Blues.ogg), which credits this same archive.org item and repeats 'Okeh-4169 (7529 take C)' in its own description."
+      },
+      "trim": {
+        "startSec": 0.6,
+        "endSec": 3.063,
+        "origDurationSec": 210.913,
+        "storedDurationSec": 207.25
+      },
+      "script": "scripts/music/pd-shelf/trim_convert.py",
+      "scriptSha256": "e5f2698073a8f2c538183f606902f3273a2ac4ab51701c71a7d7bd3bcfd70c5b",
+      "tools": {
+        "python": "3.12.13",
+        "numpy": "2.5.3",
+        "soundfile": "0.14.0",
+        "libsndfile": "1.2.2"
+      },
+      "downloadedAt": "2026-09-29",
+      "ownerSignedAt": "2026-09-26T00:00:00Z"
+    },
+    {
+      "id": "bessie_smith_downhearted_1923",
+      "file": "bessie_smith_downhearted_1923.mp3",
+      "title": "Down Hearted Blues",
+      "performer": "Bessie Smith",
+      "year": 1923,
+      "sha256": "258c37b7d598b8fc3cc3abc4ef7b4d3e4ee8f300f5709f8e5d8b0cfa05eb0310",
+      "bytes": 1636807,
+      "licence": "Public domain (US), sound recording published 1923",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bessie_Smith_-_Downhearted_Blues_(1923).ogg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/2/27/Bessie_Smith_-_Downhearted_Blues_%281923%29.ogg",
+      "original": {
+        "sha256": "7e275894275e15f1fa60139b490148338a72c9e098fcb2e1cedb04803658beba",
+        "bytes": 4990670,
+        "format": "OGG"
+      },
+      "checks": {
+        "transfer": "Commons file description: 'Credit: 78 RPM disc' -- a transfer of the physical disc.",
+        "terms": "Commons file's own License/Permission fields: UsageTerms 'Public domain', Copyrighted 'False', with the uploader's stated reasoning that both the 1923 Columbia sound recording and the 1922 Hunter/Austin composition have expired; carries the PD-old-auto-record-expired and CC-PD-Mark categories.",
+        "matrixTake": "Recording date on the file page, 1923-02-16, matches the candidate table's 'recorded Feb 1923'. The file page does not itself print the Columbia A3844 catalog number, so this one check rests on date, artist and title, not a matrix number -- noted as the least certain of the three."
+      },
+      "trim": {
+        "startSec": 0.55,
+        "endSec": 0.966,
+        "origDurationSec": 205.166,
+        "storedDurationSec": 203.65
+      },
+      "script": "scripts/music/pd-shelf/trim_convert.py",
+      "scriptSha256": "e5f2698073a8f2c538183f606902f3273a2ac4ab51701c71a7d7bd3bcfd70c5b",
+      "tools": {
+        "python": "3.12.13",
+        "numpy": "2.5.3",
+        "soundfile": "0.14.0",
+        "libsndfile": "1.2.2"
+      },
+      "downloadedAt": "2026-09-29",
+      "ownerSignedAt": "2026-09-26T00:00:00Z"
+    },
+    {
+      "id": "whiteman_rhapsody_1924",
+      "file": "whiteman_rhapsody_1924.mp3",
+      "title": "Rhapsody in Blue, Part 1",
+      "performer": "Paul Whiteman and His Concert Orchestra, George Gershwin (piano)",
+      "year": 1924,
+      "sha256": "952a7eada5099f8e93b51593605ba066a8665a0b293aeac1b701dbede50c540e",
+      "bytes": 977050,
+      "licence": "Public domain (US), sound recording published 1924",
+      "sourceUrl": "https://publicdomainreview.org/collection/rhapsody-in-blue-paul-whiteman-and-george-gershwin-original-1924-recording/",
+      "downloadUrl": "https://archive.org/download/rhapblue11924/rhapblue11924_64kb.mp3",
+      "original": {
+        "sha256": "e4f8b948c0a57d9f01a0a1e1d6c9e6fda5910c2dfad9cff77a25abb5a570e6a8",
+        "bytes": 2208623,
+        "format": "MP3"
+      },
+      "checks": {
+        "transfer": "archive.org item rhapblue11924 notes: 'Digital recording from Victor Talking Machine disc made at Menlo Park' -- a transfer of the original 78rpm Victor disc, acoustic (pre-electric) as the item description itself says.",
+        "terms": "The Public Domain Review page's own 'Download' table links this exact file ('MP3 Part 1' -> archive.org/download/rhapblue11924/rhapblue11924_64kb.mp3); the LOC's jukebox-70342 page for the same recording streams only, under a Sony licence, so per decision #37 this archive.org transfer -- not loc.gov -- is the download source.",
+        "matrixTake": "archive.org title 'Rhapsody In Blue Part 1', creator 'Paul Whiteman and George Gershwin' -- matches Victor 55225-A / 'Part 1' in the candidate table."
+      },
+      "trim": {
+        "startSec": 0.0,
+        "endSec": 0.0,
+        "origDurationSec": 275.853,
+        "storedDurationSec": 275.853
+      },
+      "script": "scripts/music/pd-shelf/trim_convert.py",
+      "scriptSha256": "e5f2698073a8f2c538183f606902f3273a2ac4ab51701c71a7d7bd3bcfd70c5b",
+      "tools": {
+        "python": "3.12.13",
+        "numpy": "2.5.3",
+        "soundfile": "0.14.0",
+        "libsndfile": "1.2.2"
+      },
+      "downloadedAt": "2026-09-29",
+      "ownerSignedAt": "2026-09-26T00:00:00Z"
+    }
+  ]
+}

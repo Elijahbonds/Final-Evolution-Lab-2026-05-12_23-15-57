@@ -2,10 +2,17 @@
 //
 // The Academy's arena key moved from 'musicAcademy' to 'music', the key its sessions are saved under. A CompetitionMatch
 // written before that still says 'musicAcademy'. Read raw, the lobby lists it under that raw key with a '#' PLAY link.
-// Its stake stays locked, because nothing expires an arena duel. Its ghost draw also finds no sessions and falls back
+// Its stake stays locked, because nothing expired an arena duel (until MUSIC-SUITE P6's reclaim sweep,
+// lib/arena-reclaim.ts, 2026-09-26). Its ghost draw also finds no sessions and falls back
 // to the default baseline of 100 on a 5000-point scale. These tests run the real route handlers against an in-memory
 // stand-in for the database; nothing here opens a connection. They check that an old row reads as a music duel
 // everywhere, and that a new duel is stored under the new key even when an old client posts the old one.
+//
+// MUSIC-SUITE P6 (2026-09-26): music staking is open again (lib/stakingPause.ts), so the P1 twins that proved the paused
+// refusal are gone (the pause is still proven on dance in lib/stakingPause.test.ts). A music duel's score is now the
+// server's rejudge of the player's one recorded attempt (lib/arena-music.ts), so every submit below first plays a set
+// (played(): the start and finish events the room posts), and a past duel counts toward the rival only when it carries
+// the player's finished attempt (RIVAL_SCORE_EVENT) — the old scores stop counting.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const USER = 'user-1';
@@ -18,7 +25,7 @@ const db = {
   created: [] as Row[],
   sessionQueries: [] as Row[],
   duelQueries: [] as Row[],
-  events: [] as Array<{ type: string; payload: Row }>,
+  events: [] as Array<{ matchId?: string; userId?: string | null; type: string; payload: Row; createdAt?: Date }>,
 };
 
 const matchesWhere = (where: Row): Row[] => db.matches.filter((m) => {
@@ -35,19 +42,31 @@ const tx = {
     findUnique: async ({ where }: Row) => db.matches.find((m) => m.id === where.id) ?? null,
     update: async ({ where, data }: Row) => { const m = db.matches.find((x) => x.id === where.id)!; Object.assign(m, data); return m; },
     create: async ({ data }: Row) => { const m = { id: `m-${db.created.length + 1}`, ...data, createdAt: new Date() }; db.created.push(m); return m; },
-    // the ghost draw's read of the player's past duels in the mode: either side, their score in, before this match
+    // the ghost draw's read of the player's past duels in the mode: either side, their score in, before this match —
+    // and (MUSIC-SUITE P6) carrying the player's event, `events: { some }`, with the event rows it selects
     findMany: async (args: Row) => {
       db.duelQueries.push(args.where);
       const { where } = args;
       const mine = (m: Row) => where.OR.some((c: Row) => (c.player1Id
         ? m.player1Id === c.player1Id && m.player1Score !== null
         : m.player2Id === c.player2Id && m.player2Score !== null));
+      const eventsOf = (m: Row, w: Row) => db.events.filter((e) => e.matchId === m.id && e.type === w.eventType && e.userId === w.userId);
+      const carries = (m: Row) => !where.events?.some || eventsOf(m, where.events.some).length > 0;
       return db.matches
-        .filter((m) => m.currency === where.currency && where.mode.in.includes(m.mode) && m.createdAt < where.createdAt.lt && mine(m))
+        .filter((m) => m.currency === where.currency && where.mode.in.includes(m.mode) && m.createdAt < where.createdAt.lt && mine(m) && carries(m))
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, args.take)
-        .map((m) => ({ player1Id: m.player1Id, player1Score: m.player1Score, player2Score: m.player2Score }));
+        .map((m) => ({
+          player1Id: m.player1Id, player1Score: m.player1Score, player2Score: m.player2Score,
+          ...(args.select?.events ? { events: eventsOf(m, args.select.events.where).map((e) => ({ eventType: e.type, userId: e.userId })) } : {}),
+        }));
     },
+  },
+  // MUSIC-SUITE P6: the player's attempt events on a duel (lib/arena-music.ts readMusicAttempt)
+  matchEvent: {
+    findMany: async ({ where }: Row) => db.events
+      .filter((e) => e.matchId === where.matchId && e.userId === where.userId && where.eventType.in.includes(e.type))
+      .map((e) => ({ eventType: e.type, payload: JSON.stringify(e.payload), createdAt: e.createdAt ?? new Date(0) })),
   },
   gameSession: {
     findMany: async (args: Row) => {
@@ -91,18 +110,8 @@ vi.mock('@/lib/arena', async (importOriginal) => ({
   arenaLockEntry: vi.fn(async () => 0),
   arenaPayWinner: vi.fn(async () => ({ payout: 0, rake: 0 })),
   arenaRefund: vi.fn(async () => 0),
-  appendMatchEvent: vi.fn(async (_db: unknown, _id: string, type: string, _u: unknown, payload: Row = {}) => { db.events.push({ type, payload }); }),
+  appendMatchEvent: vi.fn(async (_db: unknown, matchId: string, type: string, userId: string | null, payload: Row = {}) => { db.events.push({ matchId, userId, type, payload, createdAt: new Date() }); }),
 }));
-
-// MUSIC-SUITE P1 (2026-09-25): music's staking is paused (lib/stakingPause.ts, owner decision #9: "pause staking both
-// now"). The tests below that OPEN or JOIN a music duel describe the alias path as it runs once the pause lifts (phase 6),
-// so they lift it for themselves with pause.lifted; each has a twin proving what the paused route does today. The pause
-// itself is covered in lib/stakingPause.test.ts. The real isStakingPaused decides whenever the pause is not lifted.
-const pause = vi.hoisted(() => ({ lifted: false }));
-vi.mock('@/lib/stakingPause', async (importOriginal) => {
-  const real = await importOriginal<typeof import('./stakingPause')>();
-  return { ...real, isStakingPaused: (m: string | null | undefined) => !pause.lifted && real.isStakingPaused(m) };
-});
 
 import { GET as listGET } from '../app/api/arena/list/route';
 import { GET as matchGET } from '../app/api/arena/[matchId]/route';
@@ -112,7 +121,11 @@ import { POST as quickPOST } from '../app/api/arena/quick-match/route';
 import { POST as joinPOST } from '../app/api/arena/join/route';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { ARENA_SCORE_BASELINES, RIVAL_BAND } from './arena-rivals';
-import { performHitPoints, PERFORM_SET_NOTES } from './babylon/music/performSet';
+import { performHitPoints } from './babylon/music/performSet';
+import { houseBeatFor, houseTap, judgeHouseSet, HOUSE_SET_NOTES, HOUSE_SET_MAX } from './babylon/music/houseBeat';
+import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from './arena-music';
+import { isStakingPaused } from './stakingPause';
+import { SCORE_CEILINGS } from './arena-score-integrity';
 
 const post = (body: unknown) => new Request('http://local.test/api/arena', { method: 'POST', body: JSON.stringify(body) }) as any;
 const legacyMatch = (over: Row = {}): Row => ({
@@ -122,15 +135,29 @@ const legacyMatch = (over: Row = {}): Row => ({
   updatedAt: new Date('2026-09-20T00:00:00Z'), ...over,
 });
 
+/**
+ * MUSIC-SUITE P6: a set played by `userId` in duel `matchId` — the start and the finish the room posts to
+ * /api/arena/music-attempt (every `every`-th charted note tapped dead on) — and the score the server will make of it.
+ */
+function played(matchId: string, userId: string, every = 2): number {
+  const beat = houseBeatFor(matchId);
+  const taps = beat.notes.filter((_, i) => i % every === 0).map((n) => houseTap(n.lane, n.t));
+  db.events.push(
+    { matchId, userId, type: MUSIC_ATTEMPT_START, payload: { player: 'p1' }, createdAt: new Date(0) },
+    { matchId, userId, type: MUSIC_ATTEMPT_FINISH, payload: { player: 'p1', taps }, createdAt: new Date(60_000) },
+  );
+  return judgeHouseSet(beat, taps).score;
+}
+/** A past duel whose score came from a finished house-beat attempt by `userId` (what the rival bands on). */
+const finished = (matchId: string, userId: string) => db.events.push({ matchId, userId, type: MUSIC_ATTEMPT_FINISH, payload: { taps: [] } });
+
 beforeEach(() => {
   db.matches = []; db.sessions = []; db.created = []; db.sessionQueries = []; db.duelQueries = []; db.events = [];
   vi.mocked(recordServerEvent).mockClear();
-  pause.lifted = false;
 });
 
 describe('an arena duel stored as "musicAcademy"', () => {
-  it('lists as a music duel with a working PLAY link, in the open lobby and in my duels (once the pause lifts)', async () => {
-    pause.lifted = true;
+  it('lists as a music duel with a working PLAY link, in the open lobby and in my duels', async () => {
     db.matches = [legacyMatch(), legacyMatch({ id: 'legacy-2', player1Id: USER, player2Id: HOUSE, status: 'ACTIVE' })];
     const body = await (await listGET()).json();
     expect(body.open).toHaveLength(1);
@@ -142,14 +169,13 @@ describe('an arena duel stored as "musicAcademy"', () => {
     }
   });
 
-  // MUSIC-SUITE P1: while music is paused nobody can accept a posted music duel, so the open lobby does not advertise it;
-  // the one I am already in keeps its name, its PLAY link and a flag the lobby reads.
-  it('while music is paused: hidden from OPEN CHALLENGES, still in MY DUELS as music with its PLAY link', async () => {
+  // MUSIC-SUITE P6: music staking is open again (P1 hid a paused music duel from OPEN CHALLENGES and flagged mine).
+  it('with music staking open again: advertised in OPEN CHALLENGES, and MY DUELS carries no paused flag', async () => {
+    expect(isStakingPaused('musicAcademy')).toBe(false);
     db.matches = [legacyMatch(), legacyMatch({ id: 'legacy-2', player1Id: USER, player2Id: HOUSE, status: 'ACTIVE' })];
     const body = await (await listGET()).json();
-    expect(body.open).toEqual([]);
-    expect(body.mine).toHaveLength(1);
-    expect(body.mine[0]).toMatchObject({ mode: 'music', name: 'Groove Academy', href: '/play/music', status: 'ACTIVE', stakingPaused: true });
+    expect(body.open.map((d: Row) => d.id)).toEqual(['legacy-1']);
+    expect(body.mine[0]).toMatchObject({ mode: 'music', name: 'Groove Academy', href: '/play/music', status: 'ACTIVE', stakingPaused: false });
   });
 
   it('opens as a music duel on its own page', async () => {
@@ -163,11 +189,12 @@ describe('an arena duel stored as "musicAcademy"', () => {
   it("draws its house rival from the player's past Arena music scores, never their free-play sessions", async () => {
     db.matches = [
       legacyMatch({ matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE }),
-      legacyMatch({ id: 'past-1', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 4200, player2Score: 4100, createdAt: new Date('2026-09-19T00:00:00Z') }),
-      legacyMatch({ id: 'past-2', mode: 'music', status: 'SETTLED', player1Id: 'someone-else', player2Id: USER, player1Score: 9000, player2Score: 4400, createdAt: new Date('2026-09-18T00:00:00Z') }),
+      legacyMatch({ id: 'past-1', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 42_000, player2Score: 4100, createdAt: new Date('2026-09-19T00:00:00Z') }),
+      legacyMatch({ id: 'past-2', mode: 'music', status: 'SETTLED', player1Id: 'someone-else', player2Id: USER, player1Score: 9000, player2Score: 44_000, createdAt: new Date('2026-09-18T00:00:00Z') }),
     ];
+    finished('past-1', USER); finished('past-2', USER);
     db.sessions = [{ userId: USER, mode: 'music', score: 1_900_000, createdAt: new Date('2026-09-19T12:00:00Z') }];   // a long free set
-    const res = await submitPOST(post({ matchId: 'legacy-1', score: 4000 }));
+    const res = await submitPOST(post({ matchId: 'legacy-1', score: played('legacy-1', USER) }));
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.settled).toBe(true);
@@ -175,13 +202,13 @@ describe('an arena duel stored as "musicAcademy"', () => {
     expect(db.duelQueries.map((w) => w.mode.in)).toEqual([['music', 'musicAcademy']]);
     const ghost = db.events.find((e) => e.type === 'GHOST_SCORED')!.payload;
     expect(ghost.bandSource).toBe('player-history');
-    expect(ghost.bandCenter).toBe(4300);
+    expect(ghost.bandCenter).toBe(43_000);   // (MUSIC-SUITE P6 FIX PASS: scores above the music floor, 12,000 — below it the floor holds)
   });
 
   it('with no past Arena music score, draws off the music baseline, not the default 100, however long the free sets', async () => {
     db.matches = [legacyMatch({ matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE })];
     db.sessions = [{ userId: USER, mode: 'music', score: 1_900_000, createdAt: new Date('2026-09-19T00:00:00Z') }];
-    await submitPOST(post({ matchId: 'legacy-1', score: 10 }));
+    await submitPOST(post({ matchId: 'legacy-1', score: played('legacy-1', USER, 5) }));
     const ghost = db.events.find((e) => e.type === 'GHOST_SCORED')!.payload;
     expect(ghost.bandSource).toBe('baseline');
     expect(ghost.bandCenter).toBe(ARENA_SCORE_BASELINES.music);
@@ -192,8 +219,8 @@ describe('an arena duel stored as "musicAcademy"', () => {
 describe('a staked music rival and endless free play', () => {
   // A player who hits every note PERFECT but drops the combo every 40 notes, over a set of `notes` notes.
   const setScore = (notes: number) => { let t = 0; for (let i = 0; i < notes; i++) t += performHitPoints(true, i % 40); return t; };
-  const arenaSet = setScore(PERFORM_SET_NOTES);   // the 32-bar Arena set
-  const freeSet = setScore(1300);                 // about 80 bars of free play at the same accuracy
+  const arenaSet = setScore(HOUSE_SET_NOTES);   // a 32-bar Arena set on the house beat (MUSIC-SUITE P6: 192 notes)
+  const freeSet = setScore(1300);               // about 80 bars of free play at the same accuracy
 
   it('a history of long free sets never lifts the rival above what a 32-bar set reaches at the same accuracy', async () => {
     expect(freeSet).toBeGreaterThan(2 * arenaSet);   // the scale gap the rival must not see
@@ -203,12 +230,64 @@ describe('a staked music rival and endless free play', () => {
       // a score from before the Arena capped the set: above today's ceiling, so no staked set can reach it and it is left out
       legacyMatch({ id: 'past-0', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 9_000_000, player2Score: 1, createdAt: new Date('2026-09-10T00:00:00Z') }),
     ];
+    finished('past-1', USER); finished('past-0', USER);
     db.sessions = Array.from({ length: 10 }, (_, i) => ({ userId: USER, mode: 'music', score: freeSet, createdAt: new Date(Date.parse('2026-09-19T01:00:00Z') + i) }));
-    const res = await submitPOST(post({ matchId: 'legacy-1', score: arenaSet }));
+    const res = await submitPOST(post({ matchId: 'legacy-1', score: played('legacy-1', USER) }));
     expect(res.status).toBe(200);
     const ghost = db.events.find((e) => e.type === 'GHOST_SCORED')!.payload;
     expect(ghost.bandCenter).toBe(arenaSet);
     expect(ghost.score).toBeLessThanOrEqual(Math.round(arenaSet * (1 + RIVAL_BAND)));
+  });
+
+  // Owner decision #12: "old music duel scores stop counting; 5,000 baseline kept until real scores exist".
+  it('P6: only a duel with the player\'s own FINISHED attempt bands the rival — old scores, forfeits and the other side\'s attempt do not', async () => {
+    db.matches = [
+      legacyMatch({ mode: 'music', matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE }),
+      legacyMatch({ id: 'old', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 90_000, player2Score: 1, createdAt: new Date('2026-09-19T03:00:00Z') }),
+      legacyMatch({ id: 'forfeit', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 0, player2Score: 1, createdAt: new Date('2026-09-19T02:00:00Z') }),
+      legacyMatch({ id: 'theirs', mode: 'music', status: 'SETTLED', player1Id: 'someone-else', player2Id: USER, player1Score: 1, player2Score: 70_000, createdAt: new Date('2026-09-19T01:00:00Z') }),
+      legacyMatch({ id: 'good', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 30_000, player2Score: 1, createdAt: new Date('2026-09-18T00:00:00Z') }),
+    ];
+    db.events.push({ matchId: 'forfeit', userId: USER, type: MUSIC_ATTEMPT_START, payload: {} });   // started, never finished
+    finished('theirs', 'someone-else');                                                            // the opponent finished, not me
+    finished('good', USER);
+    const res = await submitPOST(post({ matchId: 'legacy-1', score: played('legacy-1', USER) }));
+    expect(res.status).toBe(200);
+    expect(db.duelQueries[0].events).toEqual({ some: { eventType: MUSIC_ATTEMPT_FINISH, userId: USER } });   // asked of the database
+    expect(db.events.find((e) => e.type === 'GHOST_SCORED')!.payload).toMatchObject({ bandSource: 'player-history', bandCenter: 30_000 });
+  });
+
+  it('P6: a player with only pre-P6 music duels meets the music baseline (12,000 since the P6 fix pass), as a first duel does', async () => {
+    db.matches = [
+      legacyMatch({ mode: 'music', matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE }),
+      legacyMatch({ id: 'old-1', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 250_000, player2Score: 1, createdAt: new Date('2026-09-19T00:00:00Z') }),
+      legacyMatch({ id: 'old-2', mode: 'musicAcademy', status: 'SETTLED', player1Id: HOUSE, player2Id: USER, player1Score: 1, player2Score: 180_000, createdAt: new Date('2026-09-18T00:00:00Z') }),
+    ];
+    await submitPOST(post({ matchId: 'legacy-1', score: played('legacy-1', USER) }));
+    expect(db.events.find((e) => e.type === 'GHOST_SCORED')!.payload).toMatchObject({ bandSource: 'baseline', bandCenter: 12_000 });
+    expect(ARENA_SCORE_BASELINES.music).toBe(12_000);
+  });
+
+  // The ghost's score is drawn from the same banding; a player whose every set was perfect draws a band centred on the
+  // ceiling, up to 18 % above it. The house is held to the ceiling — the house beat's maximum, the same for every beat.
+  it('P6: the house rival never posts above the house-beat ceiling, however good the player\'s history', async () => {
+    let clamped = 0;
+    for (let i = 0; i < 12; i++) {
+      db.matches = [
+        legacyMatch({ id: `g-${i}`, seed: `ghost-seed-${i}`, mode: 'music', matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE }),
+        legacyMatch({ id: `best-${i}`, mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: HOUSE_SET_MAX, player2Score: 1, createdAt: new Date('2026-09-19T00:00:00Z') }),
+      ];
+      db.events = [];
+      finished(`best-${i}`, USER);
+      const res = await submitPOST(post({ matchId: `g-${i}`, score: played(`g-${i}`, USER) }));
+      expect(res.status).toBe(200);
+      const ghost = db.events.find((e) => e.type === 'GHOST_SCORED')!.payload;
+      expect(ghost.bandCenter).toBe(HOUSE_SET_MAX);
+      expect(ghost.score, `seed ${i}`).toBeLessThanOrEqual(SCORE_CEILINGS.music.max);
+      if (ghost.drawnAboveCeiling) clamped++;
+    }
+    expect(SCORE_CEILINGS.music.max).toBe(HOUSE_SET_MAX);
+    expect(clamped).toBeGreaterThan(0);   // some draws went over, and each was held to the ceiling
   });
 
   it('another mode still bands its rival on the player\'s sessions', async () => {
@@ -222,16 +301,7 @@ describe('a staked music rival and endless free play', () => {
 });
 
 describe('a new duel', () => {
-  it('while music is paused, an old client posting "musicAcademy" is refused as PAUSED (the alias is read), and nothing is stored', async () => {
-    const res = await createPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe('STAKING_PAUSED');
-    expect(db.created).toHaveLength(0);
-    expect(db.events).toHaveLength(0);
-  });
-
-  it('is stored under the session key even when an old client posts "musicAcademy" (once the pause lifts)', async () => {
-    pause.lifted = true;
+  it('is stored under the session key even when an old client posts "musicAcademy" (music staking is open again, P6)', async () => {
     const res = await createPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
     expect(res.status).toBe(200);
     expect(db.created).toHaveLength(1);
@@ -240,7 +310,6 @@ describe('a new duel', () => {
   });
 
   it('is stored as posted when the client posts the current key, and an unknown key is still refused', async () => {
-    pause.lifted = true;
     await createPOST(post({ mode: 'music', feeLc: 50 }));
     expect(db.created[0].mode).toBe('music');
     const bad = await createPOST(post({ mode: 'notAMode', feeLc: 50 }));
@@ -252,16 +321,7 @@ describe('a new duel', () => {
 // HOTFIX (2026-09-24): quick-match got the same normalisation as create, and it is the path that makes GHOST_DUEL rows,
 // the rows the ghost draw reads. Join was the one arena route still answering with the raw stored key.
 describe('a quick match', () => {
-  it('while music is paused, an old client posting "musicAcademy" is refused as PAUSED, with no row and no event', async () => {
-    const res = await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe('STAKING_PAUSED');
-    expect(db.created).toHaveLength(0);
-    expect(db.events).toHaveLength(0);
-  });
-
-  it('is stored, logged and answered under the session key when an old client posts "musicAcademy" (once the pause lifts)', async () => {
-    pause.lifted = true;
+  it('is stored, logged and answered under the session key when an old client posts "musicAcademy"', async () => {
     const res = await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
     expect(res.status).toBe(200);
     expect(db.created).toHaveLength(1);
@@ -272,16 +332,15 @@ describe('a quick match', () => {
   });
 
   it("then settles against a rival drawn from the player's past Arena music scores", async () => {
-    pause.lifted = true;
     await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
-    pause.lifted = false;   // MUSIC-SUITE P1: a quick match opened before the pause still settles while it is on
     db.matches = db.created.map((m) => ({ ...m, player1Score: null, player2Score: null, createdAt: new Date('2026-09-20T00:00:00Z') }));
-    db.matches.push(legacyMatch({ id: 'past-1', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 4800, player2Score: 4700, createdAt: new Date('2026-09-19T00:00:00Z') }));
+    db.matches.push(legacyMatch({ id: 'past-1', mode: 'music', status: 'SETTLED', player1Id: USER, player2Id: HOUSE, player1Score: 48_000, player2Score: 4700, createdAt: new Date('2026-09-19T00:00:00Z') }));
+    finished('past-1', USER);
     db.sessions = [{ userId: USER, mode: 'music', score: 14_800, createdAt: new Date('2026-09-19T00:00:00Z') }];
-    const res = await submitPOST(post({ matchId: db.matches[0].id, score: 4000 }));
+    const res = await submitPOST(post({ matchId: db.matches[0].id, score: played(db.matches[0].id, USER) }));
     expect(res.status).toBe(200);
     expect(db.sessionQueries).toEqual([]);
-    expect(db.events.find((e) => e.type === 'GHOST_SCORED')!.payload).toMatchObject({ bandSource: 'player-history', bandCenter: 4800 });
+    expect(db.events.find((e) => e.type === 'GHOST_SCORED')!.payload).toMatchObject({ bandSource: 'player-history', bandCenter: 48_000 });
   });
 
   it('refuses an unknown mode and stores nothing', async () => {
@@ -292,17 +351,7 @@ describe('a quick match', () => {
 });
 
 describe('joining a duel stored as "musicAcademy"', () => {
-  it('while music is paused, is refused as PAUSED: no stake locked, the row untouched (its creator cancels for a refund)', async () => {
-    db.matches = [legacyMatch()];
-    const res = await joinPOST(post({ matchId: 'legacy-1' }));
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe('STAKING_PAUSED');
-    expect(db.matches[0]).toMatchObject({ status: 'WAITING', player2Id: null });
-    expect(db.events).toHaveLength(0);
-  });
-
-  it('answers and logs it as a music duel (once the pause lifts)', async () => {
-    pause.lifted = true;
+  it('answers and logs it as a music duel (music staking is open again, P6)', async () => {
     db.matches = [legacyMatch()];
     const res = await joinPOST(post({ matchId: 'legacy-1' }));
     expect(res.status).toBe(200);

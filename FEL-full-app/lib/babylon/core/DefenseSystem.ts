@@ -60,15 +60,18 @@ export class DefenseController {
    *  me at `nowMs`". Mutates nothing — returns the defense action and lets
    *  the caller apply FightCore state changes (keeps one mutation site).
    */
-  resolve(atk: AttackDef, dist: number, blocking: boolean, nowMs: number): DefenseAction {
+  resolve(atk: AttackDef, dist: number, blocking: boolean, nowMs: number, windows?: { impactMs?: number; parryMs?: number }): DefenseAction {
     if (dist > atk.range) return 'none';
     const sincePress = nowMs - this.pressMs;
+    // MOVEMENT PLAY P7 (2026-09-25): a BODY defender's windows are widened (bodyFight: guard impact 160, parry 200 ms);
+    // no `windows` (every pad defender) = 90 / 160 as before
+    const impactMs = windows?.impactMs ?? GUARD_IMPACT_WINDOW_MS, parryMs = windows?.parryMs ?? PARRY_WINDOW_MS;
     // Guard impact: tighter window AND the directional flick. No-sells.
-    if (sincePress >= 0 && sincePress <= GUARD_IMPACT_WINDOW_MS && this.flickTowardFoe) {
+    if (sincePress >= 0 && sincePress <= impactMs && this.flickTowardFoe) {
       return 'guardImpacted';
     }
     // Parry: timing only.
-    if (sincePress >= 0 && sincePress <= PARRY_WINDOW_MS) return 'parried';
+    if (sincePress >= 0 && sincePress <= parryMs) return 'parried';
     if (blocking) return 'blocked';
     return 'none';
   }

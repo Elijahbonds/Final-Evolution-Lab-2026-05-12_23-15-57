@@ -39,6 +39,8 @@ interface Store {
   beforeInsert?: (key: string) => void;
   /** Counts ledger reads of the sweep's shape, so a test can see what a read cost. */
   sweepQueries: number;
+  /** MUSIC-SUITE P6: the User rows the kit grandfather reads (createdAt only); absent = no user found. */
+  users?: { id: string; createdAt: Date }[];
 }
 
 const h = vi.hoisted(() => ({ session: { user: { id: 'p1' } } as unknown, client: null as unknown, onSale: new Set<string>() }));
@@ -67,11 +69,12 @@ const { POST: shopBuy } = await import('@/app/api/shop/purchase/route');
 const { DELETE: deleteMyData } = await import('@/app/api/v1/workout/scan/route');
 const { POST: sessionsBook } = await import('@/app/api/v1/sessions/book/route');
 const { upcomingGroupSlots } = await import('@/lib/sessions/schedule');
-const { readWallet, earn, spend } = await import('./wallet-service');
+const { readWallet, earn, spend, sessionWalletGrant } = await import('./wallet-service');
 const { refundNotesFor } = await import('./dead-buy-refunds');
 const { refundKey } = await import('./dead-buys');
 const { NOT_ON_SALE } = await import('./catalog');
 const { GET: musicOwned, POST: musicBuy } = await import('@/app/api/music/unlock/route');
+const { POST: musicGrandfather } = await import('@/app/api/music/grandfather/route');
 const { spendResultFromStatus, ownedReadFromResponse, SPEND_FAILURE_TEXT } = await import('@/lib/babylon/music/purchases');
 
 const unique = (target: string) => new Prisma.PrismaClientKnownRequestError(`Unique constraint failed on the fields: (\`${target}\`)`, { code: 'P2002', clientVersion: 'test' });
@@ -238,6 +241,14 @@ function client(store: Store) {
         findMany: async ({ where }: { where: { userId: string } }) => live.plans.filter((p) => p.userId === where.userId).map((p) => ({ tier: p.tier, createdAt: p.createdAt })),
       },
       get sessionJoinLink() { return live.accessor ? joinLinks : undefined; },
+      // MUSIC-SUITE P6: POST /api/music/grandfather reads the account's age
+      user: {
+        findUnique: async ({ where }: { where: { id: string } }) => {
+          guard();
+          const u = (live.users ?? []).find((x) => x.id === where.id);
+          return u ? { createdAt: new Date(u.createdAt) } : null;
+        },
+      },
     };
   }
   const c = delegates(null) as ReturnType<typeof delegates> & { $transaction: unknown };
@@ -1014,6 +1025,103 @@ describe('the Music Room\'s kits come from the account, and a refund still means
   });
 });
 
+// MUSIC-SUITE P6 (2026-09-25), owner decision #23: "Kits unlocked free before 2026-09-20 (bug): LET PLAYERS KEEP THEM — a
+// one-time server grant with its own ledger reason, kept out of the dead-buy sweep". The room sends what its device still
+// holds (lib/babylon/music/kitGrandfather.ts) to POST /api/music/grandfather just before its owned-kits read. Proven here
+// on the real routes, the real sweep and the real ledger writer: the grant is one zero-delta row, the sweep's refunds are
+// exactly what they were, the kit is owned, and nothing about it can be had twice or by an account made since.
+describe('a kit the room gave away before 2026-09-20 is kept: one grant, never swept', () => {
+  let store: Store;
+  beforeEach(() => {
+    vi.setSystemTime(NOW);
+    ({ store } = seed());
+    // p1 predates the cutoff; p2's account was made after it
+    store.users = [{ id: 'p1', createdAt: new Date('2026-08-20T00:00:00Z') }, { id: 'p2', createdAt: new Date('2026-09-22T00:00:00Z') }];
+    // p1's kit rows as spend() wrote them: /store's DUST (dead, paid back) and the Room's own NEON (delivered)
+    store.entitlements.push({ playerId: 'p1', skuId: 'music_kit_dust', quantity: 1 }, { playerId: 'p1', skuId: 'music_kit_neon', quantity: 1 });
+    h.client = client(store);
+    h.session = { user: { id: 'p1' } };
+  });
+  const claim = (records: unknown[]) => post(musicGrandfather, { records });
+  const grants = () => store.entries.filter((e) => e.reasonCode === 'KIT_GRANDFATHER_2026_09');
+  const LIST = (kit: string) => ({ kit, at: null, from: 'kit_list' });
+
+  it('the old kit list names DUST and NEON: DUST (never paid for in the Room) is granted, NEON is already owned', async () => {
+    const res = await claim([LIST('dust'), LIST('neon')]);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ eligible: true, granted: ['music_kit_dust'], owned: ['music_kit_neon'], refused: [] });
+    expect(grants()).toEqual([expect.objectContaining({
+      walletId: 'w1', currency: 'shards', delta: 0n, reasonCode: 'KIT_GRANDFATHER_2026_09', source: 'admin_adjust',
+      idempotencyKey: 'kit_grandfather_2026_09:p1:music_kit_dust',
+      metadata: expect.objectContaining({ skuId: 'music_kit_dust', kit: 'dust', record: { from: 'kit_list', at: null } }),
+    })]);
+    expect(String((grants()[0].metadata as { note?: unknown }).note)).toMatch(/^DUST kit is yours to keep/);
+    // the sweep ran first (the owned read) and paid the /store DUST back exactly as before; the grant moved nothing
+    expect(refundsIn(store).map((r) => r.idempotencyKey)).toContain(refundKey('store_dust'));
+    expect(walletOf(store, 'p1')).toMatchObject(P1_AFTER);
+    // the Room's read lists it now, from the same rule
+    expect(await (await musicOwned()).json()).toEqual({ owned: ['music_kit_dust', 'music_kit_neon'], shards: Number(P1_AFTER.shards) });
+  });
+
+  it('KEPT OUT OF THE SWEEP: a fresh server instance sweeps the wallet again — nothing is paid back for the grant, the kit stays', async () => {
+    await claim([LIST('dust')]);
+    const refundsBefore = refundsIn(store).length;
+    h.client = client(store);                         // another instance: its sweep has never seen p1
+    await GET();
+    await readWallet(client(store) as never, 'p1');
+    expect(refundsIn(store)).toHaveLength(refundsBefore);
+    expect(refundsIn(store).some((r) => r.idempotencyKey === refundKey(grants()[0].id))).toBe(false);
+    expect(walletOf(store, 'p1')).toMatchObject(P1_AFTER);
+    expect((await (await musicOwned()).json()).owned).toEqual(['music_kit_dust', 'music_kit_neon']);
+  });
+
+  it('ONCE per player and kit: a replayed claim grants nothing more, and two racing tabs grant one row between them', async () => {
+    const [a, b] = await Promise.all([claim([LIST('dust')]), claim([LIST('dust')])]);
+    const bodies = [await a.json(), await b.json()];
+    expect(bodies.flatMap((x) => x.granted)).toEqual(['music_kit_dust']);
+    expect(bodies.flatMap((x) => x.owned)).toEqual(['music_kit_dust']);
+    const again = await (await claim([LIST('dust'), { kit: 'dust', at: Date.parse('2026-09-01T12:00:00-07:00'), from: 'library' }])).json();
+    expect(again).toEqual({ eligible: true, granted: [], owned: ['music_kit_dust'], refused: [] });
+    expect(grants()).toHaveLength(1);
+    expect(walletOf(store, 'p1')).toMatchObject(P1_AFTER);
+  });
+
+  it('an account made after the cutoff gets nothing, whatever its device says (a forged list included)', async () => {
+    h.session = { user: { id: 'p2' } };
+    const res = await claim([LIST('neon'), LIST('dust')]);
+    expect(await res.json()).toEqual({
+      eligible: false, granted: [], owned: [],
+      refused: [{ kit: 'neon', why: 'account_after_cutoff' }, { kit: 'dust', why: 'account_after_cutoff' }],
+    });
+    expect(grants()).toHaveLength(0);
+    expect((await (await musicOwned()).json()).owned).toEqual([]);
+  });
+
+  it('never on a record dated on/after the cutoff, and never a kit that was not sold', async () => {
+    const res = await claim([{ kit: 'dust', at: Date.parse('2026-09-20T00:00:00-07:00'), from: 'library' }, LIST('street')]);
+    expect(await res.json()).toEqual({
+      eligible: true, granted: [], owned: [],
+      refused: [{ kit: 'dust', why: 'dated_after_cutoff' }, { kit: 'street', why: 'not_in_free_window' }],
+    });
+    expect(grants()).toHaveLength(0);
+  });
+
+  it('signed out 401, no record list 400, no account 404, a database failure 503 — and nothing written by any of them', async () => {
+    h.session = null;
+    expect((await claim([LIST('dust')])).status).toBe(401);
+    h.session = { user: { id: 'p1' } };
+    expect((await post(musicGrandfather, { kit: 'dust' })).status).toBe(400);
+    h.session = { user: { id: 'ghost' } };
+    expect((await claim([LIST('dust')])).status).toBe(404);
+    h.session = { user: { id: 'p1' } };
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    h.client = { ...client(store), user: { findUnique: async () => { throw new Error('db down'); } } };
+    expect((await claim([LIST('dust')])).status).toBe(503);
+    err.mockRestore();
+    expect(grants()).toHaveLength(0);
+  });
+});
+
 describe('delete-my-data', () => {
   it('erases the plans and the scans in one transaction, so no reader sees one gone and the other left', async () => {
     const batches: unknown[][] = [];
@@ -1047,7 +1155,11 @@ describe('an earn under another wallet\'s key', () => {
       $transaction: async () => { throw new Error('the grant must not open a transaction'); },
     };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const r = await earn(db as never, { playerId: 'me', idempotencyKey: 'k_theirs', eventType: 'mode_session_completed', payload: { run_id: 'r1', score: 80 } });
+    // ECONOMY-SESSIONS-HARDEN: the vehicle was mode_session_completed, which the run pays now (earn refuses it before the
+    // key is tried). DAILY-KEY-HOTFIX: then it was the daily faucet, which no longer files under the client's key at all
+    // (the server builds it: dailyKey.test.ts covers a day's key held by another wallet). The flat routine reward goes
+    // through every check a fresh key gets and then reaches the key the same way.
+    const r = await earn(db as never, { playerId: 'me', idempotencyKey: 'k_theirs', eventType: 'dunk_routine_completed', payload: {} });
     warn.mockRestore();
     expect(r).toMatchObject({ granted: { coins: 0, shards: 0 }, entry_id: null, rejected: 'replayed_key', balances: { coins: 7 } });
     expect(updates).toEqual([{ where: { id: 'ev1' }, data: { rejectedReason: 'replayed_key' } }]);
@@ -1067,7 +1179,9 @@ describe('a refund is not an earn', () => {
       gameSession: { findFirst: async () => ({ won: false }) },
       rewardRule: { findUnique: async () => null },
     };
-    await expect(earn(db as never, { playerId: 'p1', idempotencyKey: 'k1', eventType: 'mode_session_completed', payload: { run_id: 'r1', score: 80 } }))
+    // ECONOMY-SESSIONS-HARDEN: the session coin earn is priced inside the run's transaction now (sessionWalletGrant), by the
+    // same caps earn() uses (capGrant) — the cap under test
+    await expect(sessionWalletGrant(db as never, { playerId: 'p1', reasonCode: 'MODE_SESSION_COMPLETED', payload: { run_id: 'r1', score: 80 }, idempotencyKey: 'run:r1:coins' }))
       .rejects.toThrow('stop here');
     expect(seen[0].where).toMatchObject({ currency: 'coins', delta: { gt: 0 }, reasonCode: { not: 'DEAD_BUY_REFUND' } });
   });

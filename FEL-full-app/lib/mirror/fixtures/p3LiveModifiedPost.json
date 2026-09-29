@@ -1,0 +1,148 @@
+{
+ "_about": "The Movement Screen POST body the served harness sent on the lane's dev server (:3131) in the MIRROR-COACH P3 live proof, 2026-09-26 (scripts/probes/_mirror-p3-proof-live.mts): a Modified screen on synthetic landmark fixtures (lib/mirror/fixtures/stations.ts) - heels clean, front stack with the LEFT knee 6 cm inside its hip-ankle line, the side-on station first fed a facing body (it never started) and then a side-on body whose face and feet were not seen, both legs steady. Captured from the browser, unedited; lib/mirror/screen-route-live.test.ts posts it through the real route.",
+ "screenId": "412a55e2-38e7-47f4-ad56-aad50bbe8b95",
+ "screen": "modified",
+ "results": [
+  {
+   "checkId": "heelLine",
+   "grade": "stable",
+   "source": "camera",
+   "detail": "heel lines L 1° · R 3° from vertical (+ = heel outside the ankle) · estimated"
+  },
+  {
+   "checkId": "kneeWindow",
+   "grade": "fail",
+   "source": "camera",
+   "side": "left",
+   "detail": "knee against its hip–ankle line, in hip half-widths: L 0.67 in · R 0.02 out · estimated"
+  },
+  {
+   "checkId": "hipLevel",
+   "grade": "stable",
+   "source": "camera",
+   "detail": "0.00 of a shoulder width apart in height · estimated"
+  },
+  {
+   "checkId": "shoulderLevel",
+   "grade": "stable",
+   "source": "camera",
+   "detail": "0.00 of a shoulder width apart in height · estimated"
+  },
+  {
+   "checkId": "singleLeg",
+   "grade": "stable",
+   "source": "camera",
+   "side": "left",
+   "detail": "sway 0.01 torso lengths a second, 0 touch-downs, 29 s on one leg · estimated"
+  },
+  {
+   "checkId": "singleLeg",
+   "grade": "stable",
+   "source": "camera",
+   "side": "right",
+   "detail": "sway 0.02 torso lengths a second, 0 touch-downs, 29 s on one leg · estimated"
+  }
+ ],
+ "grades": [
+  {
+   "checkId": "heelLine",
+   "status": "pass",
+   "value": 2.8640232275654873,
+   "unit": "deg",
+   "frames": 362,
+   "readableFrames": 353,
+   "note": "Heel lines read alike (heel lines L 1° · R 3° from vertical (+ = heel outside the ankle) · estimated).",
+   "uncertainty": 1.4435653624927567,
+   "spread": 16.85447345273613,
+   "stationId": "heels",
+   "bySide": {
+    "left": 0.8228917159317449,
+    "right": 2.8640232275654873
+   }
+  },
+  {
+   "checkId": "kneeWindow",
+   "status": "flag",
+   "value": 0.6659545551587789,
+   "unit": "ratio",
+   "frames": 421,
+   "readableFrames": 420,
+   "note": "Your left knee read inside the line from hip to ankle (knee against its hip–ankle line, in hip half-widths: L 0.67 in · R 0.02 out · estimated). Flagged for a closer look.",
+   "uncertainty": 0.01973997703537308,
+   "spread": 0.251398494213814,
+   "side": "left",
+   "stationId": "frontStack",
+   "bySide": {
+    "left": 0.6659545551587789,
+    "right": -0.017081514358248135
+   }
+  },
+  {
+   "checkId": "hipLevel",
+   "status": "pass",
+   "value": -0.0028378208907030825,
+   "unit": "ratio",
+   "frames": 421,
+   "readableFrames": 421,
+   "note": "Hips read level (0.00 of a shoulder width apart in height · estimated).",
+   "uncertainty": 0.0028185654396690866,
+   "spread": 0.03593855027824698,
+   "stationId": "frontStack"
+  },
+  {
+   "checkId": "shoulderLevel",
+   "status": "pass",
+   "value": -0.0014799662683838712,
+   "unit": "ratio",
+   "frames": 421,
+   "readableFrames": 421,
+   "note": "Shoulders read level (0.00 of a shoulder width apart in height · estimated).",
+   "uncertainty": 0.002826233352674185,
+   "spread": 0.0360363211772953,
+   "stationId": "frontStack"
+  },
+  {
+   "checkId": "headFloat",
+   "status": "unreadable",
+   "value": null,
+   "unit": "ratio",
+   "frames": 301,
+   "readableFrames": 0,
+   "note": "Not read: this check reads you from the side, and the camera saw a different view.",
+   "uncertainty": null,
+   "spread": null,
+   "reason": "wrongView",
+   "stationId": "profile"
+  },
+  {
+   "checkId": "singleLeg",
+   "status": "pass",
+   "value": 0.013829688473885661,
+   "unit": "px-norm",
+   "frames": 901,
+   "readableFrames": 901,
+   "note": "Left leg: held steady (sway 0.01 torso lengths a second, 0 touch-downs, 29 s on one leg · estimated).",
+   "uncertainty": 0.03334334919315416,
+   "spread": null,
+   "stationId": "wobbleL",
+   "side": "left",
+   "touchDowns": 0,
+   "stanceSec": 28.69860000002384
+  },
+  {
+   "checkId": "singleLeg",
+   "status": "pass",
+   "value": 0.016111812301794037,
+   "unit": "px-norm",
+   "frames": 901,
+   "readableFrames": 901,
+   "note": "Right leg: held steady (sway 0.02 torso lengths a second, 0 touch-downs, 29 s on one leg · estimated).",
+   "uncertainty": 0.033375881016796685,
+   "spread": null,
+   "stationId": "wobbleR",
+   "side": "right",
+   "touchDowns": 0,
+   "stanceSec": 28.6645
+  }
+ ]
+}

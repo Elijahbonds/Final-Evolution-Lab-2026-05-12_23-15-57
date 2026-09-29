@@ -19,7 +19,8 @@ import { armChain, reachArm, anatomicalElbowPole, elbowBackDir, type ArmChain } 
 import { frameAbove } from './TwoBoneIK';
 import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
-import { smoothByDefault, smoothQuatKeys, smoothScalarKeys, type Q4 } from './smoothKeys';
+import { smoothByDefault, smoothQuatKeys, smoothScalarKeys, HOOPS_MOTION_MODES, hoopsMotionModeOf, type Q4 } from './smoothKeys';
+import { HOOPS_OVERHEAD_CLIPS } from './authored/hoopsOverhead';   // (a data table: the clip-scope test reads anim/authored/ as data)
 
 export type Deg3 = [number, number, number];
 export interface PoseKey {
@@ -57,9 +58,38 @@ export interface PoseClipOpts {
   smooth?: boolean;
   /** [1 2 1] passes over the keys first (a capture's jitter). Default: from smoothByDefault. */
   prefilter?: number;
-  /** Hold every elbow pole to the arm's anatomy (HandIK.anatomicalElbowPole). Default: the dunk family. */
-  anatomicalPoles?: boolean;
+  /** Hold every elbow pole to the arm's anatomy (HandIK.anatomicalElbowPole). Default: the dunk family, and — HOOPS MOTION phase 3c —
+   *  'overhead' for the hoops overhead families (HOOPS_OVERHEAD_CLIPS): the rule on the keys whose hand is over the shoulder only. */
+  anatomicalPoles?: boolean | 'overhead';
+  /** HOOPS MOTION phase 3c: the clip loops — the smoothing's end slopes are one, across the seam (smoothKeys `periodic`). Default: a clip
+   *  whose first key is at 0, whose last is at `duration` and is the same pose as the first. */
+  periodic?: boolean;
 }
+/**
+ * HOOPS MOTION phase 3c (plan §3 "Anatomical elbow poles"): THE OVERHEAD FAMILIES. Every hoops finish over the head was authored with the
+ * dunk pass's first pole — out and BACK (UP_R [0.9, 0.1, −0.3]) — so with the ball above the head the elbow trailed behind a hand held in
+ * front of it: an arm bent the wrong way at the shoulder (base2: post moves 13.0, layups 12.1 wrong-way elbow frames a window; the dunk
+ * pass measured the same on its carry-up and fixed it with this rule). The floater, the hook, the reverse, the finger roll, the Mikan, the
+ * up-and-under, the spin and hang layups, the fadeaway, the block reach, the hand up and the late follow-through, with their _left
+ * versions: the rule applies on their OVERHEAD keys (the hand above the shoulder) — the low keys (the gather, the dribble hand they
+ * start from) keep the poles they had: re-rolling the low gathers made 84 forearm pops in the dunk pass (p9f).
+ */
+export { HOOPS_OVERHEAD_CLIPS };
+/** A key's hand this far over its shoulder (m, body scale) is an OVERHEAD arm for the 'overhead' rule. */
+export const OVERHEAD_HAND_OVER_SHOULDER_M = 0.05;
+/** The pole rule a clip gets by default: the dunk family everywhere (not push 1-2's low gathers), the hoops overhead families on their
+ *  overhead keys, nothing else. */
+export function anatomicalByDefault(name: string, modeId?: string | null): boolean | 'overhead' {
+  if (/^dunk_/.test(name) && !/^dunk_gather_/.test(name)) return true;
+  return HOOPS_OVERHEAD_CLIPS.includes(name) && !!modeId && HOOPS_MOTION_MODES.has(modeId) ? 'overhead' : false;   // (a hoops mode's bodies)
+}
+/** Dev A/B (HOOPS MOTION phase 3c): `?capPrefilter=0|1` builds the hoops captures (bball_mc_*) with that prefilter. */
+export function capturePrefilterOverride(search: string | null | undefined, dev: boolean): number | null {
+  if (!dev || !search) return null;
+  const m = /[?&]capPrefilter=([01])\b/.exec(search);
+  return m ? Number(m[1]) : null;
+}
+const CAP_PREFILTER = capturePrefilterOverride(typeof location !== 'undefined' ? location.search : null, process.env.NODE_ENV === 'development');
 /** The sample rate a smoothed clip is written at. */
 export const SMOOTH_FPS = 30;
 /** Hips height the targets were authored against (the forge hero). */
@@ -99,6 +129,58 @@ export function elbowFoldsBetween(arm: ArmChain, from: Quaternion): boolean {
 function elbowSide(arm: ArmChain): Vector3 {
   const s = arm.shoulder.getAbsolutePosition(), e = arm.elbow.getAbsolutePosition().subtract(s), u = arm.hand.getAbsolutePosition().subtract(s).normalize();
   return e.subtract(u.scale(Vector3.Dot(e, u))).normalize();
+}
+
+/** The authored shoulder height a hand target is judged against for the 'overhead' rule's transitions (body-local, REF body). */
+export const REF_SHOULDER_Y = 1.42;
+type TransitionKey = PoseKey & { transition?: boolean };
+/**
+ * HOOPS MOTION phase 3c: THE ELBOW TURNS THROUGH ITS NATURAL SIDE ON THE WAY DOWN FROM AN OVERHEAD KEY TO A LOW ONE. With the rule on the overhead keys
+ * only, a finish's descent went from an overhead key's elbow (forward) straight to the landing key's (out and back): the joint-space
+ * cubic swung the elbow behind the arm while the hand was still over the head — the fadeaway's follow-through read 8 wrong-way frames
+ * a window (smoke1), the up-and-under's 3. Where a hand comes down through the shoulder line between two keys, a key is inserted half-way (the
+ * hands, the bones and the hips half-way, no authored pole): it is solved under the rule, so the elbow passes through the side the
+ * anatomy gives a hand at that height (down, for an arm held forward) on its way round.
+ */
+export function withOverheadTransitions(keys: PoseKey[]): TransitionKey[] {
+  const over = (k: PoseKey, side: 'Left' | 'Right'): boolean | null => {
+    const h = k.hands?.[side], r = k.handsRel?.[side];
+    if (r) return r[1] > OVERHEAD_HAND_OVER_SHOULDER_M; if (h) return h[1] > REF_SHOULDER_Y + OVERHEAD_HAND_OVER_SHOULDER_M; return null;
+  };
+  const lerp = (a: number, b: number) => (a + b) / 2;
+  const out: TransitionKey[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const a = keys[i]; out.push(a);
+    const b = keys[i + 1]; if (!b) continue;
+    // (on the way DOWN only: on the way up the low key's elbow already leads round — an inserted key there added transit frames to the
+    // block reach and the hang layup's rise, measured on the forge rig)
+    const crosses = (['Left', 'Right'] as const).some((sd) => { const x = over(a, sd), y = over(b, sd); return x === true && y === false && !!a.hands?.[sd] === !!b.hands?.[sd]; });
+    if (!crosses) continue;
+    const mid: TransitionKey = { t: lerp(a.t, b.t), transition: true };
+    const bones: Record<string, Deg3> = {};
+    for (const [n, v] of Object.entries(a.bones ?? {})) { const w = b.bones?.[n] ?? v; bones[n] = [lerp(v[0], w[0]), lerp(v[1], w[1]), lerp(v[2], w[2])]; }
+    for (const [n, w] of Object.entries(b.bones ?? {})) if (!bones[n]) bones[n] = w;
+    mid.bones = bones;
+    for (const f of ['hands', 'handsRel', 'feet'] as const) {
+      const A = a[f], B = b[f]; if (!A || !B) continue;
+      const o: { Left?: [number, number, number]; Right?: [number, number, number] } = {};
+      for (const sd of ['Left', 'Right'] as const) { const x = A[sd], y = B[sd]; if (x && y) o[sd] = [lerp(x[0], y[0]), lerp(x[1], y[1]), lerp(x[2], y[2])]; }
+      if (o.Left || o.Right) mid[f] = o;
+    }
+    if (a.kneePoles && b.kneePoles) mid.kneePoles = a.kneePoles;
+    if (a.hipsY != null || b.hipsY != null) mid.hipsY = lerp(a.hipsY ?? 0, b.hipsY ?? 0);
+    out.push(mid);
+  }
+  return out;
+}
+
+/** A loop's keys: the first at 0, the last at `duration`, and the last the same pose as the first (every field). */
+export function closesLoop(keys: PoseKey[], duration: number): boolean {
+  if (keys.length < 3) return false;
+  const a = keys[0], b = keys[keys.length - 1];
+  if (Math.abs(a.t) > 1e-6 || Math.abs(b.t - duration) > 1e-3) return false;
+  const same = (x: unknown, y: unknown): boolean => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+  return same(a.bones, b.bones) && same(a.hands, b.hands) && same(a.handsRel, b.handsRel) && same(a.poles, b.poles) && same(a.feet, b.feet) && same(a.kneePoles, b.kneePoles) && (a.hipsY ?? 0) === (b.hipsY ?? 0);
 }
 
 export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration: number, keys: PoseKey[], opts: PoseClipOpts = {}): AnimationGroup | null {
@@ -184,12 +266,16 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   };
 
   const out: QuatKeys = {}; const hipsY: [number, number][] = [];
-  /** DUNK MOTION phase 9: the dunk family's elbows are held to the arm's anatomy (opt out with `anatomicalPoles: false`). */
-  const anatomical = opts.anatomicalPoles ?? (/^dunk_/.test(name) && !/^dunk_gather_/.test(name));   // (push 1-2's arms are low and authored true: the rule only re-rolled them — 84 forearm pops, p9f)
+  /** DUNK MOTION phase 9: the dunk family's elbows are held to the arm's anatomy (opt out with `anatomicalPoles: false`); HOOPS MOTION
+   *  phase 3c: the hoops overhead families on their overhead keys ('overhead'). */
+  const modeId = hoopsMotionModeOf(scene.metadata as { felModeId?: string; felCarnivalEvent?: string } | null | undefined);   // HOOPS MOTION phase 3c: a hoops mode's bodies (3c review: the carnival's Slam Rush only)
+  const anatomicalMode = opts.anatomicalPoles ?? anatomicalByDefault(name, modeId);   // (push 1-2's arms are low and authored true: the rule only re-rolled them — 84 forearm pops, p9f)
+  const anatomical = anatomicalMode === true;
   const push = (bone: string, t: number, q: Quaternion) => { (out[bone] ??= []).push([t, q.clone()]); };
   /** Each arm's last solved key: the forearm's local rotation, and the side of the shoulder→hand line its elbow was on. */
   const lastArm: Partial<Record<'Left' | 'Right', { fore: Quaternion; side: Vector3 }>> = {};
-  for (const key of keys) {
+  const solveKeys: TransitionKey[] = anatomicalMode === 'overhead' ? withOverheadTransitions(keys) : keys;
+  for (const key of solveKeys) {
     restore();
     // 1) torso and any explicit bone keys
     for (const [bone, deg] of Object.entries(key.bones ?? {})) { const n = nodes.get(bone); if (n) n.rotationQuaternion = keyed(n, deg); }
@@ -208,7 +294,10 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
       // DUNK MOTION phase 9: the dunk family's elbows point where an elbow can (HandIK.anatomicalElbowPole): an authored pole in the
       // forbidden half turned into the allowed one, a missing one the upper arm's natural back plus a flare out to its own side
       let poleW = inBody(pole);
-      if (anatomical) {
+      // HOOPS MOTION phase 3c: 'overhead' = the rule on this key only if its hand is over the shoulder
+      arm.shoulder.computeWorldMatrix(true);
+      const keyRule = anatomical || (anatomicalMode === 'overhead' && (!!key.transition || world.y - arm.shoulder.getAbsolutePosition().y > OVERHEAD_HAND_OVER_SHOULDER_M * scale));
+      if (keyRule) {
         arm.shoulder.computeWorldMatrix(true); const sh = arm.shoulder.getAbsolutePosition();
         if (!key.poles?.[side]) { const nat = elbowBackDir(sh, world, bodyFrame.up, bodyFrame.front); if (nat.sagittal >= 0.35) poleW = nat.dir.add(bodyFrame.right.scale(side === 'Left' ? -0.6 : 0.6)).normalize(); }
         poleW = anatomicalElbowPole(poleW, sh, world, bodyFrame.up, bodyFrame.front);
@@ -226,7 +315,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
       // never on the 45 GLB bodies (the forge hero, the scan, both kits, the 41 athletes; 214 clips each) — which are only two distinct
       // skeletons: 44 share the forge hero's joint heights, and the female kit differs from them in its hips and head alone.
       const last = lastArm[side];
-      if (anatomical && last && upper0 && fore0 && elbowFoldsBetween(arm, last.fore)) {
+      if (keyRule && last && upper0 && fore0 && elbowFoldsBetween(arm, last.fore)) {
         const sh = arm.shoulder.getAbsolutePosition().clone(), u = world.subtract(sh).normalize();
         const b1 = Vector3.Cross(u, Math.abs(u.x) < 0.9 ? Vector3.Right() : Vector3.Up()).normalize(), b2 = Vector3.Cross(u, b1);
         let best = { upper: arm.shoulder.rotationQuaternion!.clone(), fore: arm.elbow.rotationQuaternion!.clone(), near: -Infinity };
@@ -260,9 +349,12 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   restore();
   // DUNK MOTION phase 2: the joint-space cubic between the poses (slow-in / slow-out, velocity continuous through a key,
   // a pose reached and never overshot) instead of Babylon's constant-speed slerp from key to key
-  const byDefault = smoothByDefault(name);
+  const byDefault = smoothByDefault(name, modeId);
   if (opts.smooth ?? byDefault != null) {
-    const so = { fps: SMOOTH_FPS, duration, holds: keys.filter((k) => k.hold).map((k) => k.t), prefilter: opts.prefilter ?? byDefault ?? 0 };
+    // HOOPS MOTION phase 3c: a loop's end slopes are one (periodic) — explicit, or read off the keys (the last key at the clip's end is
+    // the first key's pose); the hoops captures' prefilter can be A/B'd in dev (?capPrefilter=)
+    const prefilter = opts.prefilter ?? (/^bball_mc_/.test(name) && CAP_PREFILTER !== null ? CAP_PREFILTER : byDefault ?? 0);
+    const so = { fps: SMOOTH_FPS, duration, holds: keys.filter((k) => k.hold).map((k) => k.t), prefilter, periodic: opts.periodic ?? (!/^dunk_/.test(name) && closesLoop(keys, duration)) };   // (the dunk family's curves stay as they were)
     for (const bone of Object.keys(out)) {
       const dense = smoothQuatKeys(out[bone].map(([t, q]) => ({ t, q: [q.x, q.y, q.z, q.w] as Q4 })), so);
       out[bone] = dense.map((k) => [k.t, new Quaternion(k.q[0], k.q[1], k.q[2], k.q[3])]);

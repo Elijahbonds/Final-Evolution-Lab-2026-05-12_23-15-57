@@ -36,6 +36,7 @@
 //   REPS=N — attempts kept per action (1 = the canonical instance; ≥ 5 = the plan's gate; per-action caps in MAXA)
 //   TAKES=canon|all — which takes run (default: canon for REPS=1, all for REPS>1; canon = phase 1's take list exactly)
 //   SEED=7  VDT=16.6667  COLS=12  HOG=<ms>  FROM_REC=<dir> — re-measure recordings already on disk (sheets need SCRUB=1 + a server)
+//   EXTRA_QS=&nomotion=1 — extra query parameters on every page (PHASE 3c: the A/Bs)
 //   WEIGHTS=1 — write the per-frame weights log for every recording (default: the 3PT shots only, plus weights-summary.txt)
 //   HUNT=<take>:<from>-<to> + ACTIONS=<action> + AOFF=<action>:<n> — a supplemental hunt for a rare action, merged after the n on disk
 //   Determinism: run the same TAG twice idle and once with HOG=60, then DET=1 _hoops-motion-compare.mts <tagA> <tagB>
@@ -61,6 +62,9 @@ const COLS = Number(process.env.COLS ?? 12);
 const FROM_REC = process.env.FROM_REC ?? '';
 const TAKE_WALL_MS = Number(process.env.TAKE_WALL_MS ?? 240000);
 const WEIGHTS_ALL = process.env.WEIGHTS === '1';
+/** EXTRA_QS=&nomotion=1 (PHASE 3c): extra query parameters on every session's page — the A/Bs (?nomotion=1 the motion layers off,
+ *  ?heroMocap=0 the authored clips for the captures, ?capPrefilter=0|1 the hoops captures' prefilter). */
+const EXTRA_QS = process.env.EXTRA_QS ?? '';
 /** HOG=<ms>: the load self-test — burn up to that much wall time inside every frame (see the clock). Numbers must not move. */
 const HOG = Number(process.env.HOG ?? 0);
 const VCLOCK_JS = fs.readFileSync(path.join(HERE, '_vclock-page.js'), 'utf8');
@@ -335,7 +339,11 @@ const CATALOGUE: ActionDef[] = [
   { ...A('hero_3v3_drive_finish', "3v3 wing drive's finish, whatever it reads", 'layups/floaters/hooks', 'finish', '3v3-off', withReps(['t_layup', 't_layup2', 't_layup3', 't_layup4', 't_layup5', 't_layup6', 't_layup7', 't_layup_open', 't_layup_screen']), { body: 'me', clip: ANY_FINISH }, 600, 1600), supplemental: true },
 ];
 /** Per-action caps above REPS: the drive finishes keep one per approach; the post-up its instances across the four reads. */
-const MAXA: Record<string, number> = { hero_1v1_layup: 8, hero_1v1_drive_finish: 9, hero_3v3_drive_finish: 10, hero_1v1_post_up: 8, hero_3v3_layup: 6, hero_3pt_rack_shot: 8, hero_1v1_dunk: 14, hero_3v3_dunk: 11 };
+const MAXA: Record<string, number> = { hero_1v1_layup: 8, hero_1v1_drive_finish: 9, hero_3v3_drive_finish: 10, hero_1v1_post_up: 8, hero_3v3_layup: 6, hero_3pt_rack_shot: 8, hero_1v1_dunk: 14, hero_3v3_dunk: 11,
+  // (3b review) the AI actions whose feet / acceleration verdicts rested on 1–4 attempts with loop frames: up to 10 kept, so the gate's
+  // mean of ≥ 5 QUALIFYING attempts has them where the takes play them (gate3b2 marks the rest insufficient)
+  ai_1v1_cross: 10, ai_1v1_hesi: 10, ai_1v1_idle: 10, ai_1v1_block: 10, ai_1v1_def_backpedal: 10, ai_1v1_react: 10, ai_3pt_react: 10, ai_3v3_dunk: 10,
+  ai_3v3_layup: 10, ai_3v3_block: 10, ai_3v3_boxout: 10, ai_3v3_contest: 10, ai_3v3_rebound: 10, ai_carn_react: 10 };
 const capOf = (id: string) => (REPS === 1 ? 1 : Math.max(REPS, MAXA[id] ?? 0));
 function nameSeed(n: string): number { let h = 2166136261; for (let i = 0; i < n.length; i++) { h ^= n.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 997; }
 function boxing(s: Record<string, unknown>, id: string): boolean { return typeof s.jb === 'string' && new RegExp(`(^| )${id}:[^ ]*!`).test(s.jb) ; }
@@ -583,6 +591,101 @@ export interface Metrics {
     /** 1. the ball path's worst frame is in ball.pathMaxM; here: the same for the CATCH frame alone (the warp into the palm) */
     catchWarpM: number | null;
   };
+  /** PHASE 3a (2026-09-25) — the "right-handed on screen" and "a carry on every body" gate lines. */
+  h3: {
+    /** held frames (the ball parented to this body's hand) by the side the holding hand is DRAWN on; `deliberateLeft` = left frames a
+     *  `_left` clip is on (top, or ≥ 0.25 of the pose: a left finish, hook or move the game chose), excluded from `rightFracExcl`;
+     *  `leftClips` lists the top clip on every left frame */
+    held: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null; leftClips: Record<string, number>; pelvis: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null } };
+    /** dribble frames (the ball on this body's live carry) by the side the BALL is drawn on; `deliberateLeft` = frames the mode had
+     *  this body's carry on its left hand (hh 'L': a crossing the move ended on), excluded from `rightFracExcl` */
+    dribble: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null; pelvis: { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null } };
+    /** the ball path on frames it was this body's on BOTH ends (held or dribbled) — the arrival of a catch, a board or a check is
+     *  excluded (phase 11's catch gate); world and against the hips; frames over 0.15 m */
+    pathHeld: { frames: number; maxM: number | null; atMs: number | null; maxRelM: number | null; over015: number };
+    /** the palm at every bounce top: the nearer hand bone's distance to the ball's centre, less 0.15 m (the palm-held distance:
+     *  ballRig's PALM_OFFSET, the constant the old "ball against the palm" read) — ≤ 0.08 m is the palm on the ball */
+    palm: { bounces: number; maxGapM: number | null; p90GapM: number | null; over008: number;
+      /** (3a review) the ALONG-TRAVEL part of the ball's offset from that hand bone at the tops where the body moves (root > 1 m/s over
+       *  the frames either side): + = the ball ahead of the hand, − = behind. The gap above cannot see a trail — the ball sits ~0.12 m
+       *  under the bone at a top, so a 7–10 cm horizontal lag still reads as a pass. |trail| ≤ 0.08 m is the palm on the ball. */
+      movingTops?: number; trailMeanM?: number | null; trailMaxAbsM?: number | null; trailOver008?: number } | null;
+    /** each hand bone's local rotation range over the window (degrees, the largest angle from the first frame) */
+    hands: { L: number | null; R: number | null; bothMove: boolean | null };
+    /** the subject had the ball (held or dribbled) on at least one frame of the window */
+    withBall: boolean;
+  };
+  /** PHASE 3c (2026-09-26) — the elbows on the overhead clips: frames whose top clip is an overhead family (OVERHEAD_CLIP), the wrong-way
+   *  elbow count on them (elbowBad's test, both arms, high + low), per clip. */
+  h3c?: { overheadFrames: number; elbowOverhead: number; byClip: Record<string, { frames: number; bad: number; straight?: number; locked?: number }>;
+    /** PHASE 3c review (2026-09-26): elbowBad skips an arm straighter than 160° (an arm without a bend has no side to point), so an arm
+     *  that only STRAIGHTENED reads as a fixed elbow. The arms (both, per frame) on the overhead frames over 160° (straight: the frames the
+     *  test could not judge) and over 172° (locked, the lockedElbow threshold), in total and per clip. */
+    straightOverhead?: number; lockedOverhead?: number };
+  /** PHASE 3b (2026-09-25) — the "Feet" gate lines. */
+  h3b: {
+    /** the foot slide on LOCOMOTION / DRIBBLE LOOP frames only (the subject's top clip a loop: the dribbles, the drive, the run, the
+     *  slides, the backpedal, the stance, the strafes, the idles): p90 per planted foot-frame, skating foot-frames (> 5 cm), and the
+     *  planted slide against the root's travel over the moving loop frames that had a planted foot (the feet account for the travel
+     *  when this is ~0; a foot carried along with the body reads ~1) */
+    loop: { frames: number; planted: number; p90Cm: number | null; skates: number; slideCm: number; rootCm: number; plantedFrac: number | null; clips: Record<string, number>;
+      /** the footplant probe's contact test alone (low, the lower foot, not rising) on the same frames — it also flags a SWING foot on its
+       *  way down before the strike (moving forward faster than the body: measured on base2's jog, 0.11 m a frame against the root's
+       *  0.07), which is a step, not a slide; the lines above leave out a foot moving along the travel faster than the root */
+      raw: { planted: number; p90Cm: number | null; skates: number } } | null;
+    /** step cadence against the decode's reference (SPEC-HOOPS-MOTION-DECODE §1) per gait, on the forward loops: each step's cadence
+     *  (1 / the time between two touchdowns of alternating feet) over the reference at the root's mean speed through it; the slides
+     *  against 3–5 contacts/s */
+    cadence: Record<'walk' | 'jog' | 'run' | 'sprint' | 'slide', { steps: number; medianSps: number; medianMps: number; medianRatio: number } | undefined> | null;
+    /** the root's planar acceleration (second difference of the root, consecutive frames, resets and snaps excluded), m/s² */
+    accel: { frames: number; p99: number | null; p95: number | null; max: number | null; over34: number } | null;
+    /** the same on the LOOP frames only (the body's own locomotion: the gate's line — a scripted flight, a hop or a knock is a beat's),
+     *  leaving out the frames of a HIT-STOP (the harness's time scale < 1, recorded as s.ts: game time freezes while the frames keep
+     *  coming, so every body reads a stop and a start that is the clock's, not the legs') */
+    accelLoop: { frames: number; p99: number | null; p95: number | null; max: number | null; over34: number } | null;
+    /** …and also without the frames this body is in CONTACT with another (another root inside 1.12 m: the modes' body separation and
+     *  momentum exchange — a collision, reported apart from the locomotion) */
+    accelLoopFree: { frames: number; p99: number | null; p95: number | null; max: number | null; over34: number } | null;
+    /** hit-stop frames in the window (s.ts < 1) */
+    hitStopFrames?: number;
+    /** (3b review) accelLoop / accelLoopFree on base2's basis: the hit-stop frames KEPT. base2's recordings carry no s.ts (the harness line
+     *  that records it came in 3b), so its accelLoop kept them; a comparison with base2 reads these. */
+    accelLoopB2?: { frames: number; p99: number | null; p95: number | null; max: number | null; over34: number } | null;
+    accelLoopFreeB2?: { frames: number; p99: number | null; p95: number | null; max: number | null; over34: number } | null;
+    /** the knee bend (180° − the hip–knee–ankle angle, both legs' mean) on the frames the subject STANDS in a stance clip (root < 0.3
+     *  m/s; dribble idle / defend stance / idle stand): the median, and how many frames */
+    knee: { stanceDeg: number | null; frames: number; byClip: Record<string, { deg: number; frames: number }> };
+    /** frames × bodies in the window where a body WITHOUT the ball plays a dribbling clip (≥ 0.5) more than 0.25 s after it last had
+     *  the ball (the loop's own fade-out on a lost possession, 0.12–0.2 s, is a transition): the plan's "a ball-less runner runs" — by
+     *  body; `balllessDribbleRaw` without the grace */
+    balllessDribble: Record<string, number>; balllessDribbleRaw?: Record<string, number>;
+  };
+}
+/** PHASE 3b: which clips are locomotion / dribble loops (the feet lines are read on their frames). */
+/** PHASE 3c: the OVERHEAD families (plan §3 "Anatomical elbow poles"): the floater, the hook, the reverse, the finger roll, the Mikan, the
+ *  up-and-under, the spin and hang layups, the fadeaway, the block reach, the hand up and the late follow-through (with their _left
+ *  versions), and the captured layup (its extend pole). */
+export const OVERHEAD_CLIP = /^(bball_(floater|hook|layup_reverse|finger_roll|mikan|up_and_under|layup_spin|layup_hang)(_left)?|bball_(fadeaway|block_reach|hand_up|follow_through_late)|bball_mc_layup_gather(_left)?)$/;
+export const LOOP_CLIP = /^(bball_mc_(dribble_(idle|walk|jog|run)|drive|run|defend_(slide_left|slide_right|slide_hard_left|slide_hard_right|stance|backpedal))|bball_(dribble_(idle|walk|jog|run)|defend_(slide_left|slide_right|slide_hard_left|slide_hard_right|stance|backpedal)|closeout|idle_stand)|run_forward|run|walk|jog|strafe_(left|right)|idle_stand|football_mc_run)$/;
+/** the forward loops (cadence by gait) and the lateral ones (the slide band) */
+const FORWARD_LOOP = /^(bball_mc_(dribble_(walk|jog|run)|drive|run)|bball_dribble_(walk|jog|run)|run_forward|run|walk|jog|football_mc_run)$/;
+const SLIDE_LOOP = /defend_(slide|backpedal)|strafe_|closeout/;
+const STANCE_CLIP = /dribble_idle|defend_stance|idle_stand/;
+/** a dribbling clip (the ball-less runner must never play one): the dribbles and the captured drive (78_06, the run_forward stand-in) */
+export const DRIBBLE_CLIP = /^(bball_mc_(dribble_(idle|walk|jog|run)|drive)|bball_dribble_(idle|walk|jog|run))$/;
+/** The decode's cadence reference at a speed (steps/s): the band centres of SPEC-HOOPS-MOTION-DECODE §1, piecewise linear. */
+export function cadenceRef(mps: number): number {
+  const pts: [number, number][] = [[1.35, 1.9], [2.75, 2.85], [4.1, 3.05], [6.0, 4.15]];
+  if (mps <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) if (mps <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (mps - x0) / (x1 - x0); }
+  return pts[pts.length - 1][1];
+}
+export const gaitOf = (mps: number): 'walk' | 'jog' | 'run' | 'sprint' => (mps < 2.05 ? 'walk' : mps < 3.4 ? 'jog' : mps < 5.05 ? 'run' : 'sprint');
+/** The knee bend of one body frame (degrees; both legs' mean), or null. */
+export function kneeBendOf(b: BodyFrame): number | null {
+  const one = (u: number, k: number, f: number) => { const U = b.j[u], K = b.j[k], F = b.j[f]; return U && K && F ? 180 - angleAt(U, K, F) : null; };
+  const l = one(J.LeftUpLeg, J.LeftLeg, J.LeftFoot), r = one(J.RightUpLeg, J.RightLeg, J.RightFoot);
+  return l == null && r == null ? null : l == null ? r : r == null ? l : (l + r) / 2;
 }
 /** The look target of an action kind: the rim while shooting / finishing / dunking, the ball otherwise (a defender watches the
  *  handler; a receiver the pass); a reaction has none. */
@@ -650,12 +753,15 @@ export function measure(rec: Rec): Metrics {
     joints[k] = { bent: bent.length, off: errs.filter((e) => e > 35 && e <= 120).length, inverted: errs.filter((e) => e > 120).length, errP90: errs.length ? errs[Math.floor(errs.length * 0.9)] : 0, rollMax: Math.round(Math.max(0, ...rolls)), rollFast: rolls.filter((r) => r > 1500).length };
   }
   const elbowBad: Metrics['elbowBad'] = {};
+  const elbowBadAt: number[] = bw.map(() => 0);   // PHASE 3c: the wrong-way elbows per frame (both arms, high + low), for the overhead-clip line
+  const straightAt: number[] = bw.map(() => 0), lockedAt: number[] = bw.map(() => 0);   // (3c review) the arms the test skips (> 160°), and > 172°
   for (const sd of ['Left', 'Right']) {
     let high = 0, low = 0;
-    for (const b of bw) {
+    for (const [bi, b] of bw.entries()) {
       const Sh = b.j[J[sd + 'Arm']], E = b.j[J[sd + 'ForeArm']], H = b.j[J[sd + 'Hand']]; if (!Sh || !E || !H) continue;
       const ax = sub(H, Sh), al = len(ax); if (al < 1e-3) continue;
-      if (angleAt(Sh, E, H) > 160) continue;
+      const elbowDeg = angleAt(Sh, E, H);
+      if (elbowDeg > 160) { straightAt[bi]++; if (elbowDeg > 172) lockedAt[bi]++; continue; }
       const axn = ax.map((v) => v / al) as V3, e = sub(E, Sh), pe = sub(e, axn.map((v) => v * dot(e, axn)) as V3), pl = len(pe); if (pl < 1e-3) continue;
       // AUDIT 2026-09-25: the dunk probe's forward, exactly — the hip line's normal oriented by the LEFT foot (was: the mean of both
       // feet's heel→toe, which a turned-out foot drags)
@@ -663,8 +769,8 @@ export function measure(rec: Rec): Metrics {
       const across = sub(ru, lu); across[1] = 0; const acl = len(across) || 1; const ac = across.map((v) => v / acl);
       let fwd: V3 = [ac[2], 0, -ac[0]]; if (dot(fwd, sub(lt, lf)) < 0) fwd = [-fwd[0], 0, -fwd[2]];
       const pf = dot(p, fwd), pu = p[1], handUp = H[1] - Sh[1];
-      if (handUp > 0.15 && pf < -0.5 && pu < 0.3) high++;
-      if (handUp < -0.1 && pf > 0.6) low++;
+      if (handUp > 0.15 && pf < -0.5 && pu < 0.3) { high++; elbowBadAt[bi]++; }
+      if (handUp < -0.1 && pf > 0.6) { low++; elbowBadAt[bi]++; }
     }
     elbowBad[sd] = { high, low };
   }
@@ -870,13 +976,191 @@ export function measure(rec: Rec): Metrics {
   const stacked = { frames: 0, pairs: {} as Record<string, number> };
   for (const b of bw) { const full = b.c.filter((c) => c[1] >= 0.9).map((c) => clipName(c[0]).replace(/^bball_/, '')).sort(); if (full.length >= 2) { stacked.frames++; const k = full.join('+'); stacked.pairs[k] = (stacked.pairs[k] ?? 0) + 1; } }
   const h2: Metrics['h2'] = { dribbleContact, hipYawSeam, cadence, finish, guideHand, wristFlex, overlap, aiArms, look, shield, catchReach, celebration, pacing, stacked, catchWarpM: catchWarp.length ? r3(Math.max(...catchWarp)) : null };
+  // ── PHASE 3a: the right hand, the held path, the palm at the top, the hands ─────────────────────────────────────────────
+  const LEFT_CLIP = /_left$/;
+  // TWO READS OF "THE ATHLETE'S RIGHT". `visSide` is phases 1–2's: the feet's heel→toe line. On a run it is noise — a swinging foot's
+  // toe points back and down, and the feet's facing turned 145° in five frames at a sprint while the root and the pelvis held
+  // (3a smoke, the dunk run-up; the ball read "left" on those frames). `pelvisSide` reads the pelvis: the hip line's normal, turned
+  // to agree with the root's facing (AUD: the root's yaw matches the body's). Both are reported; see the step's report.
+  const pelvisSide = (b: BodyFrame, p: number[]): 'R' | 'L' | '' => {
+    const h = b.j[J.Hips], lu = b.j[J.LeftUpLeg], ru = b.j[J.RightUpLeg]; if (!h || !lu || !ru) return '';
+    const ax = ru[0] - lu[0], az = ru[2] - lu[2], l = Math.hypot(ax, az); if (l < 1e-4) return '';
+    let fx = az / l, fz = -ax / l; const y = yawOf(b); if (fx * Math.sin(y) + fz * Math.cos(y) < 0) { fx = -fx; fz = -fz; }
+    const d = (p[0] - h[0]) * fz + (p[2] - h[2]) * -fx;   // rightOf(fwd) = (fwd.z, 0, −fwd.x)
+    return Math.abs(d) < 0.03 ? '' : d > 0 ? 'R' : 'L';
+  };
+  type SideTally = { frames: number; right: number; left: number; deliberateLeft: number; rightFrac: number | null; rightFracExcl: number | null };
+  const tally = (): SideTally => ({ frames: 0, right: 0, left: 0, deliberateLeft: 0, rightFrac: null, rightFracExcl: null });
+  const add = (t: SideTally, v: string, deliberate: boolean) => { if (!v) return; t.frames++; if (v === 'R') t.right++; else { t.left++; if (deliberate) t.deliberateLeft++; } };
+  const close = (t: SideTally) => { t.rightFrac = t.frames ? r3(t.right / t.frames) : null; t.rightFracExcl = t.frames - t.deliberateLeft > 0 ? r3(t.right / (t.frames - t.deliberateLeft)) : null; };
+  const heldH = { ...tally(), leftClips: {} as Record<string, number>, pelvis: tally() };
+  for (const f of heldF) {
+    const b = f.B[S]; const hand = f.bh === 'L' ? b.j[J.LeftHand] : f.bh === 'R' ? b.j[J.RightHand] : null; if (!hand) continue;
+    const top = topClip(b);
+    // deliberate: a `_left` clip the game chose is on (top, or ≥ 0.25 of the pose — its crossfade's first frames count too)
+    const delib = LEFT_CLIP.test(top) || b.c.some((c) => c[1] >= 0.25 && LEFT_CLIP.test(clipName(c[0])));
+    const v = visSide(b, hand);
+    add(heldH, v, delib); add(heldH.pelvis, pelvisSide(b, hand), delib);
+    if (v === 'L') heldH.leftClips[top || '-'] = (heldH.leftClips[top || '-'] ?? 0) + 1;
+  }
+  close(heldH); close(heldH.pelvis);
+  const dribH = { ...tally(), pelvis: tally() };
+  for (const f of carryF) {
+    const hh = (f.s as { hh?: Record<string, string> } | undefined)?.hh; const delib = !!hh && hh[S] === 'L';
+    add(dribH, visSide(f.B[S], f.ball!), delib); add(dribH.pelvis, pelvisSide(f.B[S], f.ball!), delib);
+  }
+  close(dribH); close(dribH.pelvis);
+  const ph = path.filter((x) => !x.catchF);
+  const phMax = ph.length ? ph.reduce((a, x) => (x.d > a.d ? x : a), ph[0]) : null; const phRel = ph.filter((x) => isFinite(x.rel));
+  const pathHeld = { frames: ph.length, maxM: phMax ? r3(phMax.d) : null, atMs: phMax ? Math.round(phMax.t - A0) : null, maxRelM: phRel.length ? r3(Math.max(...phRel.map((x) => x.rel))) : null, over015: ph.filter((x) => x.d > 0.15).length };
+  let palm: Metrics['h3']['palm'] = null;
+  {
+    const gaps: number[] = []; const trails: number[] = [];
+    // a top is a top OF THE DRIBBLE: this body's dribble on the frames either side too (the frame a hand-off or a board puts the ball
+    // on it is an arrival, not a bounce — phase 11's catch)
+    const onDribble = (g: Frame | undefined) => !!g && !!g.ball && !g.bb && !g.br && carrierIs(g, S);
+    for (let i = 1; i < win.length - 1; i++) {
+      const f = win[i]; if (!onDribble(f) || !onDribble(win[i - 1]) || !onDribble(win[i + 1])) continue;
+      if (!(f.ball[1] > win[i - 1].ball![1] && f.ball[1] >= win[i + 1].ball![1])) continue;
+      const b = f.B[S]; const hs = [b.j[J.LeftHand], b.j[J.RightHand]].filter((h): h is number[] => !!h); if (!hs.length) continue;
+      const near = hs.reduce((a, h) => (len(sub(f.ball!, h)) < len(sub(f.ball!, a)) ? h : a), hs[0]);
+      gaps.push(len(sub(f.ball!, near)) - 0.15);
+      const r0 = win[i - 1].B[S]?.rp, r1 = win[i + 1].B[S]?.rp, tdt = (win[i + 1].t - win[i - 1].t) / 1000;
+      if (r0 && r1 && tdt > 0) {
+        const vx = (r1[0] - r0[0]) / tdt, vz = (r1[2] - r0[2]) / tdt, sp = Math.hypot(vx, vz);
+        if (sp > 1 && sp < 12) trails.push(((f.ball![0] - near[0]) * vx + (f.ball![2] - near[2]) * vz) / sp);
+      }
+    }
+    if (carryF.length) palm = { bounces: gaps.length, maxGapM: gaps.length ? r3(Math.max(...gaps)) : null, p90GapM: gaps.length ? r3(pctl(gaps, 0.9)) : null, over008: gaps.filter((g) => g > 0.08).length,
+      movingTops: trails.length, trailMeanM: trails.length ? r3(trails.reduce((a, x) => a + x, 0) / trails.length) : null, trailMaxAbsM: trails.length ? r3(Math.max(...trails.map(Math.abs))) : null, trailOver008: trails.filter((x) => Math.abs(x) > 0.08).length };
+  }
+  const handRange = (bn: string): number | null => { const bi = idxOf(bn); if (bi < 0 || !bw.length) return null; const q0 = bw[0].q.slice(bi * 4, bi * 4 + 4); let mx = 0; for (const b of bw) mx = Math.max(mx, qAngleDeg(q0, b.q.slice(bi * 4, bi * 4 + 4))); return r2(mx); };
+  const hL = handRange('LeftHand'), hR = handRange('RightHand');
+  const h3: Metrics['h3'] = { held: heldH, dribble: dribH, pathHeld, palm, hands: { L: hL, R: hR, bothMove: hL == null || hR == null ? null : hL >= 3 && hR >= 3 }, withBall: heldF.length + carryF.length > 0 };
+  // ── PHASE 3b: the feet on the loops, cadence by gait, the root's acceleration, the stance's knee, ball-less dribbling ─────────
+  const h3b: Metrics['h3b'] = { loop: null, cadence: null, accel: null, accelLoop: null, accelLoopFree: null, knee: { stanceDeg: null, frames: 0, byClip: {} }, balllessDribble: {} };
+  {
+    const top1 = (b: BodyFrame) => { const c = b.c.slice().sort((x, y) => y[1] - x[1])[0]; return c && c[1] >= 0.5 ? clipName(c[0]) : ''; };
+    const isLoop = bw.map((b) => LOOP_CLIP.test(top1(b)));
+    const lslides: number[] = [], rawSlides: number[] = []; let lframes = 0, slideSum = 0, rootSum = 0; const lclips: Record<string, number> = {};
+    for (let i = 1; i < bw.length; i++) {
+      if (!isLoop[i]) continue;
+      const rs = Math.hypot(bw[i].rp[0] - bw[i - 1].rp[0], bw[i].rp[2] - bw[i - 1].rp[2]); if (rs > 0.5) continue;
+      lframes++; const tc = top1(bw[i]); lclips[tc] = (lclips[tc] ?? 0) + 1;
+      const fr: number[] = [];
+      for (const [fi, oi] of [[J.LeftFoot, J.RightFoot], [J.RightFoot, J.LeftFoot]]) {
+        const w = bw[i].j[fi], was = bw[i - 1].j[fi], other = bw[i].j[oi]; if (!w || !was) continue;
+        const low = w[1] < floorY + 0.05, stance = !other || w[1] <= other[1], rising = w[1] - was[1] > 0.002;
+        if (!(low && stance && !rising)) continue;
+        const d = Math.hypot(w[0] - was[0], w[2] - was[2]); rawSlides.push(d);
+        // a swing foot on its way down moves forward FASTER than the body; a planted foot never does (skating, it at most keeps up)
+        const along = rs > 0.005 ? ((w[0] - was[0]) * (bw[i].rp[0] - bw[i - 1].rp[0]) + (w[2] - was[2]) * (bw[i].rp[2] - bw[i - 1].rp[2])) / rs : 0;
+        if (rs > 0.005 && along > rs + 0.005) continue;
+        lslides.push(d); fr.push(d);
+      }
+      if (fr.length && rs > 0.005) { slideSum += fr.reduce((a, x) => a + x, 0) / fr.length; rootSum += rs; }
+    }
+    if (lframes) h3b.loop = { frames: lframes, planted: lslides.length, p90Cm: lslides.length ? r2(pctl(lslides, 0.9) * 100) : null, skates: lslides.filter((x) => x > 0.05).length, slideCm: r2(slideSum * 100), rootCm: r2(rootSum * 100), plantedFrac: rootSum > 0.05 ? r3(slideSum / rootSum) : null, clips: lclips,
+      raw: { planted: rawSlides.length, p90Cm: rawSlides.length ? r2(pctl(rawSlides, 0.9) * 100) : null, skates: rawSlides.filter((x) => x > 0.05).length } };
+    // cadence: touchdowns (a foot coming down against this body's floor) on loop frames; a step = two touchdowns of alternating feet
+    // a touchdown needs the foot to have been UP first (above the floor + 8 cm) — a foot hovering at the 5 cm line counted a strike each
+    // time it crossed it
+    const td: { i: number; t: number; foot: number; fwd: boolean }[] = [];
+    const upNow: Record<number, boolean> = { [J.LeftFoot]: false, [J.RightFoot]: false };
+    for (let i = 0; i < bw.length; i++) {
+      const tc = top1(bw[i]); const fwd = FORWARD_LOOP.test(tc), sl = SLIDE_LOOP.test(tc);
+      for (const fi of [J.LeftFoot, J.RightFoot]) {
+        const y = bw[i].j[fi]?.[1]; if (typeof y !== 'number') continue;
+        if (y > floorY + 0.08) upNow[fi] = true;
+        else if (y < floorY + 0.05 && upNow[fi]) { upNow[fi] = false; if (i > 0 && isLoop[i] && (fwd || sl)) td.push({ i, t: win[i].t, foot: fi, fwd }); }
+      }
+    }
+    const steps: Record<string, { sps: number; mps: number; ratio: number }[]> = {};
+    for (let k = 1; k < td.length; k++) {
+      const a = td[k - 1], b = td[k]; if (a.foot === b.foot || a.fwd !== b.fwd) continue;
+      const dtS = (b.t - a.t) / 1000; if (!(dtS > 0.08 && dtS < 0.8)) continue;
+      let d = 0, ok = true; for (let i = a.i + 1; i <= b.i; i++) { const st = Math.hypot(bw[i].rp[0] - bw[i - 1].rp[0], bw[i].rp[2] - bw[i - 1].rp[2]); if (st > 0.5 || !isLoop[i]) { ok = false; break; } d += st; }
+      if (!ok) continue;
+      const mps = d / dtS, sps = 1 / dtS; if (mps < 0.8) continue;
+      const g = a.fwd ? gaitOf(mps) : 'slide';
+      const ref = a.fwd ? cadenceRef(mps) : Math.min(5, Math.max(3, sps));
+      (steps[g] ??= []).push({ sps, mps, ratio: sps / ref });
+    }
+    if (Object.keys(steps).length) {
+      h3b.cadence = { walk: undefined, jog: undefined, run: undefined, sprint: undefined, slide: undefined };
+      for (const [g, xs] of Object.entries(steps)) (h3b.cadence as Record<string, unknown>)[g] = { steps: xs.length, medianSps: r2(pctl(xs.map((x) => x.sps), 0.5)), medianMps: r2(pctl(xs.map((x) => x.mps), 0.5)), medianRatio: r3(pctl(xs.map((x) => x.ratio), 0.5)) };
+    }
+    // the root's planar acceleration
+    const acc: number[] = [], accL: number[] = [], accF: number[] = [], accLB: number[] = [], accFB: number[] = [];
+    const frozen = (k: number) => { const ts = (win[k]?.s as { ts?: number } | undefined)?.ts; return typeof ts === 'number' && ts < 1; };
+    const touching = (k: number) => { const me = bw[k]; if (!me) return false; return Object.entries(win[k].B).some(([id, o]) => id !== S && Math.hypot(o.rp[0] - me.rp[0], o.rp[2] - me.rp[2]) < 1.12); };
+    h3b.hitStopFrames = win.filter((_, k) => frozen(k)).length;
+    for (let i = 1; i < bw.length - 1; i++) {
+      const p0 = bw[i - 1].rp, p1 = bw[i].rp, p2 = bw[i + 1].rp;
+      const s1 = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]), s2 = Math.hypot(p2[0] - p1[0], p2[2] - p1[2]); if (s1 > 0.25 || s2 > 0.25) continue;
+      const dt1 = (win[i].t - win[i - 1].t) / 1000, dt2 = (win[i + 1].t - win[i].t) / 1000; if (!(dt1 > 0) || !(dt2 > 0)) continue;
+      const vx1 = (p1[0] - p0[0]) / dt1, vz1 = (p1[2] - p0[2]) / dt1, vx2 = (p2[0] - p1[0]) / dt2, vz2 = (p2[2] - p1[2]) / dt2;
+      const av = Math.hypot(vx2 - vx1, vz2 - vz1) / ((dt1 + dt2) / 2);
+      acc.push(av);
+      if (isLoop[i - 1] && isLoop[i] && isLoop[i + 1] && ![i - 2, i - 1, i, i + 1].some(frozen)) {
+        accL.push(av);
+        if (![i - 1, i, i + 1].some(touching)) accF.push(av);
+      }
+      if (isLoop[i - 1] && isLoop[i] && isLoop[i + 1]) {   // (3b review) base2's basis: no s.ts, so no hit-stop frame left out
+        accLB.push(av);
+        if (![i - 1, i, i + 1].some(touching)) accFB.push(av);
+      }
+    }
+    const accOf = (a: number[]) => ({ frames: a.length, p99: r2(pctl(a, 0.99)), p95: r2(pctl(a, 0.95)), max: r2(Math.max(...a)), over34: a.filter((x) => x > 34).length });
+    if (acc.length) h3b.accel = accOf(acc);
+    if (accL.length) h3b.accelLoop = accOf(accL);
+    if (accF.length) h3b.accelLoopFree = accOf(accF);
+    h3b.accelLoopB2 = accLB.length ? accOf(accLB) : null; h3b.accelLoopFreeB2 = accFB.length ? accOf(accFB) : null;
+    // the stance's knee bend
+    const kn: number[] = []; const kc: Record<string, number[]> = {};
+    for (let i = 1; i < bw.length; i++) {
+      const sp = Math.hypot(bw[i].rp[0] - bw[i - 1].rp[0], bw[i].rp[2] - bw[i - 1].rp[2]) / (((win[i].t - win[i - 1].t) / 1000) || VDT / 1000);
+      const tc = top1(bw[i]); if (sp >= 0.3 || !STANCE_CLIP.test(tc)) continue;
+      if ((bw[i].c.find(([n]) => clipName(n) === tc)?.[1] ?? 0) < 0.9) continue;   // the clip itself, not a crossfade into it
+      const k = kneeBendOf(bw[i]); if (k != null) { kn.push(k); (kc[tc] ??= []).push(k); }
+    }
+    // (the stance clips differ by design — a dribble idle sits ~66°, the defend stance ~100°, a ball-less idle_stand ~40° — so the
+    // session line compares one clip with itself: byClip)
+    h3b.knee = { stanceDeg: kn.length ? r2(pctl(kn, 0.5)) : null, frames: kn.length, byClip: Object.fromEntries(Object.entries(kc).map(([c, xs]) => [c, { deg: r2(pctl(xs, 0.5)), frames: xs.length }])) };
+    // ball-less bodies on a dribbling clip (every body in the window, not just the subject)
+    const lastHad: Record<string, number> = {}; h3b.balllessDribbleRaw = {}; let prevF: Frame | null = null;
+    for (const f of rec.frames) {   // (the whole recording, so a possession lost just before the window counts its grace)
+      const holder = holderOf(f); const inWin = f.t >= wS - 1e-6 && f.t <= wE + 1e-6;
+      for (const [id, b] of Object.entries(f.B)) {
+        // it has the ball: in its hand, on its dribble, or its team's possession is its own (the 1v1 rival's dribble before the carries'
+        // hands were recorded; a 3v3 carrier)
+        if (id === holder || f.bb === id || (!!f.ball && !f.br && carrierIs(f, id))) { lastHad[id] = f.t; continue; }
+        const dc = inWin ? b.c.find(([n, w]) => w >= 0.5 && DRIBBLE_CLIP.test(clipName(n))) : undefined; if (!dc) continue;
+        h3b.balllessDribbleRaw[id] = (h3b.balllessDribbleRaw[id] ?? 0) + 1;
+        // …and not FADING OUT (its weight below last frame's): a possession that ended before the recording began (a reset at the take's
+        // start) leaves the old dribble fading for 0.2 s with no ball-frame in the window to start the grace from
+        const was = prevF?.B[id]?.c.find(([n]) => n === dc[0])?.[1] ?? 0;
+        if (f.t - (lastHad[id] ?? -1e9) > 250 && dc[1] >= was - 1e-6) h3b.balllessDribble[id] = (h3b.balllessDribble[id] ?? 0) + 1;
+      }
+      prevF = f;
+    }
+  }
+  // ── PHASE 3c: the wrong-way elbows ON THE OVERHEAD CLIPS (the gate line: ≤ 1 per window) — the frames whose top clip (≥ 0.5) is one of the
+  // overhead families (OVERHEAD_CLIP), the elbowBad test on each (both arms, high + low, as the family tables sum it) ──────────────
+  const h3c: Metrics['h3c'] = { overheadFrames: 0, elbowOverhead: 0, byClip: {}, straightOverhead: 0, lockedOverhead: 0 };
+  for (const [bi, b] of bw.entries()) {
+    const c = b.c.slice().sort((x, y) => y[1] - x[1])[0]; const tc = c && c[1] >= 0.5 ? clipName(c[0]) : '';
+    if (!OVERHEAD_CLIP.test(tc)) continue;
+    h3c.overheadFrames++; h3c.elbowOverhead += elbowBadAt[bi]; h3c.straightOverhead! += straightAt[bi]; h3c.lockedOverhead! += lockedAt[bi];
+    const e = (h3c.byClip[tc] ??= { frames: 0, bad: 0, straight: 0, locked: 0 }); e.frames++; e.bad += elbowBadAt[bi]; e.straight! += straightAt[bi]; e.locked! += lockedAt[bi];
+  }
   return {
     id: rec.action, label: rec.label, who: rec.who, kind: rec.kind, family: rec.family, session: rec.session, take: rec.take, subject: S, anchorClip: rec.anchorClip, attempt: rec.attempt ?? 1,
     frames: win.length, fps: +fs.toFixed(1), windowMs: [rec.pre, rec.post], clips, shotTypes,
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
     pops, popsN: pops.length, severe: pops.filter((p) => p.degPerSec >= 3000).length, whips,
     heldFrac: held, wristStill: r2(((held.LeftHand ?? 0) + (held.RightHand ?? 0)) / 2), thoracicStill: held.Spine2 ?? 0,
-    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2,
+    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2, h3, h3b, h3c,
     audit: (() => { const cl = bw.map((b) => Math.min(b.j[J.LeftFoot]?.[1] ?? 9, b.j[J.RightFoot]?.[1] ?? 9) - floorY); let fi = -1, ft = -1e9; win.forEach((f, i) => { if (f.t >= A0 - 100 && cl[i] > ft) { ft = cl[i]; fi = i; } });
       return { windowMs: [Math.round(Math.max(wS, win[0]?.t ?? wS) - A0), Math.round(Math.min(wE, win[win.length - 1]?.t ?? wE) - A0)] as [number, number], frames: win.length, resetsMs: resetsT.map((t) => Math.round(t - A0)), anchorAtReset, snaps, preMs, frozen, flight: { feetUpM: r2(ft), feetApexMs: fi >= 0 ? Math.round(win[fi].t - A0) : null, rootUpM: r2(Math.max(0, ...bw.map((b) => b.rp[1]))) } }; })(),
   };
@@ -887,14 +1171,16 @@ function holderOf(f: Frame): string {
   if (f.bb) return f.bb;
   if (!f.ball || f.br) return '';
   const s = f.s || {};
-  if (typeof s.cr === 'string') return s.cr === 'foeTeam' ? '' : s.cr;
+  if (typeof s.cr === 'string') return s.cr === 'foeTeam' ? (typeof s.cf === 'string' ? s.cf : '') : s.cr;   // PHASE 3a: the 3v3 foe on his own dribble
+  // PHASE 3a: with the carries' hands recorded (hh), the 1v1 rival's own dribble is his (s.ca is MY carry only)
+  if (typeof s.po === 'string' && s.hh && typeof s.hh === 'object') { const hh = s.hh as Record<string, string>; return s.po === 'mine' ? (hh.me ? 'me' : '') : s.po === 'defense' ? (hh.foe ? 'foe' : '') : ''; }
   if (typeof s.po === 'string' && s.ca) return s.po === 'mine' ? 'me' : s.po === 'defense' ? 'foe' : '';
   return '';
 }
 function carrierIs(f: Frame, id: string): boolean {
   const s = f.s || {};
   if (typeof s.po === 'string') return id === 'me' ? s.po === 'mine' : id === 'foe' ? s.po === 'defense' : false;
-  if (typeof s.cr === 'string') return id === 'me' ? s.cr === 'me' : id.startsWith('mate') ? s.cr === id : false;
+  if (typeof s.cr === 'string') return id === 'me' ? s.cr === 'me' : id.startsWith('mate') ? s.cr === id : id.startsWith('foe') ? s.cr === 'foeTeam' && s.cf === id : false;
   return id === 'me';
 }
 /** PHASE 2a: the animation-group weights of the subject on every frame around the anchor — the crossFade re-entrancy question
@@ -956,7 +1242,7 @@ async function boot(b: Browser, s: Session): Promise<Seg> {
   const errors: string[] = [];
   p.on('console', (m) => { const t = m.text(); if (m.type() === 'error' && !/status of 401|favicon|gamepad|Unauthorized/.test(t)) errors.push(t.slice(0, 200)); });
   p.on('pageerror', (e) => errors.push('pageerror ' + e.message.slice(0, 200)));
-  const url = `${BASE}/dev/mode/${s.mode}?agent=1${s.qs}`;
+  const url = `${BASE}/dev/mode/${s.mode}?agent=1${s.qs}${EXTRA_QS}`;
   const w0 = Date.now();
   await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 300000 });
   let st = '';
@@ -1056,12 +1342,15 @@ if (FROM_REC) {
     const takes = s.takes.filter((t) => (huntNames.size && !sequential ? huntNames.has(t.name) : (t.canon || TAKES === 'all') && (need.has(t.name) || sequential || t.rec === false))).map((t) => (need.has(t.name) ? t : { ...t, rec: false }));
     if (huntNames.size && !sequential && !takes.length) continue;
     const timelines: Record<string, unknown> = {};
+    // PHASE 3b: the stance across the session — every body's knee bend while it stands in a stance clip, per take, in take order (the
+    // plan: "the knee bend stays within ±5° of the first take's across a 10-take session"; a fresh page starts a new page index)
+    const stance: { take: string; idx: number; page: number; body: string; kneeDeg: number | null; frames: number; clip: string }[] = []; let takeIdx = 0, pageIdx = 0;
     let seg = await boot(browser, s);
     for (const t of takes) {
       // every wanted action of this session has its cap: the rest of the takes are not needed (a '*' action that the game never
       // draws — ai_1v1_celebrate — keeps the session running to the end, as the runners did)
       if (!sequential && acts.every((a) => status[a.id].found >= capOf(a.id))) { console.log(`[seg] ${s.id}: every action has its ${REPS} attempts — the remaining takes are skipped`); break; }
-      if (await seg.p.evaluate('window.__hm.ended()')) { console.log(`[seg] ${s.id}: the game ended — sheets for this page, then a fresh one`); await finishSegment(seg); seg = await boot(browser, s); }
+      if (await seg.p.evaluate('window.__hm.ended()')) { console.log(`[seg] ${s.id}: the game ended — sheets for this page, then a fresh one`); await finishSegment(seg); seg = await boot(browser, s); pageIdx++; }
       // the take's dice are seeded by its NAME, not its index: adding a take to the catalogue must not reseed every take after it
       // (measured: inserting two takes turned the 3v3 dunk take's dunk into a turnover)
       const opts = { ...t, seed: SEED * 1000 + nameSeed(t.name) };
@@ -1072,6 +1361,20 @@ if (FROM_REC) {
       if (t.rec === false) { console.log(`[take] ${s.id}/${t.name} (not recorded) ${JSON.stringify(res)}`); continue; }
       const data = await pull(seg.p);
       const td: TakeData = { session: s.id, take: t.name, bodies: data.bodies, frames: data.frames, marks: data.marks, meta: { ...res, seed: opts.seed, vdt: VDT, tip, url: seg.boot.url, skins: data.skins } };
+      {
+        takeIdx++;
+        for (const id of Object.keys(data.bodies)) {
+          const kn: number[] = []; const clips: Record<string, number> = {};
+          for (let i = 1; i < data.frames.length && kn.length < 40; i++) {
+            const b = data.frames[i].B[id], a0 = data.frames[i - 1].B[id]; if (!b || !a0) continue;
+            const sp = Math.hypot(b.rp[0] - a0.rp[0], b.rp[2] - a0.rp[2]) / (((data.frames[i].t - data.frames[i - 1].t) / 1000) || VDT / 1000);
+            const top = b.c.slice().sort((x, y) => y[1] - x[1])[0]; const tc = top && top[1] >= 0.9 ? clipName(top[0]) : '';   // the clip itself, not a crossfade into it
+            if (sp >= 0.3 || !/dribble_idle|defend_stance|idle_stand/.test(tc)) continue;
+            const k = kneeBendOf(b); if (k != null) { kn.push(k); clips[tc] = (clips[tc] ?? 0) + 1; }
+          }
+          stance.push({ take: t.name, idx: takeIdx, page: pageIdx, body: id, kneeDeg: kn.length ? r2(pctl(kn, 0.5)) : null, frames: kn.length, clip: Object.entries(clips).sort((x, y) => y[1] - x[1])[0]?.[0] ?? '' });
+        }
+      }
       const tl = timeline(td);
       timelines[t.name] = { res, timeline: tl, marks: data.marks.filter((m) => !/-PP(-FOE)?\]/.test(m.msg)).slice(0, 80).map((m) => `${Math.round(m.t - (res.t0 as number ?? 0))} ${m.msg}`), pageErrors: data.errors };
       const hits: string[] = [];
@@ -1097,6 +1400,7 @@ if (FROM_REC) {
     const supp = HUNT.length || Object.keys(AOFF).length; let tf = `${OUT}/takes-${s.id}.json`;
     if (supp) { let k = 1; while (fs.existsSync(`${OUT}/takes-${s.id}-supp${k}.json`)) k++; tf = `${OUT}/takes-${s.id}-supp${k}.json`; }
     fs.writeFileSync(tf, JSON.stringify(timelines, null, 1));
+    fs.writeFileSync(tf.replace(/takes-/, 'stance-'), JSON.stringify(stance, null, 1));
     await finishSegment(seg);
   }
   await browser.close();

@@ -41,4 +41,38 @@ describe('the prisma schema that ships', () => {
     const models = (s: string) => [...s.matchAll(/^model\s+(\w+)/gm)].map((m) => m[1]).sort();
     expect(models(generated)).toEqual(models(source()));
   });
+
+  // MIRROR-COACH P2 review (2026-09-26): model NAMES alone let a stale client through. P2 added 10 columns, 3 enums and a
+  // unique key to existing models; a client generated before them has every model name and 500s on every query that
+  // names a new column. So the whole schema is compared (the generator runs `prisma format`, which only moves
+  // whitespace), and so is the data model the client actually runs on — fields, enums, unique keys.
+  it('the generated client\'s schema is the shipped schema, character for character outside whitespace', () => {
+    const squash = (s: string) => s.replace(/\s+/g, '');
+    expect(squash(readFileSync('public/_prisma/client/schema.prisma', 'utf8'))).toBe(squash(shipped()));
+  });
+
+  it('the data model inside the generated client has every field, enum and unique key of the source schema', () => {
+    const js = readFileSync('public/_prisma/client/index.js', 'utf8');
+    const raw = /config\.runtimeDataModel = JSON\.parse\(("(?:[^"\\]|\\.)*")\)/.exec(js);
+    expect(raw, 'runtimeDataModel in index.js').toBeTruthy();
+    const dm = JSON.parse(JSON.parse(raw![1])) as {
+      models: Record<string, { fields: { name: string; isUnique: boolean }[]; uniqueFields: string[][] }>;
+      enums: Record<string, { values: { name: string }[] }>;
+    };
+    const src = source();
+    const blocks = (kind: string) => [...src.matchAll(new RegExp(`^${kind}\\s+(\\w+)\\s*\\{([\\s\\S]*?)^\\}`, 'gm'))].map((m) => [m[1], m[2]] as const);
+    const lines = (body: string) => body.split('\n').map((l) => l.replace(/\/\/.*$/, '').trim()).filter(Boolean);
+    for (const [name, body] of blocks('model')) {
+      const fields = lines(body).filter((l) => !l.startsWith('@@')).map((l) => l.split(/\s+/)[0]).sort();
+      expect(dm.models[name]?.fields.map((f) => f.name).sort(), name).toEqual(fields);
+      const compound = lines(body).filter((l) => l.startsWith('@@unique(')).map((l) => /\[([^\]]*)\]/.exec(l)![1].split(',').map((x) => x.trim()));
+      expect(dm.models[name].uniqueFields, name).toEqual(compound);
+      const single = lines(body).filter((l) => !l.startsWith('@@') && /\s@unique\b/.test(l)).map((l) => l.split(/\s+/)[0]).sort();
+      expect(dm.models[name].fields.filter((f) => f.isUnique).map((f) => f.name).sort(), name).toEqual(single);
+    }
+    for (const [name, body] of blocks('enum')) {
+      expect(dm.enums[name]?.values.map((v) => v.name), name).toEqual(lines(body));
+    }
+    expect(Object.keys(dm.models).sort()).toEqual(blocks('model').map(([n]) => n).sort());
+  });
 });

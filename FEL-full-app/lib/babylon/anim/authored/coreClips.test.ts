@@ -14,7 +14,7 @@ import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './free
 import { buildDanceClip, DANCE_CLIP_IDS, DANCE_CAPTURES, danceRootTracks, closedCycle } from '../danceClips';
 import { sampleRootTrack } from '../MoveRootLayer';
 import { MOCAP_STYLE_CLIPS } from './mocapStyles';
-import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildBoardCarveRight } from './boardSuite';
+import { buildBoardRideIdle, buildBoardTuck, buildBoardGrab, buildSkateBail, buildSnowBail, buildBoardCarveRight } from './boardSuite';
 import { buildChargeGather, buildLaunch, buildLandCrouch } from './dunkSuite';
 import { buildFinishTomahawk, buildFinishWindmill, buildCelebrateBig, buildFinishBlown } from './dunkFinishes';
 import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall, CELEB_SPIDERMAN_SEC, CELEB_SPIDERMAN_KEYS } from './dunkCelebrations';
@@ -544,6 +544,17 @@ describe('board suite', () => {
     const g = fresh(() => buildSkateBail(scene, sk)!);
     at(g, 0); const h0 = hipsY();
     at(g, 0.75); expect(hipsY()).toBeLessThan(h0 - 0.35);
+  });
+  // GATE-CRASHER-POLISH-2 (2026-09-28): the snowboard's own wipeout goes DOWN — the hips to a hand above the deck, the head
+  // below a standing rider's waist — and comes back to the ride crouch it left from, so the tree settles without a step
+  it('snow bail puts the rider down in the snow and brings him back up', () => {
+    const g = fresh(() => buildSnowBail(scene, sk)!);
+    at(g, 0); const h0 = hipsY(), head0 = pos('Head').y, lh0 = pos('LeftHand').clone();
+    at(g, 1.1 * 0.42);
+    expect(hipsY(), 'hips down').toBeLessThan(h0 - 0.4);
+    expect(pos('Head').y, 'head down').toBeLessThan(head0 - 0.45);
+    expect(Math.max(pos('LeftHand').y, pos('RightHand').y), 'hands down in the snow, behind').toBeLessThan(hipsY() + 0.15);
+    at(g, 1.1); expect(Math.abs(hipsY() - h0)).toBeLessThan(0.02); expect(Vector3.Distance(pos('LeftHand'), lh0)).toBeLessThan(0.05);
   });
 });
 

@@ -130,6 +130,11 @@ export class CombatMovement {
   /** Leave the floor. Refused mid-roll and mid-air. */
   jump(): boolean { return this.evade.jump(); }
 
+  /** MOVEMENT PLAY P7 (2026-09-25): the body's slip (a unit world direction) or duck ((0, 0): in place) — EvadeMoves.slip.
+   *  Only the body makes one; its i-frames are the mode's DefenseLedger's, so `iframes` is unchanged. */
+  slip(dirX: number, dirZ: number): boolean { return this.evade.slip(dirX, dirZ); }
+  get slipping(): boolean { return this.evade.slipping; }
+
   /** Dash-cancel: a fast directional burst with i-frames. Returns false if
    *  on cooldown (modes gate the resource spend on this returning true). */
   dash(dirX: number, dirZ: number, force = false): boolean {

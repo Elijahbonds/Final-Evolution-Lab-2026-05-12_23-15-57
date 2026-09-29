@@ -31,6 +31,9 @@ import type { DanceTrack } from '../core/danceTracks';
 import type { TrackState } from './AudioEngine';
 import type { Section, SongChain } from './Song';
 import { expandChain } from './Song';
+import type { KitId } from './SynthKit';
+import { DEFAULT_KEY, type SongKey } from './scales';
+import type { ProjectTake } from './StudioProject';
 
 /**
  * Which drum a track is, inferred from its sample id.
@@ -156,8 +159,43 @@ export function routineFromGroove(hits: GrooveHit[], totalBeats: number, difficu
 export interface ExportedTrack {
   track: DanceTrack;
   steps: DanceStep[];
-  /** What the chart was built from, for the card that explains the export. */
-  summary: { hits: number; density: number; bars: number; beats: number };
+  /** What the chart was built from, for the card that explains the export. MUSIC-SUITE P4: + the song's key ('Am'). */
+  summary: { hits: number; density: number; bars: number; beats: number; key?: string };
+  /**
+   * MUSIC-SUITE P7 ("your beat"): the song itself — everything the Cypher needs to render YOUR audio, offline, as the
+   * dancer's band (dance/yourSong.ts), rather than the from-scratch funk band every shipped track dances to
+   * (audio/StemBand.ts). Absent on an export saved before P7 (readExportedTrack drops a malformed one rather than
+   * refuse the whole record): `track` + `steps` alone are still a complete, playable export — the room falls back to
+   * the old audio-free chart. `danceTracks.ts` (movement play) never reads this field; it only ever needs `track` and
+   * `steps`, exactly as before.
+   */
+  song?: YourSongExport;
+}
+
+/**
+ * MUSIC-SUITE P7: one recorded take, by REFERENCE to the device's audio table (studioStore.ts's shared `audio` table,
+ * StudioLibrary.readDeviceAudio) — never copied into the export, so sending a song to the dance floor never duplicates
+ * the booth's bytes. Every field but `audioKey` is `ProjectTake`'s own (StudioProject.ts), so a take resolves through
+ * the SAME rules SongPanel already plays it by (takeCapture.ts: pickedTakeIds, engineTakeList's loop + trims).
+ */
+export type ExportedTake = Pick<ProjectTake, 'id' | 'atBar' | 'bars' | 'loopBars' | 'trimStart' | 'trimEnd' | 'gain' | 'muted' | 'pickedAt'>
+  & { audioKey: string };
+
+/**
+ * MUSIC-SUITE P7: everything dance/yourSong.ts needs to render the song's OWN audio. `bars` is danceSongAtTier's
+ * output, already expanded (Song.expandChain) and already only the rows the room draws and plays — the grid-only
+ * 8-bar loop (owner decision #32) is baked in by the time this is built, and the renderer never re-derives it. `kit` +
+ * `key` let the renderer synthesize the SAME sounds (SynthKit) and lock a FILLED part's note to the song's own key
+ * (scales.defaultRowNote) without carrying a single extra sample byte.
+ */
+export interface YourSongExport {
+  bpm: number;
+  steps: number;
+  swing: number;
+  kit: KitId;
+  key: SongKey;
+  bars: TrackState[][];
+  takes: ExportedTake[];
 }
 
 /** A song id that is stable for the same song, so re-exporting overwrites rather than piling up. */
@@ -180,7 +218,15 @@ export function seedFrom(songId: string): number {
  * without a store, a scene or an audio context in the room.
  */
 export function exportSongToDance(
-  song: { id: string; name: string; bpm: number; steps: number; chain: SongChain; sections: Section[] },
+  song: {
+    id: string; name: string; bpm: number; steps: number; chain: SongChain; sections: Section[]; key?: string;
+    /**
+     * MUSIC-SUITE P7 ("your beat"): carried into `song` (YourSongExport) for the Cypher's real-audio render (item 1).
+     * Absent = a pre-P7 caller (or a test that only cares about the chart): swing 0, kit 'street', the default key, no
+     * takes — a real but silent-on-the-melodic-parts export, same as any song that happens to use those defaults.
+     */
+    swing?: number; kit?: KitId; songKey?: SongKey; takes?: ExportedTake[];
+  },
 ): ExportedTrack | null {
   const bars = expandChain(song.chain, song.sections);
   if (!bars.length) return null;                  // an empty arrangement is not a track
@@ -200,10 +246,47 @@ export function exportSongToDance(
       bars: bars.length,
       difficulty,
       seed,
-      blurb: `Your song · ${hits.length} hits · ${'●'.repeat(difficulty)}${'○'.repeat(3 - difficulty)}`,
+      // MUSIC-SUITE P4 (2026-09-25), grid-ui: the song's key rides on the card ('Your song · A minor · 64 hits') — the project
+      // has one now (StudioProject.key), and the dance floor's pick card is where the player sees it. MUSIC-SUITE P4 FIX
+      // PASS: in words (scales.ts keyCardText) — the Cypher's chip upper-cases the blurb, and 'Am' read 'AM'
+      blurb: `Your song · ${song.key ? `${song.key} · ` : ''}${hits.length} hits · ${'●'.repeat(difficulty)}${'○'.repeat(3 - difficulty)}`,
     },
     steps,
-    summary: { hits: hits.length, density: +d.toFixed(3), bars: bars.length, beats: totalBeats },
+    summary: { hits: hits.length, density: +d.toFixed(3), bars: bars.length, beats: totalBeats, ...(song.key ? { key: song.key } : {}) },
+    song: {
+      bpm: song.bpm, steps: song.steps, swing: song.swing ?? 0, kit: song.kit ?? 'street', key: song.songKey ?? DEFAULT_KEY,
+      bars, takes: song.takes ?? [],
+    },
+  };
+}
+
+// ── MUSIC-SUITE P3 (2026-09-25), "Keep my work": THE TIER GATE ───────────────────────────────────────────────────────
+//
+// The ladder opens the dance export AT THE GRID (MusicTiers TIERS.grid.danceExport, "one bar of drums is already a
+// chart"), but the only SEND TO THE DANCE FLOOR button lived in SongPanel, which mounts at the CHAIN, and it exported the
+// CHAIN — disabled while the chain was empty. So the grid tier never had it. Now the song the dance floor gets is decided
+// here, from the tier's own flags: with the arrangement open and a chain built, the chain; otherwise the grid itself,
+// looped. Either way only the rows the room draws and plays go in (`heard`: MusicTiers.shownRowIds) — a chart that
+// dances to a hidden row dances to something nobody can hear, the rule grooveOf already applies to a muted row.
+
+/** How long the grid alone plays on the dance floor (assumption: 8 bars — the PERFORM win's minimum, near the Cypher's
+ *  shipped 13–17-bar songs; one bar would be a 2.5-second dance). */
+export const GRID_DANCE_BARS = 8;
+export const GRID_SECTION_ID = 'grid';
+
+/** The song the dance floor gets at this tier, or null when the tier has no dance export. */
+export function danceSongAtTier(input: {
+  danceExport: boolean; arrangement: boolean; chain: SongChain; sections: Section[]; grid: TrackState[]; heard: (t: TrackState) => boolean;
+}): { chain: SongChain; sections: Section[]; from: 'chain' | 'grid' } | null {
+  if (!input.danceExport) return null;
+  const only = (ts: TrackState[]): TrackState[] => ts.filter(input.heard);
+  if (input.arrangement && input.chain.length) {
+    return { chain: input.chain, sections: input.sections.map((s) => ({ ...s, tracks: only(s.tracks) })), from: 'chain' };
+  }
+  return {
+    chain: [{ sectionId: GRID_SECTION_ID, bars: GRID_DANCE_BARS }],
+    sections: [{ id: GRID_SECTION_ID, name: 'grid', tracks: only(input.grid) }],
+    from: 'grid',
   };
 }
 
@@ -215,8 +298,17 @@ export function exportSongToDance(
 
 export const EXPORTED_TRACK_KEY = 'fel-dance-exported';
 
-export function saveExportedTrack(out: ExportedTrack): void {
-  try { window.localStorage.setItem(EXPORTED_TRACK_KEY, JSON.stringify(out)); } catch { /* private mode: the export just does not persist */ }
+/**
+ * Keep the export for the Cypher. MUSIC-SUITE P3 FIX PASS (2026-09-25): true when it was kept. It swallowed every failure
+ * and the room always said "sent to the dance floor" — with localStorage full (the pre-P3 library still in it, the
+ * walk-out's 1.5 M-character copy) or in private mode the Cypher found nothing. The room says the failure now.
+ */
+export function saveExportedTrack(out: ExportedTrack): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    window.localStorage.setItem(EXPORTED_TRACK_KEY, JSON.stringify(out));
+    return true;
+  } catch { return false; /* private mode or full: not kept — the caller says so */ }
 }
 
 /** The player's exported chart, or null. Never throws — a corrupt value is the same as no export. */
@@ -230,10 +322,36 @@ export function readExportedTrack(): ExportedTrack | null {
     // a stored chart is data the player put there, but it is still parsed input: check the shape rather
     // than trusting it, or one bad write breaks the pick screen for good
     if (typeof v.track.bpm !== 'number' || typeof v.track.bars !== 'number') return null;
-    return v;
+    // MUSIC-SUITE P7: `song` is the real-audio payload — absent (an export saved before P7) or malformed (a half-write)
+    // drops OUT rather than failing the whole record, because `track` + `steps` are still a complete, playable export
+    // on their own (danceTracks.ts never reads `song`). The Cypher falls back to the old audio-free band for it.
+    const song = v.song;
+    const songOk = !!song && Array.isArray(song.bars) && typeof song.bpm === 'number' && typeof song.steps === 'number'
+      && typeof song.swing === 'number' && typeof song.kit === 'string' && Array.isArray(song.takes);
+    return songOk ? v : { ...v, song: undefined };
   } catch { return null; }
 }
 
 export function clearExportedTrack(): void {
   try { window.localStorage.removeItem(EXPORTED_TRACK_KEY); } catch { /* nothing to clear */ }
+}
+
+// ── device-private songs (MUSIC-SUITE P7, "your beat" contract item 4) ──────────────────────────────────────────────
+//
+// P5 read "device-private" (a song with an uploaded source, owner decision #15/#35) as closing only what would leave
+// the DEVICE, and kept the dance floor open because the export was audio-free (a step chart of booleans — see the
+// LICENSING note at the top of this file). That reading no longer holds: the export now carries the song ITSELF
+// (YourSongExport) and the Cypher plays it back as real audio, through real speakers, as "an instrument the dancer
+// earns" — which is not what an upload's "I made this or I own this" tick was reviewed for. So a song that plays an
+// uploaded source stays off the dance floor now, independent of uploadPrivacy.UPLOAD_DOORS.danceFloor (left `true`
+// there on purpose: it is still the right answer for a hypothetically audio-free export, and library / walk-out are
+// unaffected — this file's own door, not a change to theirs).
+
+/** The one line the room shows when a device-private song can't go to the dance floor. */
+export const DANCE_FLOOR_UPLOAD_LINE =
+  "This song uses an uploaded file — the dance floor plays your song's own audio now, so it stays off it until FEL can review uploads online. Your library and your walk-out still work.";
+
+/** May this song go to the dance floor? False for any song that plays an uploaded source. */
+export function danceFloorOpenFor(privacy: { private: boolean }): boolean {
+  return !privacy.private;
 }

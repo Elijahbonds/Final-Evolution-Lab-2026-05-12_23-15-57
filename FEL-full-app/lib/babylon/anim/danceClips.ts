@@ -162,7 +162,26 @@ function spin(): PoseKey[] {
     hands: { Left: [-0.12 - 0.45 * out, 1.24 + 0.06 * out, 0.22 - 0.16 * out], Right: [0.12 + 0.45 * out, 1.24 + 0.06 * out, 0.22 - 0.16 * out] },
     poles: { Left: [-0.9, -0.3, -0.3], Right: [0.9, -0.3, -0.3] }, hipsY: -0.02,
   });
-  return [key(0, STAND), key(beats(0.35), at(60, 0)), key(beats(1), at(180, 1)), key(beats(1.65), at(300, 0)), key(beats(2), { ...STAND, bones: { ...STAND_BONES, Hips: [0, 360, 0] } })];
+  // MUSIC-SUITE P8 FIX (2026-09-25): THE trans_spin T. The last key used to read `Hips: [0, 360, 0]` — meant as "one
+  // full turn past 300°, landing facing front again", and mid-clip that is fine: Babylon's own quaternion slerp
+  // between two keys of ONE track corrects the sign for the short way round, so 300°→360° plays as the intended
+  // forward 60°. But 360° as a STORED quaternion is not the same VALUE as 0°: half-angle(360°) = 180°, so its
+  // (sin, cos) pair is (≈0, −1) — the same rotation as 0° (≈0, +1), but quaternion double-cover's OTHER hemisphere
+  // (negative w). MEASURED (danceClips.transSpin.test.ts): trans_spin's last key was the ONLY key anywhere in this
+  // whole pack on that hemisphere — every other clip's first and last key agree (this file's own header: "every
+  // clip now starts AND ends in the same standing groove"); a slerp within one track is sign-corrected regardless
+  // (confirmed: no jump at trans_spin's own loop wrap, fixed or not), so this was never externally visible played
+  // alone. What I could NOT reproduce on a NullEngine + the real fel-hero skeleton, driving CharacterAnimator's own
+  // crossFade at this exact boundary, was a resulting T-pose frame — sampled every bone through the clip and a
+  // realistic crossfade in and out, nothing ever read as bind/identity, with or without this fix. assumption: a
+  // sign mismatch AT a clip boundary is still the right class of bug to eliminate on its own terms (this file's
+  // mirrored-clips.ts header calls exactly this "keeps zero T-pose frames"), and this key is a clear, low-risk,
+  // reversible-if-wrong outlier regardless — but I have not confirmed IT is the T-pose the owner saw, only that it
+  // is the one authoring inconsistency this pack actually has. Landing on 0° instead of 360° is the SAME rotation
+  // (a full turn already happened at the literal 360° key), with none of the sign risk — the in-clip slerp from
+  // 300° still resolves as the short way (60°) either way, so the spin still visibly completes its turn. Fixes the
+  // base clip AND `.M` (mirrored-clips.ts reflects whatever quaternions the base group actually holds).
+  return [key(0, STAND), key(beats(0.35), at(60, 0)), key(beats(1), at(180, 1)), key(beats(1.65), at(300, 0)), key(beats(2), STAND)];
 }
 
 function shoulderBop(): PoseKey[] {

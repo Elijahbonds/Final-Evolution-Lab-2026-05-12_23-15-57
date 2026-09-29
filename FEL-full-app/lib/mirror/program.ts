@@ -117,6 +117,20 @@ const PLAYBOOK: Record<ZoneId, Record<BlockKind, { title: string; movements: str
   },
 };
 
+/** One playbook entry as the Movement Screen's correctives read it: which zone and kind, what it is called, what is in it. */
+export interface PlaybookBlock { zone: ZoneId; kind: BlockKind; title: string; movements: string[]; minutes: number }
+
+/**
+ * One entry of the playbook above, copied (MIRROR-COACH P3, 2026-09-26). The Movement Screen maps each flagged camera
+ * check to one of these blocks (lib/mirror/screenCorrectives.ts), so the screen, the coach's draft and the athlete's own
+ * "what to work on" all name the same written work instead of each inventing a line. Read-only: nothing that reads the
+ * playbook changes it.
+ */
+export function playbookBlock(zone: ZoneId, kind: BlockKind): PlaybookBlock {
+  const e = PLAYBOOK[zone][kind];
+  return { zone, kind, title: e.title, movements: [...e.movements], minutes: e.minutes };
+}
+
 // ── BUILDING THE PROGRAM ─────────────────────────────────────────────────────────────────────────────────
 
 /** How often each zone showed up, as a fraction of the sessions that were substantial enough to count. */

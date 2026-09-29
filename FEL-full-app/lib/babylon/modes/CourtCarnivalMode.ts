@@ -222,6 +222,9 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     if (!S.current) return;
     showHub(ctx, S, false);                          // the event paints its own floor and spawns its own player
     ctx.setHud({ banner: '', blurb: '' });
+    // HOOPS MOTION phase 3c (review): the bodies this event spawns are built for IT — the hoops smoothing and the overhead pole rule reach
+    // only Slam Rush's (smoothKeys.hoopsMotionModeOf); the karate, coin, trick and goal events keep their core clips as their own modes do
+    (ctx.scene.metadata ??= {}).felCarnivalEvent = S.current.id;
     await S.current.build(ctx);
     if (S.ended || S.scene.isDisposed) return;
     if (S.players === 1) S.rivalTarget = Math.round(rollRival(S.current.rivalRange) * S.current.pointsPerUnit);

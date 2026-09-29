@@ -2,8 +2,22 @@
 
 // The phone controller. Renders whatever schemas the host's mode declared —
 // this file has no per-mode knowledge and should never gain any.
+//
+// MUSIC-SUITE P5 (2026-09-25), phone-mpc: a button schema may carry OPT-IN hints (types.ts ButtonSchemaHints —
+// haptics / velocity / compact; the rules are schemas/padFeel.ts). Still no per-mode knowledge: the page reads the hint,
+// never the mode. A schema without hints renders and sends exactly what it did before — the schema list moved into
+// SchemaControls (exported so padFeel.test.ts can render it) and its markup for every mode that sets no hint is pinned
+// byte-for-byte against this page as it was, and a hint-less press still calls the bare `client.send(action)`.
+//
+// MUSIC-SUITE P6 phone-replay (2026-09-26): THE PHONE SEES THE ROOM. A config with `roomState: true` (types.ts; the rules
+// are lib/controller-link/roomState.ts) is sent the host's live state, and the page draws it: a row of status chips above
+// the controls, and the listed buttons lit (the live bank, PLAY while the transport runs, REC while armed). Still no
+// per-mode knowledge — the page lights actions by name and prints the host's words. For every other config SchemaControls
+// never reads the state at all, so its markup is byte-for-byte what it was (controller-page.test.tsx, and the 21-mode
+// capture in the outbox, musicsuite/p6/phone-replay/controller-markup-proof.json).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { ControllerClient } from '@/lib/controller-link/client';
 import { usePadRelay } from './use-pad-relay';
 import type { TouchState } from '@/lib/controller-link/padSampler';
@@ -12,7 +26,12 @@ import {
 } from '@/lib/controller-link/schemas/motion';
 import { colorFor, holdActions } from '@/lib/controller-link/schemas/button';
 import { DPAD_LAYOUT, dpadPayload } from '@/lib/controller-link/schemas/dpad';
-import type { LinkState, ModeControllerConfig } from '@/lib/controller-link/types';
+import {
+  buzz, canBuzz, feelLine, freshVelocityState, hasHints, hintsOf, pressMessage, readVelocity, sampleOf,
+  type PadHints, type VelocityReading, type VelocityVia,
+} from '@/lib/controller-link/schemas/padFeel';
+import type { LinkState, ModeControllerConfig, RoomState } from '@/lib/controller-link/types';
+import { isLit, roomStateOptIn } from '@/lib/controller-link/roomState';
 
 const STATE_LABEL: Record<LinkState, string> = {
   idle: 'Ready', signaling: 'Finding host…', connecting: 'Connecting…',
@@ -29,6 +48,8 @@ export default function ControllerPage({ code }: { code: string }) {
   const [state, setState] = useState<LinkState>('idle');
   const [config, setConfig] = useState<ModeControllerConfig | null>(null);
   const [slot, setSlot] = useState<number | null>(null);
+  // MUSIC-SUITE P6 phone-replay: the host's live state (only an opted-in host sends one; only an opted-in config draws it)
+  const [roomState, setRoomState] = useState<RoomState | null>(null);
   const clientRef = useRef<ControllerClient | null>(null);
   // PHASE B: a controller paired to THIS PHONE is relayed as canonical binary frames. The touch layout below
   // feeds the same frame, so the host has one code path whether this phone has a gamepad or not.
@@ -43,6 +64,7 @@ export default function ControllerPage({ code }: { code: string }) {
       onState: setState,
       onConfig: setConfig,
       onSlot: setSlot,
+      onRoomState: setRoomState,
     });
     clientRef.current = client;
     setRelayClient(client);
@@ -83,22 +105,83 @@ export default function ControllerPage({ code }: { code: string }) {
         {!config && (
           <p className="text-center text-sm text-white/40">Waiting for the host…</p>
         )}
-        {config?.schemas.map((s, i) => {
-          if (s.kind === 'motion') {
-            return <MotionPad key={i} spec={s.motion} client={clientRef.current} />;
-          }
-          if (s.kind === 'button') {
-            return (
-              <div key={i} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(6, s.columns ?? 2))}, minmax(0, 1fr))` }}>
-                {s.buttons.map((b, bi) => (
-                  <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={clientRef.current} />
-                ))}
-              </div>
-            );
-          }
-          return <DpadPad key={i} action={s.dpad.action} client={clientRef.current} />;
-        })}
+        {config && <SchemaControls config={config} client={clientRef.current} live={roomState} />}
       </main>
+    </div>
+  );
+}
+
+/** A pad bank's feel: reads each press's velocity by the padFeel rule, remembering what this phone has shown so far. */
+export interface PadFeel { read: (e: ReactPointerEvent<HTMLButtonElement>) => VelocityReading }
+
+/**
+ * The mode's schemas, in order (the body of the page once the host has said what it wants). MUSIC-SUITE P5: moved out of
+ * ControllerPage unchanged; the only additions are for a schema that asked for a hint — and the one feel line after the
+ * list, said only when some schema asked for haptics or velocity.
+ * MUSIC-SUITE P6 phone-replay: `live` = the host's room state. Read ONLY for a config with `roomState: true` (the chips
+ * above the controls; `lit` on its hinted buttons); for any other config it is ignored — not one byte of its markup moves.
+ */
+export function SchemaControls({ config, client, live = null }: { config: ModeControllerConfig; client: ControllerClient | null; live?: RoomState | null }) {
+  const room = roomStateOptIn(config) ? live : null;
+  const hints = hintsOf(config.schemas);
+  // null until the page has looked (a server render never claims a buzz either way)
+  const [vibrates, setVibrates] = useState<boolean | null>(null);
+  useEffect(() => { setVibrates(canBuzz(typeof navigator === 'undefined' ? null : navigator)); }, []);
+  // one velocity state for the whole controller: the rule learns this phone's readings across every pad
+  const velRef = useRef(freshVelocityState());
+  const [via, setVia] = useState<VelocityVia | null>(null);
+  const viaRef = useRef<VelocityVia | null>(null);
+  const feel = useRef<PadFeel>({
+    read: (e) => {
+      const r = readVelocity(velRef.current, sampleOf(e));
+      velRef.current = r.state;
+      if (r.via !== viaRef.current) { viaRef.current = r.via; setVia(r.via); }
+      return r;
+    },
+  }).current;
+  const line = hasHints(hints) ? feelLine(hints, { buzz: vibrates }, via) : null;
+  return (
+    <>
+      {room && room.chips.length > 0 && <RoomChips state={room} />}
+      {config.schemas.map((s, i) => {
+        if (s.kind === 'motion') {
+          return <MotionPad key={i} spec={s.motion} client={client} />;
+        }
+        if (s.kind === 'button') {
+          const h: PadHints | undefined = hasHints(s) ? { haptics: s.haptics, velocity: s.velocity, compact: s.compact } : undefined;
+          return (
+            <div key={i} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(6, s.columns ?? 2))}, minmax(0, 1fr))` }}>
+              {s.buttons.map((b, bi) => (
+                h
+                  ? <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={client} hints={h} feel={h.velocity ? feel : undefined} {...(room ? { lit: isLit(room, b.action) } : {})} />
+                  : <ActionButton key={b.action} spec={b} color={colorFor(b, bi)} client={client} />
+              ))}
+            </div>
+          );
+        }
+        return <DpadPad key={i} action={s.dpad.action} client={client} />;
+      })}
+      {line && <p data-testid="pad-feel" className="text-center font-mono text-[11px] text-white/45">{line}</p>}
+    </>
+  );
+}
+
+/**
+ * MUSIC-SUITE P6 phone-replay: the host's status chips, in its words and colours (parseRoomState kept a tone only if it is
+ * a plain #rrggbb). A polite live region, so a screen reader hears 'BANK B' / 'PLAYING' / 'REC ARMED' change.
+ */
+function RoomChips({ state }: { state: RoomState }) {
+  return (
+    <div data-testid="room-state" role="status" aria-live="polite" className="flex flex-wrap items-center justify-center gap-2 font-mono text-[11px]">
+      {state.chips.map((c, i) => {
+        const tone = c.tone ?? '#e8d9c2';
+        return (
+          <span key={i} data-on={c.on ? 'true' : undefined} className="rounded-full px-3 py-1 font-bold tracking-wider"
+            style={{ color: c.on ? '#07090d' : tone, background: c.on ? tone : 'transparent', border: `1px solid ${c.on ? tone : `${tone}66`}` }}>
+            {c.text}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -195,11 +278,36 @@ function MotionPad({
 }
 
 function ActionButton({
-  spec, color, client,
-}: { spec: { action: string; label: string; hold?: boolean }; color: string; client: ControllerClient | null }) {
+  spec, color, client, hints, feel, lit,
+}: { spec: { action: string; label: string; hold?: boolean }; color: string; client: ControllerClient | null; hints?: PadHints; feel?: PadFeel; lit?: boolean }) {
   const acts = holdActions(spec);
-  const down = (): void => { client?.send(spec.hold ? acts.down : spec.action); };
+  const down = (e: ReactPointerEvent<HTMLButtonElement>): void => {
+    if (!hints) { client?.send(spec.hold ? acts.down : spec.action); return; }   // every mode without a hint: as it always was
+    // MUSIC-SUITE P5 (phone-mpc): the hit goes first (it is the latency-critical part), then the buzz
+    const [a, p] = pressMessage(spec, hints, feel ? feel.read(e) : null);
+    if (p === undefined) client?.send(a); else client?.send(a, p);
+    if (hints.haptics) buzz(typeof navigator === 'undefined' ? null : navigator);
+  };
   const up = (): void => { if (spec.hold) client?.send(acts.up); };
+  if (hints) {
+    // a hinted pad: no double-tap zoom / long-press callout between fast hits (touch-action), and a compact row is shorter
+    // MUSIC-SUITE P6 phone-replay: LIT (the host's room state names this action — the live bank, PLAY while playing, REC
+    // while armed): a filled face and a ring in the button's own colour. Unlit and unset render exactly as P5 did.
+    return (
+      <button
+        onPointerDown={down}
+        onPointerUp={up}
+        onPointerCancel={up}
+        className={`select-none rounded-xl ${hints.compact ? 'py-3 text-sm' : 'py-8 text-lg'} font-bold active:brightness-125`}
+        style={lit
+          ? { background: `${color}88`, color: '#07090d', border: `1px solid ${color}`, touchAction: 'manipulation', boxShadow: `0 0 0 2px ${color}` }
+          : { background: `${color}33`, color, border: `1px solid ${color}66`, touchAction: 'manipulation' }}
+        {...(lit ? { 'aria-pressed': true, 'data-lit': 'true' } : {})}
+      >
+        {spec.label}
+      </button>
+    );
+  }
   return (
     <button
       onPointerDown={down}

@@ -47,6 +47,8 @@ model User {
 
   profile  PlayerProfile?
   sessions GameSession[]
+  sessionRuns   SessionRun[]
+  sessionGrants SessionGrant[]
   ledger   CreditLedger[]
   cards    CardOwnership[]
   prqEntries PrqEntry[]
@@ -181,6 +183,55 @@ model GameSession {
   createdAt     DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ECONOMY-SESSIONS-HARDEN (2026-09-28): a run the SERVER started. POST /api/sessions/start issues it (the run id is
+// the one idempotency key every payout of the run is filed under), and POST /api/sessions finishes it at most once:
+// its duration is now - startedAt, never a client number; payoutEligible is decided at start from signals the server
+// controls (?agent=1, the playtest flag, User.role / the test allowlist) and nothing in the finish can turn it on.
+// status: open -> paid (an eligible run's grants were written) | recorded (validated, ineligible: score kept, nothing
+// paid) | rejected (SCORE_INVALID and friends) | expired (never finished inside maxDurationMs + grace).
+// `result` is the response the finish returned, replayed verbatim (with replayed: true) to any retry.
+model SessionRun {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode             String
+  status           String    @default("open")
+  payoutEligible   Boolean
+  ineligibleReason String?
+  startedAt        DateTime  @default(now())
+  expiresAt        DateTime
+  finishedAt       DateTime?
+  score            Int?
+  durationMs       Int?
+  rejectReason     String?
+  sessionId        String?
+  result           Json?
+
+  grants           SessionGrant[]
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+// ECONOMY-SESSIONS-HARDEN: the one ledger every payout of a run is written to, inside the run's transaction and BEFORE
+// any balance moves. The unique key is the idempotency: a second write of any grant of the same run fails, the whole
+// transaction rolls back, and the stored result is returned instead. grantType: xp | shards | wallet_lc | wallet_coins
+// | wallet_shards | season_xp | mastery | prq.
+model SessionGrant {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId     String
+  run       SessionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  grantType String
+  amount    Float
+  metadata  Json?
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, runId, grantType])
+  @@index([runId])
 }
 
 model CreditLedger {
@@ -1451,7 +1502,13 @@ model CrmNote {
 model ProgramExercise {
   id           String   @id @default(cuid())
   coachId      String   // Coach who created this exercise
-  name         String   @unique
+  // MIRROR-COACH P2 (2026-09-25/26): NAMES ARE UNIQUE PER COACH. The old FEL-wide `name @unique` meant the second coach to
+  // type "Goblet Squat" was refused (first a unique-constraint 500, then an honest 409 name_taken_fel). The swap to
+  // @@unique([coachId, name]) drops the index "ProgramExercise_name_key", which is outside the owner's additive-only GO
+  // (#16), so it waited for an explicit go: owner decision #28 (2026-09-26), applied with
+  // painfree/p2/schema-structure/held-unique-swap.sql. It is strictly looser than the old key, so it cannot fail on data.
+  // catalogueServer.ts looks a coach's own row up with findFirst and still answers name_taken_fel if a legacy key is met.
+  name         String
   category     String   @default("general")  // lower-body, upper-push, upper-pull, core, mobility, etc.
   
   // Demo & cues
@@ -1462,17 +1519,57 @@ model ProgramExercise {
   // Progression
   equipment    String[] @default([])
   defaultTempo String   @default("3-1-1-0")  // e.g. "3-1-1-0" (eccentric-pause-concentric-pause)
-  progressionOfId String? // ID of exercise this is progression of
-  regressionOfId String? // ID of exercise this is regression of
-  
+  // P2 review (2026-09-26): these two comments said the opposite of what every reader does. The P1 fixture and the P2
+  // catalogue editor, Today read model and KB bridge all read regressionOfId as the EASIER version and progressionOfId
+  // as the HARDER one (Goblet Squat.regressionOfId = Box Squat).
+  progressionOfId String? // the HARDER version of this exercise (step up to): another ProgramExercise id, same coach
+  regressionOfId String?  // the EASIER version of this exercise (step down to): another ProgramExercise id, same coach
+
+  // MIRROR-COACH P2 (2026-09-25): THREE TAGS THE CATALOGUE NEVER HAD. `category` is a body region (lower-body,
+  // upper-push…), so nothing could tell a hinge from a squat, a set-and-hold lift from a reactive cut, or which of the
+  // owner's Playbook layers an exercise trains — the warm-up generator (P6), the weekly pattern-coverage check (P8)
+  // and the roster's "stuck on" strip all key on these. All three are NULLABLE and default to nothing: null means
+  // "untagged", which is the honest state of every row that exists today (a default of `other`/`none` would claim a
+  // coach had tagged it). The skill-layer ids live in lib/coach/taxonomy.ts, taken from the Playbook's own chapters.
+  pattern      MovementPattern?
+  braceMode    BraceMode?
+  skillLayer   String?  // lib/coach/taxonomy.ts SKILL_LAYERS id; validated there, a String so the list can grow without a push
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
   // Relations
   sessionExercises SessionExercise[]
   
+  @@unique([coachId, name])
   @@index([coachId])
   @@index([category])
+}
+
+/// MIRROR-COACH P2 (2026-09-25): the movement pattern an exercise trains. `breath` and `mobility` are here because
+/// the prep and cool-down sections are prescribed from the same catalogue; `other` is a coach's explicit choice,
+/// distinct from null (never tagged).
+enum MovementPattern {
+  squat
+  hinge
+  lunge
+  push
+  pull
+  carry
+  rotation
+  locomotion
+  breath
+  mobility
+  other
+}
+
+/// MIRROR-COACH P2 (2026-09-25): how the trunk is braced for this exercise. `set` = a planned brace you build
+/// before the rep (a lift); `reflex` = the brace that has to show up on its own mid-play (a cut, a landing);
+/// `none` = no brace asked for (a breath drill, an easy mobility flow).
+enum BraceMode {
+  set
+  reflex
+  none
 }
 
 model CoachingProgram {
@@ -1552,7 +1649,19 @@ model SessionExercise {
   restSeconds  Int      @default(90)
   
   coachNote    String?  // Coach's override cue for this client/session
-  
+
+  // MIRROR-COACH P2 (2026-09-25): A SESSION HAD NO SHAPE. Session held an order and a label and nothing else, so a
+  // warm-up, the main lift, the accessories and a wind-down were one flat list, and a 30-second hold had to be typed
+  // into `reps` as "30 seconds each side" (lib/coach/mirrorToProgram.ts). All additive, all defaulted: every
+  // existing row reads as a plain `key`-section exercise with no timer, no group and no band — exactly what it was.
+  section      SessionSection @default(key)
+  isKeySet     Boolean  @default(false)  // the one set the session is built around; the ramp-up sets + breath attach here (P7)
+  supersetGroup String? // exercises sharing a label ("A", "B") alternate set for set; null = done on its own
+  workSeconds  Int?     // a timed dose: seconds of work per set (a carry, a flow). null = counted in reps
+  holdSeconds  Int?     // seconds held at the end of each rep/set (an end-range hold). null = no hold
+  setupCues    String[] @default([])  // ids from lib/coach/taxonomy.ts SETUP_CUES (a pick-list, not free text)
+  effortBand   String?  // lib/coach/taxonomy.ts EFFORT_BANDS id (FEL's five named bands); null = not set
+
   exerciseLogs ExerciseLog[]
   
   createdAt    DateTime @default(now())
@@ -1560,6 +1669,16 @@ model SessionExercise {
   
   @@index([sessionId])
   @@index([exerciseId])
+}
+
+/// MIRROR-COACH P2 (2026-09-25): where an exercise sits in the session, in running order.
+enum SessionSection {
+  prep
+  prime
+  key
+  assist
+  finish
+  cooldown
 }
 
 model ClientSession {
@@ -1603,12 +1722,37 @@ model ExerciseLog {
   coachCommentAt DateTime?
   
   completedAt  DateTime?
+
+  setLogs      SetLog[] // MIRROR-COACH P2: per-set rows; the fields above stay as the per-exercise summary
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
   @@index([clientSessionId])
   @@index([sessionExerciseId])
+}
+
+/// MIRROR-COACH P2 (2026-09-25): ONE ROW PER SET. ExerciseLog was one row per exercise with reps as free text
+/// ("8,9,10") and load as free text that mixed kilograms with "RPE7", so no progress line could be drawn and no
+/// reps-in-reserve could be kept. Here the weight and the effort are separate numbers. ExerciseLog keeps every field
+/// it had (old clients and the coach review read them). (exerciseLogId, setIndex) is unique so a re-save of set 2
+/// replaces set 2 instead of adding a second one.
+model SetLog {
+  id            String      @id @default(cuid())
+  exerciseLogId String
+  exerciseLog   ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+  setIndex      Int         // 0-based, in the order the sets were done
+  reps          Int?
+  weightKg      Float?      // absolute load; null for bodyweight / timed work
+  rir           Int?        // reps in reserve (0 = nothing left)
+  effort        Int?        // RPE 1-10
+  workSeconds   Int?        // timed sets: seconds actually worked
+  note          String?
+  createdAt     DateTime    @default(now())
+
+  // (no separate @@index([exerciseLogId]): the unique index leads with it, and Postgres uses it for every lookup by
+  // log and for the cascade — P2 review, 2026-09-26: two indexes would be paid for on every set write)
+  @@unique([exerciseLogId, setIndex])
 }
 
 /// lane 1 C3 — the coach ↔ client thread on a program (both sides write; read by both).

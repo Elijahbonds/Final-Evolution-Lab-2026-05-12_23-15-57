@@ -80,6 +80,7 @@ function rig(o: {
   const detectors: FakeDetector[] = [];
   const streams: FakeStream[] = [];
   const released: unknown[] = [];
+  const parked: unknown[] = [];
   const videos: unknown[] = [];
   /** A play() held open, as a browser's is until the picture starts; releasing the video rejects it, as pause() does. */
   const plays: { video: unknown; d: Deferred<void> }[] = [];
@@ -93,7 +94,7 @@ function rig(o: {
     makeVideo: (stream) => {
       // The picture is the size the camera answered with.
       const s: TrackSettings = stream.getVideoTracks()[0]?.getSettings() ?? {};
-      const v = { videoWidth: s.width ?? 1280, videoHeight: s.height ?? 720, addEventListener() {} };
+      const v = { videoWidth: s.width ?? 1280, videoHeight: s.height ?? 720, addEventListener() {}, style: { cssText: '' }, parent: 'page' as unknown };
       videos.push(v);
       return v as unknown as HTMLVideoElement;
     },
@@ -103,6 +104,7 @@ function rig(o: {
       plays.push({ video: v, d });
       return d.promise;
     },
+    parkVideo: (v) => { parked.push(v); (v as unknown as { parent: unknown }).parent = 'park'; },
     releaseVideo: (v) => {
       released.push(v);
       plays.filter((p) => p.video === v).forEach((p) => p.d.reject(new DOMException('The play() request was interrupted', 'AbortError')));
@@ -155,7 +157,7 @@ function rig(o: {
   };
 
   return {
-    svc, w, grant, live, tick, frames, advanceTo, detectors, streams, released, videos, plays, store, gum, asked, loads,
+    svc, w, grant, live, tick, frames, advanceTo, detectors, streams, released, parked, videos, plays, store, gum, asked, loads,
     get ticking() { return onTick != null; },
   };
 }
@@ -566,5 +568,58 @@ describe('the dev feed (window.__FEL_POSE_FEED__)', () => {
     r.svc.stop();
     expect(await done).toBe(0);
     expect(r.svc.status.source).toBeNull();
+  });
+});
+
+// MOVEMENT PLAY P4 (2026-09-25): two self-views show the one <video> — the space check's panel at READY and the corner
+// during play — so the hosts stack, and an undo never takes the picture from a host shown after it.
+describe('the self-view hosts (showIn)', () => {
+  type FakeVideo = { style: { cssText: string }; parent: unknown };
+  /** A host element: appendChild moves the video into it, as the DOM does. */
+  const host = (name: string) => ({ name, appendChild(v: FakeVideo) { v.parent = name; return v; } }) as unknown as HTMLElement;
+  const at = (r: ReturnType<typeof rig>) => (r.videos[0] as FakeVideo).parent;
+
+  it('the last host shown has the picture, sized to it; with no camera there is nothing to show', async () => {
+    const r = rig();
+    expect(r.svc.showIn(host('panel'))).toBeInstanceOf(Function);   // no video yet: a no-op undo
+    await r.live();
+    const undoA = r.svc.showIn(host('panel'));
+    expect(at(r)).toBe('panel');
+    expect((r.videos[0] as FakeVideo).style.cssText).toMatch(/object-fit:cover/);
+    const undoB = r.svc.showIn(host('corner'));
+    expect(at(r)).toBe('corner');
+    undoA();                                     // the panel goes: the corner keeps it
+    expect(at(r)).toBe('corner');
+    undoB();                                     // the last host goes: parked, out of sight
+    expect(at(r)).toBe('park');
+    expect(r.parked).toEqual([r.videos[0]]);
+  });
+
+  it('the top host\'s undo hands the picture back to the one under it; a second undo does nothing', async () => {
+    const r = rig();
+    await r.live();
+    r.svc.showIn(host('panel'));
+    const undoB = r.svc.showIn(host('corner'));
+    undoB();
+    expect(at(r)).toBe('panel');
+    undoB();
+    expect(at(r)).toBe('panel');
+    expect(r.parked).toEqual([]);
+  });
+
+  it('a stop releases the video and forgets the hosts: an undo after it, or after a restart, touches nothing', async () => {
+    const r = rig();
+    await r.live();
+    const undo = r.svc.showIn(host('panel'));
+    r.svc.stop();
+    expect(r.released).toEqual([r.videos[0]]);
+    undo();
+    expect(r.parked).toEqual([]);                // nothing parked: the video is gone
+    await r.live();                              // a restart: a new <video>
+    const undo2 = r.svc.showIn(host('corner'));
+    undo();                                      // the old undo, again
+    expect((r.videos[1] as FakeVideo).parent).toBe('corner');
+    undo2();
+    expect((r.videos[1] as FakeVideo).parent).toBe('park');
   });
 });

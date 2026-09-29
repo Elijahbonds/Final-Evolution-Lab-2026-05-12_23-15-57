@@ -126,6 +126,10 @@ describe('Z3: a session-only row never produces a body FelInput', () => {
   it('the streams press every bound move somewhere (so a silent floor below is the row\'s, not the stream\'s)', () => {
     for (const row of BOUND) {
       const got = Object.values(STREAMS).flatMap((s) => floorOut(row.modeId, s).filter((e) => !(e.t === 'stick' && e.x === 0 && e.y === 0)));
+      // (MOVEMENT PLAY P8: a row steering with the carve needs a ride read these facing streams do not hold — no stance: its
+      // hop and its crouch are what they press here; the kart's and the plane's every move needs a wheel or wings, which no
+      // stream here holds — lib/pose/rideGate.test.ts presses them on the streams that do)
+      if (row.bindings.every((b) => ['grip', 'wheel', 'hopTurn', 'spread', 'wingBank', 'wingPitch'].includes(b.from))) { expect(got, row.modeId).toEqual([]); continue; }
       expect(got.length, row.modeId).toBeGreaterThan(0);
       const allowed = new Set(row.bindings.map((b) => (b.to === 'Lx' || b.to === 'Ly' ? 'stickL' : b.to === 'dpadByFoot' ? 'dpad' : b.to === 'RT' ? 'RT' : b.to === 'LT' ? 'LT' : `b:${b.to}`)));
       for (const e of got) expect(allowed.has(label(e)), `${row.modeId}: ${label(e)}`).toBe(true);
@@ -151,13 +155,23 @@ describe('Z5: losing the body never pauses a mode it does not drive', () => {
 describe('claims and the overhead flag', () => {
   it('a claimed move comes off the floor: skate claiming its take-off pops nothing on the hop stream', () => {
     const seam = bodySeamFor({ modeId: 'skateboard', body: { claims: ['takeoff'] } });
-    expect(seam.profile.bindings.map((b) => b.from)).toEqual(['lean', 'squat']);
+    expect(seam.profile.bindings.map((b) => b.from)).toEqual(['carve', 'squat']);   // MOVEMENT PLAY P8: the carve steers
     expect(seam.claimed.has('takeoff')).toBe(true);
     const out: BodyOut[] = [];
     seam.floor.begin();
     for (const p of STREAMS.jump_two_foot_low) out.push(...seam.floor.step(p, p.arrivedAt, false), ...seam.floor.tick(p.arrivedAt + 16));
     expect(out.filter((e) => e.t === 'button')).toEqual([]);
     expect(floorOut('skateboard', STREAMS.jump_two_foot_low).filter((e) => e.t === 'button' && e.btn === 'A' && e.pressed).length).toBeGreaterThan(0);
+  });
+  it('MOVEMENT PLAY P7: a mode that reads the body itself says its own card lines; without them, the row\'s', () => {
+    const lines = [{ move: 'Punch', verb: 'JAB · CROSS · HOOK · UPPERCUT' }] as const;
+    const own = bodySeamFor({ modeId: 'karate-vs', body: { claims: ['blow', 'punch', 'kick'], lines }, onBody: () => true });
+    expect(own.card.lines).toEqual([...lines]);
+    expect(own.card.drives).toBe(true);
+    // the claimed P2 punch / kick come off the floor: the row's JAB / KICK press nothing
+    expect(own.profile.bindings).toEqual([]);
+    const row = BODY_PROFILES['karate-vs'] ?? Object.values(BODY_PROFILES).find((p) => p.modeId === 'karate-vs')!;
+    expect(bodySeamFor({ modeId: 'karate-vs' }).card.lines).toEqual(cardLines(row));
   });
   it('overheadIsPlay: the spec\'s own flag, else the row\'s or a claimed \'overhead\'', () => {
     expect(bodySeamFor({ modeId: 'skateboard' }).overheadIsPlay).toBe(false);

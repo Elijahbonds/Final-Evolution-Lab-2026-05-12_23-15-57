@@ -3,8 +3,9 @@ import { CATALOG, NOT_ON_SALE, SPEND_ROUTE_SKUS } from './catalog';
 import { SHOP_CARDS, shopCardOnSale } from '@/lib/game-data';
 import { REASON } from './reward-rules';
 import {
-  BOOKING_SKU, CLASS_PASS_REASON, DEAD_CATALOG_BUYS, HOLLOW_SHOP_CARDS, NO_LINK_REASON, PLAN_CLAIM_WINDOW_MS,
+  BOOKING_SKU, CLASS_PASS_REASON, DEAD_BUY_REASONS, DEAD_CATALOG_BUYS, HOLLOW_SHOP_CARDS, NO_LINK_REASON, PLAN_CLAIM_WINDOW_MS,
   backedEntitlements, bookingCharges, bookingName, bookingRefundAmount, bookingRefundNote, deadBuyOf, endedBookings, firstChargeIds, isClientMadeKey,
+  isKitGrandfatherGrant, kitGrandfatherKey,
   linkedSlotsFor, refundKey, refundNote, refundToastTexts, refundableDeadBuys, refundedRowIds, shopPurchaseKey, unclaimed,
   unlinkedBookings, unseenRefundNotes,
   type BookingRow, type DeadBuyRow, type DeliveryEvidence,
@@ -290,6 +291,59 @@ describe('the entitlement rows a charge still backs (the Music Room reads its ki
     const first = mk(0), second = mk(10);
     expect([...backedEntitlements(['boost_card_neural-max'], [first, second], 'p1')]).toEqual(['boost_card_neural-max']);
     expect(backedEntitlements(['boost_card_neural-max'], [second, first, refundOf(first.id)], 'p1').size).toBe(0);
+  });
+});
+
+// MUSIC-SUITE P6 (2026-09-25), owner decision #23: a kit the room gave away before 2026-09-20 is granted once, on a
+// zero-delta KIT_GRANDFATHER_2026_09 row — "kept out of the dead-buy sweep". The grant written for real, on the real
+// routes and sweep, is dead-buy-refunds.test.ts; these are the ledger rules.
+describe('the kit grandfather grant: backs its kit, never swept', () => {
+  const KITS = ['music_kit_neon', 'music_kit_dust'];
+  const grant = (over: Partial<DeadBuyRow> & { sku?: string; player?: string } = {}) => {
+    const { sku = 'music_kit_neon', player = 'p1', ...rest } = over;
+    return row({
+      reasonCode: REASON.KIT_GRANDFATHER_2026_09, currency: 'shards', delta: 0, idempotencyKey: kitGrandfatherKey(player, sku),
+      metadata: { skuId: sku, kit: sku.replace('music_kit_', ''), note: 'NEON kit is yours to keep' }, ...rest,
+    });
+  };
+  const storeKit = () => row({ sku: 'music_kit_neon', currency: 'shards', delta: -200 });   // a /store charge (browser key)
+  const refundOf = (id: string) => row({ reasonCode: REASON.DEAD_BUY_REFUND, currency: 'shards', delta: 200, idempotencyKey: refundKey(id) });
+
+  it('has its own reason and a key that carries the player and the SKU (unique per player+kit across the ledger)', () => {
+    expect(REASON.KIT_GRANDFATHER_2026_09).toBe('KIT_GRANDFATHER_2026_09');
+    expect(kitGrandfatherKey('p1', 'music_kit_neon')).toBe('kit_grandfather_2026_09:p1:music_kit_neon');
+    expect(kitGrandfatherKey('p1', 'music_kit_neon')).not.toBe(kitGrandfatherKey('p2', 'music_kit_neon'));
+    expect(kitGrandfatherKey('p1', 'music_kit_neon')).not.toBe(kitGrandfatherKey('p1', 'music_kit_dust'));
+    expect(isClientMadeKey(kitGrandfatherKey('p1', 'music_kit_neon'))).toBe(false);
+  });
+
+  it('OUT OF THE SWEEP: the sweep never reads the reason, and no rule takes the row as a dead buy', () => {
+    expect(DEAD_BUY_REASONS).not.toContain(REASON.KIT_GRANDFATHER_2026_09);
+    expect(deadBuyOf(grant(), 'p1')).toBeNull();
+    // not even if it somehow carried a charge's shape: it is not a SPEND_CATALOG_ITEM row
+    expect(deadBuyOf(grant({ delta: -200, idempotencyKey: UUID }), 'p1')).toBeNull();
+    expect(refundedRowIds([grant()]).size).toBe(0);
+    // the grant shares the kit's entitlement row with any /store charge of it: a kit refund must never take that row back
+    // (an `undo` here would delete a granted kit the day the sweep reached a young /store charge of it)
+    for (const sku of KITS) expect(DEAD_CATALOG_BUYS[sku].undo, sku).toBeUndefined();
+  });
+
+  it('BACKS ITS KIT: the owned-kits read counts it, and a /store charge of the same kit being paid back leaves it standing', () => {
+    expect([...backedEntitlements(KITS, [grant()], 'p1')]).toEqual(['music_kit_neon']);
+    const store = storeKit();
+    expect(refundableDeadBuys([buy(store)], NONE).map((b) => b.row)).toEqual([store]);   // the sweep's rule is unchanged
+    expect([...backedEntitlements(KITS, [store, refundOf(store.id), grant()], 'p1')]).toEqual(['music_kit_neon']);
+    expect([...backedEntitlements(KITS, [grant(), grant({ sku: 'music_kit_dust' })], 'p1')].sort()).toEqual(['music_kit_dust', 'music_kit_neon']);
+  });
+
+  it("backs only this player's own grant of exactly that SKU, with nothing moved", () => {
+    expect(backedEntitlements(KITS, [grant({ player: 'p2' })], 'p1').size).toBe(0);                                   // another player's key
+    expect(backedEntitlements(KITS, [grant({ metadata: { skuId: 'music_kit_dust' } })], 'p1').size).toBe(0);           // key and SKU disagree
+    expect(backedEntitlements(KITS, [grant({ delta: 200 })], 'p1').size).toBe(0);                                       // a grant moves nothing
+    expect(backedEntitlements(['music_kit_dust'], [grant()], 'p1').size).toBe(0);                                       // not asked about
+    expect(backedEntitlements(KITS, [grant({ reasonCode: REASON.ADMIN_ADJUST })], 'p1').size).toBe(0);                  // another reason
+    expect(isKitGrandfatherGrant(grant(), 'p1', 'music_kit_neon')).toBe(true);
+    expect(isKitGrandfatherGrant(grant(), 'p1', 'music_kit_dust')).toBe(false);
   });
 });
 

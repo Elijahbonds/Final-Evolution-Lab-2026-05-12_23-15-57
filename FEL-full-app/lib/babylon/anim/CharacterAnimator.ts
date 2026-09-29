@@ -68,6 +68,10 @@ export class CharacterAnimator {
   /** M68: SkinningGuard uses this to tell "stalled" from "nothing is playing". */
   get isPlaying(): boolean { return this.current?.isPlaying ?? false; }
 
+  /** HOOPS MOTION phase 3d (final review): the clip the body is on — an owner compares it with what it last played to see that a play
+   *  from outside it took the body (combatTree). */
+  get currentGroup(): AnimationGroup | null { return this.current; }
+
   /** M69: current playhead frame of the active clip. SkinningGuard v3 uses it
    *  to tell a real stall (playhead advancing, bones frozen) from a legitimate
    *  held pose (KO/victory freeze — playhead parked). 0 when nothing is active,
@@ -120,6 +124,10 @@ export class CharacterAnimator {
     if (prev === next && next.isPlaying) {       // restart same clip cleanly
       next.stop();
     }
+    // HOOPS MOTION phase 3d (final review): THE CUT CLIP'S END CALLBACK GOES WHEN THE CUT STARTS, not when its fade ends (retire()). A
+    // clip whose own end fell INSIDE that fade still raised it, and neverBindPose's "back to the base loop" — or a raw chain — played over
+    // the clip that had just cut it (a 0.5 s one-shot cut 26 frames in: the new clip at weight 0 by frame 20, measured).
+    if (prev && prev !== next) this.detachEnd(prev);
 
     next.speedRatio = Math.abs(finalSpeed) * this.timeScale;
     this.requested.set(next, Math.abs(finalSpeed));
@@ -150,11 +158,13 @@ export class CharacterAnimator {
     // faster than fadeSec — combo strings, rapid input, a stalled frame loop —
     // hits this. Retire the orphan before taking over the fade slot.
     if (this.fadingOut && this.fadingOut !== next && this.fadingOut !== prev) {
-      this.fadingOut.stop();
+      // HOOPS MOTION phase 3d: untracked, then RETIRED (no end callback — see retire())
+      const orphan = this.fadingOut; this.fadingOut = null;
+      this.retire(orphan);
     }
     this.fadeObs?.remove();
     if (fadeSec <= 0) {
-      prev?.stop();
+      if (prev && prev !== next) this.retire(prev); else prev?.stop();   // HOOPS MOTION phase 3d: a cut with no fade retires too
       this.fadingOut = null;
       next.setWeightForAllAnimatables(1);
       return;
@@ -173,12 +183,38 @@ export class CharacterAnimator {
       this.fadingOutWeight = w0 * (1 - k);
       if (prev && prev !== next) prev.setWeightForAllAnimatables(w0 * (1 - k));
       if (k >= 1) {
-        if (prev && prev !== next) prev.stop();
-        this.fadingOut = null;
+        // HOOPS MOTION phase 3d: THE FADE IS OVER, AND ITS OUTGOING CLIP IS RETIRED — stopped WITHOUT its end callback (retire()). A plain
+        // stop() raised the clip's end observable from inside this handler: an end callback that played the next clip (a raw onEnd chain)
+        // started its fade here, and the handler then cleared it — its clip stood as the current clip at weight 0 while the clip this fade
+        // had just brought in played on at full weight, untracked, and the next play() blended the two at full weight (V:3pt N1; 3PT's
+        // weight log, 2a and rE: dunk_mc_celebrate_big + bball_mc_jumpshot, 5–11 frames a shot).
         this.fadeObs?.remove();
         this.fadeObs = null;
+        this.fadingOut = null;
+        if (prev && prev !== next) this.retire(prev);
       }
     });
+  }
+
+  /**
+   * HOOPS MOTION phase 3d (review): RETIRE A CLIP THE BODY HAS MOVED ON FROM — stop it WITHOUT running its end callback. Babylon raises a
+   * group's end observable from stop() as well as from a natural end, so the fade that replaced a clip used to run that clip's onEnd when
+   * it stopped it. The callback belongs to the clip's NATURAL end: a clip cut by a newer play() is the past, and its chain is stale —
+   * neverBindPose's default "back to the base loop" (on every spawned body) took the body back from the clip that had cut it (Who Scene
+   * It: the buzz's idle erased the verdict ~0.2 s after it began; CharacterAnimator.reentry.test). The owners — the trees, BeatOwner, the
+   * dunk modes' clip tokens, Contestants.perform — already ignored a cut clip's end. The callback is removed as well, so it cannot fire
+   * on a later play of the same clip that registers none.
+   */
+  private retire(g: AnimationGroup): void {
+    this.endObs.get(g)?.remove();
+    this.endObs.delete(g);
+    g.stop(true);
+  }
+
+  /** (final review) Drop a clip's end callback without stopping it — deferred, so it is safe inside that clip's own end notification. */
+  private detachEnd(g: AnimationGroup): void {
+    this.endObs.get(g)?.remove(true);
+    this.endObs.delete(g);
   }
 
   /** A playing group's blend weight (its animatables carry it; −1 = never set = full). */
@@ -223,9 +259,23 @@ export class CharacterAnimator {
     const r = resolveClip(name, this.clipNames);
     const g = this.groups.get(r.clip);
     if (!g) return;
+    // HOOPS MOTION phase 3d: A CLIP THE BODY HAS MOVED ON FROM IS NOT FROZEN BACK IN. The freeze is asked for from the clip's end callback,
+    // and Babylon raises that from stop() too — so a clip cut by a newer play() came back, when that fade stopped it, as the CURRENT clip
+    // at full weight, over the clip that had replaced it, which played on untracked: two clips at full weight (3PT's weight log, rE: the
+    // pull-up gather frozen back in over the idle_stand a chained onEnd had faded in, 80 frames of one shot). The animator's own cuts now
+    // retire without the callback (retire()); a stop from elsewhere (park(), a same-clip restart) still raises it. A clip still FADING OUT
+    // (its own end came inside the fade) holds its last frame at the fade's weight while the fade runs on: it used to take the body back
+    // and strand the incoming clip at whatever weight it had reached. Only the body's current clip is frozen as its pose. (Final review:
+    // a cut clip's end callback is detached when the cut starts, so a fading-out clip reaches this only from a direct call.)
+    if (g !== this.current) {
+      if (g !== this.fadingOut) return;
+      if (g.isPlaying) { g.stop(); if (g === this.fadingOut) this.startFrozen(g, this.fadingOutWeight); }
+      else this.deferFreeze(g);   // (flushFreezes starts it at the fade's weight if it is still fading out then)
+      return;
+    }
     const wasRunning = g.isPlaying;
     if (wasRunning) g.stop();
-    if (this.fadingOut && this.fadingOut !== g) { this.fadingOut.stop(); this.fadingOut = null; }
+    if (this.fadingOut && this.fadingOut !== g) { const out = this.fadingOut; this.fadingOut = null; this.retire(out); }   // (3d: retired)
     this.fadeObs?.remove(); this.fadeObs = null;
     this.current = g; this.currentName = r.clip; this.currentSpeed = CharacterAnimator.FREEZE_SPEED;
     // HOTFIX (2026-09-24): a freezeAtEnd made by that stop()'s own end callback (a holdEnd beat) queued a deferred freeze

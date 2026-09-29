@@ -100,7 +100,9 @@ describe('each yardstick is what its mode actually posts', () => {
 
   it('Gate Crasher: half the gates at 100 a gate', () => {
     const gates = pin('lib/babylon/modes/rideWorlds.ts', /export const SLALOM_GATES = (\d+);/);
-    const share = pin('lib/babylon/modes/SnowboardSlalomMode.ts', /const GATE_CRASHER_SHARE = ([\d.]+);/);
+    // GATE-CRASHER-MAJOR: the share lives with the slalom's other rules in the pure module now (crashTarget reads it)
+    const share = pin('lib/babylon/modes/gateCrasher.ts', /export const GATE_CRASHER_SHARE = ([\d.]+);/);
+    has('lib/babylon/modes/SnowboardSlalomMode.ts', 'const crashed = gatesHit >= target;');
     has('lib/babylon/modes/SnowboardSlalomMode.ts', 'gatesHit++;\n            tricks.score += 100;');
     expect(STORY_YARDSTICKS.snowboarding.reach).toBe(Math.ceil(gates * share) * 100);
   });

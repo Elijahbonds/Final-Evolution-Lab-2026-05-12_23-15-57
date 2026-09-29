@@ -14,6 +14,12 @@
 //      opens it on STREET and says so under the banner; with ?owned=dust it opens on DUST and says nothing.
 //   6. A frame of the confirm with a failure line on screen.
 //
+// MUSIC-SUITE P3 FIX PASS (2026-09-25): P3 keyed the kits cache to the player (purchases.ts kitCacheKey:
+// 'fel_studio_kits_v1:<playerId>'; /dev/music plays as 'dev-player') and never adopts the old shared key — it removes it on
+// the first keyed write. This probe still read and seeded the shared key, so four of its checks FAILED against the P3 tree
+// (the review re-ran it). It reads and seeds the dev player's key now, checks the shared key is ignored and removed, and
+// the ?shop=500/offline words are today's SPEND_FAILURE_TEXT.unreachable (the P2 fix pass changed them).
+//
 // Usage: node node_modules/tsx/dist/cli.mjs scripts/probes/_music-p2-economy.mts   (BASE, OUT env override)
 import { chromium, type Browser, type Page } from 'playwright-core';
 import fs from 'node:fs';
@@ -35,12 +41,16 @@ const kitButton = (p: Page, label: string) => p.locator('button', { hasText: new
 const confirmText = (p: Page) => p.evaluate(() => document.querySelector('[data-qa="shop-confirm"]')?.textContent ?? null);
 const errorText = (p: Page) => p.evaluate(() => document.querySelector('[data-qa="shop-error"]')?.textContent ?? null);
 const probe = (p: Page) => p.evaluate(() => { const s = (window as Any).__FEL_STUDIO__; return { spends: s.spends.map((x: Any) => ({ ...x })), ownedReads: s.ownedReads }; });
-const cache = (p: Page) => p.evaluate(() => localStorage.getItem('fel_studio_kits_v1'));
+/** MUSIC-SUITE P3 FIX PASS: the dev player's cache (app/dev/music DEV_PLAYER_ID) — and the old shared key, for the check. */
+const DEV_KIT_KEY = 'fel_studio_kits_v1:dev-player';
+const SHARED_KIT_KEY = 'fel_studio_kits_v1';
+const cache = (p: Page) => p.evaluate((k) => localStorage.getItem(k), DEV_KIT_KEY);
+const sharedCache = (p: Page) => p.evaluate((k) => localStorage.getItem(k), SHARED_KIT_KEY);
 const kitLabels = (p: Page) => p.evaluate(() => {
   const row = [...document.querySelectorAll('span')].find((s) => s.textContent === 'KITS:')?.parentElement;
   return row ? [...row.querySelectorAll('button')].map((b) => b.textContent) : null;
 });
-const litCells = (p: Page) => p.evaluate(`(() => { const g = ${GRID_EL}; return g ? [...g.children].filter((c) => c.style.background === 'rgb(255, 179, 71)').length : -1; })()`);
+const litCells = (p: Page) => p.evaluate(`(() => { const g = ${GRID_EL}; return g ? [...g.children].filter((c) => c.style.background === 'rgb(255, 179, 71)').length : -1; })()`) as Promise<number>;
 const toast = (p: Page) => p.evaluate(() => [...document.querySelectorAll('div')].map((d) => d.textContent ?? '').filter((t) => /kit loaded|Remixing|foundation/.test(t)).pop() ?? null);
 
 const DUST_TRACK = {
@@ -56,14 +66,18 @@ const DUST_TRACK = {
 };
 
 /** A fresh context (its own localStorage), a page on /dev/music with `query`, past the splash, grid on screen. */
-async function open(browser: Browser, query: string, seed: { kits?: string; tracks?: boolean } = {}): Promise<Page> {
+async function open(browser: Browser, query: string, seed: { kits?: string; sharedKits?: string; tracks?: boolean } = {}): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  await ctx.addInitScript(([kits, tracks]) => {
+  // seeded once per context (an init script runs on every navigation; a sessionStorage flag keeps it to the first)
+  await ctx.addInitScript(([kits, shared, tracks, devKey, sharedKey]) => {
     try {
-      if (kits) localStorage.setItem('fel_studio_kits_v1', kits as string);
+      if (sessionStorage.getItem('__seeded')) return;
+      sessionStorage.setItem('__seeded', '1');
+      if (kits) localStorage.setItem(devKey as string, kits as string);
+      if (shared) localStorage.setItem(sharedKey as string, shared as string);
       if (tracks) localStorage.setItem('fel_studio_tracks_v1', tracks as string);
     } catch { /* none */ }
-  }, [seed.kits ?? null, seed.tracks ? JSON.stringify([DUST_TRACK]) : null]);
+  }, [seed.kits ?? null, seed.sharedKits ?? null, seed.tracks ? JSON.stringify([DUST_TRACK]) : null, DEV_KIT_KEY, SHARED_KIT_KEY]);
   const p = await ctx.newPage();
   p.on('pageerror', (e) => R.pageErrors.push(`${query}: ${String(e)}`));
   await p.goto(`${BASE}/dev/music?stage=studio${query}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
@@ -132,7 +146,7 @@ async function run(): Promise<void> {
     // ── 3. real words ──
     const words: Record<string, string> = {
       '401': 'Sign in to unlock', '409': 'Not enough Shards',
-      '500': "Couldn't reach the shop — nothing was charged", offline: "Couldn't reach the shop — nothing was charged",
+      '500': "Couldn't reach the shop — if it went through, you won't be charged twice", offline: "Couldn't reach the shop — if it went through, you won't be charged twice",
     };
     for (const [shop, want] of Object.entries(words)) {
       const p = await open(browser, `&shop=${shop}`);
@@ -166,6 +180,14 @@ async function run(): Promise<void> {
       const p = await open(browser, '&shop=offline', { kits: '["street","neon"]' });
       check('the account unreachable: the cache stands', JSON.stringify(await kitLabels(p)) === JSON.stringify(['STREET', 'NEON', 'DUST · 400◈']),
         { kits: await kitLabels(p), cache: await cache(p) });
+      await close(p);
+    }
+    {
+      // MUSIC-SUITE P3: the old shared key could be anyone's on this device — never adopted, and gone on the first write
+      const p = await open(browser, '&shop=offline', { sharedKits: '["street","neon","dust"]' });
+      check('a shared (unkeyed) cache is ignored and removed: its kits stay locked, the key is gone',
+        JSON.stringify(await kitLabels(p)) === JSON.stringify(['STREET', 'NEON · 200◈', 'DUST · 400◈']) && (await sharedCache(p)) === null,
+        { kits: await kitLabels(p), shared: await sharedCache(p), cache: await cache(p) });
       await close(p);
     }
 

@@ -59,6 +59,7 @@ vi.mock('../visual/meshyProps', () => ({
 }));
 vi.mock('../anim/ballRig', () => ({
   attachBallToHand: (_b: unknown, _sk: unknown, hand: string) => { ballRig.hands.push(hand); return true; },
+  trackDrawnBall: () => undefined,   // HOOPS MOTION phase 3: rightHandBall keeps the ball's drawn position (the gather's first step)
 }));
 vi.mock('../anim/boardTree', () => ({ BoardAnimTree: class { update(): void {} clearBeat(): void {} } }));
 vi.mock('../visual/VenueKit', () => ({ VenueKit: { buildCourt: () => undefined, buildDojo: () => undefined, buildField: () => undefined } }));
@@ -359,7 +360,8 @@ describe('SLAM RUSH: the gather is held, not looped, and the ball is the hoops b
   it("the ball wears the hoops modes' Meshy leather and rides the dunker's right hand", async () => {
     const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
     expect(ballRig.dressed).toEqual([{ name: 'carn_ball', kind: 'basketball' }]);
-    expect(ballRig.hands).toEqual(['RightHand']);
+    // HOOPS MOTION phase 3: the hand DRAWN on his right — rig LeftHand on the runtime rig (athleteSide's fallback for a stub rig)
+    expect(ballRig.hands).toEqual(['LeftHand']);
     f.dispose();
   });
 });

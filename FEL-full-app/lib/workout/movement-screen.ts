@@ -63,3 +63,20 @@ export const PILLAR_LABELS: Record<Pillar, string> = {
   power: 'Explosive Power', mobility: 'Mobility & Range', symmetry: 'L/R Symmetry',
   stability: 'Joint Stability', cadence: 'Running Cadence', posture: 'Postural Control',
 };
+
+/**
+ * The WorkoutScan kinds POST /api/v1/workout/scan may write (MIRROR-COACH P3 review, 2026-09-26). The route stored
+ * `kind = body.kind` — any string — with the client's metrics, so a signed-in user could write a `mirror_screen` row
+ * carrying `gradedBy: 'server'`, `provisional: false` and seven clean camera results: the coach's panel then read a clean,
+ * "server-checked" screen (lib/coach/mirrorToProgram.ts coachDraft), triage cleared the stale-scan flag
+ * (lib/coach/attention.ts isScanEquivalentScreen), and the future load gate would have unlocked on it — the server
+ * regrade (app/api/mirror/screen) skipped entirely. Every other kind has its own writer (the Mirror's screen route, the
+ * dunk log, lib/move/formWrite.ts), and no client posts any kind here but the default.
+ */
+export const SCAN_ROUTE_KINDS: readonly string[] = ['movement_screen'];
+
+/** The kind the scan route writes for a posted body, or null when the posted kind is not one it may write. */
+export function scanRouteKind(posted: unknown): string | null {
+  if (posted === undefined || posted === null) return SCAN_ROUTE_KINDS[0];
+  return typeof posted === 'string' && SCAN_ROUTE_KINDS.includes(posted) ? posted : null;
+}

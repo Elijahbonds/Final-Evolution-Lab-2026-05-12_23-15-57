@@ -16,7 +16,7 @@ import type { CharacterAnimator } from './CharacterAnimator';
 
 export interface LoopOpts { fadeSec?: number; speedRatio?: number }
 export interface BeatOpts extends LoopOpts {
-  /** Fires when the beat ENDS on its own (never when the owner cut it). */
+  /** Fires when the beat ENDS on its own (never when the owner cut it). A beat started here is the next link of a chain (the loop waits). */
   onSettle?: () => void;
   /** HOLD the beat's last frame when it runs out, until the next beat or `settle()` (HOTFIX 2026-09-24, the basketballTree's
    *  holdEnd): a ONE-WAY clip (a crouch into a load) that must stay loaded. Looped instead, it snapped back to its first
@@ -54,6 +54,9 @@ export class BeatOwner {
         if (o.holdEnd) { this.animator.freezeAtEnd(clip); o.onSettle?.(); return; }
         this.shot = null;
         o.onSettle?.();
+        // HOOPS MOTION phase 3d: a beat started from onSettle (a chain: the 3PT follow-through into its absorb) is where the body goes —
+        // the loop played after it cut the chained beat in the frame it began
+        if (this.token !== tok) return;
         if (this.base) this.animator.play(this.base, { loop: true, ...this.baseOpts });
       },
     });

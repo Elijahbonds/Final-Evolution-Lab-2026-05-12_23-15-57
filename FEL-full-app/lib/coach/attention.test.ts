@@ -125,3 +125,136 @@ describe('attentionBoard', () => {
     expect(b.drift.map((d) => d.clientId).sort()).toEqual(['a', 'b']);
   });
 });
+
+// MIRROR-COACH P2 (2026-09-25): the adapter carries coached sessions, logged coached work, games and Mirror screens as
+// four facts, and each board reads the one it means.
+describe('coached work, games and screens, read apart', () => {
+  const coachedSix = [ago(1), ago(3), ago(5), ago(7), ago(9), ago(11)];
+
+  it('a client with coached sessions and no games is not stalled, and triage has nothing to say', () => {
+    const b = attentionBoard([facts({ sessionTimesMs: coachedSix, loggedTimesMs: coachedSix, gameTimesMs: [], screenTimesMs: [], lastActiveMs: ago(1) })], NOW);
+    expect(b.drift[0]).toMatchObject({ state: 'steady', recent: 6, games: 0 });
+    expect(b.triage.flags).toEqual([]);          // coached work is current data: no "ask for a System Scan"
+    expect(b.headline).toBeNull();
+  });
+
+  it('a client who only plays games is stalled, named with their games — and not gone quiet', () => {
+    const games = [ago(0.5), ago(2), ago(4)];
+    const b = attentionBoard([facts({ sessionTimesMs: [], loggedTimesMs: [], gameTimesMs: games, screenTimesMs: [], lastActiveMs: ago(0.5) })], NOW);
+    expect(b.drift[0]).toMatchObject({ state: 'stalled', games: 3 });
+    expect(b.drift[0].note).toMatch(/Still playing: 3 games/);
+    // P2 review (2026-09-26): never any coached work is not "no coached session in 10+ days"
+    expect(b.headline).toBe('1 athlete has not logged any coached work yet.');
+    expect(b.triage.flags.map((f) => f.kind)).toEqual(['stale-scan']);
+    expect(b.triage.flags[0].observed).toBe('No PRQ System Scan on file; no graded Mirror screen; no coached work logged.');
+  });
+
+  it('a GRADED Mirror screen yesterday is current data for triage (the route passes graded screens only)', () => {
+    const b = attentionBoard([facts({ sessionTimesMs: [], loggedTimesMs: [], gameTimesMs: [ago(1)], screenTimesMs: [ago(1)], lastActiveMs: ago(1) })], NOW);
+    expect(b.triage.flags).toEqual([]);
+  });
+
+  it('the load read counts coached sessions only: ten games in a day is not under-recovered', () => {
+    const tenGames = Array.from({ length: 10 }, (_, i) => ago(0.05 * (i + 1)));
+    const row = toAthleteRow(facts({ sessionTimesMs: [ago(2)], gameTimesMs: tenGames }), NOW);
+    expect(row.sessions24h).toBe(0);
+    expect(row.sessions7d).toBe(1);
+  });
+
+  it('hands triage the newest coached work (a logged set can be newer than the last completed session)', () => {
+    const row = toAthleteRow(facts({ sessionTimesMs: [ago(5)], loggedTimesMs: [ago(2)], screenTimesMs: [ago(8)] }), NOW);
+    expect(row.lastCoachedAt).toBe(new Date(ago(2)).toISOString());
+    expect(row.lastScreenAt).toBe(new Date(ago(8)).toISOString());
+  });
+
+  it('a fact the caller did not read stays unread: no lastCoachedAt / lastScreenAt keys at all', () => {
+    const row = toAthleteRow(facts(), NOW);
+    expect('lastCoachedAt' in row).toBe(false);
+    expect('lastScreenAt' in row).toBe(false);
+    const a = toClientActivity(facts());
+    expect('gameAtMs' in a).toBe(false);
+    expect('loggedAtMs' in a).toBe(false);
+  });
+});
+
+// MIRROR-COACH P2 review (2026-09-26): an ungraded Mirror screen (every screen stored until P3) is not current data.
+describe('gradedScreenTimes: only a screen the coach can read counts', () => {
+  it('an ungraded row, a legacy empty row and junk count nothing; a graded row counts', async () => {
+    const { gradedScreenTimes } = await import('./attention');
+    const { storedScreen } = await import('../mirror/screenStore');
+    const { scoreScreen } = await import('../mirror/screen');
+    const { serverRow } = await import('../mirror/fixtures/storedRows');
+    // (P3 review: three checks from more than one station — the screen bar the payout uses — as the route stores them)
+    const results = (['heelLine', 'hipLevel', 'headFloat'] as const).map((checkId) => ({ checkId, grade: 'stable', source: 'camera' })) as Parameters<typeof scoreScreen>[1];
+    const t = (d: number) => new Date(ago(d));
+    // (MIRROR-COACH P3: "graded" is the SERVER's grading now — `extras` is what the screen route stores with it)
+    const server = { camera: [], provisional: false };
+    expect(gradedScreenTimes([
+      { createdAt: t(1), metrics: storedScreen('ungraded', 'modified', [], scoreScreen('modified', []), server) },
+      { createdAt: t(2), metrics: { screenId: 'legacy', screen: 'full', results: [], summary: { score: 100 } } },
+      { createdAt: t(3), metrics: {} },
+      { createdAt: t(4), metrics: null },
+      { createdAt: t(5), metrics: serverRow('graded', 'modified', results) },
+    ])).toEqual([ago(5)]);
+  });
+});
+
+// MIRROR-COACH P3 (2026-09-26): the screen grades for real now, so a Mirror screen is a scan-equivalent signal only once
+// the SERVER graded it — and only when it read enough to be a screen (not provisional: three camera checks, the payout's
+// own bar). Before P3 any row with results counted, and the only rows with results were the posting phone's own word.
+describe('isScanEquivalentScreen: graded by the server, and not provisional', () => {
+  it('a phone-graded row (stored before P3, no gradedBy) is not current data; the same results server-graded are', async () => {
+    const { gradedScreenTimes, isScanEquivalentScreen } = await import('./attention');
+    const { storedScreen } = await import('../mirror/screenStore');
+    const { scoreScreen } = await import('../mirror/screen');
+    const results = [
+      { checkId: 'heelLine', grade: 'stable', source: 'camera' },
+      { checkId: 'hipLevel', grade: 'stable', source: 'camera' },
+      { checkId: 'headFloat', grade: 'fail', source: 'camera' },
+    ] as Parameters<typeof scoreScreen>[1];
+    const summary = scoreScreen('modified', results);
+    const { serverRow } = await import('../mirror/fixtures/storedRows');
+    const phone = storedScreen('phone', 'modified', results, summary);
+    const server = serverRow('server', 'modified', results);
+    const thin = serverRow('thin', 'modified', results.slice(0, 2));
+    expect([phone, server, thin].map(isScanEquivalentScreen)).toEqual([false, true, false]);
+    // MIRROR-COACH P3 review (2026-09-26): the marker alone is not enough — a row with gradedBy: 'server' and no evidence
+    // behind its results (what POST /api/v1/workout/scan could store), or a stored provisional: false over too little
+    const bare = storedScreen('bare', 'modified', results, summary, { camera: [], provisional: false });
+    expect(isScanEquivalentScreen(bare)).toBe(false);
+    const oneStation = (['kneeWindow', 'hipLevel', 'shoulderLevel'] as const).map((checkId) => ({ checkId, grade: 'stable', source: 'camera' })) as Parameters<typeof scoreScreen>[1];
+    const frontOnly = { ...serverRow('front', 'modified', oneStation), provisional: false };
+    expect(isScanEquivalentScreen(frontOnly)).toBe(false);
+    const t = (d: number) => new Date(ago(d));
+    expect(gradedScreenTimes([{ createdAt: t(1), metrics: thin }, { createdAt: t(2), metrics: phone }, { createdAt: t(3), metrics: server }])).toEqual([ago(3)]);
+  });
+
+  it('a real screen stored by the route counts: the claims re-checked, three or more checks read', async () => {
+    const { isScanEquivalentScreen } = await import('./attention');
+    const { decideScreenPost } = await import('../mirror/screenClaims');
+    const { storedScreen } = await import('../mirror/screenStore');
+    const { regradeFromSummary } = await import('../mirror/stationGraders');
+    const summaries = [
+      { checkId: 'hipLevel', value: 0.01, unit: 'ratio', frames: 420, readableFrames: 420, uncertainty: 0.005, spread: 0.02, stationId: 'frontStack' },
+      { checkId: 'shoulderLevel', value: -0.01, unit: 'ratio', frames: 420, readableFrames: 420, uncertainty: 0.005, spread: 0.02, stationId: 'frontStack' },
+      { checkId: 'headFloat', value: 0.02, unit: 'ratio', frames: 300, readableFrames: 300, uncertainty: 0.005, spread: 0.02, stationId: 'profile' },
+    ];
+    const store = (n: number) => {
+      const checks = summaries.slice(0, n).map((x) => ({ ...x, status: regradeFromSummary(x)!.status }));
+      const d = decideScreenPost({ screenId: `r${n}`, screen: 'modified', checks }, 'a1');
+      if (!d.ok) throw new Error('refused');
+      return JSON.parse(JSON.stringify(storedScreen(d.screenId, d.screen, d.outcome.results, d.summary, { camera: d.outcome.camera, provisional: d.outcome.provisional })));
+    };
+    expect(isScanEquivalentScreen(store(3))).toBe(true);
+    expect(isScanEquivalentScreen(store(2))).toBe(false);     // provisional: two checks read
+    // the front stack alone — three checks, one station (P3 review): stored, never current data
+    const front = [
+      summaries[0], summaries[1],
+      { checkId: 'kneeWindow', value: 0.05, bySide: { left: 0.05, right: 0.02 }, unit: 'ratio', frames: 420, readableFrames: 420, uncertainty: 0.01, spread: 0.1, stationId: 'frontStack' },
+    ].map((x) => ({ ...x, status: regradeFromSummary(x)!.status }));
+    const d = decideScreenPost({ screenId: 'front', screen: 'modified', checks: front }, 'a1');
+    if (!d.ok) throw new Error('refused');
+    expect(d.outcome).toMatchObject({ readableChecks: 3, readableStations: 1, provisional: true });
+    expect(isScanEquivalentScreen(JSON.parse(JSON.stringify(storedScreen(d.screenId, d.screen, d.outcome.results, d.summary, { camera: d.outcome.camera, provisional: d.outcome.provisional }))))).toBe(false);
+  });
+});

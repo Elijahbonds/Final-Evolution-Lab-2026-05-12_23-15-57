@@ -30,12 +30,23 @@ import { PODIUM_TOP_M, PODIUM_AHEAD_M } from '../anim/authored/party';
 
 /** The wheel: centre, radius, and a small tilt so its face points at the camera below it. */
 export const WHEEL = { x: 0, y: 4.85, z: -4.6, r: 1.45, tilt: 0.09 };
-/** The seats: 2.3 m further forward than 252548b's line (z −2), on a lower riser, never wider than `spread`. The contestant
- *  reads ~1.4× bigger through the same camera (the probe measures it); the riser's foot drops out of the bottom of the frame
- *  the way a TV podium shot crops, and the lectern stays clear of the card's column. */
-export const SEATS = { z: 0.3, riser: 0.55, spread: 3.0 };
-/** Where the host stands: centre stage, in front of the wheel's column. */
-export const HOST_AT = new Vector3(0, 0, -2.4);
+/** The seats: 2.3 m further forward than 252548b's line (z −2), on a lower riser, never wider than `spread`. POLISH-2 N7: the
+ *  eye found the lecterns' feet and the risers cut off by the frame's bottom edge — Brain Brawl's camera now stands back far
+ *  enough to hold the whole podium, riser foot and floor included (BrainBrawlMode's CAM_ANCHOR), so the seats may spread wider
+ *  (3.6 m) to keep the same place in the frame, beside the card's column. */
+export const SEATS = { z: 0.3, riser: 0.55, spread: 3.6 };
+/** The riser's radius: just wide enough for the body and the lectern in front of it (the lectern's front edge is 0.55 m from
+ *  the riser's centre), so its foot sits as high in the frame as it can. */
+const RISER_R = 0.65;
+/**
+ * Where the host stands (POLISH-2 N2). He stood centre stage — exactly where the card's column sits — so from the expose to the
+ * reveal the card hid him. His mark is now stage right of the card (screen right, world −x): clear of the card's column (the
+ * middle 40 % of the frame) and inside P2's podium, a step behind the seats' line. The wheel is behind him and up to his right,
+ * the side party_present sweeps his right arm to. A portrait phone's frame ends inside the podiums, so there he keeps the
+ * centre (HOST_CENTRE; the phone's card covers the whole width either way).
+ */
+export const HOST_AT = new Vector3(-3.0, 0, -0.9);
+export const HOST_CENTRE = new Vector3(0, 0, -2.4);
 
 const TAU = Math.PI * 2;
 const hex = (h: string) => Color3.FromHexString(h);
@@ -382,7 +393,7 @@ function buildLectern(scene: Scene, seat: number, color: string): Lectern {
     g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, 2, w, 3);
   });
   const sideGlow = painted(scene, `bb_riser_glow_${seat}`, 256, 32, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = color; g.fillRect(0, h * 0.42, w, h * 0.16); });
-  const riser = MeshBuilder.CreateCylinder(`bb_riser_${seat}`, { height: riserH, diameter: 1.55, tessellation: 40, cap: Mesh.NO_CAP }, scene);
+  const riser = MeshBuilder.CreateCylinder(`bb_riser_${seat}`, { height: riserH, diameter: RISER_R * 2, tessellation: 40, cap: Mesh.NO_CAP }, scene);
   riser.parent = seatRoot; riser.position.set(0, riserH / 2, 0.15);
   riser.material = material(scene, `bb_riser_mat_${seat}`, { albedo: side, emissiveTex: sideGlow, emissive: '#ffffff', glow: 0.9, roughness: 0.45, metallic: 0.3 });
   const topTex = painted(scene, `bb_riser_top_${seat}`, 512, 512, (g, w) => {
@@ -391,7 +402,7 @@ function buildLectern(scene: Scene, seat: number, color: string): Lectern {
     for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; g.fillRect(Math.random() * w, Math.random() * w, 2, 2); }
     g.strokeStyle = color; g.lineWidth = 14; g.beginPath(); g.arc(c, c, c * 0.93, 0, TAU); g.stroke();
   });
-  const cap = MeshBuilder.CreateDisc(`bb_riser_top_${seat}`, { radius: 0.775, tessellation: 40 }, scene);
+  const cap = MeshBuilder.CreateDisc(`bb_riser_top_${seat}`, { radius: RISER_R, tessellation: 40 }, scene);
   cap.parent = seatRoot; cap.rotation.x = Math.PI / 2; cap.position.set(0, riserH + 0.002, 0.15);
   cap.material = material(scene, `bb_riser_topmat_${seat}`, { albedo: topTex, roughness: 0.85 });
   cap.receiveShadows = true;
@@ -496,7 +507,7 @@ export function buildStage(scene: Scene, seatColors: readonly string[]): StageHa
   const beams = [
     beam(scene, 'bb_beam_p1', new Vector3(5.5, 11, -6), new Vector3(SEATS.spread, 0.6, SEATS.z), seatColors[0] ?? '#22d3ee', fade, 0.16),
     beam(scene, 'bb_beam_p2', new Vector3(-5.5, 11, -6), new Vector3(-SEATS.spread, 0.6, SEATS.z), seatColors[1] ?? '#facc15', fade, 0.16),
-    beam(scene, 'bb_beam_host', new Vector3(0, 12, -3.5), new Vector3(HOST_AT.x, 0, HOST_AT.z), '#b9b2ff', fade, 0.1),
+    beam(scene, 'bb_beam_host', new Vector3(HOST_AT.x * 0.7, 12, HOST_AT.z - 2.5), new Vector3(HOST_AT.x, 0, HOST_AT.z), '#b9b2ff', fade, 0.1),
   ];
   let wash = 0, washColor = hex('#ffffff'), t = 0, flapA = 0, flapV = 0, lastPeg = Math.floor(w.root.rotation.z / (TAU / 5));
   const baseGlow = wall.mats.map((m) => m.emissiveColor.clone());

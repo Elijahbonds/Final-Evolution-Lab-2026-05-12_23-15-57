@@ -25,6 +25,12 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: one loco pick + stride rate for every on-foot body
 import { stepFinishGrace } from '../racing/RaceField';   // MECHANICS PASS: the race ends for everyone
+// MOVEMENT PLAY P8 (2026-09-26): running in place IS the race — each told step graded on the camera's capture clock against a
+// body's cadence (a thumb's 5 taps a second is not a jog's 3), the reaction timed on the same clock, a step captured before
+// the gun a false start even when it arrives after it, and the chest dipped at the tape the DIP
+import { RideIntents, BodyStride, rideLines } from '../core/rideBody';
+import type { ModeContext as Ctx, BodyView } from '../core/ModeHarness';   // (Ctx: the helpers below the definition)
+import type { BodyEvent } from '@/lib/pose/BodyReader';
 
 const RACE_DIST = SPRINT_TUNING.raceDistanceM;   // core-owned (100m)
 /** The dip at the tape (racing pass phase 8): how close to the line it must come, and what it is worth. */
@@ -70,12 +76,18 @@ const S = {
   /** Clean alternating strides in a row (the rhythm streak). */
   streak: 0,
   lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
+  /** MOVEMENT PLAY P8: the gun's instant on the page clock (the capture clock is the same performance.now), and the body's strides. */
+  goAt: null as number | null,
+  body: { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, falseStarts: 0, dips: 0 },
 };
+const stride = new BodyStride();
+const rideIntents = new RideIntents();
 
 const reset = (): void => {
   S.done = false; S.stumbles = 0; S.rivalDist = 0; S.graceLeft = null;
   S.banner = ''; S.bannerT = 0; S.lastSide = null; S.streak = 0; S.trigL = false; S.trigR = false; S.reactS = null; S.dipped = false;
   finishLatch = false;
+  S.goAt = null; S.body = { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, falseStarts: 0, dips: 0 }; stride.reset(); rideIntents.reset();   // MOVEMENT PLAY P8
 };
 
 const say = (t: string, sec = 0.9): void => { S.banner = t; S.bannerT = sec; };
@@ -171,7 +183,8 @@ return {
     core = makeSprintRace(undefined, {
       onPhase: (phase) => {
         if (phase === 'Set') say('SET', 1.0);
-        else if (phase === 'Go') { say('GO!', 0.8); SoundKit.play('whistle'); }
+        else if (phase === 'Go') { say('GO!', 0.8); SoundKit.play('whistle'); S.goAt = performance.now(); }
+        else if (phase === 'Ready') S.goAt = null;   // MOVEMENT PLAY P8: back to the blocks (a false start)
       },
       onFinish: (rawS) => {
         const timeS = Math.max(0, rawS - (S.dipped ? DIP_BONUS_S : 0));   // the dip, if it came in time
@@ -187,6 +200,8 @@ return {
     // runner — FrameGuard reported "hero off-screen" every frame.
     ctx.camDirector.snapTo(runner.root.position, null);
     say('ON YOUR MARKS', 1.2);
+    // MOVEMENT PLAY P8: the probe's read-only seam
+    (ctx.scene.metadata ??= {}).sprint = { state: () => ({ ...core!.state, reactS: S.reactS, dipped: S.dipped, stumbles: S.stumbles, rivalDist: +S.rivalDist.toFixed(1), body: { ...S.body }, cadence: core!.cadenceStats }) };
     pushHud(ctx);
   },
 
@@ -210,17 +225,64 @@ return {
       const left = RACE_DIST - core.state.distanceM;
       if (S.dipped) return;
       if (left > DIP_WINDOW_M) { refuse(ctx, 'DIP AT THE TAPE — NOT YET'); return; }
-      S.dipped = true; say('DIP!', 0.6); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 }); ctx.juice.shake(0.03, 80);
-      console.info(`[SPRINT-DIP] ${left.toFixed(2)} m out`);
+      dipAtTape(ctx, left);
       return;
     }
     if (e.dir !== 'left' && e.dir !== 'right') return;
+    takeStride(ctx, e.dir === 'left' ? 'L' : 'R');
+  },
 
-    const side: 'L' | 'R' = e.dir === 'left' ? 'L' : 'R';
+  // MOVEMENT PLAY P8: the steps are the mode's, graded here on the capture clock — the claim takes the P3 row's step → d-pad
+  // off the floor (dropping it is the cut line); the card says the stride and the dip this mode reads itself
+  body: { claims: ['step'], lines: rideLines('sprint', ['step']) },
+  onBody(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+    if (ev.kind !== 'step' || S.done || !core || core.state.phase === 'Finish') return false;
+    const q = stride.grade(ev, view);
+    if (!q) return false;
+    // captured before the gun: a false start whenever it arrives (the core's Ready / Set handle the rest)
+    const early = S.goAt === null ? core.state.phase === 'Go' || core.state.phase === 'Run' : ev.t < S.goAt;
+    const react = S.goAt !== null && !early ? Math.max(0, (ev.t - S.goAt) / 1000) : null;
+    const before = core.state.falseStarts;
+    takeStride(ctx, ev.foot, { quality: q, early }, react);
+    if (core.state.falseStarts > before) { S.body.falseStarts++; stride.reset(); }
+    else { S.body.strides++; if (q !== 'first') S.body[q]++; }
+    return true;
+  },
+
+  update(ctx: ModeContext, dt: number): void {
+    if (S.done || !core || !runner || !rival || !finishLine) return;
+    // MOVEMENT PLAY P8: the chest dipped at the tape (a body's dip earlier than the window is never refused out loud)
+    for (const it of rideIntents.poll(ctx.body?.() ?? null, { airborne: false })) {
+      if (it.kind === 'dip' && (core.state.phase === 'Run' || core.state.phase === 'Go')) {
+        const left = RACE_DIST - core.state.distanceM;
+        if (!S.dipped && left <= DIP_WINDOW_M) { dipAtTape(ctx, left); S.body.dips++; }
+      }
+    }
+    updateRace(ctx, dt);
+  },
+
+  dispose(): void {
+    runner?.dispose(); runner = null;
+    rival?.dispose(); rival = null;
+    finishLine?.dispose(); finishLine = null;
+    core = null;
+  },
+};
+
+/** The dip at the tape (the d-pad's UP and a body's chest alike). */
+function dipAtTape(ctx: Ctx, left: number): void {
+  S.dipped = true; say('DIP!', 0.6); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.45 }); ctx.juice.shake(0.03, 80);
+  console.info(`[SPRINT-DIP] ${left.toFixed(2)} m out`);
+}
+
+/** One stride: the d-pad's (graded by the core on its own clock) or a body's (graded on the capture clock: `opts`, and the
+ *  reaction `react` measured on that clock too). */
+function takeStride(ctx: Ctx, side: 'L' | 'R', opts?: { quality: import('@/lib/feel').CadenceQuality; early: boolean }, react: number | null = null): void {
+    if (!core) return;
     const beforeFalse = core.state.falseStarts;
     const beforeSpeed = core.state.speed;
-    const offTheGun = core.state.phase === 'Go', gunClock = core.state.timeS;
-    core.step(side);
+    const offTheGun = core.state.phase === 'Go', gunClock = react ?? core.state.timeS;
+    core.step(side, opts);
     // THE REACTION: the first clean stride after the gun is timed and called — the start is a skill you can see
     if (offTheGun && core.state.falseStarts === beforeFalse && S.reactS === null) {
       S.reactS = gunClock;
@@ -253,9 +315,10 @@ return {
       if (S.streak % 10 === 0) { ctx.juice.callout(`RHYTHM ×${S.streak}`, '#fde047', 600); ctx.juice.shake(0.03, 90); }
     }
     S.lastSide = side;
-  },
+}
 
-  update(ctx: ModeContext, dt: number): void {
+/** The race's frame (the pre-P8 update, unchanged). */
+function updateRace(ctx: Ctx, dt: number): void {
     if (S.done || !core || !runner || !rival || !finishLine) return;
 
     core.tick(dt * 1000);
@@ -302,15 +365,7 @@ return {
     ctx.camDirector.look(S.lookX, S.lookY, dt);
     ctx.camDirector.update(runner.root.position, new Vector3(0, 0, -st.speed), null);
     pushHud(ctx);
-  },
-
-  dispose(): void {
-    runner?.dispose(); runner = null;
-    rival?.dispose(); rival = null;
-    finishLine?.dispose(); finishLine = null;
-    core = null;
-  },
-};
+}
 }
 
 export const SprintMode: ModeDefinition = makeSprintMode();

@@ -17,6 +17,7 @@
 // guard step — no idle flash), ignores the callback when the tree itself cut the clip (state + token guard), holds the
 // floor after a knockdown until the mode lets the fighter rise, and rises through the get-up before any standing state.
 
+import type { AnimationGroup } from '@babylonjs/core';
 import type { CharacterAnimator } from './CharacterAnimator';
 import { combatGait } from '../core/StrideMatch';
 import { combatRateFor, StrideRateFilter } from '../core/StrideMatch';
@@ -200,10 +201,23 @@ export class CombatAnimTree {
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
   private strideAuthored = 1;
+  /** The clip the tree's last play() put on the body (null: unknown — a stub animator returns none). */
+  private played: AnimationGroup | null = null;
   constructor(private animator: CharacterAnimator) {}
   get state(): CombatAnimState | null { return this.current; }
   update(input: CombatAnimInput): CombatAnimState {
     this.lastInput = input;
+    // HOOPS MOTION phase 3d (final review): A PLAY FROM OUTSIDE THE TREE ENDED ITS ONE-SHOT. The animator drops a cut clip's end callback,
+    // so a one-shot cut by another play() (Showdown's ultimate and Duel's round-end knockdown play on the fighter directly) never settled
+    // the tree, and the get-up latch below held the fighter in `get_up` — no strike, walk or guard animated — until he was hit. The body's
+    // clip is no longer the one the tree played: that one-shot is over. It settles as if it had run out, and the tree re-enters from the
+    // context. Loops are left alone: they have no end to wait for, and re-entering one would fight an owner that plays every frame.
+    const was = this.current, on = this.animator.currentGroup;   // (undefined: an animator stub without it — never read as a cut)
+    if (was && isOneShot(was) && this.played && on !== undefined && on !== this.played) {
+      this.spent = was;
+      this.onSettle?.(was);
+      this.current = null;
+    }
     let c = chooseCombatClip(input);
     if (this.spent && c.state !== this.spent) this.spent = null;
     if (this.spent && c.state === this.spent) c = settleAfter(this.spent, input);
@@ -234,15 +248,16 @@ export class CombatAnimTree {
     const st = c.state;
     const tok = ++this.token;
     const onEnd = isOneShot(st) ? () => {
-      // Fires on a natural end — and also when the animator cuts this clip for the next one (Babylon raises the group's
-      // end observable from stop()). Only the natural case is ours: the tree must still be sitting in this state.
+      // Fires on a natural end — and also when a same-clip restart stops this clip (Babylon raises the group's end observable
+      // from stop(); a clip the animator cuts for another is retired without it). Only the natural case is ours: the tree must
+      // still be sitting in this state.
       if (this.current !== st || this.token !== tok) return;
       this.spent = st;
       this.onSettle?.(st);
       this.enter(settleAfter(st, this.lastInput ?? EMPTY_INPUT));
     } : undefined;
     const opts = { loop: c.loop, fadeSec: c.fadeSec, ...(c.speedRatio === undefined ? {} : { speedRatio: c.speedRatio }), ...(restart ? { restart: true } : {}) };
-    this.animator.play(c.clip, onEnd ? { ...opts, onEnd } : opts);
+    this.played = this.animator.play(c.clip, onEnd ? { ...opts, onEnd } : opts) ?? null;
     // remember what this loop was authored at, so stride matching can scale it while KEEPING ITS SIGN (walk_back is
     // the guard step at −1: the same cadence played backwards)
     this.strideAuthored = c.speedRatio ?? 1;
@@ -258,7 +273,7 @@ export class CombatAnimTree {
   }
   /** True while a strike one-shot is the current state (the mode's "mid-swing"). */
   get striking(): boolean { return this.current !== null && isStrike(this.current); }
-  reset(): void { this.current = null; this.spent = null; this.lastInput = null; }
+  reset(): void { this.current = null; this.spent = null; this.lastInput = null; this.played = null; }
 }
 
 const EMPTY_INPUT: CombatAnimInput = {

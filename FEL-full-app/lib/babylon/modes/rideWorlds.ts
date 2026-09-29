@@ -16,7 +16,7 @@
 // where a world has none). Modes shipped alongside consume it.
 
 import { VenueKit } from '../visual/VenueKit';
-import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material, Quaternion } from '@babylonjs/core';
 import type { AbstractMesh, Camera, Scene } from '@babylonjs/core';
 import { mountOcean, oceanShade } from '../visual/OceanSurface';   // SURF OCEAN: the living sea
 import type { GrindLine } from '../core/GroundRide';
@@ -26,6 +26,8 @@ import { VertexData, Texture } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
 import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
 import { SNOW_SLOPE, snowCrowd } from './snowSlope';
+import { GATE_HALF_WIDTH, FINISH_AFTER_M, treeline, edgePoles, rockSpots, type RideSolid } from './gateCrasher';
+import { snowParkMaterials, parkBoxUV, PARK_TILE_M } from '../visual/snowParkTextures';   // GATE-CRASHER-POLISH-2: the park, painted
 import { surfCrowd } from './surfLineup';
 
 export interface RideObstacle { pos: Vector3; radius: number }
@@ -42,7 +44,22 @@ export interface RideWorld {
   /** Half-extent of the rideable world, metres. The mode's clamp and the fence read THIS, not a module constant, so a
    *  venue can be a different size without the two disagreeing. */
   bound: number;
+  /** GATE-CRASHER-MAJOR: what a board cannot pass through (the snow run only; see modes/gateCrasher). */
+  solids?: RideSolid[];
+  /** GATE-CRASHER-MAJOR: the slalom's gates answer the verdict on the mountain itself (the snow run only). */
+  gates?: SlalomGateFx;
+  /** GATE-CRASHER-MAJOR: the finish line the run ends under (the snow run only). */
+  finish?: Vector3;
   dispose(): void;
+}
+
+/** A gate's state as the rider sees it: the one to make, one he made, one he missed, or one still ahead. */
+export type GateState = 'ahead' | 'next' | 'hit' | 'miss';
+export interface SlalomGateFx {
+  set(i: number, s: GateState): void;
+  /** A body brushed gate `i`'s pole on `side` (−1 left, +1 right): it whips. */
+  brush(i: number, side: number): void;
+  update(dt: number): void;
 }
 
 /** Ride-world props are PBR (Phase 1, 2026-09-03): matte, lit by the IBL and the tier's shadows. */
@@ -110,6 +127,18 @@ function rampWedge(scene: Scene, name: string, width: number, depth: number, hei
   const idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 6, 8, 9, 10, 11, 12, 10, 12, 13, 14, 15, 16, 14, 16, 17];
   const vd = new VertexData();
   vd.positions = p; vd.indices = idx;
+  // GATE-CRASHER-POLISH-2 (2026-09-28): METRE-SCALE UVs. The prism had none, so no material on a ramp could carry a texture —
+  // every kicker in the game was one flat colour (the eye's "plain white wedge kickers"). Each face is mapped in metres over
+  // PARK_TILE_M a repeat: the ends and the back by their own plane, the slope along its length (so a texture's rows run
+  // ACROSS the ramp, the way a shovel-cut does), the floor from above. Geometry and picking are untouched.
+  const slopeLen = Math.hypot(depth, height), T = PARK_TILE_M;
+  vd.uvs = [
+    lo / T, 0, hi / T, 0, hi / T, height / T,            // the −x end (z, y)
+    lo / T, 0, hi / T, height / T, hi / T, 0,            // the +x end
+    -hx / T, 0, hx / T, 0, hx / T, height / T, -hx / T, height / T,   // the back (x, y)
+    -hx / T, 0, hx / T, 0, hx / T, slopeLen / T, -hx / T, slopeLen / T,   // the slope (x, along it)
+    -hx / T, lo / T, -hx / T, hi / T, hx / T, hi / T, hx / T, lo / T,     // the floor (x, z)
+  ];
   let normals: number[] = []; VertexData.ComputeNormals(p, idx, normals);
   if (normals[10 * 3 + 1] < 0) {   // the slope must face UP: flip its two triangles if the winding came out underneath
     idx.splice(12, 6, 10, 12, 11, 10, 13, 12);
@@ -520,7 +549,6 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
     new Vector3(x, -Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
 
   const markers: Vector3[] = [];
-  const gateMatL = mat(scene, 'gateL', '#e23c50'), gateMatR = mat(scene, 'gateR', '#2c6fe2');
   // A slalom is a RHYTHM: left, right, left, at a spacing you can carve. This
   // was sin(i * 1.7) * 9, which is neither -- stepping a sine by 1.7 radians
   // aliases into a near-random sequence (0, +8.9, -2.3, -8.4, +4.4, +7.3 ...),
@@ -533,95 +561,67 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // 3.2m -> 5.0m a side (6.4m -> 10m gate to gate): comfortable at the top of
   // the course, genuinely demanding at the bottom. Gate 0 sits dead ahead so
   // the run starts fair rather than with an immediate cut across the hill.
-  const gateLeftM: Matrix[] = [], gateRightM: Matrix[] = [];
-  for (let i = 0; i < SLALOM_GATES; i++) {
-    const dist = slalomGateDist(i);
-    const cx = slalomGateX(i);
-    markers.push(onPiste(cx, dist));
-    for (const side of [-1, 1]) {
-      // one MATRIX per pole, not one mesh — batched below
-      (side < 0 ? gateLeftM : gateRightM).push(
-        Matrix.Translation(...(() => { const q = onPiste(cx + side * 1.7, dist).add(new Vector3(0, 0.8, 0)); return [q.x, q.y, q.z] as [number, number, number]; })()),
-      );
-    }
-  }
-  // THIN INSTANCES for the slalom poles. 24 poles were 24 draw calls and the mode flags its own budget at
-  // `draws 786 > 600`; they are the same cylinder in two colours, which is exactly what thin instances are for. Two
-  // masters (one per gate colour) carry the lot, so 24 draws become 2.
-  const gatePole = (name: string, m: Material, mats: Matrix[]): AbstractMesh | null => {
-    if (!mats.length) return null;
-    const master = MeshBuilder.CreateCylinder(name, { diameter: 0.12, height: 1.6 }, scene);
-    master.material = m;
-    const buf = new Float32Array(mats.length * 16);
-    mats.forEach((mm, i) => mm.copyToArray(buf, i * 16));
-    master.thinInstanceSetBuffer('matrix', buf, 16, true);
-    return master;
-  };
-  { const l = gatePole('gate', gateMatL, gateLeftM); if (l) all.push(l); }
-  { const r = gatePole('gate', gateMatR, gateRightM); if (r) all.push(r); }
+  for (let i = 0; i < SLALOM_GATES; i++) markers.push(onPiste(slalomGateX(i), slalomGateDist(i)));
+  const gates = buildSlalomGates(scene, all, markers, PITCH);
 
   // THE TREELINE — scenery, off-piste, and a VENUE NUMBER. The pines were teal once (they took the Kenney kit's
   // palette); they are a real conifer green mixed toward the venue's edge colour now, so the night park's trees go
   // dark with the rest of it. The glacier declares 0 and the loop simply does not run: "above the trees" is copy
   // the place has to honour.
-  const trunkM = mat(scene, 'trunk', mixHex('#5a3d26', P.edge, 0.3));
-  const leafM = mat(scene, 'leaf', mixHex('#1d4d2b', P.edge, 0.28));
-  // 22 trees were 44 draw calls (a trunk and a leaf each) and every one is the same pair of cylinders. Batched to two
-  // masters: 44 draws become 2. Together with the poles this is 68 of the mode's ~786.
-  const TREES = venue.trees ?? 22;
-  const trunkMats: Matrix[] = [], leafMats: Matrix[] = [];
-  for (let i = 0; i < TREES; i++) {
-    const dist = 10 + i * 9.5;
-    const x = (i % 2 ? 1 : -1) * (HALF - 2 + (i * 7) % 4);   // just outside the groom, whatever the groom's width is
-    const p = onPiste(x, dist);
-    const t = p.add(new Vector3(0, 0.7, 0)), l = p.add(new Vector3(0, 3, 0));
-    trunkMats.push(Matrix.Translation(t.x, t.y, t.z));
-    leafMats.push(Matrix.Translation(l.x, l.y, l.z));
-  }
-  const batch = (name: string, opts: Parameters<typeof MeshBuilder.CreateCylinder>[1], m: Material, mats: Matrix[]): AbstractMesh | null => {
-    if (!mats.length) return null;
-    const master = MeshBuilder.CreateCylinder(name, opts, scene);
-    master.material = m;
-    const buf = new Float32Array(mats.length * 16);
-    mats.forEach((mm, i) => mm.copyToArray(buf, i * 16));
-    master.thinInstanceSetBuffer('matrix', buf, 16, true);
-    return master;
-  };
-  { const t = batch('trunk', { diameter: 0.3, height: 1.4 }, trunkM, trunkMats); if (t) all.push(t); }
-  { const l = batch('leaf', { diameterTop: 0, diameterBottom: 1.9, height: 3.2 }, leafM, leafMats); if (l) all.push(l); }
+  // GATE-CRASHER-MAJOR (2026-09-28): THE TREELINE RUNS THE WHOLE MOUNTAIN, AND NONE OF IT STANDS IN THE GROOM. This was
+  // 22 cone-on-a-stick pines over the first 210 m of a 678 m run at HALF − 2 … HALF + 1 — half of them inside the rider's
+  // clamp (HALF − 1), ridden straight through — and the lower two thirds of the run had no trees at all: a white slope
+  // into grey fog, with nothing going past to say how fast the board was going. The spots are modes/gateCrasher
+  // `treeline` (tested: outside the clamp, no 40 m gap, down to the finish); each pine is a trunk, three tiers of
+  // needles and a cap of snow, five thin-instance masters for the whole forest.
+  // (the rocks' section below builds the park's painted materials; the forest takes its needles, bark and snow from them)
+  const treeSpots = treeline(HALF, RUN_LEN, venue.trees ?? 22).map((t) => ({ at: onPiste(t.x, t.dist), scale: t.scale }));
+  // THE EDGE YOU HIT IS AN EDGE YOU CAN SEE: piste poles just outside the rider's clamp, the whole way down (every venue,
+  // the glacier too — on a run with no trees they are the only thing passing at speed).
+  buildEdgePoles(scene, all, edgePoles(HALF, RUN_LEN).map((e) => onPiste(e.x, e.dist)), P.accent);
 
-  // ROCKS — actually on the piste, between gates, never ON a gate line
+  // ROCKS — actually on the piste, between gates, never ON a gate line. Solid now (GATE-CRASHER-MAJOR): a rock you do not
+  // jump is a rock you hit — the stumble AND a body that goes round it, not through it (measured: 15 frames inside one).
   const obstacles: RideObstacle[] = [];
-  const rockM = mat(scene, 'rockM', mixHex(P.edge, '#6b7079', 0.5));
-  for (let i = 0; i < 8; i++) {
-    const dist = 26 + i * 21;
-    const x = Math.sin(i * 2.9) * 10;
+  const solids: RideSolid[] = [];
+  const TAN = Math.tan(PITCH);
+  // GATE-CRASHER-POLISH-2 (2026-09-28): the park's painted materials (visual/snowParkTextures), one set per mount, and the
+  // rocks OFF THE RACING LINE (gateCrasher.rockSpots — rock 0 stood on the gate 0 → 1 line and wiped the eye's rider out at
+  // walking pace, x 1.0 z 24.8). The sphere is the rock's instant look and its fallback: the mode swaps in the Kenney kit's
+  // rocks when they load and hides these. Not pickable: the kit rocks drop onto the snow by a ray, not onto this.
+  const park = snowParkMaterials(scene, venue.id, P, { leaf: mixHex('#1f4a30', P.edge, 0.22), bark: mixHex('#4a3423', P.edge, 0.25), snow: P.ground });
+  const courseGates = Array.from({ length: SLALOM_GATES }, (_, i) => ({ x: slalomGateX(i), dist: slalomGateDist(i) }));
+  const featureSpans = SNOW_SLOPE.map((f) => ({ x0: f.lateral * HALF - f.width / 2, x1: f.lateral * HALF + f.width / 2, d0: f.dist, d1: f.dist + f.length }));
+  rockSpots(courseGates, featureSpans, HALF).forEach(({ x, dist }, i) => {
     const p = onPiste(x, dist);
-    const rock = MeshBuilder.CreateSphere(`rock_${i}`, { diameter: 1.7, segments: 6 }, scene);
+    const rock = MeshBuilder.CreateSphere(`rock_${i}`, { diameter: 1.7, segments: 10 }, scene);
     rock.position = p.add(new Vector3(0, 0.35, 0));
     rock.scaling.y = 0.55;
-    rock.material = rockM;
+    rock.material = park.rock; rock.isPickable = false;
     all.push(rock);
     obstacles.push({ pos: rock.position, radius: 1.0 });
-  }
+    solids.push({ kind: 'post', tag: `rock_${i}`, x: p.x, z: p.z, r: 0.8, y0: p.y, h: 0.35 + 0.85 * 0.55 });
+  });
 
-  // RAILS — three down-slope grind lines following the piste surface
+  buildPines(scene, all, treeSpots, park.pineLeaf, park.pineBark, park.pineSnow);
+
+  // THE LEGACY SLOPE-v2 RAILS AND THE ON-LINE KICKER ARE GONE (GATE-CRASHER-MAJOR). Three bare 9 cm bars hung 0.7 m over
+  // the snow with nothing holding them up — floating, and ridden through at knee height — and the one at x −5 ended ON
+  // gate 2's left pole line (the park's own rule is 7 m clear of any gate). The first box kicker sat on the racing line
+  // before gate 3, a 0.5 m slab whose corner lifted the rider 0.67 m in one frame. The park (snowSlope.ts) carries ten
+  // rails on real bodies and ten kickers, all off the line. The lift-cable launcher stays, as a ramp that starts at the snow.
   const grindLines: GrindLine[] = [];
-  for (const [x, d1, d2, bonus] of [[-5, 40, 58, 200], [6, 92, 112, 240], [-3, 150, 172, 280]] as const) {
-    makeRail(scene, all, grindLines,
-      onPiste(x, d1).add(new Vector3(0, 0.7, 0)),
-      onPiste(x, d2).add(new Vector3(0, 0.7, 0)), bonus);
-  }
-
-  // KICKERS — two launch ramps; the second sits under the lift cable
-  const kickM = mat(scene, 'kickM', P.structure);
-  for (const [x, dist] of [[3, 70], [11.5, 125]] as const) {
-    const kick = MeshBuilder.CreateBox('kicker', { width: 5, height: 0.5, depth: 4 }, scene);
-    kick.position = onPiste(x, dist).add(new Vector3(0, 0.7, 0));
-    kick.rotation.set(PITCH - 0.5, 0, 0);
+  const kickM = park.feature;
+  {
+    const [x, dist, w, len, h] = [11.5, 123, 5, 5, 1.8] as const;
+    const kick = rampWedge(scene, 'kicker', w, len, h, true);
+    kick.position.copyFrom(onPiste(x, dist + len / 2));
+    kick.rotation.x = PITCH;
     kick.material = kickM;
     kick.checkCollisions = true;
     all.push(kick); rideable.push(kick);
+    const z0 = Math.cos(PITCH) * dist, z1 = Math.cos(PITCH) * (dist + len);
+    solids.push({ kind: 'box', tag: 'kicker', x0: x - w / 2, x1: x + w / 2, z0, z1, y0: -TAN * z0, slope: -TAN, h: h / Math.cos(PITCH), ramp: true });
   }
 
   // SKI-LIFT — pylons down the right edge, cable strung pylon-to-pylon,
@@ -635,6 +635,7 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
     pylon.position = p.add(new Vector3(0, 2.7, 0));
     pylon.material = pylonM;
     all.push(pylon);
+    solids.push({ kind: 'post', tag: `pylon_${i}`, x: p.x, z: p.z, r: 0.18, y0: p.y, h: 5.4 });   // it stands in the groom: it is solid
     pylonTops.push(p.add(new Vector3(0, 5.2, 0)));
     // a hanging chair every other pylon — pure dressing
     if (i % 2 === 0) {
@@ -671,6 +672,8 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   const crowdSpots: Vector3[] = snowCrowd(HALF)
     .slice(0, Math.max(2, venue.crowd))
     .map((c) => onPiste(c.lateral, c.dist));
+  // they stand inside the rider's clamp (HALF − 6 … HALF − 4.6): a board goes round a person, never through one
+  crowdSpots.forEach((c, i) => solids.push({ kind: 'post', tag: `crowd_${i}`, x: c.x, z: c.z, r: 0.45, y0: c.y, h: 1.8 }));
   // ── THE SNOW PARK (BOARD-10PHASE P3) ──────────────────────────────────────────────────────────────────────
   //
   // Phase 1 measured snow at ONE grind line, and it was the ski-lift cable — so snow had nothing to grind and
@@ -678,37 +681,261 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // middle stays the racing line and no feature fouls a slalom gate. The layout is modes/snowSlope.ts, as data,
   // for the reason skatePlaza is: this builder makes a DynamicTexture before it places anything, so nothing
   // authored inline here can be reached by a headless test.
-  const snowFeatM = mat(scene, `snowFeat_${venue.id}`, mixHex(P.structure, '#ffffff', 0.18));
-  const snowRailM = mat(scene, `snowRail_${venue.id}`, '#d8dce2');
+  // GATE-CRASHER-MAJOR (2026-09-28): THE PARK SAT AGAINST THE SLOPE. Every feature was built at rotation.x = −PITCH
+  // while the piste is +PITCH, so each one was counter-tilted 25° to the snow: buried ~2 m at its uphill end and jutting
+  // up to 3 m into the air at its downhill end (measured on the alpine run: the 12 m box's low end 2.2 m under the snow,
+  // its high end 3.0 m over it), while the rail's grind line followed the snow — a grind on nothing beside a bar in the
+  // sky. These were the "white slabs" in every snowboard frame. They sit ON the piste now (+PITCH, centred on the span the
+  // data names: dist … dist + length), and they are not greybox: kickers and rollers are packed snow a shade off the groom
+  // with a painted lip, jib boxes and rail stands are dark with a light slide deck, the wallrides are painted.
+  // GATE-CRASHER-POLISH-2: and they are PAINTED now (visual/snowParkTextures): packed snow with shovel ridges and a normal map on
+  // the kickers and rollers, hazard-banded steel jib boxes with an HDPE deck, plywood wallrides with a chevron band, steel
+  // rail stands — the eye's "grey box walls, plain white wedge kickers" (GC-4).
+  const snowFeatM = park.feature, snowRailM = park.rail, snowBoxM = park.box, snowWallM = park.wall, deckM = park.deck, lipM = park.lip;
+  const up = new Vector3(0, Math.cos(PITCH), Math.sin(PITCH));   // the piste's normal: a feature's "up"
   for (const feat of SNOW_SLOPE) {
-    const at = onPiste(feat.lateral * HALF, feat.dist + feat.length / 2);
+    const x = feat.lateral * HALF;
+    const z0 = Math.cos(PITCH) * feat.dist, z1 = Math.cos(PITCH) * (feat.dist + feat.length);
+    const hv = feat.height / Math.cos(PITCH);                    // the height measured straight up, for the solid
+    const x0 = x - feat.width / 2, x1 = x + feat.width / 2;
     if (feat.kind === 'kicker' || feat.kind === 'roller') {
       const w = rampWedge(scene, `snow_${feat.kind}`, feat.width, feat.length, feat.height, true);
-      w.position.copyFrom(onPiste(feat.lateral * HALF, feat.dist));
-      w.rotation.x = -PITCH;                       // the piste is pitched; a kicker sits ON it, not level with the world
+      w.position.copyFrom(onPiste(x, feat.dist + feat.length / 2));
+      w.rotation.x = PITCH;                        // the piste is pitched; a kicker sits ON it, not level with the world
       w.material = snowFeatM;
       w.checkCollisions = true;
       all.push(w); rideable.push(w);
+      solids.push({ kind: 'box', tag: `snow_${feat.kind}`, x0, x1, z0, z1, y0: -TAN * z0, slope: -TAN, h: hv, ramp: true });
+      if (feat.kind === 'kicker') {
+        // the painted lip: where the ramp ends is the one line a rider has to read at speed
+        const lip = MeshBuilder.CreateBox('snow_lip', { width: feat.width, height: 0.06, depth: 0.35 }, scene);
+        lip.position.copyFrom(onPiste(x, feat.dist + feat.length - 0.2).add(up.scale(feat.height + 0.02)));
+        lip.rotation.x = PITCH;
+        lip.material = lipM; lip.isPickable = false;
+        all.push(lip);
+      }
       continue;
     }
     const body = MeshBuilder.CreateBox(`snow_${feat.kind}`, {
       width: feat.width, height: feat.height, depth: feat.length,
+      faceUV: parkBoxUV(feat.width, feat.height, feat.length, feat.kind !== 'rail'),   // metres along the run; the band once up a side
+      wrap: true,   // every side face upright (without it the long ±x faces map the texture turned 90°: bands ran vertical)
     }, scene);
-    body.position.copyFrom(at);
-    body.position.y += feat.height / 2;
-    body.rotation.x = -PITCH;
-    body.material = feat.kind === 'rail' ? snowRailM : snowFeatM;
+    body.position.copyFrom(onPiste(x, feat.dist + feat.length / 2).add(up.scale(feat.height / 2)));
+    body.rotation.x = PITCH;
+    body.material = feat.kind === 'rail' ? snowRailM : feat.kind === 'wallride' ? snowWallM : snowBoxM;
     body.checkCollisions = true;
     all.push(body); rideable.push(body);
+    solids.push({ kind: 'box', tag: `snow_${feat.kind}`, x0, x1, z0, z1, y0: -TAN * z0, slope: -TAN, h: hv, ramp: false });
+    if (feat.kind === 'box') {
+      // the slide deck: a light top on a dark box, so a jib box reads as one from the top of the run
+      const deck = MeshBuilder.CreateBox('snow_deck', { width: feat.width + 0.04, height: 0.05, depth: feat.length + 0.04, faceUV: parkBoxUV(feat.width + 0.04, 0.05, feat.length + 0.04) }, scene);
+      deck.position.copyFrom(onPiste(x, feat.dist + feat.length / 2).add(up.scale(feat.height + 0.02)));
+      deck.rotation.x = PITCH;
+      deck.material = deckM; deck.isPickable = false;
+      all.push(deck);
+    }
     if (feat.bonus > 0) {
-      const a = onPiste(feat.lateral * HALF, feat.dist);
-      const b = onPiste(feat.lateral * HALF, feat.dist + feat.length);
-      a.y += feat.height; b.y += feat.height;
+      // the grind line on the body's top edge, along the piste's normal — the bar you see is the bar you lock
+      const a = onPiste(x, feat.dist).add(up.scale(feat.height));
+      const b = onPiste(x, feat.dist + feat.length).add(up.scale(feat.height));
       makeRail(scene, all, grindLines, a, b, feat.bonus);
     }
   }
 
-  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, dispose: () => all.forEach((m) => m.dispose()) };
+  // THE FINISH (GATE-CRASHER-MAJOR). The run ended at the last gate with nothing there — a white slope into fog, and the
+  // whistle. An arch across the groom FINISH_AFTER_M past the last gate is where the run ends now, and the mode ends it
+  // when the rider crosses its line.
+  const finishDist = slalomGateDist(SLALOM_GATES - 1) + FINISH_AFTER_M;
+  const finish = onPiste(0, finishDist);
+  buildFinishArch(scene, all, finish, HALF, PITCH, P.accent);
+
+  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, solids, gates, finish, dispose: () => { all.forEach((m) => m.dispose()); park.dispose(); } };
+}
+
+// ── GATE-CRASHER-MAJOR builders: the gates, the pines, the edge poles and the finish ─────────────────────────────────────
+const GATE_COLOR: Record<'L' | 'R' | 'hit' | 'miss' | 'stripAhead' | 'stripNext' | 'stripHit' | 'stripMiss', string> = {
+  L: '#e23c50', R: '#2c6fe2', hit: '#22c55e', miss: '#5b6472',
+  stripAhead: '#9fb3cc', stripNext: '#10d8f0', stripHit: '#22c55e', stripMiss: '#ef4444',
+};
+const POLE_H = 1.8;
+
+/**
+ * THE GATE TELLS YOU (GATE-CRASHER-MAJOR). A gate was two bare poles and a banner at the top of the screen: nothing on the
+ * mountain said which gate was next, whether you made the last one, or where the line between the poles ran. Now every
+ * pole carries a flag panel, a strip is painted on the snow between the poles (the line the verdict is judged on), the
+ * NEXT gate's strip is lit and a marker hangs over it, a gate you make goes green and one you miss goes grey with a red
+ * strip, and a pole a body brushes whips. Four thin-instance masters and one marker for all thirty gates.
+ */
+function buildSlalomGates(scene: Scene, all: AbstractMesh[], markers: Vector3[], pitch: number): SlalomGateFx {
+  const n = markers.length;
+  const white = mat(scene, 'gatePoleM', '#ffffff');
+  const poles = MeshBuilder.CreateCylinder('gate', { diameter: 0.12, height: POLE_H }, scene);
+  const flags = MeshBuilder.CreateBox('gate_flag', { width: 0.62, height: 0.5, depth: 0.03 }, scene);
+  const strips = MeshBuilder.CreateBox('gate_strip', { width: GATE_HALF_WIDTH * 2, height: 0.02, depth: 0.24 }, scene);
+  for (const m of [poles, flags, strips]) { m.material = white; m.isPickable = false; all.push(m); }
+  const rot = Quaternion.RotationYawPitchRoll(0, pitch, 0);
+  const col = (hex: string): [number, number, number, number] => { const c = Color3.FromHexString(hex); return [c.r, c.g, c.b, 1]; };
+  const poleBase: Vector3[] = [];
+  const poleBuf = new Float32Array(n * 2 * 16), flagBuf = new Float32Array(n * 2 * 16), stripBuf = new Float32Array(n * 16);
+  const poleCol = new Float32Array(n * 2 * 4), stripCol = new Float32Array(n * 4);
+  const tmp = new Matrix();
+  const poleMatrix = (k: number, lean: number, out: Matrix): void => {
+    // a pole leans about its BASE (the whip): rotate the upright pole, then stand it on the snow
+    const q = Quaternion.RotationYawPitchRoll(0, 0, lean);
+    const c = new Vector3(0, POLE_H / 2, 0).rotateByQuaternionToRef(q, new Vector3());
+    Matrix.ComposeToRef(Vector3.OneReadOnly, q, poleBase[k].add(c), out);
+  };
+  const flagMatrix = (k: number, lean: number, out: Matrix): void => {
+    const side = k % 2 === 0 ? -1 : 1;
+    const q = Quaternion.RotationYawPitchRoll(0, 0, lean);
+    const c = new Vector3(side * 0.37, POLE_H - 0.3, 0).rotateByQuaternionToRef(q, new Vector3());
+    Matrix.ComposeToRef(Vector3.OneReadOnly, q, poleBase[k].add(c), out);
+  };
+  for (let i = 0; i < n; i++) {
+    const g = markers[i];
+    for (const side of [-1, 1]) {
+      const k = i * 2 + (side < 0 ? 0 : 1);
+      poleBase[k] = new Vector3(g.x + side * GATE_HALF_WIDTH, g.y, g.z);   // the piste falls away along z only
+      poleMatrix(k, 0, tmp); tmp.copyToArray(poleBuf, k * 16);
+      flagMatrix(k, 0, tmp); tmp.copyToArray(flagBuf, k * 16);
+      poleCol.set(col(side < 0 ? GATE_COLOR.L : GATE_COLOR.R), k * 4);
+    }
+    Matrix.ComposeToRef(Vector3.OneReadOnly, rot, g.add(new Vector3(0, Math.cos(pitch) * 0.02, 0)), tmp); tmp.copyToArray(stripBuf, i * 16);
+    stripCol.set(col(GATE_COLOR.stripAhead), i * 4);
+  }
+  poles.thinInstanceSetBuffer('matrix', poleBuf, 16, false); poles.thinInstanceSetBuffer('color', poleCol, 4, false);
+  flags.thinInstanceSetBuffer('matrix', flagBuf, 16, false); flags.thinInstanceSetBuffer('color', new Float32Array(poleCol), 4, false);
+  strips.thinInstanceSetBuffer('matrix', stripBuf, 16, true); strips.thinInstanceSetBuffer('color', stripCol, 4, false);
+
+  // the marker over the next gate: a lit chevron that bobs, the one bright thing on the run
+  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 0.9, diameterBottom: 0, height: 0.8, tessellation: 4 }, scene);
+  const markM = new PBRMaterial('gateNextM', scene);
+  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(0.9);
+  markM.metallic = 0; markM.roughness = 0.6;
+  marker.material = markM; marker.isPickable = false; marker.setEnabled(false);
+  all.push(marker);
+
+  const whip: { k: number; t: number; dir: number }[] = [];
+  let next = -1, clock = 0;
+  const paintGate = (i: number, pole: string | null, strip: string): void => {
+    for (let s = 0; s < 2; s++) {
+      const k = i * 2 + s;
+      const c = col(pole ?? (s === 0 ? GATE_COLOR.L : GATE_COLOR.R));
+      poles.thinInstanceSetAttributeAt('color', k, c, false);
+      flags.thinInstanceSetAttributeAt('color', k, c, false);
+    }
+    strips.thinInstanceSetAttributeAt('color', i, col(strip), false);
+    poles.thinInstanceBufferUpdated('color'); flags.thinInstanceBufferUpdated('color'); strips.thinInstanceBufferUpdated('color');
+  };
+  return {
+    set(i, s) {
+      if (i < 0 || i >= n) return;
+      if (s === 'hit') paintGate(i, GATE_COLOR.hit, GATE_COLOR.stripHit);
+      else if (s === 'miss') paintGate(i, GATE_COLOR.miss, GATE_COLOR.stripMiss);
+      else if (s === 'next') { paintGate(i, null, GATE_COLOR.stripNext); next = i; marker.setEnabled(true); }
+      else paintGate(i, null, GATE_COLOR.stripAhead);
+      if (s !== 'next' && next === i) { next = -1; marker.setEnabled(false); }
+    },
+    brush(i, side) {
+      if (i < 0 || i >= n) return;
+      whip.push({ k: i * 2 + (side < 0 ? 0 : 1), t: 0, dir: side < 0 ? 1 : -1 });
+    },
+    update(dt) {
+      clock += dt;
+      if (next >= 0) marker.position.set(markers[next].x, markers[next].y + 3.1 + Math.sin(clock * 4) * 0.18, markers[next].z);
+      marker.rotation.y = clock * 1.6;
+      if (!whip.length) return;
+      for (const w of whip) {
+        w.t += dt;
+        const lean = w.dir * 0.55 * Math.exp(-w.t * 5) * Math.sin(w.t * 26);   // a flex pole slapped aside, ringing out
+        poleMatrix(w.k, lean, tmp); poles.thinInstanceSetMatrixAt(w.k, tmp, false);
+        flagMatrix(w.k, lean, tmp); flags.thinInstanceSetMatrixAt(w.k, tmp, false);
+      }
+      poles.thinInstanceBufferUpdated('matrix'); flags.thinInstanceBufferUpdated('matrix');
+      for (let j = whip.length - 1; j >= 0; j--) if (whip[j].t > 1.2) whip.splice(j, 1);
+    },
+  };
+}
+
+/** Snow-capped pines: a trunk, three tiers of needles, a cap of snow — five masters for the whole forest. */
+function buildPines(scene: Scene, all: AbstractMesh[], spots: { at: Vector3; scale: number }[], leaf: Material, bark: Material, snow: Material): void {
+  if (!spots.length) return;
+  const trunk = MeshBuilder.CreateCylinder('pine_trunk', { diameterTop: 0.22, diameterBottom: 0.36, height: 1.6, tessellation: 7 }, scene);
+  const tier = MeshBuilder.CreateCylinder('pine_tier', { diameterTop: 0, diameterBottom: 3, height: 2.6, tessellation: 9 }, scene);
+  const cap = MeshBuilder.CreateCylinder('pine_cap', { diameterTop: 0, diameterBottom: 1.25, height: 1.05, tessellation: 9 }, scene);
+  trunk.material = bark; tier.material = leaf; cap.material = snow;   // GATE-CRASHER-POLISH-2: needles, bark and snow, painted (snowParkTextures)
+  // [mesh, height of its centre on a 1.0 tree, width scale] — three tiers of one cone, narrowing up the tree
+  const parts: [Mesh, number, number][] = [[trunk, 0.8, 1], [tier, 2.4, 1], [tier, 3.6, 0.76], [tier, 4.6, 0.52], [cap, 5.35, 1]];
+  const bufs = new Map<Mesh, number[]>([[trunk, []], [tier, []], [cap, []]]);
+  for (const sp of spots) {
+    for (const [mesh, y, w] of parts) {
+      const s = sp.scale * w, sy = sp.scale * (0.6 + 0.4 * w);
+      bufs.get(mesh)!.push(...Matrix.Compose(new Vector3(s, sy, s), Quaternion.Identity(), sp.at.add(new Vector3(0, y * sp.scale, 0))).asArray());
+    }
+  }
+  for (const [mesh, buf] of bufs) {
+    mesh.isPickable = false;
+    mesh.thinInstanceSetBuffer('matrix', new Float32Array(buf), 16, true);
+    all.push(mesh);
+  }
+}
+
+/** Piste edge poles: orange, one black band — the marker every real run has, and the parallax a fast board reads. */
+function buildEdgePoles(scene: Scene, all: AbstractMesh[], at: Vector3[], accentHex: string): void {
+  if (!at.length) return;
+  const pole = MeshBuilder.CreateCylinder('edge_pole', { diameter: 0.07, height: 1.5, tessellation: 6 }, scene);
+  const band = MeshBuilder.CreateCylinder('edge_band', { diameter: 0.075, height: 0.28, tessellation: 6 }, scene);
+  pole.material = mat(scene, 'edgePoleM', mixHex('#ff7a1a', accentHex, 0.15));
+  band.material = mat(scene, 'edgeBandM', '#15181d');
+  const pb: number[] = [], bb: number[] = [];
+  for (const a of at) {
+    pb.push(...Matrix.Translation(a.x, a.y + 0.75, a.z).asArray());
+    bb.push(...Matrix.Translation(a.x, a.y + 1.2, a.z).asArray());
+  }
+  for (const [m, buf] of [[pole, pb], [band, bb]] as const) {
+    m.isPickable = false;
+    m.thinInstanceSetBuffer('matrix', new Float32Array(buf), 16, true);
+    all.push(m);
+  }
+}
+
+/** The finish arch: two towers and a checkered FINISH banner across the whole groom, and a checkered line on the snow. */
+function buildFinishArch(scene: Scene, all: AbstractMesh[], at: Vector3, half: number, pitch: number, accentHex: string): void {
+  const towerM = mat(scene, 'finishTowerM', mixHex('#20252e', accentHex, 0.2));
+  for (const side of [-1, 1]) {
+    const t = MeshBuilder.CreateBox('finish_tower', { width: 0.6, height: 6, depth: 0.6 }, scene);
+    t.position.set(side * (half - 0.2), at.y + 3, at.z);
+    t.material = towerM; t.isPickable = false;
+    all.push(t);
+  }
+  const tex = new DynamicTexture('finishTex', { width: 1024, height: 128 }, scene, false);
+  const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+  for (let i = 0; i < 64; i++) for (let j = 0; j < 8; j++) { g.fillStyle = (i + j) % 2 ? '#111111' : '#f5f5f5'; g.fillRect(i * 16, j * 16, 16, 16); }
+  g.fillStyle = accentHex; g.fillRect(300, 16, 424, 96);
+  g.fillStyle = '#ffffff'; g.font = 'bold 84px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('FINISH', 512, 66);
+  tex.update();
+  // one 8:1 panel of FINISH, repeated along a banner as wide as the groom (never stretched: the text keeps its shape)
+  const BANNER_H = 1.4;
+  tex.uScale = Math.max(1, Math.round((half * 2) / BANNER_H / 8));
+  const banM = new PBRMaterial('finishBannerM', scene);
+  banM.albedoTexture = tex; banM.emissiveTexture = tex; banM.emissiveColor = new Color3(0.55, 0.55, 0.55);
+  banM.metallic = 0; banM.roughness = 0.9; banM.backFaceCulling = false;
+  const banner = MeshBuilder.CreatePlane('finish_banner', { width: half * 2, height: BANNER_H }, scene);
+  banner.position.set(0, at.y + 6 - BANNER_H / 2, at.z);   // across the tops of the towers: the rider rides under it
+  banner.material = banM; banner.isPickable = false;
+  all.push(banner);
+  const lineTex = new DynamicTexture('finishLineTex', { width: 512, height: 32 }, scene, false);
+  const lg = lineTex.getContext() as unknown as CanvasRenderingContext2D;
+  for (let i = 0; i < 32; i++) for (let j = 0; j < 2; j++) { lg.fillStyle = (i + j) % 2 ? '#111111' : '#f5f5f5'; lg.fillRect(i * 16, j * 16, 16, 16); }
+  lineTex.update();
+  const lineM = new PBRMaterial('finishLineM', scene);
+  lineM.albedoTexture = lineTex; lineM.metallic = 0; lineM.roughness = 0.95;
+  const line = MeshBuilder.CreateGround('finish_line', { width: half * 2, height: 0.8 }, scene);
+  line.position.set(0, at.y + 0.03, at.z);
+  line.rotation.x = pitch;
+  line.material = lineM; line.isPickable = false;
+  all.push(line);
 }
 
 // ── SURF v3 — the curling funnel wave + buoys ──────────────────────────────
