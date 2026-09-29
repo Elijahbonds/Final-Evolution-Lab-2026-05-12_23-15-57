@@ -15,11 +15,14 @@ export function BoostGauge({ hud, className = '' }: { hud: Record<string, HudVal
   return (
     <div className={`pointer-events-none flex flex-col items-center gap-1 ${className}`} data-testid="boost-gauge">
       <style>{`@keyframes felBoostFlash { 0%,100% { box-shadow: 0 0 6px #22d3ee88 } 50% { box-shadow: 0 0 26px #22d3ee, 0 0 4px #fff inset } }`}</style>
-      <div className="flex items-baseline gap-2">
-        <span className={`font-mono text-[11px] font-black tracking-[0.3em] ${burning ? 'text-white' : 'text-[#22d3ee]'}`}>
+      {/* GATE-CRASHER-POLISH-2 (GC-F2): the label on a dark chip. "HOLD RB · SHIFT" was white at 50% on whatever the frame was —
+          unreadable over snow, and the cyan BOOST beside it barely better. A mode can say its own words for the hint
+          (`boostHint`: Gate Crasher's body player is told how the meter FILLS, GC-13); every other host keeps the keys. */}
+      <div className="flex items-baseline gap-2 rounded-full bg-black/60 px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.35)]">
+        <span className={`font-mono text-[11px] font-black tracking-[0.3em] ${burning ? 'text-white' : 'text-[#5eead4]'}`}>
           {burning ? 'BOOSTING' : full ? 'BOOST READY' : denied ? 'BOOST EMPTY' : 'BOOST'}
         </span>
-        <span className={`font-mono text-[10px] ${denied ? 'text-[#ff6b3d]' : 'text-white/50'}`}>{denied ? 'EARN IT: TRICKS · DRIFTS · PADS' : 'HOLD RB · SHIFT'}</span>
+        <span className={`font-mono text-[10px] font-bold ${denied ? 'text-[#ff8a5c]' : 'text-white/90'}`}>{denied ? 'EARN IT: TRICKS · DRIFTS · PADS' : typeof hud.boostHint === 'string' ? hud.boostHint : 'HOLD RB · SHIFT'}</span>
       </div>
       <div className="h-2.5 w-44 overflow-hidden rounded-full border border-[#22d3ee]/60 bg-black/50"
         style={{ animation: full && !burning ? 'felBoostFlash 0.7s ease-in-out infinite' : undefined }}>

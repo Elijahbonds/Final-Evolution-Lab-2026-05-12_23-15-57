@@ -17,14 +17,15 @@ import { stepSpeedFov } from '../core/SpeedFov';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost replaces the tuck-spent meter
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
-import { Vector3 } from '@babylonjs/core';
+import { Ray, Vector3 } from '@babylonjs/core';
+import type { ShadowGenerator } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { trickFor, bestFitting, airPressFor, asTrickDef, heldTrickDir, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
-import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
+import { boardPose, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out
 import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
 import { readBoardVenue, tuneForVenue, rideOf as mountainRideOf } from '../nexus/boardVenues';   // three mountains, not three tints of one
@@ -42,12 +43,18 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
-import { SnowSpray } from '../premium/SnowSpray';   // GATE-CRASHER-MAJOR: edge spray, carve tracks, powder
+import { VENUE_PROP_SETS } from '../visual/venuePropSets';
+import { SnowSpray, SnowShadow } from '../premium/SnowSpray';   // GATE-CRASHER-MAJOR: edge spray, carve tracks, powder · POLISH-2: the air shadow
+import { upgradeAlpineSky, type AlpineSkyHandle } from '../premium/AlpineSky';   // GATE-CRASHER-POLISH-2 (GC-3): the mountains at the camera's resolution
+import { dressSnowOutfit, type SnowOutfitHandle } from '../premium/snowOutfit';   // GATE-CRASHER-POLISH-2 (GC-8): a snow jacket and pants
 import {
-  crashTarget, crashGoal, crashChip, judgeGate, resolveSolids, wipeRoll, WIPE_SEC, WIPE_FRICTION, SNOW_BANK_GAIN, carveSpeed01,
+  crashTarget, crashGoal, crashChip, judgeGate, resolveSolids, wipeRoll, WIPE_SEC, WIPE_FRICTION, carveSpeed01,
   SNOW_SCRUB, rampUnder, kickerPop,
   type RideSolid,
 } from './gateCrasher';   // GATE-CRASHER-MAJOR: the slalom's rules and the mountain's solids, pure and tested
+import {
+  snowBank, rockOutcome, ROCK_STUMBLE_KEEP, airLeftSec, shortenToAir, timeBonus, TIME_PAR_SEC, stallAction, STALL_SPEED, STALL_NUDGE_SEC, STALL_END_SEC,
+} from './gateCrasher';   // GATE-CRASHER-POLISH-2: the carve, the rocks, the air left, the time curve, the stall
 // MOVEMENT PLAY P8 (2026-09-26): the body's grab and spin in the air, the body coyote off a kicker, and the rail inferred for
 // a body rider (a second hop in the air is not a natural body move, so the magnet catches the line skate's way)
 import { RideIntents, rideOf, rideLines, stickXFromBody, BODY_COYOTE_MS, type RideIntent } from '../core/rideBody';
@@ -77,6 +84,27 @@ export const BOOST_PER_SPIN = 12;
 /** Ceiling on the boost meter. */
 export const BOOST_MAX = 100;
 
+/** A touch-only device (a phone or tablet): a coarse pointer and no pad on the input layer's roster (GATE-CRASHER-POLISH-2,
+ *  GC-3 / GC-7). The roster is the bus's (InputBus.pads) — no mode file reads the Gamepad API itself (noRawIndices.test). */
+function touchOnly(ctx: ModeContext): boolean {
+  try {
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    return coarse && ctx.input.pads().length === 0;
+  } catch { return false; }
+}
+
+/**
+ * GATE-CRASHER-POLISH-2 (GC-13): the HUD's words for whoever is playing. A body the camera sees was told "hold RB / Shift to
+ * BOOST" and shown a gamepad at its feet; it carves with a lean, tucks with a crouch, jumps with a hop, grabs with a hand to
+ * the board and spins with the shoulders (phase 8's card). The boost stays on the pad / keys / touch deck by design, so the
+ * body's gauge says how it FILLS, not which key burns it.
+ */
+function hudFor(body: boolean): { hint: string; boostHint: string } {
+  return body
+    ? { hint: 'Lean to carve between the poles · crouch to tuck · hop to jump · a hand to the board grabs · turn your shoulders to spin', boostHint: 'FILLS FROM GATES + TRICKS' }
+    : { hint: 'Between the poles for 100 · JUMP rocks · grind the rails · hold RB / Shift to BOOST', boostHint: 'HOLD RB · SHIFT' };
+}
+
 export const SnowboardSlalomMode: ModeDefinition = (() => {
   let world: RideWorld, rig: BoardRig, tricks: TrickMachine;
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
@@ -98,6 +126,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
    *  stick's dismount over the middle of a rail was caught again ~0.2 s later, and paid again, until the rail's end band) */
   const BODY_RAIL_RELOCK_MS = 350;
   let wasGrinding = false, relockUntil = -1;
+  let bodyGrabbing = false;   // GATE-CRASHER-POLISH-2 (GC-12): a body grab in flight
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let ended = false;
   let stumbleIframe = 0;
@@ -130,6 +159,61 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let lastRamp: RideSolid | null = null, lastRampT = 0;   // the kicker under the board a moment ago (its lip is a pop)
   /** BAIL HONESTY (2026-09-21): true while the board is against the edge of the piste, so one slam is one fall. */
   let edgeHit = false;
+  // GATE-CRASHER-POLISH-2 (2026-09-28): the eye's GC list on 46a8dc6a / 9096d7cf
+  let bankRoll = 0;                                    // GC-5: the carve's roll, the mode's alone (see snowBank)
+  let shadow: SnowShadow | null = null;                // GC-6: the snow's own shadow under the rider, on the ground and in the air
+  let sky: AlpineSkyHandle | null = null;              // GC-3: the mountains at 4096 px, riding the camera
+  let outfit: SnowOutfitHandle | null = null;          // GC-8: the snow jacket and pants
+  let rockProps: VenuePropsHandle | null = null;       // GC-4: the Kenney kit's rocks over the rock solids
+  let stillSec = 0, lastNudgeAt = -1e9;                // GC-F1: the stall watchdog
+  let bodyHud: boolean | null = null;                  // GC-13: whose words the HUD says (a body's, or a pad's / keys' / touch's)
+  let ringHidden = false;                              // GC-7 / GC-13: the harness ring and its pad glyph
+  let xRefused = false;                                // GC-2: an X the air could not hold — its release ends nothing
+  let lastTrickNote = '';                              // GC-2: the last press the air shortened or refused (the probe reads it)
+  const DOWN = new Vector3(0, -1, 0);
+  /** GC-2: seconds of air the rider has left — the snow under him by a ray against the ground he rides, the pitched piste
+   *  falling away under a board moving down it. 0 on the snow. */
+  function airLeftNow(ctx: ModeContext): number {
+    if (rig.rider.grounded) return 0;
+    const p = rig.char.root.position;
+    const hit = ctx.scene.pickWithRay(new Ray(new Vector3(p.x, p.y + 0.3, p.z), DOWN, 90), (m) => world.ground.includes(m));
+    const h = hit?.hit && hit.pickedPoint ? p.y - hit.pickedPoint.y : 0;
+    return airLeftSec(h, rig.rider.vel.y, Math.tan(pitch) * Math.max(0, rig.rider.vel.z));
+  }
+  /** GC-2: the trick a press may throw with the air that is left — the one asked for, the biggest shorter spin, or none
+   *  (answered: NO AIR LEFT; the trick already going keeps going). */
+  function fitToAir(ctx: ModeContext, want: BoardTrick, who: 'pad' | 'body'): BoardTrick | null {
+    const left = airLeftNow(ctx);
+    const cut = shortenToAir(want, left);
+    if (cut === want) return want;
+    lastTrickNote = cut ? `${want.label} → ${cut.label} @${left.toFixed(2)}s` : `${want.label} refused @${left.toFixed(2)}s`;
+    console.info(`[SNOW-TRICK] ${who} ${lastTrickNote}`);
+    if (!cut) refuse(ctx, 'NO AIR LEFT');
+    return cut;
+  }
+  /**
+   * GC-6: THE DARK ELLIPSES WERE NOT SHADOWS OF THE RIDER. Measured frame by frame (the frame frozen, one thing switched off at a
+   * time): (1) the light rig makes every new mesh a shadow caster by name, so each boost shard hovering 0.9 m over the snow threw a
+   * blurred disc of its own — the eye's ellipse "well away from the rider", the pale shard the "white ghost" beside it; (2) the
+   * quality tier's SSAO reads a geometry buffer that records TRANSPARENT meshes' depth too, so a faint disc lying 3 cm over the snow
+   * (the shared contact disc hung at take-off height; this mode's own shadow at alpha 0.02, 3.4 m under a flying rider) was
+   * outlined as a hard dark crease whatever its alpha. Here: the shards, the shadow disc and the carve tracks cast nothing, and
+   * this scene's geometry buffer skips transparent meshes (an alpha-blended surface occludes nothing). Idempotent.
+   */
+  let decorQuiet = false;
+  function quietDecor(ctx: ModeContext): void {
+    for (const l of ctx.scene.lights) {
+      const sg = l.getShadowGenerator?.() as ShadowGenerator | null | undefined;
+      if (!sg?.removeShadowCaster) continue;
+      for (const m of ctx.scene.meshes) if (/^boostPad\d|^snow_air_shadow$|^snow_track$/.test(m.name)) sg.removeShadowCaster(m, true);
+    }
+    const gbr = (ctx.scene as unknown as { geometryBufferRenderer?: { renderTransparentMeshes: boolean } | null }).geometryBufferRenderer;
+    if (gbr) gbr.renderTransparentMeshes = false;
+  }
+  /** Truly in the air (the tree's read): a one-frame flicker off the pitched piste is not a jump a grab can be thrown in. */
+  function inRealAir(): boolean {
+    return !rig.rider.grounded && !rig.rider.grinding && bailBeatT <= 0 && (airT > 0.1 || rig.rider.vel.y > 0.5);
+  }
   const BAIL_BEAT_SEC = WIPE_SEC, LAND_BEAT_SEC = 0.4;   // the tree holds the bail as long as the body is down
   /** A WIPEOUT: the tree's bail beat, the body laid over in the snow (wipeRoll), powder. Every fall in the mode comes here. */
   function startWipe(side: number): void {   // (the fall's puff is powder: the brown 'dust' burst read as dirt on the snow)
@@ -227,7 +311,9 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   /** MOVEMENT PLAY P8: the body's grab and spin in the air, and the rail a body rider falls onto. */
   function bodyVerbs(ctx: ModeContext): void {
     const view = ctx.body?.() ?? null;
-    const airborne = !rig.rider.grounded && !rig.rider.grinding && bailBeatT <= 0;
+    // GATE-CRASHER-POLISH-2 (GC-12): REAL air, the tree's own read — a one-frame flicker off the pitched piste took a hand at
+    // the edge as a grab thrown on the snow: the INDY called, the landing the next frame, no grab ever seen
+    const airborne = inRealAir();
     for (const it of rideIntents.poll(view, { airborne })) bodyVerb(ctx, it);
     // (a grind just ended — the rail's end, a dismount — holds the magnet off for BODY_RAIL_RELOCK_MS, skate's rule)
     if (wasGrinding && !rig.rider.grinding) relockUntil = performance.now() + BODY_RAIL_RELOCK_MS;
@@ -244,16 +330,27 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   }
   function bodyVerb(ctx: ModeContext, it: RideIntent): void {
     if (it.kind === 'grab') {
-      const t = grabTrickFor('snow', it.hand, it.edge, AIR_BUDGET_SEC);
+      // GATE-CRASHER-POLISH-2 (GC-2): named from the hand and the edge as phase 8 names it, then held to the air that is LEFT
+      const named = grabTrickFor('snow', it.hand, it.edge, AIR_BUDGET_SEC);
+      const t = named ? fitToAir(ctx, named, 'body') : null;
       if (!t) return;
       tricks.start(asTrickDef(t)); trickLayer?.start(t);
+      bodyGrabbing = true;   // GC-12: the grab pose holds while the hand does (released on grabEnd / the landing)
       ctx.setHud({ banner: t.label }); setTimeout(() => ctx.setHud({ banner: '' }), 520);
       bodyStats.grabs++; bodyStats.last = t.label;
       console.info(`[SNOW-BODY] grab ${it.hand}/${it.edge ?? '-'} → ${t.label}`);
     } else if (it.kind === 'grabEnd') {
+      // GATE-CRASHER-POLISH-2 (GC-12): A BODY'S GRAB IS HELD TO THE LANDING. The hand is at the board's edge only while the
+      // PLAYER is in the air — a real hop's ~0.4 s — and the game's rider flies 1.1–1.4 s: the grab ended a third of a second
+      // into the air and he flew the rest arms-out under the INDY call (the eye's b1x-ride-22000). In the air the hand coming
+      // up ends nothing; the landing does (update, after the trick machine grades it). On the snow it ends as it always did.
+      if (bodyGrabbing && inRealAir()) return;
+      bodyGrabbing = false;
       tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release();
     } else if (it.kind === 'spin') {
-      const t = spinTrickFor('snow', it.dir, AIR_BUDGET_SEC);
+      // (GC-2, as the grab: the biggest spin the direction names, then the biggest the air left can finish)
+      const named = spinTrickFor('snow', it.dir, AIR_BUDGET_SEC);
+      const t = named ? fitToAir(ctx, named, 'body') : null;
       if (!t) return;
       tricks.start(asTrickDef(t)); trickLayer?.start(t);
       ctx.setHud({ banner: t.label }); setTimeout(() => ctx.setHud({ banner: '' }), 520);
@@ -261,6 +358,27 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       bodyStats.spins++; bodyStats.last = t.label;
       console.info(`[SNOW-BODY] ${it.dir} quarter → ${t.label}`);
     }
+  }
+
+  /**
+   * The run ends: under the arch ('finish'), or — GATE-CRASHER-POLISH-2 (GC-F1) — stalled on the snow ('stalled') or at the cap
+   * ('cap'). The card offers REPLAY and HOME either way. Only a finished run earns the time bonus (GC-9: gateCrasher.timeBonus,
+   * the curve under the Arena's unchanged 600 ceiling).
+   */
+  function finishRun(ctx: ModeContext, why: 'finish' | 'stalled' | 'cap'): void {
+    ended = true;
+    SoundKit.play('whistle');
+    finishPunch(ctx);   // A+ P0: run FINISHED — hit-stop + shake + short flash, once; the whistle stays
+    const tBonus = why === 'finish' ? timeBonus(elapsed) : 0;   // GC-9: 10 a second under 90 s, capped at the Arena's mirrored 600
+    // phase 10 — GATE CRASHER: the title is the win condition. Half the gates or better (15 of 30) is the crash; fewer is
+    // a finished run. Before this the run ended 'FINISHED' whatever happened and the card said 0 COINS.
+    const target = crashTarget(world.markers.length);
+    const crashed = gatesHit >= target;
+    console.info(`[SNOW-END] ${why} ${crashed ? 'win' : 'complete'} gates ${gatesHit}/${world.markers.length} score ${tricks.score + tBonus} (gates+tricks ${tricks.score}, time +${tBonus} at ${elapsed.toFixed(1)} s, par ${TIME_PAR_SEC})`);
+    ctx.end(crashed ? 'win' : 'complete', tricks.score + tBonus, {
+      gatesHit, gates: world.markers.length, target, timeBonus: tBonus, elapsed: Math.round(elapsed), par: TIME_PAR_SEC,
+      tricksLanded: tricks.landed, bestCombo: tricks.bestCombo, ...(why === 'finish' ? {} : { stalled: 1 }),
+    });
   }
 
   return {
@@ -285,7 +403,28 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
       baseFov = null;
       const venue = readBoardVenue('snow');
+      // GATE-CRASHER-POLISH-2 (GC-7): THE RING AND ITS PAD GLYPH, ONLY WHERE THEY HELP. The harness rides a ring and a puck with the
+      // player's icon at every hero's feet; on this run it floated at the board in the air, and the icon is a gamepad — wrong for
+      // a keyboard and wrong for a body (GC-13). A phone's small screen still gets it; a desktop, a pad or a body never does.
+      // Said before the rig exists: the harness mounts its ring the first frame the hero does (modeOwnsPlayerRing).
+      ringHidden = !touchOnly(ctx);
+      if (ringHidden) ((ctx.scene.metadata ??= {}) as { felPlayerRingMode?: boolean }).felPlayerRingMode = true;
       world = buildSlopeRun(ctx.scene, venue);
+      // GC-3: the dome recomposed at the camera's resolution from the source photograph, riding the camera
+      sky?.dispose(); sky = upgradeAlpineSky(ctx.scene, { mood: venue.mood, snow: venue.palette.ground, hi: !touchOnly(ctx) });
+      // GC-4: the Kenney kit's rocks over the rock solids (the painted spheres are the look until they land, and the fallback)
+      rockProps?.dispose(); rockProps = null; propsGone = false;
+      {
+        const key = `gc-rocks-${venue.id}`;
+        const ROCK_MODELS = ['rock_largeA', 'rock_largeB', 'rock_largeC'];
+        VENUE_PROP_SETS[key] = world.obstacles.map((o, i) => ({ kit: 'nature', model: ROCK_MODELS[i % ROCK_MODELS.length], at: [o.pos.x, -0.2, o.pos.z] as [number, number, number], yaw: i * 1.7, scale: 1.55, tint: '#b8c2cf' }));
+        void mountVenueProps(ctx.scene, key, undefined, { snapToGround: true }).then((h) => {
+          if (propsGone) { h?.dispose(); return; }
+          rockProps = h;
+          if (h?.count) for (const m of ctx.scene.meshes) if (/^rock_\d+$/.test(m.name)) m.setEnabled(false);
+          console.info(`[SNOW-ROCKS] ${h?.count ?? 0} kit rocks over ${world.obstacles.length} rock solids`);
+        });
+      }
       ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
       // lateralShift: the 'slope' set's treeline is authored at x ±19…±24 for a 17 m half-piste. A wider venue
       // pushes it out by the difference, so the glacier's 34 m groom does not have pines standing in it.
@@ -322,7 +461,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           spray?.burst(rig.char.root.position, b === 'land' ? 0.35 : 0.55);   // GATE-CRASHER-MAJOR: the snow takes the landing
         } else startWipe(rig.char.root.rotation.z >= 0 ? 1 : -1);   // a trick not finished before the snow is a wipeout
       } });
-      animTree = new BoardAnimTree(rig.char.animator);
+      animTree = new BoardAnimTree(rig.char.animator, { bail: 'snow_bail' });   // POLISH-2: the snowboard's own wipeout, down in the snow
+      // GC-6: the snow's shadow replaces the shared contact disc for the rider (that one holds the take-off height, level)
+      ctx.scene.getMeshByName(`${rig.char.root.name}_contact`)?.setEnabled(false);
+      shadow?.dispose(); shadow = new SnowShadow(ctx.scene, world.ground);
+      // GC-8: the snow outfit — a jacket and pants cut from the rider's own skinned body, in this mode only
+      outfit?.dispose(); outfit = dressSnowOutfit(ctx.scene, rig.char.root, venue.palette.accent);
       posture?.dispose();
       posture = mountPostureLayer(ctx.scene, rig.char.skeleton, rig.char.root, () => {
         const { window, pose, legs } = boardPose(bio);
@@ -349,6 +493,10 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           nextGate, gatesHit, gates: world.markers.length, score: tricks.score, elapsed, ended,
           target: crashTarget(world.markers.length), wipe: wipeT, tracks: spray?.liveTracks ?? 0, finishZ: world.finish?.z ?? null,
           solids: world.solids ?? [],
+          // GATE-CRASHER-POLISH-2: the air left (GC-2), the last shortened / refused press, the carve's own roll, the stall,
+          // the shadow's height, the outfit, whose HUD is up
+          airLeft: rig.rider.grounded ? 0 : airLeftNow(ctx), trickNote: lastTrickNote, bank: bankRoll, still: stillSec,
+          shadowH: shadow?.height ?? -1, outfit: outfit?.parts ?? 0, bodyHud: !!bodyHud, ringHidden,
           gate: world.markers[nextGate] ? { x: world.markers[nextGate].x, y: world.markers[nextGate].y, z: world.markers[nextGate].z } : null,
           bound: world.bound,
         });
@@ -365,6 +513,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       stumbleIframe = 0; yeti = null; yetiPool = null; yetiSec = 0; yetiDone = false;
       wipeLatchUntil = 0; finishLatch = false;
       wipeT = -1; crashSaid = false; goalSaid = false; scrapeLatch = 0; lastRamp = null; lastRampT = 0;
+      bankRoll = 0; stillSec = 0; lastNudgeAt = -1e9; bodyHud = null; xRefused = false; lastTrickNote = ''; bodyGrabbing = false;   // POLISH-2
       prevX = rig.char.root.position.x; prevZ = rig.char.root.position.z;
       spray?.dispose(); spray = new SnowSpray(ctx.scene, venue.palette.edge, venue.palette.ground);
       world.gates?.set(0, 'next');
@@ -386,9 +535,11 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const prev = world.markers[j * 2] ?? rig.char.root.position;
         const at = prev.add(gm.subtract(prev).scale(0.5));
         return { pos: at, yaw: Math.atan2(gm.x - prev.x, gm.z - prev.z), radius: 2.6 };
-      }), '#9be7ff');
+      }), '#22d3ee');   // POLISH-2 (GC-6): the shared boost cyan — the pale '#9be7ff' tone-mapped to a white ghost on the snow
+      decorQuiet = false; quietDecor(ctx);   // GC-6 (again on the first played frame: the rig and the SSAO mount after load)
       // GATE-CRASHER-MAJOR: the win, said before the run (the splash reads `goal`) and carried in the HUD (`target`)
-      ctx.setHud({ score: 0, ...boostKit.hud(), gates: `0/${world.markers.length}`, target: crashChip(0, world.markers.length), goal: crashGoal(world.markers.length), hint: 'Between the poles for 100 · JUMP rocks · grind the rails · hold RB / Shift to BOOST' });
+      // GC-F1: the par on screen (the host shows it beside the clock); GC-13: the hints are said for whoever is playing (hudFor)
+      ctx.setHud({ score: 0, ...boostKit.hud(), gates: `0/${world.markers.length}`, target: crashChip(0, world.markers.length), goal: crashGoal(world.markers.length), par: TIME_PAR_SEC, ...hudFor(false) });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -442,6 +593,10 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           let fits: BoardTrick | null;
           if (rig.rider.grinding) { const want = trickFor('snow', held, btn); fits = want && want.airSec <= air ? want : bestFitting('snow', btn, air); }
           else fits = airPressFor('snow', held, btn, air);
+          // GATE-CRASHER-POLISH-2 (GC-2): the trick named, then held to the air that is LEFT (the fixed budget above names it; it
+          // used to be the whole test, so a Y on the way down of a flat ollie threw a 720 with a fifth of a second to spin it)
+          if (fits && !rig.rider.grinding) fits = fitToAir(ctx, fits, 'pad');
+          if (!fits && e.btn === 'X') xRefused = true;
           if (fits) {
             tricks.start(asTrickDef(fits));
             trickLayer?.start(fits);
@@ -454,12 +609,16 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }
       if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1 (press AND release)
       // a grab inside its minimum hold ends later (onGrabEnd releases the pose then); with no grab in flight the pose is let go now
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') { tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release(); }
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') {
+        if (xRefused) { xRefused = false; return; }   // POLISH-2: the X the air refused ends nothing (the trick going keeps going)
+        tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release();
+      }
     },
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
+      if (!decorQuiet) { quietDecor(ctx); decorQuiet = true; }   // POLISH-2 (GC-6): once, on the first played frame (the rig and the SSAO exist)
       // GATE-CRASHER-MAJOR: the run clock counts PLAY. The harness hands over raw frame time, and the first frames after the
       // wake can be 2.3 s long (shader compiles): the clock read 6 s before the rider had moved (QA P2-01).
       elapsed += Math.min(dt, 0.1);
@@ -499,6 +658,18 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       const steer = down ? 0 : stickX, crouch = down ? 0 : tuck;
       const v = move.update(dt, steer, crouch, ctx.scene, rig.char.root.position, world.ground);
       if (down) move.vel.scaleInPlace(Math.exp(-WIPE_FRICTION * dt));
+      // GATE-CRASHER-POLISH-2 (GC-F1): THE STALL. A board stopped on the snow (turned across the fall line, pinned on a feature)
+      // is turned back down the hill and pushed, and said; still stopped, the run ends on its card; no run outlives the cap.
+      if (rig.rider.grounded && !down && !rig.rider.grinding && move.speed < STALL_SPEED) stillSec += Math.min(dt, 0.1); else stillSec = 0;
+      const stall = stallAction(stillSec, elapsed);
+      if (stall === 'end') return finishRun(ctx, stillSec >= STALL_END_SEC ? 'stalled' : 'cap');
+      if (stall === 'nudge' && elapsed - lastNudgeAt >= STALL_NUDGE_SEC) {
+        lastNudgeAt = elapsed;
+        move.yaw = 0; move.vel.set(0, 0, 4);
+        rig.char.root.rotation.y = 0;
+        ctx.juice.callout('STALLED — BACK DOWN THE HILL', '#fcd34d', 1100);
+        console.info(`[SNOW-STALL] nudge at ${elapsed.toFixed(1)} s (still ${stillSec.toFixed(1)} s)`);
+      }
       rig.rider.vel.x = v.x; rig.rider.vel.z = v.z;
       const preY = rig.char.root.position.y;
       // THE KICKER THROWS YOU (GATE-CRASHER-MAJOR): the ramp he is riding now, so the frame his board leaves its lip is a pop
@@ -526,10 +697,23 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           p.x = r.x; p.z = r.z;
           if (p.y > preY + 0.1) p.y = preY;   // refused the step: the deck he was lifted onto this frame is a face
           const isRock = c.tag.startsWith('rock_');
+          const hitSpeed = move.speed;   // POLISH-2 (GC-1): the speed he MET it at, before the face turns the board
           const kind = move.wall(c.nx, c.nz);
           if (!rig.rider.grinding) rig.char.root.rotation.y = move.yaw;
           rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
-          if (isRock && stumbleIframe === 0 && wipeT < 0) {
+          if (isRock && stumbleIframe === 0 && wipeT < 0 && rockOutcome(hitSpeed) === 'stumble') {
+            // GATE-CRASHER-POLISH-2 (GC-1): A ROCK MET AT WALKING PACE IS A STUMBLE. The eye's rider met rock 0 at 2.4 m/s and lay
+            // down in the snow for 1.1 s, then met it again at 0.8 m/s. Slow, the board checks and goes round it (the solid
+            // already turns it off the face): no fall, no penalty, a puff and a word.
+            stumbleIframe = STUMBLE_IFRAME_SEC;
+            move.vel.scaleInPlace(ROCK_STUMBLE_KEEP); rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
+            spray?.burst(p.clone(), 0.3);
+            SoundKit.play('impact', { pitch: 1.25, volume: 0.35 });
+            ctx.juice.shake(0.04, 90);
+            console.info(`[SNOW-ROCK] stumble ${hitSpeed.toFixed(1)} m/s`);
+            ctx.setHud({ banner: 'ROCK — STUMBLE' });
+            setTimeout(() => ctx.setHud({ banner: '' }), 600);
+          } else if (isRock && stumbleIframe === 0 && wipeT < 0) {
             // THE ROCK: the stumble it always was — and the board slows for real (it used to cut the Rider's velocity, which
             // the momentum model overwrote the next frame, so the rider hit the rock and carried on at full speed)
             stumbleIframe = STUMBLE_IFRAME_SEC;
@@ -537,7 +721,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             move.vel.scaleInPlace(0.35); rig.rider.vel.x = move.vel.x; rig.rider.vel.z = move.vel.z;
             wipePunch(ctx);
             startWipe(c.nx >= 0 ? 1 : -1);
-            console.info('[SNOW-ROCK] hit');
+            console.info(`[SNOW-ROCK] hit ${hitSpeed.toFixed(1)} m/s`);
             ctx.setHud({ score: tricks.score, banner: `ROCK! -${ROCK_PENALTY}` });
             setTimeout(() => ctx.setHud({ banner: '' }), 700);
           } else if (!isRock && move.slammedWall && wipeT < 0) {
@@ -642,9 +826,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             // SCORECARD FEEL (2026-09-15): the gate is the slalom's beat — a +100 pop at the rider and a gate-streak callout, so a
             // clean line reads as a line (the run measured 1.5 juice beats a minute)
             gateStreak++;
-            ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), gateStreak >= 3 ? `+100 · ${gateStreak} IN A ROW` : '+100', '#7dd3fc');
+            // GATE-CRASHER-POLISH-2 (GC-10): ONE READOUT, NOT TWO. The streak pop flew up from the head into the GATE ✓ banner's
+            // place (both at the top third), pale sky-blue on white snow with a glow of its own colour: the eye read it as ghosted,
+            // doubled text. The streak rides in the banner now, and the pop is the +100 alone at the board, in a colour snow can hold.
+            ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 0.9, 0)), '+100', '#0284c7');
             console.info(`[SNOW-GATE] hit ${gatesHit} dx ${verdict.dx.toFixed(2)}`);
-            ctx.setHud({ banner: 'GATE ✓', score: tricks.score, target: crashChip(gatesHit, world.markers.length) });
+            ctx.setHud({ banner: gateStreak >= 3 ? `GATE ✓ · ${gateStreak} IN A ROW` : 'GATE ✓', score: tricks.score, target: crashChip(gatesHit, world.markers.length) });
             crowd?.cheer(0.5);
             // THE WIN, SAID WHEN IT IS WON: the gate that makes the target is a moment, not a number on the end card
             if (!crashSaid && gatesHit >= crashTarget(world.markers.length)) {
@@ -671,6 +858,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       }
 
       const trickBanner = tricks.update(dt);
+      // (GC-12: the body's grab, held through the air, lets go on the snow — graded above, so the whole hold was paid)
+      if (bodyGrabbing && rig.rider.grounded) { bodyGrabbing = false; tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release(); }
       if (trickBanner) {
         ctx.setHud({ banner: trickBanner });
         setTimeout(() => ctx.setHud({ banner: '' }), 900);
@@ -713,10 +902,16 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         wipeT += dt;
         rig.char.root.rotation.z = wipeSide * wipeRoll(wipeT);
         if (wipeT >= WIPE_SEC) wipeT = -1;
+        bankRoll = rig.char.root.rotation.z;
       } else if (!bio.airborne && !bio.bailing) {
-        const wantRoll = boardBank(move.balance.lean, carve01) * SNOW_BANK_GAIN;
-        rig.char.root.rotation.z += (wantRoll - rig.char.root.rotation.z) * Math.min(1, 10 * dt);
-      }
+        // GATE-CRASHER-POLISH-2 (GC-5): the carve's roll is the MODE's. It used to ease the root's roll here toward the bank while
+        // the Rider (rig.rider.update, above) eased the SAME value toward −steer · 0.28 every frame: two writers settle on their
+        // average, so the carve plateaued at 16–18° (p90 17.6°) however hard the bank asked. The mode's own eased state is
+        // written over the Rider's each frame, and the snow's bank is snowBank's (38° for a committed carve at cruise).
+        const wantRoll = snowBank(move.balance.lean, carve01);
+        bankRoll += (wantRoll - bankRoll) * Math.min(1, 9 * dt);
+        rig.char.root.rotation.z = bankRoll;
+      } else bankRoll = rig.char.root.rotation.z;   // the air's roll is the Rider's and the trick's; the carve resumes from it
       // THE SNOW ANSWERS: spray off the edge, the line it cuts, the wake at speed (premium/SnowSpray); a body in the snow plows it
       spray?.update({
         at: rig.char.root.position, yaw: move.yaw, speed: move.speed, pitch,
@@ -725,6 +920,13 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         grounded: rig.rider.grounded && !rig.rider.grinding,
       }, dt);
       world.gates?.update(dt);
+      shadow?.update(rig.char.root.position);   // POLISH-2 (GC-6): on the snow under him, soft and faint with height
+      // POLISH-2 (GC-13): the HUD's words follow who is playing — a body the camera sees, or a pad / keys / touch
+      {
+        const bodyNow = !!(ctx.body?.() ?? null);
+        if (bodyNow !== bodyHud) { bodyHud = bodyNow; ctx.setHud(hudFor(bodyNow)); }
+        if (bodyNow && !ringHidden) { ringHidden = true; for (const m of ctx.scene.meshes) if (m.name === 'player_ring' || m.name === 'player_tag') m.setEnabled(false); }
+      }
       trickLayer?.apply(dt, !rig.rider.grounded);   // TRICK POSE: the spin, the cork, the grab — after the mode's own root writes
       ctx.camDirector.setAir(!rig.rider.grounded && !rig.rider.grinding ? 1 : 0);   // the AIR CAM: the trick in the picture
       // Clamp at the edge of the snow, from the WORLD the venue built — the same
@@ -759,18 +961,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
       // THE FINISH LINE (GATE-CRASHER-MAJOR): every gate judged AND the arch crossed — the run ends under the banner, not at
       // the last gate with nothing there
-      if (nextGate >= world.markers.length && (!world.finish || rig.char.root.position.z >= world.finish.z)) {
-        ended = true;
-        SoundKit.play('whistle');
-        finishPunch(ctx);   // A+ P0: run FINISHED — hit-stop + shake + short flash, once; the whistle stays
-        const timeBonus = Math.max(0, Math.round((60 - elapsed) * 10));   // par 60 is the Arena stake's mirrored ceiling (arena-score-integrity): unchanged
-        // phase 10 — GATE CRASHER: the title is the win condition. Half the gates or better (15 of 30) is the crash; fewer is
-        // a finished run. Before this the run ended 'FINISHED' whatever happened and the card said 0 COINS.
-        const target = crashTarget(world.markers.length);
-        const crashed = gatesHit >= target;
-        console.info(`[SNOW-END] ${crashed ? 'win' : 'complete'} gates ${gatesHit}/${world.markers.length} score ${tricks.score + timeBonus} (gates+tricks ${tricks.score}, time +${timeBonus})`);
-        return ctx.end(crashed ? 'win' : 'complete', tricks.score + timeBonus, { gatesHit, gates: world.markers.length, target, timeBonus, elapsed: Math.round(elapsed), tricksLanded: tricks.landed, bestCombo: tricks.bestCombo });
-      }
+      if (nextGate >= world.markers.length && (!world.finish || rig.char.root.position.z >= world.finish.z)) return finishRun(ctx, 'finish');
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, rig.rider.vel, gate ?? null);
       // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
@@ -783,6 +974,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     dispose() {
       trickLayer?.dispose(); trickLayer = null;
       spray?.dispose(); spray = null;
+      shadow?.dispose(); shadow = null; sky?.dispose(); sky = null; outfit?.dispose(); outfit = null;   // POLISH-2
+      rockProps?.dispose(); rockProps = null;
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       posture?.dispose(); posture = null;
       yeti?.char.dispose(); yeti = null; yetiPool = null;

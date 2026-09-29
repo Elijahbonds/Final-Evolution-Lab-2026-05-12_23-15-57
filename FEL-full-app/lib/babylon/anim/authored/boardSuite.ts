@@ -494,3 +494,37 @@ export function buildSkateBail(scene: Scene, sk: Skeleton): AnimationGroup | nul
       [-0.40, 0.10, -0.26], [0.42, 0.06, -0.29], -0.62, 0, SLAM_FEET),
   ]);
 }
+
+/**
+ * THE SNOWBOARD'S WIPEOUT (GATE-CRASHER-POLISH-2, 2026-09-28). Gate Crasher fell with the SKATEBOARD's bail — a rider who has
+ * stepped off his deck and is flailing on his feet — while the mode rolled the root over (gateCrasher.wipeRoll). A snowboarder
+ * cannot step off: the board is strapped on. He catches the edge, is thrown, and goes DOWN — sat back in the snow with the
+ * board still under his feet, knees up, both hands behind him in the powder — then rolls onto the board and pushes up. Keyed
+ * over WIPE_SEC (1.1 s, the mode's bail beat): the slam by 0.14 s, down from 0.32 s to 0.62 s, the push-up, and back to the ride
+ * crouch at 1.1 s exactly, so the tree settles into the ride without a step. Feet stay planted on the deck the whole way (the
+ * bindings); the hips' drop to 0.3 m above it becomes the fold of the knees (the solver's work, as in the rest of this suite).
+ */
+export function buildSnowBail(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const T = 1.1;
+  const RIDE: Bones = { ...rideLegs(0), Spine: [16, 0, 0], Spine1: [4, 0, 0], Neck: [-6, 0, 0] };
+  const DOWN = (lean: number): Bones => ({
+    Hips: [-26, 0, 0],
+    LeftUpLeg: [-104, 0, 16], LeftLeg: [128, 0, 0], RightUpLeg: [-98, 0, -16], RightLeg: [122, 0, 0],
+    // (no sideways lean in the clip: the mode rolls the whole rider over onto either side — a lean keyed here added to one
+    // side's roll and put the head 17 cm into the snow on those falls, measured on the piste plane)
+    Spine: [-16 + lean, 0, 0], Spine1: [-6, 0, 0], Neck: [16, 0, 0], Head: [6, 0, 0],
+  });
+  return buildPoseClip(scene, sk, 'snow_bail', T, [
+    key(0, RIDE, CRUISE_L, CRUISE_R, -0.26, 1, ON_DECK),
+    // the slam: the edge catches, the arms fly out and up, the chest is thrown back and over
+    key(T * 0.13, { LeftUpLeg: [-62, 0, 12], LeftLeg: [86, 0, 0], RightUpLeg: [-56, 0, -12], RightLeg: [80, 0, 0], Spine: [-12, 0, 0], Spine1: [-4, 0, 0], Neck: [8, 0, 0] },
+      [-0.46, 0.24, 0.06], [0.44, 0.30, -0.06], -0.34, 0.7, ON_DECK),
+    // DOWN IN THE SNOW: sat back on the snow, board under the feet, knees up, both hands planted behind in the powder
+    { ...key(T * 0.29, DOWN(0), [-0.40, -0.32, -0.26], [0.40, -0.34, -0.28], -0.72, 0.35, ON_DECK), hold: true },
+    { ...key(T * 0.56, DOWN(6), [-0.38, -0.34, -0.22], [0.41, -0.33, -0.30], -0.74, 0.35, ON_DECK), hold: true },
+    // the push-up: forward over the board, the back hand still in the snow, the lead hand reaching to rise
+    key(T * 0.78, { LeftUpLeg: [-82, 0, 12], LeftLeg: [112, 0, 0], RightUpLeg: [-76, 0, -12], RightLeg: [104, 0, 0], Spine: [34, 0, 4], Spine1: [10, 0, 2], Neck: [-4, 0, 0] },
+      [-0.16, -0.30, 0.30], [0.36, -0.42, -0.10], -0.52, 0.75, ON_DECK),
+    key(T, RIDE, CRUISE_L, CRUISE_R, -0.26, 1, ON_DECK),
+  ]);
+}
