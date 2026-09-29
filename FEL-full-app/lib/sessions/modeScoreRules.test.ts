@@ -233,6 +233,14 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
     expect(checkRunScore({ mode: 'skateboarding', score: 80_832, durationMs: 90_000 }, { skateboarding: derivedRule(b.skateboarding) })).toMatchObject({ ok: true });
   });
 
+  it('the EXPORTED table carries Prove It\'s played-floor flag, and only Prove It\'s (review: dropping it in derivedRule paid Prove It in full, every test green)', () => {
+    // the route reads the flag off the real row (app/api/sessions/route.ts floorOnly), not off derivedBounds()
+    expect(derivedRule(b.dunkduel).payFloorOnly).toBe(true);
+    expect(MODE_SCORE_RULES.dunkduel).toMatchObject({ maxScoreFrom: 'derived', maxScore: 2 * DUNK_ATTEMPT_MAX, payFloorOnly: true });
+    expect(Object.entries(MODE_SCORE_RULES).filter(([, r]) => r.payFloorOnly).map(([k]) => k)).toEqual(['dunkduel']);
+    expect(checkRunScore({ mode: 'dunkduel', score: 96, durationMs: 60_000 })).toMatchObject({ ok: true, rule: { payFloorOnly: true } });
+  });
+
   it('DRIFT: the story, acting and Prove It constants are still what their code says', () => {
     const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
     const boss = src('components/games/glitch-boss-game.tsx');

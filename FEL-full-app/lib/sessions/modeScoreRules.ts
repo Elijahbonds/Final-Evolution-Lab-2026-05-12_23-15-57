@@ -22,6 +22,11 @@
  * code instead of by measured runs: the endless / combo-driven four, where one ordinary run × 4 would refuse strong honest
  * play (skateboarding, surfing, karateEndless, music), and four modes the owner ruled should pay (storyMode's boss and
  * rail, acting, irl, dunkduel). DERIVED_BOUNDS carries each bound with its basis; derivedRule() turns it into a row.
+ * KNOWN, OWNER-ACCEPTED RISK (2026-09-28, "fast-follow, not a blocker"): skateboarding and surfing take the Arena's ×2
+ * stake models (435,544,000 / 5,866,322) and are NOT endless (lib/session-payout.ts ENDLESS_MODES), so for those two the
+ * row is also the only payout cap: XP = 1.5 × score up to ~653M a run. karateEndless and music are held by the endless
+ * ceiling. (Review 2026-09-29: four maximal skate runs overflow the int4 PlayerProfile.xp, after which that player's
+ * paying sessions 500; forged rows also feed the Arena's cold-start house median, lib/arena-ghost.ts.)
  *
  * WHERE THE NUMBERS COME FROM (the tip's rule: real measured TRUE :3000 runs with headroom, not guesses). MEASURED_RUNS
  * lists, per session key, every completed run the TRUE :3000 stamp recorded in ~/Claude/outbox (the eye, Features UX and

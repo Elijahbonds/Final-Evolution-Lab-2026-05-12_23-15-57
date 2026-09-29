@@ -72,8 +72,9 @@ const OPEN_MATCH_STATES = ['WAITING', 'ACTIVE'];
  * (The expiry check and the no-opponent check below stay: #30, and movement play's WAITING-duel farm.)
  *
  * MERGE WITH ECONOMY-SESSIONS-HARDEN (2026-09-28): the three rules live inside the run the server started. This read is
- * the EARLY answer only — it runs after the run is found, open, of this mode and inside the mode's score rules (so while
- * music has no MEASURED_RUNS row, fail closed, nothing here is reached and nothing is paid). A score above the rejudge is
+ * the EARLY answer only — it runs after the run is found, open, of this mode and inside the mode's score rules (at this
+ * merge music had no MEASURED_RUNS row, failed closed, and nothing here was reached — no longer so, see the follow-up
+ * paragraph below). A score above the rejudge is
  * SCORE_INVALID above_rejudge (rejected, never clamped — the hardening clamps nothing), and the pay-once claim is made
  * inside the run's paying transaction, after claimRun and before the ledger is filed, so the ledger records what the run
  * was actually paid and a rolled-back run releases its claim with it.

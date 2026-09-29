@@ -178,7 +178,8 @@ import { performSetMax } from '@/lib/babylon/music/performSet';
 import { houseBeatFor, houseTap, judgeHouseSet, type HouseTap } from '@/lib/babylon/music/houseBeat';
 import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, MUSIC_SESSION_PAID } from '@/lib/arena-music';
 import { canonicalModeKey } from '@/lib/game-data';
-import { MODE_SCORE_RULES } from '@/lib/sessions/modeScoreRules';
+import { MODE_SCORE_RULES, SCORE_COLUMN_MAX } from '@/lib/sessions/modeScoreRules';
+import { ENDLESS_SESSION_CEILING, endlessCeilingFor } from '@/lib/session-payout';
 
 let runSeq = 0;
 /** ECONOMY-SESSIONS-HARDEN: an open run the server started `durationSec` ago, as POST /api/sessions/start leaves it. */
@@ -985,7 +986,7 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     expectNothingPaid();
   });
 
-  it('while music is fail closed a creation session still keeps the streak — it needs no run, and pays nothing', async () => {
+  it('on the real table — music fail closed as landed, or its derived row since owner decision #2 — a creation session still keeps the streak: it needs no run, and pays nothing', async () => {
     h.rules = MODE_SCORE_RULES as Record<string, unknown>;
     streakedAgo(25);
     const r = await post(creation({ runId: undefined }));
@@ -993,6 +994,36 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     expect(r.body).toMatchObject({ ok: true, creation: true, counted: true, streakDays: 4, xp: 0, shards: 0, credits: 0, sessionId: null });
     expect(h.profile.streakDays).toBe(4);
     expectNothingPaid();
+  });
+
+  // REVIEW FOLLOW-UP (2026-09-29): the red test above pins the AS-LANDED table (music one of the unmeasured keys; a
+  // rule-less run 422 no_rules). Owner decision #2 gave music a derived row and decision #1 records a rule-less run unpaid,
+  // so no code satisfies both; its assertions are left for the owner. This is what the real table does now, so the P6
+  // Arena pay path — live again with music's row — is held on the REAL table, not only on the open one or a synthetic
+  // rules() row. If the owner keeps decision #2, this replaces the red test; if not, this one goes.
+  it('OWNER DECISIONS #1 + #2 on the REAL table: music has its derived row, a verified Arena set pays once, and a second post or free play is held by the endless ceiling', async () => {
+    expect(MODE_SCORE_RULES.music).toMatchObject({ maxScoreFrom: 'derived', maxScore: SCORE_COLUMN_MAX, enabled: true });
+    h.rules = MODE_SCORE_RULES as Record<string, unknown>;          // the real table, not the open one
+    const { house, body } = arenaSet('m1');
+    const first = await post(body);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ ok: true, paid: true, capped: false, xp: 567_500, shards: 18_918 });
+    expect(h.runs[first.runId!]).toMatchObject({ status: 'paid', score: house });
+    expect(h.grants.find((g) => g.grantType === 'xp')).toMatchObject({ amount: 567_500, metadata: { arenaSet: true, arenaMatchId: 'm1', rejudged: house } });
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+    // a NEW run for the same duel: free play at the endless ceiling, no second claim
+    const again = await post(body);
+    expect(again.body).toMatchObject({ ok: true, paid: true, capped: true });
+    expect(again.body.xp).toBeLessThanOrEqual(endlessCeilingFor(66, true).xp);
+    expect(again.body.xp).toBeLessThanOrEqual(ENDLESS_SESSION_CEILING.xp);
+    // free play with no duel: paid, held by the endless ceiling, never a lock or a claim
+    const free = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(free.body).toMatchObject({ ok: true, paid: true, capped: true, xp: endlessCeilingFor(30, true).xp });
+    expect(h.locks).toEqual(['m1']);
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+    // the mode's own per-set bound still refuses a score its hits cannot make (sessionScoreCap → above_run_cap)
+    const forged = await post({ mode: 'music', score: performSetMax(128) + 1, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(forged.body).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: performSetMax(128) });
   });
 
   it('once music is measured, the mode\'s rules still come first: an Arena set outside them is refused before its duel is read', async () => {
@@ -1130,6 +1161,18 @@ describe('OWNER DECISION (2026-09-28): a mode with no rules row is recorded unpa
     const next = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
     expect(next.body).toMatchObject({ won: false, xp: 10, streakDays: 4, streakBonus: 20, credits: 20 });
     expect(h.lc[0]).toMatchObject({ delta: 20 });
+  });
+
+  it('Prove It on the REAL table: the exported dunkduel row pays the played floor (review: every other Prove It test used a synthetic row)', async () => {
+    h.rules = MODE_SCORE_RULES as Record<string, unknown>;          // the real table: derivedRule must carry payFloorOnly through
+    const r = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: false, xp: 10, shards: 1, credits: 0, coins: 0, walletShards: 0, season: null, mastery: null });
+    expect(h.sessions[0]).toMatchObject({ mode: 'dunkduel', score: 96, won: false, xp: 10, shards: 1 });
+    expect(h.wallet).toEqual([]);
+    expect(h.season).toEqual([]);
+    expect(h.mastery).toEqual([]);
+    expect(h.grants.map((g) => g.grantType).sort()).toEqual(['prq', 'shards', 'xp']);
   });
 
   it('rebased onto MUSIC-SUITE P6: a NO_RULES Arena music set is recorded unpaid and never makes the duel\'s pay-once claim — the honest paid post still gets it', async () => {
