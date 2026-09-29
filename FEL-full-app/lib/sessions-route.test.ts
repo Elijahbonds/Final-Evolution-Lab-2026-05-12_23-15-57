@@ -1182,3 +1182,16 @@ describe('OWNER DECISION (2026-09-28): a mode with no rules row is recorded unpa
     expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toHaveLength(1);
   });
 });
+
+describe('FOLLOW-UP (2026-09-29): the finite pay cap on skateboarding and surfing', () => {
+  it('a forged skate run is recorded as sent and paid the cap (capped: true); an honest strong run is paid in full', async () => {
+    const forged = await post({ mode: 'skateboarding', score: 400_000_000, won: true, duration: 90 });
+    expect(forged.body).toMatchObject({ paid: true, capped: true, xp: 485_042, shards: 16_169 });
+    expect(h.sessions[0]).toMatchObject({ score: 400_000_000, xp: 485_042 });
+    expect(h.updates[0]).toMatchObject({ xp: { increment: 485_042 } });
+    const honest = await post({ mode: 'skateboarding', score: 80_832, won: true, duration: 90 });
+    expect(honest.body).toMatchObject({ capped: false, xp: 121_298 });
+    // another finite mode is untouched
+    expect((await post({ mode: 'snowboarding', score: 400_000, won: true, duration: 90 })).body).toMatchObject({ capped: false, xp: 600_050 });
+  });
+});
