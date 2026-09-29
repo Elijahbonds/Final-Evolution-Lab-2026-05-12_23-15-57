@@ -735,3 +735,65 @@ describe('flickClip — every move a left-stick flick can become has a body', ()
     expect([...clipless]).toEqual(['off_the_head']);
   });
 });
+
+// ── HOOPS MOTION phase 4a (plan §3.1, §6): the shape of each move, its end hand, its pace ─────────────────────────────────────────
+import { MOVE_SHAPE, endHandFor, moveRateFor, MOVE_TURBO_REAL } from './HandleSystem';
+describe('MOVE_SHAPE — one row per move, the data the phase 4 renderer plays', () => {
+  const MOVES = Object.keys(MOVE_HANDLE) as HandleMove[];
+  it('covers every HandleMove, and nothing else', () => {
+    expect(Object.keys(MOVE_SHAPE).sort()).toEqual([...MOVES].sort());
+  });
+  it('off the head is the mode\'s (the release, the loose ball, the stun stay where they are): no path, no crossing; every other move is the renderer\'s', () => {
+    expect(MOVE_SHAPE.off_the_head).toMatchObject({ owner: 'mode', path: 'none', crosses: 0 });
+    for (const m of MOVES.filter((x) => x !== 'off_the_head')) expect(MOVE_SHAPE[m].owner, m).toBe('motion');
+  });
+  it('a move displaces the body in the shape exactly when moveImpulse moves it today (the call sites keep their impulses)', () => {
+    for (const m of MOVES) expect(MOVE_SHAPE[m].impulse, m).toBe(movesTheBody(m));
+  });
+  it('every move links in the chain today (the spin at its exit), and its read and exposure are fractions of the move', () => {
+    for (const m of MOVES) {
+      const s = MOVE_SHAPE[m];
+      expect(s.chain, m).toBe(true);
+      if (s.readAtK !== null) { expect(s.readAtK).toBeGreaterThan(0); expect(s.readAtK).toBeLessThan(1); }
+      if (s.exposed) { expect(s.exposed.from).toBeGreaterThanOrEqual(0); expect(s.exposed.to).toBeLessThanOrEqual(1); expect(s.exposed.from).toBeLessThan(s.exposed.to); expect(s.exposed.level).toBeGreaterThan(0); expect(s.exposed.level).toBeLessThanOrEqual(1); }
+    }
+  });
+  it('the moves that throw the ball across cross it; the fakes, the step-back and off the head keep it; the double and the roll cross back', () => {
+    for (const m of ['crossover', 'momentum_cross', 'between_legs', 'behind_back', 'momentum_btb', 'shammgod', 'spin', 'snatch_back'] as const) expect(MOVE_SHAPE[m].crosses, m).toBe(1);
+    for (const m of ['in_and_out', 'slip_slide', 'hesi', 'yoyo', 'stepback', 'off_the_head'] as const) expect(MOVE_SHAPE[m].crosses, m).toBe(0);
+    for (const m of ['double_cross', 'steezo_roll'] as const) expect(MOVE_SHAPE[m].crosses, m).toBe(2);
+  });
+  it('the path family names the clip\'s own shape: between for between, behind for the wraps, a feint for the in-and-out and the slip', () => {
+    expect(MOVE_SHAPE.between_legs.path).toBe('between');
+    for (const m of ['behind_back', 'momentum_btb', 'steezo_roll'] as const) expect(MOVE_SHAPE[m].path, m).toBe('behind');
+    for (const m of ['in_and_out', 'slip_slide'] as const) expect(MOVE_SHAPE[m].path, m).toBe('feint');
+    expect(MOVE_SHAPE.spin.path).toBe('pull'); expect(MOVE_SHAPE.shammgod.path).toBe('pushOut'); expect(MOVE_SHAPE.hesi.path).toBe('float');
+  });
+});
+describe('endHandFor — a crossing ends in the OTHER hand, whatever the defender read says (plan §3.1)', () => {
+  it('one crossing flips the hand, none or two keep it', () => {
+    for (const m of Object.keys(MOVE_SHAPE) as HandleMove[]) for (const h of ['left', 'right'] as const) {
+      expect(endHandFor(m, h), `${m} from ${h}`).toBe(MOVE_SHAPE[m].crosses === 1 ? (h === 'left' ? 'right' : 'left') : h);
+    }
+  });
+});
+describe('moveRateFor — a move plays at REAL speed, 1.25× real on the turbo (owner Q3)', () => {
+  it('plays a clip holding realSec of motion in realSec: rate = playedSec / realSec', () => {
+    expect(moveRateFor(0.48, 0.45, false)).toBeCloseTo(0.9375, 12);   // the crossover capture: 0.48 s of motion in a 0.45 s clip
+    expect(0.45 / moveRateFor(0.48, 0.45, false)).toBeCloseTo(0.48, 12);
+    expect(moveRateFor(0.35, 0.35, false)).toBe(1);                     // an authored clip: its realSec is its duration
+  });
+  it('the turbo is 1.25× real — never faster — against today\'s flat 1.35× on top of captures that already play fast', () => {
+    expect(MOVE_TURBO_REAL).toBe(1.25);
+    for (const [real, played] of [[0.48, 0.45], [0.7, 0.55], [0.75, 0.6], [1.1, 0.55], [0.42, 0.42]]) {
+      const r = moveRateFor(real, played, true);
+      expect((real / (played / r)), `${real} in ${played}`).toBeCloseTo(1.25, 12);   // real seconds per played second
+    }
+    // today's flat rate on the feint capture (0.70 s in 0.55 s) is 1.72× real on the turbo — moveRateFor holds it to 1.25
+    expect((0.7 / 0.55) * MOVE_RATE_TURBO).toBeGreaterThan(1.7);
+    expect(MOVE_TURBO_REAL).toBeGreaterThan(1.2);   // the intent of the MOVE_RATE_TURBO > 1.2 pin above: the turbo still reads faster
+  });
+  it('degenerate inputs play at rate 1 (and the turbo on top): no division by zero reaches the tree', () => {
+    expect(moveRateFor(0, 0.5, false)).toBe(1); expect(moveRateFor(0.5, 0, false)).toBe(1); expect(moveRateFor(0, 0, true)).toBe(1.25);
+  });
+});

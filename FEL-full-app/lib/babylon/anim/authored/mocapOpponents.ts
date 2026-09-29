@@ -1043,3 +1043,23 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {
   return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys, { periodic: clip.loop });
 }
+
+/** HOOPS MOTION phase 4a (plan §3.1): the REAL seconds of motion in each hoops capture one-shot — its window `to − from` in the capture's
+ *  true seconds (scripts/mocap/sources.mts CMU_TRUE_FPS) — the `realSec` HandleSystem.moveRateFor plays a move at real speed from (the clip
+ *  is `duration` long, so real speed is duration / realSec). The loops are left out: StrideMatch paces them. */
+export const MOCAP_REAL_SEC: Readonly<Record<string, number>> = {
+  bball_mc_crossover_right: 0.48,
+  bball_mc_crossover_left: 0.48,
+  bball_mc_hesi: 0.55,
+  bball_mc_jumpshot: 1.17,
+  bball_mc_follow_through: 0.65,
+  bball_mc_spin: 0.75,
+  bball_mc_layup_gather: 0.95,
+  bball_mc_pump_fake: 1.35,
+  bball_mc_step_through: 0.9,
+  bball_mc_pivot: 1.1,
+  bball_mc_layup_gather_left: 0.95,
+  bball_mc_pullup_gather: 0.45,
+  bball_mc_feint_right: 0.7,
+  bball_mc_feint_left: 0.7,
+};

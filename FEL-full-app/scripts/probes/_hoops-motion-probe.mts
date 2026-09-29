@@ -30,6 +30,15 @@
 //     (a constant 0.15 m while the ball is attached); the animation-group weights logged every frame around the 3PT shots
 //     (weights-*.txt: the crossFade re-entrancy question); driver variants for the game dunks and a 3v3 layup outside traffic.
 //
+//   · PHASE 4a (2026-09-29, plan §5) — THE HANDLES' INSTRUMENT: h4 (scripts/probes/_hoops-h4.mts, pure, tests/probes/hoops-h4.test.ts): the
+//     crossings in the pelvis frame, between / behind (replacing the underLegs / behindBack flags, which read noise — §5.2), the spin, the
+//     hesi, the in-and-out, the shimmy, the bounce rate after a crossing, the left hand, the latency, the defender's read, the ball path
+//     rel / world and the name; the page's INPUT MARKS ('[HM-INPUT] …', what a driver asked, on the virtual clock); §5.3's new takes (the
+//     left-stick reversal facing the rim / the camera, the double cross and the Shammgod deep in a chain, the momentum moves and the
+//     snatchback on R2, size-ups, the yoyo, the jab, PAUSIN', the hesi explode three ways, the minimum-rate sweeps and a held flick, a spin
+//     into a shot, the post hook's R2 shimmy, the pivot, the steezo roll off and in the drop step's range; 3v3's R-stick set) as 20
+//     SUPPLEMENTAL actions — base2's 81 stay comparable.
+//
 //   BASE=http://127.0.0.1:3098 TAG=p2/base2 ACTIONS=all REPS=5 npx tsx scripts/probes/_hoops-motion-probe.mts
 //   ACTIONS=hero_1v1_jumper_set,ai_1v1_closeout   (ids from LIST=1; a session id such as 1v1-off selects all its actions)
 //   LIST=1 — print the catalogue and exit      SCRUB=0 — numbers only, no sheets
@@ -48,6 +57,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
 import { chromiumExe } from './_chromium.mts';
+import { measureH4, holderOf, carrierIs, type H4 } from './_hoops-h4.mts';   // PHASE 4a: the handles' metrics, pure (tests/probes/hoops-h4.test.ts)
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3098';
@@ -100,11 +110,33 @@ const O = {   // the 1v1 offence takes referenced by name below
   hook: off('o_hook', 'posthook'), dropstep: off('o_dropstep', 'postread', { read: 'dropstep' }), shimmy: off('o_shimmy', 'postread', { read: 'fade' }), upunder: off('o_upunder', 'postread', { read: 'pump' }),
   rebound: off('o_rebound', 'rebound', { postMs: 1500 }), rebound2: off('o_rebound2', 'rebound', { crash: false, postMs: 1500 }), rebound3: off('o_rebound3', 'rebound', { charge: 0.4, postMs: 1500 }), rebound4: off('o_rebound4', 'rebound', { charge: 0.4, crash: false, postMs: 1500 }), rebound5: off('o_rebound5', 'rebound', { close: true, charge: 0.3, spot: [0, -0.1], postMs: 1500 }),
 };
+/** PHASE 4.0 (plan §5.3): the handles' new takes — each throws ONE input the probe marks itself ('[HM-INPUT] …', the page's inMark), so
+ *  every take is one attempt whatever the game made of it; the game's own lines ([1V1-HANDLE] / [1V1-STICK] / [1V1-THREAT]) say what it
+ *  did. handle=100 (the session's). */
+const N4 = (name: string, play: string, extra: Record<string, unknown> = {}): Take => off(name, play, { canon: false, postMs: 900, ...extra });
+const O4 = {
+  lcrossRim: N4('o_lcross_rim', 'lcross', { facing: 'rim', mag: 0.7 }), lcrossRimFast: N4('o_lcross_rim_fast', 'lcross', { facing: 'rim', mag: 1, sprint: true }),
+  lcrossCam: N4('o_lcross_cam', 'lcross', { facing: 'cam', mag: 0.7 }), lcrossCamFast: N4('o_lcross_cam_fast', 'lcross', { facing: 'cam', mag: 1, sprint: true }),
+  // the double cross and the Shammgod are REVERSALS deep in a chain (moveFromContext: a last move and speed01 > 0.45; a chain of 2 and > 0.5)
+  double: N4('o_double', 'lcross', { facing: 'rim', mag: 0.85, pre: [[480, 'crossover']], leg1: 700 }),
+  shammgod: N4('o_shammgod', 'lcross', { facing: 'rim', mag: 0.9, pre: [[380, 'crossover'], [200, 'between']], leg1: 800 }),
+  momCross: N4('o_momcross', 'escape', { move: 'crossover' }), momBtb: N4('o_mombtb', 'escape', { move: 'behind' }), snatch: N4('o_snatch', 'escape', { move: 'down', jog: 0.6 }),
+  sizeup: N4('o_sizeup', 'sizeup', { n: 3, gap: 450, postMs: 600 }), yoyo: N4('o_yoyo', 'lcross', { facing: 'rim', mag: 0.62, leg1: 90 }),
+  jab: N4('o_jab', 'jab'), pausin: N4('o_pausin', 'pausin', { holdMs: 500 }),
+  hesixFlick: N4('o_hesix_flick', 'hesix', { how: 'flick' }), hesixTap: N4('o_hesix_tap', 'hesix', { how: 'tap' }), hesixPull: N4('o_hesix_pullpush', 'hesix', { how: 'pullpush' }),
+  sweep500: N4('o_sweep500', 'slowsweep', { stepMs: 45 }), sweep380: N4('o_sweep380', 'slowsweep', { stepMs: 59 }), flickHold: N4('o_flickhold', 'slowsweep', { held: true, holdMs: 500 }),
+  spinShot: N4('o_spinshot', 'spinshot', { postMs: 1500 }), hookShimmy: N4('o_hookshimmy', 'hookshimmy', { postMs: 1200 }),
+  pivot: N4('o_pivot', 'pivot', { side: 'right' }), pivotRev: N4('o_pivot_rev', 'pivot', { side: 'left', reverse: true }),
+  steezoFar: N4('o_steezo_far', 'steezo', { far: true, postMs: 1600 }), steezoNear: N4('o_steezo_near', 'steezo', { stop: 5.0, postMs: 2500 }),
+};
 const D = { passive1: def('d_passive1', 'passive'), contest1: def('d_contest1', 'contest'), block1: def('d_block1', 'block'), steal1: def('d_steal1', 'steal'), box1: def('d_box1', 'box'), passive2: def('d_passive2', 'passive'), contest2: def('d_contest2', 'contest'), block2: def('d_block2', 'block'), passive3: def('d_passive3', 'passive'), steal2: def('d_steal2', 'steal') };
 const T = {
   set: off('t_set', 'jumper'), contest: off('t_contest', 'jumperNow', { luck: 0 }), contest2: off('t_contest2', 'contested', { luckShot: 0, creep: -0.8, hold: 550 }), block: off('t_block', 'contested', { luckShot: 0 }), layup: off('t_layup', 'layup', { wing: 3.2 }), layup2: off('t_layup2', 'layup', { wing: -3.2 }), dunk: off('t_dunk', 'dunk', { postMs: 3000 }), dunk2: off('t_dunk2', 'dunk', { wing: 3.4, postMs: 3000 }), pass: off('t_pass', 'pass', { postMs: 2500 }),
   screen: off('t_screen', 'screen'), cross: off('t_cross', 'handle', { move: 'crossover', postMs: 800 }), rebound: off('t_rebound', 'rebound', { postMs: 1500 }), rebound2: off('t_rebound2', 'rebound', { charge: 0.4, postMs: 1500 }), pass2: off('t_pass2', 'pass', { afterScreen: true, postMs: 2500 }), pass3: off('t_pass3', 'pass', { wait: 250, postMs: 2500 }), oop: off('t_oop', 'passToCutter', { postMs: 2500 }),
 };
+/** PHASE 4.0 (plan §5.3): 3v3's R-stick set, as 1v1's catalogue handles (the crossover was already there). */
+const T4 = { between: off('t_between', 'handle', { move: 'between', postMs: 800, canon: false }), behind: off('t_behind', 'handle', { move: 'behind', postMs: 800, canon: false }),
+  spin: off('t_spin', 'handle', { move: 'spin', postMs: 800, canon: false }), hesi: off('t_hesi', 'handle', { move: 'hesi', postMs: 800, canon: false }), inout: off('t_inout', 'handle', { move: 'inout', postMs: 800, canon: false }) };
 const E = { passive1: def('e_passive1', 'passive'), contest1: def('e_contest1', 'contest'), block1: def('e_block1', 'block'), steal1: def('e_steal1', 'steal'), passive2: def('e_passive2', 'passive'), box1: def('e_box1', 'box'), passive3: def('e_passive3', 'passive'), steal2: def('e_steal2', 'steal'), passive4: def('e_passive4', 'passive'), contest2: def('e_contest2', 'contest'), passive5: def('e_passive5', 'passive') };
 /** The 1v1 rival's dunk: he only dunks a lane he has BEATEN — these takes get beaten on purpose (phase 1 found 1 in ~68 takes). */
 const give = (name: string, how: string, at = 2.1): Take => ({ name, play: 'giveDunk', prep: 'defense', how, at, postMs: 2600, canon: false });
@@ -137,6 +169,15 @@ const SESSIONS: Session[] = [
     ...handleSet('o', O.cross, 'crossover'), ...handleSet('o', O.between, 'between'), ...handleSet('o', O.behind, 'behind'), ...handleSet('o', O.spin, 'spin'), ...handleSet('o', O.hesi, 'hesi'), ...handleSet('o', O.inout, 'inout'),
     ...rep(O.hook, 4), ...rep(O.dropstep, 4), ...rep(O.shimmy, 4), ...rep(O.upunder, 4),
     ...rep(O.rebound, 2), ...rep(O.rebound3, 2), ...rep(O.rebound5, 3), ...rep(O.rebound4, 2),
+    // PHASE 4.0 (plan §5.3): the handles' new takes, each to 5 attempts
+    O4.lcrossRim, O4.lcrossRimFast, O4.lcrossCam, O4.lcrossCamFast, ...rep(O4.lcrossRim, 1), ...rep(O4.lcrossCamFast, 1),
+    O4.double, ...rep(O4.double, 4), O4.shammgod, ...rep(O4.shammgod, 4),
+    O4.momCross, O4.momBtb, ...rep(O4.momCross, 2), ...rep(O4.momBtb, 1), O4.snatch, ...rep(O4.snatch, 4),
+    O4.sizeup, ...rep(O4.sizeup, 4), O4.yoyo, ...rep(O4.yoyo, 4), O4.jab, ...rep(O4.jab, 4), O4.pausin, ...rep(O4.pausin, 4),
+    O4.hesixFlick, O4.hesixTap, O4.hesixPull, ...rep(O4.hesixFlick, 1), ...rep(O4.hesixTap, 1),
+    O4.sweep500, O4.sweep380, O4.flickHold, ...rep(O4.sweep500, 1), ...rep(O4.flickHold, 1),
+    O4.spinShot, ...rep(O4.spinShot, 4), O4.hookShimmy, ...rep(O4.hookShimmy, 4),
+    O4.pivot, O4.pivotRev, ...rep(O4.pivot, 2), ...rep(O4.pivotRev, 1), O4.steezoFar, O4.steezoNear, ...rep(O4.steezoFar, 1), ...rep(O4.steezoNear, 2),
   ] },
   { id: '1v1-def', mode: 'onevone', qs: '', takes: [
     ...canon([D.passive1, D.contest1, D.block1, D.steal1, D.box1, D.passive2, D.contest2, D.block2, D.passive3, D.steal2]),
@@ -166,6 +207,9 @@ const SESSIONS: Session[] = [
     ...rep(T.pass, 3), ...rep(T.pass3, 2),
     ...rep(T.rebound, 5), ...rep(T.rebound2, 3),
     ...['t_rebound3', 't_rebound3~2', 't_rebound3~3', 't_rebound3~4', 't_rebound3~5'].map((name) => off(name, 'rebound', { ...T3, canon: false })), off('t_rebound4', 'rebound', { charge: 0.4, postMs: 1500, canon: false }),
+    // PHASE 4.0: the R-stick set (plan §5.3 "3v3-off: the same R-stick set as 1v1")
+    T4.between, ...handleSet('t', T4.between, 'between'), T4.behind, ...handleSet('t', T4.behind, 'behind'), T4.spin, ...handleSet('t', T4.spin, 'spin'),
+    T4.hesi, ...handleSet('t', T4.hesi, 'hesi'), T4.inout, ...handleSet('t', T4.inout, 'inout'),
   ] },
   { id: '3v3-def', mode: 'threevthree', qs: '', takes: [
     ...canon([E.passive1, E.contest1, E.block1, E.steal1, E.passive2, E.box1, E.passive3, E.steal2, E.passive4, E.contest2, E.passive5]),
@@ -337,6 +381,28 @@ const CATALOGUE: ActionDef[] = [
   { ...A('hero_3v3_rebound_board', "my board as the mode calls it ('[3V3-BOARD] me secures it' / 'board → me')", 'rebounds/box-out', 'rebound', '3v3-off', '*', { body: 'me', mark: /\[3V3-BOARD\] me secures it|\[3V3-OFF\] board → me/ }, 1200, 900), also: ['3v3-def'], supplemental: true },
   { ...A('hero_1v1_drive_finish', "the wing drive's finish, whatever it reads (hook / finger roll / euro floater / layup / mikan)", 'layups/floaters/hooks', 'finish', '1v1-off', withReps(['o_layup', 'o_layup2', 'o_layup3', 'o_layup4', 'o_layup5', 'o_layup6', 'o_layup7', 'o_layup8', 'o_layup9']), { body: 'me', clip: ANY_FINISH }, 600, 1600), supplemental: true },
   { ...A('hero_3v3_drive_finish', "3v3 wing drive's finish, whatever it reads", 'layups/floaters/hooks', 'finish', '3v3-off', withReps(['t_layup', 't_layup2', 't_layup3', 't_layup4', 't_layup5', 't_layup6', 't_layup7', 't_layup_open', 't_layup_screen']), { body: 'me', clip: ANY_FINISH }, 600, 1600), supplemental: true },
+  // ── PHASE 4.0 (plan §5.3): the handles' new actions, SUPPLEMENTAL (base2's 81 stay comparable). Each anchors on the probe's own input
+  //    mark, so a take is an attempt whatever the game made of it (h4 lists what it did: the move lines in the window). ──
+  ...([
+    ['hero_1v1_lcross', 'left-stick reversal (jog / speed, facing the rim / the camera)', ['o_lcross_rim', 'o_lcross_rim_fast', 'o_lcross_cam', 'o_lcross_cam_fast'], /\[HM-INPUT\] lcross/, 400, 1000],
+    ['hero_1v1_double', 'double cross (a reversal after a flick)', ['o_double'], /\[HM-INPUT\] lcross/, 400, 1100],
+    ['hero_1v1_shammgod', 'Shammgod (a reversal two moves deep)', ['o_shammgod'], /\[HM-INPUT\] lcross/, 400, 1100],
+    ['hero_1v1_momentum', 'momentum cross / behind the back (R2 + the flick)', ['o_momcross', 'o_mombtb'], /\[HM-INPUT\] flick \w+ R2/, 400, 1000],
+    ['hero_1v1_snatch', 'snatchback (R2 + down)', ['o_snatch'], /\[HM-INPUT\] flick down R2/, 400, 1000],
+    ['hero_1v1_sizeup', 'size-up ×3 (up-toward)', ['o_sizeup'], /\[HM-INPUT\] flick sizeup/, 400, 1500],
+    ['hero_1v1_yoyo', 'yoyo (a slow, unpressured reversal)', ['o_yoyo'], /\[HM-INPUT\] lcross/, 400, 1000],
+    ['hero_1v1_jab', 'jab (the left-stick tap from triple threat)', ['o_jab'], /\[HM-INPUT\] jab tap/, 400, 1000],
+    ['hero_1v1_pausin', "PAUSIN' (the R stick held 0.5 s, released with a push)", ['o_pausin'], /\[HM-INPUT\] pausin-hold/, 400, 1800],
+    ['hero_1v1_hesi_explode', 'hesi explode (R-stick flick / left-stick tap / pull-then-push, then 0.9 + R2)', ['o_hesix_flick', 'o_hesix_tap', 'o_hesix_pullpush'], /\[HM-INPUT\] (flick hesi|hesi (tap|pullpush))/, 400, 1100],
+    ['hero_1v1_slowsweep', 'minimum-rate sweeps (≈ 500 / 380°/s) and a flick held at the ring', ['o_sweep500', 'o_sweep380', 'o_flickhold'], /\[HM-INPUT\] (sweep slow|flickhold)/, 400, 1300],
+    ['hero_1v1_spinfinish', 'spin into a shot (the squeeze inside the spin-gather window)', ['o_spinshot'], /\[HM-INPUT\] sweep spin/, 400, 1800],
+    ['hero_1v1_hookshimmy', "post hook with R2 (the hook's shimmy beat)", ['o_hookshimmy'], /\[HM-INPUT\] hook R2/, 300, 1500],
+    ['hero_1v1_pivot', 'pivot (L1 planted + the stick across; front and reverse)', ['o_pivot', 'o_pivot_rev'], /\[HM-INPUT\] pivot/, 400, 1000],
+    ['hero_1v1_steezo', 'steezo roll (R2 + the sweep; off the drop-step range and on it)', ['o_steezo_far', 'o_steezo_near'], /\[HM-INPUT\] sweep steezo/, 400, 1500],
+  ] as const).map(([id, label, takes, mark, pre, post]) => ({ ...A(id, label, 'handles', 'handle', '1v1-off', withReps([...takes]), { body: 'me', mark }, pre, post), supplemental: true })),
+  ...([['hero_3v3_between', 'between the legs (R stick)', 't_between', /between/], ['hero_3v3_behind', 'behind the back (R stick)', 't_behind', /behind/], ['hero_3v3_spin', 'spin move (R stick sweep)', 't_spin', /spin(?!_layup)/],
+    ['hero_3v3_hesi', 'hesitation (R stick toward the ball)', 't_hesi', /hesi|jab/], ['hero_3v3_inout', 'in-and-out (R stick up)', 't_inout', /feint|in_and_out|inout/]] as const)
+    .map(([id, label, take, clip]) => { const mv = take.slice(2); return { ...A(id, label, 'handles', 'handle', '3v3-off', withReps([take, `t_${mv}_stand`, `t_${mv}_fast`]), { body: 'me', clip }, 400, 1000), supplemental: true }; }),
 ];
 /** Per-action caps above REPS: the drive finishes keep one per approach; the post-up its instances across the four reads. */
 const MAXA: Record<string, number> = { hero_1v1_layup: 8, hero_1v1_drive_finish: 9, hero_3v3_drive_finish: 10, hero_1v1_post_up: 8, hero_3v3_layup: 6, hero_3pt_rack_shot: 8, hero_1v1_dunk: 14, hero_3v3_dunk: 11,
@@ -622,6 +688,10 @@ export interface Metrics {
      *  that only STRAIGHTENED reads as a fixed elbow. The arms (both, per frame) on the overhead frames over 160° (straight: the frames the
      *  test could not judge) and over 172° (locked, the lockedElbow threshold), in total and per clip. */
     straightOverhead?: number; lockedOverhead?: number };
+  /** PHASE 4a (2026-09-29, plan §5.1): the handles' metrics (scripts/probes/_hoops-h4.mts) — crossings, between / behind (replacing
+   *  visual.underLegs / behindBack, whose phase 1–3 reads are kept in h4.flagsV1), spin, hesi, in-and-out, shimmy, the bounce rate after
+   *  a crossing, the left hand, the latency from the probe's input mark, the defender's read, the path rel / world, the name. */
+  h4?: H4;
   /** PHASE 3b (2026-09-25) — the "Feet" gate lines. */
   h3b: {
     /** the foot slide on LOCOMOTION / DRIBBLE LOOP frames only (the subject's top clip a loop: the dribbles, the drive, the run, the
@@ -834,14 +904,11 @@ export function measure(rec: Rec): Metrics {
   const mine = (f: Frame) => !!f.ball && (f.bb === S || (!f.bb && !f.br && carrierIs(f, S)));
   const ballSideAt = (t: number) => { const c = win.filter((x) => mine(x) && Math.abs(x.t - t) <= 300); if (!c.length) return ''; const f = c.reduce((a, x) => (Math.abs(x.t - t) < Math.abs(a.t - t) ? x : a), c[0]); return visSide(f.B[S], f.ball!); };
   const sideStart = win.length ? ballSideAt(A0 - 80) : '', sideEnd = win.length ? ballSideAt(A0 + Math.min(rec.post, 900) - 100) : '';
-  let underLegs = false, behindBack = false;
-  for (const f of win) {
-    if (f.t < A0 - 50 || f.t > A0 + 900 || !f.ball) continue;
-    const b = f.B[S]; const kneeY = ((b.j[J.LeftLeg]?.[1] ?? 0.5) + (b.j[J.RightLeg]?.[1] ?? 0.5)) / 2; const h = b.j[J.Hips]; if (!h) continue;
-    const fwd = facing(b), rt = rightOf(fwd), d = sub(f.ball, h); const lx = dot(d, rt), lz = dot(d, fwd);
-    if (f.ball[1] < kneeY + 0.05 && Math.abs(lx) < 0.22 && Math.abs(lz) < 0.3) underLegs = true;
-    if (lz < -0.15 && f.ball[1] > 0.45 && f.ball[1] < 1.4 && (f.bb === S || (!f.bb && !f.br))) behindBack = true;
-  }
+  // PHASE 4a (plan §5.2): THE FLAGS READ NOISE — "below the knees within 0.22 × 0.3 m of the hips" passed a low bounce in front (base2:
+  // hero_1v1_drive underLegs 5/5, behindBack 5/5), so they are h4's `between` (a floor contact between the feet with a crossing) and
+  // `behind` (a crossing behind the hip line); the old reads ride in h4.flagsV1
+  const h4 = measureH4(win, S, A0, rec.marks, rec.anchorClip, rec.post, withS);
+  const underLegs = h4.between.found, behindBack = h4.behind.found;
   let spin = 0; { let prev: number | null = null; for (const f of win) { if (f.t < A0 - 50 || f.t > A0 + 1000) continue; const fw = facing(f.B[S]); const y = Math.atan2(fw[0], fw[2]); if (prev !== null) { let d = y - prev; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; spin += d; } prev = y; } }
   let latSum = 0, latN = 0;
   for (let i = 1; i < bw.length; i++) { const v = sub(bw[i].rp, bw[i - 1].rp); const s = Math.hypot(v[0], v[2]); if (s < 0.004 || s > 0.5) continue; latSum += Math.abs(dot(v, rightOf(facing(bw[i])))) / s; latN++; }
@@ -1160,29 +1227,12 @@ export function measure(rec: Rec): Metrics {
     sparc: sp, sparcMean: vals.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : NaN,
     pops, popsN: pops.length, severe: pops.filter((p) => p.degPerSec >= 3000).length, whips,
     heldFrac: held, wristStill: r2(((held.LeftHand ?? 0) + (held.RightHand ?? 0)) / 2), thoracicStill: held.Spine2 ?? 0,
-    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2, h3, h3b, h3c,
+    lockedElbow, lockedKnee, joints, elbowBad, foot, ball, release, visual, marks, h2, h3, h3b, h3c, h4,
     audit: (() => { const cl = bw.map((b) => Math.min(b.j[J.LeftFoot]?.[1] ?? 9, b.j[J.RightFoot]?.[1] ?? 9) - floorY); let fi = -1, ft = -1e9; win.forEach((f, i) => { if (f.t >= A0 - 100 && cl[i] > ft) { ft = cl[i]; fi = i; } });
       return { windowMs: [Math.round(Math.max(wS, win[0]?.t ?? wS) - A0), Math.round(Math.min(wE, win[win.length - 1]?.t ?? wE) - A0)] as [number, number], frames: win.length, resetsMs: resetsT.map((t) => Math.round(t - A0)), anchorAtReset, snaps, preMs, frozen, flight: { feetUpM: r2(ft), feetApexMs: fi >= 0 ? Math.round(win[fi].t - A0) : null, rootUpM: r2(Math.max(0, ...bw.map((b) => b.rp[1]))) } }; })(),
   };
 }
-/** Who has the ball this frame: the body whose hand it is parented to, or — on a dribble, where the carry places the ball in
- *  world space and it has no parent — the carrier the mode reports (1v1 possession / 3v3 carrier). '' = loose or in flight. */
-function holderOf(f: Frame): string {
-  if (f.bb) return f.bb;
-  if (!f.ball || f.br) return '';
-  const s = f.s || {};
-  if (typeof s.cr === 'string') return s.cr === 'foeTeam' ? (typeof s.cf === 'string' ? s.cf : '') : s.cr;   // PHASE 3a: the 3v3 foe on his own dribble
-  // PHASE 3a: with the carries' hands recorded (hh), the 1v1 rival's own dribble is his (s.ca is MY carry only)
-  if (typeof s.po === 'string' && s.hh && typeof s.hh === 'object') { const hh = s.hh as Record<string, string>; return s.po === 'mine' ? (hh.me ? 'me' : '') : s.po === 'defense' ? (hh.foe ? 'foe' : '') : ''; }
-  if (typeof s.po === 'string' && s.ca) return s.po === 'mine' ? 'me' : s.po === 'defense' ? 'foe' : '';
-  return '';
-}
-function carrierIs(f: Frame, id: string): boolean {
-  const s = f.s || {};
-  if (typeof s.po === 'string') return id === 'me' ? s.po === 'mine' : id === 'foe' ? s.po === 'defense' : false;
-  if (typeof s.cr === 'string') return id === 'me' ? s.cr === 'me' : id.startsWith('mate') ? s.cr === id : id.startsWith('foe') ? s.cr === 'foeTeam' && s.cf === id : false;
-  return id === 'me';
-}
+// holderOf / carrierIs: moved to _hoops-h4.mts (PHASE 4a), unchanged — the h4 metrics read the same possession rules
 /** PHASE 2a: the animation-group weights of the subject on every frame around the anchor — the crossFade re-entrancy question
  *  (V:3pt N1: idle_stand at full weight under the 3PT shot and the follow-through; plan §3: "a prev.stop() inside a crossfade can
  *  strand a new clip at weight 0 while the old one plays untracked"). One line per frame; the header says what the shot was (the

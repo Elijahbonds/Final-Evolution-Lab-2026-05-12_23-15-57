@@ -603,3 +603,77 @@ export function fallbackMove(move: HandleMove, handle: number): HandleMove {
   for (let i = 0; i < 6 && !hasMove(m, handle) && m !== 'spin'; i++) m = FALLBACK_MOVE[m] ?? 'crossover';
   return m;
 }
+
+// ── HOOPS MOTION phase 4a (plan §3.1): THE SHAPE OF EACH MOVE, AND ITS PACE ─────────────────────────────────────────────────────────
+//
+// Phase 4's renderer (4b's HandleMotion) plays every move the same way: the move's clip, the ball's path (anim/handlePaths), the hand it
+// ends in, the pace and the defender's clip beat. What differs by move is this table. It is DATA ONLY here — nothing reads it yet but
+// handlePaths and the tests; the call sites keep their decisions (plan §3.4) and change in 4b.
+
+/** The ball's path family (anim/handlePaths builds one per move). */
+export type MovePath = 'front' | 'between' | 'behind' | 'pushOut' | 'feint' | 'float' | 'pound' | 'pull' | 'hold' | 'none';
+/** Where a defender could poke: the k range of the move (0..1) and how exposed the ball is inside it (1 = out in front of the body; 0.3
+ *  = protected: between the legs, behind the back, at the hips). */
+export interface MoveExposure { from: number; to: number; level: number }
+/** The posture window a move asks for: the handle stance, the hesi's own (4e), the spin's (the mode owns the yaw), or none. */
+export type MovePosture = 'handle' | 'hesi' | 'spin' | 'none';
+export interface MoveShape {
+  /** How many times the ball crosses the body's midline: 0 keeps the hand, 1 ends in the other hand, 2 ends back in the start hand. */
+  crosses: 0 | 1 | 2;
+  path: MovePath;
+  /** When the defender's CLIP reacts, as a fraction of the move (plan §3.7: the clip beat only — the roll, the stun and the bite slide stay
+   *  on the input frame). null: no defender clip. */
+  readAtK: number | null;
+  exposed: MoveExposure | null;
+  /** Does it link in the chain (resolveHandleMove / pushChain)? Every HandleMove does today; the spin links at its exit (gathersIntoShot). */
+  chain: boolean;
+  /** Does it displace the body (moveImpulse ≠ 0)? The fakes and the momentum moves do not: the momentum moves carry the controller's own
+   *  cut (DribbleController.momentumCross / momentumBtb), not the impulse. */
+  impulse: boolean;
+  posture: MovePosture;
+  /** 'motion': the renderer plays it; 'mode': the mode resolves it in place (off the head: the release, the loose ball, the stun). */
+  owner: 'motion' | 'mode';
+}
+const FRONT_EXPOSED: MoveExposure = { from: 0.2, to: 0.8, level: 1 };
+const PROTECTED: MoveExposure = { from: 0, to: 1, level: 0.3 };
+/**
+ * One row per HandleMove (plan §3.1 / §4). assumption (the plan gives no figure): the Shammgod's exposure (k 0.2–0.6, level 1: the ball
+ * pushed out alone), the in-and-out's and the slip-slide's (k 0.2–0.7, level 0.6: it comes toward the midline and back), the spin's and
+ * the steezo roll's (protected), the double cross's (the front crossing's), the snatchback's (k 0.2–0.7, level 1) and the momentum cross's
+ * (the crossover's); the step-back's and the steezo roll's readAtK (0.5, 0.55).
+ */
+export const MOVE_SHAPE: Readonly<Record<HandleMove, MoveShape>> = {
+  crossover:      { crosses: 1, path: 'front',   readAtK: 0.45, exposed: FRONT_EXPOSED, chain: true, impulse: true,  posture: 'handle', owner: 'motion' },
+  momentum_cross: { crosses: 1, path: 'front',   readAtK: 0.4,  exposed: FRONT_EXPOSED, chain: true, impulse: false, posture: 'handle', owner: 'motion' },
+  between_legs:   { crosses: 1, path: 'between', readAtK: 0.6,  exposed: PROTECTED,     chain: true, impulse: true,  posture: 'handle', owner: 'motion' },
+  behind_back:    { crosses: 1, path: 'behind',  readAtK: 0.55, exposed: PROTECTED,     chain: true, impulse: true,  posture: 'handle', owner: 'motion' },
+  momentum_btb:   { crosses: 1, path: 'behind',  readAtK: 0.55, exposed: PROTECTED,     chain: true, impulse: false, posture: 'handle', owner: 'motion' },
+  double_cross:   { crosses: 2, path: 'front',   readAtK: 0.7,  exposed: FRONT_EXPOSED, chain: true, impulse: true,  posture: 'handle', owner: 'motion' },
+  shammgod:       { crosses: 1, path: 'pushOut', readAtK: 0.7,  exposed: { from: 0.2, to: 0.6, level: 1 }, chain: true, impulse: true, posture: 'handle', owner: 'motion' },
+  in_and_out:     { crosses: 0, path: 'feint',   readAtK: 0.4,  exposed: { from: 0.2, to: 0.7, level: 0.6 }, chain: true, impulse: false, posture: 'handle', owner: 'motion' },
+  slip_slide:     { crosses: 0, path: 'feint',   readAtK: 0.4,  exposed: { from: 0.2, to: 0.7, level: 0.6 }, chain: true, impulse: true, posture: 'handle', owner: 'motion' },
+  hesi:           { crosses: 0, path: 'float',   readAtK: 0.3,  exposed: null,          chain: true, impulse: false, posture: 'hesi',   owner: 'motion' },
+  yoyo:           { crosses: 0, path: 'pound',   readAtK: null, exposed: null,          chain: true, impulse: false, posture: 'handle', owner: 'motion' },
+  spin:           { crosses: 1, path: 'pull',    readAtK: 0.45, exposed: PROTECTED,     chain: true, impulse: false, posture: 'spin',   owner: 'motion' },
+  snatch_back:    { crosses: 1, path: 'front',   readAtK: 0.3,  exposed: { from: 0.2, to: 0.7, level: 1 }, chain: true, impulse: true, posture: 'handle', owner: 'motion' },
+  steezo_roll:    { crosses: 2, path: 'behind',  readAtK: 0.55, exposed: PROTECTED,     chain: true, impulse: false, posture: 'spin',   owner: 'motion' },
+  stepback:       { crosses: 0, path: 'none',    readAtK: 0.5,  exposed: null,          chain: true, impulse: false, posture: 'handle', owner: 'motion' },
+  off_the_head:   { crosses: 0, path: 'none',    readAtK: null, exposed: null,          chain: true, impulse: false, posture: 'none',   owner: 'mode' },
+};
+/** The hand a move ends in (plan §3.1): a move that crosses once ends in the OTHER hand, whatever the defender read says; 0 or 2 crossings
+ *  end in the hand it started in. `dir` in MOVE_CLIP stays "the side the ball ENDS on". */
+export function endHandFor(move: HandleMove, startHand: 'left' | 'right'): 'left' | 'right' {
+  return MOVE_SHAPE[move].crosses === 1 ? (startHand === 'left' ? 'right' : 'left') : startHand;
+}
+/** The turbo's pace against real speed (owner Q3, 2026-09-26: 1.25× real on the turbo, against today's MOVE_RATE_TURBO 1.35× on top of
+ *  captures that already play fast — the feint about 1.74× real on the turbo, the crossover 1.44×). */
+export const MOVE_TURBO_REAL = 1.25;
+/**
+ * A move clip's playback rate that plays it at REAL speed (plan §3.1): `playedSec / realSec` — a clip `playedSec` long holding `realSec`
+ * of real motion (a capture's window, MOCAP_REAL_SEC; an authored clip's own duration) — × MOVE_TURBO_REAL on the turbo. Pure: the anim
+ * side looks the two numbers up and passes them in, so core imports no anim. Not wired yet (4b/4g replace moveRate with it).
+ */
+export function moveRateFor(realSec: number, playedSec: number, turbo: boolean): number {
+  const base = realSec > 1e-6 && playedSec > 1e-6 ? playedSec / realSec : 1;
+  return turbo ? base * MOVE_TURBO_REAL : base;
+}

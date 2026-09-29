@@ -46,7 +46,9 @@ const STYLES = process.argv.includes('--styles');
 // popping steps (owner decision #17). Its OWN manifest and module on purpose: regenerating mocapStyles.ts would re-cut the
 // combat styles' clips under today's retarget, and nothing here may move a clip another mode already plays.
 const DANCE = process.argv.includes('--dance');
-const OUT = DANCE ? 'lib/babylon/anim/authored/mocapDance.ts' : STYLES ? 'lib/babylon/anim/authored/mocapStyles.ts' : 'lib/babylon/anim/authored/mocapOpponents.ts';
+// GEN_OUT=<file> writes the module there instead (HOOPS MOTION phase 4a: the byte-identical gate — regenerate beside the committed module
+// and compare, without touching it)
+const OUT = process.env.GEN_OUT ?? (DANCE ? 'lib/babylon/anim/authored/mocapDance.ts' : STYLES ? 'lib/babylon/anim/authored/mocapStyles.ts' : 'lib/babylon/anim/authored/mocapOpponents.ts');
 const only = (() => { const i = process.argv.indexOf('--only'); return i > 0 ? new Set(process.argv[i + 1].split(',')) : null; })();
 const manifest = JSON.parse(readFileSync(DANCE ? 'scripts/mocap/dance-clips.json' : STYLES ? 'scripts/mocap/style-clips.json' : 'scripts/mocap/opponent-clips.json', 'utf8')) as { clips: Entry[] };
 
@@ -74,6 +76,9 @@ function refineLoop(s: JointStream, from: number, to: number, [minD, maxD]: [num
 
 const streams = new Map<string, JointStream>();
 const out: string[] = [];
+/** HOOPS MOTION phase 4a: [name, real seconds] of every hoops capture ONE-SHOT (bball_mc_*, not a loop) — its window `to − from` in the
+ *  capture's true seconds — written to its own export after the clips (MOCAP_REAL_SEC), so every clip row stays byte-identical. */
+const realSec: [string, number][] = [];
 for (const e of manifest.clips) {
   if (only && !only.has(e.name)) continue;
   const key = `${e.source}:${e.file}#${e.anim ?? ''}`;
@@ -85,6 +90,7 @@ for (const e of manifest.clips) {
   }
   let [from, to] = [e.from, e.to];
   if (e.loop && e.refineLoop) [from, to] = refineLoop(s, from, to, e.refineLoop);
+  if (!STYLES && !e.loop && /^bball_mc_/.test(e.name)) realSec.push([e.name, +(to - from).toFixed(3)]);
   const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack, smoothSec: e.smoothSec, reRoot: e.reRoot });
   if (e.extend) {
     const ex = e.extend; const m = !!e.mirror;
@@ -218,5 +224,12 @@ ${out.join('\n')}
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {
   return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys, { periodic: clip.loop });
 }
+
+/** HOOPS MOTION phase 4a (plan §3.1): the REAL seconds of motion in each hoops capture one-shot — its window \`to − from\` in the capture's
+ *  true seconds (scripts/mocap/sources.mts CMU_TRUE_FPS) — the \`realSec\` HandleSystem.moveRateFor plays a move at real speed from (the clip
+ *  is \`duration\` long, so real speed is duration / realSec). The loops are left out: StrideMatch paces them. */
+export const MOCAP_REAL_SEC: Readonly<Record<string, number>> = {
+${realSec.map(([n, v]) => `  ${n}: ${v},`).join('\n')}
+};
 `);
 console.log(`wrote ${OUT} (${out.length} clips)`);
