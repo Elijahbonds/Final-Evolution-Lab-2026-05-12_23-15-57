@@ -60,6 +60,23 @@ describe('LOWER-IS-BETTER IS NOT BACKWARDS', () => {
   });
 });
 
+describe('the camera\'s knee-to-wall angle (Mirror Assess T2, 2026-09-28)', () => {
+  it('ankleDorsiflexionDeg maps 30° → 0 and 45° → 100 on flexibility, clamped, beside the tape-measure key', () => {
+    const m = measurementFor('ankleDorsiflexionDeg')!;
+    expect(m).toMatchObject({ axis: 'flexibility', unit: 'deg', floor: 30, ceiling: 45 });
+    expect(m.lowerIsBetter).toBeUndefined();
+    expect(axisValue(m, 30)).toBe(0);
+    expect(axisValue(m, 37.5)).toBe(50);
+    expect(axisValue(m, 45)).toBe(100);
+    expect(axisValue(m, 60)).toBe(100);
+    expect(measurementFor('ankleDorsiflexion')!.unit).toBe('cm');   // the tape-measure key is unchanged
+  });
+
+  it('the tape-measure key is still the one an athlete is asked to measure first for flexibility', () => {
+    expect(suggestNextMeasurements(null, 8).find((m) => m.axis === 'flexibility')!.key).toBe('ankleDorsiflexion');
+  });
+});
+
 describe('OUT OF RANGE CLAMPS, IT DOES NOT EXTRAPOLATE', () => {
   it('a mistyped vertical does not produce a superhuman axis', () => {
     const m = measurementFor('verticalJump')!;
