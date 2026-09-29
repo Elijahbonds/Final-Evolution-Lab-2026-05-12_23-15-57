@@ -12,7 +12,9 @@ p.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') err
 p.on('pageerror', (e) => errs.push(`pageerror: ${String(e).slice(0, 300)}`));
 await p.goto(`${BASE}/dev/mode/${process.env.MODE ?? 'dunk'}${process.env.QUERY ? `?${process.env.QUERY}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 await p.waitForFunction('!!(window.__FEL_DEV__ && window.__FEL_DEV__.scene)', undefined, { timeout: 240000 });
-await p.waitForFunction('/playing|countdown/.test(document.body.innerText)', undefined, { timeout: 240000 }).catch(() => {});
+// (the dev page's HUD is a JSON panel — "HOLD to run" is its approach hint; "playing"/"countdown" never show there, so this
+// used to sit out its whole 240 s before every run)
+await p.waitForFunction('/playing|countdown|HOLD to run/.test(document.body.textContent)', undefined, { timeout: 240000 }).catch(() => {});
 await p.waitForTimeout(Number(process.env.WAIT ?? 9000));
 const out = await p.evaluate(`(() => { const s = window.__FEL_DEV__.scene; return (${process.env.EVAL ?? 's.meshes.length'}); })()`);
 console.log(typeof out === 'string' ? out : JSON.stringify(out, null, 1));
