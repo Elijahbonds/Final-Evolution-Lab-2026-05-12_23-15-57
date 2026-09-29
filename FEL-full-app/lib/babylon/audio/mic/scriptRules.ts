@@ -5,7 +5,7 @@
 // anyone, so nobody but the speaker gets a gendered pronoun; and a text-to-speech voice reads every line, so no digits, no
 // all-caps words and no stage directions.
 
-import { COACH_MOMENTS, CROWD_MOMENTS, MOMENTS, PLAYER_MOMENTS, TIER_COUNTS, momentSpec } from './moments';
+import { ACADEMY_MOMENTS, COACH_MOMENTS, CROWD_MOMENTS, DANCE_MOMENTS, MOMENTS, PLAYER_MOMENTS, TIER_COUNTS, momentSpec } from './moments';
 
 export interface ScriptLine { id?: string; moment: string; text: string; tier?: 0 | 1 | 2; tags?: string[] }
 export interface ScriptFile { cast: string; lines: ScriptLine[] }
@@ -27,6 +27,9 @@ export function maxWordsFor(moment: string): number | null {
   const c = CROWD_MOMENTS.find((x) => x.id === moment); if (c) return c.maxWords;
   const p = PLAYER_MOMENTS.find((x) => x.id === moment); if (p) return p.maxWords;
   const c2 = COACH_MOMENTS.find((x) => x.id === moment); if (c2) return c2.maxWords;
+  // MUSIC-SUITE P8: Stoop (the Cypher) and Professor Okta (the Academy) — flat moments, same shape as COACH_MOMENTS.
+  const d = DANCE_MOMENTS.find((x) => x.id === moment); if (d) return d.maxWords;
+  const ac = ACADEMY_MOMENTS.find((x) => x.id === moment); if (ac) return ac.maxWords;
   return null;
 }
 
