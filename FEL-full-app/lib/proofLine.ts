@@ -29,7 +29,8 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'hoops3v3': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
     case 'threePoint': { const pts = n(s, 'points') ?? r.score; return `${pts} PTS DOWNTOWN · ${wl(r)}`; }
     case 'skateboarding': { const combo = n(s, 'bestCombo'), coins = n(s, 'coinsCollected'); return `${r.score} PTS${combo !== null ? ` · x${Math.round(combo)} BEST CHAIN` : ''}${coins !== null ? ` · ${coins} COINS` : ''}`; }
-    case 'snowboarding': { const gates = n(s, 'gatesHit'), t = n(s, 'elapsed'); return `${gates ?? 0} GATES${t !== null ? ` · ${t}s` : ''} · ${r.score} PTS`; }
+    // GATE-CRASHER-POLISH-2 (GC-11): the time bonus left the card's title for this line — named when the run earned one
+    case 'snowboarding': { const gates = n(s, 'gatesHit'), t = n(s, 'elapsed'), tb = n(s, 'timeBonus'); return `${gates ?? 0} GATES${t !== null ? ` · ${t}s` : ''}${tb ? ` · +${tb} TIME` : ''} · ${r.score} PTS`; }
     case 'surfing': { const flow = n(s, 'bestFlow'), barrels = n(s, 'barrels'); return `${r.score} PTS${barrels !== null ? ` · ${barrels} BARREL${barrels === 1 ? '' : 'S'}` : ''}${flow !== null ? ` · FLOW ${flow}` : ''}`; }
     case 'bigAir': return `${r.score} PTS · ${r.outcome === 'win' ? 'STOMPED' : 'COMPLETE'}`;
     case 'freerun': { const t = n(s, 'timeSec'), tricks = n(s, 'tricks'), combo = n(s, 'bestCombo'), high = n(s, 'highLine'); return `${r.score} PTS${t !== null ? ` · ${t}s` : ''}${tricks !== null ? ` · ${tricks} TRICK` : ''}${combo ? ` · ×${combo}` : ''}${high ? ' · HIGH LINE' : ''}`; }

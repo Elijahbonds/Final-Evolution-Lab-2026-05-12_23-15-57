@@ -13,6 +13,9 @@ describe('proofLineFor', () => {
   it('field and board modes read their own counters', () => {
     expect(proofLineFor('football', { score: 110, won: true, stats: { yards: 24, evades: 0, trucks: 1 } })).toBe('24 YDS · 0 EVADES · 1 TRUCKS');
     expect(proofLineFor('snowboarding', { score: 340, won: false, stats: { gatesHit: 9, elapsed: 61 } })).toBe('9 GATES · 61s · 340 PTS');
+    // GATE-CRASHER-POLISH-2 (GC-11): the time bonus left the card's title for this line
+    expect(proofLineFor('snowboarding', { score: 3226, won: true, stats: { gatesHit: 27, elapsed: 64, timeBonus: 260 } })).toBe('27 GATES · 64s · +260 TIME · 3226 PTS');
+    expect(proofLineFor('snowboarding', { score: 900, won: false, stats: { gatesHit: 9, elapsed: 95, timeBonus: 0 } })).toBe('9 GATES · 95s · 900 PTS');
     expect(proofLineFor('karateEndless', { score: 850, won: false, stats: { wave: 6, kos: 31 } })).toBe('WAVE 6 · 31 KOS');
   });
   it('ball games fall back to the score pair', () => {

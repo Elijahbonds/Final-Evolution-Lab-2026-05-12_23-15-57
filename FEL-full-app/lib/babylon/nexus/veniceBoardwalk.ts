@@ -7,8 +7,13 @@
 // (apron, grass, sand, ocean, sun); the props (shops, tents, palms, lamps, bus, sedan) are placements in prop set
 // 'venice-court-meshy' (venuePropSets.ts). Runs for the basketball venues under Venice only — a picked location brings
 // its own environment. Everything hangs under the venue root and dies with it.
+//
+// DUNK-VENICE-ENV-RENDER (2026-09-28): the dunk's Venice ('venice-dunk') has no lawn — the green planes were the eye's
+// "green ground" — but beach to the water, the bike path, the Ocean Front Walk and a plaza, a court in the Venice kit's blue,
+// and its own prop set ('venice-dunk': tall palms, vendors, boats on the water). The sky and sun are the look pass's
+// (visual/veniceSurroundVisibility.ts). 1v1, 3v3, three-point and the carnival keep the lawn build unchanged.
 import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
-import { mountStreetCourt } from '../visual/CourtSurface';
+import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
 import { courtLogoTexture, groundTextureFor, signTexture, TILE_M, type GroundKind } from '../visual/groundTextures';
 import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import { Onlookers } from '../visual/Onlookers';
@@ -17,7 +22,19 @@ import type { Scene } from '@babylonjs/core';
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
 export const BOARDWALK = { apron: 3, grass: 5, walkW: 9, sandW: 34 };
 
-function flat(scene: Scene, name: string, w: number, d: number, x: number, z: number, y: number, hex: string, holder: TransformNode, rough = 1, kind?: GroundKind): Mesh {
+/**
+ * DUNK-VENICE-ENV-RENDER (2026-09-28): the Venice dunk's ground, east of the court (+x) — no lawn. The grass planes were
+ * the green field the eye read around the dunk court (and 190 m of it to the eastern horizon); Venice is concrete and sand:
+ * a planting strip of sand for the palm row, the beach BIKE PATH (dark asphalt, dashed yellow centre line), the Ocean Front
+ * Walk (a 14 m concrete promenade) and a paved plaza behind it where the vendors stand. West and north of the court it is
+ * beach to the water. x edges in metres.
+ */
+export const DUNK_BOARDWALK = { bikeX: [13.5, 17] as const, walkX: [17, 31] as const, plazaX0: 31, northSand: -57 };
+
+/** Which Venice: 'lawn' is the shared hoops boardwalk (1v1, 3v3, three-point, carnival); 'venice-dunk' is the dunk's own. */
+export type BoardwalkEnv = 'lawn' | 'venice-dunk';
+
+function flat(scene: Scene, name: string, w: number, d: number, x: number, z: number, y: number, hex: string, holder: TransformNode, rough = 1, kind?: GroundKind, mul?: string): Mesh {
   const g = MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
   g.position.set(x, y, z); g.parent = holder; g.isPickable = false; g.receiveShadows = true;
   // PBR like every kit prop: a StandardMaterial under the venue sun + grade blew the grass to lime and the sand to white
@@ -25,7 +42,9 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
   m.albedoColor = Color3.FromHexString(hex); m.roughness = rough; m.metallic = 0; m.environmentIntensity = 0.35;
   if (kind) {
     // Pass 7 phase 2: a tiling procedural albedo (groundTextures.ts) — the flat colour becomes grass, sand or concrete
-    m.albedoTexture = groundTextureFor(scene, kind, w / TILE_M[kind], d / TILE_M[kind]); m.albedoColor = Color3.White();
+    // (`hex` is not used once a kind paints the albedo; `mul` multiplies the texture — the Venice dunk sets its sand, walk and
+    // plaza apart in VALUE this way, since two concretes share one texture)
+    m.albedoTexture = groundTextureFor(scene, kind, w / TILE_M[kind], d / TILE_M[kind]); m.albedoColor = mul ? Color3.FromHexString(mul) : Color3.White();
   }
   g.material = m;
   return g;
@@ -37,7 +56,7 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
  * aprons, far hoop, centre logo and gate sign slide with it — the owner's Luma reference (2026-09-06) shows both hoops on
  * the concrete right behind each baseline.
  */
-export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0): TransformNode {
+export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn'): TransformNode {
   const holder = new TransformNode('venice_boardwalk', scene); holder.parent = root;
   const { apron, grass, walkW, sandW } = BOARDWALK;
   // concrete apron around the slab (a hair above the scan's painted ground), then the boardwalk strip to the east
@@ -56,22 +75,50 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   const northSand = -(az + 40), northSea = northSand - 14;            // shop line at z −50, sand from −57, water from −71
   const westSand = -(ax + grass), westSea = westSand - sandW;
   const zSpanN = (northSand - (-L)) ;                                  // (unused span helper kept readable)
-  flat(scene, 'vb_grass_e', grass, L * 2, ax + grass / 2, 0, 0.01, GRASS, holder, 1, 'grass');
-  flat(scene, 'vb_walk', walkW, L * 2, ax + grass + walkW / 2, 0, 0.011, '#C8BFB0', holder, 1, 'concrete');
-  flat(scene, 'vb_grass_far_e', L, L * 2, ax + grass + walkW + L / 2, 0, 0.01, GRASS2, holder, 1, 'grass');
-  // DUNK-VISUAL-POLISH: the northern grass used to stop at −az (the SLAB's edge) while the north apron ends at
-  // SCAN_N − apron, which is a different z on every mode — a 2.9 m strip of nothing behind the dunk baseline and a
-  // 12 m one behind the ones/threes hoop, straight through to the void. It runs from the apron it actually meets.
+  const dunkEnv = env === 'venice-dunk';
   const grassN0 = SCAN_N - apron;
-  flat(scene, 'vb_grass_n', ax * 2, grassN0 - northSand, 0, (northSand + grassN0) / 2, 0.01, GRASS, holder, 1, 'grass');
-  flat(scene, 'vb_grass_s', ax * 2, L - (SCAN_S + apron), 0, SCAN_S + apron + (L - (SCAN_S + apron)) / 2, 0.01, GRASS, holder, 1, 'grass');
-  flat(scene, 'vb_grass_w', grass, L * 2, -(ax + grass / 2), 0, 0.01, GRASS, holder, 1, 'grass');
-  // sand: a strip down the west side and a strip across the north, then water beyond both
-  flat(scene, 'vb_sand_w', sandW, L * 2, westSand - sandW / 2, 0, 0.008, '#CDB48C', holder, 1, 'sand');
-  flat(scene, 'vb_sand_n', ax * 2 + grass * 2 + walkW + L, northSand - northSea, (westSand + ax + grass + walkW + L) / 2, (northSand + northSea) / 2, 0.008, '#CDB48C', holder, 1, 'sand');
+  if (dunkEnv) {
+    // DUNK-VENICE-ENV-RENDER: sand from the aprons out to the water (west and north) and under the palm strip, then the bike
+    // path, the promenade and the plaza to the east. Six planes where the lawn build laid eight, and not one of them green.
+    // Multipliers over the shared ground textures, so the court stays the lit thing in the frame: the low sun and the hemi
+    // fill blew the plain sand to white-beige, and the walk and the plaza (one concrete texture) read as one slab.
+    const D = DUNK_BOARDWALK, far = L + 25, SAND = '#C4B39A';
+    flat(scene, 'vb_sand', D.bikeX[0] - westSea, L - northSea, (westSea + D.bikeX[0]) / 2, (northSea + L) / 2, 0.008, SAND, holder, 1, 'sand', SAND);
+    flat(scene, 'vb_sand_n', far - D.bikeX[0], D.northSand - northSea, (D.bikeX[0] + far) / 2, (northSea + D.northSand) / 2, 0.008, SAND, holder, 1, 'sand', SAND);
+    const eastLen = L - D.northSand, eastMid = (D.northSand + L) / 2;
+    flat(scene, 'vb_bikepath', D.bikeX[1] - D.bikeX[0], eastLen, (D.bikeX[0] + D.bikeX[1]) / 2, eastMid, 0.011, '#8C8484', holder, 0.85, 'asphalt', '#8C8484');
+    flat(scene, 'vb_walk', D.walkX[1] - D.walkX[0], eastLen, (D.walkX[0] + D.walkX[1]) / 2, eastMid, 0.011, '#E2D8CA', holder, 1, 'concrete', '#E2D8CA');
+    flat(scene, 'vb_plaza', far - D.plazaX0, eastLen, (D.plazaX0 + far) / 2, eastMid, 0.01, '#857A70', holder, 1, 'concrete', '#857A70');
+    // the bike path's dashed centre line: one plane, the dashes are its alpha-tested texture (3 m dash, 3 m gap)
+    const dashTex = new DynamicTexture('vb_bike_dash_tex', { width: 16, height: 64 }, scene, false);
+    { const c = dashTex.getContext() as CanvasRenderingContext2D; c.clearRect(0, 0, 16, 64); c.fillStyle = '#E8B83A'; c.fillRect(0, 0, 16, 32); dashTex.update(false); dashTex.hasAlpha = true; }
+    dashTex.vScale = eastLen / 6;
+    const dash = MeshBuilder.CreateGround('vb_bike_line', { width: 0.14, height: eastLen }, scene);
+    dash.position.set((D.bikeX[0] + D.bikeX[1]) / 2, 0.014, eastMid); dash.parent = holder; dash.isPickable = false; dash.receiveShadows = true;
+    const dm = new PBRMaterial('vb_bike_line_mat', scene); dm.albedoTexture = dashTex; dm.useAlphaFromAlbedoTexture = true; dm.transparencyMode = 1; dm.alphaCutOff = 0.5;
+    dm.albedoColor = Color3.White(); dm.roughness = 0.8; dm.metallic = 0; dm.environmentIntensity = 0.35; dash.material = dm;
+  } else {
+    flat(scene, 'vb_grass_e', grass, L * 2, ax + grass / 2, 0, 0.01, GRASS, holder, 1, 'grass');
+    flat(scene, 'vb_walk', walkW, L * 2, ax + grass + walkW / 2, 0, 0.011, '#C8BFB0', holder, 1, 'concrete');
+    flat(scene, 'vb_grass_far_e', L, L * 2, ax + grass + walkW + L / 2, 0, 0.01, GRASS2, holder, 1, 'grass');
+    // DUNK-VISUAL-POLISH: the northern grass used to stop at −az (the SLAB's edge) while the north apron ends at
+    // SCAN_N − apron, which is a different z on every mode — a 2.9 m strip of nothing behind the dunk baseline and a
+    // 12 m one behind the ones/threes hoop, straight through to the void. It runs from the apron it actually meets.
+    flat(scene, 'vb_grass_n', ax * 2, grassN0 - northSand, 0, (northSand + grassN0) / 2, 0.01, GRASS, holder, 1, 'grass');
+    flat(scene, 'vb_grass_s', ax * 2, L - (SCAN_S + apron), 0, SCAN_S + apron + (L - (SCAN_S + apron)) / 2, 0.01, GRASS, holder, 1, 'grass');
+    flat(scene, 'vb_grass_w', grass, L * 2, -(ax + grass / 2), 0, 0.01, GRASS, holder, 1, 'grass');
+    // sand: a strip down the west side and a strip across the north, then water beyond both
+    flat(scene, 'vb_sand_w', sandW, L * 2, westSand - sandW / 2, 0, 0.008, '#CDB48C', holder, 1, 'sand');
+    flat(scene, 'vb_sand_n', ax * 2 + grass * 2 + walkW + L, northSand - northSea, (westSand + ax + grass + walkW + L) / 2, (northSand + northSea) / 2, 0.008, '#CDB48C', holder, 1, 'sand');
+  }
+  // the sea: under the Venice dunk's sunset it is the photo's slate blue with the sun's warmth in it, not the lawn build's
+  // lavender (which read as a lilac slab against the new sky)
   const seaMat = new PBRMaterial('vb_sea_mat', scene);
-  seaMat.albedoColor = Color3.FromHexString('#3B3A6E'); seaMat.roughness = 0.35; seaMat.metallic = 0; seaMat.environmentIntensity = 0.6;
-  seaMat.emissiveColor = new Color3(0.10, 0.06, 0.12);
+  // (PBR albedo is LINEAR: the lawn build's raw '#3B3A6E' is a mid lavender, and a raw navy under the low sun and hemi fill
+  // still rendered as a pale grey band on the horizon — the dunk's navy is converted, so it lands as the dark sea it names)
+  seaMat.albedoColor = dunkEnv ? Color3.FromHexString('#1B2740').toLinearSpace() : Color3.FromHexString('#3B3A6E');
+  seaMat.roughness = dunkEnv ? 0.3 : 0.35; seaMat.metallic = 0; seaMat.environmentIntensity = dunkEnv ? 0.3 : 0.6;
+  seaMat.emissiveColor = dunkEnv ? new Color3(0.06, 0.035, 0.025) : new Color3(0.10, 0.06, 0.12);
   const seaW = MeshBuilder.CreateGround('vb_sea_w', { width: L, height: L * 2 }, scene); seaW.position.set(westSea - L / 2, 0, 0); seaW.parent = holder; seaW.material = seaMat; seaW.isPickable = false;
   const seaN = MeshBuilder.CreateGround('vb_sea_n', { width: L * 2, height: L }, scene); seaN.position.set(0, 0, northSea - L / 2); seaN.parent = holder; seaN.material = seaMat; seaN.isPickable = false;
   // The sun is PAINTED into the beach dome (scripts/backdrop/paint-beach-dome.py, u≈0.33): a 3D disc at the dome wall rendered as a
@@ -127,7 +174,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // It replaces the two key patches this file used to paint: those existed only to cover the ghost rectangles the scan's
   // flattened hoop stands left over both keys (scripts/map/cut-scan-stands.py), and the painted court now covers them
   // with a real key.
-  mountStreetCourt(scene, holder, [-COURT.hx, COURT.hx], [SCAN_N, SCAN_S], 0.02);
+  mountStreetCourt(scene, holder, [-COURT.hx, COURT.hx], [SCAN_N, SCAN_S], 0.02, dunkEnv ? VENICE_DUNK_COURT_PALETTE : STREET_COURT_PALETTE);
 
   // Pass 7 phase 6 — life: a rail of onlookers on the boardwalk's inner edge, facing the court (roster bodies, cap 8, the
   // same people every session). They idle and bob; the modes' cheer hooks are not wired here — this is scenery.
@@ -142,6 +189,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   logoTex.uScale = -1; logoTex.uOffset = 1;
   const lm = new PBRMaterial('vb_court_logo_mat', scene); lm.albedoTexture = logoTex; lm.useAlphaFromAlbedoTexture = true; lm.transparencyMode = 2; lm.roughness = 0.9; lm.metallic = 0; lm.albedoColor = Color3.White(); lm.environmentIntensity = 0.3;
   logo.material = lm;
-  console.info('[FEL-VENICE] boardwalk scenery built (apron, grass, boardwalk, sand, ocean, sun) — props from venice-court-meshy');
+  console.info(dunkEnv ? '[FEL-VENICE] dunk boardwalk built (apron, beach, bike path, promenade, plaza, ocean) — props from venice-dunk'
+    : '[FEL-VENICE] boardwalk scenery built (apron, grass, boardwalk, sand, ocean, sun) — props from venice-court-meshy');
   return holder;
 }

@@ -297,6 +297,9 @@ export class InputBus {
   body(): BodyPacket | null { return this.latest; }
   /** arrivedAt of the latest packet (a final one included); -Infinity if none since start(). */
   lastBodyAt(): number { return this.lastArrive; }
+  /** MOVEMENT PLAY P8: the L stick's x the listeners last got is the body's (arbiter.lxFromBody) — per axis, which an
+   *  event's `src` cannot say. */
+  bodyOwnsLx(): boolean { return this.arbiter.lxFromBody(); }
   /** A body floor's output → the listeners, through the arbiter (§3). No haptic: nobody pressed anything. */
   emitBody(e: BodyOut): void {
     for (const out of this.arbiter.body(e, this.gamepadActive)) this.emit(out);

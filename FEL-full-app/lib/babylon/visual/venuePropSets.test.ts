@@ -1,7 +1,8 @@
 // venuePropSets — every prop stands outside its play area and every model it names ships.
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { VENUE_PROP_SETS, surroundSize, surroundCovers, surroundColor, SURROUND_MARGIN, SURROUND_KIND } from './venuePropSets';
+import { VENUE_PROP_SETS, VENICE_PALM_TINT, surroundSize, surroundCovers, surroundColor, SURROUND_MARGIN, SURROUND_KIND } from './venuePropSets';
+import { propSetFor, tintFor } from './VenueProps';
 
 // Play areas (x half-width, z range) the props must clear — from the modes' own venues.
 //
@@ -18,6 +19,7 @@ import { VENUE_PROP_SETS, surroundSize, surroundCovers, surroundColor, SURROUND_
 const PLAY: Record<string, { hx: number; z: [number, number]; fan?: boolean }> = {
   'venice-court': { hx: 8, z: [-14, 14] },       // 16×28 court
   'venice-court-meshy': { hx: 8, z: [-14, 14] }, // the same court with the owner's Meshy hoopbus and sedan behind the hoop
+  'venice-dunk': { hx: 8, z: [-14, 14] },        // DUNK-VENICE-ENV-RENDER: the dunk's own Venice, same court
   'canopy-court': { hx: 8, z: [-14, 14] },       // court locations (docs/SPEC-COURT-LOCATIONS.md): the same court
   'night-rooftop': { hx: 8, z: [-14, 14] },
   'dojo':         { hx: 7, z: [-7, 7] },         // 14×14 mat
@@ -130,5 +132,56 @@ describe('THE SURROUND — every prop stands on something', () => {
     expect(SURROUND_KIND.sand.kind).toBe('sand');
     // an unknown ground kind falls back rather than throwing
     expect(surroundColor('no-such-kind')).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+describe('DUNK-VENICE-ENV-RENDER — the Venice dunk dresses as Venice', () => {
+  const set = VENUE_PROP_SETS['venice-dunk'];
+  /** the kit's detailed palm is 1.43 units to the top of its crown */
+  const heightOf = (p: (typeof set)[number]) => 1.43 * (p.scale ?? 1) * (p.stretch?.[1] ?? 1);
+
+  it('is the dunk\'s set (and the duel\'s — same venue), while the other Venice courts keep theirs', () => {
+    expect(propSetFor('basketball_dunk')).toBe('venice-dunk');
+    expect(propSetFor('basketball_h2h')).toBe('venice-court-meshy');
+    expect(propSetFor('basketball_3v3')).toBe('venice-court-meshy');
+  });
+
+  it('has none of the chunky low-poly palms, and no hedge or grass-tuft planting', () => {
+    const chunky = set.filter((p) => /^tree_palm(|Tall|Short|Bend)$/.test(p.model));
+    const green = set.filter((p) => /^(plant_bush|plant_bushLarge|grass_large)$/.test(p.model));
+    expect(chunky.map((p) => p.model)).toEqual([]);
+    expect(green.map((p) => p.model)).toEqual([]);
+  });
+
+  it('stands tall Venice palms — 11 m and up, on a slender trunk, bark and fronds in their own colours', () => {
+    const palms = set.filter((p) => p.model === 'tree_palmDetailedTall');
+    expect(palms.length).toBeGreaterThanOrEqual(24);
+    for (const p of palms) {
+      expect(heightOf(p)).toBeGreaterThanOrEqual(11);
+      expect(0.2 * (p.scale ?? 1) * (p.stretch?.[0] ?? 1)).toBeLessThan(0.8);   // the 0.2-unit trunk, drawn under 0.8 m
+      expect(p.tint).toEqual(VENICE_PALM_TINT);
+    }
+  });
+
+  it('keeps the sea open behind the hoop — nothing past the backboard palms inside the court\'s width', () => {
+    // the side rows (x ±12.3 and out) are the frame's edges by design; the camera's own backdrop is x ±11
+    const blocking = set.filter((p) => Math.abs(p.at[0]) < 11 && p.at[2] < -30);
+    expect(blocking.map((p) => `${p.model} ${p.at}`)).toEqual([]);
+  });
+
+  it('puts the boats on the water (west of x −50 or north of z −71), not on the ground', () => {
+    const boats = set.filter((p) => /^sail_billboard/.test(p.model));
+    expect(boats.length).toBeGreaterThan(0);
+    for (const b of boats) expect(b.at[0] < -50 || b.at[2] < -71, `${b.model} at ${b.at}`).toBe(true);
+  });
+});
+
+describe('placement tints', () => {
+  it('a plain hex tints every part; a map tints a part by its material and leaves the rest', () => {
+    expect(tintFor('#123456', 'woodBark')).toBe('#123456');
+    expect(tintFor({ woodBark: '#111111' }, 'woodBark')).toBe('#111111');
+    expect(tintFor({ woodBark: '#111111' }, 'leafsGreen')).toBeUndefined();
+    expect(tintFor({ woodBark: '#111111' }, undefined)).toBeUndefined();
+    expect(tintFor(undefined, 'woodBark')).toBeUndefined();
   });
 });
