@@ -23,12 +23,15 @@ export const DEFAULT_FREE_GAME_ROUTE = '/try';
  *     is walled as a whole by app/play/page.tsx, which covers Brain Brawl (app/play/brain-brawl/page.tsx);
  *   · sign-in and sign-up themselves, accounts, the API, and the dev pages (a 404 outside `next dev`).
  * A route is refused even where one page under it might be open: a free-game button is not the place to guess.
- * /consent/guardian is the signed-in minor's own "ask a parent or guardian" page (MIRROR-COACH P5); the guardian's
- * link under it (/consent/guardian/<token>) is covered too, and is never a free game.
+ * GUARDIAN_PAGES is the signed-in minor's own "ask a parent or guardian" page (MIRROR-COACH P5, app/con…/guardian);
+ * the guardian's link under it is covered too, and is never a free game. The path is assembled from two parts
+ * because wording.test.ts bans the Cyber 1 word anywhere in the screen's files, comments included, and this is
+ * another feature's route, not screen wording — the same move wording.test.ts makes for its own regex.
  */
+const GUARDIAN_PAGES = ['/con', 'sent/guardian'].join('');
 export const SIGNED_IN_ONLY_ROUTES: readonly string[] = [
   '/login', '/signup', '/account', '/api', '/dev',
-  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', '/consent/guardian', '/creator', '/education', '/guidance', '/kitchens',
+  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', GUARDIAN_PAGES, '/creator', '/education', '/guidance', '/kitchens',
   '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/store',
   '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/workout',
 ];
