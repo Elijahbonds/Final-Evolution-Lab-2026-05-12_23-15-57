@@ -677,7 +677,7 @@ describe('MOVE_CLIP', () => {
   });
 });
 
-import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE, STICK_ONLY, canChain, pushChain, MOMENTUM_REPEATABLE } from './HandleSystem';
+import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE, STICK_ONLY, MOMENTUM_REPEATABLE } from './HandleSystem';   // (4b: canChain / pushChain are the top import's — the duplicate was a TS2300)
 describe('move pace on the turbo', () => {
   it('a move on the turbo plays faster with a shorter fade; off it, the capture\'s own pace', () => {
     expect(moveRate(true)).toBe(MOVE_RATE_TURBO); expect(moveRate(false)).toBe(MOVE_RATE_BASE);
@@ -797,3 +797,17 @@ describe('moveRateFor — a move plays at REAL speed, 1.25× real on the turbo (
     expect(moveRateFor(0, 0.5, false)).toBe(1); expect(moveRateFor(0.5, 0, false)).toBe(1); expect(moveRateFor(0, 0, true)).toBe(1.25);
   });
 });
+
+// HOOPS MOTION phase 4b (plan §3.1, U18): the impulse signed by the MOVE, not by where the defender stands
+import { impulseFor } from './HandleSystem';
+describe('impulseFor (U18)', () => {
+  it('the lateral goes to the side named (+ right), the forward part unchanged; the fakes still move nothing', () => {
+    for (const m of ['crossover', 'between_legs', 'behind_back', 'double_cross', 'shammgod', 'slip_slide', 'snatch_back'] as const) {
+      const i = moveImpulse(m);
+      expect(impulseFor(m, 'right'), m).toEqual({ forward: i.forward, lateral: i.lateral });
+      expect(impulseFor(m, 'left'), m).toEqual({ forward: i.forward, lateral: -i.lateral });
+    }
+    for (const m of ['hesi', 'yoyo', 'in_and_out', 'spin', 'off_the_head'] as const) { expect(impulseFor(m, 'left').lateral === 0 || Object.is(impulseFor(m, 'left').lateral, -0)).toBe(true); expect(impulseFor(m, 'left').forward).toBe(0); }
+  });
+});
+

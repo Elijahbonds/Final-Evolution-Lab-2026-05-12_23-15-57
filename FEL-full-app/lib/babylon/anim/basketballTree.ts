@@ -83,6 +83,13 @@ export interface AnimTreeInput {
   floored?: boolean;
   celebrating?: boolean;
   dejected?: boolean;
+  /** HOOPS MOTION phase 4b (plan §3.5, U4): the athlete's hand the ball is in (the carry's, its destination during a move). 'left' plays the
+   *  dribble loops' `_left` twins (hoopsHand.leftDribbleTwins: the right-hand loops mirrored at spawn) where the rig has them. Default
+   *  right: a mode that does not pass it plays the loops it always did. */
+  ballHand?: 'left' | 'right';
+  /** HOOPS MOTION phase 4b: a handle move's renderer owns the ball (HandleMotion; carry.move) — the tree never chooses its own crossover
+   *  state then (one source for a move's beat). */
+  moveActive?: boolean;
 }
 
 export interface AnimChoice { state: BasketballAnimState; clip: string; loop: boolean; fadeSec: number }
@@ -153,7 +160,7 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
           : i.intense ? (i.slideDir === 'right' ? 'defend_slide_hard_right' : 'defend_slide_hard')
           : (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide'))
         : 'defend_idle';
-  } else if (i.crossover && i.hasBall) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';   // HOOPS MOTION phase 3b: a crossover is a ball move — a ball-less body never plays one
+  } else if (i.crossover && i.hasBall && !i.moveActive) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';   // HOOPS MOTION phase 3b: a crossover is a ball move — a ball-less body never plays one (phase 4b: nor while HandleMotion renders one)
   // TRAVELLING OFF THE FACING: slide, do not run. Only above a real walking pace and never inside a drive, so a
   // size-up reads as a size-up and a drive still reads as a drive.
   else if (lateralState(i)) state = lateralState(i)!;
@@ -161,8 +168,15 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.speed01 > 0.15) state = i.hasBall ? (i.speed01 < 0.42 ? 'walk_dribble' : i.speed01 > 0.74 ? 'sprint_dribble' : 'speed_dribble') : 'run';   // DRIBBLE GEARS: the loop follows the gear (walk 1.6 / jog 4.2 / sprint 6.4 m/s of 6.4)
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
   else state = i.hasBall ? 'idle_dribble' : 'watch';
-  return { state, ...CLIP_FOR[state] };
+  const pick = CLIP_FOR[state];
+  return { state, ...pick, clip: i.ballHand === 'left' && LEFT_TWIN_STATES.has(state) ? leftTwinOf(pick.clip) : pick.clip };
 }
+/** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops that have a `_left` twin — the loops a ball hand dribbles in. carry_slide(_right)
+ *  and carry_back play the generic strafe / the defender's backpedal today (no ball arm in them, and a mirrored strafe_left IS a strafe
+ *  right), so they get none until 4g's side and back dribble captures; protect's stance has no ball arm either. */
+export const LEFT_TWIN_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive']);
+/** A dribble loop's left-hand twin (the name hoopsHand.leftDribbleTwins registers it under). */
+export const leftTwinOf = (clip: string): string => `${clip}_left`;
 
 /** LATERAL / BACKWARD travel, or null when the body is going where it is pointed. The window is deliberately wide
  *  (past 50° off the nose) so the facing slew's own catch-up does not flicker the loop on every turn. */
@@ -237,11 +251,17 @@ export class BasketballAnimTree {
   private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
     return !!a && BasketballAnimTree.DWELL_GROUPS.some((g) => g.has(a) && g.has(b));
   }
+  /** A `_left` twin this rig does not have plays the loop it twins (never the resolver's fallback). */
+  private owned(c: AnimChoice): AnimChoice {
+    if (!c.clip.endsWith('_left') || !LEFT_TWIN_STATES.has(c.state)) return c;
+    const names = (this.animator as { clipNames?: Set<string> }).clipNames;
+    return names && !names.has(c.clip) ? { ...c, clip: CLIP_FOR[c.state].clip } : c;
+  }
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
-    const raw = chooseBasketballClip(input);
+    const raw = this.owned(chooseBasketballClip(input));
     if (this.settledState && raw.state !== this.settledState) this.settledState = null;
-    const c = this.settledState ? chooseBasketballClip(withoutTrigger(input, this.settledState)) : raw;
+    const c = this.settledState ? this.owned(chooseBasketballClip(withoutTrigger(input, this.settledState))) : raw;
     if (this.override) {
       // a mode-owned hold is never interrupted; a beat yields only to a priority state
       const yields = this.override.kind === 'beat' && PRIORITY.has(c.state) && c.state !== this.override.state;
@@ -249,7 +269,9 @@ export class BasketballAnimTree {
     }
     const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
     if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
-    if (c.state !== this.current) {
+    // (phase 4b) the same loop state in the other hand is its twin: replayed with the state's own fade
+    const handChanged = c.state === this.current && c.loop && !!this.strideClip && c.clip !== this.strideClip;
+    if (c.state !== this.current || handChanged) {
       this.current = c.state; this.stateSince = now;
       if (c.loop) {
         this.token++; this.override = null;

@@ -49,16 +49,20 @@ describe('the left-stick crossover goes to the hand on the side the cut goes to 
     expect(degenerate).toBe(fired);   // the reason the post-face read was a coin flip
   });
   it('the modes read the side against the pre-cut facing: 1v1 captures it before the controller turns it, 3v3 asks before its facing write', () => {
+    // HOOPS MOTION phase 4b: the side is the reversal's END side now (`cutSide`, handed to doMove — one value for the clip and the ball),
+    // no longer a toSide of its own; it is read against the same pre-cut facing
     const one = readFileSync(path.join(__dirname, '../modes/OneVOneMode.ts'), 'utf8');
     const at = one.indexOf('const yawBeforeCut = me.root.rotation.y;');
     const upd = one.indexOf('const drib = meDribble.update(dt, mx, my, sprintOk);');
     const face = one.indexOf('face(me.root, drib.facingRad)');
-    const side = one.indexOf('meCarry?.toSide(sideOfVector(yawBeforeCut, { x: mx, z: -my }))');
+    const side = one.indexOf('const cutSide = sideOfVector(yawBeforeCut, { x: mx, z: -my });');
     expect(at).toBeGreaterThan(0); expect(upd).toBeGreaterThan(at); expect(face).toBeGreaterThan(upd); expect(side).toBeGreaterThan(face);
-    expect(one).not.toMatch(/meCarry\?\.toSide\(sideOfVector\(me\.root\.rotation\.y/);
+    expect(one).not.toMatch(/sideOfVector\(me\.root\.rotation\.y/);
+    expect(one.indexOf('undefined, true, cutSide);', side)).toBeGreaterThan(side);   // …into the reversal's doMove
     const three = readFileSync(path.join(__dirname, '../modes/ThreeVThreeMode.ts'), 'utf8');
-    const s3 = three.indexOf('carries.get(me)?.toSide(sideOfVector(me.char.root.rotation.y, wish))');
+    const s3 = three.indexOf('const cutSide = sideOfVector(me.char.root.rotation.y, wish);');
     expect(s3).toBeGreaterThan(0);
+    expect(three.indexOf('}, handle), undefined, cutSide);', s3)).toBeGreaterThan(s3);
     // 3v3's facing write for the hero comes after the crossover's read in the same update
     const w3 = three.indexOf('me.char.root.rotation.y =', s3);
     expect(w3).toBeGreaterThan(s3);

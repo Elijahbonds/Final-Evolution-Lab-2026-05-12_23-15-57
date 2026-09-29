@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  measureH4, crossingsH4, betweenH4, behindH4, flagsV1, spinH4, hesiH4, shimmyH4, pathH4, latencyH4, leftDribbleH4, playedMove, JN, J,
+  measureH4, crossingsH4, betweenH4, behindH4, flagsV1, spinH4, hesiH4, shimmyH4, pathH4, latencyH4, leftDribbleH4, playedMove, JN, J, windowMoveClip,
   type H4Body, type H4Frame, type H4Mark,
 } from '../../scripts/probes/_hoops-h4.mts';
 import { pathFor, pathAt, mirrorPath, type HandlePath } from '../../lib/babylon/anim/handlePaths';
@@ -256,6 +256,14 @@ describe('the rest of h4, on the same bodies', () => {
     // a size-up is named by its own clip (the cycle's yoyo is not judged as a yoyo move)
     const su = dribbleFrames(0, 1.2, still, 0, 'R', {}, 2.0); su.forEach((f) => { if (f.t >= 520) f.B.me.c = [['bball_yoyo', 1]]; });
     expect(measureH4(su, 'me', 500, [{ t: 505, msg: '[1V1-HANDLE] size-up bball_yoyo (handle 100)' }], 'mark: [HM-INPUT] flick upright', 900).nameOk).toMatchObject({ move: 'size_up:bball_yoyo', clipOk: true, ok: true });
+  });
+
+  it('4b review F2: a clip queued by an EARLIER input (it plays when its ball starts, after this input) is not this move\'s clip; an unasked one still is', () => {
+    // the Shammgod's take: a between asked 150 ms before the Shammgod's input plays its clip at the running crossover's catch, after it
+    expect(windowMoveClip('shammgod', ['bball_between_legs_right', 'bball_shammgod_left'], ['between_legs'])).toBe('bball_shammgod_left');
+    // …but a clip nobody asked for before the anchor counts against the move (the rotation's entry flick 17 ms after a sweep)
+    expect(windowMoveClip('spin', ['bball_in_and_out_right', 'bball_spin'], [])).toBe('bball_in_and_out_right');
+    expect(windowMoveClip('crossover', [], ['between_legs'])).toBe('');
   });
 
   it("a SWEEP's window is named by its spin / roll line, not the rotation's entry flick 17 ms after the input (4a review F2)", () => {

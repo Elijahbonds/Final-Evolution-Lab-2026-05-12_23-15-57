@@ -468,6 +468,15 @@ export const CLIP_FAMILY: readonly [RegExp, RegExp][] = [
   [/crossover|momentum_cross/, /crossover/], [/snatch/, /snatch/], [/hesi/, /hesi/], [/in_and_out|slip_slide/, /in_and_out|feint/],
   [/yoyo/, /yoyo/], [/^spin$|(^|_)spin$/, /spin/], [/jab/, /jab/], [/stepback/, /stepback/], [/shimmy/, /shimmy/], [/pivot/, /pivot/],
 ];
+/** The window's move clip for the name check: the first move clip after the anchor that is not an EARLIER input's (HOOPS MOTION 4b review
+ *  F2: a move asked while another runs plays its clip when its BALL starts, so the between queued 150 ms before a Shammgod's input plays its
+ *  clip after that input). An earlier input is a mode move line logged in the second before the anchor; a clip of ITS move's family (and not
+ *  of this move's) is skipped. A clip nobody asked for before the anchor — the rotation's entry flick's in-and-out, 17 ms after a sweep —
+ *  still counts against the move. */
+export function windowMoveClip(move: string, clips: readonly string[], earlier: readonly string[] = []): string {
+  const theirs = (c: string) => clipFamilyOk(move, c) !== true && earlier.some((m) => clipFamilyOk(m, c) === true);
+  return clips.find((c) => !theirs(c)) ?? clips[0] ?? '';
+}
 export function clipFamilyOk(move: string, clip: string): boolean | null {
   if (!clip) return null;
   const su = /^size_up:(.+)$/.exec(move); if (su) return clipName(su[1]) === clip;
@@ -526,6 +535,10 @@ export function measureH4(win: H4Frame[], S: string, A0: number, marks: H4Mark[]
   return {
     ...base, nCross: crossings.length, cross: { midY: first ? first.midY : null, farLat: first ? first.farLat : null }, flagsV1: flagsV1(win, S, A0),
     bounceRate: bounceRateH4(all ?? win, S, A0, crossings), leftDribble: leftDribbleH4(win, S, marks), latency: latencyH4(win, S, A0, marks), read: readH4(win, S, A0, crossings), path: pathH4(win, S, A0),
-    moves, nameOk: nameOkH4(playedMove(marks, A0, anchorClip), base, moveClipsAfter(win, S, A0, postMs)[0] ?? '', (moveLine(marks, A0, anchorClip)?.msg ?? '').slice(0, 90)),
+    moves, nameOk: (() => {
+      const mv = playedMove(marks, A0, anchorClip);
+      const earlier = marks.filter((m) => m.t < A0 && m.t >= A0 - 1000 && /HANDLE\] move \w+/.test(m.msg)).map((m) => /HANDLE\] move (\w+)/.exec(m.msg)![1]);
+      return nameOkH4(mv, base, windowMoveClip(mv, moveClipsAfter(win, S, A0, postMs), earlier), (moveLine(marks, A0, anchorClip)?.msg ?? '').slice(0, 90));
+    })(),
   };
 }

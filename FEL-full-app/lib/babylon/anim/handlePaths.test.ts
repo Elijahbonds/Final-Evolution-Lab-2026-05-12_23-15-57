@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  pathFor, pathAt, mirrorPath, crossingsOf, DEFAULT_STANCE, PATH_PHI_AT_STRIKE, CONTACT_FADE_SEC, LOCK_STRETCH, PAUSIN_MAX_SEC,
+  pathFor, pathAt, mirrorPath, crossingsOf, strokeStretch, DEFAULT_STANCE, PATH_PHI_AT_STRIKE, CONTACT_FADE_SEC, LOCK_STRETCH, LOCK_CATCH_MAX_MPS, PAUSIN_MAX_SEC,
   type HandlePath, type PathMove, type V3,
 } from './handlePaths';
 import { STRIDE_PHI_AT_STRIKE } from './ballCarry';
@@ -77,17 +77,28 @@ describe('every path', () => {
   // turbo's real-speed ceiling 1.25 (moveRateFor). assumption: at 30 fps the plan's "≤ 0.15 at 30/60/120 fps" is read as the SAME SPEED
   // (0.30 m a 30 fps frame): today's own pushed dribble peaks at 3.1·H·hz = 5.3 m/s (Dribble.ts), 0.178 m a 30 fps frame, so a literal
   // 0.15 there would fail every bounce the game already plays.
+  // (4b) …and on a LONGER stroke — a fitted palm: the forge hero's 1.13–1.16 m — the path plays proportionally slower (strokeStretch), so
+  // the bound holds on every body, not only at the default stance (the probe's first 4b run: the in-and-out 0.18 m a frame on the hero)
   for (const pace of [1, 1.25]) {
-    it(`stays inside 0.15 m a frame hips-relative at 60 and 120 fps (0.30 at 30 fps) — pace ${pace}`, () => {
+    it(`stays inside 0.15 m a frame hips-relative at 60 and 120 fps (0.30 at 30 fps) — pace ${pace}, the default stroke and fitted ones`, () => {
       const worst: string[] = [];
-      for (const m of ALL) {
-        const p = need(pathFor(m, 'right', pace));
+      for (const P of [DEFAULT_STANCE.P, 1.16, 1.3]) for (const m of ALL) {
+        const p = need(pathFor(m, 'right', pace, { P }));
         const s60 = steps(p, 60).rel, s120 = steps(p, 120).rel, s30 = steps(p, 30).rel;
-        if (s60 > 0.15 || s120 > 0.15 || s30 > 0.30) worst.push(`${m}: ${s30.toFixed(3)} / ${s60.toFixed(3)} / ${s120.toFixed(3)}`);
+        if (s60 > 0.15 || s120 > 0.15 || s30 > 0.30) worst.push(`${m} P ${P}: ${s30.toFixed(3)} / ${s60.toFixed(3)} / ${s120.toFixed(3)}`);
       }
       expect(worst).toEqual([]);
     });
   }
+
+  it('a longer stroke plays its path slower in proportion (its speeds are the default stance\'s); a shorter one keeps its authored times', () => {
+    const d = need(pathFor('crossover', 'right')).duration;
+    expect(strokeStretch({ ...DEFAULT_STANCE })).toBe(1);
+    const tall = { ...DEFAULT_STANCE, P: 1.16 };
+    expect(need(pathFor('crossover', 'right', 1, { P: 1.16 })).duration).toBeCloseTo(d * strokeStretch(tall), 12);
+    expect(strokeStretch(tall)).toBeCloseTo((1.16 - DEFAULT_STANCE.r) / (DEFAULT_STANCE.P - DEFAULT_STANCE.r), 12);
+    expect(need(pathFor('crossover', 'right', 1, { P: 0.9 })).duration).toBeCloseTo(d, 12);
+  });
 
   it('standing, the world step is the rel step (≤ 0.15); running, the world figure is reported beside it (Q10: not a gate on a moving move)', () => {
     const table: Record<string, number[]> = {};
@@ -338,6 +349,20 @@ describe('continuity with the dribble and the stride', () => {
     }
     expect(bad).toEqual([]);
     expect(n).toBe(600); expect(landed).toBeGreaterThan(0);
+  });
+
+  it('the lock never makes a path too fast: every move × strike phase × pace 1 / 1.25 × the default and a fitted stroke, from rest and mid-bounce, inside 0.15 m a frame', () => {
+    // (4b) the catch shortened to LOCK_MIN_CATCH at the turbo's pace ran up to 1.33× its speed: the probe's hesi at 6.1 m/s stepped 0.173 m
+    // in its catch, the double cross read 0.189 here — the shortening is capped by the catch's speed now (LOCK_CATCH_MAX_MPS)
+    const bad: string[] = [];
+    for (const pace of [1, 1.25]) for (const P of [DEFAULT_STANCE.P, 1.16]) for (const period of [0.5, 0.7]) for (let sp = 0; sp < 0.999; sp += 0.1) for (const from of [undefined, drawn(0.2, 2), drawn(0.7, 2)]) {
+      for (const m of ALL.filter((x) => x !== 'pausin')) {
+        const p = need(pathFor(m, 'right', pace, { P }, { strikePhase: sp, period }, from));
+        const s60 = steps(p, 60).rel; if (s60 > 0.15) bad.push(`${m} pace ${pace} P ${P} period ${period} strike ${sp.toFixed(1)}${from ? ' mid-bounce' : ''}: ${s60.toFixed(3)}`);
+      }
+    }
+    expect(bad).toEqual([]);
+    expect(LOCK_CATCH_MAX_MPS * (1 / 60)).toBeLessThanOrEqual(0.15);
   });
 
   it("PATH_PHI_AT_STRIKE is the carry's own STRIDE_PHI_AT_STRIKE (kept apart only to spare the carry an import cycle)", () => {

@@ -87,9 +87,6 @@ const NOT_IMPORTED: Record<string, string> = {
   // module in the SAME changeset. This orphan-check never re-verifies a NOT_IMPORTED excuse against real usage, so a
   // stale entry like this one sits here silently defeating its own point; the line is deleted now that it has a real
   // caller, per this file's own rule ("wiring one up means deleting its line").
-  // HOOPS MOTION phase 4a (2026-09-29): the handle moves' ball paths land first, pure and tested (handlePaths.test, and the probe's h4
-  // negative controls build their synthetic moves from it); phase 4b's carry.runMove plays them — then this line goes.
-  'lib/babylon/anim/handlePaths.ts': 'STAGED — phase 4b (ballCarry.runMove) plays these paths; 4a lands them with no gameplay change',
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */

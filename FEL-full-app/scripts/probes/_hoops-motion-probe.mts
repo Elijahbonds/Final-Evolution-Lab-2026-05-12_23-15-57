@@ -1088,7 +1088,7 @@ export function measure(rec: Rec): Metrics {
     const onDribble = (g: Frame | undefined) => !!g && !!g.ball && !g.bb && !g.br && carrierIs(g, S);
     for (let i = 1; i < win.length - 1; i++) {
       const f = win[i]; if (!onDribble(f) || !onDribble(win[i - 1]) || !onDribble(win[i + 1])) continue;
-      if (!(f.ball[1] > win[i - 1].ball![1] && f.ball[1] >= win[i + 1].ball![1])) continue;
+      if (!(f.ball![1] > win[i - 1].ball![1] && f.ball![1] >= win[i + 1].ball![1])) continue;   // (onDribble checked the ball: a TS18048 the predicate cannot narrow)
       const b = f.B[S]; const hs = [b.j[J.LeftHand], b.j[J.RightHand]].filter((h): h is number[] => !!h); if (!hs.length) continue;
       const near = hs.reduce((a, h) => (len(sub(f.ball!, h)) < len(sub(f.ball!, a)) ? h : a), hs[0]);
       gaps.push(len(sub(f.ball!, near)) - 0.15);

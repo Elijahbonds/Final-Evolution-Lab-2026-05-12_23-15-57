@@ -22,7 +22,8 @@
 // hand meeting it); given the end hand's lock foot, the catch is then stretched or shortened (≤ LOCK_STRETCH of the path) so the bounce
 // after it lands on the stride — timed from the request, after the blend.
 import { HOOPS_DRIBBLE } from './Dribble';
-import { MOVE_SHAPE, type HandleMove, type MoveExposure, type MovePath } from '../core/HandleSystem';
+import { MOVE_SHAPE, type MoveExposure, type MovePath } from '../core/HandleShape';   // (4b: the clip-free half — the carry, and so the dunk, imports this)
+import type { HandleMove } from '../core/HandleSystem';
 
 export type Hand = 'right' | 'left';
 export interface V3 { x: number; y: number; z: number }
@@ -44,6 +45,9 @@ export const BLEND_SEC = 0.06;
 export const LOCK_STRETCH = 0.15;
 /** …and never to less than this share of the catch as authored (its own speed bound). */
 export const LOCK_MIN_CATCH = 0.75;
+/** …nor so short that the catch runs faster than this (m/s — a hand's top speed, ballCarry.HELD_MPS; 0.14 m a 60 fps frame), unless its
+ *  authored length is already faster (4b: see relockCatch). */
+export const LOCK_CATCH_MAX_MPS = 8.4;
 /** The bounce's phase when the lock foot strikes — ballCarry.STRIDE_PHI_AT_STRIKE (a test ties the two; not imported, so the carry can
  *  import this module without a cycle). */
 export const PATH_PHI_AT_STRIKE = 0.92;
@@ -180,9 +184,17 @@ function flightVel(p0: V3, p1: V3, tau: number): { v0: V3; v1: V3 } {
   return { v0: v3(vx, vy0, vz), v1: v3(vx, vy0 - PATH_G * tau, vz) };
 }
 
+/** How much longer a body's stroke is than the default stance's (≥ 1): its path plays that much slower (see build). */
+export function strokeStretch(stance: HandleStance): number { return Math.max(1, (stance.P - stance.r) / (P0 - R0)); }
 function build(move: PathMove, a: Authored, startHand: Hand, pace: number, stance: HandleStance): HandlePath {
   const k = Math.max(1e-3, pace);
-  const T = a.knots.map((n) => n.t / k), P = a.knots.map((n) => mapPoint(n.p, stance));
+  // HOOPS MOTION phase 4b: A LONGER STROKE PLAYS SLOWER. The heights map onto a body's own stroke (its fitted palm), so a stroke longer
+  // than the default's would cover more ground in the same times — measured on the probe's first 4b run: the forge hero's fitted palm
+  // (1.13–1.16 m) stretches the stroke ×1.17–1.21, and the drawn in-and-out stepped 0.18 m a frame at the turbo's pace, the hesi 0.17
+  // (handlePaths.test bounds the DEFAULT stance at 0.143). The times scale with the stretch, so the speeds — what the per-frame bound is
+  // about — are the default stance's on every body; a shorter stroke keeps its authored times (never faster).
+  const tk = k / strokeStretch(stance);
+  const T = a.knots.map((n) => n.t / tk), P = a.knots.map((n) => mapPoint(n.p, stance));
   // the flights first: their speeds come from their own times (a faster pace is still a falling ball)
   const fl: ({ v0: V3; v1: V3 } | null)[] = a.spans.map((sp, i) => (sp.flight ? flightVel(P[i], P[i + 1], T[i + 1] - T[i]) : null));
   // each knot's velocity: at rest; a flight's own at a flight's end; else Catmull-Rom between its neighbours (a C1 join)
@@ -269,7 +281,15 @@ function relockCatch(p: HandlePath, lock: PathLock): HandlePath {
   const want = base + m * lock.period;
   // never shorter than LOCK_MIN_CATCH of the catch as authored: a 15 % cut taken out of a 0.12 s catch alone halves it (0.158 m a frame)
   const lo = Math.max(p.duration * (1 - LOCK_STRETCH), last.t0 + LOCK_MIN_CATCH * (last.t1 - last.t0)), hi = p.duration * (1 + LOCK_STRETCH);
-  const end = Math.min(hi, Math.max(lo, want));
+  let end = Math.min(hi, Math.max(lo, want));
+  // (4b) …and a SHORTENED catch never runs faster than LOCK_CATCH_MAX_MPS (or its own authored top speed, if that is higher): a cut to
+  // LOCK_MIN_CATCH at the turbo's pace ran the catch 1.33× over its bound — measured, the probe's hesi at 6.1 m/s stepped 0.173 m a frame
+  // in its catch, and a scan of every move × lock phase × pace 1 / 1.25 × the default and a fitted stroke read the double cross 0.189
+  if (end < last.t1) {
+    const vMax = (t1: number): number => { let v = 0; for (let i = 0; i <= 24; i++) { const e = evalSeg({ ...last, t1 }, last.t0 + (i / 24) * (t1 - last.t0)); v = Math.max(v, Math.hypot(e.v.x, e.v.y, e.v.z)); } return v; };
+    const cap = Math.max(LOCK_CATCH_MAX_MPS, vMax(last.t1));
+    if (vMax(end) > cap) { let a = end, b = last.t1; for (let i = 0; i < 24; i++) { const mid = (a + b) / 2; if (vMax(mid) > cap) a = mid; else b = mid; } end = b; }
+  }
   let miss = (end - want) / lock.period; miss -= Math.round(miss);
   const segs = p.segs.slice(); segs[segs.length - 1] = { ...last, t1: end };
   return { ...p, segs, duration: end, lockMiss: miss };
@@ -325,18 +345,24 @@ function spliced(p: HandlePath, pre: PathSeg[], from: number): HandlePath {
 function blendFrom(p: HandlePath, from: PathFrom): HandlePath {
   const fi = p.segs.findIndex((s) => s.mode === 'fall');
   const holdFirst = fi < 0 || p.segs.slice(0, fi).some((s) => s.kind === 'hold');
+  // (4b) a BEHIND-THE-BACK's floor contact is behind the hips: re-aimed straight at it, a falling ball went through the body (the node
+  // rig: its sign change 0.05 m IN FRONT of the hip line). Its ball is the hand's to wrap — the hand takes it (high enough: at once; else
+  // after its bounce), like a hold-first path
+  const handFirst = holdFirst || p.family === 'behind';
   const s0 = p.segs[0];
   const r = fi >= 0 ? p.segs[fi].p1.y : DEFAULT_STANCE.r;   // the floor contact's height (the stance's ball radius)
   const meetY = r + (MEET_Y - R0) * ((s0.p0.y - r) / (P0 - R0));   // (s0.p0 is the start hand's top: the stance's P)
   // a FALLING ball, re-aimed at the path's floor contact
-  if (!holdFirst && from.v.y <= 0) {
+  if (!handFirst && from.v.y <= 0) {
     const F = p.segs[fi].p1, tf = fallTime(from.p.y, from.v.y, F.y);
     const v0 = v3((F.x - from.p.x) / tf, from.v.y, (F.z - from.p.z) / tf);
     const vEnd = Math.hypot(v0.x, from.v.y - PATH_G * tf, v0.z);
     if (vEnd <= REAIM_MAX_MPS) { const f = flightSeg(from.p, v0, 0, tf, 'fall'); f.p1 = { ...F }; return spliced(p, [f], fi + 1); }
   }
-  // a hold-first path gathers the ball at once where it can
-  if (holdFirst) { const m = meetSeg(from.p, from.v, s0.p1, s0.v1, meetY, p.startHand, s0.kind); if (m) return spliced(p, [m], 1); }
+  // a hold-first path gathers the ball at once where it can — a CATCH into the palm (the hold proper starts at the palm: the carry turns a
+  // held ball with the body, and a ball still being caught with the ball's own pace — 4b's probe: the steezo roll's pull swung 0.21 m)
+  const meetKind: PathSegKind = s0.kind === 'hold' ? 'catch' : s0.kind;
+  if (handFirst) { const m = meetSeg(from.p, from.v, s0.p1, s0.v1, meetY, p.startHand, meetKind); if (m) return spliced(p, [m], 1); }
   // the start hand meets it: after its own bounce (a falling ball) and its free rise to where a hand takes it
   const pre: PathSeg[] = []; let pos = from.p, vel = from.v, t = 0;
   if (vel.y <= 0) {
@@ -349,8 +375,8 @@ function blendFrom(p: HandlePath, from: PathFrom): HandlePath {
     const rs = flightSeg(pos, vel, t, Math.max(1e-3, tc), 'rise'); pre.push(rs);
     pos = rs.p1; vel = rs.v1; t = rs.t1;
   }
-  const m = meetSeg(pos, vel, s0.p1, s0.v1, Math.min(meetY, pos.y), p.startHand, s0.kind)
-    ?? { kind: s0.kind, t0: 0, t1: MEET_MAX_SEC, hand: p.startHand, mode: 'cubic' as const, p0: pos, v0: vel, p1: s0.p1, v1: s0.v1 };
+  const m = meetSeg(pos, vel, s0.p1, s0.v1, Math.min(meetY, pos.y), p.startHand, meetKind)
+    ?? { kind: meetKind, t0: 0, t1: MEET_MAX_SEC, hand: p.startHand, mode: 'cubic' as const, p0: pos, v0: vel, p1: s0.p1, v1: s0.v1 };
   m.t0 += t; m.t1 += t;
   return spliced(p, [...pre, m], 1);
 }
