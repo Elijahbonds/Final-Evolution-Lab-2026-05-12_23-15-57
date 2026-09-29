@@ -117,6 +117,12 @@ model User {
   credentials            Credential[]
   guardianConsents       GuardianConsent[]   @relation("ConsentMentee")
 
+  // MIRROR-COACH P5 (2026-09-29): health intake + pain check-in loop (lib/health/). Additive only — see the
+  // HealthIntake/PainCheckIn/HealthConsent models below for the story.
+  healthIntakes  HealthIntake[]
+  painCheckIns   PainCheckIn[]
+  healthConsents HealthConsent[]
+
   // M4 compliance stubs
   dobYear        Int? // Year of birth for 18+ attestation
   kycStatus      String    @default("NONE") // NONE | PENDING | VERIFIED | REJECTED
@@ -1948,6 +1954,114 @@ model MirrorSession {
 
   @@index([userId, createdAt])
   @@index([userId, patternId, createdAt])
+}
+
+// ===========================================================================
+// HEALTH INTAKE + PAIN LOOP (MIRROR-COACH P5, 2026-09-29)
+//
+// PHASE-5 CONTRACT — these three model names and shapes are the contract the rest of the pass codes against
+// (lib/health/painRule.ts's `decide()`, lib/health/intake.ts's question set, the /api/health/intake route, and
+// whatever mounts the pain check-in UI in a later step of this same phase). Additive only: three new models, three
+// new array relations on User (above). Nothing existing changes shape.
+//
+// Owner decisions #4/#5/#6/#15/#17/#20 (DECISIONS.md, DECISIONS-2.md): opt-in consent before ANY of this is stored;
+// FEL keeps every threshold and every line of pain copy in one reviewable module because there is no clinician
+// review (decision #15 — conservative by construction, not by audit); a coach reads a client's health data only with
+// that client's own coach_view consent; none of it is ever scored, rewarded, or sold; a blank birth year reads as a
+// minor (decision #20) until the intake answers it.
+// ===========================================================================
+
+/// One pre-participation intake, dated and versioned. `answers` is keyed by lib/health/intake.ts's question ids
+/// (INTAKE_QUESTIONS) — FEL's own plain-words questions, never the book's. `redFlags` is the SAME ids, filtered down
+/// by lib/health/intake.ts's `redFlagsFor()`: pure and derived from `answers`, but stored rather than recomputed on
+/// every read, because a later change to which questions count as red flags must never silently reinterpret an
+/// intake someone already consented to and was gated by.
+///
+/// A non-empty `redFlags` hard-stops the Mirror, pain check-ins and training features (lib/health/intake.ts's
+/// `isHardStopped`) until `clearedAt` — a SELF-ATTESTED, dated "I checked with a clinician" tick, never a diagnosis
+/// and never verified by FEL. `birthYear` mirrors what this intake wrote to `User.dobYear` (only when that field was
+/// blank — decision #20: an existing `dobYear` is never overwritten by an intake). Re-asked yearly: a stale
+/// `version` (lib/health/intake.ts's `INTAKE_VERSION`) or a `createdAt` over a year old means the gate asks again
+/// (`needsIntake()`), so a changed question set or a birthday into adulthood is never stuck on a year-old answer.
+model HealthIntake {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// lib/health/intake.ts INTAKE_VERSION at the time this was answered.
+  version     String
+  /// { [questionId]: boolean | number | null }, keyed by INTAKE_QUESTIONS ids. FEL's own questions, never the book's.
+  answers     Json
+  /// Question ids whose answer read as a red flag at submission time (see the model doc above for why this is
+  /// stored, not recomputed).
+  redFlags    String[]
+  /// Written by the intake when User.dobYear was blank (decision #20). Null when the athlete declined ("prefer not
+  /// to say") — which reads as a minor, same as never having answered.
+  birthYear   Int?
+  /// When the opt-in health-data consent (HealthConsent, scope 'health_data') was given for THIS intake. Required:
+  /// an intake is never stored without it (owner decision #4).
+  consentedAt DateTime
+  /// Self-attested, dated clearance after a red-flag stop. Null = still stopped, if redFlags is non-empty.
+  clearedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// One pain check-in — during/after an exercise, or the next-morning follow-up on one. `decision` is the exact
+/// string lib/health/painRule.ts's `decide()` returned for this row, stored (not recomputed) for the same reason
+/// HealthIntake.redFlags is: the rule is allowed to change later, and a row must keep saying what the athlete was
+/// actually told at the time. Never scored, never touches PRQ or any rewarded number (owner decision #4/#12) and
+/// never rides along in a share link (lib/share/screen.ts's leak checks cover WorkoutScan/ShareLink payloads, not
+/// this table — this table is simply never read by anything that builds one).
+model PainCheckIn {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The ProgramExercise this check-in is about, when it came from a coached session. Null for a Mirror-side or
+  /// unprescribed exercise, where only the free-text name below is known.
+  programExerciseId String?
+  /// Always present, even when programExerciseId is set — the display name at check-in time, so history reads even
+  /// if the exercise is later renamed or removed from a coach's catalogue.
+  exerciseName      String
+  /// A fixed id from lib/health/painRule.ts BODY_AREAS — never free text, so the rule and any future reporting can
+  /// group on it.
+  bodyArea          String
+  /// 0–10.
+  score             Int
+  /// during | after | next_morning — which point in lib/health/painRule.ts's decision this row is.
+  kind              String
+  /// Acute-event ids from lib/health/painRule.ts ACUTE_EVENTS present in this check-in (a pop, sudden swelling,
+  /// giving way, pain after a fall/impact). Usually empty.
+  acute             String[]
+  /// Optional free text. Never read by decide() — the rule runs on the fixed fields only, so a coach or a later
+  /// reviewer can't accidentally depend on prose no rule actually used.
+  note              String?
+  /// The exact PainDecision id lib/health/painRule.ts returned for this row at submission time.
+  decision          String
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Opt-in consent for health data, scoped separately from the app's general ToS/Privacy acceptance
+/// (User.policyVersion/policyAcceptedAt) because this data gets its own export/erase path and its own rule: never
+/// sold, never used for ads, never in a share link. Two scopes: 'health_data' (the athlete consenting to FEL storing
+/// their own intake/pain-check-in data at all — required before either HealthIntake or PainCheckIn can be written)
+/// and 'coach_view' (that specific athlete additionally letting a named coach read it — scoped to `coachId`, not a
+/// blanket "my coach can see everything"). `revokedAt` null = currently granted; a revoked row survives so consent
+/// history is auditable, it is never deleted out from under the record.
+model HealthConsent {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'health_data' | 'coach_view'.
+  scope     String
+  /// Set only for scope 'coach_view' — the one coach this grant is for.
+  coachId   String?
+  grantedAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId, scope])
 }
 
 // ===========================================================================

@@ -15,13 +15,17 @@
 // 12 days. Still playing: 5 games in the last two weeks."). A client triage already shows is not listed twice.
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Hourglass, Loader2, MoonStar, Timer, TrendingDown } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Hourglass, Loader2, MoonStar, ShieldAlert, Timer, TrendingDown } from 'lucide-react';
 
 interface Flag {
   clientId: string; displayName: string; kind: string;
   urgency: number; observed: string; action: string; positive: boolean;
 }
 interface DriftRow { clientId: string; name: string; state: string; daysSince: number | null; note: string; games?: number }
+/** MIRROR-COACH P5 (2026-09-29) — lib/health/pain.ts coachPainFlag, one per client that has one. Without a live
+ *  coach_view HealthConsent grant `items` is absent and `label` is the generic "Client paused an exercise": this
+ *  panel never has more detail than the API already decided to give it. */
+interface PainFlagRow { clientId: string; name: string; view: { present: boolean; detailed: boolean; label: string; items?: { exerciseName: string; bodyArea: string; decision: string; copy: string; createdAt: string }[] } }
 
 /** How many drifting clients the panel names — the same cap triage uses, for the same reason (lib/coach/triage.ts TOP_N). */
 const DRIFT_SHOWN = 6;
@@ -29,6 +33,8 @@ interface Board {
   triage: { flags: Flag[]; totalFlagged: number; clear: number; summary: string };
   drift: DriftRow[];
   headline: string | null;
+  /** Absent on an older cached response — the panel treats that exactly like an empty list. */
+  painFlags?: PainFlagRow[];
 }
 
 const ICON: Record<string, typeof AlertTriangle> = {
@@ -76,6 +82,7 @@ export function AttentionPanel() {
   }
 
   const { waiting, flags, drifting } = panelLists(board);
+  const painFlags = board.painFlags ?? [];
 
   return (
     <section className="mb-4 rounded-xl border border-white/6 bg-[#0f0f13] p-4" aria-labelledby="attention-heading">
@@ -131,7 +138,29 @@ export function AttentionPanel() {
         </ul>
       )}
 
-      {flags.length === 0 && waiting.length === 0 && drifting.length === 0 && (
+      {/* MIRROR-COACH P5: a pain check-in that stepped down or stopped, per client. Consent-gated in the API — see
+         lib/health/pain.ts coachPainFlag; this list only ever renders what it was already given. */}
+      {painFlags.length > 0 && (
+        <ul className="mt-3 space-y-1.5" data-testid="pain-flags">
+          {painFlags.map((p) => (
+            <li key={p.clientId} className="rounded-lg bg-[#FF3366]/8 px-3 py-2 text-sm" data-pain-flag={p.clientId} data-detailed={p.view.detailed}>
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#FF3366]" aria-hidden="true" />
+                <span><span className="font-medium text-white/90">{p.name}</span>{' '}<span className="text-white/70">{p.view.label}</span></span>
+              </div>
+              {p.view.detailed && p.view.items && (
+                <ul className="mt-1 ml-6 space-y-0.5">
+                  {p.view.items.map((it, i) => (
+                    <li key={i} className="text-xs text-white/50">{it.exerciseName} · {it.copy}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {flags.length === 0 && waiting.length === 0 && drifting.length === 0 && painFlags.length === 0 && (
         <p className="mt-3 flex items-center gap-2 text-sm text-white/55">
           <CheckCircle2 className="h-4 w-4 text-[#00FF9D]" aria-hidden="true" />
           {board.triage.clear > 0 ? `All ${board.triage.clear} training normally.` : 'Nothing to read yet.'}

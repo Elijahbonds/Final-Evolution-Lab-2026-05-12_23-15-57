@@ -12,14 +12,21 @@
 //   · Logging was one row per exercise with a free-text load box PRE-FILLED with the prescription, so an untouched card
 //     "logged" RPE7 as a load. It is now a row per set (components/coach/set-logger.tsx): reps, weight in kg or lb,
 //     reps in reserve 0–5 with plain anchors, effort 1–10. A log saved before this still shows, as it was.
-//   · The "How did it feel?" note stays: until the pain check-in lands (phase 5) it is the client's only free-text line
-//     to the coach about how a set went.
+//   · The "How did it feel?" note stays, for anything a fixed pain scale can't say.
+//
+// MIRROR-COACH P5 (2026-09-29): the pain check-in loop landed (lib/health/painRule.ts, lib/health/pain.ts,
+// components/coach/pain-checkin.tsx). Each exercise card now carries an optional, never-required "Pain?" chip
+// (0–10 + where + the acute-event checks), and the view opens with <NextMorningFollowUps> — a follow-up on
+// yesterday's flagged readings before today's session even starts. Neither computes a decision itself; both show
+// back exactly what app/api/health/pain returned.
 // `api` points the view at other endpoints (the dev harness app/dev/coach-today runs the same server code in memory).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 import { SetTimer } from '@/components/coach/set-timer';
+import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
 import { SET_LOG_ERROR_COPY, convertDrafts, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
 import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
@@ -92,6 +99,20 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const layout = useMemo(() => todayLayout(data?.today?.session.exercises ?? []), [data]);
 
   if (!data) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  // MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
+  // red-flag hard stop": checked ahead of the "no program" / "program complete" branches below, and ahead of every
+  // exercise card and its logging form — a standing red flag pauses Today outright rather than one card at a time.
+  // The server (saveClientLog, lib/coach/todayServer.ts) refuses the write either way; this is what an athlete sees
+  // instead of a session they can no longer actually save.
+  if (data.hardStopped) return (
+    <div className="fel-card rounded-xl p-6 text-center space-y-3" data-testid="today-hard-stopped">
+      <p className="text-[15px] font-semibold leading-snug text-[#FFB020]">{data.redFlagCopy}</p>
+      <p className="text-xs text-white/50">Training is paused here until you&apos;ve checked with a clinician and cleared it from the Mirror. This isn&apos;t a diagnosis — it&apos;s just a pause.</p>
+      <Link href="/play/mirror" className="inline-block rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold text-white/85">
+        Go to the Mirror
+      </Link>
+    </div>
+  );
   if (!data.program || !data.today) return (
     <div className="fel-card rounded-xl p-6 text-center">
       <p className="text-white/70 text-sm">{data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'}</p>
@@ -109,6 +130,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   };
   return (
     <div className="space-y-4" data-testid="today">
+      <NextMorningFollowUps />
       <div className="fel-card rounded-xl p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -232,8 +254,10 @@ function ExerciseCard({ e, label, draft, unit, error, prev, onSets, onNote, onVi
       )}
       <SetLogger name={e.name} rows={draft.sets} unit={unit} timed={timed} simple={simpleLogging(e)} youth={!!e.youthRules} repsHint={repsPlaceholder(e.reps)} workHint={String(e.workSeconds ?? '')} onChange={onSets} />
       {error && <div className="text-xs text-[#FF3366]" role="alert" data-set-error>{error}</div>}
-      {/* the client's free-text line to the coach — until the pain check-in (phase 5), the only one about how it felt */}
+      {/* the client's free-text line to the coach — kept alongside the pain check-in (phase 5), not replaced by it: a
+         note can say "felt off" about form or effort with no pain in it at all. */}
       <textarea value={draft.clientNote} onChange={(ev) => onNote(ev.target.value)} placeholder={NOTE_PROMPT} aria-label={`${e.name}: note to your coach`} rows={2} maxLength={500} className="w-full resize-y rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" />
+      <PainCheckInChip exerciseName={e.name} programExerciseId={e.exerciseId} />
       <div className="flex items-center gap-2"><Video className="h-4 w-4 shrink-0 text-white/40" /><input value={draft.videoUrl} onChange={(ev) => onVideo(ev.target.value)} placeholder="Form video link (https://…)" aria-label={`${e.name}: form video link`} className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /></div>
     </div>
   );

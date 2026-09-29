@@ -76,6 +76,67 @@ describe('A SHARE CARRIES CONTENT, NEVER A CLIENT', () => {
   });
 });
 
+// MIRROR-COACH P5 (2026-09-29): Privacy §5 promises a health intake and pain check-ins "never appear on a share
+// link". A share carries training content, never a client's data, and that line does not carve out an exception
+// for health data being a different KIND of client data — so every field the three health models
+// (schema.prisma HealthIntake / PainCheckIn / HealthConsent) can carry is fed through the same guard here.
+describe('A SHARE NEVER CARRIES HEALTH DATA (Privacy §5)', () => {
+  const HEALTH_INTAKE_ROW = {
+    id: 'hi_1', userId: 'u1', version: '2026-09-29', answers: { current_pain: true }, redFlags: ['dizziness_fainting_chest_pain'],
+    birthYear: 2010, consentedAt: '2026-09-29T00:00:00.000Z', clearedAt: null, createdAt: '2026-09-29T00:00:00.000Z',
+  };
+  const PAIN_CHECK_IN_ROW = {
+    id: 'pci_1', userId: 'u1', programExerciseId: 'pe_1', exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 6,
+    kind: 'after', acute: ['pop'], note: 'twinge on the way up', decision: 'step_down_flag_coach', createdAt: '2026-09-29T00:00:00.000Z',
+  };
+  const HEALTH_CONSENT_ROW = {
+    id: 'hc_1', userId: 'u1', scope: 'coach_view', coachId: 'coach_me', grantedAt: '2026-09-29T00:00:00.000Z', revokedAt: null,
+  };
+
+  it('every field of every health model throws on its own, nested at any depth', () => {
+    for (const row of [HEALTH_INTAKE_ROW, PAIN_CHECK_IN_ROW, HEALTH_CONSENT_ROW]) {
+      for (const [field, value] of Object.entries(row)) {
+        // id/createdAt/note/kind/coachId are generic names a legitimate share ALSO carries (see shareable.ts's own
+        // comment on NEVER_SHARED — coachId is SharedBy's) — a health row leaking through one of THOSE names alone
+        // is exactly the case userId already covers in the same row, so the assertion is on the whole row below,
+        // not the bare field alone.
+        if (['id', 'createdAt', 'note', 'kind', 'coachId'].includes(field)) continue;
+        expect(() => assertNoAthleteData({ [field]: value }), `${field} must never travel on a share`).toThrow(ShareLeak);
+      }
+    }
+  });
+
+  it('a whole health row, spread into an otherwise-clean share, is caught (the case the types cannot catch)', () => {
+    for (const row of [HEALTH_INTAKE_ROW, PAIN_CHECK_IN_ROW, HEALTH_CONSENT_ROW]) {
+      const sneaky = { ...shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, { now: NOW }).share, healthRow: row };
+      expect(() => assertNoAthleteData(sneaky)).toThrow(ShareLeak);
+    }
+  });
+
+  it('nested inside a program week\'s items, the way a whole profile spread already is', () => {
+    expect(() => assertNoAthleteData({ weeks: [{ items: [{ painCheckIn: PAIN_CHECK_IN_ROW }] }] }))
+      .toThrow(/share\.weeks\[0\]\.items\[0\]/);
+  });
+
+  it('every built share still survives the sweep once the health denylist is this much bigger', () => {
+    const shares = [
+      shareProgram(program(), PLATFORM_PROTOCOLS, BY, { forName: 'Ama', now: NOW }).share,
+      shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, { note: 'Quiet landings.', now: NOW }).share,
+      shareRecommendation('Ready to train unsupervised. Strong on the hinge.', BY, { now: NOW }).share,
+      shareSelection(['breath_reset', 'ankle_prep'], PLATFORM_PROTOCOLS, BY, { now: NOW }).share,
+    ];
+    for (const s of shares) expect(() => assertNoAthleteData(s)).not.toThrow();
+  });
+
+  it('none of the distinctive health field names appear in what a trainer actually sends (plaintext-shaped JSON)', () => {
+    const share = shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, { note: 'Quiet landings.', now: NOW }).share!;
+    const blob = JSON.stringify(share).toLowerCase();
+    for (const bad of ['healthintake', 'paincheckin', 'healthconsent', 'redflags', 'bodyarea', 'consentedat', 'birthyear']) {
+      expect(blob, bad).not.toContain(bad);
+    }
+  });
+});
+
 describe('A FIRST NAME IS THE ONLY PERSONAL THING ALLOWED', () => {
   it('it is carried when the trainer types it', () => {
     const s = shareProgram(program(), PLATFORM_PROTOCOLS, BY, { forName: 'Ama', now: NOW }).share!;

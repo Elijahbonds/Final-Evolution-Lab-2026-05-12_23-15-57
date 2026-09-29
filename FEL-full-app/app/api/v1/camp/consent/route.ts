@@ -31,13 +31,35 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id: consent.id, token, requestedAt: consent.requestedAt });
 }
 
-/** GET /api/v1/camp/consent?token=… — the guardian accepts. No login: the token is the credential. */
+/**
+ * GET /api/v1/camp/consent?token=… — the guardian accepts. No login: the token is the credential.
+ *
+ * MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "Guardian-consent gate is self-bypassable by the minor it
+ * restricts": app/play/mirror/_components/guardian-consent-gate.tsx shows the mentee this exact accept URL on their
+ * own screen (FEL sends no email — owner decision #21), and until this fix nothing here stopped the SAME signed-in
+ * account from opening it and tapping Accept, defeating the entire youth-mode gate with no adult involved.
+ *
+ * THE FIX: refuse the accept when the caller is signed in as the mentee this request is FOR. A genuine guardian has
+ * no FEL account and no session at all — "the token is the credential" a line below is exactly for them — so this
+ * check costs a real guardian nothing. It only ever blocks one caller: the mentee's own signed-in session.
+ *
+ * THIS IS A NARROW FIX, NOT A COMPLETE ONE, and is reported as such rather than claimed otherwise: a minor who
+ * signs out (or opens the link in a different browser/private window) before tapping Accept is not caught — this
+ * route has no email/SMS delivery step to prove a DIFFERENT human is on the other end at all (owner decision #21:
+ * no email service). Closing that fully needs real out-of-band delivery, an adult-verification step, or reworking
+ * this feature away from "the token is the credential" — each bigger than this fix; flagged for the owner rather
+ * than silently declared solved.
+ */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token') ?? '';
   if (!token) return bad('token_required');
   const consent = await prisma.guardianConsent.findUnique({ where: { token } });
   if (!consent || consent.revokedAt) return bad('not_found', 404);
   if (consent.acceptedAt) return NextResponse.json({ accepted: true, acceptedAt: consent.acceptedAt, already: true });
+
+  const callerId = await currentUserId();
+  if (callerId && callerId === consent.menteeId) return bad('self_accept_blocked', 403);
+
   const updated = await prisma.guardianConsent.update({ where: { token }, data: { acceptedAt: new Date() } });
   return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt });
 }

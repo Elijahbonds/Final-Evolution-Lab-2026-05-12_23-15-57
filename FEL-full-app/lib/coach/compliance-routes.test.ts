@@ -235,6 +235,78 @@ describe('GET /api/coach/attention — coached work counts, games are a separate
   });
 });
 
+// MIRROR-COACH P5 FIX (2026-09-29, code review): route-level coverage for `painFlags` — Finding "No route-level test
+// proves a coach without a coach_view grant sees no pain-flag detail". lib/health/pain.test.ts already covers
+// coachPainFlag() in isolation; nothing before this exercised the ACTUAL route's own coachId/scope/revokedAt
+// scoping (app/api/coach/attention/route.ts's `prisma.healthConsent.findMany({ coachId: userId, scope: 'coach_view',
+// ... revokedAt: null })`), so a bug in that query specifically (wrong coachId, wrong scope, an ignored revokedAt)
+// would have shipped with every other test in this file green.
+type PainFlagView = { present: boolean; detailed: boolean; label: string; items?: { exerciseName: string; bodyArea: string; decision: string; copy: string; createdAt: string }[] };
+type BoardWithPainFlags = Board & { painFlags: { clientId: string; name: string; view: PainFlagView }[] };
+
+describe('GET /api/coach/attention — painFlags (consent-gated pain check-in visibility)', () => {
+  const stopCheckIn = (id: string, clientId: string, daysAgo: number) => ({
+    id, userId: clientId, exerciseName: 'Goblet Squat', bodyArea: 'knee', programExerciseId: null,
+    score: 6, kind: 'after', decision: 'step_down_flag_coach', createdAt: ago(daysAgo),
+  });
+
+  it('a client with no pain check-ins at all has no painFlags entry', async () => {
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    expect(b.painFlags.find((f) => f.clientId === 'cole')).toBeUndefined();
+  });
+
+  it('a stop-outcome check-in with NO coach_view consent shows present but not detailed — no exercise, area or decision named', async () => {
+    m.db.painCheckIn = [stopCheckIn('pci-1', 'cole', 2)];
+    m.db.healthConsent = []; // no grant at all
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    const flag = b.painFlags.find((f) => f.clientId === 'cole')!;
+    expect(flag).toBeTruthy();
+    expect(flag.view).toEqual({ present: true, detailed: false, label: 'Client paused an exercise' });
+    expect(flag.view.items).toBeUndefined();
+    // the generic label never leaks which exercise, body area or decision it was
+    expect(JSON.stringify(flag)).not.toMatch(/goblet|knee|step_down/i);
+  });
+
+  it('a live coach_view grant for THIS coach unlocks the detail', async () => {
+    m.db.painCheckIn = [stopCheckIn('pci-2', 'cole', 2)];
+    m.db.healthConsent = [{ id: 'hc-1', userId: 'cole', coachId: 'coach-1', scope: 'coach_view', grantedAt: ago(5), revokedAt: null }];
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    const flag = b.painFlags.find((f) => f.clientId === 'cole')!;
+    expect(flag.view.detailed).toBe(true);
+    expect(flag.view.items).toEqual([
+      expect.objectContaining({ exerciseName: 'Goblet Squat', bodyArea: 'knee', decision: 'step_down_flag_coach' }),
+    ]);
+  });
+
+  it('a REVOKED coach_view grant reads the same as no grant at all — detail stays hidden', async () => {
+    m.db.painCheckIn = [stopCheckIn('pci-3', 'cole', 2)];
+    m.db.healthConsent = [{ id: 'hc-2', userId: 'cole', coachId: 'coach-1', scope: 'coach_view', grantedAt: ago(10), revokedAt: ago(1) }];
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    expect(b.painFlags.find((f) => f.clientId === 'cole')!.view).toMatchObject({ present: true, detailed: false });
+  });
+
+  it("a coach_view grant for a DIFFERENT coach never unlocks this coach's view", async () => {
+    m.db.painCheckIn = [stopCheckIn('pci-4', 'cole', 2)];
+    m.db.healthConsent = [{ id: 'hc-3', userId: 'cole', coachId: 'coach-2', scope: 'coach_view', grantedAt: ago(5), revokedAt: null }];
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    expect(b.painFlags.find((f) => f.clientId === 'cole')!.view).toMatchObject({ present: true, detailed: false });
+  });
+
+  it('a `health_data`-scope grant (not `coach_view`) does not unlock the detail either — the scope must match exactly', async () => {
+    m.db.painCheckIn = [stopCheckIn('pci-5', 'cole', 2)];
+    m.db.healthConsent = [{ id: 'hc-4', userId: 'cole', coachId: 'coach-1', scope: 'health_data', grantedAt: ago(5), revokedAt: null }];
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    expect(b.painFlags.find((f) => f.clientId === 'cole')!.view).toMatchObject({ present: true, detailed: false });
+  });
+
+  it('a `continue` (non-stop) decision never flags at all, consent or not', async () => {
+    m.db.painCheckIn = [{ ...stopCheckIn('pci-6', 'cole', 1), decision: 'continue' }];
+    m.db.healthConsent = [{ id: 'hc-5', userId: 'cole', coachId: 'coach-1', scope: 'coach_view', grantedAt: ago(5), revokedAt: null }];
+    const b = await get<BoardWithPainFlags>(attentionGET);
+    expect(b.painFlags.find((f) => f.clientId === 'cole')).toBeUndefined();
+  });
+});
+
 type RosterRow = { clientId: string; coachedSessions: number; games: number; sessions: number; coverage: { cells: { pattern: string; state: string }[]; sessionsDone: number; untaggedProgrammed: number } | null };
 
 describe('GET /api/coach/roster — two numbers and the six-pattern strip', () => {

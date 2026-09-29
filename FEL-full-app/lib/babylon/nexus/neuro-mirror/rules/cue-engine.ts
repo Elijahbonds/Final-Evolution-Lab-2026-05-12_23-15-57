@@ -185,7 +185,15 @@ export class CueEngine {
     // the highest-priority active fault gets the voice
     const fault = FAULT_PRIORITY.find((f) => activeSet.has(f));
     if (!fault) return null;
-    if (this.lastCueAt !== null && nowMs - this.lastCueAt < HOLD_DOWN_MS) return null;
+    // MIRROR-COACH P4 review (2026-09-25) — A LOWER-PRIORITY FAULT COULD HOLD THE MIC DOWN ON THE KNEE. The hold-down
+    // used to block ANY new cue for HOLD_DOWN_MS once one had spoken, whichever fault it was for — so a false or minor
+    // fault (the heel-rise bug above is exactly this) that fired first kept the coach silent about a real, active,
+    // higher-priority fault (the knee) for up to HOLD_DOWN_MS. The hold-down still protects a fault from being
+    // interrupted by one of EQUAL or LOWER priority (one cue lands before the coach moves on); it no longer protects a
+    // lower one from being pre-empted by a higher one that has since started faulting.
+    const heldFault = this.lastFault !== null ? FAULT_PRIORITY.indexOf(this.lastFault) : -1;
+    const outranksHeld = heldFault >= 0 && FAULT_PRIORITY.indexOf(fault) < heldFault;
+    if (!outranksHeld && this.lastCueAt !== null && nowMs - this.lastCueAt < HOLD_DOWN_MS) return null;
 
     const since = this.faultSinceMs.get(fault) ?? nowMs;
     const level = this.escalations.get(fault) ?? 0;

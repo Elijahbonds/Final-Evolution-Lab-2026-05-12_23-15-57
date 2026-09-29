@@ -1178,6 +1178,41 @@ exports.Prisma.MirrorSessionScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.HealthIntakeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  version: 'version',
+  answers: 'answers',
+  redFlags: 'redFlags',
+  birthYear: 'birthYear',
+  consentedAt: 'consentedAt',
+  clearedAt: 'clearedAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.PainCheckInScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  programExerciseId: 'programExerciseId',
+  exerciseName: 'exerciseName',
+  bodyArea: 'bodyArea',
+  score: 'score',
+  kind: 'kind',
+  acute: 'acute',
+  note: 'note',
+  decision: 'decision',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.HealthConsentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  scope: 'scope',
+  coachId: 'coachId',
+  grantedAt: 'grantedAt',
+  revokedAt: 'revokedAt'
+};
+
 exports.Prisma.ShareLinkScalarFieldEnum = {
   id: 'id',
   token: 'token',
@@ -1485,6 +1520,9 @@ exports.Prisma.ModelName = {
   CampSession: 'CampSession',
   CampTemplate: 'CampTemplate',
   MirrorSession: 'MirrorSession',
+  HealthIntake: 'HealthIntake',
+  PainCheckIn: 'PainCheckIn',
+  HealthConsent: 'HealthConsent',
   ShareLink: 'ShareLink',
   CoachInvite: 'CoachInvite',
   CoachClient: 'CoachClient'
