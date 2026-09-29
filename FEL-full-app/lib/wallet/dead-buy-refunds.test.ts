@@ -1156,8 +1156,10 @@ describe('an earn under another wallet\'s key', () => {
     };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     // ECONOMY-SESSIONS-HARDEN: the vehicle was mode_session_completed, which the run pays now (earn refuses it before the
-    // key is tried); the daily faucet goes through every check a fresh key gets and then reaches the key the same way
-    const r = await earn(db as never, { playerId: 'me', idempotencyKey: 'k_theirs', eventType: 'daily_first_session', payload: { day: '2026-09-28', source: 'wallet-chip' } });
+    // key is tried). DAILY-KEY-HOTFIX: then it was the daily faucet, which no longer files under the client's key at all
+    // (the server builds it: dailyKey.test.ts covers a day's key held by another wallet). The flat routine reward goes
+    // through every check a fresh key gets and then reaches the key the same way.
+    const r = await earn(db as never, { playerId: 'me', idempotencyKey: 'k_theirs', eventType: 'dunk_routine_completed', payload: {} });
     warn.mockRestore();
     expect(r).toMatchObject({ granted: { coins: 0, shards: 0 }, entry_id: null, rejected: 'replayed_key', balances: { coins: 7 } });
     expect(updates).toEqual([{ where: { id: 'ev1' }, data: { rejectedReason: 'replayed_key' } }]);

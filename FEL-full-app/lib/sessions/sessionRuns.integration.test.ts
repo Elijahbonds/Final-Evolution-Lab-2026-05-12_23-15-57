@@ -264,6 +264,8 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     // PM note (QA acceptance #5): already claimed says so, with granted 0 — never "granted 100" on an unchanged balance
     expect(again.body).toMatchObject({ granted: { coins: 0, shards: 0 }, replayed: true, already_claimed: true, rejected: null, balances: { coins: mid.coins } });
     expect(await balances(users.daily)).toEqual(mid);
-    expect(await prisma.walletLedgerEntry.count({ where: { idempotencyKey: key } })).toBe(1);
+    // DAILY-KEY-HOTFIX: the server files the claim under its own day key, never the client's, so the day's claim is
+    // counted by its reason: one row for this player, whatever key was sent
+    expect(await prisma.walletLedgerEntry.count({ where: { wallet: { playerId: users.daily }, reasonCode: 'DAILY_FIRST_SESSION' } })).toBe(1);
   });
 });

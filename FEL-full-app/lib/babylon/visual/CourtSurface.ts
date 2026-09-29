@@ -254,6 +254,14 @@ export interface StreetCourtPalette {
   base: string; base2: string; key: string; seam: string;
   /** Long low-alpha swell strokes in two blues under the grain — the Venice courts' ocean art, as paint, not water. */
   swell?: { light: string; dark: string };
+  /**
+   * DUNK-VENICE-ENV-2 (eye VE-4: "large triangular blotches — visible facets"). The squeegee sweeps draw a NEW random
+   * amplitude at every 60 px vertex and the swell a coarse 32 px polyline, both as fat strokes with miter joins: bands with
+   * jagged straight-edged kinks, which a low camera sees as flat triangles across the court. `smooth` draws each sweep on
+   * ONE amplitude along a fine round-jointed curve, and the swell likewise — the same random draws in the same order, so
+   * every later stroke (cracks, grain, the key's wash) lands exactly where it did.
+   */
+  smooth?: boolean;
 }
 
 /** The shared street court (1v1, 3v3, three-point, carnival — every Venice hoops venue). */
@@ -272,6 +280,7 @@ export const STREET_COURT_PALETTE: StreetCourtPalette = {
 export const VENICE_DUNK_COURT_PALETTE: StreetCourtPalette = {
   base: '#1F5A8E', base2: '#2A6CA6', key: '#0B2B52', seam: '#16426E',
   swell: { light: '90,160,215', dark: '8,34,70' },
+  smooth: true,
 };
 
 /** Deterministic street-court albedo. `wM`/`lM` are the real court metres the texture covers. */
@@ -302,6 +311,14 @@ export function paintStreetCourt(
     g.strokeStyle = `rgba(${rnd() < 0.5 ? '150,200,220' : '10,38,54'}, ${0.04 + rnd() * 0.05})`;
     g.lineWidth = 30 + rnd() * 90;
     g.beginPath(); g.moveTo(-40, y);
+    if (palette.smooth) {
+      let amp = 0;
+      for (let x = -40; x <= S + 40; x += 60) { const k = rnd(); if (x === -40) amp = 18 + k * 22; }   // the same draws; the first sets the sweep
+      g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+      for (let x = -40; x <= S + 40; x += 8) g.lineTo(x, y + Math.sin(x * 0.004 + i) * amp);
+      g.stroke(); g.restore();
+      continue;
+    }
     for (let x = -40; x <= S + 40; x += 60) g.lineTo(x, y + Math.sin(x * 0.004 + i) * (18 + rnd() * 22));
     g.stroke();
   }
@@ -315,8 +332,10 @@ export function paintStreetCourt(
       g.strokeStyle = `rgba(${light ? palette.swell.light : palette.swell.dark}, ${0.06 + rnd() * 0.08})`;
       g.lineWidth = S * (0.006 + rnd() * 0.02);
       g.beginPath(); g.moveTo(-40, y);
-      for (let x = -40; x <= S + 40; x += 32) g.lineTo(x, y + Math.sin(x * (2.7 / S) * 4 + i * 1.7) * amp + Math.sin(x * (9.3 / S) * 4 + i) * amp * 0.3);
+      if (palette.smooth) { g.save(); g.lineJoin = 'round'; g.lineCap = 'round'; }
+      for (let x = -40; x <= S + 40; x += palette.smooth ? 8 : 32) g.lineTo(x, y + Math.sin(x * (2.7 / S) * 4 + i * 1.7) * amp + Math.sin(x * (9.3 / S) * 4 + i) * amp * 0.3);
       g.stroke();
+      if (palette.smooth) g.restore();
     }
   }
   // ── 2. aggregate — the grain that stops the court reading as a flat fill.
