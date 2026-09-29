@@ -9,7 +9,8 @@
 import { PeerLink } from './transport/webrtc';
 import { pollSignals, postSignal, lookupRoom } from './transport/signaling';
 import { getOrCreatePeerId } from './codes';
-import type { ControlEvent, LinkState, ModeControllerConfig } from './types';
+import type { ControlEvent, LinkState, ModeControllerConfig, RoomState } from './types';
+import { parseRoomState } from './roomState';
 
 export interface ControllerClientOpts {
   code: string;
@@ -17,6 +18,8 @@ export interface ControllerClientOpts {
   onState: (s: LinkState) => void;
   onConfig: (c: ModeControllerConfig) => void;
   onSlot?: (slot: number) => void;
+  /** MUSIC-SUITE P6 phone-replay: the host's live state, bounded by parseRoomState (only an opted-in host sends one). */
+  onRoomState?: (s: RoomState) => void;
 }
 
 /** Backoff between reconnect attempts — quick at first, then easing off. */
@@ -79,6 +82,7 @@ export class ControllerClient {
           if (msg.type === 'ping') this.link?.sendFast({ type: 'pong', t: msg.t });
           else if (msg.type === 'lobby') this.opts.onConfig(msg.config);
           else if (msg.type === 'assign') { this.slot = msg.slot; this.opts.onSlot?.(msg.slot); }
+          else if (msg.type === 'state') { const s = parseRoomState(msg.state); if (s) this.opts.onRoomState?.(s); }
         },
       });
       const answer = await this.link.acceptOffer(data.offer as RTCSessionDescriptionInit);

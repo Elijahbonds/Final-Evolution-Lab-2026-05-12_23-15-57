@@ -17,6 +17,8 @@
 //     or recorded (ARM REC). Not in an Arena (staked) set: the PHONE answers the pings, so a held-back pong would buy
 //     late taps an earlier time the server cannot check — a staked set judges a phone tap as it arrives, as before.
 
+import type { RoomState } from '@/lib/controller-link/types';
+
 declare global {
   interface Window {
     /** MUSIC-SUITE P5 (phone-mpc): the dev / probe readout of the phone pad (StudioMode writes it on each phone input). */
@@ -80,9 +82,14 @@ export function padGain(velocity: number | null | undefined): number {
 export function phoneRoomOpen(open: boolean, view: string): boolean {
   return open || view === 'flip';
 }
-/** Is the pairing badge shown on this tab? On FLIP always; elsewhere only while a phone is connected (it is still open). */
-export function phoneBadgeShown(view: string, phones: number): boolean {
-  return view === 'flip' || phones > 0;
+/**
+ * Is the pairing badge shown on this tab? On FLIP always; elsewhere only while a phone is connected (it is still open).
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26): …and wherever the player ASKED to pair one (`pairing`: PERFORM's PAIR A PHONE, on
+ * the STUDIO view and in an Arena set) — the Arena panel said "or a phone", but its run hides the tabs, so FLIP (the only
+ * place the room opened) could never be reached and no phone could pair in an Arena set at all.
+ */
+export function phoneBadgeShown(view: string, phones: number, pairing = false): boolean {
+  return view === 'flip' || phones > 0 || pairing;
 }
 
 // ── ROUND TRIP ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -139,9 +146,48 @@ export function judgesPhoneTap(s: { mode: string; view: string }): boolean {
  * does nothing while it runs (a second PLAY never restarts the bar); STOP stops it and does nothing when stopped; REC
  * toggles ARM REC (taps write into the grid while the transport runs).
  */
-export type TransportEffect = 'start' | 'stop' | 'arm' | 'disarm' | null;
-export function transportEffect(op: 'play' | 'stop' | 'rec', s: { running: boolean; recArm: boolean }): TransportEffect {
+export type TransportEffect = 'start' | 'stop' | 'arm' | 'disarm' | 'rec-refused' | null;
+export function transportEffect(op: 'play' | 'stop' | 'rec', s: { running: boolean; recArm: boolean; perform?: boolean }): TransportEffect {
   if (op === 'play') return s.running ? null : 'start';
   if (op === 'stop') return s.running ? 'stop' : null;
-  return s.recArm ? 'disarm' : 'arm';
+  if (s.recArm) return 'disarm';
+  // MUSIC-SUITE P6 FIX PASS (2026-09-26): no ARM REC in PERFORM — a set's taps are the player's performance, not grid edits
+  return s.perform ? 'rec-refused' : 'arm';
+}
+
+/**
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26): what a phone PAD does. Where a tap is judged (judgesPhoneTap: PERFORM on the
+ * STUDIO view) it is a LANE TAP ONLY — 'lane'. It was judged in its row's lane AND then played the bank's Flip chop
+ * (playPhonePad), and with ARM REC on (armable from the phone in any mode, and left armed from the FLIP tab — enterPerform
+ * never disarmed it) wrote the hit into a Flip row: in free play every KICK / SNARE tap from the phone sounded an unrelated
+ * chop over the song, and with REC on the next loop charted the player's own taps as FLIP-lane notes, one 'flip-rec' undo
+ * step per tap. Everywhere else a pad is the MPC it always was — 'instrument'.
+ */
+export function phonePadRole(s: { mode: string; view: string }): 'lane' | 'instrument' {
+  return judgesPhoneTap(s) ? 'lane' : 'instrument';
+}
+
+// ── WHAT THE PHONE SEES (MUSIC-SUITE P6 phone-replay, 2026-09-26) ─────────────────────────────────────────────────────
+// P5 'Not done': "The phone page shows no state: the live bank, playing and REC look the same; there is no channel back to
+// the phone. The TV says it with a toast, the REC chip and the bank chips." The link has one now (lib/controller-link/
+// roomState.ts — opt-in per config: music_flip and music_perform set `roomState: true`); this is what the room puts on it.
+// It is sent on a CHANGE only (HostSession.sendState drops an unchanged one), so it moves when the bank, the transport or
+// ARM REC does — never per bar or per hit.
+export const PHONE_TONE = { bank: '#e8d9c2', play: '#4ade80', stop: '#e8d9c2', rec: '#ff5c5c' } as const;
+/**
+ * The room as the phone draws it: the live bank's button lit (and PLAY while the transport runs, REC while ARM REC is on —
+ * the action names are the music_flip schema's own, registry.ts), and three chips: the bank and what is on it, PLAYING or
+ * STOPPED, and REC (ARMED while stopped — a hit is written only once PLAY runs — RECORDING while it runs, else OFF).
+ */
+export function phoneRoomState(s: { bank: number; bankLabel?: string | null; playing: boolean; recArm: boolean }): RoomState {
+  const letter = PHONE_BANKS[Math.max(0, Math.min(PHONE_BANKS.length - 1, Math.floor(Number.isFinite(s.bank) ? s.bank : 0)))];
+  const label = typeof s.bankLabel === 'string' && s.bankLabel.trim() ? s.bankLabel.trim() : 'empty';
+  return {
+    lit: [`bank_${letter}`, ...(s.playing ? ['play'] : []), ...(s.recArm ? ['rec'] : [])],
+    chips: [
+      { text: `BANK ${letter} · ${label}`, tone: PHONE_TONE.bank },
+      s.playing ? { text: '▶ PLAYING', tone: PHONE_TONE.play, on: true } : { text: '■ STOPPED', tone: PHONE_TONE.stop },
+      s.recArm ? { text: s.playing ? '● RECORDING' : '● REC ARMED', tone: PHONE_TONE.rec, on: true } : { text: '○ REC OFF', tone: PHONE_TONE.rec },
+    ],
+  };
 }

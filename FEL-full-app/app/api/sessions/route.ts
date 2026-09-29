@@ -19,6 +19,8 @@ import {
   ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt,
 } from '@/lib/session-payout';
 import { canonicalModeKey } from '@/lib/game-data';
+import { isExpired } from '@/lib/arena-reclaim';
+import { readMusicAttempt, musicAttemptScore, claimMusicSessionPay, MUSIC_SESSION_PAID } from '@/lib/arena-music';
 import { checkRunScore } from '@/lib/sessions/modeScoreRules';
 import {
   RUN_STATUS, RunClosedError, claimRun, closeRun, fileGrants, findRun, readRunId, replayOf, runWalletKey, settleGrant,
@@ -55,24 +57,58 @@ const OPEN_MATCH_STATES = ['WAITING', 'ACTIVE'];
  * lifted the endless ceiling for anyone — up to 3,970,700 XP a set while music staking is paused. The shell posts the
  * session BEFORE it submits the Arena score (game-shell.tsx handleEnd), so an honest set is still unsubmitted here, and
  * one match cannot uncap set after set once its score is in. A lookup failure is "not verified": free play.
+ *
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26): THE FARM THE PAUSE HAD BEEN HIDING. With music stakeable again (step (e)), a
+ * music Quick Match is ACTIVE with the house in seat 2 from birth, and this check asked nothing of the SET: no recorded
+ * attempt, no limit on how many sessions claimed the match, and the paid score capped only at min(performSetMax(hits),
+ * 378,300). Measured with the real helpers: one POST {score 378,300, stats {bars 32, notes 512, perfects 512, arena}} paid
+ * 567,500 XP and 18,918 shards (+15 LC), and it could be posted in a loop for 48 h against one 25 LC Quick Match that
+ * was never submitted — and the expiry sweep then refunded the 25 LC. Now a verified Arena set needs:
+ *   · a FINISHED attempt by this player on this duel (music_attempt_finish — the room posts it before onEnd, so an
+ *     honest set always has one);
+ *   · its paid score capped at the attempt's REJUDGE (musicAttemptScore), never the client's number;
+ *   · ONE paid session per player per duel: the session transaction claims a MUSIC_SESSION_PAID event under the duel's
+ *     row lock (claimMusicSessionPay) — a second post for the same duel is paid as free play (the endless ceiling).
+ * (The expiry check and the no-opponent check below stay: #30, and movement play's WAITING-duel farm.)
+ *
+ * MERGE WITH ECONOMY-SESSIONS-HARDEN (2026-09-28): the three rules live inside the run the server started. This read is
+ * the EARLY answer only — it runs after the run is found, open, of this mode and inside the mode's score rules (so while
+ * music has no MEASURED_RUNS row, fail closed, nothing here is reached and nothing is paid). A score above the rejudge is
+ * SCORE_INVALID above_rejudge (rejected, never clamped — the hardening clamps nothing), and the pay-once claim is made
+ * inside the run's paying transaction, after claimRun and before the ledger is filed, so the ledger records what the run
+ * was actually paid and a rolled-back run releases its claim with it.
  */
-async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise<boolean> {
-  if (typeof arenaMatchId !== 'string' || !arenaMatchId || arenaMatchId.length > 64) return false;
+interface ArenaMusicVerdict { matchId: string; rejudged: number }
+async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise<ArenaMusicVerdict | null> {
+  if (typeof arenaMatchId !== 'string' || !arenaMatchId || arenaMatchId.length > 64) return null;
   try {
     const m = await (prisma as any).competitionMatch.findUnique({
       where: { id: arenaMatchId },
-      select: { mode: true, status: true, currency: true, player1Id: true, player2Id: true, player1Score: true, player2Score: true },
+      select: { id: true, mode: true, status: true, currency: true, player1Id: true, player2Id: true, player1Score: true, player2Score: true, expiresAt: true },
     });
-    if (!m || canonicalModeKey(m.mode) !== 'music' || m.currency !== 'LC' || !OPEN_MATCH_STATES.includes(m.status)) return false;
+    if (!m || canonicalModeKey(m.mode) !== 'music' || m.currency !== 'LC' || !OPEN_MATCH_STATES.includes(m.status)) return null;
+    // MUSIC-SUITE P6 (2026-09-26, owner decision #30): past expiresAt the Arena takes no score for it (submit-score 409
+    // EXPIRED; the reclaim sweep, lib/arena-reclaim.ts, refunds it or settles it by forfeit) — so, like a WAITING duel with
+    // no opponent, its player1Score/player2Score never fills and it would uncap set after set. Expired is free play.
+    if (isExpired(m.expiresAt, new Date())) return null;
     // only a duel /api/arena/submit-score will record this set's score in: it refuses a duel with no opponent yet (409
     // WAITING_OPPONENT) before it writes anything, so a WAITING duel's score never went in and every set against it was
     // uncapped, set after set (review of the shell's arenaMatchId, 2026-09-26)
-    if (!m.player2Id) return false;
-    if (m.player1Id === userId) return m.player1Score == null;
-    if (m.player2Id === userId) return m.player2Score == null;
-    return false;
+    if (!m.player2Id) return null;
+    if (m.player1Id !== userId && m.player2Id !== userId) return null;
+    if ((m.player1Id === userId ? m.player1Score : m.player2Score) != null) return null;
+    // MUSIC-SUITE P6 FIX PASS: a finished attempt, and its rejudge is the most this set is paid on
+    const id = String(m.id ?? arenaMatchId);
+    const attempt = await readMusicAttempt(prisma as never, id, userId);
+    if (!attempt.finish) return null;
+    const v = musicAttemptScore(id, attempt);
+    if (!v.ok) return null;
+    // (the pay-once claim is made under the duel's lock in the session transaction; this is only the early no)
+    const paid = await (prisma as any).matchEvent.findFirst({ where: { matchId: id, userId, eventType: MUSIC_SESSION_PAID }, select: { id: true } });
+    if (paid) return null;
+    return { matchId: id, rejudged: v.score };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -213,21 +249,34 @@ export async function POST(req: Request) {
     }
 
     // MUSIC-SUITE P2 FIX PASS: an Arena music set is one whose match this route has found (arenaMatchId), never the claim.
-    const arenaVerified = rulesMode === 'music' && !!readMusicSet(stats, duration)?.arena
-      ? await verifiedMusicDuel(userId, body?.arenaMatchId) : false;
+    // MUSIC-SUITE P6 FIX PASS: …with a finished attempt, capped at its rejudge, paid once per duel (verifiedMusicDuel).
+    // (Read with the SERVER's duration: readMusicSet's arena claim is judged on the run's own clock.)
+    const arena = rulesMode === 'music' && !!readMusicSet(stats, duration)?.arena
+      ? await verifiedMusicDuel(userId, body?.arenaMatchId) : null;
     // MUSIC-SUITE P2 FIX PASS: a score no honest run can reach — above a music set's own hits, above a finite rules game's
     // derived maximum (arena-score-integrity). Real play is never above it. ECONOMY-SESSIONS-HARDEN (2026-09-28): such a
     // score is REJECTED as SCORE_INVALID now; it used to be clamped to the cap and paid as the most one can.
-    const cap = sessionScoreCap(rulesMode, stats, duration, { arenaVerified });
+    // (A verified Arena set is held to the Arena's music ceiling as well — the tighter of the two caps.)
+    const cap = sessionScoreCap(rulesMode, stats, duration, { arenaVerified: arena !== null });
     if (cap !== null && score > cap) {
       return send(await refuse(userId, mode, 'SCORE_INVALID', 422, { detail: 'above_run_cap', limit: cap }, { id: run.id, close: 'rejected', score, durationMs }));
+    }
+    // MUSIC-SUITE P6 FIX PASS, inside the hardening (merge 2026-09-28): a verified Arena set is paid on no more than the
+    // server's REJUDGE of its recorded taps, never the posted number. The room posts exactly that number (StudioMode.tsx
+    // sendArenaFinishRef: the score the Arena has on file), so a score above it is no honest set — SCORE_INVALID
+    // above_rejudge, rejected like every other impossible score (P6 clamped it to the rejudge and paid; the hardening clamps
+    // nothing). Rejected here, before any write, the duel's one Arena pay is not claimed: the honest post still gets it.
+    if (arena && score > arena.rejudged) {
+      return send(await refuse(userId, mode, 'SCORE_INVALID', 422, { detail: 'above_rejudge', limit: arena.rejudged }, { id: run.id, close: 'rejected', score, durationMs }));
     }
     const paidScore = score;
 
     // FIX 3: a run that does not pay (AGENT / PLAYTEST / TEST_ACCOUNT — decided at start, stored on the run, never re-read
     // from this request) is validated above like any other and RECORDED on its run with its score, and nothing else: no
     // GameSession row (the card, the share funnel, the Arena's rival draw and season XP all read those), no XP, shards,
-    // Lab Credits, wallet coins, PRQ, streak, season XP or mastery, and no ledger row.
+    // Lab Credits, wallet coins, PRQ, streak, season XP or mastery, and no ledger row. (MUSIC-SUITE P6: nor does it make an
+    // Arena music duel's pay-once claim — that is made only in the paying transaction below — so an agent or playtest run
+    // of a staked set never spends the player's one Arena pay for that duel.)
     if (!run.payoutEligible) {
       await recordServerEvent({ name: 'session_unpaid', userId, props: { mode, score, won, duration, reason: run.ineligibleReason ?? '' } });
       return send(await closeRun(prisma, run.id, {
@@ -241,21 +290,6 @@ export async function POST(req: Request) {
       }));
     }
 
-    // MUSIC-SUITE P2: dance and music train by the run's ACCURACY (lib/prq.ts ACCURACY_PRQ_MODES), read from their counts
-    // (P2 FIX PASS: and by the old score path while the shell sends no counts at all — ROOM_STATS_FORWARDED).
-    const prqDelta = computePrqDelta({
-      mode: rulesMode, score: paidScore, won, duration, accuracy: sessionAccuracy(rulesMode, stats, duration),
-      whenNoAccuracy: !stats && !ROOM_STATS_FORWARDED ? 'score' : 'none',
-    });
-    // MUSIC-SUITE P2: XP = 1.5 × score and shards = score / 20 had no ceiling, and an endless run (music free play, The
-    // Hundred — lib/session-payout.ts ENDLESS_MODES) paid ~51M XP for a perfect 5-minute set. An endless run now pays at
-    // most what a flawless finite game does (ENDLESS_SESSION_CEILING); every game with an end of its own is paid as before.
-    // (P2 FIX PASS: prorated by the session's length, so back-to-back 5 s sets no longer pay ~12× the ceiling's minute.)
-    const endless = isEndlessSession(rulesMode, stats, duration, { arenaVerified });
-    const payout = sessionPayout({ score: paidScore, won, endless, durationSec: duration });
-    const { xp, shards } = payout;
-    if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
-
     // Credits: hero-mode win +15 LC, daily streak +5*day (cap day 7).
     // MUSIC-SUITE P3 (2026-09-25): the streak rule moved to lib/session-payout.ts streakStep, unchanged — plus `owed`: the
     // first play inside a streak day a creation session opened pays that day's streak LC (the creation paid none), so
@@ -264,15 +298,37 @@ export async function POST(req: Request) {
     const stamp = new Date();
     const streak = streakStep(profile as any, stamp.getTime(), 'play');
     const { streakDays, streakBonus } = streak;
-    const credits = payout.winCredits + streakBonus;
-
-    // Distribute PRQ delta to mode-relevant attributes
     const attrs = MODE_ATTRS?.[rulesMode] ?? ['mental'];
-    const attrData: Record<string, any> = {};
-    for (const a of attrs) {
-      const cur = Number((profile as any)?.[a] ?? 0);
-      attrData[a] = Math.min(100, Math.round((cur + prqDelta) * 100) / 100);
-    }
+
+    // MUSIC-SUITE P6 FIX PASS: the payout is planned both ways — as a verified Arena set and as free play — and the session
+    // transaction takes the Arena plan only if it wins the pay-once claim (a second post for the duel is free play).
+    // (Merge with ECONOMY-SESSIONS-HARDEN: both plans pay the validated score as sent. It already passed the mode's rules,
+    // the run cap and — for an Arena set — the rejudge above, and the free-play cap is never below the Arena one, so a plan
+    // clamps nothing; they differ only in the endless ceiling and what that makes of XP, shards and PRQ.)
+    const planFor = (arenaVerified: boolean) => {
+      // MUSIC-SUITE P2: dance and music train by the run's ACCURACY (lib/prq.ts ACCURACY_PRQ_MODES), read from their counts
+      // (P2 FIX PASS: and by the old score path while the shell sends no counts at all — ROOM_STATS_FORWARDED).
+      const prqDelta = computePrqDelta({
+        mode: rulesMode, score: paidScore, won, duration, accuracy: sessionAccuracy(rulesMode, stats, duration),
+        whenNoAccuracy: !stats && !ROOM_STATS_FORWARDED ? 'score' : 'none',
+      });
+      // MUSIC-SUITE P2: XP = 1.5 × score and shards = score / 20 had no ceiling, and an endless run (music free play, The
+      // Hundred — lib/session-payout.ts ENDLESS_MODES) paid ~51M XP for a perfect 5-minute set. An endless run now pays at
+      // most what a flawless finite game does (ENDLESS_SESSION_CEILING); every game with an end of its own is paid as before.
+      // (P2 FIX PASS: prorated by the session's length, so back-to-back 5 s sets no longer pay ~12× the ceiling's minute.)
+      const endless = isEndlessSession(rulesMode, stats, duration, { arenaVerified });
+      const payout = sessionPayout({ score: paidScore, won, endless, durationSec: duration });
+      // Distribute PRQ delta to mode-relevant attributes
+      const attrData: Record<string, any> = {};
+      for (const a of attrs) {
+        const cur = Number((profile as any)?.[a] ?? 0);
+        attrData[a] = Math.min(100, Math.round((cur + prqDelta) * 100) / 100);
+      }
+      return { prqDelta, payout, xp: payout.xp, shards: payout.shards, credits: payout.winCredits + streakBonus, attrData };
+    };
+    type Plan = ReturnType<typeof planFor>;
+    const freePlan: Plan = planFor(false);
+    const arenaPlan: Plan | null = arena ? planFor(true) : null;   // the transaction settles on one (the claim decides)
 
     // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet's session earns — the completed coins and, on the server's win, the
     // won shards — are paid HERE, inside the run's transaction, priced by the same reward rules and caps
@@ -282,11 +338,18 @@ export async function POST(req: Request) {
     const walletCoins = mode !== 'dunk';
 
     const at = new Date();
-    let committed: { payload: Record<string, unknown>; season: Awaited<ReturnType<typeof addSeasonXp>>; mastery: Awaited<ReturnType<typeof recordMastery>> | null };
+    let committed: { payload: Record<string, unknown>; season: Awaited<ReturnType<typeof addSeasonXp>>; mastery: Awaited<ReturnType<typeof recordMastery>> | null; plan: Plan };
     try {
       committed = await prisma.$transaction(async (tx) => {
         // 1. Claim the run: 'open' → 'paid', conditional. A second finish of this run waits here and matches nothing.
         await claimRun(tx, run.id, { score: paidScore, durationMs, now });
+        // 1b. MUSIC-SUITE P6 FIX PASS: an Arena set's ONE uncapped pay per player per duel, claimed under the duel's row lock
+        //    (claimMusicSessionPay: a MUSIC_SESSION_PAID event) — the Arena plan only for the session that makes the claim;
+        //    one that finds it made (a second post for the duel, the loser of a race past the early check) is free play.
+        //    After the run's claim and before the ledger, so the ledger files what this run is actually paid, and inside
+        //    the run's transaction, so a run that rolls back (a replay, a ledger conflict) releases the duel's claim with it.
+        const plan: Plan = arena && arenaPlan && (await claimMusicSessionPay(tx as never, arena.matchId, userId)) ? arenaPlan : freePlan;
+        const { prqDelta, payout, xp, shards, credits, attrData } = plan;
         // 2. The ledger, before any balance moves (FIX 2): one row per payout, unique on (user, run, grant). The wallet
         //    and season amounts are decided further down (their caps, the first-of-day bonus) and settled into their rows.
         await fileGrants(tx, {
@@ -298,6 +361,11 @@ export async function POST(req: Request) {
             ...(walletCoins && won ? { wallet_shards: 0 } : {}),
           },
         });
+        // MUSIC-SUITE P6 × the ledger: the xp row of the run that took the duel's Arena pay names the duel and the rejudge
+        // it was held to, so the ledger alone says which run was paid as the Arena set (the claim is the MatchEvent)
+        if (arena && plan === arenaPlan) {
+          await settleGrant(tx, { userId, runId: run.id, grantType: 'xp', amount: xp, metadata: { arenaSet: true, arenaMatchId: arena.matchId, rejudged: arena.rejudged } });
+        }
 
         // labCredits/xp/shards are pure counters — atomic increments so two
         // concurrent session submissions can't both read the same stale value
@@ -424,7 +492,7 @@ export async function POST(req: Request) {
         };
         // 3. The answer is stored with the payout it describes, so a retry after the commit always gets it back.
         await storePaidResult(tx, run.id, { result: { status: 200, body: payload }, sessionId: sid ?? null });
-        return { payload, season, mastery };
+        return { payload, season, mastery, plan };
       }, { maxWait: 10_000, timeout: 30_000 });
     } catch (e) {
       // a second finish of the same run (RunClosedError after the first committed), or any unique-key conflict on its
@@ -435,6 +503,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, paid: false, replayed: true, reason: 'RUN_IN_FLIGHT', runId: run.id }, { status: 409 });
       }
       throw e;
+    }
+
+    // MUSIC-SUITE P2: the endless ceiling, said in the log — for the plan the transaction settled on (MUSIC-SUITE P6 FIX
+    // PASS: an Arena plan that lost the pay-once claim was paid as free play)
+    {
+      const { payout, xp, shards } = committed.plan;
+      if (payout.capped) console.info('session payout capped (endless):', mode, `score ${paidScore} over ${duration} s → ${xp} XP / ${shards} shards (ceiling ${ENDLESS_SESSION_CEILING.xp} / ${ENDLESS_SESSION_CEILING.shards} a minute)`);
     }
 
     // after the commit: idempotent tier rewards, announcements, telemetry (best-effort — the run is paid either way)

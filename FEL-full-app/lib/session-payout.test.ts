@@ -47,7 +47,9 @@ describe('the endless ceiling is derived, not guessed', () => {
 
   it('counting the music rooms would have been no ceiling at all', () => {
     expect(sessionXp(SCORE_CEILINGS.dance.max, true)).toBeGreaterThan(8 * ENDLESS_SESSION_CEILING.xp);
-    expect(sessionXp(SCORE_CEILINGS.music.max, true)).toBeGreaterThan(250 * ENDLESS_SESSION_CEILING.xp);
+    // MUSIC-SUITE P6 (2026-09-26): the Arena music ceiling is the house beat's 378,300 now (was performSetMax() =
+    // 2,647,100, over 250×) — a perfect house set still pays 40× the endless ceiling
+    expect(sessionXp(SCORE_CEILINGS.music.max, true)).toBeGreaterThan(40 * ENDLESS_SESSION_CEILING.xp);
   });
 
   it('the payout formula is the route\'s old one, unchanged below the ceiling', () => {

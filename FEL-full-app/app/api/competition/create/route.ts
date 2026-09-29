@@ -14,7 +14,7 @@ import {
   appendMatchEvent,
 } from '@/lib/competition';
 import { ledgerEscrowLock } from '@/lib/stripe-helpers';
-import { scoreCeilingFor } from '@/lib/arena-score-integrity';
+import { scoreCeilingFor, isRejudgedStakeMode, NOT_STAKEABLE_HERE } from '@/lib/arena-score-integrity';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 /**
@@ -49,6 +49,13 @@ export async function POST(req: NextRequest) {
   // owner paused. Same list as the Arena (lib/stakingPause.ts), refused before anything is written.
   if (isStakingPaused(mode)) {
     return NextResponse.json({ error: STAKING_PAUSED_CODE, detail: stakingPausedDetail(mode) }, { status: STAKING_PAUSED_STATUS });
+  }
+  // MUSIC-SUITE P6 FIX PASS (2026-09-26): the pause WAS this route's only guard for music, and phase 6 lifted it. A music
+  // score settles only as the server's rejudge of a recorded attempt (lib/arena-music.ts, the Arena's submit-score); this
+  // engine's submit-score has no attempt to rejudge, so every music score there is refused SCORE_NOT_REJUDGED — and with
+  // no expiry on an H2H match, both players' escrow would be locked for good. Refused before anything is written.
+  if (isRejudgedStakeMode(mode)) {
+    return NextResponse.json({ error: NOT_STAKEABLE_HERE.code, detail: NOT_STAKEABLE_HERE.detail(mode) }, { status: 400 });
   }
   if (!['H2H', 'SCORE_DUEL', 'GHOST_DUEL'].includes(matchType)) {
     return NextResponse.json({ error: 'Invalid matchType' }, { status: 400 });

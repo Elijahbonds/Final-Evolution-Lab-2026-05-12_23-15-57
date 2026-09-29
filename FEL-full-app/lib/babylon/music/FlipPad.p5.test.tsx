@@ -5,7 +5,7 @@
 // audio clock) is driven for real by scripts/probes/_music-p5-flip-editor.mts.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import FlipPad, { bakedBuffer, slicedPads, tickUpload, type FlipPadProps } from './FlipPad';
 import { tickedUploadNote } from './uploadPrivacy';
 import { padsFromSlices } from './Flip';
@@ -41,6 +41,15 @@ function harness(flip0: ProjectFlip, extra: Partial<FlipPadProps> = {}) {
   return { box, render: () => FlipPad(props()) as React.ReactElement };
 }
 
+// Node 26 has a real global sessionStorage (Node 22 has none), and FlipPad remembers the bank view in it. Clear it
+// before each test and between renders that pick a bank, so a bank picked in one render never leaks into the next
+// (a leaked bank C made 'click C' change no state under Node 26).
+function resetStorage(): void {
+  for (const k of ['sessionStorage', 'localStorage'] as const) {
+    try { (globalThis as unknown as Record<string, { clear?: () => void } | undefined>)[k]?.clear?.(); } catch { /* not available */ }
+  }
+}
+beforeEach(resetStorage);
 describe('four banks on the FLIP tab', () => {
   const two = (): ProjectFlip => withBank(withBank(emptyFlip(), 0, bank(fel('theme_a_sunday_tape'))), 2, bank(mic, 3));
   it('A–D chips, a dot on the banks that hold a sound; the pads and the line show the bank picked', () => {
@@ -59,6 +68,7 @@ describe('four banks on the FLIP tab', () => {
     drive(h.render, [(t) => qa(t, 'flip-bank-C')[0].props.onClick(), (t) => qa(t, 'flip-clear-bank')[0].props.onClick()]);
     // bank C holds the player's own mic take, but nothing else keeps it → the replace guard asks first
     expect(h.box.changes).toBe(0);
+    resetStorage();                                                           // a fresh render starts on bank A again
     const asked = drive(h.render, [(t) => qa(t, 'flip-bank-C')[0].props.onClick(), (t) => qa(t, 'flip-clear-bank')[0].props.onClick(), (t) => qa(t, 'flip-replace-yes')[0].props.onClick()]);
     expect(asked.html).toContain('bank C · no source loaded');
     expect(bankOf(h.box.flip, 2).source).toBeNull();
