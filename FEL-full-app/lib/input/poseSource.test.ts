@@ -96,10 +96,11 @@ describe('body control publishes the body (no mapper, no render loop)', () => {
     expect(await src.start(AUTO)).toBe(true);
     expect(packets).toEqual([]);                        // nothing until a frame comes
 
-    const reader = new BodyReader(), channels = new ChannelReader();
+    // (MOVEMENT PLAY P8: the channels get the frame and the reader's calibration, for the ride read)
+    const reader = new BodyReader(), channels = new ChannelReader({ calibration: () => reader.calibration });
     const expected = stand.slice(0, 40).map((f) => {
       const { read, events } = reader.read(f);
-      return { read, events, channels: channels.step(read, events), arrivedAt: f.arrive };
+      return { read, events, channels: channels.step(read, events, f), arrivedAt: f.arrive };
     });
     for (const f of stand.slice(0, 40)) svc.pushFeed(f);
     expect(packets).toEqual(expected);

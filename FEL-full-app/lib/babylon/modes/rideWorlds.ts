@@ -26,7 +26,8 @@ import { VertexData, Texture } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
 import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
 import { SNOW_SLOPE, snowCrowd } from './snowSlope';
-import { GATE_HALF_WIDTH, FINISH_AFTER_M, treeline, edgePoles, type RideSolid } from './gateCrasher';
+import { GATE_HALF_WIDTH, FINISH_AFTER_M, treeline, edgePoles, rockSpots, type RideSolid } from './gateCrasher';
+import { snowParkMaterials, parkBoxUV, PARK_TILE_M } from '../visual/snowParkTextures';   // GATE-CRASHER-POLISH-2: the park, painted
 import { surfCrowd } from './surfLineup';
 
 export interface RideObstacle { pos: Vector3; radius: number }
@@ -126,6 +127,18 @@ function rampWedge(scene: Scene, name: string, width: number, depth: number, hei
   const idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 6, 8, 9, 10, 11, 12, 10, 12, 13, 14, 15, 16, 14, 16, 17];
   const vd = new VertexData();
   vd.positions = p; vd.indices = idx;
+  // GATE-CRASHER-POLISH-2 (2026-09-28): METRE-SCALE UVs. The prism had none, so no material on a ramp could carry a texture —
+  // every kicker in the game was one flat colour (the eye's "plain white wedge kickers"). Each face is mapped in metres over
+  // PARK_TILE_M a repeat: the ends and the back by their own plane, the slope along its length (so a texture's rows run
+  // ACROSS the ramp, the way a shovel-cut does), the floor from above. Geometry and picking are untouched.
+  const slopeLen = Math.hypot(depth, height), T = PARK_TILE_M;
+  vd.uvs = [
+    lo / T, 0, hi / T, 0, hi / T, height / T,            // the −x end (z, y)
+    lo / T, 0, hi / T, height / T, hi / T, 0,            // the +x end
+    -hx / T, 0, hx / T, 0, hx / T, height / T, -hx / T, height / T,   // the back (x, y)
+    -hx / T, 0, hx / T, 0, hx / T, slopeLen / T, -hx / T, slopeLen / T,   // the slope (x, along it)
+    -hx / T, lo / T, -hx / T, hi / T, hx / T, hi / T, hx / T, lo / T,     // the floor (x, z)
+  ];
   let normals: number[] = []; VertexData.ComputeNormals(p, idx, normals);
   if (normals[10 * 3 + 1] < 0) {   // the slope must face UP: flip its two triangles if the winding came out underneath
     idx.splice(12, 6, 10, 12, 11, 10, 13, 12);
@@ -561,8 +574,8 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // into grey fog, with nothing going past to say how fast the board was going. The spots are modes/gateCrasher
   // `treeline` (tested: outside the clamp, no 40 m gap, down to the finish); each pine is a trunk, three tiers of
   // needles and a cap of snow, five thin-instance masters for the whole forest.
-  buildPines(scene, all, treeline(HALF, RUN_LEN, venue.trees ?? 22).map((t) => ({ at: onPiste(t.x, t.dist), scale: t.scale })),
-    mixHex('#1f4a30', P.edge, 0.22), mixHex('#4a3423', P.edge, 0.25), P.ground);
+  // (the rocks' section below builds the park's painted materials; the forest takes its needles, bark and snow from them)
+  const treeSpots = treeline(HALF, RUN_LEN, venue.trees ?? 22).map((t) => ({ at: onPiste(t.x, t.dist), scale: t.scale }));
   // THE EDGE YOU HIT IS AN EDGE YOU CAN SEE: piste poles just outside the rider's clamp, the whole way down (every venue,
   // the glacier too — on a run with no trees they are the only thing passing at speed).
   buildEdgePoles(scene, all, edgePoles(HALF, RUN_LEN).map((e) => onPiste(e.x, e.dist)), P.accent);
@@ -572,19 +585,25 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   const obstacles: RideObstacle[] = [];
   const solids: RideSolid[] = [];
   const TAN = Math.tan(PITCH);
-  const rockM = mat(scene, 'rockM', mixHex(P.edge, '#6b7079', 0.5));
-  for (let i = 0; i < 8; i++) {
-    const dist = 26 + i * 21;
-    const x = Math.sin(i * 2.9) * 10;
+  // GATE-CRASHER-POLISH-2 (2026-09-28): the park's painted materials (visual/snowParkTextures), one set per mount, and the
+  // rocks OFF THE RACING LINE (gateCrasher.rockSpots — rock 0 stood on the gate 0 → 1 line and wiped the eye's rider out at
+  // walking pace, x 1.0 z 24.8). The sphere is the rock's instant look and its fallback: the mode swaps in the Kenney kit's
+  // rocks when they load and hides these. Not pickable: the kit rocks drop onto the snow by a ray, not onto this.
+  const park = snowParkMaterials(scene, venue.id, P, { leaf: mixHex('#1f4a30', P.edge, 0.22), bark: mixHex('#4a3423', P.edge, 0.25), snow: P.ground });
+  const courseGates = Array.from({ length: SLALOM_GATES }, (_, i) => ({ x: slalomGateX(i), dist: slalomGateDist(i) }));
+  const featureSpans = SNOW_SLOPE.map((f) => ({ x0: f.lateral * HALF - f.width / 2, x1: f.lateral * HALF + f.width / 2, d0: f.dist, d1: f.dist + f.length }));
+  rockSpots(courseGates, featureSpans, HALF).forEach(({ x, dist }, i) => {
     const p = onPiste(x, dist);
-    const rock = MeshBuilder.CreateSphere(`rock_${i}`, { diameter: 1.7, segments: 6 }, scene);
+    const rock = MeshBuilder.CreateSphere(`rock_${i}`, { diameter: 1.7, segments: 10 }, scene);
     rock.position = p.add(new Vector3(0, 0.35, 0));
     rock.scaling.y = 0.55;
-    rock.material = rockM;
+    rock.material = park.rock; rock.isPickable = false;
     all.push(rock);
     obstacles.push({ pos: rock.position, radius: 1.0 });
     solids.push({ kind: 'post', tag: `rock_${i}`, x: p.x, z: p.z, r: 0.8, y0: p.y, h: 0.35 + 0.85 * 0.55 });
-  }
+  });
+
+  buildPines(scene, all, treeSpots, park.pineLeaf, park.pineBark, park.pineSnow);
 
   // THE LEGACY SLOPE-v2 RAILS AND THE ON-LINE KICKER ARE GONE (GATE-CRASHER-MAJOR). Three bare 9 cm bars hung 0.7 m over
   // the snow with nothing holding them up — floating, and ridden through at knee height — and the one at x −5 ended ON
@@ -592,7 +611,7 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // before gate 3, a 0.5 m slab whose corner lifted the rider 0.67 m in one frame. The park (snowSlope.ts) carries ten
   // rails on real bodies and ten kickers, all off the line. The lift-cable launcher stays, as a ramp that starts at the snow.
   const grindLines: GrindLine[] = [];
-  const kickM = mat(scene, 'kickM', mixHex(P.structure, P.edge, 0.35));
+  const kickM = park.feature;
   {
     const [x, dist, w, len, h] = [11.5, 123, 5, 5, 1.8] as const;
     const kick = rampWedge(scene, 'kicker', w, len, h, true);
@@ -669,12 +688,10 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // sky. These were the "white slabs" in every snowboard frame. They sit ON the piste now (+PITCH, centred on the span the
   // data names: dist … dist + length), and they are not greybox: kickers and rollers are packed snow a shade off the groom
   // with a painted lip, jib boxes and rail stands are dark with a light slide deck, the wallrides are painted.
-  const snowFeatM = mat(scene, `snowFeat_${venue.id}`, mixHex(P.ground, P.edge, 0.3));
-  const snowRailM = mat(scene, `snowRail_${venue.id}`, mixHex(P.edge, '#1c232e', 0.55));
-  const snowBoxM = mat(scene, `snowBox_${venue.id}`, mixHex(P.edge, '#1c232e', 0.35));
-  const snowWallM = mat(scene, `snowWall_${venue.id}`, mixHex(P.accent, P.edge, 0.35));
-  const deckM = mat(scene, `snowDeck_${venue.id}`, '#dfe4ea');
-  const lipM = mat(scene, `snowLip_${venue.id}`, P.accent);
+  // GATE-CRASHER-POLISH-2: and they are PAINTED now (visual/snowParkTextures): packed snow with shovel ridges and a normal map on
+  // the kickers and rollers, hazard-banded steel jib boxes with an HDPE deck, plywood wallrides with a chevron band, steel
+  // rail stands — the eye's "grey box walls, plain white wedge kickers" (GC-4).
+  const snowFeatM = park.feature, snowRailM = park.rail, snowBoxM = park.box, snowWallM = park.wall, deckM = park.deck, lipM = park.lip;
   const up = new Vector3(0, Math.cos(PITCH), Math.sin(PITCH));   // the piste's normal: a feature's "up"
   for (const feat of SNOW_SLOPE) {
     const x = feat.lateral * HALF;
@@ -701,6 +718,8 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
     }
     const body = MeshBuilder.CreateBox(`snow_${feat.kind}`, {
       width: feat.width, height: feat.height, depth: feat.length,
+      faceUV: parkBoxUV(feat.width, feat.height, feat.length, feat.kind !== 'rail'),   // metres along the run; the band once up a side
+      wrap: true,   // every side face upright (without it the long ±x faces map the texture turned 90°: bands ran vertical)
     }, scene);
     body.position.copyFrom(onPiste(x, feat.dist + feat.length / 2).add(up.scale(feat.height / 2)));
     body.rotation.x = PITCH;
@@ -710,7 +729,7 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
     solids.push({ kind: 'box', tag: `snow_${feat.kind}`, x0, x1, z0, z1, y0: -TAN * z0, slope: -TAN, h: hv, ramp: false });
     if (feat.kind === 'box') {
       // the slide deck: a light top on a dark box, so a jib box reads as one from the top of the run
-      const deck = MeshBuilder.CreateBox('snow_deck', { width: feat.width + 0.04, height: 0.05, depth: feat.length + 0.04 }, scene);
+      const deck = MeshBuilder.CreateBox('snow_deck', { width: feat.width + 0.04, height: 0.05, depth: feat.length + 0.04, faceUV: parkBoxUV(feat.width + 0.04, 0.05, feat.length + 0.04) }, scene);
       deck.position.copyFrom(onPiste(x, feat.dist + feat.length / 2).add(up.scale(feat.height + 0.02)));
       deck.rotation.x = PITCH;
       deck.material = deckM; deck.isPickable = false;
@@ -731,7 +750,7 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   const finish = onPiste(0, finishDist);
   buildFinishArch(scene, all, finish, HALF, PITCH, P.accent);
 
-  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, solids, gates, finish, dispose: () => all.forEach((m) => m.dispose()) };
+  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, solids, gates, finish, dispose: () => { all.forEach((m) => m.dispose()); park.dispose(); } };
 }
 
 // ── GATE-CRASHER-MAJOR builders: the gates, the pines, the edge poles and the finish ─────────────────────────────────────
@@ -840,12 +859,12 @@ function buildSlalomGates(scene: Scene, all: AbstractMesh[], markers: Vector3[],
 }
 
 /** Snow-capped pines: a trunk, three tiers of needles, a cap of snow — five masters for the whole forest. */
-function buildPines(scene: Scene, all: AbstractMesh[], spots: { at: Vector3; scale: number }[], leafHex: string, barkHex: string, snowHex: string): void {
+function buildPines(scene: Scene, all: AbstractMesh[], spots: { at: Vector3; scale: number }[], leaf: Material, bark: Material, snow: Material): void {
   if (!spots.length) return;
   const trunk = MeshBuilder.CreateCylinder('pine_trunk', { diameterTop: 0.22, diameterBottom: 0.36, height: 1.6, tessellation: 7 }, scene);
   const tier = MeshBuilder.CreateCylinder('pine_tier', { diameterTop: 0, diameterBottom: 3, height: 2.6, tessellation: 9 }, scene);
   const cap = MeshBuilder.CreateCylinder('pine_cap', { diameterTop: 0, diameterBottom: 1.25, height: 1.05, tessellation: 9 }, scene);
-  trunk.material = mat(scene, 'pineBark', barkHex); tier.material = mat(scene, 'pineLeaf', leafHex); cap.material = mat(scene, 'pineSnow', snowHex);
+  trunk.material = bark; tier.material = leaf; cap.material = snow;   // GATE-CRASHER-POLISH-2: needles, bark and snow, painted (snowParkTextures)
   // [mesh, height of its centre on a 1.0 tree, width scale] — three tiers of one cone, narrowing up the tree
   const parts: [Mesh, number, number][] = [[trunk, 0.8, 1], [tier, 2.4, 1], [tier, 3.6, 0.76], [tier, 4.6, 0.52], [cap, 5.35, 1]];
   const bufs = new Map<Mesh, number[]>([[trunk, []], [tier, []], [cap, []]]);

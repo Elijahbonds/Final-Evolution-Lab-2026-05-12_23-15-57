@@ -113,3 +113,19 @@ describe('around the check', () => {
     expect(read('components/games/body-play.tsx')).toContain('aria-label="Move your self-view" onClick={(e) => { e.currentTarget.blur(); next(); }}');
   });
 });
+
+// MOVEMENT PLAY P8 (2026-09-26): the board games' READY stance line — after "All set", the stance asked for (with its ring),
+// then REGULAR / GOOFY measured, or the square fallback (lib/move/rideStance, drawn from the session's stance view); the
+// probe reads data-fel-body-stance. Nothing about the stance is stored or sent.
+describe('the READY stance line (P8)', () => {
+  it('the panel draws it from the session only once the check is ready, and marks the stance for the probe', () => {
+    const src = read('components/games/body-play.tsx');
+    expect(src).toContain('const stance = stanceLine(session.stance);');
+    expect(src).toContain('data-fel-body-stance={ready && stance ? stance.id : undefined}');
+    expect(src).toContain('{ready && stance?.ring != null && <HoldRing progress={stance.ring} />}');
+    expect(src).toContain('{ready ? stance?.text ?? READY_LINE : space.say.text}');
+    const words = read('lib/move/rideStance.ts');
+    expect(words).not.toMatch(NETWORK);
+    expect(words).not.toMatch(/localStorage|sessionStorage|indexedDB/);
+  });
+});

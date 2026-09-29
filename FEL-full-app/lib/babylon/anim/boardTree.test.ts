@@ -4,7 +4,7 @@
 // coasting. And the pop had no body at all — the rider went from the ride idle straight into the air tuck, so the
 // sticky plant → pop → hang that makes an ollie feel like an ollie was never on screen.
 import { describe, it, expect } from 'vitest';
-import { chooseBoardClip, AFTER_ONESHOT, type BoardAnimInput } from './boardTree';
+import { chooseBoardClip, AFTER_ONESHOT, BoardAnimTree, type BoardAnimInput } from './boardTree';
 
 const ride = (over: Partial<BoardAnimInput> = {}): BoardAnimInput => ({
   speed01: 0.6, pushing: false, lean: 0, airborne: false, grabHeld: false, flipping: false,
@@ -46,5 +46,25 @@ describe('the pop beat', () => {
 
   it('without the beat the air is what it always was', () => {
     expect(chooseBoardClip(ride({ airborne: true })).state).toBe('air_tuck');
+  });
+});
+
+// GATE-CRASHER-POLISH-2 (2026-09-28): a discipline's own clip for a state — the snowboard falls with `snow_bail` (down in the
+// snow, the board strapped on), every other state and every other board as before
+describe('a discipline can name its own clip for a state', () => {
+  const played = (clips?: Record<string, string>) => {
+    const log: string[] = [];
+    const tree = new BoardAnimTree({ play: (name: string) => { log.push(name); } } as never, clips as never);
+    tree.update(ride({ bailing: true }));
+    tree.update(ride());
+    return log;
+  };
+  it('the snowboard bails with snow_bail and rides on the shared cruise', () => {
+    const log = played({ bail: 'snow_bail' });
+    expect(log[0]).toBe('snow_bail');
+    expect(log[1]).toBe(chooseBoardClip(ride()).clip);
+  });
+  it('a board that names nothing keeps the skateboard bail', () => {
+    expect(played()[0]).toBe('skate_bail');
   });
 });

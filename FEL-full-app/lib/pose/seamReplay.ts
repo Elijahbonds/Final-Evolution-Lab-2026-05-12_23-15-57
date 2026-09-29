@@ -32,13 +32,14 @@ export interface StreamPacket extends BodyPacket { frame: number }
 
 /** A stream through the reader and the channels, once: every profile's replay shares it. */
 export function bodyPackets(frames: readonly PoseFrame[], opts: { lead?: number; reader?: BodyReaderOptions } = {}): StreamPacket[] {
-  const reader = new BodyReader(opts.reader), channels = new ChannelReader();
+  // MOVEMENT PLAY P8 (2026-09-26): the channels get the frame and the reader's calibration, as poseSource hands them over
+  const reader = new BodyReader(opts.reader), channels = new ChannelReader({ calibration: () => reader.calibration });
   const lead = opts.lead ?? 0;
   let arrive = -Infinity;
   return frames.map((f, i) => {
     const { read, events } = reader.read(f);
     arrive = Math.max(arrive, f.arrive ?? f.t);   // a frame is handed over in order, never before the one ahead of it
-    return { read, events, channels: channels.step(read, events), arrivedAt: arrive, frame: i - lead };
+    return { read, events, channels: channels.step(read, events, f), arrivedAt: arrive, frame: i - lead };
   });
 }
 

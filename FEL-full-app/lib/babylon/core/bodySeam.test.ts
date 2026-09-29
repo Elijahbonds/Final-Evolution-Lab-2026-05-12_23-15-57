@@ -126,6 +126,10 @@ describe('Z3: a session-only row never produces a body FelInput', () => {
   it('the streams press every bound move somewhere (so a silent floor below is the row\'s, not the stream\'s)', () => {
     for (const row of BOUND) {
       const got = Object.values(STREAMS).flatMap((s) => floorOut(row.modeId, s).filter((e) => !(e.t === 'stick' && e.x === 0 && e.y === 0)));
+      // (MOVEMENT PLAY P8: a row steering with the carve needs a ride read these facing streams do not hold — no stance: its
+      // hop and its crouch are what they press here; the kart's and the plane's every move needs a wheel or wings, which no
+      // stream here holds — lib/pose/rideGate.test.ts presses them on the streams that do)
+      if (row.bindings.every((b) => ['grip', 'wheel', 'hopTurn', 'spread', 'wingBank', 'wingPitch'].includes(b.from))) { expect(got, row.modeId).toEqual([]); continue; }
       expect(got.length, row.modeId).toBeGreaterThan(0);
       const allowed = new Set(row.bindings.map((b) => (b.to === 'Lx' || b.to === 'Ly' ? 'stickL' : b.to === 'dpadByFoot' ? 'dpad' : b.to === 'RT' ? 'RT' : b.to === 'LT' ? 'LT' : `b:${b.to}`)));
       for (const e of got) expect(allowed.has(label(e)), `${row.modeId}: ${label(e)}`).toBe(true);
@@ -151,7 +155,7 @@ describe('Z5: losing the body never pauses a mode it does not drive', () => {
 describe('claims and the overhead flag', () => {
   it('a claimed move comes off the floor: skate claiming its take-off pops nothing on the hop stream', () => {
     const seam = bodySeamFor({ modeId: 'skateboard', body: { claims: ['takeoff'] } });
-    expect(seam.profile.bindings.map((b) => b.from)).toEqual(['lean', 'squat']);
+    expect(seam.profile.bindings.map((b) => b.from)).toEqual(['carve', 'squat']);   // MOVEMENT PLAY P8: the carve steers
     expect(seam.claimed.has('takeoff')).toBe(true);
     const out: BodyOut[] = [];
     seam.floor.begin();

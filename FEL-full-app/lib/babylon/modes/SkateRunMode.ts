@@ -16,8 +16,9 @@ import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the sha
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
 import { Vector3, type TransformNode } from '@babylonjs/core';
-import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
+import type { ModeContext, ModeDefinition, BodyView } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
 import { airTrickFor, basePts as trickPts, heldTrickDir, SKATE_TRICKS, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
@@ -64,6 +65,10 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { CoinField } from '../core/Pickups';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
+// MOVEMENT PLAY P8 (2026-09-26): the body's own verbs on the board — a hand at the edge in the air (GRAB), a real quarter-turn
+// in the air (the game throws and finishes the spin), a kick-push with the back foot (PUSH, off the claimed step)
+import { RideIntents, KickPush, rideLines, stickXFromBody, BODY_COYOTE_MS, type RideIntent } from '../core/rideBody';
+import { grabTrickFor, spinTrickFor } from '../core/rideTricks';
 
 const RUN_SEC = 90;
 /** phase 10: the banked score that wins the run */
@@ -127,6 +132,13 @@ export const SkateRunMode: ModeDefinition = (() => {
    *  hang rather than guessed: a kerb ollie is a quarter-second, a ramp air most of a second. */
   const AIR_BUDGET_SEC = 0.95;
   let stickX = 0, stickY = 0, pump = 0;
+  // MOVEMENT PLAY P8: whose value the L stick carries (a body's carve held into the game's longer air must not spin the
+  // skater: the player flies 0.4–0.6 s, the rider 0.93–1.31 s), when the wheels last left the ground and whether a pop took
+  // them, and the body's own verbs (polled from ctx.body() every frame)
+  let stickFromBody = false, leftGroundAt = -1, poppedAt = -1, wasGrounded = true, bodySynced = false;
+  const rideIntents = new RideIntents();
+  const kickPush = new KickPush();
+  const bodyStats = { grabs: 0, spins: 0, pushes: 0, latePops: 0, last: '' };
   // SKATE-MOVE (2026-09-08): the pump released just before POP still charges the ollie (space on the keyboard emits the
   // trigger's release BEFORE the A press, so a keyboard ollie always saw pump 0).
   let pumpReleased = 0, pumpReleasedAt = -1;
@@ -444,8 +456,52 @@ export const SkateRunMode: ModeDefinition = (() => {
     console.info('[SKATE-JUICE] bail punch');
   }
 
+  /** MOVEMENT PLAY P8: the body's grab and spin, polled every frame against the game's own air (lib/babylon/core/rideBody). */
+  function bodyVerbs(ctx: ModeContext): void {
+    const airborne = !rig.rider.grounded && air.state.airborne && !rig.rider.grinding && !wallRide && !lipStall && bailBeatT <= 0;
+    const intents = rideIntents.poll(ctx.body?.() ?? null, { airborne });
+    for (const it of intents) bodyVerb(ctx, it);
+  }
+  function bodyVerb(ctx: ModeContext, it: RideIntent): void {
+    const air01 = Math.max(0.25, AIR_BUDGET_SEC - air.state.airtime);
+    if (it.kind === 'grab') {
+      // the hand and the edge name it (rear·toe INDY, lead·heel MELON, lead·toe JAPAN when the air holds it); any other the plain GRAB
+      const named = grabTrickFor('skate', it.hand, it.edge, air01);
+      if (named) airTrick(ctx, named.id, named.label, 'grab', trickPts(named), Math.max(1, Math.round(named.difficulty)));
+      else airTrick(ctx, 'grab', TRICKS.grab.name, 'grab', TRICKS.grab.pts, 1);
+      bodyStats.grabs++; bodyStats.last = named?.label ?? TRICKS.grab.name;
+      console.info(`[SKATE-BODY] grab ${it.hand}/${it.edge ?? '-'} → ${bodyStats.last}`);
+    } else if (it.kind === 'grabEnd') {
+      if (air.state.grabHeld) {
+        trickLayer?.release();
+        const pts = air.releaseGrab();
+        if (pts > 0) combo.add('GRAB', pts, 'air');
+      }
+    } else if (it.kind === 'spin') {
+      // the biggest spin that way the air left can finish (backside: the 540 or BS 180; frontside: FS 360 or nothing) —
+      // the game's caught spin turns it the rest of the way
+      const t = spinTrickFor('skate', it.dir, air01);
+      if (!t) { console.info(`[SKATE-BODY] ${it.dir} quarter, no spin fits ${air01.toFixed(2)} s of air`); return; }
+      airTrick(ctx, t.id, t.label, t.grab !== 'none' ? 'grab' : 'spin', trickPts(t), Math.max(1, Math.round(t.difficulty)));
+      bodyStats.spins++; bodyStats.last = t.label;
+      console.info(`[SKATE-BODY] ${it.dir} quarter → ${t.label}`);
+    }
+  }
+
   return {
     modeId: 'skateboard', camPreset: 'board',
+    // MOVEMENT PLAY P8: the step is the mode's — a kick-push with the back foot is the PUSH (the row binds no step); the card
+    // says the floor's lines, then the grab, the spin and the push this mode reads itself
+    body: { claims: ['step'], lines: rideLines('skateboard', ['step']) },
+    onBody(_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+      if (ev.kind !== 'step' || !rig || ended) return false;
+      if (!rig.rider.grounded || grindCh || manualCh || wallRide || lipStall || bailBeatT > 0 || !kickPush.take(ev, view)) return false;
+      if (!move.push()) return false;   // inside the stroke's own cooldown: the same push
+      bodyStats.pushes++; bodyStats.last = 'PUSH';
+      SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
+      console.info(`[SKATE-BODY] kick-push (${ev.foot})`);
+      return true;
+    },
     // The LIGHT and the SKY are the venue's, not the module's. Getters, because the harness reads both at mount —
     // after the splash has written the pick, before load() runs. THE WAREHOUSE rendered under Venice's sunset sky
     // until this existed: the palette was per-venue and the lighting was a literal declared here at module scope.
@@ -517,6 +573,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           onPatrol: rig.rider.grinding?.gapId === patrolRail.gapId,
           chain: air.state.chain.map((t) => t.label), pot: combo.pot, banked: combo.banked,
           goals: goals.doneCount, height: rig.char.root.position.y - lastGroundY,
+          body: { ...bodyStats, stickFromBody, grabHeld: rideIntents.grabHeld },   // MOVEMENT PLAY P8: the body's verbs
         });
       }
       boardSync = new BoardSync(rig.board, rig.char.root);
@@ -561,6 +618,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       grindAskedAt = -1; relockUntil = -1; lastGoodPos = null; lastGoodYaw = 0; nanReports = 0;
       flickSign = 0; flickAt = -1; brakeMuteUntil = -1; manualWanted = null; apexDone = false; lastVy = 0;
       grindCh = null; manualCh = null; save = null;
+      stickFromBody = false; leftGroundAt = -1; poppedAt = -1; wasGrounded = true; bodySynced = false; rideIntents.reset(); kickPush.reset();   // MOVEMENT PLAY P8
+      Object.assign(bodyStats, { grabs: 0, spins: 0, pushes: 0, latePops: 0, last: '' });
       // 'stadium' is a crowd bed with a breathing LFO -- wrong for a solo run
       // in an outdoor plaza. 'wind' is the open-air option in SoundKit's set.
       SoundKit.startAmbient('wind');
@@ -609,6 +668,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // the yaw, and one NaN frame poisons the whole run: position, heading and camera all go NaN together and the
         // screen turns to void (VENICE-SKATE-THPS)
         stickX = Number.isFinite(e.x) ? e.x : 0; stickY = Number.isFinite(e.y) ? e.y : 0;
+        stickFromBody = stickXFromBody(ctx.input, e);   // MOVEMENT PLAY P8: whose x it is, per axis (the bus's arbiter knows; the event's tag cannot say)
       }
       // Phase 4: flick-stick is THE trick input (Skate 3 vocabulary).
       if (e.t === 'stick' && e.side === 'R') {
@@ -630,6 +690,9 @@ export const SkateRunMode: ModeDefinition = (() => {
           rig.rider.jump(olliePower(), !rig.rider.grounded);
           airEntryYaw = rig.char.root.rotation.y;
           air.launch();
+          // MOVEMENT PLAY P8: the wheels left on a pop (the body coyote is for a lip) — and update must not stamp this take-off
+          // as a roll-off (review fix: it did, on the next frame, so a body A up to 300 ms after any pop jumped again mid-air)
+          poppedAt = performance.now(); wasGrounded = false;
           popBeatT = POP_BEAT_SEC; apexDone = false; lastVy = rig.rider.vel.y;   // the pop is the same body beat as the button's
           SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
         } else if (g && !rig.rider.grounded) {
@@ -674,6 +737,22 @@ export const SkateRunMode: ModeDefinition = (() => {
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
         }
+        // MOVEMENT PLAY P8: A BODY'S HOP is the pop and nothing else. Told late (the hop reaches the mode +144 ms median,
+        // +351 p90), it still pops a board that rolled off a lip up to BODY_COYOTE_MS ago; after that, or with the rider
+        // already popped, it is spent — never a mid-air trick (board flips stay on the pad), never a grind ask.
+        if (e.btn === 'A' && e.src === 'body' && !rig.rider.grounded && !wallRide && !lipStall) {
+          const now = performance.now();
+          if (now - leftGroundAt <= BODY_COYOTE_MS && poppedAt < leftGroundAt && !air.state.chain.length && !rig.rider.grinding) {
+            rig.rider.jump(olliePower(), true);
+            airEntryYaw = rig.char.root.rotation.y;
+            air.launch();
+            poppedAt = now; wasGrounded = false; popBeatT = POP_BEAT_SEC; apexDone = false; lastVy = rig.rider.vel.y;
+            bodyStats.latePops++; bodyStats.last = 'LATE POP';
+            SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+            console.info(`[SKATE-BODY] late pop ${(now - leftGroundAt).toFixed(0)} ms off the lip`);
+          }
+          return;
+        }
         if (e.btn === 'A') {
           // COYOTE on the button too (SKATE-MAJOR): the flick path forgave a press 110 ms after the wheels left a lip;
           // the button — the keyboard's and the touch deck's only pop — did not, so the same late press off a ledge was
@@ -682,6 +761,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             rig.rider.jump(olliePower(), !rig.rider.grounded);
             airEntryYaw = rig.char.root.rotation.y;
             air.launch();
+            poppedAt = performance.now(); wasGrounded = false;   // MOVEMENT PLAY P8 (not a roll-off: the body coyote's clock)
             popBeatT = POP_BEAT_SEC;   // VENICE-SKATE-THPS: the pop is a BODY beat now (plant -> pop -> hang)
             apexDone = false; lastVy = rig.rider.vel.y;
             popped = true;
@@ -860,7 +940,15 @@ export const SkateRunMode: ModeDefinition = (() => {
       // here was overwritten by the yaw write below every frame, so no spin ever showed. The pump is no longer fed in as
       // a pitch nudge: holding the throttle through an ollie was tilting the flip axis into a sketchy landing.
       coyote.update(rig.rider.grounded);   // one feed per frame, from the flag the ollie test reads
-      if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickX, 0);
+      if (wasGrounded && !rig.rider.grounded) leftGroundAt = performance.now();   // MOVEMENT PLAY P8: the body coyote's clock
+      wasGrounded = rig.rider.grounded;
+      // MOVEMENT PLAY P8: the grab and the spin the body asks for, in the game's air — from the first frame of play on (a quarter
+      // read before it, the turn into the stance at READY among them, is never a spin: review fix)
+      if (!bodySynced) { rideIntents.sync(ctx.body?.() ?? null); bodySynced = true; }
+      bodyVerbs(ctx);
+      // MOVEMENT PLAY P8: a BODY's carve never nudges the spin — held from before the player's hop into the rider's longer
+      // air it spun the skater (the pad's own stick keeps its air control)
+      if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickFromBody ? 0 : stickX, 0);
       if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15 && bailBeatT > 0) {
         // a rider who was ALREADY falling (a slipped grind, a slam) hitting the ground is the bail landing, not a landing
         // to grade — grading it read "touchdown clean" and paid a land punch on top of the fall (SKATE-MAJOR)

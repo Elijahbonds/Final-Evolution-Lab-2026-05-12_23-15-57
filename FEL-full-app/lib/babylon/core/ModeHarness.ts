@@ -55,7 +55,7 @@ import type { BodyChannels } from '@/lib/pose/bodyChannels';
 import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
 import type { SessionStep } from './BodySession';
 import { bodySeamFor, type BodySeam } from './bodySeam';
-import { sessionStore, type SessionWriter } from './sessionStore';
+import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore';   // (stanceOnMount: MOVEMENT PLAY P8)
 // declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
 export type { BodyClaim, BodyChannelName, ModeBodySpec } from '@/lib/input/bodyProfiles';
 
@@ -239,7 +239,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // (the step-3 review): a throw anywhere before the disposer is handed back — the engine, the scene, a rig — would
   // otherwise leave a dead mode's card up until the next mount.
   const seam = bodySeamFor(def);
-  const store = sessionStore.mount(seam.card);
+  const store = sessionStore.mount({ ...seam.card, stance: stanceOnMount(seam.profile) });   // MOVEMENT PLAY P8: a board game asks for its stance from the mount
   try {
     return await mountMode(def, opts, seam, store);
   } catch (e) {
@@ -654,6 +654,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
         }
       }
     }
+    store.setStance(seam.profile, p.channels.ride);   // MOVEMENT PLAY P8: a board game's stance, for its READY line
     store.setBody(s.presence, s.handsUp01);
   });
 

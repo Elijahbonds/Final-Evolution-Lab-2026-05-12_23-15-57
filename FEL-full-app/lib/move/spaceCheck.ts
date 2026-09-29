@@ -289,6 +289,21 @@ function xPerMetre(f: PoseFrame, fill: number, aspect: number): number {
 /** An image distance in y units (x spans aspect × as many pixels). */
 const lenY = (a: Lm, b: Lm, aspect: number) => Math.hypot((b.x - a.x) * aspect, b.y - a.y);
 
+/** The worst of a frame's issues: SPACE_ORDER's first, except that a dark room with a weak read is fixed with light first. */
+function worstOf(issues: readonly SpaceIssue[], light: LightVerdict | null): SpaceIssue | null {
+  return light === 'dark' && issues.includes('dim') ? 'dim' : SPACE_ORDER.find((i) => issues.includes(i)) ?? null;
+}
+
+/** MOVEMENT PLAY P8: the most a board stance turns a body: lib/pose/rideReader's band ends at 70°, and this reads cos 80°
+ *  for the facing read's noise (at cos 75° a still 75° turn — the synth's own limit — dipped under it and dropped the check,
+ *  seed 5). Past it — edge-on, or the back to the lens — 'turned' is P4's again. */
+export const STANCE_FACING_MIN = Math.cos((80 * Math.PI) / 180);
+/** MOVEMENT PLAY P8: this frame's 'turned' is a turn INTO a board stance: the chest toward the lens, no further round than a
+ *  stance goes (SpaceCheck.setStanceGame). */
+function inStanceBand(c: SpaceFrameCheck): boolean {
+  return c.issues.includes('turned') && !c.reading.facingAway && (c.reading.facing ?? 0) >= STANCE_FACING_MIN;
+}
+
 /** The rules on one frame (smoothed or raw). Pure. */
 export function checkSpace(frame: PoseFrame, opts: SpaceCheckOptions = {}): SpaceFrameCheck {
   const aspect = aspectOf(opts.aspect);
@@ -362,7 +377,7 @@ export function checkSpace(frame: PoseFrame, opts: SpaceCheckOptions = {}): Spac
   const jumpSpan = HEADROOM_JUMP_M * yPerM;
 
   // a dark room with a weak read: light is the fix, whatever else the guessing landmarks say
-  const worst = opts.light === 'dark' && issues.includes('dim') ? 'dim' : SPACE_ORDER.find((i) => issues.includes(i)) ?? null;
+  const worst = worstOf(issues, opts.light ?? null);
   return {
     ok: issues.length === 0,
     issues,
@@ -624,9 +639,27 @@ export class SpaceCheck {
   private lastBody: { t: number; x: number; y: number; mPerX: number; mPerY: number } | null = null;
   private trail: BodySize[] = [];
   private swapAt = -Infinity;
+  /** MOVEMENT PLAY P8: the game asks for a side-on board stance after "All set" (setStanceGame). */
+  private stanceGame = false;
 
   constructor(opts: { aspect?: number } = {}) {
     this.aspect = aspectOf(opts.aspect);
+  }
+
+  /**
+   * MOVEMENT PLAY P8 (2026-09-26): a board game (skate, snow, surf) asks for the STANCE after "All set": side-on, 20–70°
+   * off square (lib/pose/rideReader). Once `ready`, 'turned' read on a body turned INTO that stance — the chest still toward
+   * the lens (never facingAway) and no further round than STANCE_FACING_MIN allows — is the stance, not a fault: it is left
+   * out of the worst issue, so it does not drop the check back to the framing (which would drop the rulers the stance is
+   * taken with: PLAN-P8 R-F1, the first build's READY line flipped to "Face the camera square-on."). Every other issue still
+   * does — no body, a swap, the framing, the feet, the room to step, the light — however the body is turned, and a back to
+   * the lens is 'turned' as ever (review fix: the first exemption skipped the drop for any settled 'turned', which hid the
+   * back to the camera and every issue ranked below 'turned'). Before `ready` the facing rule is P4's. Off (every other
+   * game), the check is P4's to the byte. The READY host sets it on every frame it steps, from the session (a carve row
+   * writes a stance at mount).
+   */
+  setStanceGame(on: boolean): void {
+    this.stanceGame = on;
   }
 
   /** The picture's width / height changed (the phone turned on its side, as 'space.wide' asks): read the new shape. */
@@ -696,7 +729,9 @@ export class SpaceCheck {
 
     // settle the worst issue: a verdict counts once it has held SETTLE_MS (the first frame of a run counts at once).
     // A swap is an event, not a noisy verdict: it counts at once, and holds SWAP_HOLD_MS after the last one.
-    const raw = check.worst === 'noBody' || t - this.swapAt >= SWAP_HOLD_MS ? check.worst : 'swap';
+    // (MOVEMENT PLAY P8: a stance game at READY leaves the turn INTO the stance out of the worst issue — setStanceGame)
+    const worst = this.stanceGame && this.stage === 'ready' && inStanceBand(check) ? worstOf(check.issues.filter((i) => i !== 'turned'), lightV) : check.worst;
+    const raw = worst === 'noBody' || t - this.swapAt >= SWAP_HOLD_MS ? worst : 'swap';
     if (this.settled === undefined || swapped) { this.settled = raw; this.pending = raw; this.pendingSince = t; }
     else if (raw !== this.pending) { this.pending = raw; this.pendingSince = t; }
     if (raw === this.pending && raw !== this.settled && t - this.pendingSince >= SETTLE_MS) this.settled = raw;
