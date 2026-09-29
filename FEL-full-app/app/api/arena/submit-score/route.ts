@@ -12,10 +12,14 @@ import {
   ArenaError,
   arenaModeKey,
 } from '@/lib/arena';
-import { drawRivalScore, median, ownDuelScores, RIVAL_FROM_DUEL_SCORES, storedModeKeys } from '@/lib/arena-rivals';
+import {
+  isMusicDuel, readMusicAttempt, musicAttemptScore, readMusicSeats, houseSeatOf, musicTapPlausibility, PRE_HOUSE_BEAT_REASON,
+} from '@/lib/arena-music';
+import { drawHouseScore } from '@/lib/arena-ghost';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { forWire } from '@/lib/mp/dunkCard';
 import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena-score-integrity';
+import { isExpired } from '@/lib/arena-reclaim';
 
 /**
  * POST /api/arena/submit-score
@@ -28,6 +32,26 @@ import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena
  * most its rules can award, or the Arena's limit on an open-ended mode), or a Flight Night score that is not its dunk
  * card's total, is refused with a 422 and never settles (lib/arena-score-integrity.ts). This route settled a pot on any
  * non-negative integer the client sent.
+ *
+ * MUSIC-SUITE P6 (2026-09-26, owner decision #12): a Groove Academy duel's score is the server's own. The room plays the
+ * duel's house beat (lib/babylon/music/houseBeat.ts) and records ONE attempt through /api/arena/music-attempt; here the
+ * attempt is read (lib/arena-music.ts), its taps rejudged with the room's own judge (judgeHouseSet), and the posted score
+ * must equal that (422 SCORE_MISMATCH). A set started and never finished scores 0 — the reload rule, #29 — and a score
+ * with no attempt at all is refused 409 NO_ATTEMPT, before anything is written. Every other mode is unchanged.
+ *
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26):
+ *   · TWO SUBMITS AT ONE INSTANT NEVER SETTLED. The other side's score was read from the start-of-transaction read, so
+ *     when both players submitted together each transaction saw the other slot empty and answered settled:false — the
+ *     row stayed ACTIVE with both scores and no winner (and, past expiry, no route took a score and the sweep skipped
+ *     it). The second writer waits on the first one's row lock; its guarded UPDATE then returns the row as committed, so
+ *     the scores are read back from that write, and the later of the two settles.
+ *   · A MUSIC DUEL IN FLIGHT ACROSS THE DEPLOY mixed two scales: the opponent's stored pre-house-beat score (their own
+ *     grid, ceiling 2,647,100) was settled against a rejudged house-beat one (ceiling 378,300). A music score whose player
+ *     has no recorded attempt is from before the house beat (decision #12: old music duel scores stop counting): such a
+ *     duel is VOIDED and both stakes refunded (reason 'pre_house_beat') instead of settled — 409 PRE_HOUSE_BEAT after
+ *     the refund commits. (/api/arena/music-attempt does the same at START, so a set is not played for nothing.)
+ *   · The house's draw moved to lib/arena-ghost.ts (the expiry sweep draws it too, identically); and a music set's timing
+ *     spread is recorded for review (lib/arena-music.ts musicTapPlausibility — nothing is refused on it).
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -59,12 +83,39 @@ export async function POST(req: NextRequest) {
       if (!['ACTIVE', 'WAITING'].includes(match.status)) {
         throw new ArenaError('NOT_SUBMITTABLE', 'This duel is no longer accepting scores.', 409);
       }
+      // MUSIC-SUITE P6 (2026-09-26, owner decision #30): past expiresAt a duel takes no more scores, in any mode — the
+      // reclaim sweep (lib/arena-reclaim.ts) owns it from that instant: it refunds whoever did not play, or settles to
+      // the one side that did. Before this nothing read expiresAt, so a duel stayed open to a score forever.
+      if (isExpired(match.expiresAt, new Date())) {
+        throw new ArenaError('EXPIRED', 'This duel has expired: stakes nobody played for are refunded, and a side that played wins by forfeit.', 409);
+      }
       // A duel needs both players before scores count.
       if (!match.player2Id) throw new ArenaError('WAITING_OPPONENT', 'Waiting for an opponent to join.', 409);
 
+      // MUSIC-SUITE P6: a music duel's score is what the server makes of the player's one recorded attempt — no attempt,
+      // no score (409 NO_ATTEMPT); an unfinished one, 0; a finished one, judgeHouseSet on its taps. checkStakeScore then
+      // requires the posted score to equal it (422 SCORE_MISMATCH).
+      const attempt = isMusicDuel(match.mode) ? await readMusicAttempt(tx, match.id, userId) : null;
+      const rejudge = attempt ? musicAttemptScore(match.id, attempt) : null;
+      if (rejudge && !rejudge.ok) throw new ArenaError(rejudge.code, rejudge.detail, rejudge.status);
+      // MUSIC-SUITE P6 FIX PASS: the other seat's stored score from before the house beat (no attempt by its player) is
+      // not a score to settle against — the duel is refunded to both, and the refusal says so (after the refund commits)
+      if (attempt && houseSeatOf(match) === null) {
+        const seats = await readMusicSeats(tx, match);
+        const other = isP1 ? seats.p2 : seats.p1;
+        if (other.legacy) {
+          const feeLc = match.entryFeeCents;
+          await arenaRefund(tx, { userId: match.player1Id, matchId, feeLc });
+          await arenaRefund(tx, { userId: match.player2Id, matchId, feeLc });
+          await tx.competitionMatch.update({ where: { id: matchId, status: { in: ['ACTIVE', 'WAITING'] } }, data: { status: 'VOIDED' } });
+          await appendMatchEvent(tx, matchId, 'REFUNDED', null, { reason: PRE_HOUSE_BEAT_REASON, feeLc, legacySide: isP1 ? 'p2' : 'p1' });
+          return { preHouseBeat: true, feeLc } as const;
+        }
+      }
+
       // HOTFIX (2026-09-24): the score must be inside this mode's limit, and a dunk card must add up to it. A refusal
       // throws before the first write, so nothing is recorded, no ghost is drawn and nothing settles.
-      const check = checkStakeScore({ mode: match.mode, score, card: body?.card, killSwitch: killSwitchOn() });
+      const check = checkStakeScore({ mode: match.mode, score, card: body?.card, killSwitch: killSwitchOn(), ...(rejudge?.ok ? { rejudged: rejudge.score } : {}) });
       if (!check.ok) throw new ArenaError(check.code, check.detail, STAKE_REFUSAL_STATUS);
       if (!check.ceilingApplied) console.warn(`[arena/submit-score] ${match.mode}: NEXT_PUBLIC_DISABLE_3D=1 serves the fallback game, whose scale the ceiling table does not describe — ceiling not applied`);
       const card = check.card;
@@ -80,9 +131,29 @@ export async function POST(req: NextRequest) {
         data.player2SubmittedAt = new Date();
       }
       if (Object.keys(data).length) {
-        await tx.competitionMatch.update({ where: { id: matchId }, data });
+        // MUSIC-SUITE P6: the write is guarded by the state it was decided on — still open, this player's slot still
+        // empty. A reclaim sweep that closed the duel between the read above and this write (the instant of expiry) makes
+        // it match no row: Prisma answers P2025 and nothing is written or paid, instead of a second score settling a
+        // duel the sweep already refunded or paid by forfeit (a tie here would have refunded both on top of it). It also
+        // takes the row lock first, so a sweep that comes after this write sees the score and moves nothing.
+        const slot = isP1 ? 'player1Score' : 'player2Score';
+        const written = await tx.competitionMatch.update({ where: { id: matchId, status: { in: ['ACTIVE', 'WAITING'] }, [slot]: null }, data })
+          .catch((e: any) => {
+            if (e?.code === 'P2025') throw new ArenaError('NOT_SUBMITTABLE', 'This duel is no longer accepting scores.', 409);
+            throw e;
+          });
+        // MUSIC-SUITE P6 FIX PASS: the other slot as it stands AFTER this write took the row lock — a submit that landed
+        // at the same instant and committed first is in it, so the later of two simultaneous submits settles the duel
+        if (written && typeof written === 'object') {
+          if (isP1) match.player2Score = written.player2Score ?? match.player2Score;
+          else match.player1Score = written.player1Score ?? match.player1Score;
+        }
+        const plaus = attempt?.finish ? musicTapPlausibility(match.id, attempt.finish.taps) : null;
+        if (plaus?.flagged) console.warn(`[arena/submit-score] ${matchId}: a music set timed to ${plaus.spreadMs} ms over ${plaus.hits} hits — machine-exact; recorded for review`);
         await appendMatchEvent(tx, matchId, 'SCORE_SUBMITTED', userId, {
           player: isP1 ? 'p1' : 'p2', score, ...(card ? { card: forWire(card) } : {}),
+          ...(rejudge?.ok ? { rejudged: true, taps: rejudge.taps, ...(rejudge.forfeit ? { forfeit: 'unfinished_attempt' } : {}) } : {}),
+          ...(plaus ? { plausibility: plaus } : {}),
         });
       }
 
@@ -95,49 +166,8 @@ export async function POST(req: NextRequest) {
       const ghostScoreMissing =
         ghostSide === 'p1' ? match.player1Score === null : match.player2Score === null;
       if (ghostSide && ghostScoreMissing && match.seed) {
-        // HOTFIX (2026-09-24): sessions are read under the key GameShell saves them under. A duel stored as 'musicAcademy'
-        // reads 'music' here. Raw, it found no sessions and drew its rival off the default baseline of 100 on a 5000 scale.
-        const sessionMode = arenaModeKey(match.mode);
-        // A mode whose sessions are on another scale than a staked run (music: free play has no end, an Arena set does)
-        // is banded on this player's own past duel scores in the mode, never their sessions, and on the baseline until
-        // they have one. Past scores above today's ceiling came from before it, and are left out.
-        const fromDuels = RIVAL_FROM_DUEL_SCORES.has(sessionMode);
-        const [recent, population] = await Promise.all([
-          fromDuels
-            ? tx.competitionMatch.findMany({
-              where: {
-                currency: 'LC', mode: { in: storedModeKeys(sessionMode) }, createdAt: { lt: match.createdAt },
-                OR: [{ player1Id: userId, player1Score: { not: null } }, { player2Id: userId, player2Score: { not: null } }],
-              },
-              orderBy: { createdAt: 'desc' },
-              take: 10,
-              select: { player1Id: true, player1Score: true, player2Score: true },
-            }).then((rows: { player1Id: string; player1Score: number | null; player2Score: number | null }[]) =>
-              ownDuelScores(rows, userId, check.ceilingApplied ? check.ceiling.max : Infinity))
-            : tx.gameSession.findMany({
-              where: { userId, mode: sessionMode, createdAt: { lt: match.createdAt } },
-              orderBy: { createdAt: 'desc' },
-              take: 10,
-              select: { score: true },
-            }).then((rows: { score: number }[]) => rows.map((r) => r.score)),
-          fromDuels
-            ? []
-            : tx.gameSession.findMany({
-              where: { mode: sessionMode, createdAt: { lt: match.createdAt } },
-              orderBy: { createdAt: 'desc' },
-              take: 200,
-              select: { score: true },
-            }),
-        ]);
-        const draw = drawRivalScore({
-          seed: match.seed,
-          mode: sessionMode,
-          playerHistory: recent,
-          populationMedian: population.length ? median(population.map((r: { score: number }) => r.score)) : null,
-        });
-        // HOTFIX (2026-09-24): the house is held to the same ceiling as the player. A cold-start baseline on another
-        // scale (tennis draws around 21 in a first-to-4-games match) posted a score no human could reach.
-        const ghostScore = check.ceilingApplied ? Math.min(draw.score, check.ceiling.max) : draw.score;
+        // MUSIC-SUITE P6 FIX PASS: the draw is lib/arena-ghost.ts's (the expiry sweep makes the same one)
+        const { score: ghostScore, draw } = await drawHouseScore(tx, match, userId, check.ceilingApplied ? check.ceiling.max : Infinity);
         const ghostData =
           ghostSide === 'p1' ? { player1Score: ghostScore, player1SubmittedAt: new Date() } : { player2Score: ghostScore, player2SubmittedAt: new Date() };
         await tx.competitionMatch.update({ where: { id: matchId }, data: ghostData });
@@ -203,6 +233,13 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    // MUSIC-SUITE P6 FIX PASS: a duel refunded because the other score is from before the house beat (committed above)
+    if ((outcome as any).preHouseBeat) {
+      return NextResponse.json({
+        error: 'PRE_HOUSE_BEAT', refunded: true,
+        detail: "Your opponent's score in this duel is from before the house beat, so the two can't be compared: both stakes were refunded.",
+      }, { status: 409 });
+    }
     if ((outcome as any).settled) {
       recordServerEvent({ name: 'arena_match_settled', props: { matchId, status: (outcome as any).status }, userId }).catch(() => {});
     }

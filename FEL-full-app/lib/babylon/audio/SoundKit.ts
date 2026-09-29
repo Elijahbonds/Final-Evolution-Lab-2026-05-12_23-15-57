@@ -21,6 +21,16 @@
 type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
   | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak';
 
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the three player-set bus levels (lib/audio/volumes.ts owns the pure
+// arithmetic and the on-device persistence; this file is the only place that arithmetic reaches a real GainNode).
+import { busGain, loadVolumes, saveVolume, VOLUME_RAMP_TC, type VolumeBus, type VolumeSettings } from '@/lib/audio/volumes';
+
+/** Every bus's own tuned base gain BEFORE a player's volume multiplies it — voiceBus and musicBus already had these
+ *  numbers (P2); SFX_BASE_GAIN is new (sfxBus below) and is 1 because every SfxName's envelope was already tuned to
+ *  play straight into the master at unity — giving it a bus changes nothing at the default volume (1.0). */
+const VOICE_BASE_GAIN = 1.35;
+const SFX_BASE_GAIN = 1;
+
 class SoundKitImpl {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -45,14 +55,44 @@ class SoundKitImpl {
   // context through this bus into the master. Its gain undoes the master's 0.55, so the band keeps the loudness it had
   // on its own context (against the SFX it was mixed with) and only the limiter is new. Additive: nothing else routes here.
   private musicBus: GainNode | null = null;
+  // MUSIC-SUITE P7 (2026-09-29): THE SFX BUS. Every hit sound and UI tick (play(), below) played straight into
+  // `master` — the third of the "three buses on the one graph" the room-mix-ux task asks for had nowhere to live.
+  // sfxBus sits exactly where voiceBus and musicBus already did (its own gain node, between the sound and master),
+  // so play()'s cases changed only their connect() target, never their own envelope math.
+  private sfxBus: GainNode | null = null;
+  /** The three player-set levels (0..1 each), read once at construction (lib/audio/volumes.ts's own on-device
+   *  persistence — the same guarded-localStorage shape readVoicePref/writeVoicePref below already use) and kept
+   *  live from there on: setVolume() below is the only thing that ever changes it after this. */
+  private volumes: VolumeSettings = loadVolumes();
   /** The MC's voice is on (a player setting, kept across sessions; the captions carry the call either way). */
   get voiceOn(): boolean { return this.voiceEnabled && this.sfxEnabled; }
   setVoice(on: boolean): void { this.voiceEnabled = on; writeVoicePref(on); }
-  /** The graph the voice (and, MUSIC-SUITE P2, the music) plays into; null before a context can exist (server, no Web Audio). */
-  graph(): { ctx: AudioContext; voice: GainNode; crowdDuck: GainNode; out: AudioNode; music: GainNode } | null {
+  /** The graph the voice (and, MUSIC-SUITE P2, the music; MUSIC-SUITE P7, sfx) plays into; null before a context can
+   *  exist (server, no Web Audio). */
+  graph(): { ctx: AudioContext; voice: GainNode; crowdDuck: GainNode; out: AudioNode; music: GainNode; sfx: GainNode } | null {
     const ctx = this.ensure();
-    return ctx && this.voiceBus && this.crowdDuck && this.out && this.musicBus
-      ? { ctx, voice: this.voiceBus, crowdDuck: this.crowdDuck, out: this.out, music: this.musicBus } : null;
+    return ctx && this.voiceBus && this.crowdDuck && this.out && this.musicBus && this.sfxBus
+      ? { ctx, voice: this.voiceBus, crowdDuck: this.crowdDuck, out: this.out, music: this.musicBus, sfx: this.sfxBus } : null;
+  }
+
+  /** MUSIC-SUITE P7: the player's saved MUSIC / SFX / VOICE levels (0..1 each) — read by the settings UI
+   *  (lib/audio/ui/VolumeMixer.tsx) so it shows the level actually in effect, not just whatever it last saved. */
+  getVolumes(): VolumeSettings { return { ...this.volumes }; }
+
+  /**
+   * Move one bus live and persist it (lib/audio/volumes.ts's saveVolume — merges with the other two, so setting SFX
+   * never touches a saved MUSIC or VOICE level). Safe to call before a context exists: the save still lands, and
+   * ensure() reads it (via `this.volumes`, already updated below) the moment one is finally built. The gain glides
+   * (setTargetAtTime, VOLUME_RAMP_TC) rather than jumps, so a drag never clicks — the same technique the Academy's
+   * own live desk uses for a mixer move (mixGraph.ts RAMP_TC).
+   */
+  setVolume(bus: VolumeBus, level: number): void {
+    this.volumes = saveVolume(bus, level);
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const node = bus === 'music' ? this.musicBus : bus === 'voice' ? this.voiceBus : this.sfxBus;
+    const base = bus === 'music' ? 1 / MASTER_GAIN : bus === 'voice' ? VOICE_BASE_GAIN : SFX_BASE_GAIN;
+    node?.gain.setTargetAtTime(busGain(base, this.volumes[bus]), ctx.currentTime, VOLUME_RAMP_TC);
   }
 
   private ensure(): AudioContext | null {
@@ -70,8 +110,9 @@ class SoundKitImpl {
     this.master.connect(limiter).connect(this.ctx.destination);
     this.out = limiter;   // everything the game sounds like, last node before the speakers (a dev probe can tap it)
     this.crowdDuck = this.ctx.createGain(); this.crowdDuck.connect(this.master);
-    this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = 1.35; this.voiceBus.connect(this.master);
-    this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 1 / MASTER_GAIN; this.musicBus.connect(this.master);   // MUSIC-SUITE P2
+    this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = busGain(VOICE_BASE_GAIN, this.volumes.voice); this.voiceBus.connect(this.master);
+    this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = busGain(1 / MASTER_GAIN, this.volumes.music); this.musicBus.connect(this.master);   // MUSIC-SUITE P2
+    this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = busGain(SFX_BASE_GAIN, this.volumes.sfx); this.sfxBus.connect(this.master);   // MUSIC-SUITE P7
     return this.ctx;
   }
 
@@ -113,7 +154,7 @@ class SoundKitImpl {
   play(name: SfxName, opts: { pitch?: number; volume?: number } = {}): void {
     if (!this.sfxEnabled) return;
     const ctx = this.ensure();
-    if (!ctx || !this.master) return;
+    if (!ctx || !this.master || !this.sfxBus) return;
     const vol = opts.volume ?? 1;
     const pitch = opts.pitch ?? 1;
 
@@ -128,7 +169,7 @@ class SoundKitImpl {
         osc.frequency.exponentialRampToValueAtTime(38 * pitch, ctx.currentTime + 0.14);
         const og = ctx.createGain();
         this.env(og, ctx, 0.004, 0.16, 0.9 * vol);
-        osc.connect(og).connect(this.master);
+        osc.connect(og).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.2);
 
         const slap = ctx.createBufferSource();
@@ -137,7 +178,7 @@ class SoundKitImpl {
         lp.type = 'lowpass'; lp.frequency.value = 420;
         const sg = ctx.createGain();
         this.env(sg, ctx, 0.002, 0.07, 0.5 * vol);
-        slap.connect(lp).connect(sg).connect(this.master);
+        slap.connect(lp).connect(sg).connect(this.sfxBus);
         slap.start(); slap.stop(ctx.currentTime + 0.1);
         break;
       }
@@ -154,7 +195,7 @@ class SoundKitImpl {
           g.gain.setValueAtTime(0.0001, t0);
           g.gain.exponentialRampToValueAtTime(0.30 * vol * (1 - i * 0.28), t0 + 0.004);
           g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
-          osc.connect(g).connect(this.master);
+          osc.connect(g).connect(this.sfxBus);
           osc.start(t0); osc.stop(t0 + 0.1);
         }
         break;
@@ -171,7 +212,7 @@ class SoundKitImpl {
         bp.frequency.exponentialRampToValueAtTime(1300 * pitch, ctx.currentTime + 0.18);
         const g = ctx.createGain();
         this.env(g, ctx, 0.012, 0.2, 0.22 * vol);
-        src.connect(bp).connect(g).connect(this.master);
+        src.connect(bp).connect(g).connect(this.sfxBus);
         src.start(); src.stop(ctx.currentTime + 0.24);
         break;
       }
@@ -186,7 +227,7 @@ class SoundKitImpl {
           this.env(g, ctx, 0.003, 0.34, amp * vol);
           const lp = ctx.createBiquadFilter();
           lp.type = 'lowpass'; lp.frequency.value = 5200;
-          osc.connect(lp).connect(g).connect(this.master);
+          osc.connect(lp).connect(g).connect(this.sfxBus);
           osc.start(); osc.stop(ctx.currentTime + 0.4);
         }
         break;
@@ -203,7 +244,7 @@ class SoundKitImpl {
         bp.frequency.exponentialRampToValueAtTime(2600 * pitch, ctx.currentTime + 0.09);
         const g = ctx.createGain();
         this.env(g, ctx, 0.006, 0.1, 0.16 * vol);
-        src.connect(bp).connect(g).connect(this.master);
+        src.connect(bp).connect(g).connect(this.sfxBus);
         src.start(); src.stop(ctx.currentTime + 0.16);
         break;
       }
@@ -217,7 +258,7 @@ class SoundKitImpl {
         bp.frequency.exponentialRampToValueAtTime(2200 * pitch, ctx.currentTime + 0.22);
         const g = ctx.createGain();
         this.env(g, ctx, 0.02, 0.24, 0.35 * vol);
-        src.connect(bp).connect(g).connect(this.master);
+        src.connect(bp).connect(g).connect(this.sfxBus);
         src.start(); src.stop(ctx.currentTime + 0.3);
         break;
       }
@@ -228,14 +269,14 @@ class SoundKitImpl {
         osc.frequency.exponentialRampToValueAtTime(45 * pitch, ctx.currentTime + 0.12);
         const g = ctx.createGain();
         this.env(g, ctx, 0.004, 0.14, 0.6 * vol);
-        osc.connect(g).connect(this.master);
+        osc.connect(g).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.16);
         // + a noise crack layered on top for texture
         const src = ctx.createBufferSource();
         src.buffer = this.noiseBuffer(ctx, 0.06);
         const g2 = ctx.createGain();
         this.env(g2, ctx, 0.002, 0.05, 0.25 * vol);
-        src.connect(g2).connect(this.master);
+        src.connect(g2).connect(this.sfxBus);
         src.start();
         break;
       }
@@ -250,7 +291,7 @@ class SoundKitImpl {
           g.gain.setValueAtTime(0.0001, t0);
           g.gain.exponentialRampToValueAtTime(0.35 * vol, t0 + 0.01);
           g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
-          osc.connect(g).connect(this.master!);
+          osc.connect(g).connect(this.sfxBus!);
           osc.start(t0); osc.stop(t0 + 0.32);
         });
         break;
@@ -262,7 +303,7 @@ class SoundKitImpl {
         osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.4);
         const g = ctx.createGain();
         this.env(g, ctx, 0.01, 0.38, 0.28 * vol);
-        osc.connect(g).connect(this.master);
+        osc.connect(g).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.42);
         break;
       }
@@ -273,7 +314,7 @@ class SoundKitImpl {
         osc.frequency.linearRampToValueAtTime(2100, ctx.currentTime + 0.5);
         const g = ctx.createGain();
         this.env(g, ctx, 0.02, 0.5, 0.3 * vol);
-        osc.connect(g).connect(this.master);
+        osc.connect(g).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.55);
         break;
       }
@@ -283,7 +324,7 @@ class SoundKitImpl {
         osc.frequency.value = 1200 * pitch;
         const g = ctx.createGain();
         this.env(g, ctx, 0.001, 0.045, 0.18 * vol);
-        osc.connect(g).connect(this.master);
+        osc.connect(g).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.06);
         break;
       }
@@ -294,7 +335,7 @@ class SoundKitImpl {
         osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.35);
         const g = ctx.createGain();
         this.env(g, ctx, 0.02, 0.4, 0.3 * vol);
-        osc.connect(g).connect(this.master);
+        osc.connect(g).connect(this.sfxBus);
         osc.start(); osc.stop(ctx.currentTime + 0.4);
         break;
       }

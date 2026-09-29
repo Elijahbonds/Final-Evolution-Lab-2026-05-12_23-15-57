@@ -64,6 +64,10 @@ import { REASON, type WalletCurrency } from './reward-rules';
  *                 PLAN_CLAIM_WINDOW_MS. A row no plan claims is refunded. delete-my-data (DELETE /api/v1/workout/scan)
  *                 erases every plan, so a plan that was delivered and then erased is paid back too: the owner's call
  *                 (2026-09-25), over holding every unmatched charge back for want of proof.
+ *                 MIRROR-COACH P1 (2026-09-25): Workout sells no plan now (its route refuses, and both SKUs are in
+ *                 NOT_ON_SALE), so no new charge or plan of either SKU is written. The revision of a stored plan
+ *                 (lib/workout/plan-revision.ts) rewrites its weeks only, never its tier or createdAt, so every plan
+ *                 still claims the charge it claimed before.
  *   first_charge  the entitlement row IS the delivery, and spend() writes it with the first charge of the SKU; nothing
  *                 else writes it and nothing deletes it. The player's earliest charge of the SKU (whatever its key)
  *                 delivered; a later one whose key the browser made upserted the same row and delivered nothing.
@@ -148,7 +152,10 @@ export const HOLLOW_SHOP_CARDS: Readonly<Record<string, { name: string }>> = {
   'course-karate-adv': { name: 'Advanced Strike Systems' },
 };
 
-/** The reasons whose rows the sweep reads: the two dead purchases, and the refunds already made for them. */
+/**
+ * The reasons whose rows the sweep reads: the two dead purchases, and the refunds already made for them. Never
+ * KIT_GRANDFATHER_2026_09 (MUSIC-SUITE P6, kitGrandfatherKey below): a grant is not a purchase and has nothing to pay back.
+ */
 export const SHOP_PURCHASE_REASON = 'SHOP_PURCHASE';
 export const DEAD_BUY_REASONS: readonly string[] = [REASON.SPEND_CATALOG_ITEM, SHOP_PURCHASE_REASON, REASON.DEAD_BUY_REFUND];
 
@@ -166,6 +173,33 @@ export function refundKey(rowId: string): string {
 export function shopPurchaseKey(userId: string, cardKey: string, refundedSaleId?: string | null): string {
   const key = `shop:${userId}:${cardKey}`;
   return refundedSaleId ? `${key}:after-refund:${refundedSaleId}` : key;
+}
+
+/**
+ * MUSIC-SUITE P6 (2026-09-25), owner decision #23 ("Kits unlocked free before 2026-09-20 (bug): LET PLAYERS KEEP THEM —
+ * a one-time server grant with its own ledger reason, kept out of the dead-buy sweep"). Until 4b766804 the Music Room
+ * never charged for a kit (the shards seam allowed every spend), so NEON and DUST were unlocked on devices with no
+ * charge anywhere; since P2 the owned-kits read counts a kit only with a charge behind it (backedEntitlements), and the
+ * room re-locked them on the next signed-in visit ("NEON isn't on your account"). lib/wallet/kit-grandfather.ts now
+ * grants such a kit ONCE: a zero-delta ledger row under KIT_GRANDFATHER_2026_09, keyed kit_grandfather_2026_09:
+ * <player>:<sku>, beside the kit's entitlement row. How it stays out of this file's refunds, all pinned in
+ * dead-buys.test.ts:
+ *   - its reason is not in DEAD_BUY_REASONS, so the sweep never even reads the row;
+ *   - deadBuyOf never takes it (not a charge: delta 0, and not a SPEND_CATALOG_ITEM / SHOP_PURCHASE row);
+ *   - backedEntitlements counts it as backing its kit, so a /store charge of the same kit being paid back (its row
+ *     stays: a kit's refund takes nothing back) leaves the grant standing — and nothing else does.
+ * The key carries the player and the SKU, so it is unique per player+kit across the ledger: a second grant fails on it.
+ */
+export function kitGrandfatherKey(playerId: string, skuId: string): string {
+  return `kit_grandfather_2026_09:${playerId}:${skuId}`;
+}
+
+/** Is this row this player's grandfather grant of `skuId`? Its reason, its exact key and its own SKU; nothing moved. */
+export function isKitGrandfatherGrant(row: DeadBuyRow, playerId: string, skuId: string): boolean {
+  return row.reasonCode === REASON.KIT_GRANDFATHER_2026_09
+    && row.delta === 0
+    && row.idempotencyKey === kitGrandfatherKey(playerId, skuId)
+    && str(((row.metadata ?? {}) as Record<string, unknown>).skuId) === skuId;
 }
 
 /** A row younger than this is left for a later read: a Closet or Sessions buy may still be writing what it delivered. */
@@ -315,6 +349,9 @@ export function firstChargeIds(rows: readonly DeadBuyRow[]): Map<string, string>
  * charge of a client_key SKU never backs a row, even before the sweep reaches it (younger than DEAD_BUY_GRACE_MS, or a
  * failed sweep): it is going to be paid back, so it does not deliver meanwhile either. The caller intersects the result
  * with the entitlement rows it read. Not for wearable/session/workout_plan SKUs: those deliver through other tables.
+ *
+ * MUSIC-SUITE P6 (2026-09-25): a kit's grandfather grant backs its row too (isKitGrandfatherGrant: this player's own
+ * zero-delta KIT_GRANDFATHER_2026_09 row for exactly that SKU). The caller must read that reason with the charges.
  */
 export function backedEntitlements(skus: readonly string[], rows: readonly DeadBuyRow[], playerId: string): Set<string> {
   const want = new Set(skus);
@@ -322,6 +359,11 @@ export function backedEntitlements(skus: readonly string[], rows: readonly DeadB
   const first = firstChargeIds(rows);
   const out = new Set<string>();
   for (const r of rows) {
+    if (r.reasonCode === REASON.KIT_GRANDFATHER_2026_09) {
+      const sku = str(((r.metadata ?? {}) as Record<string, unknown>).skuId);
+      if (want.has(sku) && isKitGrandfatherGrant(r, playerId, sku)) out.add(sku);
+      continue;
+    }
     if (r.reasonCode !== REASON.SPEND_CATALOG_ITEM || !(r.delta < 0) || refunded.has(r.id)) continue;
     const sku = str(((r.metadata ?? {}) as Record<string, unknown>).skuId);
     if (!want.has(sku) || out.has(sku)) continue;

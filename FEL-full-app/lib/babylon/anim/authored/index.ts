@@ -25,7 +25,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump, buildElbow, buildSpinElbow } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
+  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
   buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildLandAbsorb,   // HOOPS-DEPTH S4
@@ -42,7 +42,7 @@ import { buildKeeperDive, buildKeeperSet, buildSoccerKick, buildKeeperDiveHold, 
 import {
   buildBoardRideIdle, buildBoardCarveLeft, buildBoardCarveRight, buildBoardTuck,
   buildBoardGrab, buildBoardAir, buildBoardGrind, buildBoardLand, buildBoardPush, buildBoardStandIdle, buildBoardLandSketchy,
-  buildSkateKickflip, buildSkateBail,
+  buildSkateKickflip, buildSkateBail, buildSnowBail,
   buildBoardManual, buildSkateOllie,   // VENICE-SKATE-THPS (2026-09-09): the manual had no clip and the pop had no body
 } from './boardSuite';
 
@@ -174,11 +174,13 @@ export function registerAuthoredClips(
     ['board_push', () => buildBoardPush(scene, skeleton)],   // ANIM-READABILITY (2026-09-07): the skate push, replacing the walk alias
     ['skate_kickflip', () => buildSkateKickflip(scene, skeleton)],
     ['skate_bail', () => buildSkateBail(scene, skeleton)],
+    ['snow_bail', () => buildSnowBail(scene, skeleton)],   // GATE-CRASHER-POLISH-2: the snowboard's wipeout, down in the snow
     ['board_manual', () => buildBoardManual(scene, skeleton)],   // VENICE-SKATE-THPS: the back-truck balance act (the tree pointed 'manual' at the ride idle)
     ['skate_ollie', () => buildSkateOllie(scene, skeleton)],    // VENICE-SKATE-THPS: plant -> pop -> hang, the sticky beat under the pop
     // Basketball packages (Phase 4, 2026-09-03) — size-ups, gather, slide,
     // block and steal used to alias onto run/guard/jumpshot.
     ['bball_dribble_idle', () => buildDribbleIdle(scene, skeleton)],
+    ['bball_idle_stand', () => buildIdleStandHoops(scene, skeleton)],   // HOOPS MOTION phase 3b (review): the watch with knees
     ['bball_crossover_left', () => buildCrossover(scene, skeleton, 'left')],
     ['bball_crossover_right', () => buildCrossover(scene, skeleton, 'right')],
     ['bball_hesi', () => buildHesi(scene, skeleton)],

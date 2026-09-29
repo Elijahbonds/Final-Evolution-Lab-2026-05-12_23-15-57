@@ -88,7 +88,10 @@ function runReps(n: number, pullMs: number, pressMs: number, holdMs: number): Re
   ok(h.includes('paintSkeleton(pose, p)'), 'the skeleton is painted from the pose stream');
   ok(h.includes('skeletonRef'), 'the skeleton canvas is layered over the video');
   ok(/>\s*Reps\s*</i.test(h), 'the live HUD shows the rep count');
-  ok(h.includes('measured from flight time'), 'the jump panel says where the number comes from');
+  // MIRROR-COACH P1 review (2026-09-25): a camera number is an ESTIMATE (a 2-D read at ~30 fps), and says so
+  ok(h.includes('estimated from flight time'), 'the jump panel says where the number comes from, and that it is estimated');
+  ok(!h.includes('measured from flight time'), 'the jump panel does not call a camera read "measured"');
+  ok(/Best jump · estimated/.test(h) && /Your best · estimated/.test(h) && /cm \/ week · estimated/.test(h), 'the best, your-best and trend figures say estimated');
   ok(!/verticalCm.*random|Math\.random/.test(h), 'no fabricated jump numbers in the harness');
 }
 

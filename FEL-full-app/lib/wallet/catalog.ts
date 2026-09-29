@@ -74,7 +74,11 @@ export function getSku(skuId: string): CatalogSku | null {
 // (A): refuse the sale now, no redesign. /live reads skuOnSale, so a held SKU is not offered there. Take a SKU out of
 // this set the day what it buys exists. Every pass bought before the hold is paid back and its entitlement row deleted
 // (owner decision 2026-09-25, lib/wallet/dead-buys.ts), so a pass bought once classes exist is charged again.
-export const NOT_ON_SALE: ReadonlySet<string> = new Set(['class_pass_single', 'class_monthly']);
+// MIRROR-COACH P1 (2026-09-25): the two /workout plans are held too (owner decision #3: pull /workout from sale,
+// relaunch on FEL templates behind the protocol gate). Their route refuses every purchase already
+// (app/api/v1/workout/plan/route.ts); holding them here makes spend() refuse them from any other route as well. They are
+// NOT refunded: buyers keep their plans, revised on read (lib/workout/plan-revision.ts).
+export const NOT_ON_SALE: ReadonlySet<string> = new Set(['class_pass_single', 'class_monthly', 'workout_plan_4w', 'workout_program_12w']);
 
 /** Can this SKU be bought right now? An unknown SKU and a held one both answer no. */
 export function skuOnSale(skuId: string): boolean {

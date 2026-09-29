@@ -26,6 +26,7 @@
 import { Vector3 } from '@babylonjs/core';
 import { classifyContact, type ContactSeverity } from './ContactSystem';
 import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotStyle, type ShotDrift } from './BasketballCore';
+import { athleteRight, lateralOf, sideAwayFrom, sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the ONE visual-side helper
 
 // ── M1: the gather ──────────────────────────────────────────────────────────
 export type GatherKind = 'set' | 'pullup' | 'stepback'
@@ -160,21 +161,20 @@ export const FINISH_CLIP: Record<FinishStyle, Record<FinishSide, string>> = {
 export const FINISH_RELEASE_KEY_SEC: Record<FinishStyle, number> = { layup: 0.3, floater: 0.35, hook: 0.34, fadeaway: 0.38, reverse: 0.34, mikan: 0.22, upAndUnder: 0.46, fingerRoll: 0.38, scoop: 0.32, spinLayup: 0.34, hangLayup: 0.5 };
 export const FINISH_LAND_KEY_SEC: Record<FinishStyle, number> = { layup: 0.7, floater: 0.7, hook: 0.72, fadeaway: 0.8, reverse: 0.74, mikan: 0.5, upAndUnder: 0.85, fingerRoll: 0.78, scoop: 0.72, spinLayup: 0.76, hangLayup: 0.9 };
 
-/** Body-right for a yaw (measured, MODE-STICK-FACE): (cos yaw, 0, −sin yaw). */
-export function bodyRight(yaw: number): Vector3 { return new Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); }
+/** Body-right for a yaw (measured, MODE-STICK-FACE): (cos yaw, 0, −sin yaw) — the athlete's DRAWN right (athleteSide.ts owns it). */
+export function bodyRight(yaw: number): Vector3 { return athleteRight(yaw); }
 
 /** Which hand finishes: the OUTSIDE hand of the side the drive comes from (a drive up the right side of the lane finishes
  *  right-handed off the left foot), the strong (right) hand straight on — unless a defender sits on that side inside
  *  LAYUP_PROTECT_RANGE, when the off hand finishes away from him. */
 export function pickLayupSide(shooter: Vector3, rim: Vector3, yaw: number, defender: Vector3 | null): FinishSide {
-  const right = bodyRight(yaw);
-  const off = new Vector3(shooter.x - rim.x, 0, shooter.z - rim.z);
-  const lateral = Vector3.Dot(off, right);
+  // the shooter's offset from the rim, on the athlete's own right (athleteSide: the drawn frame, not a rig's bone names)
+  const lateral = -lateralOf(shooter, yaw, rim);
   if (lateral > LAYUP_SIDE_MIN) return 'right';
   if (lateral < -LAYUP_SIDE_MIN) return 'left';
   if (defender) {
     const dv = new Vector3(defender.x - shooter.x, 0, defender.z - shooter.z);
-    if (dv.length() < LAYUP_PROTECT_RANGE && Vector3.Dot(dv, right) > 0.2) return 'left';
+    if (dv.length() < LAYUP_PROTECT_RANGE && lateralOf(shooter, yaw, defender) > 0.2) return sideAwayFrom(shooter, yaw, defender);
   }
   return 'right';
 }
@@ -445,13 +445,13 @@ export function hookShield(contest01: number): number { return contest01 * (1 - 
 /** Which hand hooks: the one AWAY from the defender, so the off shoulder and the off arm are between him and the ball.
  *  With nobody on me, the hand on the middle-of-the-floor side (toward the rim's line). */
 export function pickHookSide(shooter: Vector3, rimFloor: Vector3, yaw: number, defender: Vector3 | null): FinishSide {
-  const right = bodyRight(yaw);
   if (defender) {
     const dv = new Vector3(defender.x - shooter.x, 0, defender.z - shooter.z);
-    if (dv.length() <= POST_DEFENDER_RANGE + 0.6) return Vector3.Dot(dv, right) > 0 ? 'left' : 'right';
+    if (dv.length() <= POST_DEFENDER_RANGE + 0.6) return sideAwayFrom(shooter, yaw, defender);
   }
-  const off = new Vector3(shooter.x - rimFloor.x, 0, shooter.z - rimFloor.z);
-  return Vector3.Dot(off, right) > 0 ? 'right' : 'left';
+  // nobody on me: the hand on the side of me the rim is NOT on (the middle of the floor is the rim's side — the shooter's offset
+  // from it reads the side he came from)
+  return sideAwayFrom(shooter, yaw, rimFloor);
 }
 
 // ── M6: the spin ────────────────────────────────────────────────────────────
@@ -719,9 +719,9 @@ export function isReverseFinish(shooter: Vector3, rimFloor: Vector3, vel: Vector
 }
 /** The reverse finishes on the side the drive is carrying me TO (the far side of the rim). */
 export function reverseSide(shooter: Vector3, rimFloor: Vector3, yaw: number, vel: Vector3): FinishSide {
-  const right = bodyRight(yaw);
+  const right = athleteRight(yaw);
   const lat = vel.x * right.x + vel.z * right.z;
-  if (Math.abs(lat) > 0.4) return lat > 0 ? 'right' : 'left';
+  if (Math.abs(lat) > 0.4) return sideOfVector(yaw, vel);
   return pickLayupSide(shooter, rimFloor, yaw, null);
 }
 

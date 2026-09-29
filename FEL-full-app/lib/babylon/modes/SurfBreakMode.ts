@@ -27,7 +27,7 @@ import { BoardAnimTree } from '../anim/boardTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
-import { trickFor, bestFitting, asTrickDef, heldTrickDir, basePts as trickPts, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { trickFor, bestFitting, asTrickDef, heldTrickDir, basePts as trickPts, SURF_TRICKS, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -38,6 +38,9 @@ import { refuse } from '../core/Refusal';            // MECHANICS PASS: a press 
 import { BOARD_PACE } from '../core/BoardMovement';   // WALLS + SPEED (2026-09-15): the shared +35% board pace
 import { REPEAT_DECAY } from '../core/ComboChain';   // the same THPS repeat decay the skate and free-run chains use
 import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, rail spray, splashes
+// MOVEMENT PLAY P8 (2026-09-26): the body's grab in the air, a quarter-turn on the face (the CUTBACK) or in the air (a spin)
+import { RideIntents, rideOf, rideLines, type RideIntent } from '../core/rideBody';
+import { spinTrickFor } from '../core/rideTricks';
 
 const RUN_SEC = 90;
 /** phase 10: the score that wins a session without a barrel */
@@ -86,6 +89,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
   /** A surf air off the lip is short — this is the hang a pop actually buys. */
   const AIR_BUDGET_SEC = 0.7;
   let stickX = 0, stickY = 0, carve = 0;
+  const rideIntents = new RideIntents();   // MOVEMENT PLAY P8
+  let bodySynced = false;   // MOVEMENT PLAY P8: the body's quarters count from the first frame of play (rideIntents.sync)
+  const bodyStats = { grabs: 0, spins: 0, cutbacks: 0, last: '' };
   // phase 8 — THE PUMP: a drop→climb rhythm on the face (stick forward, then back, inside PUMP_WINDOW_SEC) is DRIVE. The
   // grammar's 'pump down the face for speed' had no payoff of its own; the trim alone moved the rider up and down.
   let pumpBoost = 0, pumpSign = 0, pumpAt = -9, pumps = 0;
@@ -245,8 +251,62 @@ export const SurfBreakMode: ModeDefinition = (() => {
     barrelSec = 0; inBarrel = false;
   }
 
+  /** A wave move (the B list), paid, and turned the way the rider asked — the pad's B + dir and (MOVEMENT PLAY P8) a body's
+   *  quarter-turn on the face share it, so the rules are one: one move at a time, the repeat decay, the drawn-out turn carved
+   *  in update(). The caller has checked the face and the lock. */
+  function waveMove(ctx: ModeContext, wave: BoardTrick, turnSign: number): void {
+    const rep = waveMoveRepeats.get(wave.id) ?? 0;
+    waveMoveRepeats.set(wave.id, rep + 1);
+    waveMoveUntil = t + WAVE_MOVE_LOCK_SEC;
+    // only the reverts swing the board round; a floater or a tube ride holds the line
+    if (wave.kind === 'revert') {
+      yawTarget += Math.PI * 0.5 * turnSign;
+      cutbackUntil = t + CUTBACK_LEAN_SEC;
+    }
+    const paid = Math.round((trickPts(wave) + Math.round(flow / 4)) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
+    tricks.score += paid;
+    if (rep < 2) boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
+    ctx.feel?.impact?.(wave.difficulty >= 3 ? 0.2 : 0.12);
+    SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
+    ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), `+${paid}`, rep ? '#94a3b8' : '#ffd75e');
+    ctx.setHud({ score: tricks.score, banner: rep ? `${wave.label} · REPEAT ×${rep + 1}` : wave.label });
+    setTimeout(() => ctx.setHud({ banner: '' }), 600);
+  }
+
+  /** MOVEMENT PLAY P8: the body's verbs, polled against the game's own air and face (lib/babylon/core/rideBody). */
+  function bodyVerbs(ctx: ModeContext): void {
+    const view = ctx.body?.() ?? null;
+    // (a quarter read before the first frame of play — the turn into the stance at READY — is never a cutback: review fix)
+    if (!bodySynced) { rideIntents.sync(view); bodySynced = true; }
+    for (const it of rideIntents.poll(view, { airborne: !rig.rider.grounded, onFace: rig.rider.grounded })) bodyVerb(ctx, it, view);
+  }
+  function bodyVerb(ctx: ModeContext, it: RideIntent, view: ReturnType<NonNullable<ModeContext['body']>>): void {
+    if (it.kind === 'grab') { tricks.start(TRICKS.grab); trickLayer?.start(SURF_GRAB); bodyStats.grabs++; bodyStats.last = 'GRAB'; return; }
+    if (it.kind === 'grabEnd') { tricks.endGrab(); trickLayer?.release(); return; }
+    if (it.kind !== 'spin') return;
+    if (it.where === 'air') {
+      const t2 = spinTrickFor('surf', it.dir, AIR_BUDGET_SEC);
+      if (!t2) return;
+      tricks.start(asTrickDef(t2)); trickLayer?.start(t2);
+      ctx.setHud({ banner: t2.label }); setTimeout(() => ctx.setHud({ banner: '' }), 560);
+      bodyStats.spins++; bodyStats.last = t2.label;
+      console.info(`[SURF-BODY] ${it.dir} quarter in the air → ${t2.label}`);
+      return;
+    }
+    // ON THE FACE: the CUTBACK — the B list's revert, turned the way the body turned (frontside = the rider's toe side:
+    // right for a left lead, left for a right lead, the carve's own sign), under the same rules a press has (one move at a
+    // time, repeat decay: the pad's own waveMove) — a body's press is never refused out loud
+    if (wipedOut || t < waveMoveUntil || !rig.rider.grounded) return;
+    const wave = SURF_TRICKS.find((x) => x.id === 'cutback')!;
+    waveMove(ctx, wave, (it.dir === 'fs' ? 1 : -1) * (rideOf(view)?.steerSign ?? 1));
+    bodyStats.cutbacks++; bodyStats.last = wave.label;
+    console.info(`[SURF-BODY] ${it.dir} quarter on the face → CUTBACK`);
+  }
+
   return {
     modeId: 'surf', camPreset: 'surf',
+    // MOVEMENT PLAY P8: the card — the floor's lines, then the grab, the cutback and the spin this mode reads itself
+    body: { lines: rideLines('surf') },
     // Per-venue light and horizon, read at mount (see SkateRunMode). This is also what finally mounts the painted
     // OCEAN backdrop — a sea, a pier and palms that had existed in Backdrops.ts since M61 and were reachable from
     // no mood at all, so every break sat under Venice's city skyline.
@@ -301,6 +361,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
       }
       bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0; rel = 0; stickY = 0; rideLean = 0;
       pumpBoost = 0; pumpSign = 0; pumpAt = -9; pumps = 0;
+      rideIntents.reset(); bodySynced = false; Object.assign(bodyStats, { grabs: 0, spins: 0, cutbacks: 0, last: '' });   // MOVEMENT PLAY P8
+      // MOVEMENT PLAY P8: the probe's read-only seam
+      (ctx.scene.metadata ??= {}).surf = { state: () => ({
+        heading: +rig.char.root.rotation.y.toFixed(3), steer: stickX, trim: stickY, pumps, grounded: rig.rider.grounded,
+        wipedOut, flow: Math.round(flow), score: tricks.score, body: { ...bodyStats },
+      }) };
       ctx.camDirector.setPreset('surf');   // over the swell back, clear of the crest (was 'board': 2.4 m up, inside a 2.6 m wave)
       assertSpawned(ctx.scene, { hero: rig.char.root, minWorldMeshes: 4, modeId: 'surf' });
       t = 0; timeLeft = RUN_SEC; flow = 0; ended = false; wipedOut = false; lapsSeen = 0; surging = false;
@@ -359,22 +425,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // (the carve has to finish), and the same move again on this wave pays less (THPS repeat decay).
           if (!rig.rider.grounded) { refuse(ctx, 'ON THE FACE'); return; }
           if (t < waveMoveUntil) { refuse(ctx, 'MID-TURN'); return; }
-          const rep = waveMoveRepeats.get(wave.id) ?? 0;
-          waveMoveRepeats.set(wave.id, rep + 1);
-          waveMoveUntil = t + WAVE_MOVE_LOCK_SEC;
-          // only the reverts swing the board round; a floater or a tube ride holds the line
-          if (wave.kind === 'revert') {
-            yawTarget += Math.PI * 0.5 * (stickX >= 0 ? 1 : -1);
-            cutbackUntil = t + CUTBACK_LEAN_SEC;
-          }
-          const paid = Math.round((trickPts(wave) + Math.round(flow / 4)) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
-          tricks.score += paid;
-          if (rep < 2) boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
-          ctx.feel?.impact?.(wave.difficulty >= 3 ? 0.2 : 0.12);
-          SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
-          ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), `+${paid}`, rep ? '#94a3b8' : '#ffd75e');
-          ctx.setHud({ score: tricks.score, banner: rep ? `${wave.label} · REPEAT ×${rep + 1}` : wave.label });
-          setTimeout(() => ctx.setHud({ banner: '' }), 600);
+          waveMove(ctx, wave, stickX >= 0 ? 1 : -1);   // (MOVEMENT PLAY P8: the body's cutback pays through the same move)
         }
         if (e.btn === 'Y') {
           // the AIRS: only legal off the lip, and the air the rider has decides which one
@@ -477,6 +528,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
         const pitch = rig.rider.grounded ? Math.atan(drop) * 0.55 : 0;
         rig.char.root.rotation.x += (pitch - rig.char.root.rotation.x) * Math.min(1, dt * 8);
 
+        bodyVerbs(ctx);   // MOVEMENT PLAY P8: the grab, the cutback and the spins the body asks for
         // BUOYS — hitting one ends the ride the same way falling behind does
         const p = rig.char.root.position;
         for (const o of world.obstacles) {

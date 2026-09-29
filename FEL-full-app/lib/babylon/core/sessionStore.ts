@@ -19,19 +19,64 @@
 // remount) runs its teardown after the next one has mounted — and a bare sessionStore.unmount() there would blank the
 // live card and pause line. So the writers belong to the mount: mount() returns this harness's SessionWriter, and every
 // writer on it does nothing once another mount has taken over (or after its own unmount).
+//
+// MOVEMENT PLAY P4 (2026-09-25): the view carries the game's PHASE too (the harness's setPhase writes it). The body-play
+// store feeds the space check only at READY (or over a pause it was asked for), and the header's Body button — which
+// lives in the shell and cannot see the host's phase — pauses a game that is playing before it runs the check.
+//
+// MOVEMENT PLAY P3 step 5 (2026-09-26): the shell reads the record at handleEnd through markRun / countedSince — a mark
+// taken when its game mounts (and on REPLAY), and the inputs counted after it.
 import type { FelInput } from './InputBus';
+import type { ModePhase } from './ModeHarness';
 import type { BodyProfile } from '@/lib/input/bodyProfiles';
+import type { RideRead } from '@/lib/pose/rideReader';
 
 export type BodyPresence = 'off' | 'calibrating' | 'present' | 'absent';
 export type PauseReason = 'input' | 'body-lost' | 'stall';
 export interface CardLine { move: string; verb: string }          // "Jump" → "POP"
+/**
+ * MOVEMENT PLAY P8 (2026-09-26): a board game's stance for its READY line — taken (side-on: the lead measured, regular =
+ * left foot forward; or the square fallback) or still being held (`hold01`, the ring). Written only for a row that steers
+ * with the carve; nothing about it is stored anywhere (it lives as long as the mount).
+ */
+export interface StanceView { kind: 'side' | 'square' | null; lead: 'L' | 'R' | null; hold01: number }
+/** MOVEMENT PLAY P8: a row that steers with the carve asks for the stance from its mount — the view's stance, not yet taken
+ *  (undefined for every other row). READY's space check holds 'ready' through the turn into it only while it is there. */
+export function stanceOnMount(profile: BodyProfile): StanceView | undefined {
+  return profile.bindings.some((b) => b.from === 'carve') ? { kind: null, lead: null, hold01: 0 } : undefined;
+}
 export interface SessionView {
   modeId: string | null; key: string | null;
   lines: readonly CardLine[]; drives: boolean; later: BodyProfile['later'];
   body: BodyPresence; handsUp01: number;                           // hold-ring progress in READY / PAUSED
   pause: PauseReason | null;
+  /** The game's phase, as the harness last set it (null: no game mounted). */
+  phase: ModePhase | null;
+  /** MOVEMENT PLAY P8: the stance (absent: not a board game that steers with the carve, or no body read yet). */
+  stance?: StanceView;
 }
 export interface RunRecord { runId: number; modeId: string; inputs: number; bodyInputs: number }
+
+/** Where a reader started watching the run record: the run current then (0 = none yet) and how much it had counted. */
+export interface RunMark { runId: number; counted: number }
+
+/** MOVEMENT PLAY P3 step 5 (2026-09-26): mark the record as it stands, so a later read can tell what came after. */
+export function markRun(rec: RunRecord | null): RunMark {
+  return { runId: rec?.runId ?? 0, counted: rec ? rec.inputs + rec.bodyInputs : 0 };
+}
+
+/**
+ * The inputs the game received since `mark` (GameShell's `played`, owner call 4). A run begun after the mark counts in
+ * full: runId only grows, so the run before it — another page's game, the last match — is never read as this one. The
+ * run the mark saw counts only what came after it: a continuous host's in-place REPLAY (Brain Brawl) starts the next
+ * match inside the same harness run — no wake, no new record — so its rematch is the presses counted since REPLAY.
+ */
+export function countedSince(rec: RunRecord | null, mark: RunMark): number {
+  if (!rec || rec.runId < mark.runId) return 0;
+  const total = rec.inputs + rec.bodyInputs;
+  return rec.runId > mark.runId ? total : Math.max(0, total - mark.counted);
+}
+
 /** One harness's hold on the store: every writer is a no-op once `live` is false. */
 export interface SessionWriter {
   /** This mount is still the current one (no later mount, not unmounted). */
@@ -39,6 +84,11 @@ export interface SessionWriter {
   /** Every body packet writes this: only a change is a new snapshot (a steady 30 Hz of the same presence is not). */
   setBody(body: BodyPresence, handsUp01: number): void;
   setPause(r: PauseReason | null): void;
+  /** The harness's setPhase: only a change is a new snapshot. */
+  setPhase(p: ModePhase): void;
+  /** MOVEMENT PLAY P8: every body packet, for a row that steers with the carve (others: nothing written). The ring moves in
+   *  steps of 0.1, so a held stance is a handful of snapshots, not thirty a second. */
+  setStance(profile: BodyProfile, ride: RideRead | null | undefined): void;
   /** At wake(): a new run, a new record (the one before it is replaced only now). */
   beginRun(modeId: string): void;
   /** One counted input (EvidenceCounter's verdict, or a claimed onBody verb) into the current run's record. */
@@ -47,7 +97,7 @@ export interface SessionWriter {
   unmount(): void;
 }
 
-const EMPTY: SessionView = { modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null };
+const EMPTY: SessionView = { modeId: null, key: null, lines: [], drives: false, later: null, body: 'off', handsUp01: 0, pause: null, phase: null };
 
 let view: SessionView = EMPTY;
 let record: RunRecord | null = null;
@@ -69,10 +119,11 @@ export const sessionStore = {
   // ── the harness's writer ──
   /** A mode mounted: its card, and this harness's writer. The body line and the pause start clear (the harness writes
    *  them as they happen). A later mount makes this writer stale. */
-  mount(m: Pick<SessionView, 'modeId' | 'key' | 'lines' | 'drives' | 'later'>): SessionWriter {
+  mount(m: Pick<SessionView, 'modeId' | 'key' | 'lines' | 'drives' | 'later' | 'stance'>): SessionWriter {
     const me = ++mountSeq;
     owner = me;
-    view = { ...EMPTY, modeId: m.modeId, key: m.key, lines: m.lines, drives: m.drives, later: m.later };
+    // (MOVEMENT PLAY P8: a board game's stance, asked for from the mount's own snapshot — stanceOnMount)
+    view = { ...EMPTY, modeId: m.modeId, key: m.key, lines: m.lines, drives: m.drives, later: m.later, ...(m.stance ? { stance: m.stance } : {}) };
     notify();
     const live = (): boolean => owner === me;
     return {
@@ -85,6 +136,20 @@ export const sessionStore = {
       setPause(r) {
         if (!live() || view.pause === r) return;
         view = { ...view, pause: r };
+        notify();
+      },
+      setPhase(p) {
+        if (!live() || view.phase === p) return;
+        view = { ...view, phase: p };
+        notify();
+      },
+      setStance(profile, ride) {
+        if (!live() || !stanceOnMount(profile)) return;
+        const st = ride?.stance ?? null;
+        const next: StanceView = { kind: st?.kind ?? null, lead: st?.lead ?? null, hold01: st ? 1 : Math.floor((ride?.stanceHold01 ?? 0) * 10) / 10 };
+        const was = view.stance;
+        if (was && was.kind === next.kind && was.lead === next.lead && was.hold01 === next.hold01) return;
+        view = { ...view, stance: next };
         notify();
       },
       beginRun(modeId) {

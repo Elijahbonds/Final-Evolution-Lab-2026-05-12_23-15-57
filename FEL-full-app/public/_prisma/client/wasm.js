@@ -180,6 +180,33 @@ exports.Prisma.GameSessionScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.SessionRunScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  mode: 'mode',
+  status: 'status',
+  payoutEligible: 'payoutEligible',
+  ineligibleReason: 'ineligibleReason',
+  startedAt: 'startedAt',
+  expiresAt: 'expiresAt',
+  finishedAt: 'finishedAt',
+  score: 'score',
+  durationMs: 'durationMs',
+  rejectReason: 'rejectReason',
+  sessionId: 'sessionId',
+  result: 'result'
+};
+
+exports.Prisma.SessionGrantScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  runId: 'runId',
+  grantType: 'grantType',
+  amount: 'amount',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.CreditLedgerScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -940,6 +967,9 @@ exports.Prisma.ProgramExerciseScalarFieldEnum = {
   defaultTempo: 'defaultTempo',
   progressionOfId: 'progressionOfId',
   regressionOfId: 'regressionOfId',
+  pattern: 'pattern',
+  braceMode: 'braceMode',
+  skillLayer: 'skillLayer',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -987,6 +1017,13 @@ exports.Prisma.SessionExerciseScalarFieldEnum = {
   tempo: 'tempo',
   restSeconds: 'restSeconds',
   coachNote: 'coachNote',
+  section: 'section',
+  isKeySet: 'isKeySet',
+  supersetGroup: 'supersetGroup',
+  workSeconds: 'workSeconds',
+  holdSeconds: 'holdSeconds',
+  setupCues: 'setupCues',
+  effortBand: 'effortBand',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -1016,6 +1053,19 @@ exports.Prisma.ExerciseLogScalarFieldEnum = {
   completedAt: 'completedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.SetLogScalarFieldEnum = {
+  id: 'id',
+  exerciseLogId: 'exerciseLogId',
+  setIndex: 'setIndex',
+  reps: 'reps',
+  weightKg: 'weightKg',
+  rir: 'rir',
+  effort: 'effort',
+  workSeconds: 'workSeconds',
+  note: 'note',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.ProgramMessageScalarFieldEnum = {
@@ -1306,6 +1356,35 @@ exports.CrmActivityStatus = exports.$Enums.CrmActivityStatus = {
   cancelled: 'cancelled'
 };
 
+exports.MovementPattern = exports.$Enums.MovementPattern = {
+  squat: 'squat',
+  hinge: 'hinge',
+  lunge: 'lunge',
+  push: 'push',
+  pull: 'pull',
+  carry: 'carry',
+  rotation: 'rotation',
+  locomotion: 'locomotion',
+  breath: 'breath',
+  mobility: 'mobility',
+  other: 'other'
+};
+
+exports.BraceMode = exports.$Enums.BraceMode = {
+  set: 'set',
+  reflex: 'reflex',
+  none: 'none'
+};
+
+exports.SessionSection = exports.$Enums.SessionSection = {
+  prep: 'prep',
+  prime: 'prime',
+  key: 'key',
+  assist: 'assist',
+  finish: 'finish',
+  cooldown: 'cooldown'
+};
+
 exports.CertificationStatus = exports.$Enums.CertificationStatus = {
   none: 'none',
   in_progress: 'in_progress',
@@ -1325,6 +1404,8 @@ exports.Prisma.ModelName = {
   User: 'User',
   PlayerProfile: 'PlayerProfile',
   GameSession: 'GameSession',
+  SessionRun: 'SessionRun',
+  SessionGrant: 'SessionGrant',
   CreditLedger: 'CreditLedger',
   CardOwnership: 'CardOwnership',
   StoryNodeProgress: 'StoryNodeProgress',
@@ -1395,6 +1476,7 @@ exports.Prisma.ModelName = {
   SessionExercise: 'SessionExercise',
   ClientSession: 'ClientSession',
   ExerciseLog: 'ExerciseLog',
+  SetLog: 'SetLog',
   ProgramMessage: 'ProgramMessage',
   FacilitatorProfile: 'FacilitatorProfile',
   Credential: 'Credential',

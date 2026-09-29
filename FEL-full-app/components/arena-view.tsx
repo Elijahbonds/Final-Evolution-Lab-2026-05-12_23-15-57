@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DuelCards } from '@/components/arena/duel-cards';
+import { HOUSE_ARENA_RULES } from '@/lib/babylon/music/houseBeat';
 
 // ---------------------------------------------------------------------------
 // Types mirroring the /api/arena/* responses.
@@ -49,7 +50,7 @@ interface OpenDuel {
   creator: string | null;
   createdAt: string;
 }
-interface MyDuel {
+export interface MyDuel {
   id: string;
   mode: string;
   name: string;
@@ -77,6 +78,14 @@ interface MyDuel {
   updatedAt: string;
   /** MUSIC-SUITE P1 (2026-09-25): the duel's mode is paused for NEW stakes. ACTIVE still plays; WAITING can only be cancelled. */
   stakingPaused?: boolean;
+  /** MUSIC-SUITE P6 (2026-09-26, owner decision #30): when an open duel lapses (null on a row from an older server). */
+  expiresAt?: string | null;
+  /** How a reclaim closed it: nobody played (every stake back), or one side played and took the pot by forfeit. */
+  expired?: 'refunded' | 'won_by_forfeit' | 'lost_by_forfeit' | 'won_at_deadline' | 'lost_at_deadline' | null;
+  /** Open, but past its deadline: it cannot be played any more, and the next sweep settles it. */
+  pastExpiry?: boolean;
+  /** MUSIC-SUITE P6 FIX PASS: a music duel's one attempt, when this player has used it (null: not started). */
+  musicAttempt?: 'started' | 'finished' | null;
 }
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -86,6 +95,50 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   VOIDED: { label: 'Refunded', color: '#A855F7' },
   EXPIRED: { label: 'Expired', color: '#888' },
 };
+
+/**
+ * MUSIC-SUITE P6 (2026-09-26, owner decision #30): a duel the reclaim sweep closed says why (lib/arena-reclaim.ts), and an
+ * open one past its deadline says it is being settled rather than offering a PLAY the Arena would refuse (409 EXPIRED).
+ */
+const EXPIRED_META: Record<'refunded' | 'won_by_forfeit' | 'lost_by_forfeit' | 'won_at_deadline' | 'lost_at_deadline' | 'past', { label: string; color: string }> = {
+  refunded: { label: 'Expired — refunded', color: '#A855F7' },
+  won_by_forfeit: { label: 'Won by forfeit', color: '#00FF9D' },
+  lost_by_forfeit: { label: 'Expired — forfeited', color: '#FF3366' },
+  // MUSIC-SUITE P6 FIX PASS: settled at the deadline on the set played (a music attempt counted without its submit)
+  won_at_deadline: { label: 'Won at the deadline', color: '#00FF9D' },
+  lost_at_deadline: { label: 'Lost at the deadline', color: '#FF3366' },
+  past: { label: 'Expired — settling', color: '#888' },
+};
+/** MUSIC-SUITE P6 FIX PASS: a music duel whose one attempt is used but not posted — PLAY posts it (the room submits it). */
+const ATTEMPT_USED_META = { label: 'Attempt used — PLAY posts it', color: '#FFD700' };
+
+/** "2d 4h left" / "5h left" / "40m left" for an open duel's deadline; null once it has passed (or on an older row). */
+export function timeLeft(expiresAt: string | null | undefined, now = Date.now()): string | null {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - now;
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const m = Math.floor(ms / 60_000);
+  if (m < 60) return `${Math.max(1, m)}m left`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h left` : `${Math.floor(h / 24)}d ${h % 24}h left`;
+}
+
+/** A MY DUELS row's badge, whether it offers PLAY, and its deadline hint (MUSIC-SUITE P6; pure, tested in node). */
+export function duelRowView(
+  d: Pick<MyDuel, 'status' | 'mySubmitted' | 'expiresAt' | 'expired' | 'pastExpiry' | 'musicAttempt'>,
+  now = Date.now(),
+): { meta: { label: string; color: string }; playable: boolean; left: string | null } {
+  const meta = d.expired ? EXPIRED_META[d.expired]
+    : d.pastExpiry ? EXPIRED_META.past
+      : d.status === 'ACTIVE' && !d.mySubmitted && d.musicAttempt ? ATTEMPT_USED_META
+        : STATUS_META[d.status] ?? { label: d.status, color: '#888' };
+  const open = d.status === 'ACTIVE' || d.status === 'WAITING';
+  return {
+    meta,
+    playable: d.status === 'ACTIVE' && !d.mySubmitted && !d.pastExpiry,
+    left: open && !d.pastExpiry ? timeLeft(d.expiresAt, now) : null,
+  };
+}
 
 function potPreview(feeLc: number, rakePercent: number) {
   const pot = feeLc * 2;
@@ -133,10 +186,16 @@ export function ArenaView() {
       const j = await r.json();
       setOpen(j.open ?? []);
       setMine(j.mine ?? []);
+      // MUSIC-SUITE P6: this read reclaimed expired duels (Lab Credits came back or a forfeit paid) — the wallet chip and
+      // the balance the stake picker checks are stale now.
+      if (Number(j.reclaimed) > 0) {
+        window.dispatchEvent(new Event(WALLET_REFRESH_EVENT));
+        void loadConfig();
+      }
     } catch {
       /* best effort */
     }
-  }, []);
+  }, [loadConfig]);
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
@@ -348,6 +407,13 @@ export function ArenaView() {
               fair. Free play is open, and a duel you already have still plays and settles.
             </p>
           )}
+          {/* MUSIC-SUITE P6 (2026-09-26, owner decisions #12 and #29): music is staked again, on the match's house beat
+              with one attempt — said here before anything is staked, and by the room again before its count-in. */}
+          {pickMode === 'music' && (
+            <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#00E5FF]/70">
+              Groove Academy duels: {HOUSE_ARENA_RULES}
+            </p>
+          )}
         </div>
 
         <div className="mt-5">
@@ -486,8 +552,7 @@ export function ArenaView() {
         ) : (
           <div className="mt-3 space-y-3">
             {mine.map((d) => {
-              const meta = STATUS_META[d.status] ?? { label: d.status, color: '#888' };
-              const playable = d.status === 'ACTIVE' && !d.mySubmitted;
+              const { meta, playable, left } = duelRowView(d);
               const settled = d.status === 'SETTLED';
               const pv = potPreview(d.feeLc, d.rakePercent);
               return (
@@ -526,7 +591,44 @@ export function ArenaView() {
                           </>
                         )}
                         {d.status === 'VOIDED' && <span className="text-[#A855F7]"> &middot; refunded</span>}
+                        {left && <span className="text-white/35"> &middot; {left}</span>}
                       </div>
+                      {/* MUSIC-SUITE P6 (owner decision #30): what an expiry did, in words */}
+                      {d.expired === 'refunded' && (
+                        <div className="mt-1 font-mono text-[11px] text-[#A855F7]/80">
+                          Nobody played before the deadline — your {d.feeLc} LC stake came back in full.
+                        </div>
+                      )}
+                      {d.expired === 'won_by_forfeit' && (
+                        <div className="mt-1 font-mono text-[11px] text-[#00FF9D]/80">
+                          {d.opponent ?? 'Your opponent'} didn&rsquo;t play before the deadline — you took the pot by forfeit.
+                        </div>
+                      )}
+                      {d.expired === 'lost_by_forfeit' && (
+                        <div className="mt-1 font-mono text-[11px] text-[#FF3366]/80">
+                          {/* MUSIC-SUITE P6 FIX PASS: a Quick Match nobody played goes to the house (arena-reclaim GHOST_UNPLAYED) */}
+                          {d.ghost
+                            ? <>You didn&rsquo;t play before the deadline — the {d.feeLc} LC stake went to the house.</>
+                            : <>You didn&rsquo;t play before the deadline — {d.opponent ?? 'your opponent'} played and took the pot by forfeit.</>}
+                        </div>
+                      )}
+                      {(d.expired === 'won_at_deadline' || d.expired === 'lost_at_deadline') && (
+                        <div className={`mt-1 font-mono text-[11px] ${d.expired === 'won_at_deadline' ? 'text-[#00FF9D]/80' : 'text-[#FF3366]/80'}`}>
+                          Settled at the deadline on the set you played (it was never posted) — you {d.expired === 'won_at_deadline' ? 'won' : 'lost'}.
+                        </div>
+                      )}
+                      {d.status === 'ACTIVE' && !d.mySubmitted && d.musicAttempt && !d.pastExpiry && (
+                        <div className="mt-1 font-mono text-[11px] text-[#FFD700]/80">
+                          {d.musicAttempt === 'finished'
+                            ? 'Your set is played but its score never reached the Arena — PLAY posts it.'
+                            : 'Your one attempt was started and left — it scores 0. PLAY posts it now; otherwise it counts at the deadline.'}
+                        </div>
+                      )}
+                      {d.pastExpiry && !d.expired && (
+                        <div className="mt-1 font-mono text-[11px] text-white/45">
+                          This duel passed its deadline and can&rsquo;t be played. Unplayed stakes are refunded; a side that played wins by forfeit.
+                        </div>
+                      )}
                       {(d.myScore !== null || d.oppScore !== null || d.oppSubmitted) && (
                         <div className="mt-1 font-mono text-[11px] text-white/55">
                           You{' '}
@@ -568,12 +670,14 @@ export function ArenaView() {
                           PLAY
                         </Link>
                       )}
-                      {d.status === 'ACTIVE' && d.mySubmitted && (
+                      {d.status === 'ACTIVE' && d.mySubmitted && !d.pastExpiry && (
                         <span className="inline-flex items-center gap-1 font-mono text-[11px] text-white/40">
                           <Clock className="h-3 w-3" />
                           awaiting opponent
                         </span>
                       )}
+                      {/* MUSIC-SUITE P6: kept on a WAITING duel past its deadline — cancel refunds it exactly as the sweep would
+                          (the same ledger key, so the two can never both pay). */}
                       {d.status === 'WAITING' && d.role === 'p1' && (
                         <button
                           onClick={() => cancelDuel(d)}

@@ -16,6 +16,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@/public/_prisma/client';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { postLc } from '@/lib/ledger';
 import {
@@ -50,8 +51,11 @@ export interface AddSeasonXpResult {
 }
 
 /** The active season, if any (server-owned; one active at a time). */
-export async function getActiveSeason() {
-  return prisma.season.findFirst({ where: { active: true }, orderBy: { startsAt: 'desc' } });
+/** The client the season writes go through: the app's, or (ECONOMY-SESSIONS-HARDEN) a session run's transaction. */
+type SeasonDb = typeof prisma | Prisma.TransactionClient;
+
+export async function getActiveSeason(db: SeasonDb = prisma) {
+  return db.season.findFirst({ where: { active: true }, orderBy: { startsAt: 'desc' } });
 }
 
 function toPublic(s: NonNullable<Awaited<ReturnType<typeof getActiveSeason>>>): SeasonPublic {
@@ -66,12 +70,12 @@ function toPublic(s: NonNullable<Awaited<ReturnType<typeof getActiveSeason>>>): 
   };
 }
 
-async function getOrCreateProgress(userId: string, seasonId: string) {
-  const existing = await prisma.passProgress.findUnique({
+async function getOrCreateProgress(userId: string, seasonId: string, db: SeasonDb = prisma) {
+  const existing = await db.passProgress.findUnique({
     where: { userId_seasonId: { userId, seasonId } },
   });
   if (existing) return existing;
-  return prisma.passProgress.create({ data: { userId, seasonId, xp: 0, tier: 0, hasPro: false } });
+  return db.passProgress.create({ data: { userId, seasonId, xp: 0, tier: 0, hasPro: false } });
 }
 
 function stateFrom(progress: { xp: number; tier: number; claimedFree: any; claimedPro: any }): Partial<PassState> {
@@ -85,10 +89,10 @@ function stateFrom(progress: { xp: number; tier: number; claimedFree: any; claim
  * first-of-day bonus to reward variety without grinding one mode. Called AFTER
  * the GameSession row is written, so a count of exactly 1 means it was first.
  */
-async function isFirstOfDayMode(userId: string, mode: string): Promise<boolean> {
+async function isFirstOfDayMode(userId: string, mode: string, db: SeasonDb = prisma): Promise<boolean> {
   const start = new Date();
   start.setUTCHours(0, 0, 0, 0);
-  const count = await prisma.gameSession.count({
+  const count = await db.gameSession.count({
     where: { userId, mode, createdAt: { gte: start } },
   });
   return count <= 1;
@@ -238,12 +242,19 @@ export interface AddSeasonXpInput {
  * lane reward is booked once via a unique dedupeKey. Best-effort at the call
  * site — never let this break the core session write.
  */
-export async function addSeasonXp(input: AddSeasonXpInput): Promise<AddSeasonXpResult | null> {
-  const season = await getActiveSeason();
+export async function addSeasonXp(
+  input: AddSeasonXpInput,
+  // ECONOMY-SESSIONS-HARDEN (2026-09-28): a session run writes its season XP inside the run's transaction (`db`), filed
+  // in the run's grant ledger, so a retried run cannot add it twice. Its tier rewards are booked after the commit
+  // (`deferTierRewards`, then bookSeasonTierUps): they are idempotent on their own keys and open their own transaction.
+  opts: { db?: SeasonDb; deferTierRewards?: boolean } = {},
+): Promise<AddSeasonXpResult | null> {
+  const db = opts.db ?? prisma;
+  const season = await getActiveSeason(db);
   if (!season) return null;
 
-  const progress = await getOrCreateProgress(input.userId, season.id);
-  const firstOfDayMode = await isFirstOfDayMode(input.userId, input.mode);
+  const progress = await getOrCreateProgress(input.userId, season.id, db);
+  const firstOfDayMode = await isFirstOfDayMode(input.userId, input.mode, db);
 
   const core = new SeasonPassCore({
     tiers: season.tiers,
@@ -259,28 +270,12 @@ export async function addSeasonXp(input: AddSeasonXpInput): Promise<AddSeasonXpR
   });
   const res = core.addXp(gained);
 
-  await prisma.passProgress.update({
+  await db.passProgress.update({
     where: { userId_seasonId: { userId: input.userId, seasonId: season.id } },
     data: { xp: core.state.xp, tier: core.state.tier, updatedAt: new Date() },
   });
 
-  // Book tier-up rewards idempotently (server owns all grants).
-  for (const ev of res.events) {
-    await bookTierRewards({
-      userId: input.userId,
-      seasonId: season.id,
-      seasonKey: season.key,
-      tier: ev.tier,
-      rewards: ev.rewards,
-    });
-    await recordServerEvent({
-      name: 'season_tier_up',
-      userId: input.userId,
-      props: { seasonKey: season.key, tier: ev.tier, mode: input.mode },
-    });
-  }
-
-  return {
+  const out: AddSeasonXpResult = {
     season: toPublic(season),
     gained,
     tier: res.tier,
@@ -289,6 +284,27 @@ export async function addSeasonXp(input: AddSeasonXpInput): Promise<AddSeasonXpR
     hasPro: progress.hasPro,
     events: res.events,
   };
+  if (!opts.deferTierRewards) await bookSeasonTierUps(input.userId, input.mode, out);
+  return out;
+}
+
+/** Book every tier-up an addSeasonXp result carries (idempotent per tier and lane: PassGrant.dedupeKey). */
+export async function bookSeasonTierUps(userId: string, mode: string, r: AddSeasonXpResult): Promise<void> {
+  // Book tier-up rewards idempotently (server owns all grants).
+  for (const ev of r.events) {
+    await bookTierRewards({
+      userId,
+      seasonId: r.season.id,
+      seasonKey: r.season.key,
+      tier: ev.tier,
+      rewards: ev.rewards,
+    });
+    await recordServerEvent({
+      name: 'season_tier_up',
+      userId,
+      props: { seasonKey: r.season.key, tier: ev.tier, mode },
+    });
+  }
 }
 
 /** Read the athlete's current pass state for the active season (HUB + API). */

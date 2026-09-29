@@ -6,7 +6,7 @@
  * (the /multiplayer online challenge and its pass-and-play twin). Each comes back when its own fairness phase lands.
  * Free play is not touched: /play/music and /play/dance without ?arena= never read this file.
  *
- * WHY (the map's findings, understand-wf_3a55346f-032.json):
+ * WHY (the map's findings, understand-wf_3a55346f-032.json; music came back in phase 6, see the list below):
  *   · dance — the song you pick decides a staked duel, not the dancing. A flawless BATTLE run tops out at 4,355 against a
  *     first-duel rival of 5,000 ±18 % (lib/arena-rivals.ts:180), while a player's own 64-bar export can reach the 79,680
  *     ceiling (lib/arena-score-integrity.ts danceCeiling). No dance file reads ?arena=.
@@ -33,8 +33,11 @@
  */
 import { canonicalModeKey, MODE_INFO } from './game-data';
 
+// MUSIC-SUITE P6 (2026-09-26): 'music' is out — its fairness phase landed. An Arena music set is the duel's house beat
+// (lib/babylon/music/houseBeat.ts: seeded by the match, tempo and swing locked), one attempt with a count-in recorded by
+// /api/arena/music-attempt, a score the server rejudges from the recorded taps (lib/arena-music.ts, submit-score), the
+// house-beat ceiling (lib/arena-score-integrity.ts) and a rival banded only on rejudged sets (lib/arena-rivals.ts).
 export const STAKING_PAUSED: ReadonlySet<string> = new Set<string>([
-  'music', // owner #9, 2026-09-25 — returns with MUSIC-SUITE phase 6 (house beat seeded by the match, locked tempo, one attempt, new ceiling)
   'dance', // owner #9, 2026-09-25 — returns with MUSIC-SUITE phase 9 (same house song for both, accuracy score, own songs free play only)
 ]);
 

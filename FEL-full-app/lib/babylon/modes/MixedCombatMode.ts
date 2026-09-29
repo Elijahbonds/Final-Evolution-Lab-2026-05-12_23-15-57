@@ -44,7 +44,7 @@ import { lockOnYaw, slewYaw, strafeAxis, wrapYaw } from '../core/Biomech';
 import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC,
-  STEP_CHI_GAIN, type AttackDef,
+  STEP_CHI_GAIN, STEP_EVADE_M, PARRY_WINDOW_MS, type AttackDef,
 } from '../core/FightCore';
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
 import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
@@ -65,6 +65,16 @@ import { readWeapon } from '../combat/arsenal';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleAttacks } from '../combat/loadout';
 import { MIN_STARTUP_SEC } from '../core/StrikeSystem';
+// MOVEMENT PLAY P7 (2026-09-25): the body's own strikes, guard, slips and steps (lib/babylon/combat/bodyFight)
+import { MOVES, type HordeMove } from '../core/HordeDynamics';
+import {
+  BodyFightDriver, DefenseLedger, DeferredHits, BodyDriveTracker, PadBlock, bodyDefenseAt, hitDelayMs, contactMsOf, bodyCancelAt, bodyLunge, stepSpace,
+  BODY_PARRY_WINDOW_MS, FIGHT_CLAIMS, FIGHT_CARD_LINES, type BodyFightIntent,
+} from '../combat/bodyFight';
+import { BODY_FIGHT } from '../combat/bodyFightFlags';
+import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import type { BodyView } from '../core/ModeHarness';
 import { boneNode } from '../anim/boneLookup';
 
 type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
@@ -94,6 +104,8 @@ const WEIGHT_OF: Record<'jab' | 'kick' | 'heavy', StrikeWeight> = { jab: 'light'
 const LOADOUT_LABEL: Record<Loadout, string> = { fists: 'FISTS — fast & close', staff: 'STAFF — long & heavy' };
 
 const BUDGET_SEC: Record<Phase, number> = { loadout: 12, fighting: 120, roundOver: 5, matchOver: 999 };
+/** MOVEMENT PLAY P7: a body strike handed to swing(): its move, its onset on the page clock, what the body threw. */
+interface BodyStrikeArg { move: HordeMove; onsetPage: number; body: string }
 
 export const MixedCombatMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
@@ -251,7 +263,17 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
   const book = new StringBook(); const xBtn = new XButtonReader();
   let ring: PlayerRingHandle | null = null; const stringLabels: string[] = [];   // PLAYER RING + the combo callout (the string's links, named on the finisher)
-  let queuedKey: { key: 'jab' | 'kick' | 'heavy'; at: number } | null = null;   // STORM: the press waiting for the cancel point
+  let queuedKey: { key: 'jab' | 'kick' | 'heavy'; at: number; body?: BodyStrikeArg } | null = null;   // STORM: the press waiting for the cancel point (P7: or a body strike)
+  // MOVEMENT PLAY P7: the body's fight read (see KarateVSMode: the same seam)
+  // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
+  // check over a pause), so a value read in load() would miss the player's tick for this match
+  const bodyDriver = new BodyFightDriver({ kicksOptIn: () => readBodyKicks('mixedcombat') });
+  const ledger = new DefenseLedger(), deferred = new DeferredHits(), drive = new BodyDriveTracker();
+  const padBlock = new PadBlock();   // P7 (the review, 2026-09-26): the pad's X apart from the body's guard — a deferred hit meets both
+  let bodyGuard = false;   // P7: the block is the body's (its guard up), to let go when the reader loses the guard
+  let bodyShift: { v: Vector3; left: number } | null = null;
+  const TOKEN_KEY: Record<StrikeBtn, 'jab' | 'kick' | 'heavy'> = { A: 'jab', B: 'kick', Y: 'heavy' };
+  const bodyDriven = (): boolean => drive.driven(!!ctx0?.body?.()?.read.tracking);
   let lastDashSec = -1e9, meDash: { dir: Vector3; left: number; homing: boolean } | null = null, meDashIframeSec = 0, meDashUntil = 0, foeLaunchedSec = 0;
   const BTN_OF: Record<'jab' | 'kick' | 'heavy', StrikeBtn> = { jab: 'A', kick: 'B', heavy: 'Y' };
   const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = ctx0.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx0.camDirector.rightFlat().scale(stickX)).normalize(); const to = rival.root.position.subtract(player.root.position); to.y = 0; to.normalize(); const d = w.x * to.x + w.z * to.z; return d > 0.5 ? 'f' : d < -0.5 ? 'b' : 'n'; };
@@ -423,7 +445,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   /** One swing, either direction. */
-  function swing(ctx: ModeContext, mine: boolean, key: 'jab' | 'kick' | 'heavy'): void {
+  function swing(ctx: ModeContext, mine: boolean, key: 'jab' | 'kick' | 'heavy', body?: BodyStrikeArg): void {
     const atkState = mine ? meState : foeState;
     const defState = mine ? foeState : meState;
     const atkChar = mine ? player : rival;
@@ -434,15 +456,16 @@ export const MixedCombatMode: ModeDefinition = (() => {
     if (mine && striking) {
       const st = animOf(true).strike;
       if (st && st.cancelFrom !== undefined && now() >= st.cancelFrom) endStrike(true);
-      else { queuedKey = { key, at: now() }; return; }
+      else { queuedKey = { key, at: now(), body }; return; }
     }
 
     const set = mine ? myAttacks() : foeAttacks();
     // the finisher is EARNED as well as charged — full chi is the cost, force is the licence
-    const special = key === 'heavy' && atkState.chi >= CHI_MAX && hasFightMove('dragon', mine ? myRatings : foeRatings);
+    const special = !body && key === 'heavy' && atkState.chi >= CHI_MAX && hasFightMove('dragon', mine ? myRatings : foeRatings);
     const baseAtk = set[key];
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
-    const move = mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
+    const move = mine && body ? book.pressMove(body.move, BTN_OF[key], body.onsetPage / 1000)   // P7: the body's own move, timed onset to onset
+      : mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
     const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
     if (mine) striking = true; else foeStriking = true;
     // Commit to the line at swing start — the impact check measures the
@@ -456,16 +479,22 @@ export const MixedCombatMode: ModeDefinition = (() => {
       setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.05 });
-    if (move) console.info(`[MC-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}`);
+    if (move) console.info(`[MC-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}${body ? ` body ${body.body} age ${Math.round(now() - body.onsetPage)}` : ''}`);
+    if (move && body && book.history.length === 1) stringLabels.length = 0;   // P7: a body strike that starts a string starts its call (a lapsed string's links are not this one's)
     if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) { ctx.setHud({ banner: `COMBO: ${call}` }); setTimeout(() => ctx.setHud({ banner: '' }), 900); } } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
-    animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
+    // P7: a body strike's hit beat is its contact frame, never under the wind-up floor; its cancel point runs from its onset
+    const hitDelay = body && move ? hitDelayMs(atk.startupMs, contactMsOf(move), now() - body.onsetPage) : atk.startupMs;
+    if (body && move) { const d = Vector3.Distance(player.root.position, rival.root.position), lunge = bodyLunge(d, atk.range); if (lunge > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(lunge / 0.15), left: 0.15 }; } }
+    animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? (body ? bodyCancelAt(now() + hitDelay, body.onsetPage, move) : now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000) : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     // the dodge window is read against when THIS strike would connect -- see DodgeRead
     // MATRIX FOCUS: the rival's swing lands on the ROOM clock (inside Focus it takes 1/worldScale longer in real time, and the
     // dodge read is told so); mine stays on the wall clock
     if (!mine) foeImpactAt = now() + atk.startupMs / focus.worldScale;
-    const onHitBeat = () => {
+    const onHitBeat = (impactAt?: number) => {
       if (phase !== 'fighting' || falling) { endStrike(mine); return; }
+      // P7: the rival's fist on a BODY player waits for the body's frames to cover the impact (DefenseLedger)
+      if (!mine && impactAt === undefined && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => onHitBeat(at)); return; }
       const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
       // The Soul Calibur read: WHERE the defender stands relative to the
       // COMMITTED attack line, not just how far. Facing is atan2(dx, dz), so
@@ -473,7 +502,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // what a sidestep changes.
       const toDef = defChar.root.position.subtract(atkChar.root.position);
       const lateral = Math.abs(toDef.x * -Math.cos(committedYaw) + toDef.z * Math.sin(committedYaw));
-      let outcome = resolveStrike(atk, dist, defState, now(), lateral);
+      let outcome = impactAt !== undefined ? bodyOutcome(atk, dist, impactAt, lateral) : resolveStrike(atk, dist, defState, now(), lateral);
       if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';
       if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
         // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
@@ -581,7 +610,77 @@ export const MixedCombatMode: ModeDefinition = (() => {
         }
       }
     };
-    if (mine) setTimeout(onHitBeat, atk.startupMs); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
+    if (mine) setTimeout(onHitBeat, hitDelay); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
+  }
+
+  /** P7: the rival's hit on a BODY player, resolved at its impact against the body's state then (see KarateVSMode). A slip's
+   *  lateral travel also makes a vertical read 'stepped' (the line grammar). */
+  function bodyOutcome(atk: AttackDef, dist: number, impactAt: number, lateral: number): ReturnType<typeof resolveStrike> {
+    const bd = bodyDefenseAt(ledger, impactAt);
+    if (bd.d === 'evaded' && dist <= atk.range && meState.controllable) {
+      const r = dodgeReward(Math.max(0, (impactAt - bd.evadeOnset!) / 1000));
+      if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx0.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx0.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx0.setHud({ banner: '' }), 600); }
+      console.info('[MC-DEF] body slip — whiff');
+      return atk.line === 'vertical' && lateral > STEP_EVADE_M ? 'stepped' : 'whiff';
+    }
+    // (the pad's block counts too, as it stood AT the impact — see KarateVSMode)
+    const held = meState.blockHeld, press = meState.lastBlockPressMs, padPress = padBlock.pressWithin(impactAt, PARRY_WINDOW_MS);
+    meState.blockHeld = bd.d === 'blocked' || padBlock.heldAt(impactAt);
+    meState.lastBlockPressMs = bd.d === 'parried' || bd.d === 'guardImpact' ? impactAt : padPress ?? -1e9;
+    const out = resolveStrike(atk, dist, meState, impactAt, lateral, BODY_PARRY_WINDOW_MS);
+    meState.blockHeld = out === 'guardBreak' ? false : held;
+    meState.lastBlockPressMs = press;
+    console.info(`[MC-DEF] body ${bd.d} → ${out} (${Math.round(now() - impactAt)} ms late)`);
+    return out;
+  }
+
+  /** P7: the ledger follows the body's own guard, per packet and per frame (see KarateVSMode). */
+  function bodyLedgerFrame(view: BodyView, t: number): void {
+    const g = ledger.frame(view, t, deferred.oldest);
+    if (g === 'down' && bodyGuard) { bodyGuard = false; if (!padBlock.held) meState.releaseBlock(); }
+    else if (ledger.guardUp && !bodyGuard && phase === 'fighting' && !falling && meState.controllable) { drive.body(t); bodyGuard = true; meState.blockHeld = true; }
+  }
+
+  /** P7: one fight-read event from the body — taken only in the fight (the loadout never starts a round from the body: its
+   *  A / B / Y are the pad's), silently refused otherwise. */
+
+  function onBodyEvent(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
+    const t = now();
+    bodyLedgerFrame(view, t);
+    if (phase !== 'fighting' || falling) return false;
+    if (ev.kind !== 'blow' && ev.kind !== 'legKick' && ev.kind !== 'guard' && ev.kind !== 'evade' && ev.kind !== 'fightStep') return false;
+    const it: BodyFightIntent | null = bodyDriver.intent(ev, view, t);
+    if (!it) return false;
+    if (it.kind === 'guard') ledger.guard(it);
+    if (!meState.controllable) return false;
+    drive.body(t);
+    switch (it.kind) {
+      case 'guard':
+        if (it.up) { meState.blockHeld = true; if (it.raise) meState.lastBlockPressMs = it.onsetPage; } else if (!padBlock.held) meState.releaseBlock();
+        bodyGuard = it.up;
+        console.info(`[MC-BODY] guard ${it.up ? (it.raise ? 'raise' : 'up') : 'down'}`);
+        return true;
+      case 'strike':
+        swing(ctx, true, TOKEN_KEY[it.token], { move: MOVES[it.move], onsetPage: it.onsetPage, body: it.body });
+        return true;
+      case 'evade': {
+        const r = ctx.camDirector.rightFlat();
+        const d = it.side === null ? Vector3.Zero() : r.scale(it.side === 'L' ? -1 : 1);
+        if (!meEvade.slip(d.x, d.z)) return false;   // (the i-frames only with the slip itself: see KarateVSMode)
+        ledger.evade(it);
+        console.info(`[MC-BODY] ${it.form}${it.side ?? ''}`);
+        return true;
+      }
+      case 'step': {
+        const sp = stepSpace(it.dir);
+        const to = rival.root.position.subtract(player.root.position); to.y = 0;
+        const along = to.lengthSquared() > 1e-4 ? to.normalize() : ctx.camDirector.forwardFlat();
+        const v = along.scale(sp.along).addInPlace(ctx.camDirector.rightFlat().scale(-sp.across));
+        bodyShift = { v: v.scale(1 / 0.25), left: 0.25 };
+        console.info(`[MC-BODY] step ${it.dir}`);
+        return true;
+      }
+    }
   }
 
   function endRound(ctx: ModeContext, playerWon: boolean, wasRingOut = false): void {
@@ -643,7 +742,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
-    meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
+    meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
+    deferred.clear(); ledger.reset(); bodyShift = null;   // P7
     applyLoadouts(ctx);
     player.root.rotation.y = Math.atan2(rival.root.position.x - player.root.position.x, rival.root.position.z - player.root.position.z);
     rival.root.rotation.y = wrapYaw(player.root.rotation.y + Math.PI);   // a ROUND START is a cut, not a turn
@@ -659,6 +759,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
   return {
     modeId: 'mixedcombat', mood: 'goldenHour', camPreset: 'fight',
+    // MOVEMENT PLAY P7: the body's own strikes, guard, slips and steps — this settles P3 decision 5 (bodyFightFlags)
+    ...(BODY_FIGHT.mixedcombat ? { body: { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES }, onBody: onBodyEvent } : {}),
 
     async load(ctx: ModeContext) {
       arena = readCombatArena('mixedcombat');
@@ -727,6 +829,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
+      // P7: who is driving — a real press or push is the pad's
+      if (e.src !== 'body' && ((e.t === 'button' && e.pressed) || (e.t === 'stick' && Math.hypot(e.x, e.y) > 0.35))) drive.pad(now());
       if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // MATRIX FOCUS
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
 
@@ -763,6 +867,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         if (e.btn === 'X') {
           xBtn.press(now() / 1000);   // STORM: the tap clock
           meState.pressBlock(now());   // the tree shows the block (blockHeld → block_hold)
+          padBlock.press(now());   // P7
           // SCORECARD CONTROLS (2026-09-15): the guard going up moved a pose and nothing else — 4 of 10 X presses had no
           // answer a player could see or hear. It is heard, the way the duel's guard is.
           SoundKit.play('uiTick', { pitch: 1.35, volume: 0.22 });
@@ -801,11 +906,12 @@ export const MixedCombatMode: ModeDefinition = (() => {
           if (meEvade.jump()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });
         }
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') { meState.releaseBlock(); const g = xBtn.release(now() / 1000); if (g === 'tap' || g === 'double') tryDash(ctx, g === 'double'); }   // STORM
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { padBlock.release(now()); if (!bodyGuard) meState.releaseBlock(); const g = xBtn.release(now() / 1000); if (g === 'tap' || g === 'double') tryDash(ctx, g === 'double'); }   // STORM (P7: a body guard still up keeps the block)
     },
 
     update(ctx: ModeContext, dt: number) {
       ctx0 = ctx;
+      { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       phaseSec += dt;
       gallery?.update(dt);
       if (phaseSec > BUDGET_SEC[phase]) {
@@ -870,6 +976,16 @@ export const MixedCombatMode: ModeDefinition = (() => {
         player.root.position.addInPlace(vel.scale(sdtHero)); arenaClamp(player.root.position, arena);
         if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
       }
+      // P7 AUTO-SPACING: a body player has no stick — a strike out of range closes a little, a step in / out / across moves
+      // the fighter; a stick past its dead zone always wins (and the ring edge still rings him out)
+      if (bodyShift) {
+        if (Math.hypot(stickX, stickY) > 0.35 || !meState.controllable) bodyShift = null;
+        else {
+          const step = Math.min(sdtHero, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); arenaClamp(player.root.position, arena);
+          bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null;
+          if (offRing(player.root.position)) { bodyShift = null; ringOut(ctx, true); animate(0, 0); return; }
+        }
+      }
       if (!tickMatrix(ctx, sdtHero)) player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity — unless the wall run / kick owns the body (MATRIX)
       arenaHandle?.tick(dt); if (arena.hazards.length) tickHazards(ctx, sdtRoom);
 
@@ -878,7 +994,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       if (queuedKey) {   // STORM: the queued link fires at the cancel point (or the settle), and goes stale after 0.4 s
         const st = animOf(true).strike;
         if (now() - queuedKey.at > 400) queuedKey = null;
-        else if (!striking || (st && st.cancelFrom !== undefined && now() >= st.cancelFrom)) { const k = queuedKey.key; queuedKey = null; swing(ctx, true, k); }
+        else if (!striking || (st && st.cancelFrom !== undefined && now() >= st.cancelFrom)) { const k = queuedKey.key, b = queuedKey.body; queuedKey = null; swing(ctx, true, k, b); }
       }
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - sdtRoom); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }
       // rival AI (its brain uses its own loadout's ranges); it never

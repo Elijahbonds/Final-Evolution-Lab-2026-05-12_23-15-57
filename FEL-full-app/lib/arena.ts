@@ -45,7 +45,14 @@ export const ARENA_FEE_TIERS: readonly number[] = [25, 50, 100, 250, 500]; // TU
 export const ARENA_MIN_FEE_LC = 25;   // TUNE(elijah)
 export const ARENA_MAX_FEE_LC = 500;  // TUNE(elijah)
 
-/** Hours an open/active Arena duel stays live before it can be reclaimed/voided. */
+/**
+ * Hours an open/active Arena duel stays live before it can be reclaimed/voided. MUSIC-SUITE P6 (2026-09-26, owner
+ * decision #30): read at last — lib/arena-reclaim.ts refunds or settles by forfeit a duel past its expiresAt, and
+ * submit-score / join / music-attempt refuse one (409 EXPIRED). It was written by create and quick-match and never read.
+ * MUSIC-SUITE P6 FIX PASS: the deadline is set at CREATE (the open post's window) and set AGAIN at JOIN (now + these
+ * hours: the play window both players get — a join near the old deadline left the creator minutes to play, then paid
+ * the joiner by forfeit). A Quick Match is joined at birth, so its one deadline is both.
+ */
 export const ARENA_EXPIRY_HOURS = 48; // TUNE(elijah)
 
 /**

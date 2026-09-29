@@ -180,7 +180,9 @@ async function open(p: Page, key: string): Promise<void> {
       if (m && m[1] !== last) { last = m[1]; tap.phases.push({ at: performance.now(), phase: last }); }
     }, 20);
     w.__FEL_POSE_FEED__.begin();
-    await w.__FEL_BODY__.start();   // the Body button
+    // the Body button — P3's self-calibrating reader (movement play P4 gates the player's source on the space check,
+    // which this probe does not run: scripts/probes/_space-check-live.mts does), so these numbers stay comparable
+    await w.__FEL_BODY__.start({ autoCalibrate: true });
   });
 }
 
@@ -201,7 +203,7 @@ async function newBody(p: Page): Promise<void> {
     const w = window as any;
     w.__FEL_BODY__.stop();
     w.__FEL_POSE_FEED__.begin();   // stop() ended the feed too: without this, start() would open the camera
-    await w.__FEL_BODY__.start();
+    await w.__FEL_BODY__.start({ autoCalibrate: true });
   });
 }
 

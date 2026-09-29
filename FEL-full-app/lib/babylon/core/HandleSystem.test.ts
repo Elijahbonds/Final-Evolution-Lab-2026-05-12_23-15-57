@@ -695,3 +695,43 @@ describe('the momentum spam (2K17)', () => {
     expect(MOMENTUM_REPEATABLE.has('momentum_cross')).toBe(true); expect(STICK_ONLY.has('steezo_roll')).toBe(true);
   });
 });
+
+// ── HOOPS MOTION phase 3d (review): the body of a left-stick flick ───────────────────────────────────────────────
+import { flickClip } from './HandleSystem';
+describe('flickClip — every move a left-stick flick can become has a body', () => {
+  /** Every read the crossover block can hand moveFromContext (a grid over each field), at the handles the probe and the owner use. */
+  const grid = (): MoveRead[] => {
+    const out: MoveRead[] = [];
+    for (const speed01 of [0, 0.2, 0.32, 0.4, 0.5, 0.6, 0.75, 0.9])
+      for (const retreating of [false, true]) for (const pressured of [false, true]) for (const inHisChest of [false, true])
+        for (const chainLength of [0, 1, 2, 3]) for (const last of [null, ...(Object.keys(MOVE_HANDLE) as HandleMove[])])
+          out.push({ speed01, retreating, pressured, last, chainLength, inHisChest });
+    return out;
+  };
+  it('exactly one clip per flick, at every handle: the move\'s own, or the crossover for a move the mode renders another way', () => {
+    for (const handle of [0, BASELINE_HANDLE, 50, 88, 92, 100]) {
+      for (const read of grid()) {
+        const move = moveFromContext(read, handle);
+        for (const dir of ['left', 'right'] as const) {
+          const own = moveClip(move, dir), c = flickClip(move, dir);
+          expect(c, `${move} @ handle ${handle}`).toMatch(/^bball_/);
+          expect(c).toBe(own ?? `bball_crossover_${dir}`);
+        }
+      }
+    }
+  });
+  it('the case the review found: off the head (handle >= 92, chest to chest, deep in a chain) has no clip of its own — the flick plays the crossover', () => {
+    const read: MoveRead = { speed01: 0.2, retreating: false, pressured: true, last: 'crossover', chainLength: 2, inHisChest: true };
+    for (const handle of [92, 100]) {
+      expect(moveFromContext(read, handle)).toBe('off_the_head');
+      expect(moveClip('off_the_head', 'left')).toBeNull();
+      expect(flickClip('off_the_head', 'left')).toBe('bball_crossover_left');
+      expect(flickClip('off_the_head', 'right')).toBe('bball_crossover_right');
+    }
+    expect(moveFromContext(read, 91)).not.toBe('off_the_head');   // under its price the same read picks a move with a clip
+    // off the head is the only clip-less move a flick can produce (the spin has its own input)
+    const clipless = new Set<HandleMove>();
+    for (const handle of [0, 50, 92, 100]) for (const r of grid()) { const m = moveFromContext(r, handle); if (!moveClip(m, 'left')) clipless.add(m); }
+    expect([...clipless]).toEqual(['off_the_head']);
+  });
+});

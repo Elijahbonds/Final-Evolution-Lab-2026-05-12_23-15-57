@@ -9,6 +9,7 @@ import {
   SPEND_REFUSED, SPEND_UNREACHABLE, newSpendNonce, ownedReadFromResponse, skuForSpend, spendResultFromStatus,
   type ReadOwnedKits, type ShardSpend,
 } from '@/lib/babylon/music/purchases';
+import { claimGrandfatherKits, claimStorage } from '@/lib/babylon/music/kitGrandfather';
 
 const spinner = () => (
   <div className="flex h-[80vh] items-center justify-center bg-[#050505]">
@@ -18,7 +19,8 @@ const spinner = () => (
 
 const StudioMode = dynamic(() => import('@/lib/babylon/music/StudioMode'), { ssr: false, loading: spinner });
 
-export function MusicLoader() {
+/** MUSIC-SUITE P3 (2026-09-25): `playerId` = the signed-in player's id from the server page (the owned-kits cache key). */
+export function MusicLoader({ playerId = null }: { playerId?: string | null } = {}) {
   // THE SHARDS SEAM, CLOSED (2026-09-20). StudioMode has always taken a `spendShards` prop and fallen back to
   // ALLOWING the spend when it is missing — logging "SHARDS SEAM not wired — allowing ... for free" as it did
   // so. Nothing ever passed it, so both kits and every Cell assist have been free since the day the room
@@ -53,14 +55,20 @@ export function MusicLoader() {
   // MUSIC-SUITE P2 (2026-09-25): OWNED KITS COME FROM THE ACCOUNT. GET /api/music/unlock had no caller; kits lived in
   // this device's localStorage only, so a kit bought on a phone was on sale again on a laptop. The room reads this at
   // mount and keeps localStorage as a cache: a failed read keeps the cache, a good one replaces it (a refunded kit goes).
+  //
+  // MUSIC-SUITE P6 (2026-09-25), owner decision #23: A KIT THE ROOM GAVE AWAY IS KEPT. Before 4b766804 every kit was free,
+  // recorded only on the device; this read then re-locked it ("NEON isn't on your account"). First, once per player per
+  // device, the device's record goes to POST /api/music/grandfather (kitGrandfather.ts claimGrandfatherKits), so the
+  // read below already lists a kit the server granted. It never throws and never delays a device with nothing to claim.
   const readOwnedKits = useCallback<ReadOwnedKits>(async () => {
+    await claimGrandfatherKits(claimStorage(), playerId);
     try {
       const res = await fetch('/api/music/unlock', { cache: 'no-store' });
       return ownedReadFromResponse(res.status, await res.json().catch(() => null));
     } catch {
       return { ok: false, reason: 'unreachable' };
     }
-  }, []);
+  }, [playerId]);
 
   // ARENA SETS ONLY (owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays
   // endless"). A duel launches the Academy with ?arena=<matchId>, the same query GameShell submits the score under, so
@@ -78,7 +86,7 @@ export function MusicLoader() {
       venue="The Academy"
       Game={StudioMode}
       ownControls
-      gameProps={{ spendShards, readOwnedKits, arenaSet }}
+      gameProps={{ spendShards, readOwnedKits, arenaSet, playerId }}
     />
   );
 }

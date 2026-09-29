@@ -15,6 +15,8 @@
 // source's own terms that were read and pinned in REVIEWED_TERMS. Anything else counts as unlabeled. PENDING_OWNER is
 // an exact list: a new unlabeled entry fails the test, and so does a pending entry whose licence has been recorded.
 
+import { signedPdEntries, type PdEntry } from '../babylon/music/pdShelf';
+
 /** CMU's required acknowledgement, word for word. The test fails if a character of it changes. */
 export const CMU_ACKNOWLEDGEMENT =
   'The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217.';
@@ -77,7 +79,11 @@ export const OPEN_LICENCES: Record<string, string> = {
   ISC: 'https://opensource.org/license/isc-license-txt',
   Unlicense: 'https://unlicense.org/',
   'OFL-1.1': 'https://openfontlicense.org/',
+  // MUSIC-SUITE P5 FIX PASS: not a licence — no copyright is left (a US sound recording published before 1925; the
+  // Music Modernization Act's schedule for pre-1972 recordings). Only an owner-signed pdShelf entry carries it.
+  'Public domain (US)': 'https://www.copyright.gov/music-modernization/pre1972-soundrecordings/',
 };
+const PD_LICENCE = 'Public domain (US)';
 
 /** The first-party statements that may ship. */
 export const FIRST_PARTY_LICENCES: readonly string[] = [
@@ -265,7 +271,7 @@ export const CREDITS: Credit[] = [
     section: 'sound',
     title: 'Kokoro-82M',
     by: 'hexgrad; ONNX export by onnx-community',
-    used: 'The voices of the MC, the crowd, the players, the coach and the quiz host. The words are our own scripts, rendered offline on our own machine.',
+    used: 'The voices of the MC, the crowd, the players, the coach and the quiz host, and the Flip pack’s vocal chops. The words are our own scripts, rendered offline on our own machine.',
     licence: 'Apache-2.0',
     licenceUrl: OPEN_LICENCES['Apache-2.0'],
     status: 'open',
@@ -285,6 +291,31 @@ export const CREDITS: Credit[] = [
     recordedIn: ['scripts/gen-808-kit.py'],
     covers: ['audio/kits/'],
     manifestLicences: [],
+  },
+  // MUSIC-SUITE P5 (2026-09-25): the Flip's own pack. Every file's record (script, seed, sha256) is
+  // public/audio/flip/PROVENANCE.json, held to the bytes by lib/babylon/music/provenance.test.ts.
+  // MUSIC-SUITE P7 (2026-09-29): broadened to also cover the six songs (public/audio/songs/**) — both roots
+  // are listed in provenance.test.ts's own MUSIC_ROOTS and share the identical manifest licence string
+  // ('FEL original, generated'), and lib/credits/credits.test.ts requires the ONE credit that claims a
+  // manifest licence string to be the SAME credit that covers the file carrying it — so a second credit
+  // reusing that string (rather than widening this one) would make the songs' own PROVENANCE.json fail that
+  // check (measured: "audio/songs/PROVENANCE.json is credited to a different source than its own licence
+  // names" against a stand-alone 'fel-songs' entry).
+  {
+    id: 'fel-flip-pack',
+    section: 'sound',
+    title: 'The FEL Flip pack and the six songs',
+    by: 'Final Evolution Lab',
+    used: 'Two things, both rendered by our own code with no samples from anywhere else: the Flip’s built-in sounds in the Groove Academy (three FEL themes, ten melodic loops, chord stabs, horn and orchestra hits, drums, textures and vocal chops), and the Cypher’s six original songs (warmup, cypher, goldenhour, battle, canals, evolution — map, preview and stems). The chops’ and songs’ vocals are Kokoro-82M, run on our own machine, saying our own words.',
+    licence: 'Our own work',
+    status: 'first-party',
+    recordedIn: [
+      'public/audio/flip/PROVENANCE.json', 'scripts/music/flip-pack/README.md',
+      'public/audio/songs/PROVENANCE.json', 'scripts/music/songs/README.md',
+      'lib/babylon/music/provenance.test.ts',
+    ],
+    covers: ['audio/flip/', 'audio/songs/'],
+    manifestLicences: ['FEL original, generated'],
   },
 
   // ── software the browser runs ───────────────────────────────────────────────────────────────────────────────────
@@ -441,7 +472,49 @@ export const CREDITS: Credit[] = [
     ],
     manifestLicences: [],
   },
+  // MUSIC-SUITE P5 FIX PASS (2026-09-25): one entry per public-domain recording the owner has signed on the Flip shelf
+  // (lib/babylon/music/pdShelf.ts — none today, decision #28), crediting the performer by name and year with the reason
+  // it is free. PD-CANDIDATES.md's publicity-rights assumption rests on the app naming them; the FLIP tab shows the same.
+  ...pdCredits(),
 ];
+
+/**
+ * The signed public-domain recordings as credits (each covers its own /audio/pd/<id>.mp3), plus — MUSIC-SUITE P7
+ * (2026-09-29), once any are signed — one credit for the shared download record, public/audio/pd/PROVENANCE.json: a
+ * file under public/ needs an entry to cover it (lib/credits/credits.test.ts), and that record's own per-entry
+ * `licence` field ('Public domain (US), sound recording published <year>') is a manifest licence this credit claims,
+ * one per signed year, so the same test that screens every manifest licence in public/ passes it through here.
+ */
+export function pdCredits(entries: readonly PdEntry[] = signedPdEntries()): Credit[] {
+  const perFile: Credit[] = entries.map((e) => ({
+    id: `pd-${e.id}`,
+    section: 'sound' as const,
+    title: e.title,
+    by: `${e.performer} (${e.year})`,
+    used: `A public-domain recording on the Flip's shelf in the Groove Academy. ${e.whyFree}`,
+    licence: PD_LICENCE,
+    licenceUrl: OPEN_LICENCES[PD_LICENCE],
+    status: 'open' as const,
+    link: e.sourceUrl,
+    recordedIn: ['lib/babylon/music/pdShelf.ts'],
+    covers: [`audio/pd/${e.id}.mp3`],
+    manifestLicences: [],
+  }));
+  if (entries.length === 0) return perFile;
+  const provenanceCredit: Credit = {
+    id: 'pd-shelf-provenance',
+    section: 'sound',
+    title: "The public-domain shelf's download record",
+    by: 'Final Evolution Lab',
+    used: "Where each public-domain recording on the Flip's shelf was downloaded from, the checks made before downloading it (the transfer, the archive's terms, the matrix/take), and its sha256 (the stored MP3 and the original download).",
+    licence: 'Our own work',
+    status: 'first-party',
+    recordedIn: ['public/audio/pd/PROVENANCE.json', 'lib/babylon/music/provenance.test.ts'],
+    covers: ['audio/pd/PROVENANCE.json'],
+    manifestLicences: [...new Set(entries.map((e) => `Public domain (US), sound recording published ${e.year}`))],
+  };
+  return [...perFile, provenanceCredit];
+}
 
 /** Files under public/ that are not assets, each with the reason. */
 export const NOT_ASSETS: Record<string, string> = {

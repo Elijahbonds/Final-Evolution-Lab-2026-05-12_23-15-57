@@ -35,6 +35,7 @@ export function attachBallToHand(
 ): boolean {
   const node = handNode(skeleton, hand);
   if (!node) { console.warn(`[FEL-BALL] no ${hand} bone`); return false; }
+  endBallGather(ball);   // a snap supersedes any gather still easing the ball in
   ball.setParent(node);
   (ball.metadata ??= {}).felReleased = false;
   ball.position.copyFrom(palmOffsetOf(ball, hand));
@@ -44,8 +45,122 @@ export function attachBallToHand(
 
 /** Detach into world space keeping the world transform (flight/physics). */
 export function releaseBall(ball: AbstractMesh): void {
+  endBallGather(ball);
   (ball.metadata ??= {}).felReleased = true;   // ballCarry: not ours to hand back
   ball.setParent(null);   // Babylon setParent(null) preserves world transform
+}
+
+// ── HOOPS MOTION phase 3 (2026-09-25): THE GATHER ────────────────────────────────────────────────────────────────────────
+// Every pick-up was a warp. A mode that stops the dribble (a shot, a finish, a pass, a possession) re-parented the ball to a palm
+// on that frame, wherever the bounce had it: up to 0.86 m in one frame (phase 1, S5; base2's ball path 0.64–1.32 m on the hoops
+// finishes). The gather parents the ball to the hand with its WORLD position kept, then eases it into the palm over GATHER_SEC —
+// never more than GATHER_STEP_M a drawn frame in the world — so the hand is seen taking the ball. The ball is the hand's from the
+// first frame (every possession test that reads `ball.parent` holds), and a release mid-gather flies from where it is.
+/** How long a gather takes to seat the ball in the palm (s). */
+export const GATHER_SEC = 0.2;
+/** Further than this from the palm, the hand-off is a reset (a check, a new rack) and the ball is put straight in the hand. */
+export const GATHER_MAX_M = 1.3;
+/** The fastest a gathered ball may move in the world (m/s) — a SPEED, so the motion is the same at 30 fps and 144 (review of 3a: a
+ *  per-frame cap let a 30 fps body outrun the ball it had just taken, 1.67 m from the palm on a 6.4 m/s finish). At 60 fps it is the
+ *  gate's 0.15 m a frame with a margin (GATHER_STEP_M). */
+export const GATHER_MPS = 8.1;
+/** The 60 fps step of GATHER_MPS (m). */
+export const GATHER_STEP_M = GATHER_MPS / 60;
+/** On top of the body's own travel a gathered ball may move this much faster (m/s): a body running 9 m/s into a dunk carries the
+ *  ball it gathers at its own pace, and the ease still closes on the palm. */
+export const GATHER_OVER_MPS = 1.8;
+interface BallGatherState { node: TransformNode; hand: 'LeftHand' | 'RightHand'; from: Vector3; t: number; dur: number; prevWorld: Vector3; obs: unknown; scene: import('@babylonjs/core').Scene; body: TransformNode; prevBody: Vector3 }
+/** The body a hand belongs to: its topmost ancestor (a spawn's root node) — whose travel a gathered ball is allowed to share. */
+function bodyOf(n: TransformNode): TransformNode { let b = n; while (b.parent) b = b.parent as TransformNode; return b; }
+const gatherOf = (ball: AbstractMesh): BallGatherState | undefined => (ball.metadata as { felGather?: BallGatherState } | null)?.felGather;
+function endBallGather(ball: AbstractMesh): void {
+  const g = gatherOf(ball); if (!g) return;
+  g.scene.onBeforeCameraRenderObservable.remove(g.obs as never);
+  (ball.metadata as { felGather?: BallGatherState }).felGather = undefined;
+}
+/** Keep this ball's last DRAWN position (after each render) — a gather started mid-frame, after the dribble already placed the ball
+ *  for the frame, measures its first step from what was drawn (a 3v3 tell's gather read 0.175 m: the dribble's step plus the cap).
+ *  Idempotent. */
+export function trackDrawnBall(ball: AbstractMesh): void {
+  const md = (ball.metadata ??= {}) as { felDrawn?: { p: Vector3; obs: unknown } };
+  if (md.felDrawn) return;
+  const p = new Vector3(Number.NaN, 0, 0);
+  const scene = ball.getScene();
+  const obs = scene.onAfterRenderObservable.add(() => { if (ball.isDisposed()) { scene.onAfterRenderObservable.remove(obs); return; } ball.computeWorldMatrix(true); p.copyFrom(ball.getAbsolutePosition()); });
+  md.felDrawn = { p, obs };
+}
+/** Is a gather still easing this ball into a palm? */
+export function ballGathering(ball: AbstractMesh): boolean { return !!gatherOf(ball); }
+
+/**
+ * The ball into a hand as a GATHER (see above). A ball already in that hand stays; one further than GATHER_MAX_M from the palm (or
+ * hidden) is put straight in (a reset). The ease runs just before the camera draws, after the arms are posed and physics has run.
+ */
+export function gatherBallToHand(ball: AbstractMesh, skeleton: Skeleton, hand: 'LeftHand' | 'RightHand', sec = GATHER_SEC): boolean {
+  const node = handNode(skeleton, hand);
+  if (!node) { console.warn(`[FEL-BALL] no ${hand} bone`); return false; }
+  if (ball.parent === node && !gatherOf(ball)) { (ball.metadata ??= {}).felReleased = false; return true; }
+  const scene = ball.getScene();
+  ball.computeWorldMatrix(true);
+  const at = ball.getAbsolutePosition().clone();
+  const palm = palmWorld(node, palmOffsetOf(ball, hand), new Vector3());
+  if (!(sec > 0) || !ball.isEnabled() || Vector3.Distance(at, palm) > GATHER_MAX_M) return attachBallToHand(ball, skeleton, hand);
+  endBallGather(ball);
+  ball.setParent(node);   // the world transform kept: the ball has not moved yet
+  const md = (ball.metadata ??= {}) as { felReleased?: boolean; felGather?: BallGatherState; felDrawn?: { p: Vector3 } };
+  md.felReleased = false;
+  const drawn = md.felDrawn?.p;
+  const prev = drawn && Number.isFinite(drawn.x) && Vector3.Distance(drawn, at) < 0.5 ? drawn.clone() : at;
+  trackDrawnBall(ball);
+  const body = bodyOf(node); body.computeWorldMatrix(true);
+  const g: BallGatherState = { node, hand, from: ball.position.clone(), t: 0, dur: sec, prevWorld: prev, obs: null, scene, body, prevBody: body.getAbsolutePosition().clone() };
+  let last = typeof performance !== 'undefined' ? performance.now() : 0;
+  // the step runs just before the camera draws — after the arms are posed AND after the physics step, which moves a Havok-driven root
+  // after the animations (a cap read before it let the root's own travel through on top); once per drawn frame
+  let lastFrame = -1;
+  g.obs = scene.onBeforeCameraRenderObservable.add(() => {
+    const fid = scene.getFrameId(); if (fid === lastFrame && fid !== 0) return; lastFrame = fid;
+    const now = typeof performance !== 'undefined' ? performance.now() : last + 1000 / 60;
+    const raw = (now - last) / 1000; last = now;
+    const dt = raw >= 0.001 && raw <= 0.1 ? raw : 1 / 60;   // (a stalled or instant frame steps one 60 Hz frame)
+    stepBallGather(ball, dt);
+  });
+  md.felGather = g;
+  return true;
+}
+
+const _gw1 = new Vector3(), _gl = new Vector3(), _gInv = Matrix.Identity();
+/**
+ * One drawn frame of a gather (the scene calls it after the arms are posed; exported for tests). The ease is in the hand's frame
+ * (from where the ball was taken to the palm); the CAP is in the world: the ball is drawn at most GATHER_MPS × dt from where it was
+ * drawn last frame — whatever the hand did this frame (a ball held 0.5 m off a turning wrist would otherwise swing with it: measured,
+ * 0.84 m in a frame on a hook's first frames) — or, when the BODY itself travels further than that in the frame, its travel plus
+ * GATHER_OVER_MPS × dt (a body's own run is not a whip: capped at a whip's pace, a 30 fps finish on the run left the ball behind).
+ * `stepCap` overrides the speed cap (m this frame). Returns true while the ball is still on its way.
+ */
+export function stepBallGather(ball: AbstractMesh, dt: number, stepCap?: number): boolean {
+  const g = gatherOf(ball); if (!g) return false;
+  if (ball.parent !== g.node) { endBallGather(ball); return false; }   // released, stolen or re-attached since
+  g.t += dt;
+  g.body.computeWorldMatrix(true);
+  const bp = g.body.getAbsolutePosition();
+  const bodyStep = Vector3.Distance(bp, g.prevBody); g.prevBody.copyFrom(bp);
+  const speedCap = Math.max(stepCap ?? GATHER_MPS * dt, bodyStep < 0.5 ? bodyStep + GATHER_OVER_MPS * dt : 0);   // (a reset is not travel)
+  const k0 = Math.min(1, g.t / g.dur), k = k0 * k0 * (3 - 2 * k0);
+  const target = palmOffsetOf(ball, g.hand);
+  Vector3.LerpToRef(g.from, target, k, _gl);
+  g.node.computeWorldMatrix(true);
+  const m = g.node.getWorldMatrix();
+  Vector3.TransformCoordinatesToRef(_gl, m, _gw1);                     // where the eased ball would be drawn this frame
+  const late = g.t > g.dur + 0.3;                                      // (half a second over: seat it, capped at twice the step)
+  const cap = late ? 2 * speedCap : speedCap;
+  const dx = _gw1.x - g.prevWorld.x, dy = _gw1.y - g.prevWorld.y, dz = _gw1.z - g.prevWorld.z, dl = Math.hypot(dx, dy, dz);
+  const f = dl > cap ? cap / dl : 1;
+  g.prevWorld.set(g.prevWorld.x + dx * f, g.prevWorld.y + dy * f, g.prevWorld.z + dz * f);
+  m.invertToRef(_gInv);
+  Vector3.TransformCoordinatesToRef(g.prevWorld, _gInv, ball.position);   // the drawn point, in the hand's frame
+  if (k0 >= 1 && f === 1) { ball.position.copyFrom(target); endBallGather(ball); return false; }
+  return true;
 }
 
 /** A hand-to-hand transfer keyed to a clip: which hand gives, which takes, on which clip second. */

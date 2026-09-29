@@ -10,6 +10,20 @@
 //   street  — the classic booming club kit (free)
 //   neon    — bright, tight, electro-leaning
 //   dust    — lo-fi, soft transients, vinyl-ish noise floor
+//
+// MUSIC-SUITE P4 (2026-09-25), "Pocket studio + melody" — THE PITCHED VOICES TAKE A NOTE. The bass and lead were one
+// frequency each (bassFreq / leadFreq, :43-45 then: STREET 55 / 440 Hz, NEON 65 / 523, DUST 49 / 392), rendered once, so
+// a bass row could only ever drone its kit's one note (outbox musicsuite/understand-wf_3a55346f-032.json problems[12]).
+// Now each kit names its voices' ROOT as a MIDI note (VOICE_ROOTS: STREET A1 / A4, NEON C2 / C5, DUST G1 / G4) and the
+// voice builder takes a frequency, so:
+//   * synthesizeKit still renders all eight slots, the pitched two AT THEIR ROOT (drum voices byte-for-byte unchanged).
+//     STREET is exactly what it was (A1 = 55 Hz, A4 = 440 Hz); NEON and DUST move onto the nearest true note (65 → 65.41,
+//     523 → 523.25, 49 → 49.00, 392 → 392.00 Hz: at most 11 cents), so a step's note plays in tune on every kit;
+//   * synthesizeNote(kit, slot, midi) renders that voice ON a note — the same envelope and length at any pitch;
+//   * voiceRootOf(buffer) tells the engine which note a pitched buffer from this file sounds (a WeakMap: the room loads
+//     these buffers through loadBuffer / swapKit, which carry no pitch), so AudioEngine plays any other note from it at
+//     playbackRate 2^((note - root) / 12), live and in every render alike.
+// Drums take no note: a drum step's note is ignored (AudioEngine playHit).
 
 export interface KitSampleDef {
   id: string; name: string; category: 'kick' | 'snare' | 'hat' | 'perc' | 'bass' | 'melody' | 'vox' | 'fx';
@@ -36,14 +50,35 @@ interface KitFlavor {
   kickFreq: number; kickDecay: number; kickClick: number;
   snareTone: number; snareNoise: number; snareDecay: number;
   hatHp: number; hatDecay: number; openDecay: number;
-  bassWave: OscillatorType; bassFreq: number; leadWave: OscillatorType; leadFreq: number;
+  bassWave: OscillatorType; leadWave: OscillatorType;
   grit: number;                      // 0..1 noise floor (dust's vinyl feel)
 }
 const FLAVORS: Record<KitId, KitFlavor> = {
-  street: { kickFreq: 120, kickDecay: 0.5, kickClick: 0.6, snareTone: 190, snareNoise: 0.9, snareDecay: 0.22, hatHp: 7500, hatDecay: 0.05, openDecay: 0.34, bassWave: 'sine', bassFreq: 55, leadWave: 'square', leadFreq: 440, grit: 0 },
-  neon: { kickFreq: 150, kickDecay: 0.3, kickClick: 1, snareTone: 240, snareNoise: 0.7, snareDecay: 0.14, hatHp: 9500, hatDecay: 0.035, openDecay: 0.25, bassWave: 'sawtooth', bassFreq: 65, leadWave: 'sawtooth', leadFreq: 523, grit: 0 },
-  dust: { kickFreq: 95, kickDecay: 0.6, kickClick: 0.25, snareTone: 160, snareNoise: 0.55, snareDecay: 0.3, hatHp: 6000, hatDecay: 0.07, openDecay: 0.4, bassWave: 'triangle', bassFreq: 49, leadWave: 'triangle', leadFreq: 392, grit: 0.06 },
+  street: { kickFreq: 120, kickDecay: 0.5, kickClick: 0.6, snareTone: 190, snareNoise: 0.9, snareDecay: 0.22, hatHp: 7500, hatDecay: 0.05, openDecay: 0.34, bassWave: 'sine', leadWave: 'square', grit: 0 },
+  neon: { kickFreq: 150, kickDecay: 0.3, kickClick: 1, snareTone: 240, snareNoise: 0.7, snareDecay: 0.14, hatHp: 9500, hatDecay: 0.035, openDecay: 0.25, bassWave: 'sawtooth', leadWave: 'sawtooth', grit: 0 },
+  dust: { kickFreq: 95, kickDecay: 0.6, kickClick: 0.25, snareTone: 160, snareNoise: 0.55, snareDecay: 0.3, hatHp: 6000, hatDecay: 0.07, openDecay: 0.4, bassWave: 'triangle', leadWave: 'triangle', grit: 0.06 },
 };
+
+/** MUSIC-SUITE P4: the pitched slots — their buffers are a NOTE (VOICE_ROOTS), and a step on their row plays its note. */
+export const PITCHED_SLOTS = ['bass', 'lead'] as const;
+export type PitchedSlot = (typeof PITCHED_SLOTS)[number];
+export function isPitchedSlot(id: string): id is PitchedSlot { return id === 'bass' || id === 'lead'; }
+/**
+ * MUSIC-SUITE P4: each kit's pitched voices as MIDI notes (were bassFreq / leadFreq in Hz: 55/440, 65/523, 49/392). STREET
+ * is unchanged to the hertz; NEON and DUST land on the nearest true note. Every root is a note of A minor (scales.ts
+ * DEFAULT_KEY), which is why a pre-P4 project opens in that key with its bass and lead unchanged (StudioProject migrate).
+ */
+export const VOICE_ROOTS: Readonly<Record<KitId, Readonly<Record<PitchedSlot, number>>>> = {
+  street: { bass: 33, lead: 69 },   // A1, A4
+  neon: { bass: 36, lead: 72 },     // C2, C5
+  dust: { bass: 31, lead: 67 },     // G1, G4
+};
+
+/** MUSIC-SUITE P4: the note each pitched buffer this file rendered sounds — the engine plays other notes from it by rate. */
+const ROOT_OF = new WeakMap<object, number>();
+/** Which note a buffer from synthesizeKit / synthesizeNote sounds; undefined for any other buffer (a drum, a chop, a take). */
+export function voiceRootOf(buffer: object): number | undefined { return ROOT_OF.get(buffer); }
+const noteHz = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12);
 
 const SR = 44100;
 
@@ -121,15 +156,8 @@ export async function synthesizeKit(kit: KitId): Promise<Map<string, AudioBuffer
     }
   }, f.grit));
 
-  out.set('bass', await render(0.42, (ctx, o) => {
-    tone(ctx, o, f.bassWave, f.bassFreq, f.bassFreq, 0, 0.4, 0.8);
-    tone(ctx, o, f.bassWave, f.bassFreq * 2.01, f.bassFreq * 2, 0, 0.2, 0.15);  // faint octave shimmer
-  }, f.grit));
-
-  out.set('lead', await render(0.3, (ctx, o) => {
-    tone(ctx, o, f.leadWave, f.leadFreq, f.leadFreq, 0, 0.28, 0.35);
-    tone(ctx, o, f.leadWave, f.leadFreq * 1.5, f.leadFreq * 1.5, 0.0, 0.2, 0.12);  // a fifth above, quieter
-  }, f.grit));
+  // MUSIC-SUITE P4: the pitched voices at their root note (VOICE_ROOTS), through the same builder a note uses
+  for (const slot of PITCHED_SLOTS) out.set(slot, await synthesizeNote(kit, slot, VOICE_ROOTS[kit][slot]));
 
   out.set('fx', await render(0.6, (ctx, o) => {
     tone(ctx, o, 'sawtooth', 200, 1400, 0, 0.55, 0.2);                            // riser
@@ -137,4 +165,25 @@ export async function synthesizeKit(kit: KitId): Promise<Map<string, AudioBuffer
   }, f.grit));
 
   return out;
+}
+
+/**
+ * MUSIC-SUITE P4: one pitched voice ON a note — the same envelope and length as at its root (the bass 0.42 s, the lead
+ * 0.3 s), so a high note is not a shorter, chirpier copy of the root. The engine plays one of these when the room has
+ * loaded it (AudioEngine.loadNote), and the root buffer at a playbackRate when it has not.
+ */
+export async function synthesizeNote(kit: KitId, slot: PitchedSlot, midi: number): Promise<AudioBuffer> {
+  const f = FLAVORS[kit];
+  const fq = noteHz(midi);
+  const buffer = slot === 'bass'
+    ? await render(0.42, (ctx, o) => {
+      tone(ctx, o, f.bassWave, fq, fq, 0, 0.4, 0.8);
+      tone(ctx, o, f.bassWave, fq * 2.01, fq * 2, 0, 0.2, 0.15);  // faint octave shimmer
+    }, f.grit)
+    : await render(0.3, (ctx, o) => {
+      tone(ctx, o, f.leadWave, fq, fq, 0, 0.28, 0.35);
+      tone(ctx, o, f.leadWave, fq * 1.5, fq * 1.5, 0.0, 0.2, 0.12);  // a fifth above, quieter
+    }, f.grit);
+  ROOT_OF.set(buffer, midi);
+  return buffer;
 }
