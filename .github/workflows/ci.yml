@@ -38,7 +38,8 @@ jobs:
       # regenerates it in the cloud). npm ci's postinstall has just regenerated it from the committed schema copy, so the third
       # check in lib/db/prismaSchemaSync.test.ts only ever saw a fresh client and could not fail. If regenerating changed the
       # committed client's schema, the commit is missing the regenerated client. Only schema.prisma is compared: index.js and
-      # edge.js embed the absolute output path, which differs per machine; schema.prisma is Prisma's formatted copy of the
+      # edge.js record the generating machine's native binaryTarget (darwin-arm64 on the Macs that commit it, debian here;
+      # their paths are repo-relative since scripts/prisma-generate.mjs, #59); schema.prisma is Prisma's formatted copy of the
       # schema and regenerates byte-identically (measured locally on 6.7.0).
       - name: generated Prisma client is committed in sync
         run: git diff --exit-code -- public/_prisma/client/schema.prisma
@@ -50,7 +51,8 @@ jobs:
       # The copy is regenerated from the source: if that changed a committed file, the commit is missing it.
       - name: deploy Prisma schema is committed in sync
         run: git diff --exit-code -- public/_prisma/schema.prisma
-      - run: npx prisma generate
+      # npm run prisma:generate = prisma generate + scripts/prisma-generate.mjs (keeps the generated paths repo-relative).
+      - run: npm run prisma:generate
       - name: type-check
         run: npx tsc --noEmit
       - name: unit tests
