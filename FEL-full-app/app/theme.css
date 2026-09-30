@@ -3,8 +3,13 @@
    Load app-wide (import once in the root layout). */
 
 :root {
-  /* Type — display for numbers/branding, body for prose */
-  --fel-font-display: 'Chakra Petch', 'JetBrains Mono', ui-monospace, monospace;
+  /* Type — display for numbers/branding, body for prose.
+     The display face is Chakra Petch with the mono face behind it, both as app/layout.tsx's next/font VARIABLES (set on
+     <html>). Never a quoted family name here: next/font registers each face under a hashed name, so 'Chakra Petch' and
+     'JetBrains Mono' never matched and every display text fell back to Courier (FONT-SHARED, 2026-09-29). Where the
+     variables are missing (the root crash screen renders its own <html>), the whole token is unset and each consumer's
+     own var() fallback (ui-monospace) applies. */
+  --fel-font-display: var(--font-chakra), var(--font-mono), ui-monospace, monospace;
   --fel-font-body: 'Inter', system-ui, sans-serif;
 
   /* Core palette.
