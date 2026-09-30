@@ -212,8 +212,15 @@ describe('the client never decides', () => {
   it('a body that claims eligibility changes nothing: a minor is refused and nothing is written', async () => {
     h.state.store.user.find((u) => u.id === 'client-1')!.dobYear = 2012;
     const r = await post({ sessionExerciseId: KEY, eligible: true, reasons: [], force: true, dobYear: 1990, usesLeft: 2 });
-    expect(r).toMatchObject({ status: 403, json: { error: 'ramp_not_allowed' } });
-    expect(r.json.reasons).toEqual(['minor']);
+    // TEEN-WRITE-BLOCK (#49): the shared health-write gate now answers a minor's POST before rampGate does — the same
+    // refusal, from the stricter, app-wide source (the DB's User.dobYear; the body's dobYear is never read).
+    expect(r).toMatchObject({ status: 403, json: { error: 'health_data_adults_only', saved: false } });
+    expect(rows()).toHaveLength(0);
+  });
+  it('a blank birth year POSTs into the same shared refusal: unknown age is not an adult, nothing written', async () => {
+    h.state.store.user.find((u) => u.id === 'client-1')!.dobYear = null;
+    const r = await post({ sessionExerciseId: KEY });
+    expect(r).toMatchObject({ status: 403, json: { error: 'health_data_adults_only', saved: false } });
     expect(rows()).toHaveLength(0);
   });
   it('not the key set, not on today\'s session, or another athlete\'s key set: refused, by the server\'s own read of Today', async () => {
