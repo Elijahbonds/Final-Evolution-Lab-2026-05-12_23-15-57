@@ -37,7 +37,8 @@ export interface AvatarConfig {
   decals: DecalConfig[];
 }
 
-export const HEIGHT_RANGE: [number, number] = [0.92, 1.08];
+// REACH-FREEZE (2026-09-29): the cosmetic clamp every body obeys (playFrame.COSMETIC_CLAMP, TUNE-EJ); it was 0.92–1.08.
+export const HEIGHT_RANGE: [number, number] = [0.96, 1.04];
 export const MAX_DECALS = 3;
 
 export const DEFAULT_AVATAR: AvatarConfig = {
