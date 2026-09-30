@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { isProUser, paywall, PAYWALL_STATUS } from '@/lib/pro-guard';
+import { recordCheckValues } from '@/lib/mirror/baselines';
+import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 
 /**
  * The Neuromechanic Mirror's training record.
@@ -36,6 +38,17 @@ export async function POST(req: NextRequest) {
   // a summary shorter than a single rep is a tab that was opened and closed; storing it would
   // pollute the trend with noise the player never intended to record
   if (durationMs < 3000) return NextResponse.json({ skipped: 'too_short' });
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): a session summary is kept only for a verified 18+ account that opted in (today nobody).
+  if (!(await canSaveScanNumbers(prisma, session.user.id))) return refuseScanSave();
+
+  // PERSONAL BASELINES (MIRROR-COACH P4, carry-and-baselines lane, 2026-09-29): an optional, additive
+  // `checkValues` map — the pattern's own per-check numeric readings for THIS session (e.g. carryAudit's
+  // `{ 'hipHike:right': 0.12 }`), stored as one more key inside the existing faultCounts Json column via
+  // lib/mirror/baselines.ts's recordCheckValues. NO SCHEMA CHANGE: every existing zone-keyed count already in
+  // faultCounts is kept exactly as the pattern's audit wrote it; a session whose body handed no checkValues at
+  // all (every older client, and any pattern that has not adopted this yet) behaves exactly as before.
+  const checkValues = isPlainRecordOfNumbers(body.checkValues) ? body.checkValues : null;
+  const faultCounts = checkValues ? recordCheckValues(body.faultCounts, checkValues) : ((body.faultCounts ?? {}) as object);
 
   const created = await prisma.mirrorSession.create({
     data: {
@@ -47,7 +60,7 @@ export async function POST(req: NextRequest) {
       avgTempoMs: body.avgTempoMs == null ? null : Math.round(num(body.avgTempoMs)),
       avgFrameMs: num(body.avgFrameMs),
       timeInStableMs: (body.timeInStableMs ?? {}) as object,
-      faultCounts: (body.faultCounts ?? {}) as object,
+      faultCounts,
     },
   });
   return NextResponse.json({ id: created.id, saved: true });
@@ -87,3 +100,9 @@ export async function GET(req: NextRequest) {
 }
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+/** A plain object of finite numbers — never trusts the client's `checkValues` shape further than that. */
+function isPlainRecordOfNumbers(v: unknown): v is Record<string, number> {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  return Object.values(v as Record<string, unknown>).every((n) => typeof n === 'number' && Number.isFinite(n));
+}

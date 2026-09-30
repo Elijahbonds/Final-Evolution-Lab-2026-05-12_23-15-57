@@ -9,6 +9,7 @@ import { MIRROR_SCREEN_KIND } from '@/lib/mirror/screen';
 import { cleanScreenId, decideScreenPost, decisionFromStoredRow } from '@/lib/mirror/screenClaims';
 import { selfReportAnswersFor } from '@/lib/mirror/selfReport';
 import { storedScreen, storedScreenId, storedSelfReport, withSelfReport } from '@/lib/mirror/screenStore';
+import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 
 /**
  * A completed movement screen.
@@ -73,6 +74,8 @@ export async function POST(req: NextRequest) {
   const d = decideScreenPost(body, athleteId);
   if (!d.ok) return NextResponse.json(d.body, { status: d.status });
   const { screenId, screen, outcome, summary, answers, reward: decision, ended } = d;
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): verified 18+ AND opted in, before the dedupe read: a refused screen (a retry too) writes no row and pays no reward.
+  if (!(await canSaveScanNumbers(prisma, athleteId))) return refuseScanSave();
 
   // THE STORED ROW IS THE SCREEN (MIRROR-COACH P3 review, 2026-09-26; lib/mirror/screenClaims.ts decisionFromStoredRow):
   // a screen id already stored is answered from its row — nothing re-decided from the new body, nothing stored again, and
@@ -163,6 +166,8 @@ export async function PATCH(req: NextRequest) {
   const b = (body && typeof body === 'object' ? body : {}) as { screenId?: unknown; answers?: unknown };
   const screenId = cleanScreenId(b.screenId);
   if (!screenId) return NextResponse.json({ error: 'missing_screen_id' }, { status: 400 });
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the answers are kept on a screen only under the screen's own rule (verified 18+ AND opted in).
+  if (!(await canSaveScanNumbers(prisma, athleteId))) return refuseScanSave();
 
   const rows = await prisma.workoutScan.findMany({
     where: { userId: athleteId, kind: MIRROR_SCREEN_KIND },

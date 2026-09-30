@@ -6,8 +6,9 @@
 //     storage — calls fetch 0 times and touches the (mocked) database 0 times, for every age band and a signed-in adult;
 //   · SCREEN-FIX Cyber 2 changed one rule, narrowly: the AGE ANSWER is written to this tab's sessionStorage before the
 //     camera (it is locked for the tab). Nothing else is written before a result, and nothing at all is sent;
-//   · the route stays as PR #20 has it, unwired from the screen: a guest still gets 401 and a possible minor without a
-//     guardian on record 412, each with no database write;
+//   · SCREEN-FIX-2 (FE PM + Research 11:50 AM PT): under 18 keep the age answer and NOTHING ELSE, grown-up ticked or not;
+//   · the route stays unwired from the screen: a guest still gets 401, and anyone but a verified, opted-in adult 403
+//     (TEEN-WRITE-BLOCK-2, FE PM 23:05 PT; it was 412 for a possible minor without a guardian), each with no database write;
 //   · the record builder carries numbers only: no image, video, landmark or frame (mediaIn), and no worst-rep skeleton.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -48,7 +49,7 @@ import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, standFront, synthetic
 import { mediaIn, toRecord } from '@/lib/assess/prqWrite';
 import { summarize } from './checks';
 import { preStep, PRE_START, type PreEvent } from './flow';
-import { KEYS, forgetAgeForTests, lockAge, readAge, readResult, writeResult, writeTakeoff, type StorageLike } from './store';
+import { KEYS, forgetAgeForTests, keepResult, lockAge, readAge, readResult, writeResult, writeTakeoff, type StorageLike } from './store';
 import { AGE_BANDS, type AgeBand } from './age';
 
 const cal = syntheticCalibration();
@@ -88,7 +89,7 @@ function playScreen(events: PreEvent[], tab = new MemStore()) {
   // a few frames and the takeoff prompt, as the page would; the grade itself comes from the synthetic session
   for (const f of standFront(1).frames) { t += 33; const v = r.tick({ ...f, t }, t); if (v.step === 'takeoff') { writeTakeoff(tab, pre.gate, 'left'); r.answerTakeoff('left', t); } }
   const s = summarize(SESSION)!;
-  writeResult(tab, pre.gate, s);
+  keepResult(tab, pre.gate, s);                                       // as the page's end does (SCREEN-FIX-2)
   return { tab, pre, stored, summary: s };
 }
 
@@ -118,7 +119,7 @@ const whole = (age: AgeBand): PreEvent[] => [
 ];
 
 describe('a whole screen, played: 0 requests, 0 database writes, storage only the age answer until the result', () => {
-  it.each(AGE_BANDS)('%s: nothing sent; before the camera only the age answer is written; the result stays in this tab', (age) => {
+  it.each(AGE_BANDS)('%s: nothing sent; before the camera only the age answer is written; an adult\'s result stays in this tab, a kid\'s nowhere', (age) => {
     forgetAgeForTests();
     const run = playScreen(whole(age));
     expect(run.pre.step).toBe('camera');
@@ -126,8 +127,14 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
     expect(m.writes).toEqual([]);
     // CHANGED (SCREEN-FIX Cyber 2): was `beforeCamera` 0 writes; now exactly one, the locked age answer
     expect(run.stored.beforeCamera).toEqual([KEYS.age]);
-    expect(readResult(run.tab)!.summary).toEqual(run.summary);
-    expect(readResult(run.tab)!.gate).toMatchObject({ ageBand: age, grownUp: age !== '18+' });
+    if (age === '18+') {
+      expect(readResult(run.tab)!.summary).toEqual(run.summary);
+      expect(readResult(run.tab)!.gate).toMatchObject({ ageBand: age, grownUp: false });
+    } else {
+      // CHANGED (SCREEN-FIX-2): was the result kept in this tab after the grown-up step; a kid keeps the age answer only
+      expect(readResult(run.tab)).toBeNull();
+      expect(run.tab.writes).toEqual([KEYS.age]);
+    }
   });
 
   it('under 18 or an age not given WITHOUT the grown-up step never reaches the camera; only the age answer is written', () => {
@@ -175,19 +182,22 @@ describe('the route, unwired from the screen, still refuses as PR #20 built it',
     expect(m.writes).toEqual([]);
   });
 
-  it('a signed-in under-18 with no guardian on record: 412, nothing written', async () => {
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): before → 412 (a possible minor with no guardian on record); after → 403
+  // scan_save_adults_only (only a verified, opted-in adult's scores are saved, and a guardian's yes no longer counts).
+  // Still nothing written.
+  it('a signed-in under-18 with no guardian on record: 403, nothing written', async () => {
     m.session = { user: { id: 'kid-1' } };
     m.users.push({ id: 'kid-1', dobYear: new Date().getFullYear() - 14 });
     const r = await post(record());
-    expect(r.status).toBe(412);
+    expect(r.status).toBe(403);
     expect(m.writes).toEqual([]);
   });
 
-  it('a signed-in athlete of unknown age with no guardian on record: 412, nothing written', async () => {
+  it('a signed-in athlete of unknown age with no guardian on record: 403, nothing written', async () => {
     m.session = { user: { id: 'who-1' } };
     m.users.push({ id: 'who-1', dobYear: null });
     const r = await post(record());
-    expect(r.status).toBe(412);
+    expect(r.status).toBe(403);
     expect(m.writes).toEqual([]);
   });
 });

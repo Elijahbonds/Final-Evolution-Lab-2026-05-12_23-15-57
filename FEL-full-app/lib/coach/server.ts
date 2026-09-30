@@ -27,6 +27,9 @@ export function toTree(p: any): ProgramTree {
       id: b.id, order: b.order, label: b.label, targetDate: b.targetDate ? new Date(b.targetDate).toISOString() : null,
       sessions: b.sessions.map((s: any) => ({
         id: s.id, order: s.order, label: s.label,
+        // MIRROR-COACH P6 (2026-09-29): the session's kind (an off day is 'recovery'); a row read before the column
+        // existed has none and is what it always was, a training session
+        kind: s.kind === 'recovery' ? 'recovery' : 'training',
         // in running order — prep first, cool-down last, stored order inside a section — so every reader (Today,
         // /training, the builder) walks the session the way it is done without re-sorting it (MIRROR-COACH P2)
         exercises: sessionOrder(s.exercises.map((e: any) => treeExercise(e))),

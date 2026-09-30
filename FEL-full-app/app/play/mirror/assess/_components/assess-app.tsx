@@ -8,9 +8,11 @@
 // → "A grown-up is with me" (under 18, or an age not given) → "Does anything hurt right now?" → the camera card →
 // only then the camera → the checks → results.
 //   · NOTHING IS SENT. No server save in this ship (A2-3): the screen never calls POST /api/mirror/assessment, no PRQ
-//     write, no analytics. The results live on the device: in this page's memory, and in this tab's sessionStorage
-//     only after the age answer (and the grown-up step under 18). Never localStorage. The age answer itself is the one
-//     key written before a result, so it is asked once per tab. (lib/screen/store.ts)
+//     write, no analytics, no crash report (SCREEN-FIX-2 amend 4). The age answer is kept in this tab's sessionStorage,
+//     so it is asked once per tab. 18 or older keep their results there too; UNDER 18 (and "rather not say") keep
+//     NOTHING ELSE: their number is shown from this page's memory, with the change since their last screen here
+//     (lastJumpRef), and "Run it again" (SCREEN-FIX-2 item 3; lib/screen/store.ts keepResult). Never localStorage: the
+//     camera's model memory is this page's too (screen-pose.ts, Cyber F5).
 //   · THE BACK ARROW STAYS IN THE SCREEN: one step back through the flow, and from the start card to /screen (S-2).
 //     The browser's Back in the middle of the screen asks first (use-leave-guard.ts, S-6).
 //   · The camera check's numbers (resolution, frame rate, model, pose rate) show only where the QA hooks are allowed
@@ -30,7 +32,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Volume2, VolumeX } from 'lucide-react';
-import { poseService, type PoseStatus } from '@/lib/pose/PoseService';
+import { makeFeedHandle, type PoseStatus } from '@/lib/pose/PoseService';
 import { MIN_CAMERA_FPS } from '@/lib/pose/modelChoice';
 import { feedHookAllowed } from '@/lib/pose/feed';
 import { PoseFilter } from '@/lib/pose/oneEuro';
@@ -42,19 +44,21 @@ import {
   LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
 } from '@/lib/screen/copy';
 import type { AgeBand } from '@/lib/screen/age';
-import { clearScreen, localForClear, lockAge, readAge, remember, tabStorage, writeResult, writeTakeoff, type GateRecord } from '@/lib/screen/store';
+import { clearScreen, keepResult, localForClear, lockAge, readAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
 import { PRE_START, preStep, type PreEvent, type PreState } from '@/lib/screen/flow';
 import { RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
 import { SKELETON_EURO, SKELETON_MIN_VISIBILITY } from '@/lib/screen/ui';
 import { drawSkeleton, SKELETON_COLOURS } from './skeleton';
 import { useVoice } from './use-voice';
 import { CameraHelp } from './camera-help';
+import { KidResults } from './kid-results';
+import { screenPose } from './screen-pose';
 import { LiveHud } from './live-hud';
 import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep } from './gate-steps';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
-type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'cameraError';
+type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'cameraError';
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'cameraInfo', 'starting', 'device', 'running'];
 
@@ -77,6 +81,7 @@ export function AssessApp() {
   const [caption, setCaption] = useState('');
   const [tech, setTech] = useState(false);                       // the camera check's numbers (S-5)
   const [stopAsk, setStopAsk] = useState(false);                 // the back arrow during the checks asks first
+  const [kid, setKid] = useState<{ jumpIn: number | null; lastIn: number | null } | null>(null);   // a kid's number (page memory)
   const voice = useVoice();
   const guard = useLeaveGuard(MID_FLOW.includes(phase));
 
@@ -92,12 +97,13 @@ export function AssessApp() {
   const highFpsRef = useRef(false);
   const smoothRef = useRef(new PoseFilter(SKELETON_EURO));
   const camRunRef = useRef(0);                                   // the current camera start; a newer one (or a back) cancels it
+  const lastJumpRef = useRef<number | null>(null);
 
   /** Drop this page's listeners; stop the camera too unless `keepFeed` and the QA feed is standing in for it. */
   const cleanup = useCallback((keepFeed = false) => {
     previewRef.current?.(); previewRef.current = null;
     for (const u of unsubRef.current.splice(0)) u();
-    const svc = poseService();
+    const svc = screenPose();
     if (!(keepFeed && svc.status.source === 'feed')) svc.stop();
     try { window.speechSynthesis?.cancel(); } catch { /* nothing speaking */ }
   }, []);
@@ -106,7 +112,7 @@ export function AssessApp() {
 
   const draw = useCallback((f: PoseFrame, colour: string) => {
     // the picture: the camera's current frame, painted (see the header)
-    const pic = pictureRef.current, video = poseService().video;
+    const pic = pictureRef.current, video = screenPose().video;
     const pctx = pic?.getContext('2d');
     if (pic && pctx && video && video.readyState >= 2) pctx.drawImage(video, 0, 0, pic.width, pic.height);
     const c = canvasRef.current;
@@ -119,7 +125,7 @@ export function AssessApp() {
   }, []);
 
   const attach = useCallback(() => {
-    const svc = poseService();
+    const svc = screenPose();
     const cam = svc.status.camera;
     for (const c of [pictureRef.current, canvasRef.current]) if (c && cam?.width && cam.height) { c.width = cam.width; c.height = cam.height; }
     cameraFpsRef.current = cam?.frameRate ?? null;
@@ -130,7 +136,7 @@ export function AssessApp() {
     cleanup(true);
     const run = ++camRunRef.current;
     setPhase('starting');
-    const svc = poseService();
+    const svc = screenPose();
     unsubRef.current.push(svc.onStatus((s) => setStatus(s)));
     const ok = await svc.start(model ? { model } : {});
     if (run !== camRunRef.current) return;                       // the athlete went back while the camera was starting
@@ -152,14 +158,19 @@ export function AssessApp() {
     cleanup();                                                   // the camera stops the moment the screen ends
     const summary = v.result ? summarize(v.result) : null;
     if (!summary) { setPhase('stopped'); return; }               // pain: a referral, nothing kept
-    remember(gateRef.current, summary);
-    writeResult(tabStorage(), gateRef.current, summary);          // refused unless the age and grown-up gate allows it
-    setPhase('toResults');
+    // under 18 (or "rather not say"): nothing kept anywhere; their number, and the change since the last screen here
+    if (keepResult(tabStorage(), gateRef.current, summary) === 'kid') {
+      setKid({ jumpIn: summary.jumpBestIn, lastIn: lastJumpRef.current });
+      lastJumpRef.current = summary.jumpBestIn ?? lastJumpRef.current;
+      setPhase('kidResults');
+      return;
+    }
+    setPhase('toResults');                                        // 18 or older: kept in this tab (keepResult)
     router.replace(RESULTS_PATH);
   }, [cleanup, router]);
 
   const begin = useCallback(() => {
-    const svc = poseService();
+    const svc = screenPose();
     const cam = svc.status.camera;
     const aspect = cam?.width && cam.height ? cam.width / cam.height : 4 / 3;
     previewRef.current?.(); previewRef.current = null;       // the runner draws from here on
@@ -188,6 +199,9 @@ export function AssessApp() {
     const agent = new URLSearchParams(window.location.search).get('agent') === '1';
     if (!feedHookAllowed(process.env.NODE_ENV, agent, window.location.hostname)) return;
     setTech(true);
+    // the QA feed drives the screen's own PoseService while this page is up (screen-pose.ts), then goes back
+    const feed = window.__FEL_POSE_FEED__;
+    window.__FEL_POSE_FEED__ = makeFeedHandle(screenPose);
     window.__FEL_ASSESS__ = {
       view: () => {
         const v = viewRef.current;
@@ -195,14 +209,14 @@ export function AssessApp() {
       },
       frames: async (part: string) => (await import('@/lib/assess/replay')).partFrames(part),
     };
-    return () => { delete window.__FEL_ASSESS__; };
+    return () => { delete window.__FEL_ASSESS__; window.__FEL_POSE_FEED__ = feed; };
   }, []);
 
   // T5 asks the camera for 60 fps (spec §3.1), and records what it really delivers
   useEffect(() => {
     if (!view?.wantsHighFps || highFpsRef.current) return;
     highFpsRef.current = true;
-    const track = (poseService().video?.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
+    const track = (screenPose().video?.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
     if (!track?.applyConstraints) return;
     track.applyConstraints({ frameRate: { ideal: 60 } })
       .then(() => { cameraFpsRef.current = track.getSettings?.().frameRate ?? cameraFpsRef.current; })
@@ -221,13 +235,15 @@ export function AssessApp() {
     if (next.step === 'camera') { void startCamera(); return; }
     setPhase(next.step);
   };
-  const startNew = () => pre({ type: 'start' });
+  const startNew = () => { lastJumpRef.current = null; pre({ type: 'start' }); };
   const answerAge = (a: AgeBand) => pre({ type: 'age', age: a });
   const grownUp = () => pre({ type: 'grownUp' });
   const answerPainFirst = (hurts: boolean) => pre({ type: 'pain', hurts });
   const cameraOn = () => pre({ type: 'cameraOn' });
-  const resetRun = () => { camRunRef.current++; cleanup(); setView(null); setCaption(''); highFpsRef.current = false; };
-  const restart = () => { resetRun(); pre({ type: 'restart' }); };
+  const resetRun = () => { camRunRef.current++; cleanup(); setView(null); viewRef.current = null; setCaption(''); highFpsRef.current = false; };
+  const restart = () => { resetRun(); setKid(null); pre({ type: 'restart' }); };
+  // "Run it again" from a kid's number: the same person, again, in the page (the last jump is kept for the change line)
+  const runAgain = () => { resetRun(); setKid(null); pre({ type: 'start' }); };
   // the camera off, back to the camera card (the flow's step before the camera)
   const cameraBack = () => { setStopAsk(false); resetRun(); pre({ type: 'back' }); };
 
@@ -248,7 +264,7 @@ export function AssessApp() {
   const back: string | (() => void) = phase === 'intro' || phase === 'toResults' ? SCREEN_HOME
     : phase === 'running' ? () => setStopAsk(true)
     : phase === 'starting' || phase === 'device' ? cameraBack
-    : phase === 'stopped' ? restart
+    : phase === 'stopped' || phase === 'kidResults' ? restart
     : () => pre({ type: 'back' });
 
   if (phase === 'cameraError') return <CameraHelp why={status?.why ?? null} onRetry={() => void startCamera()} onBack={restart} />;
@@ -286,6 +302,7 @@ export function AssessApp() {
       {phase === 'toResults' ? (
         <StepCard testId="to-results"><p className="text-white/70">Your results…</p></StepCard>
       ) : null}
+      {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
 
       {live ? (
         <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: '72vh' }}>

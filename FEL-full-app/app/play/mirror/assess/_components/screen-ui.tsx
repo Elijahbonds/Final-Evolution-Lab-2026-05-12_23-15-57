@@ -50,14 +50,14 @@ export const EarlyTag = () => (
   <span data-early-tag title={EARLY_VERSION_LINE} className="ml-1.5 whitespace-nowrap rounded border border-[#FFB020]/50 px-1.5 py-px align-middle text-[11px] font-bold text-[#FFB020]">{EARLY_VERSION}</span>
 );
 
-/** "Not a medical exam. If anything hurts, stop." On the results and the program page (owner, 2026-09-29). */
+/** "If anything hurts, stop." Under DISCLAIMER on the results and the program page (owner, 2026-09-29; S-13). */
 export const StopLine = ({ className = 'text-[13px] text-white/70' }: { className?: string }) => (
   <p data-stop-line className={className}>{STOP_LINE}</p>
 );
 
 /**
- * Under 13, or "rather not say": in place of every link out of the screen (Cyber 3). No link, no button, no field:
- * the words only.
+ * Under 18, or "rather not say", on the program page: in place of every link out of the screen (Cyber 3; SCREEN-FIX-2).
+ * No link, no button, no field: the words only.
  */
 export function ParentCard() {
   return (

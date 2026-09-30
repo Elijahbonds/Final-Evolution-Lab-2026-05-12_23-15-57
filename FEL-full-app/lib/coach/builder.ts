@@ -133,6 +133,14 @@ export const BUILDER_ERROR_COPY: Record<string, string> = {
   // MIRROR-COACH P3 review (2026-09-26): owner decision #6 (builderServer.ts pinRefused)
   pin_not_for_youth: 'Pin-and-stretch work is for adults. This athlete is under 18, or their birth year is not on file yet, so pick something that does not pin.',
   session_not_found: 'That session is not in this program.',
+  // MIRROR-COACH P6 (2026-09-29): the off day (builderServer.ts add_off_day / remove_off_day)
+  block_not_found: 'That week is not in this program any more. Reload.',
+  not_an_off_day: 'Only an off day can be taken out this way.',
+  off_day_logged: 'Your athlete has already started this off day, so it stays: their log hangs off it.',
+  // MIRROR-COACH P6 FIX (2026-09-29): an off day ahead of a finished session would send Today back to it
+  off_day_before_done: 'Your athlete has already done a session after this point, so an off day here would send their Today back to it. Add it after the last session they have done.',
+  name_taken_fel: 'Another coach on FEL already uses one of the off-day exercise names. Add it to your catalogue under your own name first.',
+  off_day_template_invalid: 'The off-day template did not pass its own checks. Nothing was added.',
   tempo_format: 'Tempo is four numbers like 3-1-1-0.',
   direction_required: 'Move it up or down.',
   facilitator_not_certified: 'Programs are written by certified coaches.',

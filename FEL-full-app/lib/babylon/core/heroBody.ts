@@ -16,6 +16,8 @@
 //
 // Pure: no Babylon, no fetch. The fetch lives in playerIdentity.resolveIdentity.
 
+import { clampCosmetic } from './playFrame';
+
 export type HeroBodyKind = 'scan' | 'kit-male' | 'kit-female';
 export type BodyType = 'male' | 'female';
 
@@ -55,12 +57,14 @@ export function decideHeroBody(email: string | null | undefined, owners: Set<str
   return bodyTypeOf(frame?.bodyType) === 'female' ? 'kit-female' : 'kit-male';
 }
 
-/** The creator frame's three scales (percent on the rows) as the multipliers applyIdentity takes; null when unset. */
-export function proportionsFromFrame(frame: Record<string, unknown> | null): { heightScale: number; buildScale: number; reachScale: number } | null {
+/** The creator frame's scales (percent on the rows) as the multipliers applyIdentity takes; null when unset. REACH-FREEZE
+ *  (2026-09-29): height and build clamp to the cosmetic range (a save made at the old 88–118 % loads, clamped), and reach is 1
+ *  whatever the frame carries — a saved reachScale is ignored, never migrated. */
+export function proportionsFromFrame(frame: Record<string, unknown> | null): { heightScale: number; buildScale: number; reachScale: 1 } | null {
   if (!frame) return null;
   const pct = (k: string) => {
     const v = frame[k];
     return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v / 100 : 1;
   };
-  return { heightScale: pct('heightScale'), buildScale: pct('buildScale'), reachScale: pct('reachScale') };
+  return { heightScale: clampCosmetic(pct('heightScale'), 'height'), buildScale: clampCosmetic(pct('buildScale'), 'build'), reachScale: 1 };
 }

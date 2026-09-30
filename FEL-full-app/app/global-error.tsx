@@ -25,11 +25,13 @@
 
 import { useEffect } from 'react';
 import { CrashScreen, GENERIC_CRASH_COPY, reportCrash } from '@/components/reliability/global-error-boundary';
+import { isQuickScreenPath } from '@/lib/screen/routes';
 
 export default function GlobalError({ error }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('[FEL-BOUNDARY] root crash:', error);
-    reportCrash(error, 'root');
+    // SCREEN-FIX-2 (amend 4): the Quick Screen sends nothing, a crash included; the screen above still shows
+    if (!isQuickScreenPath(location.pathname)) reportCrash(error, 'root');
   }, [error]);
 
   return (

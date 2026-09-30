@@ -2,15 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { FramingGate, SIDE_TURNED, SIDE_WIDTH_MAX, checkFraming, sideWidth, type FramingFrame, type FramingPoint } from './framing';
 
 /** A body standing in a good shot; each option nudges one thing out of place. */
-function shot(o: { headY?: number; ankleY?: number; centre?: number; shoulderSpan?: number; hipSpan?: number; vis?: number } = {}): FramingFrame {
+function shot(o: {
+  headY?: number; ankleY?: number; centre?: number; shoulderSpan?: number; hipSpan?: number; vis?: number;
+  /** MIRROR-COACH P4 baseline F6: move the hip and knee lines independently, to build a crouched body. */
+  hipY?: number; kneeY?: number;
+} = {}): FramingFrame {
   const headY = o.headY ?? 0.10, ankleY = o.ankleY ?? 0.90, cx = o.centre ?? 0.5;
   const ss = o.shoulderSpan ?? 0.16, hs = o.hipSpan ?? 0.12, v = o.vis ?? 0.95;
+  const hipY = o.hipY ?? 0.52, kneeY = o.kneeY ?? 0.70;
   const L: FramingPoint[] = [];
   const put = (i: number, x: number, y: number) => { L[i] = { x, y, visibility: v }; };
   put(0, cx, headY);                                    // nose
   put(11, cx - ss / 2, headY + 0.10); put(12, cx + ss / 2, headY + 0.10);   // shoulders
-  put(23, cx - hs / 2, 0.52); put(24, cx + hs / 2, 0.52);                   // hips
-  put(25, cx - hs / 2, 0.70); put(26, cx + hs / 2, 0.70);                   // knees
+  put(23, cx - hs / 2, hipY); put(24, cx + hs / 2, hipY);                   // hips
+  put(25, cx - hs / 2, kneeY); put(26, cx + hs / 2, kneeY);                 // knees
   put(27, cx - hs / 2, ankleY); put(28, cx + hs / 2, ankleY);               // ankles
   return { landmarks: L, present: true };
 }
@@ -35,6 +40,21 @@ describe('the shot before the rep', () => {
     expect(close.issues).toContain('tooClose');
     expect(checkFraming(shot({ headY: 0.35, ankleY: 0.70 })).worst).toBe('tooFar');
     expect(checkFraming(shot({ headY: 0.35, ankleY: 0.70 })).instruction).toMatch(/come forward/i);
+  });
+
+  // MIRROR-COACH P4 baseline F6 (2026-09-25): bodyFill is head-to-ankle height, which a deep squat or lunge shrinks
+  // just by folding up — measured live, the bottom of a squat read 'tooFar' on 40 of 120 fixture frames. The hip-to-
+  // knee gap against the torso length (which a squat barely shortens) tells a crouch apart from real distance.
+  it('a crouched body — hips down near the knees — is not told to step closer (MIRROR-COACH P4 baseline F6)', () => {
+    // the same small body as the 'tooFar' case above (headY 0.35, ankleY 0.70 — bodyFill 0.35, under FILL_MIN), but
+    // crouched: the hips have dropped to just above the knees, the way a deep squat or lunge bottom looks
+    const crouched = shot({ headY: 0.35, ankleY: 0.70, hipY: 0.60, kneeY: 0.62 });
+    expect(checkFraming(crouched).issues).not.toContain('tooFar');
+  });
+
+  it('the same small body simply standing (hips well above the knees) is still read as too far', () => {
+    const standingFarAway = shot({ headY: 0.35, ankleY: 0.70, hipY: 0.52, kneeY: 0.70 });
+    expect(checkFraming(standingFarAway).worst).toBe('tooFar');
   });
 
   it('spots a body turned side-on, because knee tracking cannot be read from the side', () => {

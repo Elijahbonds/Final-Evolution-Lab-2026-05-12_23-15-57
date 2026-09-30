@@ -7,8 +7,8 @@ import { summarize } from './checks';
 import { gradeSession } from '@/lib/assess/runner';
 import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, syntheticCalibration } from '@/lib/assess/replay';
 import {
-  KEYS, LEGACY_LOCAL_KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, gateRecord, lockAge, mayPersist, readAge, readResult, recall,
-  remember, writeResult, writeTakeoff, type GateRecord, type StorageLike,
+  KEYS, LEGACY_LOCAL_KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, gateRecord, keepResult, lockAge, mayPersist, readAge, readResult,
+  recall, remember, writeResult, writeTakeoff, type GateRecord, type StorageLike,
 } from './store';
 
 /** A Storage that records every write. */
@@ -62,11 +62,11 @@ describe('the age answer: written once, then locked for the tab', () => {
   });
 
   it('"Done, clear my results" keeps the lock; everything else goes', () => {
-    lockAge(s, 'under-13');
-    writeResult(s, gateRecord('under-13', true), SUMMARY);
+    lockAge(s, '18+');
+    writeResult(s, gateRecord('18+', false), SUMMARY);                // CHANGED (SCREEN-FIX-2): was an under-13 result, which is never kept now
     clearScreen(s);
     expect([...s.m.keys()]).toEqual([KEYS.age]);
-    expect(readAge(s)).toBe('under-13');
+    expect(readAge(s)).toBe('18+');
   });
 });
 
@@ -87,18 +87,35 @@ describe('the grown-up step comes first', () => {
     expect(s.writes).toEqual([]);
   });
 
-  it('after the grown-up step (or for an adult) the result goes to this tab\'s sessionStorage, under screen keys only', () => {
-    expect(writeResult(s, gateRecord('13-17', true), SUMMARY)).toBe(true);
-    expect(s.writes.every((k) => k.startsWith(SCREEN_PREFIX))).toBe(true);
+  // CHANGED (SCREEN-FIX-2; FE PM + Research 11:50 AM PT): was "after the grown-up step (or for an adult) the result goes
+  // to this tab's sessionStorage"; an under-18 result is never kept now, grown-up ticked or not
+  it('an adult\'s result goes to this tab\'s sessionStorage, under screen keys only; an under-18 result never does', () => {
+    for (const age of ['under-13', '13-17', 'unknown'] as const) {
+      expect(writeResult(s, gateRecord(age, true), SUMMARY), age).toBe(false);
+      expect(writeTakeoff(s, gateRecord(age, true), 'left'), age).toBe(false);
+      expect(mayPersist(gateRecord(age, true)), age).toBe(false);
+    }
+    expect(s.writes).toEqual([]);
     const adult = new MemStore();
     expect(writeResult(adult, gateRecord('18+', false), SUMMARY)).toBe(true);
+    expect(adult.writes.every((k) => k.startsWith(SCREEN_PREFIX))).toBe(true);
     expect(readResult(adult)!.summary).toEqual(SUMMARY);
+  });
+
+  it('keepResult: an adult\'s is remembered and written; a kid\'s nothing, anywhere', () => {
+    expect(keepResult(s, gateRecord('13-17', true), SUMMARY)).toBe('kid');
+    expect(keepResult(s, null, SUMMARY)).toBe('kid');
+    expect(s.writes).toEqual([]);
+    expect(recall(null)).toBeNull();
+    expect(keepResult(s, gateRecord('18+', false), SUMMARY)).toBe('adult');
+    expect(recall(null)!.summary).toEqual(SUMMARY);
+    expect(readResult(s)!.summary).toEqual(SUMMARY);
   });
 
   it('the gate record holds exactly the age band, the grown-up checkbox, a timestamp and the text version', () => {
     const g = gateRecord('under-13', true, new Date('2026-09-29T12:00:00Z'));
     expect(g).toEqual({ ageBand: 'under-13', grownUp: true, at: '2026-09-29T12:00:00.000Z', textVersion: GROWN_UP_TEXT_VERSION });
-    writeResult(s, g, SUMMARY);
+    writeResult(s, gateRecord('18+', false), SUMMARY);                  // CHANGED (SCREEN-FIX-2): only an adult's is written
     expect(Object.keys(JSON.parse(s.getItem(KEYS.gate)!)).sort()).toEqual(['ageBand', 'at', 'grownUp', 'textVersion']);
   });
 
@@ -108,12 +125,15 @@ describe('the grown-up step comes first', () => {
     expect(readResult(s)).toBeNull();
     s.setItem(KEYS.gate, JSON.stringify({ ageBand: '13-17', grownUp: true, at: 'x', textVersion: 'old' }));
     expect(readResult(s)).toBeNull();
+    // ADDED (SCREEN-FIX-2): a kid's record reads as nothing even with the checkbox and the current wording
+    s.setItem(KEYS.gate, JSON.stringify({ ageBand: '13-17', grownUp: true, at: 'x', textVersion: GROWN_UP_TEXT_VERSION }));
+    expect(readResult(s)).toBeNull();
     s.setItem(KEYS.gate, JSON.stringify({ ageBand: '18+', grownUp: false, at: 'x', textVersion: GROWN_UP_TEXT_VERSION, name: 'extra' }));
     expect(readResult(s)).toBeNull();                          // an extra field is refused: the record holds four
   });
 
   it('the text version was bumped: a gate record from the screen-v1 wording no longer reads', () => {
-    expect(GROWN_UP_TEXT_VERSION).toBe('screen-grown-up-v2-2026-09-29');
+    expect(GROWN_UP_TEXT_VERSION).toBe('screen-grown-up-v3-2026-09-29');      // CHANGED (SCREEN-FIX-2): was v2; the step's body changed
     // the v1 record's own shape (its checkbox field and version), as a tab from before this change holds it
     s.setItem(KEYS.gate, JSON.stringify({ ageBand: 'under-18', parentCheckbox: true, at: 'x', textVersion: 'screen-v1' }));
     s.setItem(KEYS.summary, JSON.stringify(SUMMARY));
@@ -144,6 +164,12 @@ describe('clearing, and a new screen', () => {
     expect([...s.m.keys()]).toEqual(['fel.agent']);
     expect(local.length).toBe(0);
     expect(readResult(s)).toBeNull();
+    // ADDED (SCREEN-FIX-2): a clean device's localStorage sees no call at all
+    const clean = new MemStore();
+    let removes = 0;
+    clean.removeItem = () => { removes++; };
+    clearScreen(s, clean);
+    expect(removes).toBe(0);
   });
 
   it('the page\'s memory is held under the same gate and cleared with the keys', () => {
@@ -173,7 +199,8 @@ describe('never localStorage', () => {
     expect(src).toMatch(/window\.sessionStorage/);
     // localStorage is reached once, only to REMOVE PR #20's two old keys
     expect(src.match(/window\.localStorage/g)!.length).toBe(1);
-    expect(src).toMatch(/for \(const k of LEGACY_LOCAL_KEYS\) local\?\.removeItem\(k\)/);
+    // CHANGED (SCREEN-FIX-2): was `local?.removeItem(k)` for both keys; now only a key that is there is removed
+    expect(src).toMatch(/for \(const k of LEGACY_LOCAL_KEYS\) if \(local && local\.getItem\(k\) !== null\) local\.removeItem\(k\)/);
     expect(src).not.toMatch(/local\??\.setItem|localStorage\.setItem|indexedDB|document\.cookie/);
   });
   it('a record for the gate type-checks as exactly four fields', () => {
