@@ -18,7 +18,7 @@
 //   2. THE KIND: a session made from it is Session.kind = 'recovery' (prisma/schema.prisma SessionKind), added to a
 //      client's week by the builder (lib/coach/builderServer.ts action 'add_off_day'), done on Today like any session,
 //      and completed as a ClientSession — "a coached session of kind recovery" — which P9's PRQ recovery counts by
-//      COMPLETED_OFF_DAY_WHERE below. No new model: one additive column.
+//      COMPLETED_OFF_DAY_WHERE (now in ./recoverySources, re-exported here). No new model: one additive column.
 //   3. THE WEEK: fullWeek() puts a plan week's named days into Mon→Sun with every unnamed day an OFF day that says
 //      what an off day is (the /workout viewer), and weekView() is a coached client's current week on Today, the off
 //      days in it named as off days.
@@ -31,15 +31,16 @@
 // PRQ recovery (owner decision #12), and a line that turns false the day P9 lands is not one to ship.
 //
 // Pure: no Prisma client value (types only), no DOM.
-import type { BraceMode, MovementPattern, Prisma, SessionSection } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern, SessionSection } from '@/public/_prisma/client';
 import { HOLD_SEC, ROCK_HOLDS, ROCK_HOLD_ROUNDS, ROCK_SEC } from './warmupContent';
 import { RECOVERY_BREATH, RECOVERY_BREATH_STEP, breathCycleSec } from './cooldown';
-import { LOGGED_WORK_WHERE } from './setLog';
+// MIRROR-COACH P9 (2026-09-30): the off-day kind and the two recovery filters moved to a leaf (./recoverySources) so the
+// PRQ recovery path can read them without importing this file's warm-up/cool-down graph; re-exported here unchanged.
+import { OFF_DAY_KIND } from './recoverySources';
+export { COMPLETED_OFF_DAY_WHERE, COOLDOWN_DONE_WHERE, OFF_DAY_KIND } from './recoverySources';
 
 // ── the template ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The session kind an off day is stored as (prisma/schema.prisma SessionKind). */
-export const OFF_DAY_KIND = 'recovery' as const;
 /** An off-day session's label in the builder, on Today and in the coach's inbox. */
 export const OFF_DAY_LABEL = 'Off day · recovery';
 /** The walk's timed minutes. FEL's choice: long enough to count, short enough that an off day stays an easy one. */
@@ -178,26 +179,9 @@ export function offDayWouldRewind(
 }
 
 // ── what P9 reads ────────────────────────────────────────────────────────────────────────────────────────────────────
-
-/**
- * A completed off day: a coached session of kind recovery, marked Done WITH WORK LOGGED in it. P9's PRQ recovery counts
- * these (owner decision #12).
- *
- * MIRROR-COACH P6 FIX (2026-09-29, code review): it counted any off day marked Done. saveClientLog completes a session
- * even when every log is empty (lib/coach/todayServer.ts), and the off day sits in the running order, so a client who
- * simply rested has to press Done to reach their next training day — an empty tap that would have earned recovery
- * credit. The roster and attention readers already require LOGGED_WORK_WHERE for exactly this reason; so does this.
- */
-export const COMPLETED_OFF_DAY_WHERE = {
-  completedAt: { not: null }, session: { kind: OFF_DAY_KIND }, exerciseLogs: { some: LOGGED_WORK_WHERE },
-} satisfies Prisma.ClientSessionWhereInput;
-/**
- * A finished automatic cool-down (lib/coach/cooldown.ts; stamped by lib/coach/cooldownServer.ts) on a session that was
- * COMPLETED. MIRROR-COACH P6 FIX (2026-09-29, code review): the stamp alone counted, and a tap on the card of a session
- * nobody went on to train (it is on Today's screen from the start) opened a row that is never completed — P9 would
- * have counted a cool-down after no work. The stamp counts once Done lands on the same row.
- */
-export const COOLDOWN_DONE_WHERE = { cooldownDoneAt: { not: null }, completedAt: { not: null } } satisfies Prisma.ClientSessionWhereInput;
+//
+// COMPLETED_OFF_DAY_WHERE and COOLDOWN_DONE_WHERE (P6, with their review fixes) now live in ./recoverySources and are
+// re-exported above; P9's PRQ recovery (lib/prq-recovery.ts) reads them from there.
 
 // ── the week ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 

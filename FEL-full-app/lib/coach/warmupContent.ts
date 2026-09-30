@@ -22,6 +22,11 @@
 // OFF on a day the athlete's pain check-in stepped them down or stopped them. Every pattern therefore has a primer with
 // `impact: false`, so a gated athlete still gets a primer rather than none.
 //
+// EXTERNAL FOCUS (MIRROR-COACH P9, 2026-09-30): every cue here is linted by lib/coach/cueLint.ts's policy — a cue that
+// names a body part leads with the floor, a wall, the doorway or the ceiling, and nothing names a muscle to squeeze.
+// Seven cues were reworded in FEL's words (the hip-front rock said "Squeeze the back-leg glute"; the ankle rock led
+// with the knee). The 90/90 row's POSITION is the owner's (ch4); its rock-and-hold cue is FEL's step, reworded here.
+//
 // Pure data: no DOM, no Prisma client value (types only).
 import type { MovementPattern } from '@/public/_prisma/client';
 
@@ -116,7 +121,7 @@ export const ROCK_HOLDS: readonly RockHoldStep[] = [
   rockHold({
     id: 'ankle-rock', name: 'Ankle Rock and Hold', zones: ['foot'], patterns: ['squat', 'lunge', 'locomotion', 'carry'], sides: 'each',
     setup: 'Half-kneeling, front foot flat, hands on the front knee.',
-    cue: `Rock the front knee forward over the toes in small pulses, heel down. ${HOLD_LINE}`, source: 'fel',
+    cue: `Rock toward a spot on the floor past your toes in small pulses, heel down. ${HOLD_LINE}`, source: 'fel',
   }),
   rockHold({
     id: 'wall-calf-rock', name: 'Wall Calf Rock and Hold', zones: ['foot'], patterns: ['locomotion', 'squat', 'hinge', 'carry'], sides: 'each',
@@ -133,15 +138,17 @@ export const ROCK_HOLDS: readonly RockHoldStep[] = [
     setup: 'Standing, soft knees, hands sliding down the fronts of the thighs.',
     cue: `Push the hips back toward the wall behind you in small rocks, back long. ${HOLD_LINE}`, source: 'fel',
   }),
-  rockHold({
-    id: 'hip-front-rock', name: 'Half-Kneel Hip Rock and Hold', zones: ['lumbo_pelvic', 'posterior_chain'], patterns: ['lunge', 'hinge', 'locomotion', 'squat', 'carry'], sides: 'each',
-    setup: 'Half-kneeling, back knee on something soft, tall through the trunk.',
-    cue: `Squeeze the back-leg glute and ease the hips forward a little at a time. ${HOLD_LINE}`, source: 'fel',
-  }),
+  // MIRROR-COACH P9 fix (2026-09-30, code review): THE HALF-KNEEL HIP ROCK AND HOLD IS GONE. Half-kneeling, easing the hips
+  // forward and holding is the kneeling hip-flexor stretch, and the owner's Playbook says not to do it: ch4's Trainer's
+  // Note, "Don't stretch the psoas — strengthen the stabilizers … kneeling lunge stretch, hold for 60 seconds, done"
+  // (lib/education/playbook.data.json). P9 dropped the couch stretch from lib/mirror/program.ts on that same line, while
+  // this one ran before every lunge, hinge, squat, locomotion and carry session and in their cool-downs. Owner decision
+  // #7 asks for a rock-then-hold STEP, not this stretch, and the eight below keep it: every pattern still has two that fit
+  // (warmup.test.ts), and the hips' own is the owner's 90/90 (ch4). The owner can restore it in one entry (P9 fix report).
   rockHold({
     id: 'ninety-ninety-rock', name: '90/90 Rock and Hold', zones: ['lumbo_pelvic', 'posterior_chain'], patterns: ['squat', 'rotation', 'lunge', 'hinge', 'mobility', 'breath'], sides: 'each',
     setup: 'Seated 90/90: front shin across, back shin out to the side, both knees bent.',
-    cue: `Tall chest, rock it forward over the front shin in small moves. ${HOLD_LINE}`, source: 'playbook ch4 (The Hip 90/90 Position)',
+    cue: `Rock forward toward a spot on the floor past the front shin in small moves, chest tall. ${HOLD_LINE}`, source: 'playbook ch4 (The Hip 90/90 Position)',
   }),
   rockHold({
     id: 'open-book-rock', name: 'Open Book Rock and Hold', zones: ['rib_thoracic'], patterns: ['rotation', 'push', 'pull', 'carry', 'breath', 'mobility'], sides: 'each',
@@ -156,7 +163,7 @@ export const ROCK_HOLDS: readonly RockHoldStep[] = [
   rockHold({
     id: 'doorway-chest-rock', name: 'Doorway Chest Rock and Hold', zones: ['rib_thoracic'], patterns: ['push', 'pull'], sides: 'each',
     setup: 'One forearm on a door frame, elbow at shoulder height.',
-    cue: `Step through a little at a time, easy on the front of the shoulder. ${HOLD_LINE}`, source: 'fel',
+    cue: `Step through the doorway a little at a time, easy on the front of the shoulder. ${HOLD_LINE}`, source: 'fel',
   }),
 ];
 
@@ -199,7 +206,7 @@ export const PRIMERS: readonly Primer[] = [
   {
     id: 'fast-squat-primer', name: 'Fast Squat Primer', patterns: ['squat'], impact: false, youthSafe: true,
     dose: { sets: 2, reps: '5', seconds: 60 }, lowDay: { sets: 1, reps: '5', seconds: 30 },
-    cue: 'Sit down under control, stand up as fast as you can. Heels stay down.', source: 'fel',
+    cue: 'Sit down under control, stand up as fast as you can. Heels stay on the floor.', source: 'fel',
   },
   {
     id: 'broad-jump-primer', name: 'Short Broad Jump Primer', patterns: ['hinge'], impact: true, youthSafe: false,
@@ -219,7 +226,7 @@ export const PRIMERS: readonly Primer[] = [
   {
     id: 'split-drive-primer', name: 'Split Squat Drive Primer', patterns: ['lunge'], impact: false, youthSafe: true,
     dose: { sets: 2, reps: '4 a side', seconds: 60 }, lowDay: { sets: 1, reps: '4 a side', seconds: 30 },
-    cue: 'Lower slow, then drive up fast through the front heel.', source: 'fel',
+    cue: 'Lower slow, then drive the floor away fast through the front heel.', source: 'fel',
   },
   {
     id: 'fast-push-primer', name: 'Fast Push-Up Primer', patterns: ['push'], impact: false, youthSafe: true,
@@ -234,7 +241,7 @@ export const PRIMERS: readonly Primer[] = [
   {
     id: 'tall-march-primer', name: 'Tall March Primer', patterns: ['carry'], impact: false, youthSafe: true,
     dose: { sets: 2, reps: '20 seconds', seconds: 60 }, lowDay: { sets: 1, reps: '20 seconds', seconds: 30 },
-    cue: 'March in place, tall, knees up quick, arms driving. Grow toward the ceiling.', source: 'fel',
+    cue: 'Grow toward the ceiling as you march in place, knees up quick, arms driving.', source: 'fel',
   },
   {
     id: 'turn-stop-primer', name: 'Turn and Stop Primer', patterns: ['rotation'], impact: false, youthSafe: true,

@@ -3,6 +3,8 @@
 // from the four sources that already exist. No new tables; pure helpers for
 // the deltas so the session record and the profile agree.
 import { prisma } from '@/lib/db';
+import { recoveryAsOf } from '@/lib/prq-recovery';
+import { countsInVector } from '@/lib/prq-entries';
 import { analyzeMovement } from '@/lib/workout/movement-screen';
 import { computeResiliency, type SessionOutcome } from './resiliency';
 import { certificationStatusFor } from './certification';
@@ -32,14 +34,19 @@ export async function composeProfile(userId: string, since: Date | null = null) 
     prisma.credential.findMany({ where: { userId } }),
     prisma.facilitatorProfile.findUnique({ where: { userId } }),
   ]);
-  const prqNow = latestPerAttribute(entries, null);
-  const vouched = vouchedPrq(entries);
-  const prqThen = since ? latestPerAttribute(entries, since) : {};
+  // MIRROR-COACH P9 fix (2026-09-30): a game's copy of recovery (a 'drillResult' recovery row — trivia's, from before
+  // P9) is not a measurement of it any more; the same read the traceable PRQ makes (lib/prq-entries.ts countsInVector)
+  const measuredRows = entries.filter(countsInVector);
+  const prqNow = latestPerAttribute(measuredRows, null);
+  const vouched = vouchedPrq(measuredRows);
+  const prqThen = since ? latestPerAttribute(measuredRows, since) : {};
   const latestScan = scans[0] ? safeAnalyze(scans[0].metrics) : null;
   const prevScan = scans[1] ? safeAnalyze(scans[1].metrics) : null;
   return {
     prq: {
-      card: profile ? Object.fromEntries(PRQ_ATTRS.map((k) => [k, (profile as unknown as Record<string, number>)[k]])) : null,
+      // MIRROR-COACH P9 fix (2026-09-30): recovery as of now — its half-life runs only inside a settle, and this read
+      // is direct, so a coach saw an idle client's old recovery indefinitely (lib/prq-recovery.ts recoveryAsOf, pure)
+      card: profile ? Object.fromEntries(PRQ_ATTRS.map((k) => [k, (recoveryAsOf(profile) as unknown as Record<string, number>)[k]])) : null,
       measured: prqNow,
       // what a verified shield may stand on: `measured` without the camera estimates, and the newest of those
       vouched: vouched.values,

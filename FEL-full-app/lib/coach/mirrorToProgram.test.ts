@@ -7,8 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ANSWERS_NOTE, ANSWERS_WITHHELD, COACH_OWN_CHECK_LINE, MODIFIED_NO_COACH_CHECKS, REVIEW_GROUPS, SCREEN_NOTE_PREFIX, addBodyFor, becauseLine,
-  blockAddBodies, coachDraft, matchExercise, prescribeFromOutcomes, prescribeFromScreen, reviewScreen, wantedFor,
-  type CatalogueExercise,
+  blockAddBodies, coachDraft, coachNoteFor, matchExercise, prescribeFromOutcomes, prescribeFromScreen, reviewScreen, wantedFor,
+  WRITTEN_CORRECTIVE_NOTE, type CatalogueExercise,
 } from './mirrorToProgram';
 import { validateExerciseSpec } from './loop';
 import { doseLine } from './structure';
@@ -446,4 +446,85 @@ describe('youth rules in the coach\'s draft', () => {
       expect(blockAddBodies(d.prescriptions, 's1').map((b) => b.exerciseId)).not.toContain('pin');
     });
   }
+});
+
+// MIRROR-COACH P9 (2026-09-30), PLAN item 9 rule (e): "a flagged check can prescribe the matching corrective" — the
+// Mirror's written band drill and release (lib/mirror/correctives.ts SCREEN_CORRECTIVE), for an adult client only.
+describe('P9: a flagged check carries its matching written corrective', () => {
+  const draftFor = (k: Key, youth: 'minor' | 'unknownAge' | null) =>
+    coachDraft([{ metrics: row({ [k]: FLAG[k] }), createdAt: '2026-09-30T10:00:00Z' }], CAT, { youth });
+
+  it('an adult client: the hip checks → the side-pull drill; the shoulder → the band-up hold and its release; the knee → the back-of-the-hip release', () => {
+    expect(draftFor('hipLevel', null).prescriptions[0].corrective!.drill!.signal).toBe('trunkShift');
+    expect(draftFor('singleLegL', null).prescriptions[0].corrective!.drill!.signal).toBe('trunkShift');
+    const sh = draftFor('shoulderLevel', null).prescriptions[0].corrective!;
+    expect(sh.drill!.signal).toBe('shoulderRise');
+    expect(sh.release!.zone).toBe('upper_traps');
+    const knee = draftFor('kneeWindow', null).prescriptions[0].corrective!;
+    expect(knee.drill).toBeNull();
+    expect(knee.release!.zone).toBe('posterior_chain');
+  });
+
+  it('no written corrective for a check none fits (the head float, the heel line)', () => {
+    expect(draftFor('headFloat', null).prescriptions[0].corrective).toBeNull();
+    expect(draftFor('heelLine', null).prescriptions[0].corrective).toBeNull();
+  });
+
+  for (const youth of ['minor', 'unknownAge'] as const) {
+    it(`${youth}: no written corrective on any prescription, and the draft says the drills and releases are off with the blocks`, () => {
+      for (const k of KEYS) expect(draftFor(k, youth).prescriptions.every((p) => p.corrective === null), k).toBe(true);
+      expect(draftFor('shoulderLevel', youth).youthNote).toMatch(/the band drills and releases with them/);
+    });
+  }
+
+  it('a caller that does not say whose draft it is gets none (youth rules, the conservative side)', () => {
+    const outcomes = outcomesFromGrades('modified', [regradeFromSummary({ ...PASS.shoulderLevel, ...FLAG.shoulderLevel })!]);
+    expect(prescribeFromOutcomes(outcomes, CAT)[0].corrective).toBeNull();
+    expect(prescribeFromOutcomes(outcomes, CAT, 3, { youth: null })[0].corrective).not.toBeNull();
+  });
+
+  // MIRROR-COACH P9 fix (2026-09-30, code review): this test said the written corrective is text for the COACH only —
+  // and that was the defect: rule (e) wants it reachable from the prescription, and nothing the athlete received pointed
+  // at it. "Add" still sends only the catalogue row (the drill is never an exercise); the row's coach note — what Today
+  // shows the athlete — now ends with the corrective's page anchor, which Today renders as a link (coach-note.tsx).
+  it('"add" still sends only the catalogue row — and its coach note now points the athlete at the written corrective', () => {
+    const p = draftFor('shoulderLevel', null).prescriptions[0];
+    expect(p.corrective).not.toBeNull();
+    const body = addBodyFor(p, 's1')!;
+    expect(body).toMatchObject({ exerciseId: p.exercise!.id });
+    expect(JSON.stringify(body)).not.toMatch(/Band-up|neck meets the shoulder/);   // the drill's words are not a row or a note
+    expect(body.coachNote).toBe(`${p.because} ${WRITTEN_CORRECTIVE_NOTE} /play/mirror/correctives#band-drills`);
+    expect(String(body.coachNote).startsWith(SCREEN_NOTE_PREFIX)).toBe(true);
+    // the knee has a release only: its anchor is the release section
+    expect(coachNoteFor(draftFor('kneeWindow', null).prescriptions[0])).toMatch(/Written corrective: \/play\/mirror\/correctives#release$/);
+  });
+
+  it('youth rules, or a check with none: the note is the finding alone', () => {
+    for (const youth of ['minor', 'unknownAge'] as const) {
+      const p = draftFor('shoulderLevel', youth).prescriptions[0];
+      expect(coachNoteFor(p)).toBe(p.because);
+    }
+    const head = draftFor('headFloat', null).prescriptions[0];
+    expect(coachNoteFor(head)).toBe(head.because);
+  });
+
+  it('the note never passes the 300-character coach note (the finding is trimmed, the link kept whole)', () => {
+    const p = { ...draftFor('shoulderLevel', null).prescriptions[0] };
+    p.because = `${SCREEN_NOTE_PREFIX} ${'x'.repeat(400)}`;
+    const note = coachNoteFor(p);
+    expect(note.length).toBeLessThanOrEqual(300);
+    expect(note.endsWith(`${WRITTEN_CORRECTIVE_NOTE} /play/mirror/correctives#band-drills`)).toBe(true);
+    const v = validateExerciseSpec({ exerciseId: 'e', coachNote: note } as never);
+    expect(v.ok && v.spec.coachNote).toBe(note);                    // the builder keeps it whole (its cap is 300)
+  });
+
+  it('coachDraft with no age said gives no written corrective (fails closed, like prescribeFromOutcomes) — blocks unchanged', () => {
+    const unstated = coachDraft([{ metrics: row({ shoulderLevel: FLAG.shoulderLevel }), createdAt: 'x' }], CAT);
+    expect(unstated.prescriptions.every((p) => p.corrective === null)).toBe(true);
+    expect(unstated.prescriptions.every((p) => coachNoteFor(p) === p.because)).toBe(true);
+    // P3's adult default for the blocks is not changed by this (their youth reading is a separate, owner-set rule)
+    const adult = coachDraft([{ metrics: row({ shoulderLevel: FLAG.shoulderLevel }), createdAt: 'x' }], CAT, { youth: null });
+    expect(unstated.prescriptions.map((p) => p.block)).toEqual(adult.prescriptions.map((p) => p.block));
+    expect(adult.prescriptions[0].corrective).not.toBeNull();
+  });
 });

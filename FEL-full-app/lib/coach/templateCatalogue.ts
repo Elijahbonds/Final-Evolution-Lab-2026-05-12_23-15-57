@@ -38,6 +38,13 @@
 // HONESTY. Cues say what to do; faults say what a coach sees and what to do instead. Nothing here names a condition,
 // promises an outcome or says an exercise lowers the chance of anything.
 //
+// MIRROR-COACH P9 (2026-09-30) — THE EXTERNAL-FOCUS POLICY (lib/coach/cueLint.ts; its test lints every cue and fix here).
+// 35 lines were reworded in FEL's words, meaning kept: no line names a muscle ("squeeze your glutes", "glutes squeezed",
+// "biceps finishing near the ears" are gone), "squeeze at the top" is "hold the top still", and every brace uses the
+// owner's own Playbook image (taxonomy.ts 'light-punch', "brace for a light punch") instead of a bare "brace". A fault's
+// fix — what the athlete thinks about mid-set — leads with the floor, the bar, the wall or the ceiling when it names a
+// body part. Rung names ("Glute Bridge, 5-Second Squeeze") are the owner's ch8 names and are not cues; they stay.
+//
 // Pure data + lookups: no Prisma client value (types only), no DOM.
 import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
 import type { CommonFault } from './catalogue';
@@ -115,9 +122,9 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('tempo-bw-squat', 'Tempo Bodyweight Squat', 'squat', '3-0-1-0', [
       'Three seconds down, stand up at a normal speed.',
       'Knees travel out over your laces.',
-      'Reach the arms forward as you sit, for balance.',
+      'Reach toward the wall in front of you as you sit, for balance.',
     ], { commonFaults: [
-      f('Heels lift at the bottom', 'Sit a little less deep and keep the whole foot pressing down.'),
+      f('Heels lift at the bottom', 'Sit a little less deep and keep the whole foot pressing into the floor.'),
       f('Knees drift in on the way up', 'Spread the floor apart with your feet as you stand.'),
     ] }),
     x('backpack-hug-squat', 'Backpack Hug Squat', 'squat', '3-0-1-0', [
@@ -126,7 +133,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { equipment: ['backpack'], commonFaults: [f('The chest folds forward', 'Squeeze the bag tighter and lead the stand with your chest.')] }),
     x('backpack-hug-squat-pause', 'Backpack Hug Squat, 3-Second Pause', 'squat', '2-3-1-0', [
       'The hug squat, then hold still at the bottom for three seconds.',
-      'Keep the brace through the pause, then drive up.',
+      'Stay braced for a light punch through the pause, then drive up.',
     ], { equipment: ['backpack'] }),
   ]),
   L('bw-hinge', 'hinge', [
@@ -135,38 +142,38 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Push your hips back until they touch the wall, back long, then stand tall.',
     ]),
     x('bw-rdl-hold', 'Bodyweight RDL, 3-Second Hold', 'hinge', '2-3-1-0', [
-      'Hands slide down the fronts of your thighs as the hips go back.',
-      'Stop before the back rounds, hold three seconds, then drive the hips forward.',
+      'Push the wall behind you with your hips, hands sliding down the fronts of your thighs.',
+      'Stop at the depth where the back stays long, hold three seconds, then stand tall.',
     ], { source: CH8, commonFaults: [f('The back rounds to reach lower', 'Stop higher: the depth comes from the hips moving back, not the hands going down.')] }),
     x('backpack-rdl', 'Backpack RDL', 'hinge', '3-0-1-0', [
       'Hold a loaded backpack in front of your thighs.',
-      'Push the hips back with a long back, then stand tall and squeeze at the top.',
+      'Push the hips back toward the wall behind you with a long back, then stand tall.',
     ], { source: CH8, equipment: ['backpack'], commonFaults: [f('The knees bend into a squat', 'Soft knees that stay put: the hips do the travelling.')] }),
     x('sl-rdl-supported', 'Single-Leg RDL Toe Touch, Supported', 'hinge', '3-0-1-0', [
       'One hand on a wall or chair, your weight on the standing leg.',
       'Reach the free leg back as the chest comes down, hips square to the floor.',
     ], { source: CH8, equipment: ['chair'], commonFaults: [f('The free leg\'s hip opens toward the ceiling', 'Point the back toes at the floor the whole rep.')] }),
     x('sl-rdl-free', 'Single-Leg RDL, Free Stand', 'hinge', '3-0-1-0', [
-      'No support: arms reach forward, the back leg reaches long.',
-      'Heel, big toe and little toe of the standing foot stay down.',
+      'No support: reach for the wall ahead with your hands and the wall behind with your back heel.',
+      'Press the floor with the standing foot\'s heel, big toe and little toe.',
     ], { source: CH8 }),
   ], CH8),
   L('bw-bridge', 'hinge', [
     x('glute-bridge-squeeze', 'Glute Bridge, 5-Second Squeeze', 'hinge', '2-0-1-5', [
       'On your back, knees bent, feet flat and close enough to brush your heels.',
-      'Breathe out as the hips rise, squeeze for five seconds at the top.',
+      'Breathe out as the hips rise, then hold the top still for five seconds.',
     ], { source: CH8 }),
     x('glute-bridge-close', 'Glute Bridge, Feet Close', 'hinge', '2-0-1-3', [
       'Walk the feet in closer to the hips than a normal bridge.',
-      'Press through the heels, hips up to a straight line from knees to shoulders.',
-    ], { source: CH8, commonFaults: [f('The lower back arches at the top', 'Stop the hips at a straight line and breathe out.')] }),
+      'Push the floor away through your heels until knees, hips and shoulders make one straight line.',
+    ], { source: CH8, commonFaults: [f('The lower back arches at the top', 'Stop rising at a straight line, and breathe out.')] }),
     x('sl-bridge-squeeze', 'Single-Leg Bridge, 5-Second Squeeze', 'hinge', '2-0-1-5', [
       'One foot down, the other knee pulled toward your chest.',
-      'Drive through the heel, hips level, squeeze five seconds at the top.',
-    ], { source: CH8, commonFaults: [f('One hip drops at the top', 'Lift less high until both hips stay level.')] }),
+      'Drive the floor away through the heel, hips level, and hold the top still for five seconds.',
+    ], { source: CH8, commonFaults: [f('One hip drops at the top', 'Lift less high, until the belt line stays level.')] }),
     x('sl-bridge-backpack', 'Single-Leg Bridge with a Backpack', 'hinge', '2-0-1-5', [
       'A loaded backpack across the hips, held with both hands.',
-      'The same single-leg bridge and the same five-second squeeze.',
+      'The same single-leg bridge and the same five-second hold at the top.',
     ], { source: CH8, equipment: ['backpack'] }),
   ], CH8),
   L('bw-split', 'lunge', [
@@ -176,12 +183,12 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { equipment: ['chair'] }),
     x('split-squat-hold', 'Split Squat, 3-Second Hold', 'lunge', '2-3-1-0', [
       'The back knee hovers just above the floor for three seconds.',
-      'The front shin stays close to upright; drive up through the front heel.',
+      'Drive the floor away through the front heel; the front shin stays close to upright.',
     ], { source: CH8, commonFaults: [f('The body drifts forward over the front foot', 'Think straight down and straight up, like an elevator.')] }),
     x('rfe-split-squat', 'Rear-Foot Elevated Split Squat', 'lunge', '3-0-1-0', [
       'Back foot laces-down on a step or chair behind you.',
-      'Lower until the back knee nearly touches, then drive up through the front heel.',
-    ], { source: CH8, equipment: ['step or chair'], commonFaults: [f('The front heel lifts', 'Move the front foot a little further forward.')] }),
+      'Lower until the back knee nearly touches the floor, then drive the floor away through the front heel.',
+    ], { source: CH8, equipment: ['step or chair'], commonFaults: [f('The front heel lifts', 'Set the front foot a little further from the step.')] }),
     x('rfe-split-squat-slow', 'Rear-Foot Elevated Split Squat, 4-Second Lower', 'lunge', '4-0-1-0', [
       'Four seconds on the way down, a normal speed up.',
       'When every rep is steady, the next step is light dumbbells.',
@@ -195,10 +202,10 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('reverse-lunge', 'Reverse Lunge', 'lunge', '2-0-1-0', [
       'Step back softly, the back knee toward the floor.',
       'Drive the floor down through your front heel to come back up.',
-    ], { commonFaults: [f('Short steps that tip you forward', 'Step back far enough that the front shin can stay near upright.')] }),
+    ], { commonFaults: [f('Short steps that tip you forward', 'Step back a longer way along the floor, so the front shin can stay near upright.')] }),
     x('backpack-reverse-lunge', 'Backpack Reverse Lunge', 'lunge', '2-0-1-0', [
       'Hug a loaded backpack to your chest.',
-      'The same step back and the same drive through the front heel.',
+      'The same step back, then drive the floor away through the front heel.',
     ], { equipment: ['backpack'] }),
   ]),
   L('bw-push', 'push', [
@@ -209,10 +216,10 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('incline-push-up', 'Incline Push-Up', 'push', '3-0-1-0', [
       'Hands on a bench, a table edge or a stair, the body in one straight line.',
       'Three seconds down, then push the floor away.',
-    ], { equipment: ['bench or sturdy table'], commonFaults: [f('The hips sag toward the floor', 'Brace for a light punch and squeeze your glutes before each rep.')] }),
+    ], { equipment: ['bench or sturdy table'], commonFaults: [f('The hips sag toward the floor', 'Brace for a light punch and hold one straight line from the bench to your heels.')] }),
     x('push-up', 'Push-Up', 'push', '3-0-1-0', [
       'Spread the shoulder blades apart before you lower: push the floor away.',
-      'Three seconds down, elbows about 45 degrees from your body.',
+      'Three seconds down toward the floor, elbows about 45 degrees from your body.',
     ], { source: 'playbook ch8 (Scapular-Controlled Push-Up)', commonFaults: [f('The elbows flare out wide', 'Screw the hands into the floor and bring the elbows in toward your sides.')] }),
     x('feet-elevated-push-up', 'Feet-Elevated Push-Up', 'push', '3-0-1-0', [
       'Feet on a step or chair, hands on the floor.',
@@ -227,7 +234,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('pike-push-up', 'Pike Push-Up', 'push', '2-0-1-0', [
       'Hands on the floor, hips high, heels lifted.',
       'Lower your head toward a spot just in front of your hands, then press away.',
-    ], { commonFaults: [f('The hips drop and it turns into a push-up', 'Walk the feet closer to the hands so the hips stay high.')] }),
+    ], { commonFaults: [f('The hips drop and it turns into a push-up', 'Walk the feet in along the floor, closer to the hands, so the hips stay high.')] }),
     x('feet-elevated-pike', 'Feet-Elevated Pike Push-Up', 'push', '2-0-1-0', [
       'Feet on a step or chair, hips stacked high over the hands.',
       'Lower slow, then press up.',
@@ -240,11 +247,11 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { equipment: ['sturdy door frame'] }),
     x('door-row', 'Door Frame Row', 'pull', '2-0-1-1', [
       'Hold both sides of a sturdy door frame, walk the feet in and lean back with a straight body.',
-      'Pull the chest in fast, lower slow.',
-    ], { equipment: ['sturdy door frame'], commonFaults: [f('The hips sag as you pull', 'Squeeze your glutes and pull the whole straight body in.')] }),
+      'Pull your chest to the door frame fast, lower slow.',
+    ], { equipment: ['sturdy door frame'], commonFaults: [f('The hips sag as you pull', 'Stay one straight plank from the door frame to your heels as you pull.')] }),
     x('door-row-single', 'Single-Arm Door Frame Row', 'pull', '2-0-1-1', [
       'One hand on the frame, feet in, lean back.',
-      'Pull without letting the body turn toward the free arm.',
+      'Pull straight toward the door frame without letting the body turn toward the free arm.',
     ], { equipment: ['sturdy door frame'], commonFaults: [f('The body twists open', 'Lean back less until you can pull square.')] }),
     x('door-row-single-slow', 'Single-Arm Door Frame Row, 3-Second Lower', 'pull', '3-0-1-1', [
       'The same one-arm row, three seconds on the way back out.',
@@ -258,7 +265,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('backpack-row', 'Bent-Over Backpack Row', 'pull', '2-0-1-1', [
       'Hinge forward with a long back, both hands on a loaded backpack.',
       'Pull the bag to your lower chest, elbows toward your back pockets.',
-    ], { equipment: ['backpack'], commonFaults: [f('The chest rises to help the pull', 'Hold the hinge still and move only the arms.')] }),
+    ], { equipment: ['backpack'], commonFaults: [f('The chest rises to help the pull', 'Keep the hinge frozen and move only the bag.')] }),
     x('backpack-row-squeeze', 'Bent-Over Backpack Row, 3-Second Squeeze', 'pull', '2-0-1-3', [
       'The same row; hold the bag in for three seconds each rep.',
     ], { equipment: ['backpack'] }),
@@ -270,7 +277,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ]),
     x('prone-yt', 'Prone Y-T Raise', 'pull', '1-1-1-1', [
       'Face down, forehead on a folded towel.',
-      'Lift the arms in a Y and lower, then in a T and lower. That is one rep.',
+      'Lift the arms off the floor in a Y and lower, then in a T and lower. That is one rep.',
     ], { equipment: ['towel'], commonFaults: [f('The head lifts with the arms', 'Keep the forehead on the towel and let only the arms move.')] }),
     x('prone-yt-hold', 'Prone Y-T Raise, 3-Second Holds', 'pull', '1-0-1-3', [
       'The same Y and T, each held up for three seconds.',
@@ -279,7 +286,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   L('bw-carry-side', 'carry', [
     x('farmer-hold-bags', 'Two-Bag Farmer Hold', 'carry', '0-0-0-0', [
       'A loaded bag in each hand; stand tall and still.',
-      'Breathe behind a light brace.',
+      'Stay ready for a light punch, and keep breathing.',
     ], { equipment: ['two bags'] }),
     x('farmer-carry-bags', 'Two-Bag Farmer Carry', 'carry', '0-0-0-0', [
       'A loaded bag or a water jug in each hand.',
@@ -288,7 +295,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('suitcase-carry', 'Suitcase Carry', 'carry', '0-0-0-0', [
       'One loaded bag in one hand, like a suitcase.',
       'Walk without leaning toward or away from the bag.',
-    ], { equipment: ['one bag'], commonFaults: [f('Leaning away from the bag', 'Grow tall and keep both shoulders level.')] }),
+    ], { equipment: ['one bag'], commonFaults: [f('Leaning away from the bag', 'Grow tall toward the ceiling and keep both shoulders level.')] }),
     x('suitcase-march', 'Suitcase March', 'carry', '0-0-0-0', [
       'One bag in one hand; march slowly, the knee up to hip height.',
       'Stay level each time a foot leaves the floor.',
@@ -297,21 +304,21 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   L('bw-carry-front', 'carry', [
     x('backpack-hug-hold', 'Backpack Hug Hold', 'carry', '0-0-0-0', [
       'Hug a loaded backpack high on your chest and stand tall.',
-      'Breathe behind a light brace.',
+      'Stay ready for a light punch, and keep breathing.',
     ], { equipment: ['backpack'] }),
     x('backpack-hug-carry', 'Backpack Hug Carry', 'carry', '0-0-0-0', [
       'Hug a loaded backpack high on your chest.',
       'Walk tall; do not lean back to hold it.',
     ], { equipment: ['backpack'], commonFaults: [f('Leaning back to hold the bag', 'Pull the bag in closer and stand tall over your hips.')] }),
     x('backpack-hug-march', 'Backpack Hug March', 'carry', '0-0-0-0', [
-      'The same hug; march slowly with the knees up.',
+      'The same hug; march slowly, each knee rising toward the backpack.',
       'Stay tall each time a foot leaves the floor.',
     ], { equipment: ['backpack'] }),
   ]),
   L('plank', 'other', [
     x('incline-breathing-plank', 'Incline Breathing Plank', 'other', '0-0-0-0', [
       'Forearms on a bench, the body in one straight line.',
-      'Breathe in for 4 and out for 6, and keep the brace the whole time.',
+      'Breathe in for 4 and out for 6, ready for a light punch the whole time.',
     ], { skillLayer: 'cylinder', equipment: ['bench or sturdy table'] }),
     x('breathing-plank', 'Breathing Plank', 'other', '0-0-0-0', [
       'Forearm plank, elbows under the shoulders, the body in one straight line.',
@@ -319,7 +326,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { skillLayer: 'cylinder', source: 'playbook ch8 (Breathing Plank)', commonFaults: [f('Holding the breath to stay still', 'Shorten the set and keep breathing; the time comes back.')] }),
     x('breathing-plank-taps', 'Breathing Plank with Shoulder Taps', 'other', '0-0-0-0', [
       'High plank, feet wide; tap one shoulder, then the other.',
-      'Keep breathing and keep the hips still.',
+      'Keep breathing and hold still: the taps should not rock the hips.',
     ], { skillLayer: 'cylinder' }),
   ]),
 
@@ -333,7 +340,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Dip fast to a comfortable depth and jump straight up.',
       'Land quiet on both feet and stick it still for a two-count.',
     ], { impact: 'plyometric', source: 'playbook ch6 (The Countermovement Is Where the Jump Is Won)', commonFaults: [
-      f('A loud, stiff landing', 'Land on the balls of the feet and let the ankles, knees and hips bend together.'),
+      f('A loud, stiff landing', 'Land quiet on the balls of the feet — ankles, knees and hips bend together.'),
       f('The knees cave in on the landing', 'Jump lower and land with the knees over your laces.'),
     ] }),
     x('box-jump-stick', 'Box Jump and Stick', 'squat', '0-0-0-0', [
@@ -347,25 +354,25 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   ]),
   L('pogo', 'locomotion', [
     x('fast-heel-raise', 'Fast Heel Raise', 'locomotion', '1-0-0-0', [
-      'Up onto the balls of the feet quickly, down under control.',
+      'Push the floor away to rise onto the balls of your feet quickly, then lower under control.',
       'The feet never leave the floor.',
     ], { skillLayer: 'wake-up', braceMode: 'reflex' }),
     x('pogo-hops', 'Pogo Hops', 'locomotion', '0-0-0-0', [
-      'Small, quick bounces off the balls of the feet, knees nearly straight.',
+      'Small, quick bounces off the floor on the balls of the feet, knees nearly straight.',
       'Crisp and quiet: no heel slap, arms swinging in opposition.',
-    ], { impact: 'plyometric', source: CH6_POGO, commonFaults: [f('The knees bend a lot on each contact', 'Make the bounce smaller and let the ankles do the work.')] }),
+    ], { impact: 'plyometric', source: CH6_POGO, commonFaults: [f('The knees bend a lot on each contact', 'Make the bounce smaller and quieter, springing off the floor from the ankles.')] }),
     x('single-leg-pogo', 'Single-Leg Pogo Hops', 'locomotion', '0-0-0-0', [
-      'The same small bounces on one foot, about 15 seconds a set.',
+      'The same small bounces off the floor on one foot, about 15 seconds a set.',
       'Quiet contacts, standing tall.',
     ], { impact: 'plyometric', source: CH6_POGO }),
   ], CH6_POGO),
   L('broad', 'hinge', [
     x('hip-snap', 'Hip Snap', 'hinge', '1-0-0-0', [
-      'Hands on hips; push them back toward the wall behind you.',
-      'Snap up tall, fast. The feet stay down.',
+      'Push your hips back toward the wall behind you, hands resting on them.',
+      'Snap up tall, fast. The feet stay pressed into the floor.',
     ], { skillLayer: 'wake-up' }),
     x('broad-jump-stick', 'Broad Jump and Stick', 'hinge', '0-0-0-0', [
-      'Swing the arms and jump forward a short way.',
+      'Swing the arms and jump forward to a spot a short way ahead.',
       'Land quiet on both feet and stick it for a two-count. Walk back and reset.',
     ], { impact: 'plyometric', commonFaults: [f('Falling forward out of the landing', 'Jump shorter until every landing sticks.')] }),
     x('double-broad-jump', 'Double Broad Jump and Stick', 'hinge', '0-0-0-0', [
@@ -399,14 +406,14 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Sit down between your heels, then push the floor away.',
     ], { equipment: ['dumbbell or kettlebell'], commonFaults: [f('The heels come up at the bottom', 'Widen the stance a little and sit less deep.')] }),
     x('back-squat', 'Barbell Back Squat', 'squat', '3-0-1-0', [
-      'Bar across the upper back, hands snug; brace before you unrack.',
+      'Bar across the upper back, hands snug; brace for a light punch before you unrack.',
       'Sit down between the heels, then drive the floor away.',
     ], { equipment: ['barbell', 'squat rack'], commonFaults: [
-      f('The hips shoot up first out of the bottom', 'Drive the chest and the hips up together; take weight off the bar.'),
+      f('The hips shoot up first out of the bottom', 'Push the floor away with chest and hips rising together; take weight off the bar.'),
       f('The knees drift in on the way up', 'Spread the floor apart with your feet.'),
     ] }),
     x('back-squat-pause', 'Paused Barbell Back Squat', 'squat', '3-2-1-0', [
-      'The same squat with two seconds still at the bottom, brace held.',
+      'The same squat with two seconds still at the bottom, still braced for the punch.',
       'Drive up from the stop.',
     ], { equipment: ['barbell', 'squat rack'] }),
   ]),
@@ -417,8 +424,8 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { equipment: ['kettlebell'] }),
     x('trap-bar-deadlift', 'Trap Bar Deadlift', 'hinge', '2-0-1-0', [
       'Stand in the middle of the bar, grip the handles, chest tall.',
-      'Brace, then push the floor away until you stand tall.',
-    ], { equipment: ['trap bar'], commonFaults: [f('The back rounds as the bar leaves the floor', 'Take the slack out of the bar and brace before it moves; take weight off.')] }),
+      'Brace for a light punch, then push the floor away until you stand tall.',
+    ], { equipment: ['trap bar'], commonFaults: [f('The back rounds as the bar leaves the floor', 'Take the slack out of the bar and brace for a light punch before it moves; take weight off.')] }),
     x('barbell-deadlift', 'Barbell Deadlift', 'hinge', '2-0-1-0', [
       'Bar over the middle of the foot, shins close to it.',
       'Brace, squeeze the bar and push the floor away.',
@@ -427,7 +434,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   L('g-rdl', 'hinge', [
     x('db-rdl', 'Dumbbell RDL', 'hinge', '2-0-1-0', [
       'Dumbbells in front of the thighs, soft knees.',
-      'Push the hips back with a long back, then stand tall.',
+      'Push the wall behind you with your hips, back long, then stand tall.',
     ], { equipment: ['dumbbells'] }),
     x('barbell-rdl', 'Barbell RDL', 'hinge', '2-0-1-0', [
       'Bar in front of the thighs, soft knees that stay put.',
@@ -444,24 +451,24 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { equipment: ['dumbbells'] }),
     x('db-rfe-split-squat', 'Dumbbell Rear-Foot Elevated Split Squat', 'lunge', '3-0-1-0', [
       'Back foot laces-down on a bench, dumbbells at your sides.',
-      'Lower until the back knee nearly touches, then drive up through the front heel.',
+      'Lower until the back knee nearly touches the floor, then drive the floor away through the front heel.',
     ], { equipment: ['dumbbells', 'bench'], commonFaults: [f('The front heel lifts', 'Move the front foot a little further from the bench.')] }),
     x('bb-rfe-split-squat', 'Barbell Rear-Foot Elevated Split Squat', 'lunge', '3-0-1-0', [
       'Bar across the upper back, back foot on a bench.',
-      'The same straight-down lower and the same front-heel drive.',
+      'The same straight-down lower, then drive the floor away through the front heel.',
     ], { equipment: ['barbell', 'squat rack', 'bench'] }),
   ]),
   L('g-step', 'lunge', [
     x('db-step-up-low', 'Dumbbell Step-Up, Low Box', 'lunge', '2-0-1-0', [
       'A box below knee height, dumbbells at your sides.',
-      'Drive up through the whole front foot, step down slow.',
+      'Push the box away through the whole front foot to stand up, then step down slow.',
     ], { equipment: ['dumbbells', 'box'] }),
     x('db-step-up', 'Dumbbell Step-Up', 'lunge', '2-0-1-0', [
       'A box about knee height, the whole foot on it.',
       'Stand up with the top leg; the back foot only follows.',
-    ], { equipment: ['dumbbells', 'box'], commonFaults: [f('Pushing off the back foot', 'Lift the back toes before you drive up.')] }),
+    ], { equipment: ['dumbbells', 'box'], commonFaults: [f('Pushing off the back foot', 'Lift the back toes off the floor before you drive up.')] }),
     x('db-step-up-slow', 'Dumbbell Step-Up, 3-Second Lower', 'lunge', '3-0-1-0', [
-      'The same step-up, three seconds to lower back down.',
+      'The same step-up, three seconds to step back down to the floor.',
     ], { equipment: ['dumbbells', 'box'] }),
   ]),
   L('g-bench', 'push', [
@@ -472,13 +479,13 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('db-bench', 'Dumbbell Bench Press', 'push', '3-0-1-0', [
       'Feet planted, shoulder blades pulled together on the bench.',
       'Lower with control, then push the dumbbells up and slightly together.',
-    ], { equipment: ['dumbbells', 'bench'], commonFaults: [f('The elbows flare straight out', 'Bring the elbows in to about 45 degrees from your sides.')] }),
+    ], { equipment: ['dumbbells', 'bench'], commonFaults: [f('The elbows flare straight out', 'Press the dumbbells up with the elbows about 45 degrees from your sides.')] }),
     x('bb-bench', 'Barbell Bench Press', 'push', '3-0-1-0', [
       'Eyes under the bar, feet planted, shoulder blades pulled together.',
       'Lower the bar to the lower chest, then press it back up over the shoulders.',
     ], { equipment: ['barbell', 'bench', 'spotter or safeties'], commonFaults: [f('The bar bounces off the chest', 'Touch softly and press from the touch.')] }),
     x('bb-bench-pause', 'Paused Barbell Bench Press', 'push', '3-1-1-0', [
-      'The same press with a one-second still pause on the chest.',
+      'The same press with the bar paused still for one second on the chest.',
     ], { equipment: ['barbell', 'bench', 'spotter or safeties'] }),
   ]),
   L('g-overhead', 'push', [
@@ -487,9 +494,9 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Press up and forward; the body stays tall and still.',
     ], { equipment: ['barbell', 'landmine'] }),
     x('db-overhead-press', 'Standing Dumbbell Press', 'push', '2-0-1-0', [
-      'Stand tall, dumbbells at the shoulders, glutes squeezed.',
-      'Press straight up, biceps finishing near the ears.',
-    ], { equipment: ['dumbbells'], commonFaults: [f('Leaning back to finish the press', 'Squeeze the glutes and brace; use lighter dumbbells.')] }),
+      'Stand tall, dumbbells at the shoulders, feet screwed into the floor.',
+      'Press straight up toward the ceiling, finishing with the arms near the ears.',
+    ], { equipment: ['dumbbells'], commonFaults: [f('Leaning back to finish the press', 'Grow tall toward the ceiling, ready for a light punch; use lighter dumbbells.')] }),
     x('bb-overhead-press', 'Barbell Overhead Press', 'push', '2-0-1-0', [
       'Bar on the front of the shoulders, grip just outside them.',
       'Press up, and move the head through once the bar passes it.',
@@ -524,7 +531,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('band-pull-up', 'Band-Assisted Pull-Up', 'pull', '2-0-1-0', [
       'A band looped over the bar and under one knee or both feet.',
       'Pull your chest toward the bar, then lower all the way down.',
-    ], { equipment: ['pull-up bar', 'band'], commonFaults: [f('Half reps at the bottom', 'Start each rep from straight arms; use a thicker band.')] }),
+    ], { equipment: ['pull-up bar', 'band'], commonFaults: [f('Half reps at the bottom', 'Start each rep hanging long from the bar; use a thicker band.')] }),
     x('pull-up', 'Pull-Up', 'pull', '2-0-1-0', [
       'Hang from the bar, hands just outside the shoulders.',
       'Pull until your chin clears the bar, then lower all the way.',
@@ -546,7 +553,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   L('g-carry-side', 'carry', [
     x('db-farmer-hold', 'Dumbbell Farmer Hold', 'carry', '0-0-0-0', [
       'A heavy dumbbell in each hand; stand tall and still.',
-      'Crush the handles and breathe behind a light brace.',
+      'Crush the handles, stay ready for a light punch, and keep breathing.',
     ], { equipment: ['dumbbells'] }),
     x('db-farmer-carry', 'Dumbbell Farmer Carry', 'carry', '0-0-0-0', [
       'A heavy dumbbell in each hand.',
@@ -555,7 +562,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('db-suitcase-carry', 'Dumbbell Suitcase Carry', 'carry', '0-0-0-0', [
       'One heavy dumbbell in one hand.',
       'Walk without leaning toward or away from the weight.',
-    ], { equipment: ['dumbbell'], commonFaults: [f('Leaning away from the weight', 'Grow tall and keep both shoulders level.')] }),
+    ], { equipment: ['dumbbell'], commonFaults: [f('Leaning away from the weight', 'Grow tall toward the ceiling and keep both shoulders level.')] }),
     x('db-suitcase-march', 'Dumbbell Suitcase March', 'carry', '0-0-0-0', [
       'One dumbbell in one hand; march slowly, the knee up to hip height.',
       'Stay level each time a foot leaves the floor.',
@@ -564,7 +571,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   L('g-carry-front', 'carry', [
     x('goblet-hold', 'Goblet Hold', 'carry', '0-0-0-0', [
       'A kettlebell or dumbbell held at your chest; stand tall.',
-      'Breathe behind a light brace.',
+      'Stay ready for a light punch, and keep breathing.',
     ], { equipment: ['kettlebell or dumbbell'] }),
     x('goblet-carry', 'Goblet Carry', 'carry', '0-0-0-0', [
       'Hold the weight at your chest, elbows in.',
@@ -572,7 +579,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ], { equipment: ['kettlebell or dumbbell'], commonFaults: [f('Leaning back under the weight', 'Pull the weight in closer and stand tall over your hips.')] }),
     x('front-rack-carry', 'Front-Rack Kettlebell Carry', 'carry', '0-0-0-0', [
       'Two kettlebells racked at the shoulders.',
-      'Walk tall with short steps, breathing behind the brace.',
+      'Walk tall with short steps, ready for a light punch, breathing the whole way.',
     ], { equipment: ['kettlebells'] }),
   ]),
   L('g-pallof', 'rotation', [

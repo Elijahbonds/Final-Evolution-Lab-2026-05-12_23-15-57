@@ -132,3 +132,10 @@ export const MIRROR_PATTERNS: readonly MirrorPattern[] = [
   hingePattern,
   setupLinePattern,
 ];
+
+// MIRROR-COACH P9 (2026-09-30), PLAN item 9 rule (e): the written correctives are registered BESIDE the audits — the band
+// drills, the release and the cross-session program (lib/mirror/correctives.ts). They are not MirrorPattern entries: a
+// pattern is an audit (frames in, a reading out) and a corrective reads no frames, so forcing one in would need a fake
+// `audit`. The Mirror's picker lists both (mirror-harness.tsx: the pattern tabs, then CorrectivesPicker). Every
+// corrective is adults-only (youthSafe: false — owner decision #6).
+export { MIRROR_CORRECTIVE_SESSIONS, type MirrorCorrectiveSession } from './correctives';

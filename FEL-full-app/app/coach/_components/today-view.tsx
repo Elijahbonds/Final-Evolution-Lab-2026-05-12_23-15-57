@@ -91,6 +91,8 @@ import { SET_LOG_ERROR_COPY, convertDrafts, draftIsEmpty, draftsFor, draftsToInp
 import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, servedClaim, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
+// MIRROR-COACH P9 fix (2026-09-30): a screen prescription's note links the Mirror's written corrective (rule (e))
+import { CoachNote } from '@/components/coach/coach-note';
 
 export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null }
 export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API };
@@ -379,7 +381,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
           {c.setup.map((s) => <div key={s.id} className="text-sm text-white/85">· {s.text}</div>)}
         </div>
       )}
-      {e.coachNote && <div className="text-xs text-[#00E5FF]/80">Coach: {e.coachNote}</div>}
+      {e.coachNote && <CoachNote note={e.coachNote} />}
       {c.cues.length > 0 && (
         <div className="space-y-0.5" data-cues>
           <div className="text-[11px] uppercase tracking-wider text-white/40">Cues</div>

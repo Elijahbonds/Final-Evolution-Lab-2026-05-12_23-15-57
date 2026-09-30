@@ -4,6 +4,7 @@
 // jumping; a low readiness day shortens the launch and the primer and says so; and every line a plan can show is FEL's
 // own words — nothing that names a condition, promises an outcome, says "risk" or "prevent", or borrows the book.
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { MovementPattern } from '@/public/_prisma/client';
 import { PROTOCOL_WHY } from './protocolGate';
 import { WAKE_UP } from '@/lib/drills/drills';
@@ -296,6 +297,27 @@ describe('readiness: a low day shortens the launch and the primer and says why (
       expect(suggestedMinutes(level)).toBe(warmupMinutesFor(level, DEFAULT_WARMUP_MINUTES));
       expect(WARMUP_MINUTES).toContain(suggestedMinutes(level));
     }
+  });
+});
+
+// MIRROR-COACH P9 fix (2026-09-30, code review): the owner's Playbook, ch4 — "Don't stretch the psoas … kneeling lunge
+// stretch, hold" — against the Half-Kneel Hip Rock and Hold that ran before every lunge, hinge, squat, locomotion and
+// carry session. The Playbook's line wins; decision #7's rock-then-hold step stays (the other eight).
+describe('no kneeling hip-flexor stretch-and-hold (the owner\'s Playbook, ch4)', () => {
+  it('the pool holds no half-kneeling forward stretch, and the Playbook line it follows is still there', () => {
+    expect(ROCK_HOLDS.map((r) => r.id)).not.toContain('hip-front-rock');
+    for (const r of ROCK_HOLDS) {
+      const kneelingForward = /half-kneel/i.test(`${r.name} ${r.setup}`) && /ease (the hips )?forward|hips forward/i.test(r.cue);
+      expect(kneelingForward, r.id).toBe(false);
+      expect(`${r.name} ${r.setup} ${r.cue}`, r.id).not.toMatch(/hip flexor|psoas|couch stretch/i);
+    }
+    expect(readFileSync('lib/education/playbook.data.json', 'utf8')).toMatch(/Don't stretch the psoas/);
+  });
+  it('every warm-up and every cool-down still has its rock-then-hold (decision #7), for every pattern', () => {
+    for (const pattern of PATTERNS.filter((x) => x !== 'other')) {
+      expect(ROCK_HOLDS.filter((r) => r.patterns.includes(pattern)).length, pattern).toBeGreaterThanOrEqual(2);
+    }
+    expect(ROCK_HOLDS.some((r) => r.zones.includes('lumbo_pelvic'))).toBe(true);   // the hips keep the owner's 90/90
   });
 });
 
