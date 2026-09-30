@@ -13,6 +13,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-29-draft': 'da452d02a10d392e',   // + §5 Health-Adjacent Data rewrite (mirror-coach, phase 5)
   '2026-09-29b-draft': 'da6275bf1062a1d8',  // + §5 names the daily readiness check-in (mirror-coach, phase 6)
   '2026-09-29c-draft': '7c6a27b255d6eda1',  // + §5 names the Dial-Up Breath use log and its week after an erase (mirror-coach, phase 7)
+  '2026-09-30-draft': 'abc709bb13372227',  // + §5 keeps consent records; an erase does not restart the breath's first week (mirror-coach-erase)
 };
 
 describe('the policy version', () => {
@@ -121,12 +122,15 @@ describe('privacy policy, health-adjacent data (P5)', () => {
     expect(text).toMatch(/turning on coach access for one specific coach/);
   });
 
-  // MIRROR-COACH P7 FIX (2026-09-29): the export and both erases carry the Dial-Up Breath's use log, so §5 names it
-  it('names the Dial-Up Breath use log: what it holds (and nothing else), that an erase deletes it, and the week after', () => {
+  // MIRROR-COACH P7 FIX (2026-09-29): the export and both erases carry the Dial-Up Breath's use log, so §5 names it.
+  // MIRROR-COACH-ERASE (2026-09-30): consent records stay, and an erase does not restart the first-opt-in week.
+  it('names the Dial-Up Breath use log, keeps consent records, and does not restart the first-opt-in week after an erase', () => {
     expect(text).toMatch(/dial-up breath/);
     expect(text).toMatch(/which session it was for and when, and nothing else/);
-    expect(text).toMatch(/your daily check-ins, your dial-up breath uses and your consent records/);
-    expect(text).toMatch(/waits a week before it is offered/);
+    expect(text).toMatch(/your daily check-ins and your dial-up breath uses/);
+    expect(text).toMatch(/your consent records are kept, as proof of what you agreed to and when you withdrew/);
+    expect(text).toMatch(/the first time you opt in, the dial-up breath waits a week before it is offered/);
+    expect(text).toMatch(/erasing this data does not start that week over/);
   });
 
   it('points to Health data in account settings for view/export/erase and for withdrawing consent', () => {
