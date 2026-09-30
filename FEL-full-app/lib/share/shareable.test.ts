@@ -172,6 +172,27 @@ describe('A SHARE NEVER CARRIES A READINESS CHECK-IN (Privacy §5, P6)', () => {
   });
 });
 
+// MIRROR-COACH P7 FIX (2026-09-29, review): the Dial-Up Breath's use log rides the same promise (Privacy §5 names it).
+// A whole row was already caught by its userId; a projection without one was not.
+describe('A SHARE NEVER CARRIES THE DIAL-UP BREATH USE LOG (Privacy §5, P7)', () => {
+  const USE = { kind: 'ramp', sessionId: 's-5', createdAt: '2026-09-29T07:00:00.000Z' };
+  it('the table and export key throw — with or without a userId riding along', () => {
+    expect(() => assertNoAthleteData({ breathLogs: [USE] })).toThrow(ShareLeak);
+    expect(() => assertNoAthleteData({ breathLog: USE })).toThrow(ShareLeak);
+    expect(() => assertNoAthleteData({ BreathLog: [USE] })).toThrow(ShareLeak);
+    expect(() => assertNoAthleteData({ nested: { breathLogs: [] } })).toThrow(ShareLeak);
+  });
+  it('every built share still survives the sweep with the breath-log names added', () => {
+    const shares = [
+      shareProgram(program(), PLATFORM_PROTOCOLS, BY, { forName: 'Ama', now: NOW }).share,
+      shareDrill('depth_drop', PLATFORM_PROTOCOLS, BY, { note: 'Quiet landings.', now: NOW }).share,
+      shareRecommendation('Ready to train unsupervised. Strong on the hinge.', BY, { now: NOW }).share,
+      shareSelection(['breath_reset', 'ankle_prep'], PLATFORM_PROTOCOLS, BY, { now: NOW }).share,
+    ];
+    for (const s of shares) expect(() => assertNoAthleteData(s)).not.toThrow();
+  });
+});
+
 describe('A FIRST NAME IS THE ONLY PERSONAL THING ALLOWED', () => {
   it('it is carried when the trainer types it', () => {
     const s = shareProgram(program(), PLATFORM_PROTOCOLS, BY, { forName: 'Ama', now: NOW }).share!;

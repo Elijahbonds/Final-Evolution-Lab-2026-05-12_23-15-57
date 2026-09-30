@@ -74,6 +74,9 @@
 import type { MovementPattern } from '@/public/_prisma/client';
 import { WAKE_UP } from '@/lib/drills/drills';
 import type { CoachPrompt, Drill, DrillPhase } from '@/lib/drills/chart';
+import {
+  pacerAt, pacerClockSec, pausePacerClock, resumePacerClock, startPacerClock, type PacerClock,
+} from '@/lib/breath/pacer';
 import { isHardStop, isStopOutcome, type PainDecision } from '@/lib/health/painRule';
 import { PATTERN_INFO, isPattern } from './catalogue';
 import {
@@ -680,16 +683,18 @@ export function runnerAt(plan: Pick<WarmupPlan, 'steps' | 'totalSec'>, sec: numb
   return { index: plan.steps.length, step: null, stepSec: 0, remainingSec: 0, line: null, breath: null, done: true };
 }
 
-/** The pacer at `sec` into its phase: in, hold, out, with seconds left in that part. null outside its rounds. */
+/**
+ * The pacer at `sec` into its phase: in, hold, out, with seconds left in that part. null outside its rounds.
+ *
+ * MIRROR-COACH P7 (2026-09-29): this is the ONE pacer now (lib/breath/pacer.ts pacerAt) — it used to be its own copy of
+ * the in / hold / out arithmetic, beside the cool-down's (cooldown.ts coolBreathAt) and the Mirror's CSS loop. A drill
+ * pacer has no pause (restSec 0), exactly as before; lib/breath/pacer.test.ts runs this function's old body, verbatim,
+ * against the shared one at every quarter second of WAKE_UP's Pressurize and finds no difference.
+ */
 export function breathAt(pacer: DrillPhase['pacer'] | undefined, sec: number): RunnerPoint['breath'] {
   if (!pacer) return null;
-  const into = sec - pacer.from;
-  const cycle = pacer.inSec + pacer.holdSec + pacer.outSec;
-  if (into < 0 || into >= cycle * pacer.rounds) return null;
-  const c = into % cycle;
-  if (c < pacer.inSec) return { phase: 'in', left: Math.ceil(pacer.inSec - c) };
-  if (c < pacer.inSec + pacer.holdSec) return { phase: 'hold', left: Math.ceil(pacer.inSec + pacer.holdSec - c) };
-  return { phase: 'out', left: Math.ceil(cycle - c) };
+  const p = pacerAt({ ...pacer, restSec: 0 }, sec);
+  return p && p.phase !== 'rest' ? { phase: p.phase, left: p.left } : null;
 }
 
 /**
@@ -733,14 +738,18 @@ export function readWarmupContext(json: unknown): WarmupContext {
 
 // ── the guided run's clock (the card calls these; pure so the pause / skip arithmetic is tested, not eyeballed) ──────
 
-/** A guided run: `baseSec` into the warm-up at wall time `from` (ms, performance.now), paused at `pausedAt`. */
-export interface GuidedRun { from: number; baseSec: number; pausedAt: number | null }
+/**
+ * A guided run: `baseSec` into the warm-up at wall time `from` (ms, performance.now), paused at `pausedAt`.
+ * MIRROR-COACH P7 (2026-09-29): the pacer's pausable clock (lib/breath/pacer.ts PacerClock) — the same shape and the
+ * same arithmetic this file wrote first, moved there so a standalone pacer pauses and resumes exactly as a run does.
+ */
+export type GuidedRun = PacerClock;
 
-export const startGuided = (now: number): GuidedRun => ({ from: now, baseSec: 0, pausedAt: null });
+export const startGuided = (now: number): GuidedRun => startPacerClock(now);
 /** Seconds into the warm-up at `now` (a paused run reads where it was paused). */
-export const guidedElapsed = (r: GuidedRun, now: number): number => r.baseSec + Math.max(0, (r.pausedAt ?? now) - r.from) / 1000;
-export const pauseGuided = (r: GuidedRun, now: number): GuidedRun => (r.pausedAt !== null ? r : { ...r, pausedAt: now });
-export const resumeGuided = (r: GuidedRun, now: number): GuidedRun => (r.pausedAt === null ? r : { from: now, baseSec: guidedElapsed(r, r.pausedAt), pausedAt: null });
+export const guidedElapsed = (r: GuidedRun, now: number): number => pacerClockSec(r, now);
+export const pauseGuided = (r: GuidedRun, now: number): GuidedRun => pausePacerClock(r, now);
+export const resumeGuided = (r: GuidedRun, now: number): GuidedRun => resumePacerClock(r, now);
 /** On to the start of the next step (a paused run stays paused there). Past the last step: the end. */
 export function nextGuided(plan: Pick<WarmupPlan, 'steps' | 'totalSec'>, r: GuidedRun, now: number): GuidedRun {
   const at = runnerAt(plan, guidedElapsed(r, now));

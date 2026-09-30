@@ -58,22 +58,43 @@ export interface IntakeQuestion {
 
 const yesIsRedFlag = (v: IntakeAnswerValue) => v === true;
 
+/**
+ * MIRROR-COACH P7 (2026-09-29): every question id, named ONCE, here. The adults-only Dial-Up Breath (lib/breath/
+ * rampGate.ts) gates on four specific answers — effort-brought dizziness or fainting, a heart or blood-pressure
+ * condition, heart-rate medicine, pregnancy — and the phase-7 brief's rule is "read them from lib/health/intake.ts, never
+ * re-type the strings": a second copy of 'heart_or_bp_condition' in another file is how a renamed question silently
+ * stops gating anything. INTAKE_QUESTIONS below reads its ids from this map, so the map and the question set cannot
+ * drift apart (lib/breath/rampGate.test.ts holds every id to a real question).
+ */
+export const INTAKE_IDS = {
+  currentPain: 'current_pain',
+  recentInjuryOrSurgery: 'recent_injury_or_surgery',
+  dizzinessFaintingChestPain: 'dizziness_fainting_chest_pain',
+  heartOrBpCondition: 'heart_or_bp_condition',
+  pregnancyOrPostpartum: 'pregnancy_or_postpartum',
+  heartRateOrBalanceMedicine: 'heart_rate_or_balance_medicine',
+  clinicianToldToAvoid: 'clinician_told_to_avoid',
+  birthYear: 'birth_year',
+} as const;
+
+export type IntakeQuestionId = (typeof INTAKE_IDS)[keyof typeof INTAKE_IDS];
+
 export const INTAKE_QUESTIONS: readonly IntakeQuestion[] = [
   {
-    id: 'current_pain',
+    id: INTAKE_IDS.currentPain,
     prompt: 'Do you have any pain right now, even mild, that started before today?',
     type: 'yes_no',
     skippable: true,
     // Not a red flag — see the file header. Handled per exercise by the pain check-in loop instead.
   },
   {
-    id: 'recent_injury_or_surgery',
+    id: INTAKE_IDS.recentInjuryOrSurgery,
     prompt: 'Any injury or surgery in the last 3 months?',
     type: 'yes_no',
     skippable: true,
   },
   {
-    id: 'dizziness_fainting_chest_pain',
+    id: INTAKE_IDS.dizzinessFaintingChestPain,
     prompt: 'Does physical effort ever bring on dizziness, fainting, or chest pain?',
     help: 'Meaning during or right after exercise, not any other time.',
     type: 'yes_no',
@@ -81,33 +102,33 @@ export const INTAKE_QUESTIONS: readonly IntakeQuestion[] = [
     isRedFlag: yesIsRedFlag,
   },
   {
-    id: 'heart_or_bp_condition',
+    id: INTAKE_IDS.heartOrBpCondition,
     prompt: 'Has a doctor ever told you about a heart or blood-pressure condition?',
     type: 'yes_no',
     skippable: true,
     isRedFlag: yesIsRedFlag,
   },
   {
-    id: 'pregnancy_or_postpartum',
+    id: INTAKE_IDS.pregnancyOrPostpartum,
     prompt: 'Are you currently pregnant, or within about 3 months postpartum?',
     type: 'yes_no',
     skippable: true,
   },
   {
-    id: 'heart_rate_or_balance_medicine',
+    id: INTAKE_IDS.heartRateOrBalanceMedicine,
     prompt: 'Do you take any medicine that affects your heart rate or your balance?',
     type: 'yes_no',
     skippable: true,
   },
   {
-    id: 'clinician_told_to_avoid',
+    id: INTAKE_IDS.clinicianToldToAvoid,
     prompt: 'Has a clinician told you to avoid any particular exercise or movement?',
     type: 'yes_no',
     skippable: true,
     isRedFlag: yesIsRedFlag,
   },
   {
-    id: 'birth_year',
+    id: INTAKE_IDS.birthYear,
     prompt: 'What year were you born?',
     help: "Prefer not to say is fine — we'll use the more careful youth rules until you tell us.",
     type: 'birth_year',
@@ -213,7 +234,7 @@ export function redFlagsFor(answers: IntakeAnswers): string[] {
 /** The birth year to write, from an already-validated answers object. Null when skipped/declined — which reads as
  *  a minor until answered (owner decision #20; enforced by lib/mirror/youth.ts isMinorForMirror, not here). */
 export function birthYearFrom(answers: IntakeAnswers): number | null {
-  const v = answers.birth_year;
+  const v = answers[INTAKE_IDS.birthYear];
   return typeof v === 'number' ? v : null;
 }
 

@@ -22,6 +22,8 @@ import type { TreeExercise } from './loop';
 import { groupBySection, supersetLabels, doseLine } from './structure';
 import { MAX_EFFORT_CUE, SESSION_SECTIONS, bandAllowed, effortBand, setupCue, youthSafeCues } from './taxonomy';
 import { timersFor, type TimerSpec } from './setTimer';
+import { workBreathFor } from '@/lib/breath/presets';
+import type { PacerSpec } from '@/lib/breath/pacer';
 
 // ── the catalogue columns Today reads ───────────────────────────────────────────────────────────────────────────────
 
@@ -87,6 +89,12 @@ export interface TodayExercise extends TreeExercise {
   youthRules?: boolean;
   coaching: TodayCoaching;
   timers: TimerSpec[];
+  /**
+   * MIRROR-COACH P7 FIX (2026-09-29): an item that IS the post-session breath (the off day's 4-6 Recovery Breath) carries
+   * its pacer, on its Work run's clock (lib/breath/presets.ts workBreathFor), so Today's timer draws the one pacer's ring
+   * while the clock runs instead of a bare countdown. Absent for everything else.
+   */
+  breath?: PacerSpec;
 }
 
 const strings = (v: unknown, max: number): string[] =>
@@ -169,8 +177,11 @@ export function todayExercise(e0: TreeExercise, row: CatalogueCoachingRow | null
       jumpLand: isJumpWork(r),
     },
     timers: timersFor(e),
+    ...withBreath(workBreathFor(e, r)),
   };
 }
+
+const withBreath = (breath: PacerSpec | null): { breath?: PacerSpec } => (breath ? { breath } : {});
 
 // ── the layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
 

@@ -515,6 +515,21 @@ export type HealthConsent = $Result.DefaultSelection<Prisma.$HealthConsentPayloa
  */
 export type ReadinessCheckIn = $Result.DefaultSelection<Prisma.$ReadinessCheckInPayload>
 /**
+ * Model BreathLog
+ * MIRROR-COACH P7 (2026-09-29): one row per use of a breath from FEL's breath toolbox. Today it holds kind 'ramp' —
+ * the adults-only Dial-Up Breath before a session's flagged key set (lib/breath/rampGate.ts), written by
+ * POST /api/breath/ramp at the moment the athlete starts it, and counted against FEL's own weekly limit
+ * (RAMP_LIMIT). A NEW table rather than a column on P5/P6's: a use is not an intake answer, a pain reading or a daily
+ * check-in, and the limit needs a row per use with its time.
+ * 
+ * It stores no health answer — only that a breath was used, for which coached session, and when. It is still in the
+ * export and in both erases (lib/prq-data-rights.ts), because the ramp kind is only ever written behind the health
+ * gates. NEVER read by anything that scores, pays, ranks or keeps a streak (lib/breath/ramp-never-scored.test.ts).
+ * `seconds` is for a kind that logs time (phase 9 may count breath minutes toward recovery, owner decision #12); a
+ * ramp use leaves it null.
+ */
+export type BreathLog = $Result.DefaultSelection<Prisma.$BreathLogPayload>
+/**
  * Model ShareLink
  * One shared thing at one unguessable URL.
  * 
@@ -1869,6 +1884,16 @@ export class PrismaClient<
   get readinessCheckIn(): Prisma.ReadinessCheckInDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.breathLog`: Exposes CRUD operations for the **BreathLog** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BreathLogs
+    * const breathLogs = await prisma.breathLog.findMany()
+    * ```
+    */
+  get breathLog(): Prisma.BreathLogDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.shareLink`: Exposes CRUD operations for the **ShareLink** model.
     * Example usage:
     * ```ts
@@ -2425,6 +2450,7 @@ export namespace Prisma {
     PainCheckIn: 'PainCheckIn',
     HealthConsent: 'HealthConsent',
     ReadinessCheckIn: 'ReadinessCheckIn',
+    BreathLog: 'BreathLog',
     ShareLink: 'ShareLink',
     CoachInvite: 'CoachInvite',
     CoachClient: 'CoachClient'
@@ -2446,7 +2472,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "readinessCheckIn" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -8962,6 +8988,80 @@ export namespace Prisma {
           }
         }
       }
+      BreathLog: {
+        payload: Prisma.$BreathLogPayload<ExtArgs>
+        fields: Prisma.BreathLogFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BreathLogFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BreathLogFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>
+          }
+          findFirst: {
+            args: Prisma.BreathLogFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BreathLogFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>
+          }
+          findMany: {
+            args: Prisma.BreathLogFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>[]
+          }
+          create: {
+            args: Prisma.BreathLogCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>
+          }
+          createMany: {
+            args: Prisma.BreathLogCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BreathLogCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>[]
+          }
+          delete: {
+            args: Prisma.BreathLogDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>
+          }
+          update: {
+            args: Prisma.BreathLogUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>
+          }
+          deleteMany: {
+            args: Prisma.BreathLogDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BreathLogUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BreathLogUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>[]
+          }
+          upsert: {
+            args: Prisma.BreathLogUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BreathLogPayload>
+          }
+          aggregate: {
+            args: Prisma.BreathLogAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBreathLog>
+          }
+          groupBy: {
+            args: Prisma.BreathLogGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BreathLogGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BreathLogCountArgs<ExtArgs>
+            result: $Utils.Optional<BreathLogCountAggregateOutputType> | number
+          }
+        }
+      }
       ShareLink: {
         payload: Prisma.$ShareLinkPayload<ExtArgs>
         fields: Prisma.ShareLinkFieldRefs
@@ -9356,6 +9456,7 @@ export namespace Prisma {
     painCheckIn?: PainCheckInOmit
     healthConsent?: HealthConsentOmit
     readinessCheckIn?: ReadinessCheckInOmit
+    breathLog?: BreathLogOmit
     shareLink?: ShareLinkOmit
     coachInvite?: CoachInviteOmit
     coachClient?: CoachClientOmit
@@ -9498,6 +9599,7 @@ export namespace Prisma {
     painCheckIns: number
     healthConsents: number
     readinessCheckIns: number
+    breathLogs: number
     crmContacts: number
     crmContactLinks: number
     crmDeals: number
@@ -9551,6 +9653,7 @@ export namespace Prisma {
     painCheckIns?: boolean | UserCountOutputTypeCountPainCheckInsArgs
     healthConsents?: boolean | UserCountOutputTypeCountHealthConsentsArgs
     readinessCheckIns?: boolean | UserCountOutputTypeCountReadinessCheckInsArgs
+    breathLogs?: boolean | UserCountOutputTypeCountBreathLogsArgs
     crmContacts?: boolean | UserCountOutputTypeCountCrmContactsArgs
     crmContactLinks?: boolean | UserCountOutputTypeCountCrmContactLinksArgs
     crmDeals?: boolean | UserCountOutputTypeCountCrmDealsArgs
@@ -9882,6 +9985,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountReadinessCheckInsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ReadinessCheckInWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountBreathLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BreathLogWhereInput
   }
 
   /**
@@ -11141,6 +11251,7 @@ export namespace Prisma {
     painCheckIns?: boolean | User$painCheckInsArgs<ExtArgs>
     healthConsents?: boolean | User$healthConsentsArgs<ExtArgs>
     readinessCheckIns?: boolean | User$readinessCheckInsArgs<ExtArgs>
+    breathLogs?: boolean | User$breathLogsArgs<ExtArgs>
     crmContacts?: boolean | User$crmContactsArgs<ExtArgs>
     crmContactLinks?: boolean | User$crmContactLinksArgs<ExtArgs>
     crmDeals?: boolean | User$crmDealsArgs<ExtArgs>
@@ -11257,6 +11368,7 @@ export namespace Prisma {
     painCheckIns?: boolean | User$painCheckInsArgs<ExtArgs>
     healthConsents?: boolean | User$healthConsentsArgs<ExtArgs>
     readinessCheckIns?: boolean | User$readinessCheckInsArgs<ExtArgs>
+    breathLogs?: boolean | User$breathLogsArgs<ExtArgs>
     crmContacts?: boolean | User$crmContactsArgs<ExtArgs>
     crmContactLinks?: boolean | User$crmContactLinksArgs<ExtArgs>
     crmDeals?: boolean | User$crmDealsArgs<ExtArgs>
@@ -11325,6 +11437,7 @@ export namespace Prisma {
       painCheckIns: Prisma.$PainCheckInPayload<ExtArgs>[]
       healthConsents: Prisma.$HealthConsentPayload<ExtArgs>[]
       readinessCheckIns: Prisma.$ReadinessCheckInPayload<ExtArgs>[]
+      breathLogs: Prisma.$BreathLogPayload<ExtArgs>[]
       crmContacts: Prisma.$CrmContactPayload<ExtArgs>[]
       crmContactLinks: Prisma.$CrmContactPayload<ExtArgs>[]
       crmDeals: Prisma.$CrmDealPayload<ExtArgs>[]
@@ -11795,6 +11908,7 @@ export namespace Prisma {
     painCheckIns<T extends User$painCheckInsArgs<ExtArgs> = {}>(args?: Subset<T, User$painCheckInsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PainCheckInPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     healthConsents<T extends User$healthConsentsArgs<ExtArgs> = {}>(args?: Subset<T, User$healthConsentsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HealthConsentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     readinessCheckIns<T extends User$readinessCheckInsArgs<ExtArgs> = {}>(args?: Subset<T, User$readinessCheckInsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReadinessCheckInPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    breathLogs<T extends User$breathLogsArgs<ExtArgs> = {}>(args?: Subset<T, User$breathLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmContacts<T extends User$crmContactsArgs<ExtArgs> = {}>(args?: Subset<T, User$crmContactsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmContactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmContactLinks<T extends User$crmContactLinksArgs<ExtArgs> = {}>(args?: Subset<T, User$crmContactLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmContactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmDeals<T extends User$crmDealsArgs<ExtArgs> = {}>(args?: Subset<T, User$crmDealsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmDealPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -13498,6 +13612,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ReadinessCheckInScalarFieldEnum | ReadinessCheckInScalarFieldEnum[]
+  }
+
+  /**
+   * User.breathLogs
+   */
+  export type User$breathLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    where?: BreathLogWhereInput
+    orderBy?: BreathLogOrderByWithRelationInput | BreathLogOrderByWithRelationInput[]
+    cursor?: BreathLogWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: BreathLogScalarFieldEnum | BreathLogScalarFieldEnum[]
   }
 
   /**
@@ -113920,6 +114058,1122 @@ export namespace Prisma {
 
 
   /**
+   * Model BreathLog
+   */
+
+  export type AggregateBreathLog = {
+    _count: BreathLogCountAggregateOutputType | null
+    _avg: BreathLogAvgAggregateOutputType | null
+    _sum: BreathLogSumAggregateOutputType | null
+    _min: BreathLogMinAggregateOutputType | null
+    _max: BreathLogMaxAggregateOutputType | null
+  }
+
+  export type BreathLogAvgAggregateOutputType = {
+    seconds: number | null
+  }
+
+  export type BreathLogSumAggregateOutputType = {
+    seconds: number | null
+  }
+
+  export type BreathLogMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    kind: string | null
+    sessionId: string | null
+    seconds: number | null
+    createdAt: Date | null
+  }
+
+  export type BreathLogMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    kind: string | null
+    sessionId: string | null
+    seconds: number | null
+    createdAt: Date | null
+  }
+
+  export type BreathLogCountAggregateOutputType = {
+    id: number
+    userId: number
+    kind: number
+    sessionId: number
+    seconds: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type BreathLogAvgAggregateInputType = {
+    seconds?: true
+  }
+
+  export type BreathLogSumAggregateInputType = {
+    seconds?: true
+  }
+
+  export type BreathLogMinAggregateInputType = {
+    id?: true
+    userId?: true
+    kind?: true
+    sessionId?: true
+    seconds?: true
+    createdAt?: true
+  }
+
+  export type BreathLogMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    kind?: true
+    sessionId?: true
+    seconds?: true
+    createdAt?: true
+  }
+
+  export type BreathLogCountAggregateInputType = {
+    id?: true
+    userId?: true
+    kind?: true
+    sessionId?: true
+    seconds?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type BreathLogAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BreathLog to aggregate.
+     */
+    where?: BreathLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BreathLogs to fetch.
+     */
+    orderBy?: BreathLogOrderByWithRelationInput | BreathLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BreathLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BreathLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BreathLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BreathLogs
+    **/
+    _count?: true | BreathLogCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: BreathLogAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: BreathLogSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BreathLogMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BreathLogMaxAggregateInputType
+  }
+
+  export type GetBreathLogAggregateType<T extends BreathLogAggregateArgs> = {
+        [P in keyof T & keyof AggregateBreathLog]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBreathLog[P]>
+      : GetScalarType<T[P], AggregateBreathLog[P]>
+  }
+
+
+
+
+  export type BreathLogGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BreathLogWhereInput
+    orderBy?: BreathLogOrderByWithAggregationInput | BreathLogOrderByWithAggregationInput[]
+    by: BreathLogScalarFieldEnum[] | BreathLogScalarFieldEnum
+    having?: BreathLogScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BreathLogCountAggregateInputType | true
+    _avg?: BreathLogAvgAggregateInputType
+    _sum?: BreathLogSumAggregateInputType
+    _min?: BreathLogMinAggregateInputType
+    _max?: BreathLogMaxAggregateInputType
+  }
+
+  export type BreathLogGroupByOutputType = {
+    id: string
+    userId: string
+    kind: string
+    sessionId: string | null
+    seconds: number | null
+    createdAt: Date
+    _count: BreathLogCountAggregateOutputType | null
+    _avg: BreathLogAvgAggregateOutputType | null
+    _sum: BreathLogSumAggregateOutputType | null
+    _min: BreathLogMinAggregateOutputType | null
+    _max: BreathLogMaxAggregateOutputType | null
+  }
+
+  type GetBreathLogGroupByPayload<T extends BreathLogGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BreathLogGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BreathLogGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BreathLogGroupByOutputType[P]>
+            : GetScalarType<T[P], BreathLogGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BreathLogSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    kind?: boolean
+    sessionId?: boolean
+    seconds?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["breathLog"]>
+
+  export type BreathLogSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    kind?: boolean
+    sessionId?: boolean
+    seconds?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["breathLog"]>
+
+  export type BreathLogSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    kind?: boolean
+    sessionId?: boolean
+    seconds?: boolean
+    createdAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["breathLog"]>
+
+  export type BreathLogSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    kind?: boolean
+    sessionId?: boolean
+    seconds?: boolean
+    createdAt?: boolean
+  }
+
+  export type BreathLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "kind" | "sessionId" | "seconds" | "createdAt", ExtArgs["result"]["breathLog"]>
+  export type BreathLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type BreathLogIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type BreathLogIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $BreathLogPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BreathLog"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      /**
+       * 'ramp' (lib/breath/rampGate.ts BREATH_LOG_KINDS). A string, not an enum, so a new breath kind is a code change
+       * and never a schema change.
+       */
+      kind: string
+      /**
+       * The coached Session (Session.id) the breath was for, when it was for one — how "one key set per session" is
+       * held. No foreign key on purpose: a coach deleting the session must not erase, or fail on, the athlete's record.
+       */
+      sessionId: string | null
+      /**
+       * Seconds breathed, for a kind that logs time. Null for 'ramp'.
+       */
+      seconds: number | null
+      createdAt: Date
+    }, ExtArgs["result"]["breathLog"]>
+    composites: {}
+  }
+
+  type BreathLogGetPayload<S extends boolean | null | undefined | BreathLogDefaultArgs> = $Result.GetResult<Prisma.$BreathLogPayload, S>
+
+  type BreathLogCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BreathLogFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BreathLogCountAggregateInputType | true
+    }
+
+  export interface BreathLogDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BreathLog'], meta: { name: 'BreathLog' } }
+    /**
+     * Find zero or one BreathLog that matches the filter.
+     * @param {BreathLogFindUniqueArgs} args - Arguments to find a BreathLog
+     * @example
+     * // Get one BreathLog
+     * const breathLog = await prisma.breathLog.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BreathLogFindUniqueArgs>(args: SelectSubset<T, BreathLogFindUniqueArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BreathLog that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BreathLogFindUniqueOrThrowArgs} args - Arguments to find a BreathLog
+     * @example
+     * // Get one BreathLog
+     * const breathLog = await prisma.breathLog.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BreathLogFindUniqueOrThrowArgs>(args: SelectSubset<T, BreathLogFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BreathLog that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogFindFirstArgs} args - Arguments to find a BreathLog
+     * @example
+     * // Get one BreathLog
+     * const breathLog = await prisma.breathLog.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BreathLogFindFirstArgs>(args?: SelectSubset<T, BreathLogFindFirstArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BreathLog that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogFindFirstOrThrowArgs} args - Arguments to find a BreathLog
+     * @example
+     * // Get one BreathLog
+     * const breathLog = await prisma.breathLog.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BreathLogFindFirstOrThrowArgs>(args?: SelectSubset<T, BreathLogFindFirstOrThrowArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BreathLogs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BreathLogs
+     * const breathLogs = await prisma.breathLog.findMany()
+     * 
+     * // Get first 10 BreathLogs
+     * const breathLogs = await prisma.breathLog.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const breathLogWithIdOnly = await prisma.breathLog.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BreathLogFindManyArgs>(args?: SelectSubset<T, BreathLogFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BreathLog.
+     * @param {BreathLogCreateArgs} args - Arguments to create a BreathLog.
+     * @example
+     * // Create one BreathLog
+     * const BreathLog = await prisma.breathLog.create({
+     *   data: {
+     *     // ... data to create a BreathLog
+     *   }
+     * })
+     * 
+     */
+    create<T extends BreathLogCreateArgs>(args: SelectSubset<T, BreathLogCreateArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BreathLogs.
+     * @param {BreathLogCreateManyArgs} args - Arguments to create many BreathLogs.
+     * @example
+     * // Create many BreathLogs
+     * const breathLog = await prisma.breathLog.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BreathLogCreateManyArgs>(args?: SelectSubset<T, BreathLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BreathLogs and returns the data saved in the database.
+     * @param {BreathLogCreateManyAndReturnArgs} args - Arguments to create many BreathLogs.
+     * @example
+     * // Create many BreathLogs
+     * const breathLog = await prisma.breathLog.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BreathLogs and only return the `id`
+     * const breathLogWithIdOnly = await prisma.breathLog.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BreathLogCreateManyAndReturnArgs>(args?: SelectSubset<T, BreathLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BreathLog.
+     * @param {BreathLogDeleteArgs} args - Arguments to delete one BreathLog.
+     * @example
+     * // Delete one BreathLog
+     * const BreathLog = await prisma.breathLog.delete({
+     *   where: {
+     *     // ... filter to delete one BreathLog
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BreathLogDeleteArgs>(args: SelectSubset<T, BreathLogDeleteArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BreathLog.
+     * @param {BreathLogUpdateArgs} args - Arguments to update one BreathLog.
+     * @example
+     * // Update one BreathLog
+     * const breathLog = await prisma.breathLog.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BreathLogUpdateArgs>(args: SelectSubset<T, BreathLogUpdateArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BreathLogs.
+     * @param {BreathLogDeleteManyArgs} args - Arguments to filter BreathLogs to delete.
+     * @example
+     * // Delete a few BreathLogs
+     * const { count } = await prisma.breathLog.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BreathLogDeleteManyArgs>(args?: SelectSubset<T, BreathLogDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BreathLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BreathLogs
+     * const breathLog = await prisma.breathLog.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BreathLogUpdateManyArgs>(args: SelectSubset<T, BreathLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BreathLogs and returns the data updated in the database.
+     * @param {BreathLogUpdateManyAndReturnArgs} args - Arguments to update many BreathLogs.
+     * @example
+     * // Update many BreathLogs
+     * const breathLog = await prisma.breathLog.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BreathLogs and only return the `id`
+     * const breathLogWithIdOnly = await prisma.breathLog.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BreathLogUpdateManyAndReturnArgs>(args: SelectSubset<T, BreathLogUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BreathLog.
+     * @param {BreathLogUpsertArgs} args - Arguments to update or create a BreathLog.
+     * @example
+     * // Update or create a BreathLog
+     * const breathLog = await prisma.breathLog.upsert({
+     *   create: {
+     *     // ... data to create a BreathLog
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BreathLog we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BreathLogUpsertArgs>(args: SelectSubset<T, BreathLogUpsertArgs<ExtArgs>>): Prisma__BreathLogClient<$Result.GetResult<Prisma.$BreathLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BreathLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogCountArgs} args - Arguments to filter BreathLogs to count.
+     * @example
+     * // Count the number of BreathLogs
+     * const count = await prisma.breathLog.count({
+     *   where: {
+     *     // ... the filter for the BreathLogs we want to count
+     *   }
+     * })
+    **/
+    count<T extends BreathLogCountArgs>(
+      args?: Subset<T, BreathLogCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BreathLogCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BreathLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BreathLogAggregateArgs>(args: Subset<T, BreathLogAggregateArgs>): Prisma.PrismaPromise<GetBreathLogAggregateType<T>>
+
+    /**
+     * Group by BreathLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BreathLogGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BreathLogGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BreathLogGroupByArgs['orderBy'] }
+        : { orderBy?: BreathLogGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BreathLogGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBreathLogGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BreathLog model
+   */
+  readonly fields: BreathLogFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BreathLog.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BreathLogClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BreathLog model
+   */
+  interface BreathLogFieldRefs {
+    readonly id: FieldRef<"BreathLog", 'String'>
+    readonly userId: FieldRef<"BreathLog", 'String'>
+    readonly kind: FieldRef<"BreathLog", 'String'>
+    readonly sessionId: FieldRef<"BreathLog", 'String'>
+    readonly seconds: FieldRef<"BreathLog", 'Int'>
+    readonly createdAt: FieldRef<"BreathLog", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BreathLog findUnique
+   */
+  export type BreathLogFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * Filter, which BreathLog to fetch.
+     */
+    where: BreathLogWhereUniqueInput
+  }
+
+  /**
+   * BreathLog findUniqueOrThrow
+   */
+  export type BreathLogFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * Filter, which BreathLog to fetch.
+     */
+    where: BreathLogWhereUniqueInput
+  }
+
+  /**
+   * BreathLog findFirst
+   */
+  export type BreathLogFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * Filter, which BreathLog to fetch.
+     */
+    where?: BreathLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BreathLogs to fetch.
+     */
+    orderBy?: BreathLogOrderByWithRelationInput | BreathLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BreathLogs.
+     */
+    cursor?: BreathLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BreathLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BreathLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BreathLogs.
+     */
+    distinct?: BreathLogScalarFieldEnum | BreathLogScalarFieldEnum[]
+  }
+
+  /**
+   * BreathLog findFirstOrThrow
+   */
+  export type BreathLogFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * Filter, which BreathLog to fetch.
+     */
+    where?: BreathLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BreathLogs to fetch.
+     */
+    orderBy?: BreathLogOrderByWithRelationInput | BreathLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BreathLogs.
+     */
+    cursor?: BreathLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BreathLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BreathLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BreathLogs.
+     */
+    distinct?: BreathLogScalarFieldEnum | BreathLogScalarFieldEnum[]
+  }
+
+  /**
+   * BreathLog findMany
+   */
+  export type BreathLogFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * Filter, which BreathLogs to fetch.
+     */
+    where?: BreathLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BreathLogs to fetch.
+     */
+    orderBy?: BreathLogOrderByWithRelationInput | BreathLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BreathLogs.
+     */
+    cursor?: BreathLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BreathLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BreathLogs.
+     */
+    skip?: number
+    distinct?: BreathLogScalarFieldEnum | BreathLogScalarFieldEnum[]
+  }
+
+  /**
+   * BreathLog create
+   */
+  export type BreathLogCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * The data needed to create a BreathLog.
+     */
+    data: XOR<BreathLogCreateInput, BreathLogUncheckedCreateInput>
+  }
+
+  /**
+   * BreathLog createMany
+   */
+  export type BreathLogCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BreathLogs.
+     */
+    data: BreathLogCreateManyInput | BreathLogCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BreathLog createManyAndReturn
+   */
+  export type BreathLogCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * The data used to create many BreathLogs.
+     */
+    data: BreathLogCreateManyInput | BreathLogCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BreathLog update
+   */
+  export type BreathLogUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * The data needed to update a BreathLog.
+     */
+    data: XOR<BreathLogUpdateInput, BreathLogUncheckedUpdateInput>
+    /**
+     * Choose, which BreathLog to update.
+     */
+    where: BreathLogWhereUniqueInput
+  }
+
+  /**
+   * BreathLog updateMany
+   */
+  export type BreathLogUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BreathLogs.
+     */
+    data: XOR<BreathLogUpdateManyMutationInput, BreathLogUncheckedUpdateManyInput>
+    /**
+     * Filter which BreathLogs to update
+     */
+    where?: BreathLogWhereInput
+    /**
+     * Limit how many BreathLogs to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BreathLog updateManyAndReturn
+   */
+  export type BreathLogUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * The data used to update BreathLogs.
+     */
+    data: XOR<BreathLogUpdateManyMutationInput, BreathLogUncheckedUpdateManyInput>
+    /**
+     * Filter which BreathLogs to update
+     */
+    where?: BreathLogWhereInput
+    /**
+     * Limit how many BreathLogs to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BreathLog upsert
+   */
+  export type BreathLogUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * The filter to search for the BreathLog to update in case it exists.
+     */
+    where: BreathLogWhereUniqueInput
+    /**
+     * In case the BreathLog found by the `where` argument doesn't exist, create a new BreathLog with this data.
+     */
+    create: XOR<BreathLogCreateInput, BreathLogUncheckedCreateInput>
+    /**
+     * In case the BreathLog was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BreathLogUpdateInput, BreathLogUncheckedUpdateInput>
+  }
+
+  /**
+   * BreathLog delete
+   */
+  export type BreathLogDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+    /**
+     * Filter which BreathLog to delete.
+     */
+    where: BreathLogWhereUniqueInput
+  }
+
+  /**
+   * BreathLog deleteMany
+   */
+  export type BreathLogDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BreathLogs to delete
+     */
+    where?: BreathLogWhereInput
+    /**
+     * Limit how many BreathLogs to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BreathLog without action
+   */
+  export type BreathLogDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BreathLog
+     */
+    select?: BreathLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BreathLog
+     */
+    omit?: BreathLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BreathLogInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model ShareLink
    */
 
@@ -118751,6 +120005,18 @@ export namespace Prisma {
   export type ReadinessCheckInScalarFieldEnum = (typeof ReadinessCheckInScalarFieldEnum)[keyof typeof ReadinessCheckInScalarFieldEnum]
 
 
+  export const BreathLogScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    kind: 'kind',
+    sessionId: 'sessionId',
+    seconds: 'seconds',
+    createdAt: 'createdAt'
+  };
+
+  export type BreathLogScalarFieldEnum = (typeof BreathLogScalarFieldEnum)[keyof typeof BreathLogScalarFieldEnum]
+
+
   export const ShareLinkScalarFieldEnum: {
     id: 'id',
     token: 'token',
@@ -119324,6 +120590,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInListRelationFilter
     healthConsents?: HealthConsentListRelationFilter
     readinessCheckIns?: ReadinessCheckInListRelationFilter
+    breathLogs?: BreathLogListRelationFilter
     crmContacts?: CrmContactListRelationFilter
     crmContactLinks?: CrmContactListRelationFilter
     crmDeals?: CrmDealListRelationFilter
@@ -119401,6 +120668,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInOrderByRelationAggregateInput
     healthConsents?: HealthConsentOrderByRelationAggregateInput
     readinessCheckIns?: ReadinessCheckInOrderByRelationAggregateInput
+    breathLogs?: BreathLogOrderByRelationAggregateInput
     crmContacts?: CrmContactOrderByRelationAggregateInput
     crmContactLinks?: CrmContactOrderByRelationAggregateInput
     crmDeals?: CrmDealOrderByRelationAggregateInput
@@ -119481,6 +120749,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInListRelationFilter
     healthConsents?: HealthConsentListRelationFilter
     readinessCheckIns?: ReadinessCheckInListRelationFilter
+    breathLogs?: BreathLogListRelationFilter
     crmContacts?: CrmContactListRelationFilter
     crmContactLinks?: CrmContactListRelationFilter
     crmDeals?: CrmDealListRelationFilter
@@ -126558,6 +127827,68 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"ReadinessCheckIn"> | Date | string
   }
 
+  export type BreathLogWhereInput = {
+    AND?: BreathLogWhereInput | BreathLogWhereInput[]
+    OR?: BreathLogWhereInput[]
+    NOT?: BreathLogWhereInput | BreathLogWhereInput[]
+    id?: StringFilter<"BreathLog"> | string
+    userId?: StringFilter<"BreathLog"> | string
+    kind?: StringFilter<"BreathLog"> | string
+    sessionId?: StringNullableFilter<"BreathLog"> | string | null
+    seconds?: IntNullableFilter<"BreathLog"> | number | null
+    createdAt?: DateTimeFilter<"BreathLog"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type BreathLogOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kind?: SortOrder
+    sessionId?: SortOrderInput | SortOrder
+    seconds?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type BreathLogWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: BreathLogWhereInput | BreathLogWhereInput[]
+    OR?: BreathLogWhereInput[]
+    NOT?: BreathLogWhereInput | BreathLogWhereInput[]
+    userId?: StringFilter<"BreathLog"> | string
+    kind?: StringFilter<"BreathLog"> | string
+    sessionId?: StringNullableFilter<"BreathLog"> | string | null
+    seconds?: IntNullableFilter<"BreathLog"> | number | null
+    createdAt?: DateTimeFilter<"BreathLog"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id">
+
+  export type BreathLogOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kind?: SortOrder
+    sessionId?: SortOrderInput | SortOrder
+    seconds?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: BreathLogCountOrderByAggregateInput
+    _avg?: BreathLogAvgOrderByAggregateInput
+    _max?: BreathLogMaxOrderByAggregateInput
+    _min?: BreathLogMinOrderByAggregateInput
+    _sum?: BreathLogSumOrderByAggregateInput
+  }
+
+  export type BreathLogScalarWhereWithAggregatesInput = {
+    AND?: BreathLogScalarWhereWithAggregatesInput | BreathLogScalarWhereWithAggregatesInput[]
+    OR?: BreathLogScalarWhereWithAggregatesInput[]
+    NOT?: BreathLogScalarWhereWithAggregatesInput | BreathLogScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BreathLog"> | string
+    userId?: StringWithAggregatesFilter<"BreathLog"> | string
+    kind?: StringWithAggregatesFilter<"BreathLog"> | string
+    sessionId?: StringNullableWithAggregatesFilter<"BreathLog"> | string | null
+    seconds?: IntNullableWithAggregatesFilter<"BreathLog"> | number | null
+    createdAt?: DateTimeWithAggregatesFilter<"BreathLog"> | Date | string
+  }
+
   export type ShareLinkWhereInput = {
     AND?: ShareLinkWhereInput | ShareLinkWhereInput[]
     OR?: ShareLinkWhereInput[]
@@ -126861,6 +128192,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -126938,6 +128270,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -127015,6 +128348,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -127092,6 +128426,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -134852,6 +136187,68 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type BreathLogCreateInput = {
+    id?: string
+    kind: string
+    sessionId?: string | null
+    seconds?: number | null
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutBreathLogsInput
+  }
+
+  export type BreathLogUncheckedCreateInput = {
+    id?: string
+    userId: string
+    kind: string
+    sessionId?: string | null
+    seconds?: number | null
+    createdAt?: Date | string
+  }
+
+  export type BreathLogUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutBreathLogsNestedInput
+  }
+
+  export type BreathLogUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BreathLogCreateManyInput = {
+    id?: string
+    userId: string
+    kind: string
+    sessionId?: string | null
+    seconds?: number | null
+    createdAt?: Date | string
+  }
+
+  export type BreathLogUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BreathLogUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ShareLinkCreateInput = {
     id?: string
     token: string
@@ -135453,6 +136850,12 @@ export namespace Prisma {
     none?: ReadinessCheckInWhereInput
   }
 
+  export type BreathLogListRelationFilter = {
+    every?: BreathLogWhereInput
+    some?: BreathLogWhereInput
+    none?: BreathLogWhereInput
+  }
+
   export type CrmContactListRelationFilter = {
     every?: CrmContactWhereInput
     some?: CrmContactWhereInput
@@ -135639,6 +137042,10 @@ export namespace Prisma {
   }
 
   export type ReadinessCheckInOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type BreathLogOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -140606,6 +142013,41 @@ export namespace Prisma {
     mood?: SortOrder
   }
 
+  export type BreathLogCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kind?: SortOrder
+    sessionId?: SortOrder
+    seconds?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BreathLogAvgOrderByAggregateInput = {
+    seconds?: SortOrder
+  }
+
+  export type BreathLogMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kind?: SortOrder
+    sessionId?: SortOrder
+    seconds?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BreathLogMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    kind?: SortOrder
+    sessionId?: SortOrder
+    seconds?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BreathLogSumOrderByAggregateInput = {
+    seconds?: SortOrder
+  }
+
   export type ShareLinkCountOrderByAggregateInput = {
     id?: SortOrder
     token?: SortOrder
@@ -141108,6 +142550,13 @@ export namespace Prisma {
     connect?: ReadinessCheckInWhereUniqueInput | ReadinessCheckInWhereUniqueInput[]
   }
 
+  export type BreathLogCreateNestedManyWithoutUserInput = {
+    create?: XOR<BreathLogCreateWithoutUserInput, BreathLogUncheckedCreateWithoutUserInput> | BreathLogCreateWithoutUserInput[] | BreathLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BreathLogCreateOrConnectWithoutUserInput | BreathLogCreateOrConnectWithoutUserInput[]
+    createMany?: BreathLogCreateManyUserInputEnvelope
+    connect?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+  }
+
   export type CrmContactCreateNestedManyWithoutOwnerInput = {
     create?: XOR<CrmContactCreateWithoutOwnerInput, CrmContactUncheckedCreateWithoutOwnerInput> | CrmContactCreateWithoutOwnerInput[] | CrmContactUncheckedCreateWithoutOwnerInput[]
     connectOrCreate?: CrmContactCreateOrConnectWithoutOwnerInput | CrmContactCreateOrConnectWithoutOwnerInput[]
@@ -141516,6 +142965,13 @@ export namespace Prisma {
     connectOrCreate?: ReadinessCheckInCreateOrConnectWithoutUserInput | ReadinessCheckInCreateOrConnectWithoutUserInput[]
     createMany?: ReadinessCheckInCreateManyUserInputEnvelope
     connect?: ReadinessCheckInWhereUniqueInput | ReadinessCheckInWhereUniqueInput[]
+  }
+
+  export type BreathLogUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<BreathLogCreateWithoutUserInput, BreathLogUncheckedCreateWithoutUserInput> | BreathLogCreateWithoutUserInput[] | BreathLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BreathLogCreateOrConnectWithoutUserInput | BreathLogCreateOrConnectWithoutUserInput[]
+    createMany?: BreathLogCreateManyUserInputEnvelope
+    connect?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
   }
 
   export type CrmContactUncheckedCreateNestedManyWithoutOwnerInput = {
@@ -142305,6 +143761,20 @@ export namespace Prisma {
     update?: ReadinessCheckInUpdateWithWhereUniqueWithoutUserInput | ReadinessCheckInUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: ReadinessCheckInUpdateManyWithWhereWithoutUserInput | ReadinessCheckInUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: ReadinessCheckInScalarWhereInput | ReadinessCheckInScalarWhereInput[]
+  }
+
+  export type BreathLogUpdateManyWithoutUserNestedInput = {
+    create?: XOR<BreathLogCreateWithoutUserInput, BreathLogUncheckedCreateWithoutUserInput> | BreathLogCreateWithoutUserInput[] | BreathLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BreathLogCreateOrConnectWithoutUserInput | BreathLogCreateOrConnectWithoutUserInput[]
+    upsert?: BreathLogUpsertWithWhereUniqueWithoutUserInput | BreathLogUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: BreathLogCreateManyUserInputEnvelope
+    set?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    disconnect?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    delete?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    connect?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    update?: BreathLogUpdateWithWhereUniqueWithoutUserInput | BreathLogUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: BreathLogUpdateManyWithWhereWithoutUserInput | BreathLogUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: BreathLogScalarWhereInput | BreathLogScalarWhereInput[]
   }
 
   export type CrmContactUpdateManyWithoutOwnerNestedInput = {
@@ -143105,6 +144575,20 @@ export namespace Prisma {
     update?: ReadinessCheckInUpdateWithWhereUniqueWithoutUserInput | ReadinessCheckInUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: ReadinessCheckInUpdateManyWithWhereWithoutUserInput | ReadinessCheckInUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: ReadinessCheckInScalarWhereInput | ReadinessCheckInScalarWhereInput[]
+  }
+
+  export type BreathLogUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<BreathLogCreateWithoutUserInput, BreathLogUncheckedCreateWithoutUserInput> | BreathLogCreateWithoutUserInput[] | BreathLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BreathLogCreateOrConnectWithoutUserInput | BreathLogCreateOrConnectWithoutUserInput[]
+    upsert?: BreathLogUpsertWithWhereUniqueWithoutUserInput | BreathLogUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: BreathLogCreateManyUserInputEnvelope
+    set?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    disconnect?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    delete?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    connect?: BreathLogWhereUniqueInput | BreathLogWhereUniqueInput[]
+    update?: BreathLogUpdateWithWhereUniqueWithoutUserInput | BreathLogUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: BreathLogUpdateManyWithWhereWithoutUserInput | BreathLogUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: BreathLogScalarWhereInput | BreathLogScalarWhereInput[]
   }
 
   export type CrmContactUncheckedUpdateManyWithoutOwnerNestedInput = {
@@ -146339,6 +147823,20 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutReadinessCheckInsInput, UserUpdateWithoutReadinessCheckInsInput>, UserUncheckedUpdateWithoutReadinessCheckInsInput>
   }
 
+  export type UserCreateNestedOneWithoutBreathLogsInput = {
+    create?: XOR<UserCreateWithoutBreathLogsInput, UserUncheckedCreateWithoutBreathLogsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutBreathLogsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutBreathLogsNestedInput = {
+    create?: XOR<UserCreateWithoutBreathLogsInput, UserUncheckedCreateWithoutBreathLogsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutBreathLogsInput
+    upsert?: UserUpsertWithoutBreathLogsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutBreathLogsInput, UserUpdateWithoutBreathLogsInput>, UserUncheckedUpdateWithoutBreathLogsInput>
+  }
+
   export type UserCreateNestedOneWithoutCoachSharesInput = {
     create?: XOR<UserCreateWithoutCoachSharesInput, UserUncheckedCreateWithoutCoachSharesInput>
     connectOrCreate?: UserCreateOrConnectWithoutCoachSharesInput
@@ -148971,6 +150469,32 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type BreathLogCreateWithoutUserInput = {
+    id?: string
+    kind: string
+    sessionId?: string | null
+    seconds?: number | null
+    createdAt?: Date | string
+  }
+
+  export type BreathLogUncheckedCreateWithoutUserInput = {
+    id?: string
+    kind: string
+    sessionId?: string | null
+    seconds?: number | null
+    createdAt?: Date | string
+  }
+
+  export type BreathLogCreateOrConnectWithoutUserInput = {
+    where: BreathLogWhereUniqueInput
+    create: XOR<BreathLogCreateWithoutUserInput, BreathLogUncheckedCreateWithoutUserInput>
+  }
+
+  export type BreathLogCreateManyUserInputEnvelope = {
+    data: BreathLogCreateManyUserInput | BreathLogCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type CrmContactCreateWithoutOwnerInput = {
     id?: string
     firstName: string
@@ -150862,6 +152386,34 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"ReadinessCheckIn"> | Date | string
   }
 
+  export type BreathLogUpsertWithWhereUniqueWithoutUserInput = {
+    where: BreathLogWhereUniqueInput
+    update: XOR<BreathLogUpdateWithoutUserInput, BreathLogUncheckedUpdateWithoutUserInput>
+    create: XOR<BreathLogCreateWithoutUserInput, BreathLogUncheckedCreateWithoutUserInput>
+  }
+
+  export type BreathLogUpdateWithWhereUniqueWithoutUserInput = {
+    where: BreathLogWhereUniqueInput
+    data: XOR<BreathLogUpdateWithoutUserInput, BreathLogUncheckedUpdateWithoutUserInput>
+  }
+
+  export type BreathLogUpdateManyWithWhereWithoutUserInput = {
+    where: BreathLogScalarWhereInput
+    data: XOR<BreathLogUpdateManyMutationInput, BreathLogUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type BreathLogScalarWhereInput = {
+    AND?: BreathLogScalarWhereInput | BreathLogScalarWhereInput[]
+    OR?: BreathLogScalarWhereInput[]
+    NOT?: BreathLogScalarWhereInput | BreathLogScalarWhereInput[]
+    id?: StringFilter<"BreathLog"> | string
+    userId?: StringFilter<"BreathLog"> | string
+    kind?: StringFilter<"BreathLog"> | string
+    sessionId?: StringNullableFilter<"BreathLog"> | string | null
+    seconds?: IntNullableFilter<"BreathLog"> | number | null
+    createdAt?: DateTimeFilter<"BreathLog"> | Date | string
+  }
+
   export type CrmContactUpsertWithWhereUniqueWithoutOwnerInput = {
     where: CrmContactWhereUniqueInput
     update: XOR<CrmContactUpdateWithoutOwnerInput, CrmContactUncheckedUpdateWithoutOwnerInput>
@@ -151079,6 +152631,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -151155,6 +152708,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -151247,6 +152801,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -151323,6 +152878,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -151399,6 +152955,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -151475,6 +153032,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -151567,6 +153125,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -151643,6 +153202,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -151719,6 +153279,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -151795,6 +153356,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -151915,6 +153477,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -151991,6 +153554,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -152083,6 +153647,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -152159,6 +153724,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -152290,6 +153856,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -152366,6 +153933,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -152487,6 +154055,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -152563,6 +154132,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -152655,6 +154225,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -152731,6 +154302,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -152807,6 +154379,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -152883,6 +154456,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -152975,6 +154549,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -153051,6 +154626,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -153127,6 +154703,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -153203,6 +154780,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -153295,6 +154873,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -153371,6 +154950,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -153447,6 +155027,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -153523,6 +155104,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -153615,6 +155197,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -153691,6 +155274,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -153767,6 +155351,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -153843,6 +155428,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -154061,6 +155647,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -154137,6 +155724,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -154336,6 +155924,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -154412,6 +156001,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -154504,6 +156094,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -154580,6 +156171,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -154656,6 +156248,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -154732,6 +156325,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -154824,6 +156418,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -154900,6 +156495,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -155643,6 +157239,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -155719,6 +157316,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -155811,6 +157409,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -155887,6 +157486,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -155963,6 +157563,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -156039,6 +157640,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -156131,6 +157733,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -156207,6 +157810,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -156283,6 +157887,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -156359,6 +157964,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -156451,6 +158057,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -156527,6 +158134,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -156603,6 +158211,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -156679,6 +158288,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -156771,6 +158381,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -156847,6 +158458,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -156923,6 +158535,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -156999,6 +158612,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -157117,6 +158731,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -157193,6 +158808,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -157285,6 +158901,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -157361,6 +158978,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -157483,6 +159101,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -157559,6 +159178,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -157737,6 +159357,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -157813,6 +159434,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -157942,6 +159564,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -158018,6 +159641,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -158208,6 +159832,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -158284,6 +159909,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -158407,6 +160033,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -158483,6 +160110,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -158559,6 +160187,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -158635,6 +160264,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -158716,6 +160346,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -158792,6 +160423,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -158873,6 +160505,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -158949,6 +160582,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -159069,6 +160703,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -159145,6 +160780,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -159232,6 +160868,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -159308,6 +160945,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -159395,6 +161033,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -159471,6 +161110,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -159622,6 +161262,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -159698,6 +161339,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -159855,6 +161497,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -159931,6 +161574,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -160007,6 +161651,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -160083,6 +161728,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -160175,6 +161821,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -160251,6 +161898,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -160327,6 +161975,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -160403,6 +162052,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -160495,6 +162145,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -160571,6 +162222,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -160914,6 +162566,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -160990,6 +162643,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -161116,6 +162770,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -161192,6 +162847,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -161360,6 +163016,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -161436,6 +163093,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -161528,6 +163186,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -161604,6 +163263,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -161680,6 +163340,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -161756,6 +163417,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -161848,6 +163510,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -161924,6 +163587,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -162000,6 +163664,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -162076,6 +163741,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -162168,6 +163834,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -162244,6 +163911,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -162320,6 +163988,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -162396,6 +164065,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -162514,6 +164184,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -162590,6 +164261,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -162746,6 +164418,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -162822,6 +164495,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -162903,6 +164577,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -162979,6 +164654,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -163071,6 +164747,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -163147,6 +164824,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -163234,6 +164912,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -163310,6 +164989,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -163386,6 +165066,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -163462,6 +165143,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -163554,6 +165236,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -163630,6 +165313,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -163706,6 +165390,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -163782,6 +165467,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -163874,6 +165560,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -163950,6 +165637,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -164026,6 +165714,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -164102,6 +165791,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -164194,6 +165884,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -164270,6 +165961,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -164346,6 +166038,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -164422,6 +166115,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -164542,6 +166236,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -164618,6 +166313,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -164710,6 +166406,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -164786,6 +166483,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -164901,6 +166599,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -164977,6 +166676,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -165082,6 +166782,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -165158,6 +166859,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -165250,6 +166952,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -165326,6 +167029,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -165402,6 +167106,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -165478,6 +167183,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -165570,6 +167276,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -165646,6 +167353,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -165722,6 +167430,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -165798,6 +167507,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -165890,6 +167600,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -165966,6 +167677,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -166042,6 +167754,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -166118,6 +167831,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -166210,6 +167924,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -166286,6 +168001,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -166485,6 +168201,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
@@ -166561,6 +168278,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
@@ -166675,6 +168393,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
@@ -166751,6 +168470,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
@@ -166949,6 +168669,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
@@ -167025,6 +168746,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
@@ -167151,6 +168873,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
@@ -167227,6 +168950,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
@@ -167427,6 +169151,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
@@ -167503,6 +169228,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
@@ -167747,6 +169473,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
@@ -167823,6 +169550,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
@@ -168011,6 +169739,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -168087,6 +169816,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -168271,6 +170001,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -168347,6 +170078,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -168503,6 +170235,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -168579,6 +170312,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -168763,6 +170497,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -168839,6 +170574,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -170310,6 +172046,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -170386,6 +172123,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -170602,6 +172340,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -170678,6 +172417,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -170839,6 +172579,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -170915,6 +172656,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -171007,6 +172749,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -171083,6 +172826,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -171159,6 +172903,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -171235,6 +172980,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -171327,6 +173073,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -171403,6 +173150,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -171479,6 +173227,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -171555,6 +173304,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -171636,6 +173386,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -171712,6 +173463,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -171881,6 +173633,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -171957,6 +173710,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -172044,6 +173798,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -172120,6 +173875,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -172503,6 +174259,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -172579,6 +174336,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -172671,6 +174429,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -172747,6 +174506,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -172823,6 +174583,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -172899,6 +174660,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -172991,6 +174753,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -173067,6 +174830,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -173143,6 +174907,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -173219,6 +174984,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -173311,6 +175077,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -173387,6 +175154,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -173463,6 +175231,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -173539,6 +175308,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -173631,6 +175401,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -173707,6 +175478,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -173783,6 +175555,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -173859,6 +175632,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -173951,6 +175725,7 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -174027,6 +175802,331 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserCreateWithoutBreathLogsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutBreathLogsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutBreathLogsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutBreathLogsInput, UserUncheckedCreateWithoutBreathLogsInput>
+  }
+
+  export type UserUpsertWithoutBreathLogsInput = {
+    update: XOR<UserUpdateWithoutBreathLogsInput, UserUncheckedUpdateWithoutBreathLogsInput>
+    create: XOR<UserCreateWithoutBreathLogsInput, UserUncheckedCreateWithoutBreathLogsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutBreathLogsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutBreathLogsInput, UserUncheckedUpdateWithoutBreathLogsInput>
+  }
+
+  export type UserUpdateWithoutBreathLogsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutBreathLogsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -174103,6 +176203,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -174179,6 +176280,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -174271,6 +176373,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -174347,6 +176450,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -174423,6 +176527,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -174499,6 +176604,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -174591,6 +176697,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -174667,6 +176774,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -174743,6 +176851,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -174819,6 +176928,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -174900,6 +177010,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
@@ -174976,6 +177087,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
     readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
@@ -175068,6 +177180,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -175144,6 +177257,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -175231,6 +177345,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
@@ -175307,6 +177422,7 @@ export namespace Prisma {
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
     healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
@@ -175886,6 +178002,14 @@ export namespace Prisma {
     mood?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
+  }
+
+  export type BreathLogCreateManyUserInput = {
+    id?: string
+    kind: string
+    sessionId?: string | null
+    seconds?: number | null
+    createdAt?: Date | string
   }
 
   export type CrmContactCreateManyOwnerInput = {
@@ -177702,6 +179826,30 @@ export namespace Prisma {
     mood?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BreathLogUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BreathLogUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BreathLogUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    seconds?: NullableIntFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type CrmContactUpdateWithoutOwnerInput = {
