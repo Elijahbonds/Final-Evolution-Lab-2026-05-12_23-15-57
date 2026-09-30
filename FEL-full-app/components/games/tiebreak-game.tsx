@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { useStartWake } from '@/components/games/use-start-wake';
+import { BootSplash } from '@/components/games/boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { gradeReactBase } from '@/lib/babylon/core/TiebreakBlitz';
 import { makeTiebreakMode } from '@/lib/babylon/modes/TiebreakMode';
@@ -89,6 +90,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
   }, [started]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
+  const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
 
   const myPts = Number(hud.myPts ?? 0);
   const aiPts = Number(hud.aiPts ?? 0);
@@ -115,13 +117,16 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
             PRQ {prq.toFixed(0)} · {gradeRef.current.label}
           </div>
         )}
-        {started && phase === 'error' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6 text-center text-sm text-white">
-            {loadError ?? 'Failed to load this mode.'}
-          </div>
-        )}
+        <BootSplash
+          modeId="tiebreak"
+          title="TIEBREAK BLITZ"
+          phase={phase}
+          detail={phase === 'error' ? (loadError ?? undefined) : undefined}
+          onStart={tapStart}
+          onRetry={tapStart}
+        />
         {!started && (
-          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
+          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">TIEBREAK BLITZ</h2>
             <p className="max-w-md text-sm text-gray-300">
               First to {TARGET}. The ball comes in on one side — swing <span className="text-[#00FF9D]">← / →</span> when the green ring closes on it. The window tightens as the rally and the lead grow.
