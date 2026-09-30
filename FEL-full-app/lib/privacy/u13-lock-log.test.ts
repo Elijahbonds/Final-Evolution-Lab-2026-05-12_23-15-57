@@ -31,6 +31,55 @@ const EMAIL = 'locked-person@fel.test';
 const THIS_YEAR = new Date().getFullYear();
 const IP = '203.0.113.9';
 const UA = 'AgeScreenTest/1.0';
+const PARENT = 'c07f6cf7cccefa215935ec94ad1ff0c97b2d230c';
+
+/** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
+function resolvePrismaDiffBase(): string {
+  const tryCat = (sha: string) => {
+    try {
+      execSync(`git cat-file -e ${sha}^{commit}`, { stdio: 'ignore' });
+      return sha;
+    } catch {
+      return null;
+    }
+  };
+
+  if (tryCat(PARENT)) return PARENT;
+
+  try {
+    execSync(`git fetch --no-tags --depth=1 origin ${PARENT}`, { stdio: 'ignore' });
+  } catch {
+    /* ignore failure */
+  }
+  if (tryCat(PARENT)) return PARENT;
+
+  const finishRelease = 'origin/lane/finish-release';
+  try {
+    execSync(`git fetch --no-tags --depth=1 origin lane/finish-release`, { stdio: 'ignore' });
+  } catch {
+    /* ignore failure */
+  }
+
+  for (let deepen = 0; deepen < 8; deepen++) {
+    try {
+      const base = execSync(`git merge-base HEAD ${finishRelease}`, { encoding: 'utf8' }).trim();
+      if (base && tryCat(base)) return base;
+    } catch {
+      /* merge-base not found yet */
+    }
+    try {
+      execSync('git fetch --no-tags --deepen=50 origin lane/age-screen', { stdio: 'ignore' });
+      execSync('git fetch --no-tags --deepen=50 origin lane/finish-release', { stdio: 'ignore' });
+    } catch {
+      /* ignore failure */
+    }
+  }
+
+  throw new Error(
+    'STATIC schema ban: could not resolve a git base for `git diff <base> -- prisma/` '
+    + `(tried PARENT ${PARENT}, fetch origin ${PARENT}, and merge-base HEAD origin/lane/finish-release with deepen)`,
+  );
+}
 
 type Call = { level: string; args: unknown[] };
 async function capture(fn: () => Promise<unknown>): Promise<Call[]> {
@@ -119,7 +168,8 @@ describe('MUST (3) one PII-free line per under-13 lock', () => {
   it('STATIC: no legacy lock line, and prisma/ is untouched', () => {
     const coppa = execSync("git grep -n '\\[COPPA-U13-LOCK\\]' -- app components lib || true", { encoding: 'utf8' });
     expect(coppa.trim()).toBe('');
-    const schema = execSync('git diff --name-only c07f6cf7cccefa215935ec94ad1ff0c97b2d230c -- prisma/', { encoding: 'utf8' });
+    const base = resolvePrismaDiffBase();
+    const schema = execSync(`git diff --name-only ${base} -- prisma/`, { encoding: 'utf8' });
     expect(schema.trim()).toBe('');
   });
 });
