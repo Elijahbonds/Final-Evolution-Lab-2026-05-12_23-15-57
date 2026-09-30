@@ -634,6 +634,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** The player's average card so far (0 before the first one). */
   const playerPace = (): number => (playerCards.length ? playerCards.reduce((a, c) => a + c, 0) / playerCards.length : 0);
   let lastScores: JudgeScore[] = [];
+  let lastJudgeWhy = '', lastDifficulty = 0, lastExecution = 0, lastStyleScore = 0;   // HOOPS-TO-75 HP-1: timing line after the cards
   let finishing = false;
   let ended = false;                          // soft-OPEN #3: ctx.end / resultSink once — the watchdog and rivalRound's own end can both reach advanceAfterRivalTurn
   let rivalClipToken = 0;                     // soft-OPEN #3: the rival's clip chains carry the same token guard as the player's
@@ -1335,7 +1336,7 @@ export const DunkMode: ModeDefinition = (() => {
       // DUNK-SOFTS-NAMED: the direction feeds the recognizer whenever it moves in the air (it used to be gated on the rise
       // with the buttons, so a direction held from the run-up was never seen); a trick button tapped BEFORE the rise waits
       // for the rise and fires there — the trick the player asked for, at the beat it belongs to.
-      if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
+      if (phase === 'cinematic' && e.t === 'dpad' && e.pressed) flight.recognizer.feed(e);
       // DUNK-BIOMECH: every trick has a cue window — early = ARMED (fires on its beat), late = refused with a banner
       if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y') && qteWindowOpen && !qteHit) {
         // not the slam button, thrown after the jam's beat opened: say so rather than swallowing it
@@ -2044,6 +2045,11 @@ export const DunkMode: ModeDefinition = (() => {
             SoundKit.play('uiTick', { pitch: 0.9, volume: 0.4 });
             SoundKit.play('uiTick', { pitch: 0.95, volume: 0.35 });
           } else if (beat.kind === 'total') {
+            ctx.setHud({
+              slamTiming: slamTiming?.label ?? '',
+              breakdown: `DIFF ${lastDifficulty.toFixed(1)} · EXEC ${lastExecution.toFixed(1)} · STYLE ${lastStyleScore.toFixed(1)}`,
+              judgeWhy: lastJudgeWhy,
+            });
             // THE 50. Raising the ceiling to 50 only means something if the game
             // KNOWS what a 50 is — it is the most recognisable call in the whole
             // event, and a perfect card sweep that scrolled by as an ordinary
@@ -2393,6 +2399,7 @@ export const DunkMode: ModeDefinition = (() => {
     const v = cueVerdict(trick, clipTime), cue = cueOf(trick);
     if (v === 'early') {
       if (armedAir) return;   // one cue armed at a time — the first press is the one that fires
+      if (takeoffEcho || e.t !== 'button' || !e.pressed) return;   // HOOPS-TO-75: only a deliberate press arms a trick — not the take-off echo or a held stick
       armedAir = trick;
       console.info(`[DUNK-CUE] armed ${trick.id} @${clipTime.toFixed(2)} → fires @${cueFireAt(trick).toFixed(2)} (${cue.fire})`);
       flash(ctx, `${trick.label} ARMED · ${CUE_BEAT_LABEL[cue.fire]}`, 600);
@@ -3830,11 +3837,9 @@ export const DunkMode: ModeDefinition = (() => {
     const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched && !boardTopFlip ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap, the board top and the board run are runway labels
     const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
     const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}%${isRepeat ? ' · SEEN IT' : ''}`;
-    ctx.setHud({
-      slamTiming: slamTiming?.label ?? '',
-      breakdown: `DIFF ${difficulty.toFixed(1)} · EXEC ${execution.toFixed(1)} · STYLE ${styleScore.toFixed(1)}`,
-      judgeWhy,
-    });
+    lastJudgeWhy = judgeWhy; lastDifficulty = difficulty; lastExecution = execution; lastStyleScore = styleScore;
+    // HOOPS-TO-75 HP-1: the timing line waits until the judge cards finish — one overlay at a time
+    ctx.setHud({ slamTiming: '', breakdown: '', judgeWhy: '' });
     console.info(`[JUDGE-WHY] ${judgeWhy}`);
     const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01);
     lastScores = scores;

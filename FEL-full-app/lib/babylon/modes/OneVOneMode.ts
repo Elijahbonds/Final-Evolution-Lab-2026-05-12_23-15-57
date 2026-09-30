@@ -146,7 +146,7 @@ import {
   DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
-  STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC,
+  STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC, HAND_UP_CONTEST, proximityContest01,
   SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
@@ -365,6 +365,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let shotContest = 0;
   /** Contest level on the RIVAL's release — so their makes grade your D. */
   let defContest = 0;
+  let earlyJumpBannerAt = 0;   // HOOPS-TO-75: debounce the early-jump callout
   /** Defender's closing speed toward the handler (m/s) — a SET defender
    *  doesn't bite on a hesi; only one running at you does. */
   let foeClosingSpeed = 0;
@@ -737,7 +738,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       micPoint[side] = true;
       mic.then({ moment: 'game.point', tags: [`side:${side}`], priority: 2, crowd: side === 'us' ? { moment: 'crowd.hype', n: 2 } : undefined });
     } else if (side === 'us' && micRun >= 3 && micRun % 2 === 1) mic.then({ moment: 'game.run', priority: 2, crowd: { moment: 'crowd.hype', n: 1 } });
-    if (side === 'them' && Math.random() < 0.4) mic.then({ who: 'foe', moment: 'player.trash.score' });
+    // HOOPS-TO-75 WA-25: trash on a bucket was bleeding into the loss card — never on a game-ending make
+    if (side === 'them' && foeScore < TARGET_SCORE - 2 && Math.random() < 0.4) mic.then({ who: 'foe', moment: 'player.trash.score' });
   }
   /** The result, before ctx.end: the harness stops updating in that frame, so only what starts now is heard — it plays on
    *  under the end card (the host stays mounted behind it). */
@@ -1133,6 +1135,10 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (!play) { SoundKit.play('rattle', { volume: 0.34 }); hoopJuice?.punch(); }   // a play's touches already rang the iron
           else if (play.kind === 'airball') SoundKit.play('crowdGroan', { volume: 0.3 });
           if (possession === 'mine') bannerFlash(ctx, rim.label, 850);
+          else if (possession === 'defense') {
+            bannerFlash(ctx, defContest >= 0.45 ? 'STOP! — YOUR CONTEST' : 'STOP!', 850);
+            micSay({ moment: 'game.steal', priority: 1, crowd: { moment: 'crowd.cheer', n: 1 } }, 4);
+          }
           // THE MIC: an airball always hears it from the stands; a plain miss only sometimes gets the booth (a miss a trip is not news)
           if (possession === 'mine' && !finishFoul) {
             if (play?.kind === 'airball') micSay({ moment: 'game.airball', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } });
@@ -2081,7 +2087,10 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (contact?.isReady) contact.hop('me', JUMP_VY);
     SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
     // BIOMECH-HOOPS-WAVE1 G4: a jump outside the gather is a wasted one — say so (the whiffed reach already does)
-    if (attacker.phase !== 'gather') bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600);
+    if (attacker.phase !== 'gather') {
+      const now = performance.now();
+      if (now - earlyJumpBannerAt > 1800) { earlyJumpBannerAt = now; bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600); }
+    }
     return true;
   }
 
@@ -2150,7 +2159,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     // no block — my contest (distance + a hand up) and their range set the make%
     // D3: a grounded hand-up inside range facing him counts (verticality) on top of the distance and a contest jump
     const ground = groundContest(distXZ(me.root.position, foe.root.position), facingCos(me.root.rotation.y, me.root.position, foe.root.position), meHandUp);
-    const contest = Math.min(1, handUpContest(contestLevel(foe.root.position, me.root.position), myJumpAge) + ground);
+    // HOOPS-TO-75 WA-14: planar distance + a gather-window jump — 3D distance was capping contest ~0.30 in the air
+    const distDef = distXZ(foe.root.position, me.root.position);
+    const baseContest = proximityContest01(distDef);
+    const jumpContest = myJumpAge <= HAND_UP_SEC ? Math.min(1, baseContest + HAND_UP_CONTEST) : baseContest;
+    const gatherBoost = attacker.phase === 'gather' && myJumpAge <= HAND_UP_SEC ? 0.12 : 0;
+    const contest = Math.min(1, jumpContest + ground + gatherBoost);
     defContest = contest;
     const range = distXZ(foe.root.position, RIM_FLOOR);
     // THE RIVAL FEELS THE SCORE NOW. His make chance came straight off range and contest, so he shot the
