@@ -393,6 +393,12 @@ function resetRun(): void {
 const standings = (): Shooter[] =>
   [...S.field].sort((a, b) => (b.shot ? b.score : -1) - (a.shot ? a.score : -1));
 
+/** Top posted rival score — the number the session should report as opponentScore. */
+export function topRivalScore(board: Shooter[]): number {
+  const rivals = board.filter((f) => !f.isPlayer && f.shot);
+  return rivals.length ? Math.max(...rivals.map((f) => f.score)) : 0;
+}
+
 /** A rack's last ball is the money ball — 2 points instead of 1. */
 const isMoneyBall = (i: number): boolean => i === BALLS_PER_RACK - 1;
 
@@ -719,7 +725,7 @@ function afterStandings(ctx: ModeContext): void {
     }
     S.phase = 'done';
     ctx.end(step.won ? 'win' : 'complete', step.score, {
-      points: step.score, bestStreak: S.best, place: step.place, round: 2,
+      points: step.score, bestStreak: S.best, place: step.place, round: 2, rivalScore: topRivalScore(board),
     });
     return;
   }
@@ -729,7 +735,7 @@ function afterStandings(ctx: ModeContext): void {
     S.eliminated = true;
     S.phase = 'done';
     ctx.end('complete', myScore, {
-      points: myScore, bestStreak: S.best, place: me + 1, round: 1,
+      points: myScore, bestStreak: S.best, place: me + 1, round: 1, rivalScore: topRivalScore(board),
     });
     return;
   }

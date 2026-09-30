@@ -143,10 +143,11 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
   const retry = () => { setError(null); setCode(''); setQr(null); setAttempt((a) => a + 1); };
   const openPanel = () => { if (error) retry(); setArmed(true); setOpen(true); };
 
+  const hideRoomChip = process.env.NODE_ENV === 'production';
   const showPanel = open ?? (connected.length > 0 && !collapsed);
   if (!showPanel) {
     // The USB line sits under the badge until play starts: plugging a pad in needs no tap at all, only a button press.
-    const usbLine = bus && (!collapsed || (justJoined && pads.length > 0)) ? (
+    const usbLine = bus && (!collapsed || (justJoined && pads.length > 0) || pads.length > 0) ? (
       <span
         data-testid="usb-connect-hint"
         className={`rounded-full px-3 py-0.5 text-[10px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/70'}`}
@@ -155,6 +156,13 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
         {usbStatusLine(pads)}
       </span>
     ) : null;
+    // HOOPS-TO-75 HP-2: a connected pad replaces the CONNECT badge; HP-3: no room code chip in prod
+    if (pads.length > 0) {
+      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
+    }
+    if (hideRoomChip) {
+      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
+    }
     if (error) {
       return (
         <Stack anchor={anchor}>

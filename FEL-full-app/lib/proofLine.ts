@@ -27,7 +27,11 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'karateEndless': { const wave = n(s, 'wave'), kos = n(s, 'kos'); return wave !== null ? `WAVE ${wave} · ${kos ?? 0} KOS` : null; }
     case 'hoops1v1': { const foe = n(s, 'foeScore'); return `${r.score}–${foe ?? r.opponentScore ?? 0} · ${wl(r)}`; }
     case 'hoops3v3': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
-    case 'threePoint': { const pts = n(s, 'points') ?? r.score; return `${pts} PTS DOWNTOWN · ${wl(r)}`; }
+    case 'threePoint': {
+      const pts = n(s, 'points') ?? r.score;
+      const rival = n(s, 'rivalScore') ?? r.opponentScore;
+      return rival != null && rival > 0 ? `${pts} PTS DOWNTOWN vs ${rival} · ${wl(r)}` : `${pts} PTS DOWNTOWN · ${wl(r)}`;
+    }
     case 'skateboarding': { const combo = n(s, 'bestCombo'), coins = n(s, 'coinsCollected'); return `${r.score} PTS${combo !== null ? ` · x${Math.round(combo)} BEST CHAIN` : ''}${coins !== null ? ` · ${coins} COINS` : ''}`; }
     // GATE-CRASHER-POLISH-2 (GC-11): the time bonus left the card's title for this line — named when the run earned one
     case 'snowboarding': { const gates = n(s, 'gatesHit'), t = n(s, 'elapsed'), tb = n(s, 'timeBonus'); return `${gates ?? 0} GATES${t !== null ? ` · ${t}s` : ''}${tb ? ` · +${tb} TIME` : ''} · ${r.score} PTS`; }

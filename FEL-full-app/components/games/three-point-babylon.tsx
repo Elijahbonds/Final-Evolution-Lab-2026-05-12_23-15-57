@@ -80,13 +80,18 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         if (!next.done) return;      // the next phone is up; the host remounts for their turn
       }
       endedRef.current = true;
+      const pts = Number(r.stats?.points ?? r.score ?? 0);
+      const rivalPts = Number(r.stats?.rivalScore ?? 0);
+      const won = r.outcome === 'win';
       onEnd({
-        score: Number(r.stats?.points ?? r.score ?? 0),
+        score: pts,
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-        opponentScore: 0,
-        won: r.outcome === 'win',
+        opponentScore: rivalPts,
+        won,
         duration: r.durationSec,
-        headline: r.outcome === 'win' ? 'RANGE UNLOCKED' : 'SHOOTOUT COMPLETE',
+        headline: won
+          ? `RANGE UNLOCKED · ${pts} PTS${rivalPts > 0 ? ` vs ${rivalPts}` : ''}`
+          : `SHOOTOUT COMPLETE · ${pts} PTS${rivalPts > 0 ? ` vs ${rivalPts}` : ''}`,
       } satisfies GameResult);
     };
 
@@ -161,7 +166,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   void MAX_SHOOTERS;
 
   return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
@@ -191,6 +196,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           onPeers={onPeers}
           onPadInput={onPhonePad}
           collapsed={phase === 'playing'}
+          lazy={process.env.NODE_ENV === 'production'}
           bus={busRef.current}
         />
       )}
