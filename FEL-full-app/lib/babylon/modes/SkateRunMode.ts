@@ -891,7 +891,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // less per line since the repeat decay, so the par sits at 1500) — it ended 'RUN_COMPLETE' with no win before
         const won = finalScore >= SKATE_WIN_SCORE;
         console.info(`[SKATE-END] ${won ? 'win' : 'complete'} banked ${combo.banked} coins ${coins.collected} best ${combo.bestCombo}x`);
-        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total });   // SK-3: landed tricks only (the live pot's links were never landed)
+        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total, goalsHit: goals.doneCount, goals: SKATE_GOALS.length });   // SK-3: landed tricks only; RESULTS-TRUTH: goals on the card
       }
       const gained = coins.update(dt, rig.char.root.position);
       if (gained > 0) {

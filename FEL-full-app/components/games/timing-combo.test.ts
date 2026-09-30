@@ -39,7 +39,7 @@ describe('timingMaxCombo', () => {
 
   it('the host posts it, and dance is still the one timing mode that sends its own', () => {
     const host = src('components/games/timing-babylon.tsx');
-    expect(host).toContain('maxCombo: timingMaxCombo(st),');
+    expect(host).toContain('maxCombo: timingMaxCombo(st)');
     expect(host).not.toContain("maxCombo: n('hits')");
     expect(src('lib/babylon/modes/DanceMode.ts')).toContain('maxCombo: r.maxCombo,');
     for (const f of ['lib/babylon/modes/NetSportMode.ts', 'lib/babylon/modes/TennisMode.ts', 'lib/babylon/modes/VolleyballMode.ts', 'lib/babylon/modes/precisionModes.ts']) {

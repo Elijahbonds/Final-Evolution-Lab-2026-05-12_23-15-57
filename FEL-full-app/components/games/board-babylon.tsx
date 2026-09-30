@@ -16,6 +16,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { getActiveSkin } from '@/lib/modes/art/active-skin';
 import { applyArtCardToSurface } from '@/lib/modes/art/apply-art-card';
+import { boardGameResult, boardHeadline, boardSportWon } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
 
@@ -75,29 +76,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
         endedRef.current = true;
         // boards pass phase 10: the card reads the MODE's line. It used to say `0 COINS · x1 CHAIN` for every board (snow has no
         // coins; `combo` was never a stat) and `won: false` for every run — the modes end 'win' / 'complete' now.
-        const st = r.stats ?? {};
-        const n = (k: string, d = 0) => Number(st[k] ?? d);
-        const won = r.outcome === 'win';
-        const combo = n('bestCombo', 1);
-        const headline = modeKey === 'snowboard_slalom'
-          // GATE-CRASHER-POLISH-2 (GC-11): ONE LINE. The title carried the whole run — "GATE CRASHER · 27/30 GATES · +0 TIME · 6
-          // TRICKS · X1 BEST" — and wrapped onto three lines of the card's 4xl heading. The verdict and the gates stay here (20
-          // characters, the heading's one line); the time bonus rides the proof line under it (lib/proofLine, "+260 TIME"),
-          // and the score line is the shell's. A run the stall watchdog ended says so (GC-F1).
-          ? `${n('stalled') ? 'RUN STALLED' : won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)}`
-          : modeKey === 'surf'
-            ? `${won ? 'EPIC SESSION' : 'SESSION OVER'} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`
-            : `${won ? 'LEGENDARY RUN' : 'RUN OVER'} · x${combo} BEST CHAIN · ${n('tricksLanded')} TRICKS · ${n('coinsCollected')} COINS`;
-        const result: GameResult = {
-          score: r.score,
-          stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: 0,
-          won,
-          duration: r.durationSec,
-          headline,
-          maxCombo: Math.round(combo),
-        };
-        onEnd(result);
+        const won = boardSportWon(r.outcome);
+        onEnd(boardGameResult(r, { modeKey, headline: boardHeadline(modeKey, r, won) }));
       };
 
       const def = MODES[modeKey];

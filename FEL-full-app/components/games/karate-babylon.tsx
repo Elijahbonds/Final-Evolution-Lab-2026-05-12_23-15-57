@@ -12,6 +12,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
 
@@ -37,15 +38,11 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       endedRef.current = true;
       const kos = Number(r.stats?.kos ?? 0);
       const wave = Number(r.stats?.wave ?? 0);
-      const result: GameResult = {
-        score: r.score,
-        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-        opponentScore: 0,
-        won: false, // endless survival — the run always ends on defeat
-        duration: r.durationSec,
-        headline: `WAVE ${wave} REACHED · ${kos} KO`,
-      };
-      onEnd(result);
+      const capped = r.outcome === 'WAVE_CAP';
+      onEnd(gameResultFromSession(r, {
+        won: false,
+        headline: capped ? `TIME! · WAVE ${wave} · ${kos} KO` : `WAVE ${wave} REACHED · ${kos} KO`,
+      }));
     };
     // StrictMode runs effect -> cleanup -> effect. Starting immediately lets the
     // PHANTOM mount build a Babylon engine its own cleanup cannot cancel, and two

@@ -358,7 +358,7 @@ describe('the wiring: SkateRunMode uses all of it (source scan)', () => {
     expect(src).toMatch(/const still = !!named && named\.spinDeg === 0 && named\.flipDeg === 0 && named\.grab === 'none';/);
   });
   it('SK-3: the card reads the landed count, and the touchdown and the save feed it', () => {
-    expect(src).toMatch(/tricksLanded: landed\.total \}/);
+    expect(src).toMatch(/tricksLanded: landed\.total/);
     expect(src).not.toMatch(/landedTotal/);
     expect(src).toMatch(/landed\.touchdown\(res\.grade, res\.chain\.length\)/);
     expect(src).toMatch(/landed\.saveResolved\(true\)/);

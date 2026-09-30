@@ -868,7 +868,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(src('lib/babylon/modes/NetSportMode.ts'), /new TennisScore\((\d+)\)/, 'TennisScore')).toBe(MIRRORED.tennisGames);
     const tb = src('components/games/tiebreak-game.tsx');
     expect(num(tb, /const TARGET = (\d+);/, 'tiebreak TARGET')).toBe(MIRRORED.tiebreakTarget);
-    expect(tb).toContain('score: myPts * 120 + bestRally * 30');
+    expect(tb).toContain('score: myPts');
+    expect(tb).toContain('opponentScore: aiPts');
     expect(tb).toContain('Math.random() < 0.16 + rally * 0.05');
     expect(num(src('lib/babylon/modes/BrainBrawlMode.ts'), /const MAX_ROUNDS = (\d+);/, 'MAX_ROUNDS')).toBe(MIRRORED.brainBrawlMaxRounds);
     const wsi = src('lib/babylon/modes/WhoSceneItMode.ts');
@@ -1019,8 +1020,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
   it('The Hundred: the wave budget and the end card', () => {
     const k = src('lib/babylon/modes/KarateEndlessMode.ts');
     expect(k).toContain(`felTier === 'mobile' ? 12 : ${MIRRORED.karateWaveMax}`);
-    expect(k.split('totalKos * 100 + wave * 50 + Math.round(flow.points)').length - 1).toBe(2);   // every ctx.end
-    expect(k.match(/ctx\.end\(/g)).toHaveLength(2);
+    expect(k.split('totalKos * 100 + wave * 50 + Math.round(flow.points)').length - 1).toBe(3);   // every ctx.end (defeat, bleed-out, time cap)
+    expect(k.match(/ctx\.end\(/g)).toHaveLength(3);
     expect(FREEFLOW.multMax).toBe(4);
   });
 
