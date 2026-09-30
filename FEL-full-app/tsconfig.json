@@ -37,7 +37,8 @@
     ".build/types/**/*.ts",
     ".next-prod/types/**/*.ts",
     ".next-verify/types/**/*.ts",
-    ".next-rc2/types/**/*.ts"
+    ".next-rc2/types/**/*.ts",
+    ".next-mirror/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

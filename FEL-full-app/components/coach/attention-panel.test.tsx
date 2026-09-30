@@ -60,6 +60,62 @@ describe('panelLists', () => {
   });
 });
 
+// MIRROR-COACH P5 (2026-09-29): pain flags are read from `board.painFlags` — absent on an older cached response,
+// which must read exactly like an empty list (never a crash), and never render `items` unless the API itself
+// marked the row `detailed` (a live coach_view consent grant, decided server-side in lib/health/pain.ts).
+describe('panel source: pain flags', () => {
+  it('treats a missing painFlags field as an empty list, not a crash', () => {
+    const src = readSource();
+    expect(src).toMatch(/board\.painFlags\s*\?\?\s*\[\]/);
+  });
+
+  it('only renders the detailed item list when the API marked the row detailed — never derives detail client-side', () => {
+    const src = readSource();
+    expect(src).toMatch(/p\.view\.detailed\s*&&\s*p\.view\.items/);
+  });
+
+  it('the empty-state line accounts for pain flags too, so a coach with only a pain flag never sees "nothing to do"', () => {
+    const src = readSource();
+    expect(src).toMatch(/painFlags\.length === 0/);
+  });
+});
+
+// MIRROR-COACH P6 (2026-09-29): shared readiness check-ins — absent on an older cached response (an empty list, never
+// a crash), rendered only from what the API sent (it sends nothing for a client without a coach_view grant), and
+// never folded into the "needs you" empty-state count: a check-in is context for the session, not a flag.
+describe('panel source: readiness check-ins', () => {
+  it('treats a missing readiness field as an empty list, not a crash', () => {
+    expect(readSource()).toMatch(/board\.readiness\s*\?\?\s*\[\]/);
+  });
+
+  it('renders the API\'s own label and summary — it computes no level or number of its own', () => {
+    const src = readSource();
+    expect(src).toMatch(/r\.view\.label/);
+    expect(src).toMatch(/r\.view\.summary/);
+    // MIRROR-COACH P6 FIX (2026-09-29): this asserted NO import from lib/health/readiness at all. The panel now imports
+    // exactly one thing from it — readinessDayLabel, a date formatter (the day has to be said in the coach's own local
+    // calendar, which only the browser knows) — and still no read logic: no level, strain or view is computed here.
+    const imports = [...src.matchAll(/import \{([^}]*)\} from ['"]@\/lib\/health\/readiness['"]/g)].map((m) => m[1].trim());
+    expect(imports).toEqual(['readinessDayLabel']);
+    expect(src).not.toMatch(/\b(readReadiness|coachReadinessView|strainOf)\(|LOW_ITEM/);   // no call (a comment may name them)
+  });
+
+  // MIRROR-COACH P6 FIX (2026-09-29, code review): a check-in up to 36 h old showed with no day, so yesterday's "running
+  // low" read as today's; and "warm-up N min" was a formula, not the warm-up the athlete got.
+  it('says the day of each check-in, and shows no warm-up minutes', () => {
+    const src = readSource();
+    expect(src).toContain('{readinessDayLabel(r.view.date)} · {r.view.summary}');
+    expect(src).not.toMatch(/warmupMinutes|warm-up \{/);
+  });
+
+  it('a check-in is not a flag: the empty-state line does not count it', () => {
+    const src = readSource();
+    const empty = /\{flags\.length === 0 && waiting\.length === 0 && drifting\.length === 0 && painFlags\.length === 0 && \(/;
+    expect(src).toMatch(empty);
+    expect(src).not.toMatch(/readiness\.length === 0/);
+  });
+});
+
 function readSource(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('node:fs').readFileSync(new URL('./attention-panel.tsx', import.meta.url), 'utf8');

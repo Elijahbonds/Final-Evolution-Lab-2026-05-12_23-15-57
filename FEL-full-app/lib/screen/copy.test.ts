@@ -33,9 +33,12 @@ describe('the safety copy (the research draft, verbatim)', () => {
   it('the end of the results', () => {
     expect(COPY.SCREENSHOT_LINE).toBe('Screenshot this to keep your results.');
     expect(COPY.DONE_CLEAR).toBe('Done, clear my results');
-    expect(COPY.BUILD_PROGRAM).toBe('Build my Dunk Program');
-    expect(COPY.FREE_GAME).toBe('Play the Dunk Game, free');           // SCREEN-FIX S-1: the button opens /try
-    expect(COPY.STOP_LINE).toBe('Not a medical exam. If anything hurts, stop.');
+    // CHANGED (SCREEN-FIX-2, retest 1 L5): BUILD_PROGRAM and FREE_GAME are gone; the adults' one next step is the book
+    expect(COPY).not.toHaveProperty('BUILD_PROGRAM');
+    expect(COPY).not.toHaveProperty('FREE_GAME');
+    expect(COPY.KINDLE_BOOK_URL).toBe('https://www.amazon.com/dp/B0H5J1M18H');
+    // CHANGED (SCREEN-FIX-2, retest 1 S-13): was 'Not a medical exam. If anything hurts, stop.'
+    expect(COPY.STOP_LINE).toBe('If anything hurts, stop.');
     expect(COPY.WIN_LINE).toBe('Clean screen. You\'re ready for Dunking & Plyometrics.');
     expect(COPY.NOT_SAVED_TITLE).toBe('Your results aren\'t saved. Run the screen again');
     expect(COPY.TRACKING_LOSS_PROMPT).toBe('Step back into the light');

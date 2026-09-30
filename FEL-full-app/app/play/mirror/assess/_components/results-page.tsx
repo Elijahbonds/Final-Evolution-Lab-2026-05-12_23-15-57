@@ -29,7 +29,7 @@ export function ResultsPage() {
     <ScreenFrame back={SCREEN_HOME}>
       {state === 'reading' ? <StepCard testId="reading"><p className="text-white/60">Reading your results…</p></StepCard> : null}
       {state === 'none' ? <NotSavedCard /> : null}
-      {typeof state === 'object' ? <ResultsView summary={state.summary} age={state.age} onClear={clear} /> : null}
+      {typeof state === 'object' ? <ResultsView summary={state.summary} age={state.age} onClear={clear} onRunAgain={() => router.replace(ASSESS_PATH)} /> : null}
     </ScreenFrame>
   );
 }

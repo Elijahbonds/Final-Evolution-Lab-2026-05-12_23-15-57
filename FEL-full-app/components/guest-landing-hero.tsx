@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { Flame, Zap, Trophy, ArrowRight } from 'lucide-react';
 import { track, flush } from '@/lib/analytics';
 import { EmailCapture } from '@/components/marketing/email-capture';
+import { joinLabEnabled } from '@/lib/marketing/joinLab';
 
 /**
  * M13 Step 1 — the logged-out landing. One promise: "60 seconds to a dunk."
@@ -58,9 +59,12 @@ export function GuestLandingHero() {
           </Link>
         </div>
 
-        <div className="mx-auto mt-10 max-w-md">
-          <EmailCapture source="landing_hero" />
-        </div>
+        {/* JOIN-LAB-HIDE: the Join the Lab email form stays hidden until the switch is on (lib/marketing/joinLab.ts). */}
+        {joinLabEnabled() && (
+          <div className="mx-auto mt-10 max-w-md">
+            <EmailCapture source="landing_hero" />
+          </div>
+        )}
       </div>
     </div>
   );

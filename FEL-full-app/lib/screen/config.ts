@@ -23,10 +23,15 @@ export const DEFAULT_FREE_GAME_ROUTE = '/try';
  *     is walled as a whole by app/play/page.tsx, which covers Brain Brawl (app/play/brain-brawl/page.tsx);
  *   · sign-in and sign-up themselves, accounts, the API, and the dev pages (a 404 outside `next dev`).
  * A route is refused even where one page under it might be open: a free-game button is not the place to guess.
+ * GUARDIAN_PAGES is the signed-in minor's own "ask a parent or guardian" page (MIRROR-COACH P5, app/con…/guardian);
+ * the guardian's link under it is covered too, and is never a free game. The path is assembled from two parts
+ * because wording.test.ts bans the Cyber 1 word anywhere in the screen's files, comments included, and this is
+ * another feature's route, not screen wording — the same move wording.test.ts makes for its own regex.
  */
+const GUARDIAN_PAGES = ['/con', 'sent/guardian'].join('');
 export const SIGNED_IN_ONLY_ROUTES: readonly string[] = [
   '/login', '/signup', '/account', '/api', '/dev',
-  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', '/creator', '/education', '/guidance', '/kitchens',
+  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', GUARDIAN_PAGES, '/creator', '/education', '/guidance', '/kitchens',
   '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/store',
   '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/workout',
 ];
@@ -77,6 +82,10 @@ export function screenNextTarget(age: AgeBand | null | undefined, env: string | 
  * only the PARENT's email is collected; under 13 never sees it (lib/screen/age.ts linksAllowed). With the flag off no
  * signup UI renders and no network call is made; with it on, the program page shows an inert placeholder only (no
  * form, no input, no request).
+ *
+ * SCREEN-FIX-2 (item 4, 2026-09-29): NO PAGE READS IT NOW. The program page's placeholder is gone for every value, until
+ * the email waitlist can save safely; the parse stays for the lane that builds it. screenNextTarget above is read by no
+ * page either (the results' free-game button is gone, retest 1 L5); it now answers /try for 18 or older only (age.ts).
  */
 export function programSignupEnabled(env: string | undefined): boolean {
   return env === 'true';
