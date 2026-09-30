@@ -307,6 +307,107 @@ describe('GET /api/coach/attention — painFlags (consent-gated pain check-in vi
   });
 });
 
+// MIRROR-COACH P6 (2026-09-29): the daily readiness check-in on the coach's board — ONLY with that client's live
+// coach_view grant for THIS coach, and otherwise nothing at all (not a generic line like a pain flag gets). Run through
+// the real route so the query's own scoping (coachId, scope, revokedAt, the `userId in consented` filter) is what is
+// tested, not just lib/health/readiness.ts coachReadinessView in isolation.
+type ReadinessView = { date: string; level: 'ok' | 'low'; label: string; summary: string };
+type BoardWithReadiness = Board & { readiness: { clientId: string; name: string; view: ReadinessView }[]; painFlags: unknown[] };
+
+describe('GET /api/coach/attention — readiness (consent-gated daily check-ins)', () => {
+  const HOUR = 3_600_000;
+  const check = (id: string, userId: string, over: Row = {}) => ({
+    id, userId, date: '2026-09-29', sleep: 2, soreness: 4, energy: 2, mood: 3, createdAt: new Date(NOW - 2 * HOUR), updatedAt: new Date(NOW - 2 * HOUR), ...over,
+  });
+  const grant = (userId: string, over: Row = {}) => ({ id: `hc-${userId}`, userId, coachId: 'coach-1', scope: 'coach_view', grantedAt: ago(5), revokedAt: null, ...over });
+
+  it('NO coach_view grant → nothing for that client: no row, no count, no hint', async () => {
+    m.db.readinessCheckIn = [check('rc-1', 'cole')];
+    m.db.healthConsent = [];
+    const b = await get<BoardWithReadiness>(attentionGET);
+    expect(b.readiness).toEqual([]);
+    expect(JSON.stringify(b)).not.toMatch(/rc-1|running low|soreness/i);
+  });
+
+  it('without any consenting client the readiness table is never even read', async () => {
+    let reads = 0;
+    const rows = [check('rc-2', 'cole')];
+    Object.defineProperty(m.db, 'readinessCheckIn', { get: () => { reads += 1; return rows; }, configurable: true, enumerable: true });
+    m.db.healthConsent = [grant('cole', { coachId: 'coach-2' })];   // another coach's grant
+    await get<BoardWithReadiness>(attentionGET);
+    expect(reads).toBe(0);
+    // the control: the same counter DOES see a read once this coach holds a grant, so the zero above is real
+    m.db.healthConsent = [grant('cole')];
+    await get<BoardWithReadiness>(attentionGET);
+    expect(reads).toBeGreaterThan(0);
+  });
+
+  it('a live grant for THIS coach shows the check-in: its day, level, what is low, the numbers — no warm-up formula', async () => {
+    m.db.readinessCheckIn = [check('rc-3', 'cole')];
+    m.db.healthConsent = [grant('cole')];
+    const b = await get<BoardWithReadiness>(attentionGET);
+    expect(b.readiness).toEqual([{
+      clientId: 'cole', name: 'Cole',
+      view: expect.objectContaining({ date: '2026-09-29', level: 'low', label: 'Running low: sleep, soreness, energy', summary: 'Sleep 2/5 · soreness 4/5 · energy 2/5 · mood 3/5' }),
+    }]);
+    // MIRROR-COACH P6 FIX: "warm-up 14 min" was the read's formula, not the warm-up the athlete got (coach Prep, off
+    // days, a picked length, youth and pain-day plans all differ)
+    expect(b.readiness[0].view).not.toHaveProperty('warmupMinutes');
+  });
+
+  // MIRROR-COACH P6 FIX (2026-09-29, code review): the review's trace — a row dated yesterday, saved 34 h ago, is inside
+  // the 36 h window and came back looking like today's. It still comes back (a coach may want last night's read), but
+  // carrying its OWN day, which the panel says ('yesterday', lib/health/readiness.ts readinessDayLabel); and a newer
+  // day's row always wins over it.
+  it('a check-in from yesterday inside the window comes back with its own date; today\'s, once there, wins', async () => {
+    const yesterday = new Date(NOW - 34 * HOUR);
+    const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    m.db.readinessCheckIn = [check('rc-y', 'cole', { date: dayKey(yesterday), updatedAt: yesterday, createdAt: yesterday })];
+    m.db.healthConsent = [grant('cole')];
+    const b = await get<BoardWithReadiness>(attentionGET);
+    expect(b.readiness[0].view.date).toBe(dayKey(yesterday));
+    const { readinessDayLabel } = await import('@/lib/health/readiness');
+    expect(readinessDayLabel(b.readiness[0].view.date, new Date(NOW))).not.toBe('today');
+    m.db.readinessCheckIn.push(check('rc-t', 'cole', { date: dayKey(new Date(NOW)), sleep: 5, soreness: 1, energy: 5, mood: 5, updatedAt: new Date(NOW - HOUR) }));
+    const b2 = await get<BoardWithReadiness>(attentionGET);
+    expect(b2.readiness[0].view).toMatchObject({ date: dayKey(new Date(NOW)), level: 'ok' });
+    expect(readinessDayLabel(b2.readiness[0].view.date, new Date(NOW))).toBe('today');
+  });
+
+  it('a REVOKED grant, another coach’s grant, or a health_data-scope grant each show nothing', async () => {
+    m.db.readinessCheckIn = [check('rc-4', 'cole')];
+    for (const g of [grant('cole', { revokedAt: ago(1) }), grant('cole', { coachId: 'coach-2' }), grant('cole', { scope: 'health_data' })]) {
+      m.db.healthConsent = [g];
+      expect((await get<BoardWithReadiness>(attentionGET)).readiness, JSON.stringify(g)).toEqual([]);
+    }
+  });
+
+  it('only the consenting client appears, even when the other client checked in too', async () => {
+    m.db.readinessCheckIn = [check('rc-5', 'cole'), check('rc-6', 'gia', { sleep: 5, soreness: 1, energy: 5, mood: 5 })];
+    m.db.healthConsent = [grant('gia')];
+    const b = await get<BoardWithReadiness>(attentionGET);
+    expect(b.readiness.map((r) => r.clientId)).toEqual(['gia']);
+    expect(b.readiness[0].view).toMatchObject({ level: 'ok', label: 'Checked in, good to go' });
+  });
+
+  it('a check-in older than a day and a half is not shown', async () => {
+    m.db.readinessCheckIn = [check('rc-7', 'cole', { updatedAt: new Date(NOW - 40 * HOUR) })];
+    m.db.healthConsent = [grant('cole')];
+    expect((await get<BoardWithReadiness>(attentionGET)).readiness).toEqual([]);
+  });
+
+  it('never touches triage, drift or the headline — the board reads the same with or without check-ins', async () => {
+    const before = await get<BoardWithReadiness>(attentionGET);
+    m.db.readinessCheckIn = ['cole', 'gia', 'lou', 'otto', 'mira'].map((c, i) => check(`rc-t${i}`, c, { sleep: 1, soreness: 5, energy: 1, mood: 1 }));
+    m.db.healthConsent = ['cole', 'gia', 'lou', 'otto', 'mira'].map((c) => grant(c));
+    const after = await get<BoardWithReadiness>(attentionGET);
+    expect(after.readiness).toHaveLength(5);
+    expect(after.triage).toEqual(before.triage);
+    expect(after.drift).toEqual(before.drift);
+    expect(after.headline).toEqual(before.headline);
+  });
+});
+
 type RosterRow = { clientId: string; coachedSessions: number; games: number; sessions: number; coverage: { cells: { pattern: string; state: string }[]; sessionsDone: number; untaggedProgrammed: number } | null };
 
 describe('GET /api/coach/roster — two numbers and the six-pattern strip', () => {

@@ -80,6 +80,42 @@ describe('panel source: pain flags', () => {
   });
 });
 
+// MIRROR-COACH P6 (2026-09-29): shared readiness check-ins — absent on an older cached response (an empty list, never
+// a crash), rendered only from what the API sent (it sends nothing for a client without a coach_view grant), and
+// never folded into the "needs you" empty-state count: a check-in is context for the session, not a flag.
+describe('panel source: readiness check-ins', () => {
+  it('treats a missing readiness field as an empty list, not a crash', () => {
+    expect(readSource()).toMatch(/board\.readiness\s*\?\?\s*\[\]/);
+  });
+
+  it('renders the API\'s own label and summary — it computes no level or number of its own', () => {
+    const src = readSource();
+    expect(src).toMatch(/r\.view\.label/);
+    expect(src).toMatch(/r\.view\.summary/);
+    // MIRROR-COACH P6 FIX (2026-09-29): this asserted NO import from lib/health/readiness at all. The panel now imports
+    // exactly one thing from it — readinessDayLabel, a date formatter (the day has to be said in the coach's own local
+    // calendar, which only the browser knows) — and still no read logic: no level, strain or view is computed here.
+    const imports = [...src.matchAll(/import \{([^}]*)\} from ['"]@\/lib\/health\/readiness['"]/g)].map((m) => m[1].trim());
+    expect(imports).toEqual(['readinessDayLabel']);
+    expect(src).not.toMatch(/\b(readReadiness|coachReadinessView|strainOf)\(|LOW_ITEM/);   // no call (a comment may name them)
+  });
+
+  // MIRROR-COACH P6 FIX (2026-09-29, code review): a check-in up to 36 h old showed with no day, so yesterday's "running
+  // low" read as today's; and "warm-up N min" was a formula, not the warm-up the athlete got.
+  it('says the day of each check-in, and shows no warm-up minutes', () => {
+    const src = readSource();
+    expect(src).toContain('{readinessDayLabel(r.view.date)} · {r.view.summary}');
+    expect(src).not.toMatch(/warmupMinutes|warm-up \{/);
+  });
+
+  it('a check-in is not a flag: the empty-state line does not count it', () => {
+    const src = readSource();
+    const empty = /\{flags\.length === 0 && waiting\.length === 0 && drifting\.length === 0 && painFlags\.length === 0 && \(/;
+    expect(src).toMatch(empty);
+    expect(src).not.toMatch(/readiness\.length === 0/);
+  });
+});
+
 function readSource(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('node:fs').readFileSync(new URL('./attention-panel.tsx', import.meta.url), 'utf8');

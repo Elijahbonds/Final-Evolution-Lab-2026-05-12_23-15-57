@@ -103,6 +103,30 @@ export function canUse(feature: GuardianGatedFeature, input: GuardianGateInput, 
   }
 }
 
+/**
+ * WHAT A GUARDIAN'S YES COVERS, in the words both guardian screens say it (app/consent/guardian/[token]/page.tsx for a
+ * coach's or camp's link, player-request.tsx for the athlete's own). MIRROR-COACH P6 FIX (2026-09-29, code review —
+ * "the guardian's yes now unlocks the daily readiness check-in, but the guardian is never told"): P6's readiness
+ * check-in is gated as 'pain_checkin' (lib/health/readiness.ts READINESS_GUARDIAN_FEATURE), so an accepted consent
+ * now also lets a minor answer a daily sleep / soreness / energy / mood check-in — while both screens still said the
+ * yes covered the Mirror and pain check-ins, the camp one adding "That's all this does". The screens now read this
+ * list, and tests/camp/guardian-accept-page.test.ts holds every gated feature with a consumer to a line in it.
+ * `body_play` has no consumer yet (movement play's); when it gets one, it gets a line here before it ships.
+ * Copy only: neither accept call changes.
+ */
+export const GUARDIAN_CONSENT_COVERS: readonly { feature: GuardianGatedFeature; words: string }[] = [
+  { feature: 'mirror', words: 'use its movement-coaching camera tool (the Mirror)' },
+  { feature: 'pain_checkin', words: 'log how an exercise feels (a pain check-in)' },
+  { feature: 'pain_checkin', words: 'answer an optional daily check-in on sleep, soreness, energy and mood' },
+];
+
+/** "Before Sam can use …, log … or answer …, we ask a parent or guardian to confirm that's OK." */
+export function guardianConsentAsk(menteeName: string): string {
+  const w = GUARDIAN_CONSENT_COVERS.map((c) => c.words);
+  const list = w.length > 1 ? `${w.slice(0, -1).join(', ')} or ${w[w.length - 1]}` : w[0];
+  return `FEL is a training app. Before ${menteeName} can ${list}, we ask a parent or guardian to confirm that's OK.`;
+}
+
 /** Owner decision #6's own number: a youth reader's activity target is 60 min/day, not the adult WHO figure (see
  *  the file header — no screen shows either figure yet). Minutes, not sessions: a short daily habit, counted the way
  *  WHO's own youth guideline counts it. */

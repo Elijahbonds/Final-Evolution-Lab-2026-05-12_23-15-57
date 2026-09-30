@@ -28,6 +28,8 @@ export const newTodayStore = (): TodayStore => ({ seq: 0, clock: Date.parse('202
 export const EXERCISE_LOG_WRITABLE = ['clientSessionId', 'sessionExerciseId', 'actualSets', 'actualReps', 'actualLoad', 'rpe', 'clientNote', 'videoUrl', 'coachComment', 'coachCommentAt', 'completedAt'] as const;
 /** SetLog columns a write may name. */
 export const SET_LOG_WRITABLE = ['exerciseLogId', 'setIndex', 'reps', 'weightKg', 'rir', 'effort', 'workSeconds', 'note'] as const;
+/** ClientSession columns a write may name (MIRROR-COACH P6: cooldownDoneAt joined them — lib/coach/cooldownServer.ts). */
+export const CLIENT_SESSION_WRITABLE = ['programId', 'sessionId', 'clientId', 'completedAt', 'cooldownDoneAt'] as const;
 /** SessionExercise's prescription defaults (prisma/schema.prisma), for seeding rows the way the database fills them. */
 export const SE_DEFAULTS: Row = {
   sets: 3, reps: '8-10', load: 'RPE7', tempo: '3-1-1-0', restSeconds: 90, coachNote: null,
@@ -105,7 +107,9 @@ export function todayMemoryDb(s: TodayStore) {
         const x = s.session.find((y) => y.id === a.where.id);
         if (!x) return null;
         const block = s.block.find((b) => b.id === x.blockId)!;
-        return { ...clone(x), block: { programId: block.programId }, exercises: s.se.filter((e) => e.sessionId === x.id).map((e) => ({ id: e.id })) };
+        // the exercises as selected (MIRROR-COACH P6: the cool-down's done tap also reads each one's section)
+        const sel: Row = a.include?.exercises?.select ?? { id: true };
+        return { kind: 'training', ...clone(x), block: { programId: block.programId }, exercises: s.se.filter((e) => e.sessionId === x.id).map((e) => pick(e, sel)) };
       },
     },
     clientSession: {
@@ -116,8 +120,12 @@ export function todayMemoryDb(s: TodayStore) {
         return hit ? clone(hit) : null;
       },
       findUnique: async (a: Row) => { const c = s.cs.find((x) => x.id === a.where.id); return c ? csWith(c, a.include) : null; },
-      // the coach's inbox read (app/api/coach/inbox): completed sessions in the coach's programs, newest first
-      findMany: async (a: Row) => s.cs
+      // the coach's inbox read (app/api/coach/inbox): completed sessions in the coach's programs, newest first —
+      // or (MIRROR-COACH P6, the cool-down's done tap) one client's rows for one program + session, newest first
+      findMany: async (a: Row) => !a.where.program ? s.cs
+        .filter((c) => c.programId === a.where.programId && c.sessionId === a.where.sessionId && c.clientId === a.where.clientId)
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt)).slice(0, a.take ?? Infinity)
+        .map((c) => pick({ cooldownDoneAt: null, ...c }, a.select)) : s.cs
         .filter((c) => c.completedAt !== null && s.program.find((p) => p.id === c.programId)?.coachId === a.where.program.coachId)
         .sort((x, y) => time(y.completedAt) - time(x.completedAt)).slice(0, a.take ?? Infinity)
         .map((c) => {
@@ -131,8 +139,12 @@ export function todayMemoryDb(s: TodayStore) {
             session: { label: session.label, block: { label: s.block.find((b) => b.id === session.blockId)!.label } }, exerciseLogs: logs,
           };
         }),
-      create: async (a: Row) => { const at = tick(); const c = { id: id('cs'), completedAt: null, ...clone(a.data), createdAt: at, updatedAt: at }; s.cs.push(c); return clone(c); },
+      create: async (a: Row) => {
+        checkColumns('clientSession.create', a.data, CLIENT_SESSION_WRITABLE);
+        const at = tick(); const c = { id: id('cs'), completedAt: null, cooldownDoneAt: null, ...clone(a.data), createdAt: at, updatedAt: at }; s.cs.push(c); return clone(c);
+      },
       update: async (a: Row) => {
+        checkColumns('clientSession.update', a.data, CLIENT_SESSION_WRITABLE);
         const i = s.cs.findIndex((c) => c.id === a.where.id);
         if (i < 0) throw err('Record to update not found.', 'P2025');
         s.cs[i] = { ...s.cs[i], ...clone(a.data), updatedAt: tick() };
@@ -211,7 +223,7 @@ export function todayMemoryDb(s: TodayStore) {
 // ── seeding ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface SeedExercise { id?: string; exerciseId: string; order?: number; [k: string]: unknown }
-export interface SeedSession { id?: string; order: number; label: string; exercises: SeedExercise[] }
+export interface SeedSession { id?: string; order: number; label: string; kind?: 'training' | 'recovery'; exercises: SeedExercise[] }
 
 /** A program for `clientId` from `coachId`, one block, with the given sessions. Returns the ids it made. */
 export function seedProgram(s: TodayStore, spec: { coachId: string; clientId: string; name: string; blockLabel: string; sessions: SeedSession[]; isActive?: boolean }): { programId: string; blockId: string; sessionIds: string[]; exerciseIds: string[][] } {
@@ -223,7 +235,7 @@ export function seedProgram(s: TodayStore, spec: { coachId: string; clientId: st
   const sessionIds: string[] = [], exerciseIds: string[][] = [];
   for (const x of spec.sessions) {
     const sid = x.id ?? id('s');
-    s.session.push({ id: sid, blockId, order: x.order, label: x.label });
+    s.session.push({ id: sid, blockId, order: x.order, label: x.label, kind: x.kind ?? 'training' });
     sessionIds.push(sid);
     exerciseIds.push(x.exercises.map((e, i) => {
       const eid = e.id ?? id('se');

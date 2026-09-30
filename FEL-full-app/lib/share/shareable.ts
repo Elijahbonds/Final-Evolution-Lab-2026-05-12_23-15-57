@@ -129,6 +129,10 @@ const NEVER_SHARED = [
   'paincheckin', 'programexerciseid', 'exercisename', 'bodyarea', 'acute', 'decision', 'score',
   // HealthConsent
   'healthconsent', 'scope', 'grantedat', 'revokedat',
+  // ReadinessCheckIn (MIRROR-COACH P6, 2026-09-29): the daily check-in's own table and export key, its four answers,
+  // and the read's "what was low" list. `date`, `level` and `suggestion` are left out for the reason `note` is above —
+  // generic names a legitimate share could carry — and a whole row is still caught by its `userid`.
+  'readiness', 'readinesscheckin', 'readinesscheckins', 'sleep', 'soreness', 'energy', 'mood', 'lowitems',
 ];
 
 export class ShareLeak extends Error {}

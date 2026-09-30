@@ -15,7 +15,8 @@
 // 12 days. Still playing: 5 games in the last two weeks."). A client triage already shows is not listed twice.
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Hourglass, Loader2, MoonStar, ShieldAlert, Timer, TrendingDown } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, BatteryLow, CheckCircle2, Hourglass, Loader2, MoonStar, ShieldAlert, SunMedium, Timer, TrendingDown } from 'lucide-react';
+import { readinessDayLabel } from '@/lib/health/readiness';
 
 interface Flag {
   clientId: string; displayName: string; kind: string;
@@ -26,6 +27,10 @@ interface DriftRow { clientId: string; name: string; state: string; daysSince: n
  *  coach_view HealthConsent grant `items` is absent and `label` is the generic "Client paused an exercise": this
  *  panel never has more detail than the API already decided to give it. */
 interface PainFlagRow { clientId: string; name: string; view: { present: boolean; detailed: boolean; label: string; items?: { exerciseName: string; bodyArea: string; decision: string; copy: string; createdAt: string }[] } }
+/** MIRROR-COACH P6 (2026-09-29) — lib/health/readiness.ts coachReadinessView, one per client who checked in AND gave
+ *  this coach a live coach_view grant. A client without that grant is simply absent — the API never sends a row, a
+ *  count or a hint for them — so this panel has nothing to hide client-side. */
+interface ReadinessRow { clientId: string; name: string; view: { date: string; level: 'ok' | 'low'; label: string; summary: string } }
 
 /** How many drifting clients the panel names — the same cap triage uses, for the same reason (lib/coach/triage.ts TOP_N). */
 const DRIFT_SHOWN = 6;
@@ -35,6 +40,8 @@ interface Board {
   headline: string | null;
   /** Absent on an older cached response — the panel treats that exactly like an empty list. */
   painFlags?: PainFlagRow[];
+  /** Absent on an older cached response, same as painFlags. */
+  readiness?: ReadinessRow[];
 }
 
 const ICON: Record<string, typeof AlertTriangle> = {
@@ -83,6 +90,7 @@ export function AttentionPanel() {
 
   const { waiting, flags, drifting } = panelLists(board);
   const painFlags = board.painFlags ?? [];
+  const readiness = board.readiness ?? [];
 
   return (
     <section className="mb-4 rounded-xl border border-white/6 bg-[#0f0f13] p-4" aria-labelledby="attention-heading">
@@ -158,6 +166,31 @@ export function AttentionPanel() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* MIRROR-COACH P6: recent check-ins (up to 36 h), shared with this coach by the client's own coach_view grant.
+         Context for the session, never a flag: it does not count toward "needs you" and it is not in triage. P6 FIX
+         (2026-09-29, review): each row says its day ('today', 'yesterday', a date) — yesterday's "running low" read as
+         today's — and no longer shows a "warm-up N min" formula as if it were the warm-up the athlete got. */}
+      {readiness.length > 0 && (
+        <div className="mt-3" data-testid="readiness-checkins">
+          <div className="text-[11px] uppercase tracking-wider text-white/35">Check-ins shared with you</div>
+          <ul className="mt-1 space-y-1.5">
+            {readiness.map((r) => {
+              const Icon = r.view.level === 'low' ? BatteryLow : SunMedium;
+              return (
+                <li key={r.clientId} className="flex items-start gap-2 rounded-lg bg-white/4 px-3 py-2 text-sm" data-readiness={r.clientId} data-level={r.view.level}>
+                  <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${r.view.level === 'low' ? 'text-[#FFD700]' : 'text-[#00FF9D]'}`} aria-hidden="true" />
+                  <span>
+                    <span className="font-medium text-white/90">{r.name}</span>{' '}
+                    <span className="text-white/70">{r.view.label}.</span>{' '}
+                    <span className="text-white/45" data-readiness-day={r.view.date}>{readinessDayLabel(r.view.date)} · {r.view.summary}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       {flags.length === 0 && waiting.length === 0 && drifting.length === 0 && painFlags.length === 0 && (

@@ -6,6 +6,7 @@ import { attentionBoard, gradedScreenTimes, type ClientFacts } from '@/lib/coach
 import { LOGGED_WORK_WHERE } from '@/lib/coach/setLog';
 import { MIRROR_SCREEN_KIND } from '@/lib/mirror/screen';
 import { coachPainFlag, type PainCheckInHistoryRow } from '@/lib/health/pain';
+import { COACH_READINESS_WINDOW_MS, coachReadinessView, type ReadinessHistoryRow } from '@/lib/health/readiness';
 
 /**
  * GET /api/coach/attention — who on my roster needs me today, and who is drifting.
@@ -21,6 +22,12 @@ import { coachPainFlag, type PainCheckInHistoryRow } from '@/lib/health/pain';
  * signal (decision #4/#12): this is its OWN small, consent-gated list, read by lib/health/pain.ts's coachPainFlag —
  * without a live 'coach_view' HealthConsent grant for THIS coach, an entry says only "Client paused an exercise",
  * never which exercise, where, or how bad.
+ *
+ * MIRROR-COACH P6 (2026-09-29): `readiness` is the same kind of pure addition, and stricter. A client's daily
+ * readiness check-in (lib/health/readiness.ts) reaches this board ONLY for a client with a live 'coach_view' grant for
+ * THIS coach — and without one there is NOTHING, not even a generic line: the rows of a non-consenting client are
+ * never queried at all (the `userId: { in: consented }` below), and coachReadinessView returns null without consent
+ * as a second lock. It never enters attentionBoard(), triage, compliance or any number on this board.
  */
 const HISTORY_DAYS = 60;
 
@@ -34,7 +41,7 @@ export async function GET() {
     prisma.coachClient.findMany({ where: { coachId: userId, endedAt: null }, select: { clientId: true, createdAt: true } }),
   ]);
   const clientIds = [...new Set([...linked.map((l) => l.clientId), ...programs.map((p) => p.clientId)])];
-  if (!clientIds.length) return NextResponse.json({ triage: { flags: [], totalFlagged: 0, clear: 0, summary: 'No athletes on your roster yet.' }, drift: [], headline: null, painFlags: [] });
+  if (!clientIds.length) return NextResponse.json({ triage: { flags: [], totalFlagged: 0, clear: 0, summary: 'No athletes on your roster yet.' }, drift: [], headline: null, painFlags: [], readiness: [] });
   const programIds = programs.map((p) => p.id);
 
   const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000);
@@ -88,6 +95,21 @@ export async function GET() {
     .map((cid) => ({ clientId: cid, name: users.find((u) => u.id === cid)?.name ?? users.find((u) => u.id === cid)?.email?.split('@')[0] ?? 'player', view: coachPainFlag((painByClient.get(cid) ?? []) as PainCheckInHistoryRow[], consentedClients.has(cid)) }))
     .filter((f) => f.view.present);
 
+  // readiness (MIRROR-COACH P6): consenting clients only — the query itself never names anyone else (see the header).
+  const consented = clientIds.filter((cid) => consentedClients.has(cid));
+  const readinessRows = consented.length
+    ? await prisma.readinessCheckIn.findMany({
+      where: { userId: { in: consented }, updatedAt: { gte: new Date(Date.now() - COACH_READINESS_WINDOW_MS) } },
+      select: { userId: true, date: true, sleep: true, soreness: true, energy: true, mood: true, updatedAt: true },
+    })
+    : [];
+  const readinessByClient = by(readinessRows, (r) => r.userId);
+  const readiness = consented
+    .map((cid) => ({ clientId: cid, name: users.find((u) => u.id === cid)?.name ?? users.find((u) => u.id === cid)?.email?.split('@')[0] ?? 'player', view: coachReadinessView((readinessByClient.get(cid) ?? []) as ReadinessHistoryRow[], true) }))
+    .filter((r) => r.view !== null)
+    // running low first: that is the one a coach might act on before the session
+    .sort((a, b) => (a.view!.level === b.view!.level ? 0 : a.view!.level === 'low' ? -1 : 1));
+
   const gamesBy = by(games, (s) => s.userId);
   const coachedBy = by(coached, (s) => s.clientId);
   const logsBy = by([
@@ -128,5 +150,5 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ ...attentionBoard(facts, Date.now()), painFlags });
+  return NextResponse.json({ ...attentionBoard(facts, Date.now()), painFlags, readiness });
 }

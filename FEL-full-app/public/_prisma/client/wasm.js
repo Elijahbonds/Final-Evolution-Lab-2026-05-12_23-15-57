@@ -1002,6 +1002,7 @@ exports.Prisma.SessionScalarFieldEnum = {
   blockId: 'blockId',
   order: 'order',
   label: 'label',
+  kind: 'kind',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -1034,6 +1035,7 @@ exports.Prisma.ClientSessionScalarFieldEnum = {
   sessionId: 'sessionId',
   clientId: 'clientId',
   completedAt: 'completedAt',
+  cooldownDoneAt: 'cooldownDoneAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -1112,7 +1114,9 @@ exports.Prisma.GuardianConsentScalarFieldEnum = {
   token: 'token',
   requestedAt: 'requestedAt',
   acceptedAt: 'acceptedAt',
-  revokedAt: 'revokedAt'
+  revokedAt: 'revokedAt',
+  selfRequested: 'selfRequested',
+  acceptedById: 'acceptedById'
 };
 
 exports.Prisma.GoalPlanScalarFieldEnum = {
@@ -1211,6 +1215,18 @@ exports.Prisma.HealthConsentScalarFieldEnum = {
   coachId: 'coachId',
   grantedAt: 'grantedAt',
   revokedAt: 'revokedAt'
+};
+
+exports.Prisma.ReadinessCheckInScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  date: 'date',
+  sleep: 'sleep',
+  soreness: 'soreness',
+  energy: 'energy',
+  mood: 'mood',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.ShareLinkScalarFieldEnum = {
@@ -1411,6 +1427,11 @@ exports.BraceMode = exports.$Enums.BraceMode = {
   none: 'none'
 };
 
+exports.SessionKind = exports.$Enums.SessionKind = {
+  training: 'training',
+  recovery: 'recovery'
+};
+
 exports.SessionSection = exports.$Enums.SessionSection = {
   prep: 'prep',
   prime: 'prime',
@@ -1523,6 +1544,7 @@ exports.Prisma.ModelName = {
   HealthIntake: 'HealthIntake',
   PainCheckIn: 'PainCheckIn',
   HealthConsent: 'HealthConsent',
+  ReadinessCheckIn: 'ReadinessCheckIn',
   ShareLink: 'ShareLink',
   CoachInvite: 'CoachInvite',
   CoachClient: 'CoachClient'

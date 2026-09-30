@@ -304,7 +304,9 @@ function PrqDataRights() {
 interface HealthConsentApiView {
   healthData: { granted: boolean; grantedAt: string | null };
   coaches: { coachId: string; name: string; viewGranted: boolean; grantedAt: string | null }[];
-  counts: { healthIntakes: number; painCheckIns: number };
+  /** MIRROR-COACH P6 (2026-09-29): readinessCheckIns — the daily check-in, stored under this same consent. Optional
+   *  so a response from before P6 still renders (read as 0). */
+  counts: { healthIntakes: number; painCheckIns: number; readinessCheckIns?: number };
 }
 
 function HealthDataSection() {
@@ -352,7 +354,7 @@ function HealthDataSection() {
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
         const e = j?.erased ?? {};
-        toast.success(`Deleted ${e.healthIntakes ?? 0} intake${e.healthIntakes === 1 ? '' : 's'}, ${e.painCheckIns ?? 0} pain check-in${e.painCheckIns === 1 ? '' : 's'} and ${e.healthConsents ?? 0} consent record${e.healthConsents === 1 ? '' : 's'}`);
+        toast.success(`Deleted ${e.healthIntakes ?? 0} intake${e.healthIntakes === 1 ? '' : 's'}, ${e.painCheckIns ?? 0} pain check-in${e.painCheckIns === 1 ? '' : 's'}, ${e.readinessCheckIns ?? 0} daily check-in${e.readinessCheckIns === 1 ? '' : 's'} and ${e.healthConsents ?? 0} consent record${e.healthConsents === 1 ? '' : 's'}`);
         setShowErase(false);
         setView(j);
       } else {
@@ -373,7 +375,7 @@ function HealthDataSection() {
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
       <p className="text-xs text-white/40 mb-4">
-        Your health intake and pain check-ins, kept separately from the rest of your account: opt-in only, stored on FEL
+        Your health intake, pain check-ins and daily check-ins, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
 
@@ -382,7 +384,7 @@ function HealthDataSection() {
           <div className="text-sm font-bold text-white">Health data collection</div>
           <div className="text-xs text-white/40">
             {granted
-              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${view?.counts.healthIntakes ?? 0} intake${(view?.counts.healthIntakes ?? 0) === 1 ? '' : 's'}, ${view?.counts.painCheckIns ?? 0} pain check-in${(view?.counts.painCheckIns ?? 0) === 1 ? '' : 's'} stored.`
+              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${view?.counts.healthIntakes ?? 0} intake${(view?.counts.healthIntakes ?? 0) === 1 ? '' : 's'}, ${view?.counts.painCheckIns ?? 0} pain check-in${(view?.counts.painCheckIns ?? 0) === 1 ? '' : 's'}, ${view?.counts.readinessCheckIns ?? 0} daily check-in${(view?.counts.readinessCheckIns ?? 0) === 1 ? '' : 's'} stored.`
               : 'Off — nothing is being collected.'}
           </div>
         </div>

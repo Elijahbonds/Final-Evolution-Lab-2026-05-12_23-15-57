@@ -29,7 +29,9 @@ interface StatusResponse {
   needsGuardian: boolean;
   status: 'none' | 'pending' | 'accepted' | 'revoked';
   birthYear: number | null;
-  pending: { token: string; guardianName: string; requestedAt: string } | null;
+  /** MIRROR-COACH P6 FIX (2026-09-29): `token` is null and `by` is 'coach' for a request a coach or camp made — its
+   *  link stays with them (app/api/health/guardian/route.ts). Only the athlete's own request hands its link back. */
+  pending: { token: string | null; guardianName: string; requestedAt: string; by?: 'you' | 'coach' } | null;
 }
 
 type Stage = 'loading' | 'error' | 'ready' | 'ask' | 'pending' | 'sent';
@@ -79,12 +81,16 @@ function LinkToShare({ token }: { token: string }) {
       // clipboard can refuse (no permission, non-https preview) — the link is still selectable text below
     }
   };
+  // MIRROR-COACH P6 (2026-09-29): the link this screen hands out is a PLAYER request (the POST below omits menteeId,
+  // so app/api/v1/camp/consent stores it selfRequested), and it now confirms only from a signed-in adult account that
+  // is not this one — so the copy says so up front, or the athlete tells a parent "just tap it" and the parent meets
+  // a sign-in wall they were not warned about.
   return (
     <div className="mt-3 space-y-2">
       <p className="text-[12px] leading-snug text-white/55">
         FEL doesn&apos;t send this anywhere — copy the link and send it yourself, the same way you&apos;d share anything
-        else from your phone (a text, a DM, however&apos;s easiest). It only works for them: opening it yourself,
-        signed in as you, won&apos;t confirm it.
+        else from your phone (a text, a DM, however&apos;s easiest). They confirm it from their own FEL account (free
+        to make) — opening it yourself won&apos;t confirm it.
       </p>
       <div className="break-all rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[12px] text-white/70">{url}</div>
       <button type="button" onClick={copy} className={quietBtn}>
@@ -168,7 +174,25 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (stage === 'pending' && status?.pending) {
+  // MIRROR-COACH P6 FIX (2026-09-29): a coach's or camp's pending request. Its accept link is theirs, not this
+  // screen's to hand out (the status route no longer returns it), so this says who has it and offers the athlete's own
+  // request, whose link they share themselves.
+  if (stage === 'pending' && status?.pending && !status.pending.token) {
+    return (
+      <GateShell>
+        <h2 className="text-[20px] font-black leading-tight text-white" data-pending-by="coach">Waiting on {status.pending.guardianName}</h2>
+        <p className="mt-2 text-[13.5px] leading-snug text-white/70">
+          Your coach or camp asked {status.pending.guardianName} on {new Date(status.pending.requestedAt).toLocaleDateString()},
+          and they have the link. Once {status.pending.guardianName} confirms it, this unlocks.
+        </p>
+        <button type="button" onClick={() => setStage('ask')} className={`${quietBtn} mt-3`}>
+          Ask a parent or guardian myself
+        </button>
+      </GateShell>
+    );
+  }
+
+  if (stage === 'pending' && status?.pending?.token) {
     return (
       <GateShell>
         <h2 className="text-[20px] font-black leading-tight text-white">Waiting on {status.pending.guardianName}</h2>
@@ -189,7 +213,7 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
       <GateShell>
         <h2 className="text-[20px] font-black leading-tight text-white">Almost there</h2>
         <p className="mt-2 text-[13.5px] leading-snug text-white/70">
-          Send this link to {guardianName || 'your parent or guardian'}. Once they open it, you&apos;re in.
+          Send this link to {guardianName || 'your parent or guardian'}. Once they confirm it, you&apos;re in.
         </p>
         <LinkToShare token={sentToken} />
       </GateShell>
@@ -202,8 +226,8 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
       <h2 className="text-[20px] font-black leading-tight text-white">Ask a parent or guardian</h2>
       <p className="mt-2 text-[13.5px] leading-snug text-white/70">
         {status?.status === 'revoked'
-          ? 'A guardian consent on your account was withdrawn. Ask again to keep using the Mirror and pain check-ins.'
-          : "Because you're under 18 (or haven't told us your birth year yet), a parent or guardian needs to say it's OK before you can use the Mirror or log a pain check-in. This is safety, not a paywall — it's free either way."}
+          ? 'A guardian consent on your account was withdrawn. Ask again to keep using the Mirror, pain check-ins and the daily check-in.'
+          : "Because you're under 18 (or haven't told us your birth year yet), a parent or guardian needs to say it's OK before you can use the Mirror, log a pain check-in or answer the daily check-in. This is safety, not a paywall — it's free either way."}
       </p>
       <div className="mt-4 space-y-2.5">
         <input

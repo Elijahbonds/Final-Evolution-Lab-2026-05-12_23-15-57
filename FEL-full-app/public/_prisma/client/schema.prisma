@@ -119,9 +119,12 @@ model User {
 
   // MIRROR-COACH P5 (2026-09-29): health intake + pain check-in loop (lib/health/). Additive only — see the
   // HealthIntake/PainCheckIn/HealthConsent models below for the story.
-  healthIntakes  HealthIntake[]
-  painCheckIns   PainCheckIn[]
-  healthConsents HealthConsent[]
+  healthIntakes     HealthIntake[]
+  painCheckIns      PainCheckIn[]
+  healthConsents    HealthConsent[]
+  // MIRROR-COACH P6 (2026-09-29): the daily readiness check-in (lib/health/readiness.ts). Additive only — see the
+  // ReadinessCheckIn model below.
+  readinessCheckIns ReadinessCheckIn[]
 
   // M4 compliance stubs
   dobYear        Int? // Year of birth for 18+ attestation
@@ -1630,6 +1633,14 @@ model Session {
   order Int // 1, 2, 3... within block
   label String // "Day 1 — Lower Push", "Session A", etc.
 
+  // MIRROR-COACH P6 (2026-09-29): AN OFF DAY WAS A BLANK. A week of three sessions had four days nothing said anything
+  // about, and a coach who wanted an easy walk, some mobility and a long-exhale breath on one of them had no way to
+  // write it as anything but another training session (crossref: "no 'recovery day' session type"). `recovery` is
+  // FEL's off-day session (lib/coach/offDay.ts: 15–20 easy minutes, walk + mobility + breath), logged like any other
+  // coached session, so P9's PRQ recovery can count the completed ones by this column. Additive and defaulted: every
+  // existing session reads `training`, exactly what it was.
+  kind SessionKind @default(training)
+
   exercises      SessionExercise[]
   clientSessions ClientSession[]
 
@@ -1687,6 +1698,13 @@ enum SessionSection {
   cooldown
 }
 
+/// MIRROR-COACH P6 (2026-09-29): what a session is for. `training` = every session written before this (and the
+/// default); `recovery` = FEL's off day (lib/coach/offDay.ts), 15–20 low-intensity minutes.
+enum SessionKind {
+  training
+  recovery
+}
+
 model ClientSession {
   id        String          @id @default(cuid())
   programId String
@@ -1697,8 +1715,13 @@ model ClientSession {
 
   clientId String
 
-  completedAt  DateTime?
-  exerciseLogs ExerciseLog[]
+  completedAt    DateTime?
+  // MIRROR-COACH P6 (2026-09-29): when the client tapped "done" on Today's automatic cool-down for this session (the
+  // one Today adds after the last item when the coach wrote no Cool-down section — lib/coach/cooldown.ts). null = not
+  // done, or the coach wrote their own cool-down (that one is logged like any exercise). P9's PRQ recovery counts it;
+  // nothing scores, pays or streaks on it here. Additive, nullable.
+  cooldownDoneAt DateTime?
+  exerciseLogs   ExerciseLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1843,6 +1866,15 @@ model GuardianConsent {
   requestedAt     DateTime  @default(now())
   acceptedAt      DateTime?
   revokedAt       DateTime?
+  // MIRROR-COACH P6 (2026-09-29), both additive. selfRequested: the mentee asked for this themselves (the "Ask a
+  // parent or guardian" screen), set by the SERVER from who made the request, never from the request body — so the
+  // minor, who holds this link, cannot opt their own request out of the stricter accept (app/api/v1/camp/consent).
+  // false = a facilitator asked (coach-managed camp flow, accepted exactly as before), and every row written before
+  // this column existed. acceptedById: the signed-in account that said yes to a self-requested consent; null for camp
+  // accepts (unchanged) and for anything accepted before this column. A plain id, no relation: FEL has no account
+  // delete path today, and a relation would add a field to User for a value nothing reads back by join.
+  selfRequested   Boolean   @default(false)
+  acceptedById    String?
 
   @@index([menteeId])
 }
@@ -2062,6 +2094,42 @@ model HealthConsent {
   revokedAt DateTime?
 
   @@index([userId, scope])
+}
+
+/// MIRROR-COACH P6 (2026-09-29): the unscored daily readiness check-in — four tap scales on Today before a session,
+/// every one optional, the whole card skippable (lib/health/readiness.ts; owner decision #12). A NEW table rather than
+/// P5's: PainCheckIn needs an exercise, a body area, a 0–10 score and a stored rule decision, and none of those exist
+/// here — squeezing this into it would mean fake values in required columns.
+///
+/// Health-adjacent data under P5's rules: written only with a live 'health_data' HealthConsent (and, for a minor, an
+/// accepted guardian consent — the same gate as a pain check-in), exported and erased with the rest of the health
+/// data (lib/prq-data-rights.ts), readable by a coach only with that client's live 'coach_view' grant, never in a
+/// share link, and NEVER read by anything that scores, pays, ranks or keeps a streak (lib/health/readiness-never-scored
+/// .test.ts walks the source tree for that). It only lengthens today's warm-up and suggests an easier day.
+///
+/// ONE ROW PER ATHLETE PER DAY, editable that day: the route upserts on (userId, date), so a second answer the same
+/// day edits the first instead of adding a row, and a day that is no longer "today" anywhere on Earth cannot be written.
+model ReadinessCheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The athlete's OWN calendar day, 'YYYY-MM-DD' in their local time zone (the device sends it; the route accepts
+  /// only a day that is currently "today" in some time zone, UTC-12 to UTC+14). A string, not a DateTime: a check-in
+  /// belongs to a day, not an instant, and a Date at UTC midnight reads as the previous day west of Greenwich.
+  date      String
+  /// 1 (rough night) to 5 (great night). Null = not answered.
+  sleep     Int?
+  /// 1 (not sore at all) to 5 (very sore) — the natural direction for the word, so a coach or an export reads it
+  /// without a legend. lib/health/readiness.ts turns it around internally. Null = not answered.
+  soreness  Int?
+  /// 1 (drained) to 5 (charged). Null = not answered.
+  energy    Int?
+  /// 1 (low) to 5 (great). Null = not answered.
+  mood      Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
 }
 
 // ===========================================================================

@@ -20,7 +20,12 @@
 // consumer-health-data laws (e.g. Washington's My Health My Data Act) by extending the same rights to everyone
 // everywhere rather than only where a given law requires it. 2026-09-25-draft is live and signups recorded it for
 // the old three-sentence §5.
-export const CURRENT_POLICY_VERSION = '2026-09-29-draft';
+// MIRROR-COACH P6 (2026-09-29): bumped again, §5 only — it now names the optional daily check-in (sleep, soreness,
+// energy, mood; lib/health/readiness.ts) in what is collected, where it lives, who can see it and what an erase
+// deletes, because it is stored under the same health-data consent and §5 listed only the intake and pain
+// check-ins. 2026-09-29-draft never shipped (it is on the mirror lane's open PR only), but a new string is the rule
+// this file keeps, and it costs nothing: a bump re-prompts no one.
+export const CURRENT_POLICY_VERSION = '2026-09-29b-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -103,17 +108,17 @@ settings. Account deletion removes all personal data.
 
 ## 5. Health-Adjacent Data
 
-PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics. We do not collect medical data through them, and these values are stored with their source and measurement date for full traceability. This section covers a different, separate kind of data: a short health intake and per-exercise pain check-ins, for people who choose to use the Mirror or a coached program.
+PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics. We do not collect medical data through them, and these values are stored with their source and measurement date for full traceability. This section covers a different, separate kind of data: a short health intake, per-exercise pain check-ins and an optional daily check-in, for people who choose to use the Mirror or a coached program.
 
-**What this is.** Before the Mirror or a coached program asks your body to do anything, it can ask you a short intake about your training history and any red-flag symptoms. While you train, you can log a quick pain check-in — which exercise, where it hurt, how much, and an optional note — including a next-morning follow-up. We also ask for your birth year here if we do not already have it, because the rules that apply to a minor are stricter than the rules that apply to an adult.
+**What this is.** Before the Mirror or a coached program asks your body to do anything, it can ask you a short intake about your training history and any red-flag symptoms. While you train, you can log a quick pain check-in — which exercise, where it hurt, how much, and an optional note — including a next-morning follow-up. Before a session you can also answer a quick daily check-in — how you slept, how sore you are, your energy and your mood, each on a 1-to-5 scale, every question optional and the whole thing skippable — which only sets how long that day's warm-up runs and whether to offer an easier day. We also ask for your birth year here if we do not already have it, because the rules that apply to a minor are stricter than the rules that apply to an adult.
 
 **Consent first, always.** None of this is collected until you say yes to it, separately from creating an account or accepting this Policy. Saying yes to the Service does not turn this on. If you are under 18, or you have not told us your birth year, a parent or guardian has to give that consent before any of it is collected, and a pain check-in from an under-18 account always tells you to stop and tell an adult rather than offering anything else.
 
-**Where it lives, and where it never goes.** Your intake answers, pain check-ins and the birth year you gave us here are stored on FEL's own servers and nowhere else. We do not sell this data, license it, or use it to target advertising, to you or to anyone else. It never appears on a share link, a public page, or anything a coach can forward to someone else — a share carries training content, never a client's data (see §7). It is never used to compute your PRQ, never unlocks anything, and never earns Lab Credits, shards or any other reward: what you tell us about pain changes what the app suggests next, not what it scores or pays.
+**Where it lives, and where it never goes.** Your intake answers, pain check-ins, daily check-ins and the birth year you gave us here are stored on FEL's own servers and nowhere else. We do not sell this data, license it, or use it to target advertising, to you or to anyone else. It never appears on a share link, a public page, or anything a coach can forward to someone else — a share carries training content, never a client's data (see §7). It is never used to compute your PRQ, never unlocks anything, and never earns Lab Credits, shards or any other reward: what you tell us about pain or how you feel changes what the app suggests next, not what it scores or pays.
 
-**Who can see it.** Only you, by default. Turning on coach access for one specific coach lets that coach read your intake and pain check-ins; you can turn it off at any time, for one coach or all of them, from Health data in your account settings. Turning it off stops that coach from seeing anything logged after that; it does not erase what they already read.
+**Who can see it.** Only you, by default. Turning on coach access for one specific coach lets that coach read your intake, pain check-ins and daily check-ins; you can turn it off at any time, for one coach or all of them, from Health data in your account settings. Turning it off stops that coach from seeing anything logged after that; it does not erase what they already read.
 
-**Your rights.** You can view, export or erase this data at any time from Health data in your account settings, separately from the rest of your account (see §8). Erasing it deletes your intake answers, your pain check-ins and your consent records; it never touches a workout plan or your PRQ history, because those never held this data to begin with. Withdrawing consent stops new collection immediately and offers you the erase button in the same place.
+**Your rights.** You can view, export or erase this data at any time from Health data in your account settings, separately from the rest of your account (see §8). Erasing it deletes your intake answers, your pain check-ins, your daily check-ins and your consent records; it never touches a workout plan or your PRQ history, because those never held this data to begin with. Withdrawing consent stops new collection immediately and offers you the erase button in the same place.
 
 **Consumer health data laws.** Some places have a law specifically for data like this, beyond ordinary privacy law — for example Washington State's My Health My Data Act. Rather than work out where each law applies, we extend the same protections everywhere, to everyone: a specific opt-in kept separate from the rest of this Policy, no sale of this data under any circumstance, no use of it or of your location to target advertising, and the same view, export, deletion and consent-withdrawal rights described above, honored the same way regardless of where you are.
 
