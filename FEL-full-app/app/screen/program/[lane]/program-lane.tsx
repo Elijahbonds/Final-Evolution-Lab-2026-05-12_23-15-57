@@ -4,12 +4,16 @@
 // style; (2) "Your top flag: <flag>, so start with <Lane>" (or the win line on a clean screen); (3) one free sample
 // drill, its cue marked "Early version"; (4) "Dunk Program coming soon"; then a visible "Back to my results".
 //
-// SAVES NOTHING and SENDS NOTHING: no email or phone box, no form, no fetch, no localStorage, IndexedDB or cookie. The
+// SAVES NOTHING and SENDS NOTHING: no email box, no form, no fetch, no localStorage, IndexedDB or cookie. The
 // flag is read from this tab's sessionStorage; the URL carries only the lane. A tab without a result shows "Your results
 // aren't saved. Run the screen again" (no fallback lane); a lane that is not the result's own goes to the result's.
 //
-// UNDER 13 (Cyber 3): a tab whose age answer is under 13 or "rather not say" sees "Have a parent open this" here, even
-// when the address was typed in: no lane, no sign-up placeholder, no link out.
+// UNDER 18 (Cyber 3; SCREEN-FIX-2: 13–17 too): a tab whose age answer is under 18 or "rather not say" sees "Have a
+// parent open this" here, even when the address was typed in: no lane, no link out.
+//
+// NO SIGN-UP, FOR ANY FLAG VALUE (SCREEN-FIX-2 item 4): the "Sign-up opens here later." placeholder is gone and this
+// page no longer reads NEXT_PUBLIC_PROGRAM_SIGNUP_ENABLED, until the email waitlist can save safely.
+// "Not a medical exam" shows ONCE on every version of this page (S-13): DISCLAIMER, then the stop line.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -19,7 +23,6 @@ import { LANES, sampleDrill, type LaneSlug } from '@/lib/screen/PROPOSED-program
 import { linksAllowed, strictestAge, type AgeBand } from '@/lib/screen/age';
 import { readAge, recall, tabStorage } from '@/lib/screen/store';
 import type { ScreenSummary } from '@/lib/screen/checks';
-import { programSignupEnabled } from '@/lib/screen/config';
 import { RESULTS_PATH, programPath } from '@/lib/screen/routes';
 import { BACK_TO_RESULTS, DISCLAIMER, NO_PICK_LINE, PROGRAM_COMING, WIN_LINE } from '@/lib/screen/copy';
 import { NotSavedCard } from '@/app/play/mirror/assess/_components/not-saved';
@@ -47,22 +50,25 @@ export function ProgramLane({ lane }: { lane: LaneSlug }) {
 }
 
 /** The page's body for what the tab holds. Pure: the tests render it for every age answer. */
-export function ProgramLaneView({ lane, state, signupFlag }: { lane: LaneSlug; state: LaneState; signupFlag?: string }) {
+export function ProgramLaneView({ lane, state }: { lane: LaneSlug; state: LaneState }) {
   if (state === 'reading') return <StepCard testId="reading"><p className="text-white/60">Reading your results…</p></StepCard>;
   if (state.age && !linksAllowed(state.age)) {
     return (
       <div data-parent-view className="space-y-3">
-        <StopLine />
+        <div className="space-y-1">
+          <p className="text-[13px] text-white/60">{DISCLAIMER}</p>
+          <StopLine />
+        </div>
         <ParentCard />
         <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={quietBtn}>{BACK_TO_RESULTS}</Link>
       </div>
     );
   }
   if (!state.s) return <NotSavedCard />;
-  return <LaneBody lane={lane} s={state.s} signupFlag={signupFlag} />;
+  return <LaneBody lane={lane} s={state.s} />;
 }
 
-export function LaneBody({ lane, s, signupFlag = process.env.NEXT_PUBLIC_PROGRAM_SIGNUP_ENABLED }: { lane: LaneSlug; s: ScreenSummary; signupFlag?: string }) {
+export function LaneBody({ lane, s }: { lane: LaneSlug; s: ScreenSummary }) {
   const L = LANES[lane];
   if (!s.lane) {
     return (
@@ -99,10 +105,6 @@ export function LaneBody({ lane, s, signupFlag = process.env.NEXT_PUBLIC_PROGRAM
       <section data-coming-soon className="rounded-2xl border border-dashed border-white/20 p-4">
         <p className="text-[16px] font-black">{PROGRAM_COMING}</p>
         <p className="mt-1 text-[13px] text-white/60">A full plan built from your screen. Nothing is saved or sent from this page.</p>
-        {programSignupEnabled(signupFlag) ? (
-          // NEXT_PUBLIC_PROGRAM_SIGNUP_ENABLED is on: an INERT placeholder only (see lib/screen/config.ts). No form, no input, no request.
-          <p data-signup-placeholder className="mt-2 text-[13px] text-white/70">Sign-up opens here later.</p>
-        ) : null}
       </section>
       <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={quietBtn}>{BACK_TO_RESULTS}</Link>
     </div>

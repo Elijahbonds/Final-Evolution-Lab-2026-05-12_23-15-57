@@ -14,7 +14,11 @@ export interface TreeExercise {
   id: string; order: number; exerciseId: string; name: string; sets: number; reps: string; load: string; tempo: string; restSeconds: number; coachNote: string | null;
   section: SessionSection; isKeySet: boolean; supersetGroup: string | null; workSeconds: number | null; holdSeconds: number | null; setupCues: string[]; effortBand: string | null;
 }
-export interface TreeSession { id: string; order: number; label: string; exercises: TreeExercise[] }
+/**
+ * MIRROR-COACH P6 (2026-09-29): `kind` — 'recovery' for an off day (lib/coach/offDay.ts), else 'training'. Optional so
+ * a tree built before the column existed (a fixture, an old row) still reads, as a training session.
+ */
+export interface TreeSession { id: string; order: number; label: string; kind?: 'training' | 'recovery'; exercises: TreeExercise[] }
 export interface TreeBlock { id: string; order: number; label: string; targetDate: string | null; sessions: TreeSession[] }
 export interface ProgramTree { id: string; name: string; coachId: string; clientId: string; blocks: TreeBlock[] }
 

@@ -9,6 +9,7 @@ import { PILLAR_LABELS, analyzeMovement, defaultMetrics, type Pillar } from '@/l
 import { buildAvatarSpec } from '@/lib/workout/avatar-builder';
 import { PLAN_SALE_PAUSED } from '@/lib/workout/plan-sale';
 import { HELD_FOR_PROTOCOL, HELD_LINE } from '@/lib/workout/plan-revision';
+import { OFF_DAY_WEEK_LINE, fullWeek } from '@/lib/coach/offDay';
 
 type Analysis = { pillars: Record<Pillar, number>; weakest: Pillar; overall: number; flags: string[] };
 type AvatarSpec = { heightScale: number; buildScale: number; reachScale: number; palette: { skin: string; primary: string; accent: string }; stance: string };
@@ -224,25 +225,41 @@ function PlanViewer({ plan }: { plan: SavedPlan }) {
         </p>
       )}
       <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-        {weeks.map((wk: any, wi: number) => (
-          <div key={wk?.week ?? wi} className="rounded-lg border border-white/10 p-3">
-            <div className="text-[#00E5FF] text-xs font-bold mb-2">Week {wk?.week ?? wi + 1}{wk?.theme ? ` · ${wk.theme}` : ''}</div>
-            {(Array.isArray(wk?.days) ? wk.days : []).map((d: any, i: number) => (
-              <div key={i} className="mb-2">
-                <div className="text-white/70 text-[11px] font-semibold">{d?.day}{d?.block ? ` — ${d.block}` : ''}</div>
-                {(Array.isArray(d?.exercises) ? d.exercises : []).map((ex: any, j: number) => (
-                  <div key={j} className="flex flex-wrap items-center gap-1 text-[11px] text-white/50">
-                    <ChevronRight className="h-3 w-3 text-[#00FF9D]" />{ex?.name} · {ex?.sets}×{ex?.reps}
-                    {ex?.cue && <span className="text-white/30">({ex.cue})</span>}
-                    {ex?.replaced && <span className="basis-full pl-4 text-[#00E5FF]/70">in place of {ex.replaced}</span>}
-                    {/* an adult's depth drop after week 4 (lib/workout/plan-revision.ts holdLateDepthDrops) */}
-                    {ex?.held === HELD_FOR_PROTOCOL && <span className="basis-full pl-4 text-[#FFD700]/80">{HELD_LINE}</span>}
+        {weeks.map((wk: any, wi: number) => {
+          const days: any[] = Array.isArray(wk?.days) ? wk.days : [];
+          // MIRROR-COACH P6 (2026-09-29): THE WHOLE WEEK. This listed Mon, Wed and Fri and nothing else, so four days of
+          // every week were blanks. The plan's named days now sit in a Mon → Sun week and every other day is an off day
+          // that says what one is (lib/coach/offDay.ts fullWeek / OFF_DAY_WEEK_LINE). A plan whose days aren't named as
+          // days of the week can't be placed honestly, so it shows as it always did.
+          const week = fullWeek(days);
+          const dayBlock = (d: any, i: number) => (
+            <div key={i} className="mb-2">
+              <div className="text-white/70 text-[11px] font-semibold">{d?.day}{d?.block ? ` — ${d.block}` : ''}</div>
+              {(Array.isArray(d?.exercises) ? d.exercises : []).map((ex: any, j: number) => (
+                <div key={j} className="flex flex-wrap items-center gap-1 text-[11px] text-white/50">
+                  <ChevronRight className="h-3 w-3 text-[#00FF9D]" />{ex?.name} · {ex?.sets}×{ex?.reps}
+                  {ex?.cue && <span className="text-white/30">({ex.cue})</span>}
+                  {ex?.replaced && <span className="basis-full pl-4 text-[#00E5FF]/70">in place of {ex.replaced}</span>}
+                  {/* an adult's depth drop after week 4 (lib/workout/plan-revision.ts holdLateDepthDrops) */}
+                  {ex?.held === HELD_FOR_PROTOCOL && <span className="basis-full pl-4 text-[#FFD700]/80">{HELD_LINE}</span>}
+                </div>
+              ))}
+            </div>
+          );
+          return (
+            <div key={wk?.week ?? wi} className="rounded-lg border border-white/10 p-3">
+              <div className="text-[#00E5FF] text-xs font-bold mb-2">Week {wk?.week ?? wi + 1}{wk?.theme ? ` · ${wk.theme}` : ''}</div>
+              {week ? week.map((slot) => slot.kind === 'training'
+                ? <div key={slot.day} data-plan-day={slot.day} data-kind="training">{slot.entries.map(dayBlock)}</div>
+                : (
+                  <div key={slot.day} className="mb-2" data-plan-day={slot.day} data-kind="off">
+                    <div className="text-[#7BD389]/80 text-[11px] font-semibold">{slot.day} — Off day</div>
+                    <div className="pl-4 text-[11px] text-white/40">{OFF_DAY_WEEK_LINE}</div>
                   </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
+                )) : days.map(dayBlock)}
+            </div>
+          );
+        })}
       </div>
       <p className="mt-3 text-[10px] text-white/30">Not medical advice.</p>
     </motion.div>

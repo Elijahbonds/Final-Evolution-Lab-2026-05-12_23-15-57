@@ -17,7 +17,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Row = Record<string, any>;
 const m = vi.hoisted(() => ({
   session: { user: { id: 'athlete-1' } } as unknown,
-  db: { workoutScan: [] as Row[], coachClient: [] as Row[], coachingProgram: [] as Row[], programExercise: [] as Row[], prqEntry: [] as Row[], gameSession: [] as Row[], user: [] as Row[] },
+  // MIRROR-COACH P5 (2026-09-29): healthIntake/painCheckIn/healthConsent added empty — a sibling lane's
+  // lib/prq-data-rights.ts collectPrqExport now reads all three (Privacy §5's export promise extended to health
+  // data), so GET /api/prq/export touches them even though this file tests the Mirror screen route, not health.
+  db: {
+    workoutScan: [] as Row[], coachClient: [] as Row[], coachingProgram: [] as Row[], programExercise: [] as Row[],
+    prqEntry: [] as Row[], gameSession: [] as Row[], user: [] as Row[],
+    healthIntake: [] as Row[], painCheckIn: [] as Row[], healthConsent: [] as Row[],
+    // MIRROR-COACH P6 (2026-09-29): readinessCheckIn added empty for the same reason — collectPrqExport now also
+    // hands over the daily readiness check-ins (lib/health/readiness.ts).
+    readinessCheckIn: [] as Row[],
+  },
   grants: [] as unknown[],
   updates: 0,
   clock: 0,

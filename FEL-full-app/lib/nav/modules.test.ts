@@ -35,6 +35,12 @@ const NOT_IMPORTED: Record<string, string> = {
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
+  // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
+  // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
+  // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this
+  // module in the SAME changeset. This orphan-check never re-verifies a NOT_IMPORTED excuse against real usage, so a
+  // stale entry like this one sits here silently defeating its own point; the line is deleted now that it has a real
+  // caller, per this file's own rule ("wiring one up means deleting its line").
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */
@@ -73,6 +79,9 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
   'lib/locomotion/moves/MoveGraph.ts',
+  // MIRROR-COACH P4 (2026-09-25/29): the hinge-and-setup lane's own fixture builder for lib/mirror/hingeAudit.ts /
+  // setupLine.ts's tests, landed the same day as this line, not this lane's (registry-and-lunge) file to wire up.
+  'lib/mirror/fixtures/hingeSetupBuild.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',

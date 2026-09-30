@@ -17,6 +17,16 @@ import { timingWon } from './timing-won';
 import { timingMaxCombo } from './timing-combo';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the Cypher's instrument chips (replacing the MIX bar) and its paused-
+// screen MIX sliders. Dance-only — gated below on hud.instruments / modeKey==='dance', so every other timing sport
+// this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
+import { decodeInstrumentChips } from '@/lib/babylon/dance/ui/InstrumentChips';
+import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
+// MUSIC-SUITE P8 (2026-09-25): Stoop's caption — the same shared caption layer THE MIC's hoops modes already draw
+// with (mic-caption.tsx's <MicCaption>, reading hud.mic/hud.micWho); DanceMode.ts is the only mode this host also
+// drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
+// renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
+import { MicCaption } from './mic-caption';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -195,6 +205,30 @@ export function makeTimingHost(opts: TimingHostOpts) {
                 )}
               </span>
             )}
+          </div>
+        )}
+
+        {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: THE INSTRUMENT CHIPS — replaces the one MIX bar above for the
+            Cypher only (DanceMode.ts stopped publishing hud.energy/energyLabel; every other timing sport is
+            untouched by this block). One chip per instrument the CURRENT SONG calls for: gold + filled once earned,
+            dim while ducked, and marked FEL when the chart has no move in that category this run (contract (a)'s
+            "FEL's band filling missing parts" — the fill itself is a separate, bigger task; this only has to be able
+            to SHOW that state the day it lands). Sits where the MIX bar sat (left-4 top-14), well clear of the cue
+            lane below at bottom-[34%] — the HUD area movement play's P9 body cue lane needs stays free. */}
+        {typeof hud.instruments === 'string' && hud.instruments && (
+          <div className="pointer-events-none absolute left-4 top-14 flex max-w-[220px] flex-wrap gap-1.5">
+            {decodeInstrumentChips(hud.instruments).map((c) => (
+              <span
+                key={c.id}
+                className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider transition-colors duration-200 ${
+                  c.state === 'earned' ? 'bg-[var(--fel-gold)] text-black'
+                    : c.state === 'fel' ? 'border border-white/20 text-white/35'
+                    : 'bg-black/50 text-white/50'
+                }`}
+              >
+                {c.label}{c.state === 'fel' ? ' · FEL' : ''}
+              </span>
+            ))}
           </div>
         )}
 
@@ -475,9 +509,24 @@ export function makeTimingHost(opts: TimingHostOpts) {
           onRetry={tapStart}
         />
 
+        {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: "reachable from the dance room's pause menu" — boot-splash.tsx
+            is a held file (movement play owns it) and draws the PAUSED screen with no slot for extra content, so this
+            sits ON TOP of it instead: rendered after BootSplash, it paints over the paused backdrop rather than under
+            it, and its own controls (the sliders) capture the click before PausedLayer's full-screen "any click
+            resumes" button ever sees it. Dance only — every other timing sport pauses exactly as it did before. */}
+        {modeKey === 'dance' && phase === 'paused' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
+            <div className="fel-panel pointer-events-auto w-full max-w-xs rounded-xl p-3">
+              <VolumeMixer heading="MIX — this device" />
+            </div>
+          </div>
+        )}
+
         {busRef.current && (
           <TouchOverlay bus={busRef.current} modeId={modeKey} visible={phase === 'playing' || phase === 'countdown'} />
         )}
+
+        {modeKey === 'dance' && <MicCaption text={hud.mic} who={hud.micWho} className="bottom-[10%]" />}
       </div>
     );
   }

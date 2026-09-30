@@ -87,6 +87,7 @@
 
 import { gridStepTime, retempoGrid, songStepTime, stepDurSec, stepIsPast, type StepGrid } from './stepTime';
 import { claimPlaybackSession } from '@/lib/audio/session';
+import { busGain, loadVolumes, VOLUME_RAMP_TC } from '@/lib/audio/volumes';
 import {
   DEFAULT_MIXER, RAMP_TC, TAKES_CHANNEL, buildMixGraph, clickBuffer, gateOpen,
   type ClickKind, type MeterReadout, type MixGraph, type MixerState,
@@ -337,13 +338,53 @@ export class AudioEngine {
   private releaseSession: () => void;
   /** MUSIC-SUITE P3: the rows the room draws (MusicTiers.shownRowIds) — the only rows that sound. null = every row. */
   private audible: ReadonlySet<string> | null = null;
+  /**
+   * MUSIC-SUITE P7 FIX (2026-09-29): "The Academy's MUSIC/SFX/VOICE sliders have zero live effect in the room
+   * they are shown in" (review finding, confirmed) — this engine builds its OWN AudioContext/MixGraph
+   * (mixGraph.ts's own "THE ACADEMY'S ONE MIXING DESK" — a graph the P4 engine contract also builds fresh for
+   * every offline render, so it can never simply share SoundKit's musicBus the way the dance room's own `bus`
+   * does, DanceMode.ts:641-644), and lib/audio/ui/VolumeMixer.tsx (mounted right in StudioMode.tsx, next to the
+   * MASTER/BPM/SWING row) only ever moves SoundKit's own musicBus/sfxBus/voiceBus gain nodes — nothing this
+   * engine plays was ever reachable from any of the three sliders. Routing the whole live engine into SoundKit's
+   * graph is the bigger, riskier fix (offline renders must stay on their own throwaway context regardless); this
+   * one instead reads the SAME on-device MUSIC level the slider itself writes (lib/audio/volumes.ts) and applies
+   * it as one more gain stage at the very END of this engine's own chain (after the limiter/ceiling, never
+   * inside a render's graph — an export is still exactly the mix, unaffected by a device setting). There is no
+   * push notification when the slider moves (loadVolumes() is a plain localStorage read, not an event), so
+   * `applyDeviceVolume` is polled from the scheduler tick that already runs every LOOKAHEAD_MS while something is
+   * playing — the same 25 ms cadence a live drag already glides on (VOLUME_RAMP_TC, matching SoundKit.setVolume's
+   * own ramp).
+   */
+  private deviceVol: GainNode;
+  private lastDeviceVolume = -1;   // never a real gain value: forces the first applyDeviceVolume() to always apply
 
   constructor(initial: SequencerState) {
     this.releaseSession = claimPlaybackSession();
     this.ctx = new AudioContext();
     // MUSIC-SUITE P4 FIX PASS: the live desk glides a mixer move (a render's desk is static — offlineGraph)
     this.graph = buildMixGraph(this.ctx, { mixer: this.mixer, polish: this.polished }, { live: true });
+    // MUSIC-SUITE P7 FIX (2026-09-29, this.deviceVol's own comment): splice a device-volume gain stage between
+    // the graph's own ceiling and the speakers. disconnect(dest) with an explicit destination takes back only
+    // THAT edge — the ceiling's other output (the meter splitter, mixGraph.ts) is untouched.
+    this.deviceVol = this.ctx.createGain();
+    this.graph.ceiling.disconnect(this.ctx.destination);
+    this.graph.ceiling.connect(this.deviceVol).connect(this.ctx.destination);
+    this.applyDeviceVolume();
     this.state = initial;
+  }
+
+  /** The on-device MUSIC level actually applied to this engine's output right now (busGain(1, level) — a dev
+   *  probe / test hook; also read by applyDeviceVolume itself to skip a redundant AudioParam write). */
+  deviceVolume(): number { return this.deviceVol.gain.value; }
+
+  /** Re-read the on-device MUSIC level (lib/audio/volumes.ts) and glide this engine's own output to match, if it
+   *  moved since the last check. Called once at construction and on every scheduler tick — see this.deviceVol's
+   *  own comment for why polling, not a push. */
+  private applyDeviceVolume(): void {
+    const v = busGain(1, loadVolumes().music);
+    if (v === this.lastDeviceVolume) return;
+    this.lastDeviceVolume = v;
+    this.deviceVol.gain.setTargetAtTime(v, this.ctx.currentTime, VOLUME_RAMP_TC);
   }
 
   async loadSample(id: string, name: string, url: string, category: Sample['category']): Promise<void> {
@@ -589,6 +630,7 @@ export class AudioEngine {
   }
 
   private scheduler(): void {
+    this.applyDeviceVolume();   // MUSIC-SUITE P7 FIX (2026-09-29): the only live-updating hook — see this.deviceVol
     const horizon = this.ctx.currentTime + SCHEDULE_AHEAD_S;
     for (let t = this.nextStepTime(); t < horizon; t = this.nextStepTime()) {
       this.scheduleStep(this.currentStep, t);

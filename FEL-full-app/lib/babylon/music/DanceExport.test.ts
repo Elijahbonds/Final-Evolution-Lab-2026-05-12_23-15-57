@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   roleOf, grooveOf, density, difficultyFor, routineFromGroove, exportSongToDance, exportedTrackId, seedFrom,
-  GRID_DANCE_BARS, danceSongAtTier, saveExportedTrack, readExportedTrack,
+  GRID_DANCE_BARS, danceSongAtTier, saveExportedTrack, readExportedTrack, danceFloorOpenFor, DANCE_FLOOR_UPLOAD_LINE,
 } from './DanceExport';
 import { installFakeWebAudio } from './fakeWebAudio';
 import { shownRowIds } from './MusicTiers';
@@ -17,6 +17,7 @@ import {
   CHAIN_AT_PATTERNS, STUDIO_AT_CHAIN, type MusicProgress,
 } from './MusicTiers';
 import type { TrackState } from './AudioEngine';
+import { DEFAULT_KEY } from './scales';
 
 const STEPS = 16;
 const track = (sampleId: string, on: number[], extra: Partial<TrackState> = {}): TrackState => ({
@@ -305,5 +306,100 @@ describe('the dance export says whether it was kept', () => {
       expect(saveExportedTrack(out)).toBe(false);
       expect(readExportedTrack()).toBeNull();
     } finally { full.uninstall(); }
+  });
+});
+
+// MUSIC-SUITE P7 ("your beat", 2026-09-29): the export carries the SONG now — pattern, chain/sections (as `bars`,
+// already expanded), kit, tempo, swing and note rows, plus a reference to the booth's takes — not just the chart.
+describe('THE EXPORT CARRIES THE SONG (MUSIC-SUITE P7)', () => {
+  const kickRow = (hits: number[]): TrackState => ({ sampleId: 'kick', pattern: Array.from({ length: STEPS }, (_, i) => hits.includes(i)), volume: 0.8, muted: false, pan: 0 });
+  const bassRow = (notes: number[]): TrackState => ({
+    sampleId: 'bass', pattern: Array.from({ length: STEPS }, (_, i) => i % 4 === 0), volume: 0.8, muted: false, pan: 0, notes,
+  });
+
+  it('round-trips every field the render needs: bpm, steps, swing, kit, key, bars (expanded) and takes (by reference)', () => {
+    const takes = [{ id: 't1', atBar: 0, bars: 2, loopBars: 2, trimStart: 0, trimEnd: 0, gain: 1, muted: false, pickedAt: 5, audioKey: 'aud_123' }];
+    const out = exportSongToDance({
+      id: 'prj_full', name: 'Full', bpm: 104, steps: STEPS, swing: 0.3, kit: 'neon', songKey: { root: 2, scale: 'dorian' },
+      takes, chain: [{ sectionId: 'a', bars: 2 }], sections: [{ id: 'a', name: 'a', tracks: [kickRow([0, 8])] }],
+    })!;
+    expect(out.song).toBeDefined();
+    expect(out.song).toMatchObject({ bpm: 104, steps: STEPS, swing: 0.3, kit: 'neon', key: { root: 2, scale: 'dorian' }, takes });
+    expect(out.song!.bars).toHaveLength(2);                              // expandChain's own output, unmodified
+    expect(out.song!.bars[0][0].sampleId).toBe('kick');
+    expect(out.song!.bars[1]).toEqual(out.song!.bars[0]);                // the same section repeated: expandChain shares the reference
+  });
+
+  it('missing swing/kit/songKey/takes default to 0 / street / A minor / none — a pre-P7 caller still gets a real, if plain, song', () => {
+    const out = exportSongToDance({ id: 'prj_defaults', name: 'Plain', bpm: 100, steps: STEPS, chain: [{ sectionId: 'a', bars: 1 }], sections: [{ id: 'a', name: 'a', tracks: [kickRow([0])] }] })!;
+    expect(out.song).toMatchObject({ swing: 0, kit: 'street', key: DEFAULT_KEY, takes: [] });
+  });
+
+  it("A REMIX'S OWN NOTES REACH THE EXPORT UNCHANGED — before P7 only `pattern` was carried, so a remix's bass/lead played the kit voice's default note", () => {
+    const notes = [40, 40, 40, 40, 43, 43, 43, 43, 47, 47, 47, 47, 52, 52, 52, 52];   // a melody, not the kit's flat default
+    const out = exportSongToDance({
+      id: 'prj_notes', name: 'Melody', bpm: 96, steps: STEPS, chain: [{ sectionId: 'a', bars: 1 }],
+      sections: [{ id: 'a', name: 'a', tracks: [kickRow([0]), bassRow(notes)] }],
+    })!;
+    const bass = out.song!.bars[0].find((t) => t.sampleId === 'bass')!;
+    expect(bass.notes).toEqual(notes);                                   // untouched — not collapsed to a flat root
+  });
+
+  it('an export with no real-audio input at all (a pre-P7 caller passing none of the new fields) is still a complete, playable chart', () => {
+    // danceTracks.ts (movement play) reads only `track` and `steps` — never `song` — so a caller that never learned
+    // about `song` must still get a fully working export
+    const out = exportSongToDance({ id: 'prj_old', name: 'Old', bpm: 90, steps: STEPS, chain: [{ sectionId: 'a', bars: 2 }], sections: [{ id: 'a', name: 'a', tracks: [kickRow([0, 4, 8, 12])] }] })!;
+    expect(out.track.id).toBeTruthy();
+    expect(out.steps.length).toBeGreaterThan(0);
+  });
+});
+
+// MUSIC-SUITE P7 ("your beat" contract item 4): the export now renders real audio, so a device-private song (an
+// uploaded source) cannot go to the dance floor, whatever uploadPrivacy.UPLOAD_DOORS.danceFloor says (kept `true`
+// there for a hypothetically audio-free reading — library and walk-out still read it).
+describe('DEVICE-PRIVATE SONGS STAY OFF THE DANCE FLOOR (MUSIC-SUITE P7, contract item 4)', () => {
+  it('closed for a song with an upload, open for one without, independent of the door table', () => {
+    expect(danceFloorOpenFor({ private: true })).toBe(false);
+    expect(danceFloorOpenFor({ private: false })).toBe(true);
+  });
+
+  it('the room has one line to say why', () => {
+    expect(DANCE_FLOOR_UPLOAD_LINE.length).toBeGreaterThan(10);
+    expect(DANCE_FLOOR_UPLOAD_LINE).toMatch(/dance floor/i);
+  });
+});
+
+// readExportedTrack must still open an export saved before P7 (no `song`), and never let a malformed `song` sink an
+// otherwise-good `track` + `steps` record.
+describe('A STALE OR MALFORMED `song` NEVER SINKS THE RECORD (MUSIC-SUITE P7)', () => {
+  const base = { track: { id: 'song_old', name: 'OLD', bpm: 100, bars: 4, difficulty: 1 as const, seed: 1, blurb: 'x' }, steps: [{ clipId: 'dance_wave_arm', beat: 0, holdBeats: 1, mirrored: false }] };
+
+  it('no `song` at all (an export saved before P7): reads back fine, `song` absent', () => {
+    const roomy = installFakeWebAudio();
+    try {
+      window.localStorage.setItem('fel-dance-exported', JSON.stringify(base));
+      const back = readExportedTrack();
+      expect(back?.track.id).toBe('song_old');
+      expect(back?.song).toBeUndefined();
+    } finally { roomy.uninstall(); }
+  });
+
+  it('a half-written `song` (missing fields): dropped, `track` + `steps` still open', () => {
+    const roomy = installFakeWebAudio();
+    try {
+      window.localStorage.setItem('fel-dance-exported', JSON.stringify({ ...base, song: { bpm: 100 } }));
+      const back = readExportedTrack();
+      expect(back?.track.id).toBe('song_old');
+      expect(back?.song).toBeUndefined();
+    } finally { roomy.uninstall(); }
+  });
+
+  it('a real `song` reads back whole', () => {
+    const roomy = installFakeWebAudio();
+    try {
+      const song = { bpm: 100, steps: STEPS, swing: 0, kit: 'street', key: DEFAULT_KEY, bars: [], takes: [] };
+      window.localStorage.setItem('fel-dance-exported', JSON.stringify({ ...base, song }));
+      expect(readExportedTrack()?.song).toEqual(song);
+    } finally { roomy.uninstall(); }
   });
 });

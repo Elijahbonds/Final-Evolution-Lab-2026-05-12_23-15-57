@@ -54,7 +54,8 @@ describe('one exercise, with its coaching', () => {
 
   it('an empty or missing catalogue row, or junk in its columns, reads as no coaching — never a crash', () => {
     const bare = todayExercise(tree(), null, new Map());
-    expect(bare.coaching).toEqual({ cues: [], faults: [], demo: null, easier: null, harder: null, pattern: null, brace: null, equipment: [], setup: [], band: null });
+    // MIRROR-COACH P6 FIX: jumpLand (the catalogue's jump tagging, for the warm-up's youth gate) — a bare row is not jump work
+    expect(bare.coaching).toEqual({ cues: [], faults: [], demo: null, easier: null, harder: null, pattern: null, brace: null, equipment: [], setup: [], band: null, jumpLand: false });
     const junk = todayExercise(tree(), { primaryCues: 'one long string', commonFaults: { fault: 'not an array' }, demoVideoUrl: 42, pattern: 'twist', braceMode: 'hard', equipment: [3, null, 'band'], regressionOfId: 7 }, new Map());
     expect(junk.coaching).toMatchObject({ cues: [], faults: [], demo: null, pattern: null, brace: null, equipment: ['band'], easier: null });
   });

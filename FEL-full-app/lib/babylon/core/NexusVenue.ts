@@ -43,6 +43,15 @@ export interface VenueHandle {
   /** Placeholder bodies, kept so a mode can drop them the moment real
    *  characters are ready. */
   placeholders: TransformNode[];
+  /**
+   * MUSIC-SUITE P8 (2026-09-25), dance-only: the stage lamps, the backdrop banner (standing in for the LED wall
+   * until a real one exists — see MESHY-PROMPTS.md) and the podium, so DanceMode's beat bus can pulse them on the
+   * beat and on a cheer without this file growing a generic "beat props" concept every OTHER venue would carry and
+   * never use. Populated only when `modeId === 'dance'`; every other mode's handle leaves this undefined. Nodes are
+   * matched by their `prop_<kind>_…` name prefix (NexusWebScene.buildProp), not by exact position, so a `PlaceLook`
+   * that moves the lamps (placeLooks.ts's 'neon-club') is still found.
+   */
+  readonly beatProps?: { lamps: TransformNode[]; banners: TransformNode[]; podium: TransformNode[] };
   /** Hide the stand-ins. Call right after CharacterLibrary.spawn() resolves. */
   hidePlaceholders(): void;
   /** Reveal the capsule stand-ins. Authoring only — see the note at the mount. */
@@ -375,8 +384,17 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   let disposed = false;
   void disposed;
 
+  // MUSIC-SUITE P8, dance-only (see the VenueHandle.beatProps doc): gathered once, synchronously — every 'lamp' /
+  // 'banner' / 'podium' prop is built by buildProp() with no async load to race (unlike the CC0 kit props above).
+  const beatProps = modeId === 'dance' ? {
+    lamps: built.root.getChildTransformNodes(true).filter((n) => n.name.startsWith('prop_lamp_')),
+    banners: built.root.getChildTransformNodes(true).filter((n) => n.name.startsWith('prop_banner_')),
+    podium: built.root.getChildTransformNodes(true).filter((n) => n.name.startsWith('prop_podium_')),
+  } : undefined;
+
   return {
     built,
+    beatProps,
     placeholders,
     get nav() { return nav; },
     constrain(pos: Vector3) { if (!nav) return false; const [x, z] = nav.constrain(pos.x, pos.z); pos.x = x; pos.z = z; return true; },
