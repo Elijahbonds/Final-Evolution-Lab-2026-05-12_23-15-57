@@ -33,6 +33,7 @@ import { isMissingTable, isUnreachable } from '@/lib/db/errors';
 // HOTFIX (2026-09-24): the page reads the same axes for the editor's ceilings, so the one function lives in lib (a
 // route file may only export its handlers) — and it reads measured axes, not the dice-seeded profile row.
 import { axesFor } from '@/lib/creator/athleteAxes-server';
+import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGate';
 
 /**
  * `AthleteBuild` is new and the migration is the owner's to run, so the one error a fresh checkout will
@@ -119,6 +120,9 @@ export async function POST(req: NextRequest) {
   const refused = refusedItems(look.equipped, owned);
   const equipped = filterEquipped(look.equipped, owned);
 
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): only the PRQ snapshot is a movement save (verified 18+ AND opted in); the look and the Fine Tune build save for every signed-in user.
+  const prqAllowed = await canSaveScanNumbers(prisma, userId);
+
   try {
     const [, row] = await prisma.$transaction([
       prisma.avatarLook.upsert({
@@ -130,8 +134,10 @@ export async function POST(req: NextRequest) {
         where: { userId },
         // HOTFIX (2026-09-24): no measurement CLEARS the column (Prisma.DbNull), where `undefined` left it alone — so a
         // dice-seeded snapshot an earlier Finalize stored is wiped on the next one instead of living on as "measured".
-        update: { build: toBuild(values) as object, prq: prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
-        create: { userId, build: toBuild(values) as object, prq: prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
+        // TEEN-WRITE-BLOCK (FE PM 23:05 PT): refused, the snapshot is not written: DbNull on a create, and on an update the
+        // key is left out (no new write, and no clear of an older snapshot: this lane deletes nothing; GET serves axesFor).
+        update: { build: toBuild(values) as object, ...(prqAllowed ? { prq: prq ? (prq as object) : Prisma.DbNull } : {}), finalizedAt: new Date() },
+        create: { userId, build: toBuild(values) as object, prq: prqAllowed && prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
       }),
     ]);
     return NextResponse.json({
@@ -139,6 +145,8 @@ export async function POST(req: NextRequest) {
       finalizedAt: row.finalizedAt,
       // Named, not silent — see the header.
       refused: refused.map((id) => ({ itemId: id, name: getWearable(id)?.name ?? id })),
+      // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the PRQ refusal rides inside the 200, because the look and the build did save.
+      ...(prqAllowed ? {} : { prqSaved: false, prqRefusal: { status: 403, ...SCAN_SAVE_REFUSED } }),
     });
   } catch (e) {
     const named = dbFailure(e);

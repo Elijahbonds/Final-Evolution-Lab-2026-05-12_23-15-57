@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { canUse, type GuardianConsentLike } from '@/lib/consent/guardianGate';
 import { activeHealthDataConsent, type ConsentRow } from '@/lib/health/consent';
+import { canWriteHealthData, refuseHealthWrite } from '@/lib/privacy/healthWriteGate';
 import {
   READINESS_GUARDIAN_FEATURE, ReadinessValidationError, isEmptyCheckIn, isPlausibleToday, parseReadinessAnswers, readReadiness,
 } from '@/lib/health/readiness';
@@ -33,17 +34,29 @@ import {
  * NEVER SCORED (owner decision #12). Nothing here writes PRQ, a wallet row, a GameSession, a streak or an analytics
  * event, and the response carries nothing a scoring path could pick up; lib/health/readiness-never-scored.test.ts
  * holds that from the other side (nothing that scores or pays reads this table).
+ *
+ * TEEN-WRITE-BLOCK (2026-09-29; Elijah 2:40 PM PT: health data saves ONLY for a verified adult, unknown age is not an
+ * adult, the parent-consent path is gone). POST writes a check-in only for a verified 18+ account (User.dobYear from the
+ * database, lib/privacy/healthWriteGate.ts), checked after the clear path and BEFORE the health_data consent; everyone
+ * else gets 403 health_data_adults_only and nothing is stored. The guardian 412 is gone from POST, which no longer reads
+ * GuardianConsent. The clear (all four blank) stays open to everyone: it erases the athlete's own row. GET is a read and
+ * is unchanged, guardianOk included.
  */
 
 const SELECT = { date: true, sleep: true, soreness: true, energy: true, mood: true, createdAt: true, updatedAt: true } as const;
 
+async function healthDataConsented(userId: string) {
+  const rows = await prisma.healthConsent.findMany({ where: { userId, scope: 'health_data' }, select: { scope: true, coachId: true, grantedAt: true, revokedAt: true } });
+  return !!activeHealthDataConsent(rows as ConsentRow[]);
+}
+
+/** GET's read gate (unchanged by TEEN-WRITE-BLOCK): the health_data consent and, for a minor or a blank year, the guardian. */
 async function gate(userId: string) {
-  const [user, healthConsentRows, guardianConsentRows] = await Promise.all([
+  const [user, healthData, guardianConsentRows] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } }),
-    prisma.healthConsent.findMany({ where: { userId, scope: 'health_data' }, select: { scope: true, coachId: true, grantedAt: true, revokedAt: true } }),
+    healthDataConsented(userId),
     prisma.guardianConsent.findMany({ where: { menteeId: userId }, select: { requestedAt: true, acceptedAt: true, revokedAt: true } }),
   ]);
-  const healthData = !!activeHealthDataConsent(healthConsentRows as ConsentRow[]);
   const consents: GuardianConsentLike[] = guardianConsentRows;
   const guardianOk = canUse(READINESS_GUARDIAN_FEATURE, { dobYear: user?.dobYear ?? null, consents });
   return { healthData, guardianOk };
@@ -96,9 +109,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ date, checkIn: null, read: readReadiness(null) });
   }
 
-  const { healthData, guardianOk } = await gate(userId);
-  if (!healthData) return bad('health_data_consent_required', 412);
-  if (!guardianOk) return bad('guardian_consent_required', 412);
+  if (!(await canWriteHealthData(prisma, userId))) return refuseHealthWrite();
+  if (!(await healthDataConsented(userId))) return bad('health_data_consent_required', 412);
 
   const checkIn = await prisma.readinessCheckIn.upsert({
     where: { userId_date: { userId, date } },

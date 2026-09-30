@@ -250,11 +250,16 @@ function fakeDb() {
   // guardian consent here keeps every pre-existing test in this describe block testing exactly what it always
   // tested (consent handling, red flags, dobYear writes); the guardian-HOLD behavior itself gets its own describe
   // block below, using a user with no guardian consent on file at all.
-  const guardianConsents: FakeGuardianRow[] = [
-    { menteeId: 'u1', requestedAt: new Date('2020-01-01'), acceptedAt: new Date('2020-01-02'), revokedAt: null },
-  ];
+  //
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): that guardian allowance is REMOVED. submitIntake stores an intake only for a
+  // DB-verified adult (User.dobYear, lib/privacy/verifiedAdult.ts); a guardian's yes unlocks nothing. Before → u1 had a
+  // blank dobYear and a seeded ACCEPTED guardian row. After → u1 is an ADULT ON FILE (1990) with no guardian row, which
+  // keeps the tests below testing what they always tested (consent handling, red flags, latest, clear). The guardian fake
+  // stays, and counts its reads, only to prove it is never read.
+  const guardianConsents: FakeGuardianRow[] = [];
+  let guardianReads = 0;
   const users = new Map<string, { id: string; dobYear: number | null }>([
-    ['u1', { id: 'u1', dobYear: null }],
+    ['u1', { id: 'u1', dobYear: 1990 }],
     ['u2', { id: 'u2', dobYear: 1980 }],
   ]);
 
@@ -300,10 +305,10 @@ function fakeDb() {
   };
 
   const guardianConsent = {
-    findMany: async ({ where }: { where: { menteeId: string } }) => guardianConsents.filter((c) => c.menteeId === where.menteeId),
+    findMany: async ({ where }: { where: { menteeId: string } }) => { guardianReads += 1; return guardianConsents.filter((c) => c.menteeId === where.menteeId); },
   };
 
-  return { db: { healthIntake, healthConsent, user, guardianConsent } as never, intakes, consents, users, guardianConsents };
+  return { db: { healthIntake, healthConsent, user, guardianConsent } as never, intakes, consents, users, guardianConsents, guardianReads: () => guardianReads };
 }
 
 describe('grantHealthDataConsent', () => {
@@ -370,10 +375,18 @@ describe('submitIntake', () => {
     expect(hardStopped).toBe(false);
   });
 
-  it('writes User.dobYear when it was blank', async () => {
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): before → 'writes User.dobYear when it was blank' (the answered 2001 was stored,
+  // under the seeded accepted guardian row). After → a blank dobYear is refused before anything is written, the accepted
+  // guardian row and the adult answer notwithstanding, so the dobYear write is unreachable. Flipped, not deleted.
+  it('a BLANK User.dobYear WITH an accepted guardian consent is refused, even for an adult answer: nothing written, dobYear stays blank', async () => {
     const f = fakeDb();
-    await submitIntake(f.db, { userId: 'u1', rawAnswers: { birth_year: 2001 }, consent: true, now });
-    expect(f.users.get('u1')!.dobYear).toBe(2001);
+    f.users.set('u1', { id: 'u1', dobYear: null });
+    f.guardianConsents.push({ menteeId: 'u1', requestedAt: new Date('2020-01-01'), acceptedAt: new Date('2020-01-02'), revokedAt: null });
+    await expect(submitIntake(f.db, { userId: 'u1', rawAnswers: { birth_year: 2001 }, consent: true, now })).rejects.toMatchObject({ code: 'health_data_adults_only' });
+    expect(f.users.get('u1')!.dobYear).toBeNull();
+    expect(f.intakes).toHaveLength(0);
+    expect(f.consents).toHaveLength(0);
+    expect(f.guardianReads()).toBe(0);
   });
 
   it('never overwrites an existing User.dobYear (decision #20)', async () => {
@@ -382,10 +395,12 @@ describe('submitIntake', () => {
     expect(f.users.get('u2')!.dobYear).toBe(1980);
   });
 
-  it('a skipped birth year writes nothing to User.dobYear', async () => {
+  // TEEN-WRITE-BLOCK-2: before → u1 was blank, and a skipped birth year left it null. After → u1 is the adult on file (the
+  // fake's new default), and a skipped birth year leaves the 1990 on file exactly as it was.
+  it('a skipped birth year changes nothing on User.dobYear', async () => {
     const f = fakeDb();
     await submitIntake(f.db, { userId: 'u1', rawAnswers: {}, consent: true, now });
-    expect(f.users.get('u1')!.dobYear).toBeNull();
+    expect(f.users.get('u1')!.dobYear).toBe(1990);
   });
 });
 
@@ -394,7 +409,13 @@ describe('submitIntake', () => {
 // HealthIntake row, no health_data consent grant, no dobYear write — when the effective birth year reads as needing
 // a guardian and none has been accepted. 'u3' below has NO guardianConsents row at all (unlike u1's seeded-accepted
 // default above), so it exercises the hold path directly.
-describe('submitIntake — holds the whole submission for a minor with no accepted guardian consent (decision #6)', () => {
+//
+// TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT; Elijah: health data saves ONLY for a verified adult, unknown age is not an adult,
+// the parent path is gone). Before: this block's hold waited on a guardian ('guardian_consent_required'), and an accepted
+// consent, or an adult birth_year ANSWER, let the submission through. After: only a verified 18+ User.dobYear already in
+// the database lets it through; everything else is 'health_data_adults_only' with nothing written, and the guardian rows
+// are never read. Each case says before → after.
+describe('submitIntake — refuses the whole submission for anyone but a DB-verified adult (TEEN-WRITE-BLOCK-2)', () => {
   const now = new Date('2026-09-29T12:00:00.000Z');
   const freshMinor = () => {
     const f = fakeDb();
@@ -406,38 +427,48 @@ describe('submitIntake — holds the whole submission for a minor with no accept
     const f = freshMinor();
     await expect(
       submitIntake(f.db, { userId: 'u3', rawAnswers: { current_pain: true, heart_or_bp_condition: true }, consent: true, now }),
-    ).rejects.toMatchObject({ code: 'guardian_consent_required' });
+    ).rejects.toMatchObject({ code: 'health_data_adults_only' });   // before: guardian_consent_required
     expect(f.intakes).toHaveLength(0);
     expect(f.consents).toHaveLength(0); // not even the health_data grant
     expect(f.users.get('u3')!.dobYear).toBeNull();
+    expect(f.guardianReads()).toBe(0);
   });
 
   it('answering a birth year that reads as a minor is ALSO held, even though it is the very answer that proves it', async () => {
     const f = freshMinor();
     await expect(
       submitIntake(f.db, { userId: 'u3', rawAnswers: { birth_year: 2014, heart_or_bp_condition: true }, consent: true, now }),
-    ).rejects.toMatchObject({ code: 'guardian_consent_required' });
+    ).rejects.toMatchObject({ code: 'health_data_adults_only' });   // before: guardian_consent_required
     expect(f.intakes).toHaveLength(0);
     // the red flag answer is exactly the sensitive data the Finding says must not be collected before consent
     expect(f.consents).toHaveLength(0);
   });
 
-  it('answering a birth year that reads as an ADULT goes through normally — no guardian needed', async () => {
+  // before: went through and wrote dobYear 1990. After: the answer is never trusted as proof of age — a blank dobYear
+  // is refused whatever the intake answers, and nothing is written.
+  it('answering a birth year that reads as an ADULT is still refused while the database has no year — the answer is not proof', async () => {
     const f = freshMinor();
-    const { intake } = await submitIntake(f.db, { userId: 'u3', rawAnswers: { birth_year: 1990 }, consent: true, now });
-    expect(f.intakes).toHaveLength(1);
-    expect(intake.birthYear).toBe(1990);
-    expect(f.users.get('u3')!.dobYear).toBe(1990);
+    await expect(submitIntake(f.db, { userId: 'u3', rawAnswers: { birth_year: 1990 }, consent: true, now })).rejects.toMatchObject({ code: 'health_data_adults_only' });
+    expect(f.intakes).toHaveLength(0);
+    expect(f.consents).toHaveLength(0);
+    expect(f.users.get('u3')!.dobYear).toBeNull();
   });
 
-  it('once a guardian consent is accepted, the SAME submission goes through and IS persisted', async () => {
-    const f = freshMinor();
-    f.guardianConsents.push({ menteeId: 'u3', requestedAt: new Date('2026-09-20'), acceptedAt: new Date('2026-09-25'), revokedAt: null });
-    const { intake, hardStopped } = await submitIntake(f.db, { userId: 'u3', rawAnswers: { birth_year: 2014, heart_or_bp_condition: true }, consent: true, now });
-    expect(f.intakes).toHaveLength(1);
-    expect(intake.redFlags).toEqual(['heart_or_bp_condition']);
-    expect(hardStopped).toBe(true);
-    expect(f.consents).toHaveLength(1); // health_data consent IS granted once it actually persists
+  // before: once a guardian accepted, the minor's intake was persisted (and the health_data grant written). After: a
+  // parent's yes unlocks nothing — refused for a blank dobYear and for a 17-year-old on file alike, nothing written, the
+  // guardian rows never read.
+  it('an ACCEPTED guardian consent does not let the submission through — blank or 17 on file, nothing written, the consent never read', async () => {
+    for (const dobYear of [null, 2009]) {
+      const f = freshMinor();
+      f.users.set('u3', { id: 'u3', dobYear });
+      f.guardianConsents.push({ menteeId: 'u3', requestedAt: new Date('2026-09-20'), acceptedAt: new Date('2026-09-25'), revokedAt: null });
+      await expect(
+        submitIntake(f.db, { userId: 'u3', rawAnswers: { birth_year: 2014, heart_or_bp_condition: true }, consent: true, now }),
+      ).rejects.toMatchObject({ code: 'health_data_adults_only' });
+      expect(f.intakes, String(dobYear)).toHaveLength(0);
+      expect(f.consents, String(dobYear)).toHaveLength(0);
+      expect(f.guardianReads(), String(dobYear)).toBe(0);
+    }
   });
 
   it('a REVOKED guardian consent reads the same as none — still held', async () => {
@@ -445,7 +476,7 @@ describe('submitIntake — holds the whole submission for a minor with no accept
     f.guardianConsents.push({ menteeId: 'u3', requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: new Date('2026-09-10') });
     await expect(
       submitIntake(f.db, { userId: 'u3', rawAnswers: { birth_year: 2014 }, consent: true, now }),
-    ).rejects.toMatchObject({ code: 'guardian_consent_required' });
+    ).rejects.toMatchObject({ code: 'health_data_adults_only' });   // before: guardian_consent_required
   });
 
   it('an EXISTING dobYear on file is what decides it when birth_year is skipped this time, not a blank re-derivation', async () => {
