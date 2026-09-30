@@ -61,7 +61,21 @@ export interface TodayCoaching {
   setup: { id: string; text: string }[];
   /** The prescription's effort band, named. */
   band: { id: string; label: string; meaning: string; rir: string } | null;
+  /**
+   * The catalogue row is jump work: skill layer Jump & Land ('jump-land', taxonomy.ts SKILL_LAYERS) or category
+   * 'plyometric'. MIRROR-COACH P6 FIX (2026-09-29, code review): the warm-up's youth gate read "a coach assigned jumps"
+   * off the PATTERN — any 'locomotion' item in Prime — and FEL's own off-day Easy Walk is tagged locomotion
+   * (lib/coach/offDay.ts), as are sprints, shuffles and marches. A walk in a 14-year-old's Prime unlocked the Wake-Up's
+   * pogos and dip-jump-stomp and told them "Your coach put jumping in today's Prime section". The jump signal is the
+   * row's own jump tagging, which TREE_INCLUDE already selects (CATALOGUE_COACHING_SELECT: skillLayer, category).
+   * Optional so a TodayCoaching built before this (a fixture, a harness) reads as "not jump work" — the careful side.
+   */
+  jumpLand?: boolean;
 }
+
+/** A catalogue row is jump work (see TodayCoaching.jumpLand). */
+export const isJumpWork = (r: Pick<CatalogueCoachingRow, 'skillLayer' | 'category'> | null | undefined): boolean =>
+  r?.skillLayer === 'jump-land' || r?.category === 'plyometric';
 
 export interface TodayExercise extends TreeExercise {
   /** The prescription as one line ("3 × 8-10 @ RPE7 · Drive"). */
@@ -152,6 +166,7 @@ export function todayExercise(e0: TreeExercise, row: CatalogueCoachingRow | null
       equipment: strings(r.equipment, 8),
       setup: e.setupCues.map((id) => setupCue(id)).filter((c): c is NonNullable<typeof c> => !!c).map((c) => ({ id: c.id, text: c.text })),
       band: band ? { id: band.id, label: band.label, meaning: band.meaning, rir: band.rir } : null,
+      jumpLand: isJumpWork(r),
     },
     timers: timersFor(e),
   };

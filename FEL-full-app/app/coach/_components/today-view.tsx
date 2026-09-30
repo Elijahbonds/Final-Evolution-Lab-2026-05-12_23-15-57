@@ -12,21 +12,65 @@
 //   · Logging was one row per exercise with a free-text load box PRE-FILLED with the prescription, so an untouched card
 //     "logged" RPE7 as a load. It is now a row per set (components/coach/set-logger.tsx): reps, weight in kg or lb,
 //     reps in reserve 0–5 with plain anchors, effort 1–10. A log saved before this still shows, as it was.
-//   · The "How did it feel?" note stays: until the pain check-in lands (phase 5) it is the client's only free-text line
-//     to the coach about how a set went.
+//   · The "How did it feel?" note stays, for anything a fixed pain scale can't say.
+//
+// MIRROR-COACH P5 (2026-09-29): the pain check-in loop landed (lib/health/painRule.ts, lib/health/pain.ts,
+// components/coach/pain-checkin.tsx). Each exercise card now carries an optional, never-required "Pain?" chip
+// (0–10 + where + the acute-event checks), and the view opens with <NextMorningFollowUps> — a follow-up on
+// yesterday's flagged readings before today's session even starts. Neither computes a decision itself; both show
+// back exactly what app/api/health/pain returned.
+//
+// MIRROR-COACH P6 (2026-09-29): <ReadinessCheckInCard> (components/coach/readiness-checkin.tsx) sits right after the
+// follow-ups, before the session: four optional tap scales (sleep, soreness, energy, mood) + Skip. It never blocks
+// the session below, is never scored, and its read (lib/health/readiness.ts) reaches the warm-up through `onRead`.
+//
+// MIRROR-COACH P6 (2026-09-29): <WarmupPrep> (components/coach/warmup-prep.tsx) is the Prep section when the coach
+// wrote none: the owner's Pre-Game Wake-Up in its own order, a rock-and-hold stretch for the weakest Movement Screen
+// area, and a primer for the key set's pattern (lib/coach/warmup.ts). A coach's own Prep items always win — then it
+// renders nothing and the coach's Prep shows as before. It takes today's readiness level from the card above (in
+// memory, never a URL) and its server context from `api.warmup`; with no `warmup` endpoint (the dev harness) it falls
+// back to the careful context (youth rules: no jumps).
+//
+// MIRROR-COACH P6 (2026-09-29), cool-down + off day:
+//   · <CooldownCard> (components/coach/cooldown-card.tsx) after the last section when the coach wrote no Cool-down: the
+//     owner's recovery breath, then a rock-and-hold stretch per pattern trained, 3–5 minutes, and a "done" tap
+//     (POST /api/coach/me/cooldown). A coach's own Cool-down always wins (lib/coach/cooldown.ts needsAutoCooldown).
+//     Pressing Done on the session before cooling down keeps the card on screen for the session just finished (the
+//     `finished` state) instead of jumping straight to the next session, so the order people really do it in works too.
+//     P6 FIX (2026-09-29, code review): while that card is up, the NEXT session's cool-down card is not rendered, and
+//     the view scrolls to the finished one. Done reloads Today onto the next session Y, and Y's own card sat at the
+//     bottom, right above Save/Done where the thumb already was — so "I did the cool-down" went to Y: the server opened
+//     a row for Y stamped as cooled down (lib/coach/cooldownServer.ts), X's cool-down was never recorded, and Y read
+//     "done" before any work. Y's card comes back once the finished card is closed.
+//   · An OFF DAY (a session of kind 'recovery', lib/coach/offDay.ts) reads as one: its line under the title, no
+//     generated warm-up (the Wake-Up's launch and a primer have no place on an easy day), no automatic cool-down (its
+//     own Cool-down section is both), and simple logging (minutes or reps, no weight or reps-left for a walk).
+//   · THIS WEEK: the week's sessions in order, done / today / next, off days named as off days — a coached client's week
+//     view. Before this Today showed one session and "Session N of M", so a week's off days were not there at all.
 // `api` points the view at other endpoints (the dev harness app/dev/coach-today runs the same server code in memory).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 import { SetTimer } from '@/components/coach/set-timer';
+import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
+import { ReadinessCheckInCard } from '@/components/coach/readiness-checkin';
+import { WarmupPrep } from '@/components/coach/warmup-prep';
+import { CooldownCard } from '@/components/coach/cooldown-card';
+import { needsAutoCooldown, showsGeneratedWarmup, todayWarmupKind } from '@/lib/coach/cooldown';
+import { OFF_DAY_LINE, type WeekEntry } from '@/lib/coach/offDay';
+import type { WarmupReadiness } from '@/lib/coach/warmup';
 import { SET_LOG_ERROR_COPY, convertDrafts, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
 import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
 
-export interface TodayApi { today: string; log: string; messages: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages' };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown' };
+
+/** The session just marked Done, kept on screen for its cool-down (MIRROR-COACH P6). */
+interface FinishedSession { programId: string; sessionId: string; label: string; exercises: TodayExercise[] }
 
 interface ExerciseDraft { sets: SetDraft[]; clientNote: string; videoUrl: string }
 interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string }
@@ -42,7 +86,14 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const unitRef = useRef<WeightUnit>('kg');
   const [busy, setBusy] = useState(false);
   const [thread, setThread] = useState<Msg[]>([]);
+  const [readiness, setReadiness] = useState<WarmupReadiness | null>(null);
   const [msg, setMsg] = useState('');
+  // MIRROR-COACH P6: sessions whose automatic cool-down was tapped done on this visit, and the one just marked Done
+  const [cooldownDoneIds, setCooldownDoneIds] = useState<string[]>([]);
+  const [finished, setFinished] = useState<FinishedSession | null>(null);
+  const finishedRef = useRef<HTMLDivElement | null>(null);
+  // after Done, bring the finished session's cool-down into view (it renders at the top; the thumb is at the bottom)
+  useEffect(() => { if (finished) finishedRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, [finished]);
 
   const load = useCallback(async () => {
     const r = await fetch(api.today); const j: TodayPayload = await r.json(); setData(j);
@@ -81,6 +132,11 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       return;
     }
     toast.success(complete ? 'Session done — your coach will see it' : 'Saved');
+    // MIRROR-COACH P6: Done before the cool-down — keep this session's cool-down on screen (the reload moves Today on)
+    const s = data.today.session;
+    if (complete && needsAutoCooldown(s.exercises, s.kind) && !data.open?.cooldownDone && !cooldownDoneIds.includes(s.id)) {
+      setFinished({ programId: data.program.id, sessionId: s.id, label: s.label, exercises: s.exercises });
+    }
     void load();
   };
   const send = async () => {
@@ -90,36 +146,70 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   };
 
   const layout = useMemo(() => todayLayout(data?.today?.session.exercises ?? []), [data]);
+  const markCooldown = (sessionId: string) => setCooldownDoneIds((ids) => (ids.includes(sessionId) ? ids : [...ids, sessionId]));
 
   if (!data) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  // MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
+  // red-flag hard stop": checked ahead of the "no program" / "program complete" branches below, and ahead of every
+  // exercise card and its logging form — a standing red flag pauses Today outright rather than one card at a time.
+  // The server (saveClientLog, lib/coach/todayServer.ts) refuses the write either way; this is what an athlete sees
+  // instead of a session they can no longer actually save.
+  if (data.hardStopped) return (
+    <div className="fel-card rounded-xl p-6 text-center space-y-3" data-testid="today-hard-stopped">
+      <p className="text-[15px] font-semibold leading-snug text-[#FFB020]">{data.redFlagCopy}</p>
+      <p className="text-xs text-white/50">Training is paused here until you&apos;ve checked with a clinician and cleared it from the Mirror. This isn&apos;t a diagnosis — it&apos;s just a pause.</p>
+      <Link href="/play/mirror" className="inline-block rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold text-white/85">
+        Go to the Mirror
+      </Link>
+    </div>
+  );
+  // MIRROR-COACH P6: the session just marked Done, with its cool-down, above whatever Today shows next (even "Program
+  // complete" — the last session of a program deserves its cool-down too)
+  const finishedCard = finished ? (
+    <div ref={finishedRef} className="space-y-1" data-finished-session={finished.sessionId}>
+      <CooldownCard key={`finished-${finished.sessionId}`} exercises={finished.exercises} programId={finished.programId} sessionId={finished.sessionId}
+        endpoint={api.cooldown ?? null} lead={`${finished.label} done. Cool down now, while you're still warm.`} onDone={() => markCooldown(finished.sessionId)} />
+      <button type="button" onClick={() => setFinished(null)} className="px-1 text-xs text-white/45" data-finished-close>Close</button>
+    </div>
+  ) : null;
   if (!data.program || !data.today) return (
-    <div className="fel-card rounded-xl p-6 text-center">
-      <p className="text-white/70 text-sm">{data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'}</p>
+    <div className="space-y-4">
+      {finishedCard}
+      <div className="fel-card rounded-xl p-6 text-center">
+        <p className="text-white/70 text-sm">{data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'}</p>
+      </div>
     </div>
   );
   const { program, today } = data;
+  const recovery = today.session.kind === 'recovery';
   const card = (e: TodayExercise, label: string | null) => {
     const d = drafts[e.id]; if (!d) return null;
     const put = (patch: Partial<ExerciseDraft>) => setDrafts((s) => ({ ...s, [e.id]: { ...s[e.id], ...patch } }));
     return (
-      <ExerciseCard key={e.id} e={e} label={label} draft={d} unit={unit} error={errors[e.id] ?? null}
+      <ExerciseCard key={e.id} e={e} label={label} draft={d} unit={unit} error={errors[e.id] ?? null} simpleLog={recovery}
         prev={data.open?.logs.find((l) => l.sessionExerciseId === e.id) ?? null}
         onSets={(sets) => put({ sets })} onNote={(clientNote) => put({ clientNote })} onVideo={(videoUrl) => put({ videoUrl })} />
     );
   };
   return (
     <div className="space-y-4" data-testid="today">
-      <div className="fel-card rounded-xl p-4">
+      {finishedCard}
+      <NextMorningFollowUps />
+      <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
+      <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-wider text-white/40">{program.name} · coach {program.coachName}</div>
             <div className="fel-heading text-lg text-white mt-1">{today.block.label} · {today.session.label}</div>
             <div className="text-xs text-white/40 mt-0.5">Session {today.index + 1} of {today.total}</div>
+            {recovery && <div className="text-xs text-[#7BD389]/90 mt-1" data-off-day-line>{OFF_DAY_LINE}</div>}
           </div>
-          <UnitSwitch unit={unit} onChange={switchUnit} />
+          {!recovery && <UnitSwitch unit={unit} onChange={switchUnit} />}
         </div>
+        {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
       </div>
       {today.session.exercises.length === 0 && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
+      {today.session.exercises.length > 0 && showsGeneratedWarmup(today.session.kind) && <WarmupPrep exercises={today.session.exercises} contextUrl={api.warmup ?? null} readiness={readiness} />}
       {layout.map((sec) => (
         <section key={sec.section} className="space-y-2" data-section={sec.section} aria-label={sec.label}>
           <div className="px-1">
@@ -137,6 +227,11 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
           ))}
         </section>
       ))}
+      {/* not while the session just finished has its cool-down up: this card is the NEXT session's (see the P6 fix) */}
+      {!showsNextCooldown(finished) ? null : (
+        <CooldownCard key={`cooldown-${today.session.id}`} exercises={today.session.exercises} kind={today.session.kind} programId={program.id} sessionId={today.session.id}
+          endpoint={api.cooldown ?? null} done={!!data.open?.cooldownDone || cooldownDoneIds.includes(today.session.id)} onDone={() => markCooldown(today.session.id)} />
+      )}
       <div className="flex gap-2">
         <button disabled={busy} onClick={() => submit(false)} className="flex-1 rounded-xl border border-white/10 py-3 text-sm text-white/80">Save</button>
         <button disabled={busy} onClick={() => submit(true)} className="flex-1 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/40 py-3 text-sm font-medium text-[#00E5FF] flex items-center justify-center gap-2"><CheckCircle2 className="h-4 w-4" /> Done</button>
@@ -158,9 +253,40 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   );
 }
 
+/** Today's own cool-down card shows only when no just-finished session's card is up (MIRROR-COACH P6 FIX, 2026-09-29):
+ *  both at once put the next session's done tap by the Done button, where the finished session's tap belonged. */
+export const showsNextCooldown = (finished: { sessionId: string } | null): boolean => finished === null;
+
+/**
+ * This week on Today (MIRROR-COACH P6, 2026-09-29): the block's sessions in order, done / today / next, an off day named
+ * as an off day. lib/coach/offDay.ts weekView builds the entries; this only draws them.
+ */
+export function WeekStrip({ label, entries }: { label: string; entries: readonly WeekEntry[] }) {
+  const look = (e: WeekEntry) => e.state === 'today' ? 'border-[#00E5FF]/60 bg-[#00E5FF]/10 text-[#00E5FF]'
+    : e.state === 'done' ? 'border-[#7BD389]/40 bg-[#7BD389]/10 text-[#7BD389]'
+      : e.kind === 'recovery' ? 'border-dashed border-[#7BD389]/40 text-[#7BD389]/80' : 'border-white/15 text-white/60';
+  return (
+    <div className="mt-3 space-y-1" data-testid="week-strip">
+      <div className="text-[10px] uppercase tracking-wider text-white/35">This week · {label}</div>
+      <ol className="flex flex-wrap gap-1" aria-label={`This week, ${label}`}>
+        {entries.map((e) => (
+          <li key={e.id} data-week-entry={e.id} data-kind={e.kind} data-state={e.state}
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] leading-tight ${look(e)}`}>
+            {e.state === 'done' && <CheckCircle2 className="h-3 w-3" aria-hidden="true" />}
+            <span>{e.label}</span>
+            {e.state === 'today' && <span className="sr-only">(today)</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 /** One prescribed exercise: what to do, how to do it, and its sets. */
-function ExerciseCard({ e, label, draft, unit, error, prev, onSets, onNote, onVideo }: {
+function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, onSets, onNote, onVideo }: {
   e: TodayExercise; label: string | null; draft: ExerciseDraft; unit: WeightUnit; error: string | null; prev: OpenLog | null;
+  /** An off day logs minutes or reps only (MIRROR-COACH P6): no weight, reps left or effort to ask about a walk. */
+  simpleLog?: boolean;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
   const [demo, setDemo] = useState(false);
@@ -230,10 +356,12 @@ function ExerciseCard({ e, label, draft, unit, error, prev, onSets, onNote, onVi
           Saved earlier: {earlier.lines[0]}
         </div>
       )}
-      <SetLogger name={e.name} rows={draft.sets} unit={unit} timed={timed} simple={simpleLogging(e)} youth={!!e.youthRules} repsHint={repsPlaceholder(e.reps)} workHint={String(e.workSeconds ?? '')} onChange={onSets} />
+      <SetLogger name={e.name} rows={draft.sets} unit={unit} timed={timed} simple={simpleLog || simpleLogging(e)} youth={!!e.youthRules} repsHint={repsPlaceholder(e.reps)} workHint={String(e.workSeconds ?? '')} onChange={onSets} />
       {error && <div className="text-xs text-[#FF3366]" role="alert" data-set-error>{error}</div>}
-      {/* the client's free-text line to the coach — until the pain check-in (phase 5), the only one about how it felt */}
+      {/* the client's free-text line to the coach — kept alongside the pain check-in (phase 5), not replaced by it: a
+         note can say "felt off" about form or effort with no pain in it at all. */}
       <textarea value={draft.clientNote} onChange={(ev) => onNote(ev.target.value)} placeholder={NOTE_PROMPT} aria-label={`${e.name}: note to your coach`} rows={2} maxLength={500} className="w-full resize-y rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" />
+      <PainCheckInChip exerciseName={e.name} programExerciseId={e.exerciseId} />
       <div className="flex items-center gap-2"><Video className="h-4 w-4 shrink-0 text-white/40" /><input value={draft.videoUrl} onChange={(ev) => onVideo(ev.target.value)} placeholder="Form video link (https://…)" aria-label={`${e.name}: form video link`} className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /></div>
     </div>
   );

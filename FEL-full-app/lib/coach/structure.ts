@@ -182,6 +182,13 @@ export function loadBandConflict(load: string | null | undefined, bandId: string
 }
 
 /**
+ * A timed set's length as the dose line says it: seconds, or whole minutes from five minutes up. MIRROR-COACH P6
+ * (2026-09-29): the off day's walk (lib/coach/offDay.ts, 720 s) read "1 × 720 s"; it reads "1 × 12 min". Under five
+ * minutes, or not a whole minute, it stays in seconds ("1 × 120 s", "3 × 30 s") — what a coach typed and a timer shows.
+ */
+export const timedAmount = (seconds: number): string => (seconds >= 300 && seconds % 60 === 0 ? `${seconds / 60} min` : `${seconds} s`);
+
+/**
  * The prescription as one line: "3 × 8-10 @ RPE7", "3 × 30 s", "2 × 5 · hold 20 s · Drive". A timed item shows its
  * seconds, not whatever `reps` still says, because the seconds are what the timer will run.
  *
@@ -195,7 +202,7 @@ export function loadBandConflict(load: string | null | undefined, bandId: string
  */
 export function doseLine(d: DoseLike): string {
   const suffix = d.workSeconds ? timedRepsSuffix(d.reps, d.workSeconds) : null;
-  const work = d.workSeconds ? `${d.sets} × ${d.workSeconds} s${suffix ? ` ${suffix}` : ''}` : `${d.sets} × ${d.reps}`;
+  const work = d.workSeconds ? `${d.sets} × ${timedAmount(d.workSeconds)}${suffix ? ` ${suffix}` : ''}` : `${d.sets} × ${d.reps}`;
   const load = loadBandConflict(d.load, d.effortBand)
     ? (d.load ?? '').replace(/\s*@?\s*\bRPE\s*\d+(?:\.\d+)?/gi, '').replace(/[\s@·,]+$/, '').trim()
     : (d.load ?? '').trim();

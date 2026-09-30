@@ -25,8 +25,10 @@ const count = <K extends string>(m: Partial<Record<K, number>>, k: K) => { m[k] 
 
 // ── the squat audit ──────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Anything shaped like SquatAudit — the live one, or the pre-P1 one the probe loads from git. */
-export interface SquatAuditLike { evaluate(frame: AdapterFrame): Pick<SquatFrameResult, 'present' | 'phase' | 'depth01' | 'faults' | 'valgusRatio' | 'lateralDrift' | 'note'> & { valgusBySide?: { left: number; right: number } } }
+/** Anything shaped like SquatAudit — the live one, or the pre-P1 one the probe loads from git. `square` and `hipDrop`
+ *  are optional (SquatFrameResult's own shape): the pre-P1 audit predates both and simply does not set them, which
+ *  falls back to stepSquatSession's own pre-P2 rule for THAT comparison only (see the reps field below). */
+export interface SquatAuditLike { evaluate(frame: AdapterFrame): Pick<SquatFrameResult, 'present' | 'phase' | 'depth01' | 'faults' | 'valgusRatio' | 'lateralDrift' | 'note' | 'square' | 'hipDrop'> & { valgusBySide?: { left: number; right: number } } }
 export interface CueEngineLike { decide(nowMs: number, faults: FaultId[]): { fault: string; text: string; level: string } | null }
 
 export interface SquatRecord {
@@ -36,7 +38,14 @@ export interface SquatRecord {
   calibratedAtFrame: number | null;
   /** Frames in each phase. */
   phases: Record<string, number>;
-  /** Reps by the harness's rule: the phase leaves 'standing' and comes back (mirror-harness.tsx, squatStage.ts). */
+  /**
+   * Reps by the harness's ACTUAL rule (squatStage.ts stepSquatSession: the hips drop past REP_MIN_DROP and come back
+   * to standing, on POSE frames only — MIRROR-COACH P4 review, 2026-09-25). This used to be its own cruder rule here
+   * ("the phase leaves 'standing' and comes back", with no hip-drop gate and no repeated-frame guard) — the same one
+   * P2 replaced in the harness itself, left behind in this measurement. The `stage: false` comparison path (the
+   * pre-P1 audit, which predates the hip-drop gate) still uses that cruder rule, since there is nothing else to compare
+   * it against.
+   */
   reps: number;
   maxDepth01: number;
   /** Frames each fault was active. */
@@ -68,7 +77,7 @@ export function measureSquat(
   const firstFaultFrame: Record<string, number> = {};
   const coach: SquatRecord['coach'] = [];
   const seen = new Set<string>();
-  let present = 0, calibratedAtFrame: number | null = null, reps = 0, prev = 'standing';
+  let present = 0, calibratedAtFrame: number | null = null, repsNaive = 0, repsGated = 0, prev = 'standing';
   let maxDepth01 = 0, maxValgus = 0, maxDrift = 0, perSide = false;
   let wL = -Infinity, wR = -Infinity, lL = Infinity, lR = Infinity;
   let stage: SquatSessionState = { ...initialSquatSession(), stage: 'check' };
@@ -77,7 +86,8 @@ export function measureSquat(
     if (r.present) present++;
     if (calibratedAtFrame == null && r.present && !/Calibrating/i.test(r.note) && r.note !== 'Landmarks not visible') calibratedAtFrame = i;
     count(phases, r.phase);
-    if (prev !== 'standing' && r.phase === 'standing' && r.present) reps++;
+    // the `stage: false` path's own comparison rule (see the reps field's doc) — kept ONLY for that path
+    if (prev !== 'standing' && r.phase === 'standing' && r.present) repsNaive++;
     prev = r.phase;
     maxDepth01 = Math.max(maxDepth01, r.depth01);
     maxValgus = Math.max(maxValgus, r.valgusRatio);
@@ -93,9 +103,18 @@ export function measureSquat(
       if (evt) coach.push({ atFrame: i, fault: evt.fault, level: evt.level, text: evt.text });
     }
     if (deps.stage !== false) {
-      stage = stepSquatSession(stage, { nowMs: f.timestampMs, phase: r.phase, present: r.present, faults: r.faults as SquatFault[] }).state;
+      // MIRROR-COACH P4 review (2026-09-25): `square` and `hipDrop` ride along now, so a rep here is the SAME
+      // pose-frame-gated rule the live harness counts by (squatStage.ts REP_MIN_DROP), not the cruder "phase left
+      // standing and came back" rule this file used to keep on its own, unreviewed since P1's baseline.
+      const step = stepSquatSession(stage, {
+        nowMs: f.timestampMs, phase: r.phase, present: r.present, faults: r.faults as SquatFault[],
+        square: r.square, hipDrop: r.hipDrop,
+      });
+      stage = step.state;
+      if (step.repCounted) repsGated++;
     }
   });
+  const reps = deps.stage === false ? repsNaive : repsGated;
   return {
     frames: frames.length, present, calibratedAtFrame, phases, reps, maxDepth01: r2(maxDepth01),
     faultFrames, firstFaultFrame,

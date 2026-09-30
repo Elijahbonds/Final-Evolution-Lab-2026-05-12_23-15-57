@@ -10,6 +10,14 @@
 // audit raises only on a body square to the camera (squat-audit.ts squareOn).
 
 export interface OverlayPoint { x: number; y: number; visibility?: number }
+/**
+ * Which knee(s) actually get an arrow this frame (MIRROR-COACH P4 review, 2026-09-25). Omitted = both visible knees
+ * (kneeArrows' original, unfiltered geometry — what kneeOverlay.test.ts's arrow-shape tests still call it with). Before
+ * this, the harness's only gate was whole-frame ("does ANY knee cave"), so a ONE-SIDED cave painted a correction arrow
+ * on the clean knee too — the other leg was never told to press out because there was nothing wrong with it. The
+ * caller (mirror-harness.tsx) now says which side(s) are actually over the warn line this frame.
+ */
+export interface KneeSides { left: boolean; right: boolean }
 export interface KneeArrow {
   /** Which landmark the arrow belongs to (25 = MediaPipe's left knee, 26 = right). */
   knee: 25 | 26;
@@ -26,13 +34,17 @@ const LEFT_HIP = 23, RIGHT_HIP = 24;
 const GAP = 10, REACH = 34, BARB_BACK = 6, BARB_SPREAD = 6;
 const MIN_VIS = 0.5;
 
-/** The knee arrows for one frame on a W×H canvas: none when the hips are not both there, one per visible knee. */
-export function kneeArrows(landmarks: readonly (OverlayPoint | undefined)[], W: number, H: number): KneeArrow[] {
+/**
+ * The knee arrows for one frame on a W×H canvas: none when the hips are not both there, one per visible knee that
+ * `sides` allows (both, when `sides` is omitted).
+ */
+export function kneeArrows(landmarks: readonly (OverlayPoint | undefined)[], W: number, H: number, sides?: KneeSides): KneeArrow[] {
   const lh = landmarks[LEFT_HIP], rh = landmarks[RIGHT_HIP];
   if (!lh || !rh) return [];
   const midX = ((lh.x + rh.x) / 2) * W;
   const out: KneeArrow[] = [];
   for (const knee of [25, 26] as const) {
+    if (sides && !(knee === 25 ? sides.left : sides.right)) continue;
     const k = landmarks[knee];
     if (!k || (k.visibility ?? 1) < MIN_VIS) continue;
     const kx = k.x * W, ky = k.y * H;
