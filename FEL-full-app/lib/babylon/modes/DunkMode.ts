@@ -102,7 +102,10 @@ import {
 import { MomentumBus } from '../core/MomentumBus';
 import { rivalNerve, rivalExecution } from '../core/RivalNerve';   // the rival feels the contest too
 import { rivalTricksFor, rivalSlamOffset } from '../core/RivalPlay';
-import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, pickCelebration, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
+import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
+import {
+  DUNK_LAND_ABSORB_CLIP, CELEB_BLEND_SEC, pickLiveCelebration, holdEndMs, celebStartMs, clipFor, type RotCelebId,
+} from '../core/DunkLandCelebrate';
 import { PhoneFlashes } from '../visual/PhoneFlashes';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
 import { dunkStingers } from '../audio/mic/names';
@@ -703,10 +706,12 @@ export const DunkMode: ModeDefinition = (() => {
   const JAM_FOLLOW_M = 0.3, JAM_FOLLOW_TAU = 0.07, JAM_Y = 1.15, JAM_LIFT_TAU = 0.08, JAM_DROP_TAU = 0.1, JAM_Y_LEFT_EXTRA = 0.15;
   const RIM_RADIUS = 0.225;
   let airHeld = false;                        // H5: an aerial clip (finish / trick) holds its last frame until feet-down
-  let landingClip: string = SPORT_CLIP.dunkLandCrouch;   // H5: the land clip feet-down plays (a make picks it from the score)
+  let landingClip: string = DUNK_LAND_ABSORB_CLIP;   // DUNK-LAND-CELEBRATE: feet-first absorb on every Flight Night landing
   let aerialClip: string = SPORT_CLIP.dunkScoreHang;     // the finish chosen at resolve (the replay re-plays it)
   let dropToFloor = false;                    // H5: the root falls to the floor (a miss from the release; a make after the replay)
-  let dropVy = 0, liveLandAt = -1;            // DUNK MOTION phase 11: the drop's speed (gravity), and when the feet came down live
+  let dropVy = 0, liveLandAt = -1, liveHoldMs = LIVE_LAND_BEAT_MS;   // DUNK MOTION phase 11: the drop's speed (gravity), and when the feet came down live
+  let liveCeleb: CelebId | null = null, liveCelebActive = false, liveCelebTimer: ReturnType<typeof setTimeout> | null = null, lastRotCeleb: RotCelebId | null = null;
+  let landDriftVz = 0;   // DUNK-LAND-CELEBRATE: a decaying share of the approach speed through the absorb
   // DUNK MOTION phase 12: the triple cut is on (the pose replay owns the body — the old re-fly stands aside); the celebration the
   // player threw on the d-pad after the make; the stands' phones
   let cutting = false, celebPick: CelebId | null = null, phoneFlashes: PhoneFlashes | null = null;
@@ -724,11 +729,37 @@ export const DunkMode: ModeDefinition = (() => {
    * (or out of the hang), the drop under gravity in the flush's own let-go (arms down in front) and the brace legs, the land clip at
    * feet-down, a beat on the floor — and then the replay, which ends where he stands.
    */
+  function cancelLiveCeleb(): void {
+    if (liveCelebTimer) { clearTimeout(liveCelebTimer); liveCelebTimer = null; }
+    liveCelebActive = false; liveCeleb = null; liveHoldMs = LIVE_LAND_BEAT_MS; landDriftVz = 0;
+  }
+  function startLiveCeleb(ctx: ModeContext, celeb: CelebId): void {
+    if (liveCelebActive || finishing) return;
+    liveCelebActive = true;
+    const cz = CELEBRATIONS[celeb];
+    { const away = player.root.position.subtract(rim); away.y = 0; if (away.lengthSquared() < 0.01) away.set(0, 0, 1); celebFace = player.root.position.add(away.normalize().scale(6)); }
+    playClip(cz.clip, { fadeSec: CELEB_BLEND_SEC, onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
+    console.info(`[DUNK-CELEB] live ${celeb} (${cz.clip})${celebPick ? ' — thrown on the d-pad' : ''}`);
+    if (cz.by) ctx.setHud({ call: `${cz.label} — ${cz.by!.toUpperCase()}` });
+    if (celeb === 'spiderman' || celeb === 'itsover') SoundKit.play('crowdCheer', { volume: 0.55 });
+    mic?.then({ moment: 'dunk.celeb', tags: [`celeb:${celeb}`] });
+  }
   function liveLandThenJudge(ctx: ModeContext): void {
     if (finishing) return;
     if (player.root.position.y > 0.02) { if (!dropToFloor) { dropToFloor = true; dropVy = 0; console.info(`[HANDS] off the iron — the drop from ${player.root.position.y.toFixed(2)} m`); } return; }
-    if (liveLandAt < 0) { liveLandAt = performance.now(); if (airHeld) landNow(); console.info('[HANDS] feet down, live'); return; }   // (the land clip on the feet, here — a held trick clip must not carry past the floor)
-    if (performance.now() - liveLandAt >= LIVE_LAND_BEAT_MS) { liveLandAt = -1; void finishAttempt(ctx, true); }
+    if (liveLandAt < 0) {
+      liveLandAt = performance.now(); phaseSec = 0; landingClip = DUNK_LAND_ABSORB_CLIP;
+      landDriftVz = Math.max(-0.35, Math.min(0.35, holdRunSpeed * 0.12));
+      if (airHeld) landNow();
+      if (qteHit) {
+        liveCeleb = pickLiveCelebration({ made: true, chosen: turn === 'player' ? celebPick : null, rivalId: turn === 'rival' ? foe.id : null, total: turn === 'rival' ? BAND_TOTAL.approval : 35, bands: BAND_TOTAL, seed: seedOf(`${round}:${dunkInRound}`), lastRot: lastRotCeleb });
+        if (liveCeleb === 'roar' || liveCeleb === 'toosmall' || liveCeleb === 'itsover') lastRotCeleb = liveCeleb;
+        liveHoldMs = holdEndMs(true, liveCeleb);
+        if (liveCeleb) liveCelebTimer = setTimeout(() => startLiveCeleb(ctx, liveCeleb!), celebStartMs());
+      } else liveHoldMs = holdEndMs(false, null);
+      console.info('[HANDS] feet down, live'); return;
+    }
+    if (performance.now() - liveLandAt >= liveHoldMs) { liveLandAt = -1; cancelLiveCeleb(); void finishAttempt(ctx, true); }
   }
   let replayClipNow = 0;                      // DUNK-BALL-ARMS-RIM: the replayed flight's clip second (the reach gate)
   let replaying = false, replayAir = false, replayAerial = false, replayAirSec = 0, replayAerialAt = 0, replayPrevY = 0;   // H5: replay re-drive
@@ -1217,6 +1248,9 @@ export const DunkMode: ModeDefinition = (() => {
       // contest simply is not his right now. RUN already said this (the trigger path below); now every input does.
       // DUNK MOTION phase 12: after a MAKE the d-pad throws your celebration (up the roar, right "it's over", down Ruffin's Spider-Man
       // splits, left too small) — through the landing and the triple cut
+      if (liveLandAt >= 0 && e.t === 'button' && e.pressed && phase === 'resolve' && qteHit) {
+        liveLandAt = -1; cancelLiveCeleb(); void finishAttempt(ctx, true); return;
+      }
       if (e.t === 'dpad' && e.pressed && turn === 'player' && (phase === 'resolve' || phase === 'judging') && qteHit && !celebPick) {
         celebPick = CELEB_BY_DPAD[e.dir]; flash(ctx, `${CELEBRATIONS[celebPick].label}!`, 700); SoundKit.play('uiTick', { pitch: 1.5, volume: 0.35 });
         console.info(`[DUNK-CELEB] thrown on the d-pad: ${celebPick}`);
@@ -2003,6 +2037,11 @@ export const DunkMode: ModeDefinition = (() => {
         player.root.position.y = Math.max(0, player.root.position.y - dropVy * dt);
         if (player.root.position.y <= 0) { dropToFloor = false; dropVy = 0; }
       }
+      if (liveLandAt >= 0 && landDriftVz !== 0 && !replaying) {
+        player.root.position.z += landDriftVz * dt;
+        landDriftVz *= Math.max(0, 1 - dt * 3.5);
+        if (Math.abs(landDriftVz) < 0.01) landDriftVz = 0;
+      }
       // H5: feet-down — the land clip plays when the body is back on the floor, never on the hit frame and never in the air
       const floorY = obstacleClipped ? clipFloorY : 0;
       if (airHeld && !replaying && phase !== 'cinematic' && player.root.position.y <= floorY + 0.05) landNow();
@@ -2244,10 +2283,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
   /** The last named air trick of this flight — the dunk the player actually called. */
   const calledAirTrick = (): string | null => flight.attempt.tricks.length ? flight.attempt.tricks[flight.attempt.tricks.length - 1].id : null;
-  function pickLanding(total: number): string {
-    if (!DUNK_FINISH_VARIETY) return SPORT_CLIP.dunkLandCrouch;
-    return total >= BAND_TOTAL.eruption ? SPORT_CLIP.dunkCelebrateBig : SPORT_CLIP.dunkLandCrouch;
-  }
+  function pickLanding(_total: number): string { return DUNK_LAND_ABSORB_CLIP; }
 
   /** The jump's height this attempt: the charge and the run-up buy it (the duel's factor), the double-up hop adds to it. */
   /** An obstacle that needs a bigger jump gets one — the take-off line already moves back for it, and the arc moves with it. */
@@ -2965,7 +3001,7 @@ export const DunkMode: ModeDefinition = (() => {
     const inp: PostureInput = {
       phase: rep ? (replayAerial ? 'resolve' : 'cinematic') : phase === 'approach' || phase === 'charge' || phase === 'cinematic' || phase === 'resolve' ? phase : 'other',
       clipTime: t, made: rep ? true : phase === 'resolve' ? qteHit : null, clipped: obstacleClipped && !rep,
-      landed: win === 'land', celebrate: landingClip === SPORT_CLIP.dunkCelebrateBig, trick,
+      landed: win === 'land', celebrate: liveCelebActive, trick,
     };
     const { window, pose: authored, trick: trickId } = posturePose(inp);
     // phase 8: the stance table was authored against the left-handed clips — its yaws and rolls turn with the mirror
@@ -2977,7 +3013,9 @@ export const DunkMode: ModeDefinition = (() => {
     const dyn = dynamicPose(pose, runMotion.signals(speed01, 0, window !== 'stance'), window);
     ppPose = ppOverride ? clonePose(ppOverride) : easePose(ppPose, dyn, lowPassK(dt, POSTURE_TAU));
     // the feet flatten on the way DOWN (a miss's fall, a make's drop after the replay), not on the feet-down frame
-    llPose = easeLegPose(llPose, legPose(dropToFloor && !rep && window !== 'land' && window !== 'celebrate' ? 'brace' : window, trickId), lowPassK(dt, POSTURE_TAU));
+    const legWindow = landingClip === DUNK_LAND_ABSORB_CLIP && (window === 'land' || window === 'celebrate') ? null
+      : dropToFloor && !rep && window !== 'land' && window !== 'celebrate' ? 'brace' : window;
+    llPose = legWindow ? easeLegPose(llPose, legPose(legWindow, trickId), lowPassK(dt, POSTURE_TAU)) : llPose;
   }
   /** Commit to the runway: the hold drives it toward the rim (the stick steers), the jump loads while you run, and the
    *  launch fires at the gather line — or on release, from wherever you are. Called by the press AND by a hold that was
@@ -3738,7 +3776,7 @@ export const DunkMode: ModeDefinition = (() => {
         SoundKit.play('crowdGroan', { volume: 0.35 });
         flash(ctx, `${missWhy()} — MISSED · ${attemptsLeft(stakes)} LEFT`);
         ctx.setHud({ judgeReveal: null, hint: '', attempt: stakesLabel(stakes, calledLabel()) });
-        landingClip = SPORT_CLIP.dunkLandCrouch; landNow();
+        landingClip = DUNK_LAND_ABSORB_CLIP; landNow();
         setPhase('judging');
         setTimeout(() => { clearBanner(ctx); void retryThisDunk(ctx); }, MISS_BEAT_MS);
         finishing = false;
@@ -3770,7 +3808,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.setHud({ slamTiming: slamTiming?.label ?? '' });
       if (turn === 'rival') ctx.setHud({ judgeReveal: [], hint: '', rivalScore: rivalTotal });
       else ctx.setHud({ judgeReveal: [], hint: '', score: playerTotal, chain, hype: Math.round(hype) });
-      landingClip = SPORT_CLIP.dunkLandCrouch; landNow();   // A+ P8 H5: normally landed at feet-down already (~0.1 s after the release); this is the floor
+      landingClip = DUNK_LAND_ABSORB_CLIP; landNow();   // A+ P8 H5: normally landed at feet-down already (~0.1 s after the release); this is the floor
       setPhase('judging');
       // Pad acceptance #4: a miss is one beat, then the next run-up — no reveal wait, no card, no re-press
       // (a hold still down streams the trigger and starts the next run the frame the approach resets).
@@ -3936,19 +3974,7 @@ export const DunkMode: ModeDefinition = (() => {
     replay.stop(); cutting = false; replaying = false;
     ctx.camDirector.suspended = false;
     ctx.setHud({ cut: '' });
-    // back live, on the floor: the celebration (the one he threw on the d-pad, else his own, else the card's)
-    const celeb = pickCelebration({ total: dunkTotal, bands: BAND_TOTAL, chosen: turn === 'player' ? celebPick : null, rivalId: turn === 'rival' ? foe.id : null, seed: seedOf(`${theName}:${dunkTotal}`) });
-    airHeld = false;   // (on the floor: nothing may land again over what comes next)
-    if (celeb) {
-      const cz = CELEBRATIONS[celeb];
-      { const away = player.root.position.subtract(rim); away.y = 0; if (away.lengthSquared() < 0.01) away.set(0, 0, 1); celebFace = player.root.position.add(away.normalize().scale(6)); }
-      playClip(cz.clip, { fadeSec: 0.2, onEnd: () => playClip(SPORT_CLIP.idle, { loop: true }) });
-      console.info(`[DUNK-CELEB] ${celeb} (${cz.clip})${celebPick ? ' — thrown on the d-pad' : ''}`);
-      if (cz.by) setTimeout(() => ctx.setHud({ call: `${cz.label} — ${cz.by!.toUpperCase()}` }), 400);
-      if (celeb === 'spiderman' || celeb === 'itsover') SoundKit.play('crowdCheer', { volume: 0.55 });
-      mic?.then({ moment: 'dunk.celeb', tags: [`celeb:${celeb}`] });
-    }
-    landingClip = SPORT_CLIP.dunkLandCrouch;   // (the landing already happened, live — after the cut there is no second one)
+    airHeld = false; cancelLiveCeleb(); celebFace = null;   // DUNK-LAND-CELEBRATE: the celebration already played live — after the cut he stands in idle
 
     // Phase 7: STAGED REVEAL — confer, Silk, Doc, the long Prime beat,
     // then the total + eruption/hush. Not a number flash.
@@ -3977,6 +4003,7 @@ export const DunkMode: ModeDefinition = (() => {
    */
   function retryThisDunk(ctx: ModeContext): void {
     if (phase !== 'judging') return;
+    cancelLiveCeleb(); celebFace = null;
     clearBanner(ctx); ctx.setHud({ judgeReveal: null });
     resetForNextAttempt(ctx);
   }
@@ -4007,7 +4034,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0; approachMove.stop();
-    airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
+    airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; cancelLiveCeleb(); replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
     cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
     armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });
@@ -4250,7 +4277,7 @@ export const DunkMode: ModeDefinition = (() => {
     // disagrees with its own score is exactly what an integrity check refuses. load() already opened a fresh one.
     card = emptyCard();
     hype = 0; chain = 0;
-    ended = false; finishing = false;
+    ended = false; finishing = false; cancelLiveCeleb(); celebFace = null;
     usedCombos.clear(); momentum.reset(); flight.reset();
     lastScores = []; revealed = [];
     // the run's own held state — a button or a stick still down when the card came up

@@ -8,7 +8,9 @@
 #
 # What these attributes buy: the artifact is ~43 MB of generated JS plus two engine binaries, and it goes DIRTY on any
 # machine whose `native` binaryTarget differs from the one it was generated on (the schema pins
-# ["native", "debian-openssl-3.0.x"], so a Mac bakes darwin-arm64 and absolute mac paths into it; a Linux container
-# regenerates both and every path). Marking it generated keeps that churn out of diffs and reviews. It stays tracked.
+# ["native", "debian-openssl-3.0.x"], so a Mac bakes darwin-arm64 into it and a Linux container regenerates it for its
+# own platform). Generator paths are repo-relative: always regenerate with `npm run prisma:generate`
+# (scripts/prisma-generate.mjs); a bare `prisma generate` re-bakes this machine's absolute path and dirties the tree.
+# Marking it generated keeps the remaining churn out of diffs and reviews. It stays tracked.
 public/_prisma/client/** -diff linguist-generated=true
 public/_prisma/client/*.node binary

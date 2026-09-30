@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env tsx
 /**
  * scripts/ci-suite.ts — full CI regression runner.
  *
@@ -14,9 +14,15 @@
  * exact condition under which four assertions rotted red and got read as
  * furniture (see wallet/input-layer/anim-coverage/ledger, 2026-09-15).
  *
- * Run:  yarn test               (skips DB suites when DATABASE_URL is unset)
- *       yarn test:ci            (CI: DB provided, skips are fatal)
- *       npx tsx scripts/ci-suite.ts --filter tennis --concurrency 1
+ * Each suite is launched with the tsx CLI npm installed for this package
+ * (`tsx/cli`, which is `node_modules/tsx/dist/cli.mjs`) on `process.execPath`.
+ * No shell, so the same argv works where a package-manager `.cmd` shim would
+ * not, and nothing is fetched at run time.
+ *
+ * Run:  npm test                      (vitest)
+ *       npm run test:suites           (skips DB suites when DATABASE_URL is unset)
+ *       npm run test:ci               (CI: DB provided, skips are fatal)
+ *       npm run test:suites -- --filter tennis --concurrency 1
  *
  * Flags:
  *   --require-db        treat a skipped DB suite as a failure (CI uses this)
@@ -28,9 +34,13 @@
  */
 
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { cpus } from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const requireFromHere = createRequire(import.meta.url);
 
 const ROOT = path.resolve(__dirname, '..');
 const SCRIPTS = path.join(ROOT, 'scripts');
@@ -117,12 +127,35 @@ function assertDbListFresh(suites: string[]) {
   }
 }
 
+/** Absolute path of the tsx CLI that npm installed for this package. */
+export function installedTsxCli(): string {
+  return requireFromHere.resolve('tsx/cli');
+}
+
+/**
+ * How one headless suite is spawned: [node, tsx CLI, scripts/<file>].
+ * The caller sets cwd to ROOT, NODE_ENV=test, maxBuffer, and the timeout.
+ */
+export function suiteCommand(file: string): [string, string[]] {
+  return [process.execPath, [installedTsxCli(), path.join('scripts', file)]];
+}
+
+/** True only when this file is the process entry point, so an import does not run the suite. */
+export function isDirectRun(
+  entry: string | undefined = process.argv[1],
+  moduleUrl: string = import.meta.url,
+): boolean {
+  if (!entry) return false;
+  return pathToFileURL(path.resolve(entry)).href === moduleUrl;
+}
+
 function runSuite(file: string): Promise<Result> {
   const started = Date.now();
+  const [command, args] = suiteCommand(file);
   return new Promise((resolve) => {
     execFile(
-      'yarn',
-      ['tsx', path.join('scripts', file)],
+      command,
+      args,
       {
         cwd: ROOT,
         env: { ...process.env, NODE_ENV: 'test' },
@@ -237,7 +270,9 @@ async function main() {
   console.log('\n✅ ALL SUITES GREEN');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (isDirectRun()) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

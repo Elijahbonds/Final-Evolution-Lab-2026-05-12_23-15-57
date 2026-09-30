@@ -84,16 +84,25 @@ describe('a) intake submit', () => {
   });
 
   // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): the guardian allowance inside submitIntake is removed, and with it the route's 412
-  // mapping. A minor's birth_year answer (what used to trip it) now gets 403 for the three refused users and, for the
-  // adult on file, is just an answer: the DB's year decides (assumption: the ruling's "DB dobYear only" includes this).
+  // mapping. AGE-SCREEN MUST (1) flipped the adult arm: before → an adult on file plus birth_year thisYear−14 was 200
+  // (the answer was ignored; "the DB's year decides"). After → the younger signal wins, so that answer is 403
+  // health_data_adults_only and nothing is written. A skipped birth_year still follows the database year (200).
   it.each([...HEALTH_REFUSED_CASES, HEALTH_ADULT].map((c) => [c.id, c] as const))('%s: no 412 guardian_consent_required is ever answered', async (_id, c) => {
     for (const answers of [ANSWERS, { ...ANSWERS, birth_year: THIS_YEAR - 14 }]) {
       as(c);
       const r = await post({ answers, consent: true });
       expect(r.status).not.toBe(412);
       expect(r.json.error).not.toBe('guardian_consent_required');
-      expect(r.status).toBe(c === HEALTH_ADULT ? 200 : 403);
+      const youngerAnswer = 'birth_year' in answers;
+      expect(r.status).toBe(c === HEALTH_ADULT && !youngerAnswer ? 200 : 403);
       expect(callsOn(db, 'guardianConsent')).toEqual([]);
+      if (c === HEALTH_ADULT && youngerAnswer) {
+        expect(r.json).toMatchObject({ error: 'health_data_adults_only', saved: false });
+        // The route (not edited) opens $transaction before submitIntake; the throw is before any model write.
+        expect(writesOf(db).filter((op) => op !== '$transaction')).toEqual([]);
+        expect(db.tables.healthIntake ?? []).toEqual([]);
+        expect(db.tables.user[0].dobYear).toBe(1990);
+      }
     }
   });
 });

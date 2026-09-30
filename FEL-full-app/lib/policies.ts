@@ -30,7 +30,10 @@
 // breath waits a week after an erase or a first opt-in. The export and both erases already carried the log while §5
 // still listed only the intake, pain and daily check-ins and the consent records (decisions #4, #17, #18; P6 bumped §5
 // the same way for the readiness check-in). 2026-09-29b-draft never shipped either; a new string is still the rule.
-export const CURRENT_POLICY_VERSION = '2026-09-29c-draft';
+// MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT, "No wait and fix"): bumped again, §5 only — an erase keeps the
+// consent records as proof of agreement and withdrawal, and it does not start the Dial-Up Breath's first-week wait
+// over. A first opt-in still waits that week. 2026-09-29c-draft never shipped either; a new string is still the rule.
+export const CURRENT_POLICY_VERSION = '2026-09-30-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -123,7 +126,7 @@ PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics. We do not
 
 **Who can see it.** Only you, by default. Turning on coach access for one specific coach lets that coach read your intake, pain check-ins and daily check-ins; you can turn it off at any time, for one coach or all of them, from Health data in your account settings. Turning it off stops that coach from seeing anything logged after that; it does not erase what they already read.
 
-**Your rights.** You can view, export or erase this data at any time from Health data in your account settings, separately from the rest of your account (see §8). Erasing it deletes your intake answers, your pain check-ins, your daily check-ins, your Dial-Up Breath uses and your consent records; it never touches a workout plan or your PRQ history, because those never held this data to begin with. After an erase, as after you first opt in, the Dial-Up Breath waits a week before it is offered, so its weekly limit still holds. Withdrawing consent stops new collection immediately and offers you the erase button in the same place.
+**Your rights.** You can view, export or erase this data at any time from Health data in your account settings, separately from the rest of your account (see §8). Erasing it deletes your intake answers, your pain check-ins, your daily check-ins and your Dial-Up Breath uses. Your consent records are kept, as proof of what you agreed to and when you withdrew. It never touches a workout plan or your PRQ history, because those never held this data to begin with. The first time you opt in, the Dial-Up Breath waits a week before it is offered. Erasing this data does not start that week over. Withdrawing consent stops new collection immediately and offers you the erase button in the same place.
 
 **Consumer health data laws.** Some places have a law specifically for data like this, beyond ordinary privacy law — for example Washington State's My Health My Data Act. Rather than work out where each law applies, we extend the same protections everywhere, to everyone: a specific opt-in kept separate from the rest of this Policy, no sale of this data under any circumstance, no use of it or of your location to target advertising, and the same view, export, deletion and consent-withdrawal rights described above, honored the same way regardless of where you are.
 
