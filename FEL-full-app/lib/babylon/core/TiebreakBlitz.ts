@@ -33,21 +33,23 @@ export interface BlitzFeel {
 }
 
 /**
- * The hit window is a short beat at the end of the flight, and it closes further when a lead or a
- * rally stacks. A swing aimed at the middle still connects; one that is early or late by a realistic
- * human error does not, and a stacked rally makes that miss more likely — that is how the opponent
- * takes the point. The between-point hold is a readable result beat (1.4 s, was 4.0 s, originally
- * 1.1 s). Dead time is not the challenge.
+ * Opening window is about ±90 ms around the cue (a party swing still connects). A lead or a stacked
+ * rally closes it to a floor around ±40–45 ms, which is where an early or late swing loses the point.
+ * The between-point hold stays 1.4 s (was 4.0 s, originally 1.1 s). Dead time is not the challenge.
+ *
+ * At READY (react 0.95): windowOpen 0.905 → 0.801, tightenPerLead 0.012 → 0.022,
+ * tightenPerRally 0.014 → 0.085, windowOpenMax 0.935 → 0.889, flight0 1.05 → 0.95,
+ * flightPerRally 0.045 → 0.06, flightMin 0.74 → 0.77. gapSec stays 1.4.
  */
 export const NORMAL_FEEL: BlitzFeel = {
-  windowOpen: 0.905,
-  tightenPerLead: 0.012,
-  tightenPerRally: 0.014,
-  windowOpenMax: 0.935,
+  windowOpen: 0.801,
+  tightenPerLead: 0.022,
+  tightenPerRally: 0.085,
+  windowOpenMax: 0.889,
   easePerTrail: 0.02,
-  flight0: 1.05,
-  flightPerRally: 0.045,
-  flightMin: 0.74,
+  flight0: 0.95,
+  flightPerRally: 0.06,
+  flightMin: 0.77,
   gapSec: 1.4,
   humanSigma: 0.13,
   misreadBase: 0.1,

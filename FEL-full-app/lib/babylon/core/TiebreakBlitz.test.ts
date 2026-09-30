@@ -2,13 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  freshBlitz, NORMAL_FEEL, postedScore, scriptedCueRun, skipGap, TARGET,
+  flightOf, freshBlitz, NORMAL_FEEL, postedScore, scriptedCueRun, skipGap, TARGET, windowOpenFrac,
 } from './TiebreakBlitz';
 
 const host = readFileSync(path.resolve(__dirname, '../../../components/games/tiebreak-game.tsx'), 'utf8');
 
-/** On-cue timing error, in seconds. A realistic human is late or early by about this much. */
-const HUMAN_ERROR = [0.06, 0.075, 0.09];
+/** Half-width of the hit window in milliseconds, at the READY grade the scripted runs use. */
+function halfMs(lead: number, rally: number): number {
+  const flight = flightOf(rally, 0.95, NORMAL_FEEL);
+  const open = windowOpenFrac(lead, rally, NORMAL_FEEL);
+  return (flight * (1 - open) / 2) * 1000;
+}
+
+function cueBatch(errorSec: number) {
+  let wins = 0;
+  const runs = [];
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = scriptedCueRun(seed, errorSec);
+    runs.push(run);
+    if (run.myPts === TARGET && run.myPts > run.aiPts) wins++;
+  }
+  return { wins, runs };
+}
 
 describe('Tiebreak Blitz — the point is the window, not the clock', () => {
   it('holds about 1.4s between points, a readable beat', () => {
@@ -29,17 +44,26 @@ describe('Tiebreak Blitz — the point is the window, not the clock', () => {
     expect(skipGap(s)).toBe(false);
   });
 
-  it('on-cue human timing loses points and does not sweep, and the match posts', () => {
-    for (const error of HUMAN_ERROR) {
-      for (let seed = 1; seed <= 40; seed++) {
-        const run = scriptedCueRun(seed, error);
-        const label = `±${Math.round(error * 1000)}ms seed ${seed}`;
-        expect(run.over, `${label} ends`).toBe(true);
-        expect(run.myPts >= TARGET || run.aiPts >= TARGET, `${label} reaches 7`).toBe(true);
-        expect(run.aiPts, `${label} opponent takes a point`).toBeGreaterThan(0);
-        expect(run.myPts, `${label} player takes a point`).toBeGreaterThan(0);
-        expect(run.myPts === TARGET && run.aiPts === 0, `${label} is not 7-0`).toBe(false);
-        expect(Number.isFinite(postedScore(run.myPts, run.bestRally)), `${label} posts`).toBe(true);
+  it('opens near ±90ms and closes to a ±40–45ms floor', () => {
+    expect(halfMs(0, 0)).toBeGreaterThanOrEqual(85);
+    expect(halfMs(0, 0)).toBeLessThanOrEqual(95);
+    expect(halfMs(6, 8)).toBeGreaterThanOrEqual(40);
+    expect(halfMs(6, 8)).toBeLessThanOrEqual(45);
+  });
+
+  it('±60ms wins about half to two thirds, ±90ms wins fewer, and neither sweeps', () => {
+    for (const [error, lo, hi] of [[0.06, 20, 28], [0.09, 6, 14]] as const) {
+      const { wins, runs } = cueBatch(error);
+      const label = `±${Math.round(error * 1000)}ms`;
+      expect(wins, `${label} wins ${wins}/40`).toBeGreaterThanOrEqual(lo);
+      expect(wins, `${label} wins ${wins}/40`).toBeLessThanOrEqual(hi);
+      for (const run of runs) {
+        expect(run.over).toBe(true);
+        expect(run.myPts >= TARGET || run.aiPts >= TARGET).toBe(true);
+        expect(run.aiPts).toBeGreaterThan(0);
+        expect(run.myPts).toBeGreaterThan(0);
+        expect(run.myPts === TARGET && run.aiPts === 0).toBe(false);
+        expect(Number.isFinite(postedScore(run.myPts, run.bestRally))).toBe(true);
       }
     }
   });

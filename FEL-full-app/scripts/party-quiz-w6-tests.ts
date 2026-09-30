@@ -6,7 +6,7 @@
 // Run: npx tsx scripts/party-quiz-w6-tests.ts
 
 import { readFileSync } from 'node:fs';
-import { NORMAL_FEEL, postedScore, scriptedCueRun } from '../lib/babylon/core/TiebreakBlitz';
+import { flightOf, NORMAL_FEEL, postedScore, scriptedCueRun, windowOpenFrac } from '../lib/babylon/core/TiebreakBlitz';
 import { scriptedSoloClaims } from '../lib/babylon/core/BrainBrawlCore';
 import { whoSceneItStageBox } from '../lib/babylon/modes/whoSceneItFrame';
 import { makeVenueShelf } from '../lib/babylon/modes/whoSceneItVenues';
@@ -21,24 +21,36 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
 // ── tiebreak: the window decides the point, and the 2D overlay is gone ──
 {
   ok(NORMAL_FEEL.gapSec >= 1.2 && NORMAL_FEEL.gapSec <= 1.6, 'tiebreak: the between-point hold is a short beat');
-  const humanError = [0.06, 0.075, 0.09];
-  let open = 0;
-  let sweep = 0;
-  let kept = 0;
-  let unposted = 0;
-  for (const error of humanError) {
+  const halfMs = (lead: number, rally: number) => {
+    const flight = flightOf(rally, 0.95, NORMAL_FEEL);
+    const open = windowOpenFrac(lead, rally, NORMAL_FEEL);
+    return (flight * (1 - open) / 2) * 1000;
+  };
+  ok(halfMs(0, 0) >= 85 && halfMs(0, 0) <= 95, 'tiebreak: the opening window is about ±90ms');
+  ok(halfMs(6, 8) >= 40 && halfMs(6, 8) <= 45, 'tiebreak: a stacked rally closes to about ±40-45ms');
+  const band = (error: number) => {
+    let wins = 0;
+    let open = 0;
+    let sweep = 0;
+    let blank = 0;
+    let unposted = 0;
     for (let seed = 1; seed <= 40; seed++) {
       const run = scriptedCueRun(seed, error);
       if (!run.over || (run.myPts < 7 && run.aiPts < 7)) open++;
+      if (run.myPts === 7 && run.myPts > run.aiPts) wins++;
       if (run.myPts === 7 && run.aiPts === 0) sweep++;
-      if (run.aiPts === 0 || run.myPts === 0) kept++;
+      if (run.myPts === 0 || run.aiPts === 0) blank++;
       if (!Number.isFinite(postedScore(run.myPts, run.bestRally))) unposted++;
     }
-  }
-  ok(open === 0, 'tiebreak: every on-cue human run ends');
-  ok(sweep === 0, 'tiebreak: on-cue human timing does not win 7-0');
-  ok(kept === 0, 'tiebreak: on-cue human timing loses some points and still scores');
-  ok(unposted === 0, 'tiebreak: a finished match posts a score');
+    return { wins, open, sweep, blank, unposted };
+  };
+  const h60 = band(0.06);
+  const h90 = band(0.09);
+  ok(h60.open === 0 && h60.unposted === 0, 'tiebreak: every ±60ms run ends and posts');
+  ok(h90.open === 0 && h90.unposted === 0, 'tiebreak: every ±90ms run ends and posts');
+  ok(h60.sweep === 0 && h90.sweep === 0 && h60.blank === 0 && h90.blank === 0, 'tiebreak: neither timing error goes 7-0');
+  ok(h60.wins >= 20 && h60.wins <= 28, `tiebreak: ±60ms wins ${h60.wins}/40 (band 20–28)`);
+  ok(h90.wins >= 6 && h90.wins <= 14, `tiebreak: ±90ms wins ${h90.wins}/40 (band 6–14)`);
   let perfectOpen = 0;
   let perfectLoss = 0;
   for (let seed = 1; seed <= 40; seed++) {
