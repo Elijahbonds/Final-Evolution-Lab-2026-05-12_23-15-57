@@ -15,6 +15,7 @@ import {
   latestIntake,
   clearIntake,
 } from '@/lib/health/intake';
+import { canWriteHealthData, refuseHealthWrite, HEALTH_WRITE_REFUSED } from '@/lib/privacy/healthWriteGate';
 
 /**
  * MIRROR-COACH P5 (2026-09-29): app/api/health/intake — the pre-participation intake's own endpoint.
@@ -77,9 +78,15 @@ export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return bad('invalid_json'); }
 
+  // TEEN-WRITE-BLOCK (2026-09-29): health data is written ONLY for a verified 18+ account — User.dobYear from the
+  // database, never this request's birth_year answer, never a parent's GuardianConsent (lib/privacy/healthWriteGate.ts).
+  // Everyone else gets 403 health_data_adults_only and nothing is written: no intake, no clearance, no health_data
+  // grant, no dobYear. So the dobYear write inside submitIntake (it only ran for a BLANK dobYear, which is refused here
+  // first) can no longer run from this route.
   if (body.action === 'clear') {
     const intakeId = String(body.intakeId ?? '');
     if (!intakeId) return bad('missing_intake_id');
+    if (!(await canWriteHealthData(prisma, userId))) return refuseHealthWrite();
     try {
       const cleared = await clearIntake(prisma, { userId, intakeId });
       return NextResponse.json({ intake: { id: cleared.id, clearedAt: cleared.clearedAt } });
@@ -88,6 +95,8 @@ export async function POST(req: NextRequest) {
       throw err;
     }
   }
+
+  if (!(await canWriteHealthData(prisma, userId))) return refuseHealthWrite();
 
   try {
     const { intake, hardStopped } = await prisma.$transaction((tx) =>
@@ -110,6 +119,11 @@ export async function POST(req: NextRequest) {
       // that it wrote NOTHING because this athlete reads as needing a guardian first (see its own doc comment) — same
       // 412 status and error shape app/api/health/pain/route.ts already uses for the identical reason, so the client
       // (health-intake-gate.tsx) can tell "held for a guardian" apart from an ordinary validation failure.
+      // TEEN-WRITE-BLOCK (2026-09-29): after the check above, only a DB-verified adult reaches submitIntake, so this 412
+      // is left only for an adult whose own birth_year answer reads as a minor — it can refuse, never unlock. It goes
+      // when R-HEALTH (~/Claude/outbox/teen-write-block-routed.md) replaces that allowance in lib/health/intake.ts with
+      // the DB-dobYear check, which throws 'health_data_adults_only' (answered as the same 403 here).
+      if (err.code === HEALTH_WRITE_REFUSED.error) return refuseHealthWrite();
       const status = err.code === 'guardian_consent_required' ? 412 : 400;
       return NextResponse.json({ error: err.code, details: err.details }, { status });
     }
