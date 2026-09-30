@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, ScanLine, Volume2, VolumeX } from 'lucide-react';
+import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // CODE-SPLIT (2026-09-12). `NeuroMirror` reaches @babylonjs through render/overlay-compositor and
 // rig/zone-binding, so importing it here as a VALUE pulled the whole engine into this route's
 // first-load bundle: /play/mirror shipped 2.03 MB against ~160 kB for every other /play route,
@@ -100,6 +101,7 @@ import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 // MIRROR-COACH P9 (2026-09-30): the written correctives, mounted — beside the pattern picker, and under a press/row set's
 // summary (lib/mirror/correctives.ts; adults only, youth rules show none).
 import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
+import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -131,8 +133,10 @@ const BONES: [number, number][] = [
  * `youth` (MIRROR-COACH P3 review, 2026-09-26): the athlete's youth gate from their birth year (app/play/mirror/page.tsx
  * youthGateFor) — under 18 or no birth year on file, the screen's written corrective blocks are off (PLAN item 9).
  * Absent → youth rules, the conservative side (decision #20: blank = youth until answered).
+ * `canSaveScan` (R-HEALTH-CLIENT, 2026-09-30): page.tsx's canSaveScanNumbers for this user, asked once on the server. False
+ * (the default: a missing prop never saves) → no request to /api/mirror/* at all; results stay in this page's memory.
  */
-export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = {}) {
+export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { youth?: YouthGate; canSaveScan?: boolean } = {}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -615,7 +619,8 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
       // counts — was computed on every session and then discarded when the tab closed, so the
       // Mirror could never show whether anyone was improving. Saving is best-effort and silent:
       // a failed write must never interrupt the end of a workout.
-      void fetch('/api/mirror/sessions', {
+      // R-HEALTH-CLIENT: null (nothing sent) unless this account's sessions are saved; the summary already showed.
+      void mirrorSave(canSaveScan, fetch, '/api/mirror/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -623,16 +628,18 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
           startedAtMs: s.startedAtMs,
           durationMs: s.durationMs,
           reps: s.reps,
-          avgTempoMs: s.avgTempo ?? null,
+          // MIRROR-COACH P9 fix (2026-09-30): ms per rep (pull + press), the one conversion the correctives use. It posted the
+          // { pullSec, pressSec } object, which the route's num() stores as 0 — every saved session's tempo read 0.
+          avgTempoMs: sessionLikeFromSummary(s).avgTempo,
           avgFrameMs: s.avgFrameMs,
           timeInStableMs: s.timeInStableMs,
           faultCounts: s.faultCounts,
         }),
-      }).catch(() => { /* offline or signed out: the session still showed on screen */ });
+      })?.catch(() => { /* offline or signed out: the session still showed on screen */ });
     });
     stop();
     setStatus('idle');
-  }, [stop]);
+  }, [stop, canSaveScan]);
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
 
@@ -647,11 +654,14 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
   const recordDunk = useCallback(async (m: DunkMetrics) => {
     const attempt = attemptFrom(m);
     try {
-      const res = await fetch('/api/mirror/dunks', {
+      const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(attempt),
       });
+      // R-HEALTH-CLIENT: not sent (this account's jumps aren't saved) → the same on-device line as offline, below
+      if (!pending) { setDunkSaid(progressLine(readProgress([attempt]), attempt)); return; }
+      const res = await pending;
       if (!res.ok) return;
       const j = await res.json().catch(() => null);
       if (!j?.progress) return;
@@ -664,18 +674,21 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
       const local = readProgress([attempt]);
       setDunkSaid(progressLine(local, attempt));
     }
-  }, [speak]);
+  }, [speak, canSaveScan]);
 
   // The history, so the screen opens on what there is to beat rather than on nothing.
+  // R-HEALTH-CLIENT: only an account whose jumps are saved has a history to read; everyone else starts from this session.
   useEffect(() => {
     if (pattern !== 'jump') return;
+    const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks');
+    if (!pending) return;
     let live = true;
-    fetch('/api/mirror/dunks')
+    pending
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (live && j?.progress) setDunkProgress(j.progress); })
       .catch(() => {});
     return () => { live = false; };
-  }, [pattern]);
+  }, [pattern, canSaveScan]);
 
   /**
    * A finished screen goes to the server, which recomputes the score and decides the payout. A screen the
@@ -700,7 +713,7 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
     // so (NOT_READ_LINE), not "not graded yet" (P3 review)
     setScreenSummary(scoreScreen(ran, results, { attempted: grades.length > 0 }));
     try {
-      const res = await fetch('/api/mirror/screen', {
+      const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/screen', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -715,6 +728,14 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
           grades,
         }),
       });
+      // R-HEALTH-CLIENT: not sent (this account's screens aren't saved). The local score above stands; 'unsaved' keeps the
+      // answers card from PATCHing (components/mirror/screen-self-report.tsx), and the line says why, not "could not".
+      if (!pending) {
+        setScreenMessage(NOT_SAVED_ON_DEVICE);
+        setSavedScreenId('unsaved');
+        return;
+      }
+      const res = await pending;
       // A refused post (signed out, a server error) is not saved either, and says so like a network failure does
       // (MIRROR-COACH P1 review, 2026-09-25: it said nothing, and the ungraded panel hid even the network line).
       // MIRROR-COACH P3 (2026-09-25): a screen the server refused to check (422) says the server's own line.
@@ -733,7 +754,7 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
       setScreenMessage(SCREEN_NOT_SAVED);
       setSavedScreenId('unsaved');
     }
-  }, [speak]);
+  }, [speak, canSaveScan]);
 
   // The screen ends itself. Nothing else in the Mirror does, which is the point of a protocol.
   //
