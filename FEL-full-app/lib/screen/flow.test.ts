@@ -27,12 +27,12 @@ describe('every age band → the right next step', () => {
       const b = preStep(a, { type: 'grownUp' });
       expect(b.step, age).toBe('pain');
       expect(b.gate).toMatchObject({ ageBand: age, grownUp: true });
-      expect(mayPersist(b.gate), age).toBe(true);
+      expect(mayPersist(b.gate), age).toBe(false);                    // CHANGED (SCREEN-FIX-2): nothing but the age answer is kept for them
     }
   });
 
-  it('links out of the screen are for 13 and older only; "rather not say" is read as under 13', () => {
-    expect(AGE_BANDS.filter(linksAllowed)).toEqual(['13-17', '18+']);
+  it('CHANGED (SCREEN-FIX-2, S-10): links out of the screen are for 18 or older only (was 13 and older)', () => {
+    expect(AGE_BANDS.filter(linksAllowed)).toEqual(['18+']);
     expect(linksAllowed(null)).toBe(false);
   });
 });

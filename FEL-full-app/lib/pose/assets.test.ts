@@ -3,28 +3,30 @@ import { readFileSync, statSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import {
-  AssetResolver, CDN_WASM_BASE, LOCAL_WASM_BASE, LOCAL_WASM_FILES, POSE_MODEL_BYTES, VISION_VERSION, cdnModelUrl,
-  headProbe, localModelUrl,
+  AssetResolver, LOCAL_WASM_BASE, LOCAL_WASM_FILES, POSE_MODEL_BYTES, VISION_VERSION, headProbe, localModelUrl,
 } from './assets';
 
 const root = join(__dirname, '..', '..');
 const sha = (p: string) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
 describe('where the pose model and wasm load from', () => {
-  it('our copy when it is there, and each URL is asked about once', async () => {
+  // CHANGED (SCREEN-FIX-2, Cyber F3): was "each URL is asked about once" (the HEAD probe before the CDN fallback);
+  // there is no fallback now, so nothing is asked
+  it('our copy, and nothing is asked first', async () => {
     const asked: string[] = [];
     const r = new AssetResolver(async (u) => { asked.push(u); return true; });
     expect(await r.wasmBase()).toBe(LOCAL_WASM_BASE);
     expect(await r.poseModel('full')).toBe('/pose/models/pose_landmarker_full.task');
     expect(await r.poseModel('full')).toBe(localModelUrl('full'));
     await r.wasmBase();
-    expect(asked).toEqual(['/pose/wasm/vision_wasm_internal.js', '/pose/models/pose_landmarker_full.task']);
+    expect(asked).toEqual([]);
   });
 
-  it('the CDN only when ours is missing; a probe that fails keeps our copy', async () => {
+  // CHANGED (SCREEN-FIX-2, Cyber F3): was "the CDN only when ours is missing" (CDN_WASM_BASE / cdnModelUrl('lite'))
+  it('our copy even when ours is missing: it fails closed, never to the CDN; a probe that fails keeps our copy', async () => {
     const missing = new AssetResolver(async () => false);
-    expect(await missing.wasmBase()).toBe(CDN_WASM_BASE);
-    expect(await missing.poseModel('lite')).toBe(cdnModelUrl('lite'));
+    expect(await missing.wasmBase()).toBe(LOCAL_WASM_BASE);
+    expect(await missing.poseModel('lite')).toBe(localModelUrl('lite'));
     const broken = new AssetResolver(() => Promise.reject(new Error('offline')));
     expect(await broken.poseModel('lite')).toBe(localModelUrl('lite'));
     expect(await broken.wasmBase()).toBe(LOCAL_WASM_BASE);
@@ -49,9 +51,9 @@ describe('where the pose model and wasm load from', () => {
     }
   });
 
-  it('the CDN fallback is the same wasm build and the same model family', () => {
-    expect(CDN_WASM_BASE).toContain(`@mediapipe/tasks-vision@${VISION_VERSION}/wasm`);
-    expect(cdnModelUrl('full')).toMatch(/pose_landmarker_full\/float16\/1\/pose_landmarker_full\.task$/);
+  // CHANGED (SCREEN-FIX-2, Cyber F3): was "the CDN fallback is the same wasm build and the same model family"
+  it('no off-site address is left in the resolver', () => {
+    expect(readFileSync(join(__dirname, 'assets.ts'), 'utf8')).not.toMatch(/https?:\/\/|cdn\.jsdelivr|storage\.googleapis/);
   });
 });
 
