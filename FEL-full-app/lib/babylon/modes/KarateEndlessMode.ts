@@ -3,7 +3,7 @@
 // against escalating waves of identical, suited pursuers in a stylized
 // digital arena. Four concrete systems, all new:
 //   1. THIRD-PERSON OVER-THE-SHOULDER CAMERA — CameraDirector's new
-//      'overShoulder' preset (M50), locked behind your facing direction
+//      'fightShoulder' preset (COMBAT-AI), locked behind your facing direction
 //      rather than the nearest-enemy midpoint, the way action games frame
 //      combat instead of a fighting-game side-view.
 //   2. CO-OP-READY ALLY — a second fighter built on PlayerSlot (M48): today
@@ -131,7 +131,8 @@ import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   
  * The camera's bounds come from the ground mesh, so a play area the same size as
  * the mat leaves it nowhere to stand: at the old ±8 on a 16x16 mat the camera was
  * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
- * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the overShoulder rig.
+ * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the fightShoulder rig at
+ * its 3.1m predecessor; at 4.0m the mat's 12m half-extent still clears (11.6m).
  */
 /**
  * The fighter is held inside a DISC of this radius, not a square of this half-
@@ -1551,7 +1552,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'karate', mood: 'dojoWarm', camPreset: 'overShoulder',
+    modeId: 'karate', mood: 'dojoWarm', camPreset: 'fightShoulder',
     // MOVEMENT PLAY P7: the body plays The Hundred only behind its flag (read at mount — the dev probe's ?bodyfight=karate)
     get body() { return bodyFightOn('karate') ? { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES } : undefined; },
     get onBody() { return bodyFightOn('karate') ? onBodyEvent : undefined; },
@@ -1888,7 +1889,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // transition only — setPreset re-derives the venue bounds)
       const surroundedNow = surroundedCount(player.root.position,
         enemies.map((e) => ({ id: 'e', pos: e.mob.char.root.position, hp: e.hp, airborneSec: 0 }))) >= 3;
-      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'crowd' : 'overShoulder'); }
+      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'fightCrowd' : 'fightShoulder'); }
       ctx.camDirector.look(lookX, lookY, dtReal);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
       animate(mySpeed01, Math.min(1, pVel.length() / 2.6));
