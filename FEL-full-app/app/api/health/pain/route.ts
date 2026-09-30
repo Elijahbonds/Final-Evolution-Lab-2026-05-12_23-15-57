@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { PainValidationError, pendingNextMorningFollowUps, submitPainCheckIn, type PainCheckInHistoryRow } from '@/lib/health/pain';
-import { canUse, type GuardianConsentLike } from '@/lib/consent/guardianGate';
 import { activeHealthDataConsent, type ConsentRow } from '@/lib/health/consent';
+import { canWriteHealthData, refuseHealthWrite } from '@/lib/privacy/healthWriteGate';
 
 /**
  * MIRROR-COACH P5 (2026-09-29): app/api/health/pain — the per-exercise pain check-in loop's own endpoint.
@@ -38,6 +38,13 @@ import { activeHealthDataConsent, type ConsentRow } from '@/lib/health/consent';
  * phase ("None of this is collected until you say yes to it, separately from creating an account") and schema
  * .prisma's own HealthConsent/PainCheckIn model comments. Checked FIRST, before the guardian check, because it is
  * the more fundamental promise and applies to every athlete, not only minors.
+ *
+ * TEEN-WRITE-BLOCK (2026-09-29; Elijah 2:40 PM PT: "health and movement data save ONLY for a verified adult; unknown age
+ * is NOT an adult; the guardian/parent-consent path is gone"). The guardian gate above is replaced, not kept beside the
+ * new one: a pain check-in is written only for a verified 18+ account (User.dobYear from the database, lib/privacy/
+ * healthWriteGate.ts), checked FIRST, before the health_data consent. Everyone else — unknown age, under 18, a minor
+ * whose guardian said yes — gets 403 health_data_adults_only and nothing is written. The POST no longer reads
+ * GuardianConsent at all. GET (a read) is unchanged.
  */
 const HISTORY_DAYS = 14;
 
@@ -68,26 +75,20 @@ export async function POST(req: NextRequest) {
     return bad('invalid_json');
   }
 
-  const [user, healthConsentRows, guardianConsentRows] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } }),
-    prisma.healthConsent.findMany({ where: { userId, scope: 'health_data' }, select: { scope: true, coachId: true, grantedAt: true, revokedAt: true } }),
-    prisma.guardianConsent.findMany({ where: { menteeId: userId }, select: { requestedAt: true, acceptedAt: true, revokedAt: true } }),
-  ]);
+  // TEEN-WRITE-BLOCK (2026-09-29): verified 18+ first (see the header). This replaces the guardian check that stood
+  // after the consent check below (owner decision #6's guardian path is gone for health writes).
+  if (!(await canWriteHealthData(prisma, userId))) return refuseHealthWrite();
+
+  const healthConsentRows = await prisma.healthConsent.findMany({
+    where: { userId, scope: 'health_data' },
+    select: { scope: true, coachId: true, grantedAt: true, revokedAt: true },
+  });
 
   // Nothing is collected until this athlete has said yes to health-data collection at all (see this file's own
   // header for the Finding this closes). components/coach/pain-checkin.tsx turns this code into an inline consent
   // prompt (the same HEALTH_DATA_CONSENT_COPY the Mirror's intake shows) rather than a generic "could not save".
   if (!activeHealthDataConsent(healthConsentRows as ConsentRow[])) {
     return bad('health_data_consent_required', 412);
-  }
-
-  // Minors: no pain check-in without an accepted guardian consent (owner decision #6 — the same rule and the same
-  // source lib/consent/guardianGate.ts as the Mirror's own gate). Checked here, not only in front of the Mirror
-  // session, because a pain check-in is reachable from the coach's Today view (components/coach/pain-checkin.tsx),
-  // an entirely different surface with no shared front door to gate it from.
-  const consents: GuardianConsentLike[] = guardianConsentRows;
-  if (!canUse('pain_checkin', { dobYear: user?.dobYear ?? null, consents })) {
-    return bad('guardian_consent_required', 412);
   }
 
   try {

@@ -7,6 +7,8 @@ const m = vi.hoisted(() => ({
   session: { user: { id: 'athlete-1' } } as unknown,
   db: { workoutScan: [] as Row[], prqEntry: [] as Row[], user: [] as Row[], guardianConsent: [] as Row[] },
   clock: 0,
+  /** TEEN-WRITE-BLOCK-2: the save gate's opt-in (lib/privacy/scanSaveOptIn, false for everyone until PRIVACY-CORE/AB-04). */
+  optedIn: true,
 }));
 
 const matches = (row: Row, where: Row = {}) => Object.entries(where).every(([k, v]) => {
@@ -41,6 +43,9 @@ function table(name: keyof typeof m.db) {
     },
   };
 }
+// TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): athlete-1 (1995) is an OPTED-IN ADULT, which is what this file has always saved as;
+// who the save gate refuses is lib/privacy/scan-save-assessment.test.ts's.
+vi.mock('@/lib/privacy/scanSaveOptIn', () => ({ scanSaveOptIn: async () => m.optedIn }));
 vi.mock('next-auth', () => ({ getServerSession: async () => m.session }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({
@@ -80,6 +85,7 @@ beforeEach(() => {
   m.session = { user: { id: 'athlete-1' } };
   for (const k of Object.keys(m.db) as (keyof typeof m.db)[]) m.db[k] = [];
   m.db.user.push({ id: 'athlete-1', dobYear: 1995 });
+  m.optedIn = true;
 });
 
 describe('the PRQ formula is untouched (fixed inputs, pinned before this lane)', () => {
@@ -216,16 +222,22 @@ describe('POST /api/mirror/assessment', () => {
     expect(entries()).toEqual([]);
   });
 
-  it('MINORS FAIL CLOSED: no known age and no accepted guardian consent saves nothing (412)', async () => {
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): the parent path is removed. Before → 'MINORS FAIL CLOSED: no known age and no
+  // accepted guardian consent saves nothing (412)': unknown age 412; 14 with a pending consent 412; then, once the consent
+  // was ACCEPTED, 200 and one scan. After → all three are 403 scan_save_adults_only with nothing written, the accepted
+  // consent included (only a verified, opted-in adult saves). Flipped, not deleted.
+  it('MINORS FAIL CLOSED, the parent path gone: unknown age, 14 pending, 14 with an ACCEPTED guardian consent all get 403 and save nothing', async () => {
+    const refused = { status: 403, json: { error: 'scan_save_adults_only', saved: false } };
     m.db.user = [{ id: 'athlete-1', dobYear: null }];
-    expect((await post(record())).status).toBe(412);
+    expect(await post(record())).toEqual(refused);
     m.db.user = [{ id: 'athlete-1', dobYear: new Date().getFullYear() - 14 }];
     m.db.guardianConsent = [{ id: 'g1', menteeId: 'athlete-1', menteeBirthYear: new Date().getFullYear() - 14, acceptedAt: null, revokedAt: null }];
-    expect((await post(record())).status).toBe(412);
+    expect(await post(record())).toEqual(refused);
     expect(scans()).toEqual([]);
     m.db.guardianConsent[0].acceptedAt = new Date();
-    expect((await post(record())).status).toBe(200);
-    expect(scans()).toHaveLength(1);
+    expect(await post(record())).toEqual(refused);   // before: 200 and one scan
+    expect(scans()).toEqual([]);
+    expect(entries()).toEqual([]);
   });
 });
 

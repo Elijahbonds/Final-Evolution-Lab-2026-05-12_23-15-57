@@ -14,6 +14,7 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { sessionHasPlay } from '@/lib/session-evidence';
 import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POWER_ATTR } from '@/lib/move/formSummary';
 import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
+import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGate';
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
   ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
@@ -239,6 +240,8 @@ export async function POST(req: Request) {
     // a height that agrees with its flight (g·t²/8), capped attempts — and a broken one is dropped, never the session.
     const { form, issues: formIssues } = boundFormSummary(body?.form, { mode });
     if (formIssues.length) console.warn('form read bounded:', formIssues.slice(0, 5).join('; '));
+    // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the form write is movement data (verified 18+ AND opted in); asked once, outside the run's transaction.
+    const formAllowed = form ? await canSaveScanNumbers(prisma, userId) : false;
 
     const profile = await getOrCreateProfile(userId);
     const before = prqScore(profile as any);
@@ -433,7 +436,8 @@ export async function POST(req: Request) {
         // row rather than sitting 1 ms after it, and once a camera reading is on file no game session writes drillResult
         // power again (formSummary.gameRowAttrs has the numbers).
         const sid = (createdSession as any)?.id;
-        const formPlan = form && sid ? planFormWrite(form, { userId, sessionId: sid, measuredAt: at }) : null;
+        // TEEN-WRITE-BLOCK (FE PM 23:05 PT): refused → no plan, so no form rows and no camera PRQ; the rest settles as a no-form session.
+        const formPlan = form && sid && formAllowed ? planFormWrite(form, { userId, sessionId: sid, measuredAt: at }) : null;
 
         // Task 3: emit drillResult PrqEntries for mode-relevant attributes.
         // prqDelta is the per-attribute gain; source = drillResult, linked to this session.
@@ -514,7 +518,10 @@ export async function POST(req: Request) {
             ? { mode: mastery.mode, tier: mastery.tier, tierIndex: mastery.tierIndex, ups: mastery.events }
             : null,
           // null when no form was sent; `power` is the camera ESTIMATE (the end card says so), null when no jump was measured
-          form: form ? { attempts: form.attempts.length, stored: formWrite?.stored ?? 0, power: formWrite?.power ?? null, dropped: formIssues.length } : null,
+          // TEEN-WRITE-BLOCK (FE PM 23:05 PT): a refused form says so (saved: false, reason); nothing of it was written
+          form: !form ? null
+            : formAllowed ? { attempts: form.attempts.length, stored: formWrite?.stored ?? 0, power: formWrite?.power ?? null, dropped: formIssues.length }
+            : { attempts: form.attempts.length, stored: 0, power: null, dropped: formIssues.length, saved: false, reason: SCAN_SAVE_REFUSED.error },
         };
         // 3. The answer is stored with the payout it describes, so a retry after the commit always gets it back.
         await storePaidResult(tx, run.id, { result: { status: 200, body: payload }, sessionId: sid ?? null });

@@ -200,27 +200,36 @@ describe('POST /api/health/pain', () => {
     expect(json.copy).not.toMatch(/diagnos/i);
   });
 
-  it('a minor with any pain event stops and tells an adult (once a guardian has already accepted)', async () => {
+  // TEEN-WRITE-BLOCK (2026-09-29; Elijah: health data saves ONLY for a verified adult, the parent-consent path is gone).
+  // Before: a minor whose guardian had accepted was stored and answered 'stop_tell_adult'. After: refused with 403
+  // health_data_adults_only, nothing stored — a parent's yes unlocks no health write. (The minor rule itself,
+  // 'stop_tell_adult', is still decide()'s and still covered by lib/health/painRule.test.ts and pain.test.ts.)
+  it('a minor is refused (403 health_data_adults_only) even once a guardian has accepted — nothing is stored', async () => {
     h.users['client-1'] = { dobYear: 2015 };
     h.consents.push({ menteeId: 'client-1', requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: null });
-    const { json } = await post({ exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 1, kind: 'after' });
-    expect(json.decision).toBe('stop_tell_adult');
+    const { status, json } = await post({ exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 1, kind: 'after' });
+    expect(status).toBe(403);
+    expect(json).toEqual({ error: 'health_data_adults_only', saved: false });
+    expect(h.rows).toHaveLength(0);
   });
 
-  it('a minor with NO accepted guardian consent is refused before the pain rule ever runs (owner decision #6)', async () => {
+  // TEEN-WRITE-BLOCK: before → 412 guardian_consent_required; after → 403 health_data_adults_only (the age check replaced
+  // the guardian check). Still refused before the pain rule ever runs, and still nothing written.
+  it('a minor with NO accepted guardian consent is refused before the pain rule ever runs', async () => {
     h.users['client-1'] = { dobYear: 2015 };
     const { status, json } = await post({ exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 1, kind: 'after' });
-    expect(status).toBe(412);
-    expect(json.error).toBe('guardian_consent_required');
+    expect(status).toBe(403);
+    expect(json.error).toBe('health_data_adults_only');
     expect(h.rows).toHaveLength(0); // nothing written — the gate is in front of submitPainCheckIn, not after it
   });
 
+  // TEEN-WRITE-BLOCK: before → 412 guardian_consent_required; after → 403 health_data_adults_only.
   it('a minor whose guardian consent was withdrawn is refused, even though one was once accepted', async () => {
     h.users['client-1'] = { dobYear: 2015 };
     h.consents.push({ menteeId: 'client-1', requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: new Date('2026-09-10') });
     const { status, json } = await post({ exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 0, kind: 'after' });
-    expect(status).toBe(412);
-    expect(json.error).toBe('guardian_consent_required');
+    expect(status).toBe(403);
+    expect(json.error).toBe('health_data_adults_only');
   });
 
   // MIRROR-COACH P5 FIX (2026-09-29, code review): this test used to read "even with zero consents on file" and ran
@@ -269,22 +278,28 @@ describe('POST /api/health/pain', () => {
       expect(h.rows).toHaveLength(1);
     });
 
-    it('checked BEFORE the guardian check: a minor with no health_data consent gets health_data_consent_required, not guardian_consent_required', async () => {
+    // TEEN-WRITE-BLOCK (2026-09-29): before → "health_data is checked BEFORE the guardian check: a minor with no
+    // health_data consent gets 412 health_data_consent_required". After → the age check comes first of all, so that
+    // minor gets 403 health_data_adults_only; an ADULT with no health_data consent still gets the 412 (above).
+    it('the AGE check comes first: a minor with no health_data consent gets 403 health_data_adults_only, not a consent prompt', async () => {
       h.users['client-1'] = { dobYear: 2015 };
       h.healthConsents = [];
       h.consents = []; // also no guardian consent — proves which check fires first
       const { status, json } = await post({ exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 3, kind: 'after' });
-      expect(status).toBe(412);
-      expect(json.error).toBe('health_data_consent_required');
+      expect(status).toBe(403);
+      expect(json.error).toBe('health_data_adults_only');
     });
 
-    it('a minor WITH health_data consent but no guardian consent still falls through to the guardian check', async () => {
+    // TEEN-WRITE-BLOCK: before → "a minor WITH health_data consent but no guardian consent still falls through to the
+    // guardian check" (412 guardian_consent_required). After → there is no guardian check; the minor gets 403.
+    it('a minor WITH health_data consent is refused by age — there is no guardian check to fall through to', async () => {
       h.users['client-1'] = { dobYear: 2015 };
       h.healthConsents = [{ userId: 'client-1', scope: 'health_data', coachId: null, grantedAt: new Date('2026-09-01'), revokedAt: null }];
       h.consents = [];
       const { status, json } = await post({ exerciseName: 'Goblet Squat', bodyArea: 'knee', score: 3, kind: 'after' });
-      expect(status).toBe(412);
-      expect(json.error).toBe('guardian_consent_required');
+      expect(status).toBe(403);
+      expect(json.error).toBe('health_data_adults_only');
+      expect(h.rows).toHaveLength(0);
     });
   });
 

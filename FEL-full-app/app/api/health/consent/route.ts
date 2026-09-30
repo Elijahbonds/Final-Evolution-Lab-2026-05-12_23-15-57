@@ -20,6 +20,7 @@ import { prisma } from '@/lib/db';
 import { buildHealthConsentView, activeHealthDataConsent, activeCoachViewConsent, canGrantCoachView, type ConsentRow } from '@/lib/health/consent';
 import { grantHealthDataConsent } from '@/lib/health/intake';
 import { eraseHealthData } from '@/lib/prq-data-rights';
+import { canWriteHealthData, refuseHealthWrite } from '@/lib/privacy/healthWriteGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,6 +90,8 @@ export async function POST(req: Request) {
   if (scope === 'coach_view' && !coachId) return NextResponse.json({ error: 'coach_id_required' }, { status: 400 });
 
   if (action === 'grant') {
+    // TEEN-WRITE-BLOCK (FE PM 23:05 PT): both grants (d health_data, e coach_view) are health writes, verified 18+ only; revoke and erase stay open.
+    if (!(await canWriteHealthData(prisma, userId))) return refuseHealthWrite();
     if (scope === 'health_data') {
       // Same helper the intake flow calls on submit (lib/health/intake.ts) — granting from Settings, without
       // redoing the whole intake, has to be the identical idempotent rule: already-active grants nothing new,

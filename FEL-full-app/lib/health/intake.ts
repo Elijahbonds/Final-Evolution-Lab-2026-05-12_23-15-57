@@ -33,7 +33,7 @@
 // year-old answer.
 
 import type { Prisma } from '@/public/_prisma/client';
-import { needsGuardian, guardianStatus, type GuardianConsentLike } from '../consent/guardianGate';
+import { verifiedAdult } from '../privacy/verifiedAdult';
 
 export const INTAKE_VERSION = '2026-09-29';
 export const INTAKE_REASK_DAYS = 365;
@@ -261,7 +261,7 @@ export function needsIntake(
 // collect app/; see lib/prq-data-rights.ts for the same pattern).
 // ---------------------------------------------------------------------------------------------------------------
 
-type IntakeDb = Pick<Prisma.TransactionClient, 'healthIntake' | 'healthConsent' | 'user' | 'guardianConsent'>;
+type IntakeDb = Pick<Prisma.TransactionClient, 'healthIntake' | 'healthConsent' | 'user'>;
 
 /** Grant (or return the already-active) 'health_data' consent for a user. Idempotent: granting twice while already
  *  active writes nothing new. A revoked grant is NOT reactivated by this — a fresh row is created instead, so the
@@ -311,6 +311,13 @@ export interface SubmitIntakeInput {
  *
  * A returning ADULT who skips the birth_year question (it is already on file) is unaffected: `effectiveDobYear`
  * falls back to the existing User.dobYear, so this never mistakes "already answered, not asked again" for "blank".
+ *
+ * TEEN-WRITE-BLOCK (FE PM 23:05 PT; Elijah 2026-09-29: health data saves ONLY for a verified adult, unknown age is not an
+ * adult, the parent path is gone). THE GUARDIAN ALLOWANCE ABOVE IS REMOVED: no GuardianConsent is read here any more,
+ * and an accepted one unlocks nothing. The whole submission is refused (IntakeValidationError 'health_data_adults_only',
+ * answered 403 by the route) unless the DATABASE's User.dobYear is verified 18+ (lib/privacy/verifiedAdult.ts, pure,
+ * because client components import this file). This submission's own birth_year answer is never used for it (there is
+ * no `effectiveDobYear` any more). So the dobYear write below, which only ran for a BLANK dobYear, is now unreachable.
  */
 export async function submitIntake(db: IntakeDb, input: SubmitIntakeInput) {
   if (input.consent !== true) throw new IntakeValidationError('consent_required');
@@ -320,17 +327,8 @@ export async function submitIntake(db: IntakeDb, input: SubmitIntakeInput) {
 
   const birthYear = birthYearFrom(answers);
   const user = await db.user.findUnique({ where: { id: input.userId }, select: { dobYear: true } });
-  const effectiveDobYear = birthYear ?? user?.dobYear ?? null;
-
-  if (needsGuardian(effectiveDobYear, now)) {
-    const guardianRows = await db.guardianConsent.findMany({
-      where: { menteeId: input.userId },
-      select: { requestedAt: true, acceptedAt: true, revokedAt: true },
-    });
-    if (guardianStatus(guardianRows as GuardianConsentLike[]) !== 'accepted') {
-      throw new IntakeValidationError('guardian_consent_required');
-    }
-  }
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the DB's User.dobYear only (never the answer, never a guardian); else nothing is written.
+  if (!verifiedAdult(user?.dobYear ?? null, now)) throw new IntakeValidationError('health_data_adults_only');
 
   await grantHealthDataConsent(db, input.userId, now);
 
