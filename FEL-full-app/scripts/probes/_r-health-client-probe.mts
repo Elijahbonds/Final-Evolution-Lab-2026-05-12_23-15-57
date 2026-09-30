@@ -32,7 +32,11 @@ import bcrypt from 'bcryptjs';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
 import { PrismaClient } from '../../public/_prisma/client/index.js';
-import { RED_FLAG_COPY } from '../../lib/health/intake';
+// lib/health/intake.ts is transpiled to CommonJS under tsx, whose named exports Node's ESM loader can't see statically:
+// read it through a dynamic import (the export itself, or the module.exports object behind `default`).
+const intakeModule: any = await import('../../lib/health/intake');
+const RED_FLAG_COPY: string = intakeModule.RED_FLAG_COPY ?? intakeModule.default?.RED_FLAG_COPY;
+if (typeof RED_FLAG_COPY !== 'string' || !RED_FLAG_COPY) throw new Error('could not read RED_FLAG_COPY from lib/health/intake.ts');
 
 const BASE = process.env.PROBE_BASE ?? 'http://127.0.0.1:3331';
 const DB = process.env.PROBE_DB ?? '';
