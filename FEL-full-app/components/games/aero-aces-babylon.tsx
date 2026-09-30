@@ -18,6 +18,7 @@ import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode } from './hud-format';
 
 type Hud = Record<string, HudValue>;
@@ -47,11 +48,10 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
       endedRef.current = true;
       const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
       const place = Number(r.stats?.place ?? 0);
-      onEnd({
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'WIN', duration: r.durationSec,
+      onEnd(gameResultFromSession(r, {
+        won: r.outcome === 'WIN',
         headline: place > 0 ? `${place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`} PLACE${t > 0 ? ` · ${t.toFixed(1)}s` : ''}` : 'FLIGHT COMPLETE',
-      } satisfies GameResult);
+      }));
     };
 
     const startTimer = setTimeout(() => {

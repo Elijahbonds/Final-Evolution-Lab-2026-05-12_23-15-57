@@ -14,6 +14,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';   // CONTROLLER-UNIVERSAL-MULTI: pass-the-pad nights name each controller
 import { hnode } from './hud-format';
+import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): the MC's words and the voice switch
 /** The between-events scoreboard rows the mode publishes (HudScoreCard shape). */
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
@@ -53,16 +54,11 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'CHAMPION';
-      const result: GameResult = {
-        score: r.score,
-        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-        opponentScore: r.stats?.rivalPoints ?? 0,
-        won,
-        duration: r.durationSec,
-        headline: won ? 'CARNIVAL CHAMPION' : 'RUNNER-UP',
-      };
-      onEnd(result);
+      onEnd(gameResultFromSession(r, {
+        won: r.outcome === 'CHAMPION',
+        opponentScore: opponentScoreFromStats(r.stats),
+        headline: r.outcome === 'CHAMPION' ? 'CARNIVAL CHAMPION' : 'RUNNER-UP',
+      }));
     };
 
     runMode(MODES.carnival, {
