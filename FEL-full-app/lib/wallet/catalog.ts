@@ -74,11 +74,16 @@ export function getSku(skuId: string): CatalogSku | null {
 // (A): refuse the sale now, no redesign. /live reads skuOnSale, so a held SKU is not offered there. Take a SKU out of
 // this set the day what it buys exists. Every pass bought before the hold is paid back and its entitlement row deleted
 // (owner decision 2026-09-25, lib/wallet/dead-buys.ts), so a pass bought once classes exist is charged again.
-// MIRROR-COACH P1 (2026-09-25): the two /workout plans are held too (owner decision #3: pull /workout from sale,
-// relaunch on FEL templates behind the protocol gate). Their route refuses every purchase already
-// (app/api/v1/workout/plan/route.ts); holding them here makes spend() refuse them from any other route as well. They are
-// NOT refunded: buyers keep their plans, revised on read (lib/workout/plan-revision.ts).
-export const NOT_ON_SALE: ReadonlySet<string> = new Set(['class_pass_single', 'class_monthly', 'workout_plan_4w', 'workout_program_12w']);
+// MIRROR-COACH P1 (2026-09-25): the two /workout plans were held too (owner decision #3: pull /workout from sale,
+// relaunch on FEL templates behind the protocol gate). They were NOT refunded: buyers keep their plans, revised on read
+// (lib/workout/plan-revision.ts).
+// MIRROR-COACH P8 (2026-09-29), owner decision #24: THE RELAUNCH. Both /workout SKUs leave this set, at the SAME price
+// they always carried in CATALOG above (workout_plan_4w 60 shards, workout_program_12w 200 shards — neither row
+// changed), because what they buy exists now: a FEL template plan, read behind the protocol gate, written by the one
+// route that sells them (app/api/v1/workout/plan → lib/workout/relaunchServer.ts). They stay off SPEND_ROUTE_SKUS: the
+// generic spend route would take the shards and write no plan. lib/wallet/dead-buys.ts says how a relaunch charge is
+// told apart from a past one (same commit).
+export const NOT_ON_SALE: ReadonlySet<string> = new Set(['class_pass_single', 'class_monthly']);
 
 /** Can this SKU be bought right now? An unknown SKU and a held one both answer no. */
 export function skuOnSale(skuId: string): boolean {

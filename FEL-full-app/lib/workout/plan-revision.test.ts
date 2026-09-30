@@ -355,13 +355,20 @@ describe('a plan P1 already revised on read (deployed 2026-09-25)', () => {
 // The notes are FEL's draft (decisions #3, #22 and #23 gave no wording), pinned here so a change is seen, and listed for
 // the owner to approve.
 describe('the words (FEL\'s draft, for the owner to approve)', () => {
-  it('the notes say what changed and that the new plans are free when they ship: no refund, no date', () => {
-    expect(RELAUNCH_FREE_LINE).toBe('When our new training plans ship, you get them free.');
-    expect(PLAN_REVISED_NOTE).toBe('We changed your plan: every depth drop, in every week, is swapped for a move with a softer landing or none. When our new training plans ship, you get them free. Nothing to do.');
-    expect(PLAN_REVISED_NOTE_YOUTH).toBe('We changed your plan: it no longer includes depth drops or jumps unless a coach assigns them. When our new training plans ship, you get them free. Nothing to do.');
+  // MIRROR-COACH P8 (2026-09-29): FLIPPED ON PURPOSE. The P2 notes promised the new plans free "when they ship"; the
+  // relaunch shipped them (owner decisions #23, #24), so the promise now says they are here and how many: one of each
+  // product, free (lib/workout/pastBuyer.ts). Still no refund offered, still no date.
+  // MIRROR-COACH P8 FIX (2026-09-30, code review): "one of each is free for you" stayed on every revised plan after both
+  // claims were used, beside prices, and "Nothing to do." contradicted "pick yours". A past buyer now has every template
+  // free (pastBuyer.ts), and a revised plan's holder is always one, so the line is true on every read it shows on.
+  it('the notes say what changed and that the new plans are here, free for them: no refund, no date', () => {
+    expect(RELAUNCH_FREE_LINE).toBe('Our new training plans are here, and they are free for you: pick one at the top of this page.');
+    expect(PLAN_REVISED_NOTE).toBe('We changed your plan: every depth drop, in every week, is swapped for a move with a softer landing or none. This plan needs nothing from you. Our new training plans are here, and they are free for you: pick one at the top of this page.');
+    expect(PLAN_REVISED_NOTE_YOUTH).toBe('We changed your plan: it no longer includes depth drops or jumps unless a coach assigns them. This plan needs nothing from you. Our new training plans are here, and they are free for you: pick one at the top of this page.');
     for (const s of [PLAN_REVISED_NOTE, PLAN_REVISED_NOTE_YOUTH]) {
       expect(s, s).toContain(RELAUNCH_FREE_LINE);
-      expect(s, s).toMatch(/\bwhen\b.*\bship\b/i);
+      expect(s, s).toMatch(/\bare here\b.*\bfree for you\b/i);
+      expect(s, s).not.toMatch(/\bwhen\b.*\bship\b/i);                       // the P2 promise, kept
       expect(s, s).not.toMatch(/refund|money back|shards? back|credit/i);
       expect(s, s).not.toMatch(/\b(19|20)\d\d\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b\d{1,2}\/\d{1,2}\b|\bsoon\b|\bnext (week|month)\b/i);
       expect(s, s).not.toMatch(/early weeks|held/i);                         // P1's scope and P1's hold are gone

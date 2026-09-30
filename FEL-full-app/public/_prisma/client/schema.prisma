@@ -1753,7 +1753,12 @@ model ExerciseLog {
   coachComment   String? // lane 1 C3: the coach's review of this log
   coachCommentAt DateTime?
 
-  completedAt DateTime?
+  completedAt      DateTime?
+  // MIRROR-COACH P8 FIX (2026-09-30): what the athlete did on a slot the protocol gate swapped for its ladder's easier
+  // step — that step's ProgramExercise id (lib/coach/todayServer.ts servedOnSlots, server-checked). null = done as
+  // written, or a slot the gate never decides. The coach's inbox names it ("Did X in place of Y"), so a logged easier
+  // step is never read as the jump. No relation (the ladder links are bare ids too). Additive, nullable.
+  servedExerciseId String?
 
   setLogs SetLog[] // MIRROR-COACH P2: per-set rows; the fields above stay as the per-exercise summary
 

@@ -17,7 +17,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 const ex = (id: string, order: number, section: string, pattern: string | null, isKeySet = false, jumpLand = false) =>
   ({ id, order, section, isKeySet, coaching: { pattern: pattern ? { id: pattern as 'squat', label: pattern } : null, jumpLand } });
 const SQUAT_DAY = [ex('a', 1, 'key', 'squat', true), ex('b', 2, 'assist', 'lunge'), ex('c', 3, 'cooldown', 'breath')];
-const ADULT_HEEL: WarmupContext = { isYouth: false, painDecision: null, zone: { id: 'foot', words: ZONE_WORDS.foot, checks: ['heelLine'] }, screen: 'flagged', screenAt: '2026-09-28T10:00:00.000Z', hardStopped: false };
+const ADULT_HEEL: WarmupContext = { isYouth: false, painDecision: null, zone: { id: 'foot', words: ZONE_WORDS.foot, checks: ['heelLine'] }, screen: 'flagged', screenAt: '2026-09-28T10:00:00.000Z', hardStopped: false, jumpGate: { closed: false, why: '', href: null } };
 
 const html = (props: Parameters<typeof WarmupPrep>[0]) => renderToStaticMarkup(createElement(WarmupPrep, props));
 const stepIds = (m: string) => [...m.matchAll(/data-step="([^"]+)"/g)].map((x) => x[1]);

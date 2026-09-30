@@ -34,6 +34,9 @@ export function BuilderHarness({ reset }: { reset: boolean }) {
           completedSessionIds={[]}
           catalogue={catalogue}
           endpoint="/dev/program-builder/api?op=action"
+          // MIRROR-COACH P8 FIX (2026-09-30): no gates route here (no session on this harness): it answered 401, which
+          // Chromium logs as a console error and P2's no-console-error probe then failed (_program-builder-p2r.mts)
+          gatesEndpoint={null}
           onTree={(tree) => setLoaded((l) => (l ? { ...l, program: { ...l.program, tree } } : l))}
         />
       </div>

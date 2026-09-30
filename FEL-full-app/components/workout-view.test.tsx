@@ -5,7 +5,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { analyzeMovement, defaultMetrics } from '@/lib/workout/movement-screen';
 import { generatePlan, legacyWeeks } from '@/lib/workout/plan-generator';
 import { HELD_LINE, PLAN_REVISED_NOTE, PLAN_REVISED_NOTE_YOUTH, planRevisionNote, reviseDepthDrops, revisePlan } from '@/lib/workout/plan-revision';
-import { PLAN_SALE_PAUSED } from '@/lib/workout/plan-sale';
+import {
+  PLAN_SALE_PAUSED, WORKOUT_AGE_HREF, WORKOUT_AGE_NEEDED_LINE, WORKOUT_AGE_UNREAD, WORKOUT_CHECK_FAILED, WORKOUT_FREE_LINE, WORKOUT_INTRO,
+  WORKOUT_JUMP_LINE, WORKOUT_PRODUCTS, WORKOUT_YOUTH_LINE, unfinishedLine,
+} from '@/lib/workout/plan-sale';
+import type { OfferProduct, WorkoutOffer } from '@/lib/workout/relaunchServer';
+import { gatedPlanView, pickTemplate, templatePlanWeeks } from '@/lib/workout/relaunch';
+import { PROTOCOL_WHY, swappedLine } from '@/lib/coach/protocolGate';
+import { WAVE_LINE } from '@/lib/coach/templates/waves';
+import { dailyTargetLine } from '@/lib/coach/templates/list';
 import { screenText } from '@/lib/share/screen';
 import { DEMO_CONSENT, demoScan, SavedPlans, WorkoutView, type SavedPlan } from './workout-view';
 import { OFF_DAY_WEEK_LINE } from '@/lib/coach/offDay';
@@ -53,24 +61,44 @@ describe('WorkoutView, the demo scan', () => {
   });
 });
 
-// MIRROR-COACH P1 (2026-09-25), owner decision #3: /workout's plans are pulled from sale, buyers keep theirs (revised
-// on read, with a note), and the page stops promising what is not there.
-describe('WorkoutView, the sale pulled', () => {
+// MIRROR-COACH P1 (2026-09-25), owner decision #3: /workout's plans were pulled from sale, buyers kept theirs (revised
+// on read, with a note), and the page stopped promising what is not there.
+// MIRROR-COACH P8 (2026-09-29), owner decisions #3, #24: THE RELAUNCH. P1's "offers nothing to buy" pins are FLIPPED ON
+// PURPOSE — the page sells again, at the same prices, a FEL template matched to the answers. What P1 took out stays out.
+describe('WorkoutView, the relaunch', () => {
   const page = renderToStaticMarkup(createElement(WorkoutView));
+  const text = page.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 
-  it('says the plan is being rebuilt (FEL\'s draft line, for the owner to approve), and offers nothing to buy', () => {
-    expect(page).toContain(PLAN_SALE_PAUSED);
-    expect(page).not.toMatch(/>\s*Unlock\s*</);
-    expect(page).not.toMatch(/◆/);                                          // no shard prices
-    expect(page).not.toMatch(/60 ◆|200 ◆/);
-    // and the source has no purchase left in it: nothing POSTs to the plan route
-    expect(src).not.toMatch(/fetch\('\/api\/v1\/workout\/plan',\s*\{[^}]*method:\s*'POST'/);
-    expect(code).not.toMatch(/buyPlan|idempotency_key|newIdempotencyKey/);
+  it('says what a plan is — a FEL template matched to your answers — and the waves as FEL\'s choice; the paused line is gone', () => {
+    expect(text).toContain(WORKOUT_INTRO);
+    expect(WORKOUT_INTRO).toMatch(/^A FEL template matched to your answers/);
+    expect(text).toContain(WAVE_LINE);
+    expect(page).not.toContain(PLAN_SALE_PAUSED);
   });
 
-  it('no longer calls anything "periodized": the plan never changed a set or a rep from week to week', () => {
-    expect(code).not.toMatch(/periodi[sz]/i);
-    expect(page).not.toMatch(/periodi[sz]/i);
+  it('buys through the plan route: a POST with the browser\'s key, kept across a retry, and `free` on a free card', () => {
+    expect(code).toMatch(/fetch\('\/api\/v1\/workout\/plan',\s*\{\s*method:\s*'POST'/);
+    expect(code).toMatch(/idempotency_key: key/);
+    expect(code).toMatch(/pendingKey\.current\[p\.tier\] \?\? newIdempotencyKey\(\)/);
+    // MIRROR-COACH P8 FIX: a paid product waiting to be finished is never sent as a free claim
+    expect(code).toMatch(/p\.free && !p\.unfinished \? \{ free: true \}/);
+    // and the page names the template it previewed, so the server sells that one or none
+    expect(code).toMatch(/template: preview\.id/);
+    // a paid purchase asks first, with the price; the price shown is the server's (offer), never one typed here
+    expect(code).toMatch(/window\.confirm\(`Buy the \$\{p\.name\} for \$\{p\.price\} shards\?`\)/);
+    expect(code).not.toMatch(/\b(60|200)\s*(shards|◆)/);
+  });
+
+  it('never calls anything "periodized" or "scored", and promises no video analysis, no AI and no animated avatar', () => {
+    for (const s of [code, page]) {
+      expect(s).not.toMatch(/periodi[sz]/i);
+      expect(s).not.toMatch(/\bscored\b/i);
+      expect(s).not.toMatch(/Upload a video/i);
+      expect(s).not.toMatch(/AI-generated/);
+      expect(s).not.toMatch(/Exercise movies/i);
+      expect(s).not.toMatch(/animated with/i);
+      expect(s).not.toMatch(/Personalized Workout/);
+    }
   });
 
   it('the consent box says what happens (a demo: no camera, no video, sample numbers, nothing saved), not "anonymous metrics"', () => {
@@ -83,25 +111,65 @@ describe('WorkoutView, the sale pulled', () => {
     expect(DEMO_CONSENT).toMatch(/sample numbers/);
     expect(DEMO_CONSENT).toMatch(/nothing is sent or saved/);
     expect(page).toContain('Not medical advice.');
+    expect(text).toMatch(/does not change your plan/);
   });
 
-  it('promises no video analysis, no AI and no animated avatar: none of them exist here', () => {
-    for (const s of [code, page]) {
-      expect(s).not.toMatch(/Upload a video/i);
-      expect(s).not.toMatch(/AI-generated/);
-      expect(s).not.toMatch(/Exercise movies/i);
-      expect(s).not.toMatch(/animated with/i);
-      expect(s).not.toMatch(/Personalized Workout/);
-    }
-  });
-
-  it('asks for the buyer\'s saved plans on load (GET, the route that revises them)', () => {
+  it('asks for the plans and the offer on load (GET, the route that revises old plans and gates new ones)', () => {
     expect(src).toMatch(/fetch\('\/api\/v1\/workout\/plan',\s*\{\s*cache:\s*'no-store'\s*\}\)/);
   });
 
   it('every sentence on the page passes the no-diagnosis, no-treatment, no-guarantee screen (lib/share/screen.ts)', () => {
-    const text = page.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/\s+/g, ' ');
     expect(screenText(text)).toEqual([]);
+  });
+});
+
+// MIRROR-COACH P8 (2026-09-29): a FEL template plan as the server hands it over — already gated for this reader, today.
+describe('SavedPlans, a FEL template plan', () => {
+  const weeks = templatePlanWeeks(pickTemplate({ daysPerWeek: 3, equipment: 'bodyweight' }, false), 'plan_4w');
+  const view = (reasons: Parameters<typeof gatedPlanView>[1], over: Partial<SavedPlan> = {}): SavedPlan => {
+    const v = gatedPlanView(weeks, reasons);
+    return {
+      id: 'wp_1', kind: 'template', tier: 'plan_4w', focus: '3 days a week · bodyweight', createdAt: '2026-10-01T00:00:00.000Z', free: false,
+      template: { id: 'adult-bw-3', name: '3 days a week · bodyweight', summary: 'S', equipmentLine: 'E', audience: 'adult', dailyTargetLine: null },
+      weeks: v.weeks, gate: { gatedItems: v.gatedItems, swapped: v.swapped, held: v.held }, revisionNote: null, ...over,
+    } as SavedPlan;
+  };
+
+  it('a shut gate: the easier step is drawn with the gate\'s one line and its link; the jump is not prescribed', () => {
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [view(['landing_never'])] }));
+    expect(html).toContain('data-plan-kind="template"');
+    expect(html).toContain(swappedLine('Countermovement Jump and Stick', PROTOCOL_WHY.landing_never));
+    expect(html).toContain('Fast Bodyweight Squat · 3 × 3 · Cruise');
+    expect(html).not.toMatch(/Countermovement Jump and Stick ·/);
+    expect(html).toContain('href="/play/mirror/assess"');
+    expect(html).toContain('4-week plan · 3 days a week · bodyweight');
+  });
+
+  it('an open gate: the jump as written, no line', () => {
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [view([])] }));
+    expect(html).toContain('Countermovement Jump and Stick · 3 × 3 jumps · Cruise');
+    expect(html).not.toContain('data-protocol-gate');
+  });
+
+  it('the weeks run Mon → Sun with off days, week 4 named the easier week; a free plan says why it is free', () => {
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [view([], { free: true })] }));
+    const days = [...html.matchAll(/data-plan-day="(\w+)" data-kind="(\w+)"/g)].map((m) => `${m[1]}:${m[2]}`);
+    expect(days.slice(0, 7)).toEqual(['Mon:training', 'Tue:off', 'Wed:training', 'Thu:off', 'Fri:training', 'Sat:off', 'Sun:off']);
+    expect(html).toContain('Week 4 · Easier week');
+    expect(html).toContain('Free: you bought a plan here before');
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+    expect(screenText(text)).toEqual([]);
+    expect(text).not.toMatch(/periodi[sz]|\bscored\b/i);
+  });
+
+  it('a youth template shows the 60-minute daily target where it names the template', () => {
+    const youth = templatePlanWeeks(pickTemplate({ daysPerWeek: 3, equipment: 'bodyweight' }, true), 'plan_4w');
+    const v = gatedPlanView(youth, ['minor']);
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [view([], {
+      weeks: v.weeks, template: { id: 'youth-bw-3', name: 'Youth · 3 days a week · bodyweight', summary: 'S', equipmentLine: 'E', audience: 'youth', dailyTargetLine: dailyTargetLine(60) },
+    } as Partial<SavedPlan>)] }));
+    expect(html).toContain(dailyTargetLine(60));
+    expect(html).not.toContain('data-protocol-gate');
   });
 });
 
@@ -195,3 +263,67 @@ function legacyWeek1() {
   weeks[0].days[2].exercises[1] = { name: 'Depth Drop to Vertical', sets: 4, reps: '4', cue: 'Absorb soft, explode tall', targets: 'power' };
   return weeks;
 }
+
+
+// ── MIRROR-COACH P8 FIX (2026-09-30, code review): what the offer says, rendered ─────────────────────────────────────
+describe('WorkoutView, the offer states', () => {
+  const product = (tier: 'plan_4w' | 'program_12w', over: Partial<OfferProduct> = {}): OfferProduct => {
+    const p = WORKOUT_PRODUCTS.find((x) => x.tier === tier)!;
+    return { tier, sku: p.sku, name: p.name, weeks: p.weeks, line: p.line, price: tier === 'plan_4w' ? 60 : 200, currency: 'shards', onSale: true, free: false, unfinished: false, ...over };
+  };
+  const offer = (over: Partial<WorkoutOffer> = {}): WorkoutOffer => ({
+    audience: 'adult', ageKnown: true, pastBuyer: false, purchasable: true, blockedBy: null, ageHref: null,
+    products: [product('plan_4w'), product('program_12w')], ...over,
+  });
+  const render = (o: WorkoutOffer) => {
+    const html = renderToStaticMarkup(createElement(WorkoutView, { initialData: { plans: [], offer: o } }));
+    return { html, text: html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ') };
+  };
+
+  it('an adult: the template preview and both products at the server\'s prices', () => {
+    const { html, text } = render(offer());
+    expect(html).toContain('data-template="adult-bw-3"');
+    expect(text).toContain('Buy for 60 shards');
+    expect(text).toContain('Buy for 200 shards');
+    expect(text).toContain(WORKOUT_JUMP_LINE);
+  });
+
+  it('NO BIRTH YEAR ON FILE: the line and the link to the health answers — no preview, no price, no button (blocker)', () => {
+    const { html, text } = render(offer({ audience: 'youth', ageKnown: false, purchasable: false, blockedBy: 'age_needed', ageHref: WORKOUT_AGE_HREF }));
+    expect(text).toContain(WORKOUT_AGE_NEEDED_LINE);
+    expect(html).toContain(`href="${WORKOUT_AGE_HREF}"`);
+    expect(html).not.toContain('data-template=');
+    expect(text).not.toMatch(/Buy for|Get the/);
+    expect(text).not.toContain(WORKOUT_YOUTH_LINE);
+    expect(text).not.toContain(WORKOUT_CHECK_FAILED);
+  });
+
+  it('the birth year could not be read: its own line, not the past-purchases one (minor)', () => {
+    const { text } = render(offer({ purchasable: false, blockedBy: 'age_unread' }));
+    expect(text).toContain(WORKOUT_AGE_UNREAD);
+    expect(text).not.toContain(WORKOUT_CHECK_FAILED);
+    expect(render(offer({ purchasable: false, blockedBy: 'purchases' })).text).toContain(WORKOUT_CHECK_FAILED);
+  });
+
+  it('a youth reader: the youth line (why there is no 12-week plan) and the 4-week plan only', () => {
+    const { html, text } = render(offer({ audience: 'youth', products: [product('plan_4w'), product('program_12w', { onSale: false })] }));
+    expect(text).toContain(WORKOUT_YOUTH_LINE);
+    expect(html).toContain('data-product="plan_4w"');
+    expect(html).not.toContain('data-product="program_12w"');
+  });
+
+  it('A PAID PLAN THAT DID NOT SAVE: the product says so and offers to get it, with no price (major)', () => {
+    const { html, text } = render(offer({ products: [product('plan_4w', { unfinished: true }), product('program_12w')] }));
+    expect(html).toContain('data-unfinished');
+    expect(text).toContain(unfinishedLine('4-week plan'));
+    expect(text).toContain('Get your 4-week plan');
+    expect(text).toContain('Buy for 200 shards');
+  });
+
+  it('a past buyer: both free', () => {
+    const { text } = render(offer({ pastBuyer: true, products: [product('plan_4w', { free: true }), product('program_12w', { free: true })] }));
+    expect(text).toContain(WORKOUT_FREE_LINE);
+    expect(text).toContain('Get the 4-week plan free');
+    expect(text).not.toMatch(/Buy for/);
+  });
+});
