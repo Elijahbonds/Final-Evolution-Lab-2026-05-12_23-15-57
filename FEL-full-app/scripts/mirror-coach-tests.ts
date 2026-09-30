@@ -162,7 +162,12 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(h.includes('cueEngineRef.current.decide('), 'measured faults feed the cue engine');
   ok(h.includes('speak(evt.text)'), 'cues are voiced (on-device speechSynthesis)');
   ok(/breathe first/i.test(h), 'the session breathes before it moves (the Blueprint)');
-  ok(h.includes('fel-breath'), 'the pacer animates the breath cadence');
+  // MIRROR-COACH P7 (2026-09-29): the check used to be h.includes('fel-breath') — the CSS loop the stage drew. The stage
+  // now draws the ONE pacer (components/breath/Pacer.tsx) with the squat's own spec on the stage's pose clock, so the
+  // check names both halves: the shared component, fed SQUAT_BREATH_PACER at breathElapsedSec. Not relaxed: the old
+  // string would still pass on a page that drew a ring on no clock at all; this one fails if either half goes.
+  ok(/<BreathPacer[^>]*spec=\{SQUAT_BREATH_PACER\}[^>]*elapsedSec=\{breathSec\}/.test(h) && h.includes('setBreathSec(breathElapsedSec(step.state, now))'),
+    'the pacer animates the breath cadence (the one pacer, on the stage\'s pose clock)');
   // The negative checks read the CODE, not the comments that explain what was removed.
   const code = h.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   // MIRROR-COACH P1 (2026-09-25): there is no band, and an unverified knee read is never painted as a correction

@@ -12,6 +12,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-25-draft': '2950422a8d3c13c7',   // + §6's space check paragraph (movement play, phase 4)
   '2026-09-29-draft': 'da452d02a10d392e',   // + §5 Health-Adjacent Data rewrite (mirror-coach, phase 5)
   '2026-09-29b-draft': 'da6275bf1062a1d8',  // + §5 names the daily readiness check-in (mirror-coach, phase 6)
+  '2026-09-29c-draft': '7c6a27b255d6eda1',  // + §5 names the Dial-Up Breath use log and its week after an erase (mirror-coach, phase 7)
 };
 
 describe('the policy version', () => {
@@ -118,6 +119,14 @@ describe('privacy policy, health-adjacent data (P5)', () => {
   it('says who can see it: the person, and a coach only with access turned on', () => {
     expect(text).toMatch(/only you, by default/);
     expect(text).toMatch(/turning on coach access for one specific coach/);
+  });
+
+  // MIRROR-COACH P7 FIX (2026-09-29): the export and both erases carry the Dial-Up Breath's use log, so §5 names it
+  it('names the Dial-Up Breath use log: what it holds (and nothing else), that an erase deletes it, and the week after', () => {
+    expect(text).toMatch(/dial-up breath/);
+    expect(text).toMatch(/which session it was for and when, and nothing else/);
+    expect(text).toMatch(/your daily check-ins, your dial-up breath uses and your consent records/);
+    expect(text).toMatch(/waits a week before it is offered/);
   });
 
   it('points to Health data in account settings for view/export/erase and for withdrawing consent', () => {

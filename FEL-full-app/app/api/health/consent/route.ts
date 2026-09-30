@@ -46,14 +46,17 @@ async function loadView(userId: string) {
   // MIRROR-COACH P6 (2026-09-29): readinessCheckIns counted too — the daily check-in is stored under this same
   // consent (lib/health/readiness.ts), so "what is stored" has to name it, and 'erase' below deletes it
   // (lib/prq-data-rights.ts eraseHealthData).
-  const [consents, coaches, healthIntakes, painCheckIns, readinessCheckIns] = await Promise.all([
+  // MIRROR-COACH P7 FIX (2026-09-29, review): breathLogs counted too — the Dial-Up Breath's use log is in the export and
+  // both erases (lib/prq-data-rights.ts) and Privacy §5 names it, so "what is stored" and the erase toast name it as well.
+  const [consents, coaches, healthIntakes, painCheckIns, readinessCheckIns, breathLogs] = await Promise.all([
     prisma.healthConsent.findMany({ where: { userId }, select: { scope: true, coachId: true, grantedAt: true, revokedAt: true } }),
     loadActiveCoaches(userId),
     prisma.healthIntake.count({ where: { userId } }),
     prisma.painCheckIn.count({ where: { userId } }),
     prisma.readinessCheckIn.count({ where: { userId } }),
+    prisma.breathLog.count({ where: { userId } }),
   ]);
-  return { ...buildHealthConsentView(consents as ConsentRow[], coaches), counts: { healthIntakes, painCheckIns, readinessCheckIns } };
+  return { ...buildHealthConsentView(consents as ConsentRow[], coaches), counts: { healthIntakes, painCheckIns, readinessCheckIns, breathLogs } };
 }
 
 /** GET /api/health/consent — the Health data section's current state. */

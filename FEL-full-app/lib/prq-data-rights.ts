@@ -31,18 +31,32 @@
 // health-only one (a person erasing "my health data" means the check-ins as much as the pain log) and, through it, the
 // account-wide one.
 //
+// MIRROR-COACH P7 (2026-09-29): THE BREATH LOG RIDES ALONG (schema.prisma BreathLog, lib/breath/rampGate.ts). A row says
+// only that a breath from FEL's toolbox was used, for which coached session, and when — no health answer. But its one
+// kind today, the adults-only Dial-Up Breath, is written only behind the health gates (consent, a clean intake, today's
+// pain and check-in), so a row is a trace of those answers: the export hands every row over, and BOTH erases delete
+// them, the narrow health one included.
+// MIRROR-COACH P7 FIX (2026-09-29, review): this paragraph used to end "erasing them also resets FEL's weekly count,
+// which is harmless — nothing can be dialled up again until the athlete opts back in". Opting back in is one intake POST
+// (lib/health/intake.ts submitIntake grants consent), so erase → re-take → dial up was a third use in three days: the
+// limit was only as strong as the athlete's willingness to press erase. It is not reset now, and nothing an erase
+// promises to delete is kept to do it: the gate needs the OLDEST health-data grant FEL holds to be a full limit window
+// old (lib/breath/rampGate.ts RAMP_LIMIT.firstUseAfterDays, consentOldEnough). After either erase the ledger starts
+// again, so the breath waits a week — by which time every erased use has rolled out of the window anyway. Privacy §5
+// says so (lib/policies.ts), and lib/breath/ramp-route.test.ts runs erase → re-intake → POST through this function.
+//
 // Kept out of the route files so it can be tested against a fake client (vitest does not collect app/).
 
 import type { Prisma } from '@/public/_prisma/client';
 
-type Db = Pick<Prisma.TransactionClient, 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn'>;
+type Db = Pick<Prisma.TransactionClient, 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'>;
 
 /** What a movement-history row carries in an export: its kind, its numbers, and the avatar proportions made from it. */
 export const MOVEMENT_HISTORY_SELECT = { id: true, kind: true, metrics: true, avatarSpec: true, createdAt: true } as const;
 
 /** The JSON a Profile export downloads. */
 export async function collectPrqExport(db: Db, userId: string, now: Date = new Date()) {
-  const [entries, sessions, history, healthIntakes, painCheckIns, healthConsents, readinessCheckIns] = await Promise.all([
+  const [entries, sessions, history, healthIntakes, painCheckIns, healthConsents, readinessCheckIns, breathLogs] = await Promise.all([
     db.prqEntry.findMany({
       where: { userId },
       orderBy: { measuredAt: 'desc' },
@@ -76,6 +90,8 @@ export async function collectPrqExport(db: Db, userId: string, now: Date = new D
     db.healthConsent.findMany({ where: { userId }, orderBy: { grantedAt: 'desc' } }),
     // MIRROR-COACH P6: every daily readiness check-in, whole — the four answers and the day they were for.
     db.readinessCheckIn.findMany({ where: { userId }, orderBy: { date: 'desc' } }),
+    // MIRROR-COACH P7: every breath-toolbox use, whole — its kind, the coached session it was for, when.
+    db.breathLog.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
   ]);
 
   return {
@@ -88,6 +104,7 @@ export async function collectPrqExport(db: Db, userId: string, now: Date = new D
     painCheckIns,
     healthConsents,
     readinessCheckIns,
+    breathLogs,
   };
 }
 
@@ -100,6 +117,8 @@ export interface HealthErasedCounts {
   healthConsents: number;
   /** ReadinessCheckIn rows deleted (MIRROR-COACH P6): every daily check-in. */
   readinessCheckIns: number;
+  /** BreathLog rows deleted (MIRROR-COACH P7): every breath-toolbox use. */
+  breathLogs: number;
 }
 
 export interface ErasedCounts extends HealthErasedCounts {
@@ -110,33 +129,34 @@ export interface ErasedCounts extends HealthErasedCounts {
 }
 
 /**
- * Erase ONLY the health data: the intake, every pain check-in, every daily readiness check-in (MIRROR-COACH P6), and
- * the consent ledger itself (both scopes). This is the narrow action Health data in account settings offers next to
+ * Erase ONLY the health data: the intake, every pain check-in, every daily readiness check-in (MIRROR-COACH P6), every
+ * breath-toolbox use (MIRROR-COACH P7), and the consent ledger itself (both scopes). This is the narrow action Health data in account settings offers next to
  * "withdraw" — see the file header for why it has to stay separate from `erasePrqData`. Idempotent, same as that
  * function. The ledger goes LAST, so a failure part-way through (outside a transaction) never leaves health rows
  * behind with no consent record explaining why they were collected.
  */
 export async function eraseHealthData(
-  db: Pick<Db, 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn'>,
+  db: Pick<Db, 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'>,
   userId: string,
 ): Promise<HealthErasedCounts> {
   const healthIntakes = await db.healthIntake.deleteMany({ where: { userId } });
   const painCheckIns = await db.painCheckIn.deleteMany({ where: { userId } });
   const readinessCheckIns = await db.readinessCheckIn.deleteMany({ where: { userId } });
+  const breathLogs = await db.breathLog.deleteMany({ where: { userId } });
   const healthConsents = await db.healthConsent.deleteMany({ where: { userId } });
   return {
     healthIntakes: healthIntakes.count, painCheckIns: painCheckIns.count, healthConsents: healthConsents.count,
-    readinessCheckIns: readinessCheckIns.count,
+    readinessCheckIns: readinessCheckIns.count, breathLogs: breathLogs.count,
   };
 }
 
 /**
  * Erase the user's PRQ entries, movement history and health data (intake, pain check-ins, readiness check-ins,
- * consent records). Pass a transaction client, so all six go together or not at all. Idempotent: a second call
+ * breath-toolbox uses, consent records). Pass a transaction client, so all of it goes together or not at all. Idempotent: a second call
  * deletes nothing and says so.
  */
 export async function erasePrqData(
-  db: Pick<Db, 'prqEntry' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn'>,
+  db: Pick<Db, 'prqEntry' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'>,
   userId: string,
 ): Promise<ErasedCounts> {
   const prq = await db.prqEntry.deleteMany({ where: { userId } });
@@ -147,7 +167,7 @@ export async function erasePrqData(
 
 /** The ledger line for an erasure (the wallet is untouched; the event is recorded). */
 export function erasureReason(c: ErasedCounts): string {
-  const health = c.healthIntakes + c.painCheckIns + c.healthConsents + c.readinessCheckIns;
+  const health = c.healthIntakes + c.painCheckIns + c.healthConsents + c.readinessCheckIns + c.breathLogs;
   return `PRQ data erasure: ${c.prqEntries} entries, ${c.movementHistory} movement history rows and `
     + `${health} health record${health === 1 ? '' : 's'} deleted`;
 }
