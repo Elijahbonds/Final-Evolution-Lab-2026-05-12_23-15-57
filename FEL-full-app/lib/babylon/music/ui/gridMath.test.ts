@@ -1,8 +1,10 @@
 // MUSIC-SUITE P4 (2026-09-25): the pocket grid's rules (ui/gridMath.ts) — page math, the ≥ 40 px phone cell at 375 px,
 // the drag-to-paint stroke, the cursor, and where a transient line may float.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  MIN_CELL_PX, PHONE_MAX_PX, bandOverlap, beatShade, cellSizePx, clampPage, gridLayout, gridTemplate, isBeatStart, moveCursor,
+  FOLLOW_HOLD_MS, followPage, MIN_CELL_PX, PHONE_MAX_PX, bandOverlap, beatShade, cellSizePx, clampPage, gridLayout, gridTemplate, isBeatStart, moveCursor,
   pageLabel, pageOfStep, paintRows, phoneContainerPx, stepsOnPage, strokeBreak, strokeCells, strokeEnter, strokeStart, swipePage, toastSpot,
 } from './gridMath';
 
@@ -174,5 +176,75 @@ describe('where a transient line floats', () => {
   it('bandOverlap sums the covered pixels', () => {
     expect(bandOverlap({ top: 0, bottom: 80 }, [{ top: 50, bottom: 100 }, { top: -10, bottom: 10 }])).toBe(40);
     expect(bandOverlap({ top: 0, bottom: 80 }, [{ top: 90, bottom: 100 }])).toBe(0);
+  });
+});
+
+// MUSIC-SUITE P10 (2026-09-29): P4's open item — the phone grid stayed on its page while the playhead ran off to the other.
+describe('P10: followPage — the phone grid follows the playhead unless the player is editing', () => {
+  const phone = gridLayout(375, 16);
+  const desk = gridLayout(1280, 16);
+  const base = { layout: phone, playing: true, page: 0, lastTouchMs: Number.NEGATIVE_INFINITY, nowMs: 100_000 };
+  it('playing and left alone: the page is the playhead\'s (steps 9–16 → page 2, the wrap to 1–8 → page 1)', () => {
+    expect(followPage({ ...base, playhead: 7 })).toBe(0);
+    expect(followPage({ ...base, playhead: 8 })).toBe(1);
+    expect(followPage({ ...base, page: 1, playhead: 0 })).toBe(0);
+  });
+  it('a touch on the grid in the last FOLLOW_HOLD_MS holds the page; after it, following resumes', () => {
+    expect(followPage({ ...base, playhead: 12, lastTouchMs: base.nowMs - 100 })).toBe(0);
+    expect(followPage({ ...base, playhead: 12, lastTouchMs: base.nowMs - FOLLOW_HOLD_MS + 1 })).toBe(0);
+    expect(followPage({ ...base, playhead: 12, lastTouchMs: base.nowMs - FOLLOW_HOLD_MS })).toBe(1);
+  });
+  it('stopped, no playhead, or a desktop grid (all 16 on screen): the page never moves', () => {
+    expect(followPage({ ...base, playing: false, playhead: 12 })).toBe(0);
+    expect(followPage({ ...base, playhead: -1 })).toBe(0);
+    expect(followPage({ ...base, layout: desk, playhead: 12 })).toBe(0);
+    expect(followPage({ ...base, playhead: Number.NaN })).toBe(0);
+  });
+  it('the room wires it: a page press, the key cursor and every grid edit count as a touch', () => {
+    const src = readFileSync(join(__dirname, '..', 'StudioMode.tsx'), 'utf8');
+    expect(src).toContain('const next = followPage({ layout, playing, playhead, page, lastTouchMs: gridTouchRef.current, nowMs: performance.now(), held });');
+    expect(src).toContain('onPage={turnPage}');
+    expect(src.match(/touchGrid\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+  });
+
+  // MUSIC-SUITE P10 FIX (2026-09-29): the review's traced failure — the page turned under a finger that was still down
+  // (a pending touch), and under an open NoteRow, because only an EMITTED edit counted as a touch.
+  it('held (a pointer down on the grid, an open NoteRow, the key cursor): the page never turns, however long it lasts', () => {
+    // the finger went down on kick step 4 (page 1–8) long after the last edit; the playhead runs on to step 12
+    expect(followPage({ ...base, playhead: 12, held: true })).toBe(0);
+    expect(followPage({ ...base, playhead: 12, held: true, nowMs: base.nowMs + 60_000 })).toBe(0);
+    // an open bass NoteRow on page 9–16 while the playhead wraps to step 2: it stays on 9–16
+    expect(followPage({ ...base, page: 1, playhead: 2, held: true })).toBe(1);
+    // released: the FOLLOW_HOLD_MS hold counts from the release (the room stamps lastTouchMs on pointerup / close)
+    const releasedAt = base.nowMs + 5_000;
+    expect(followPage({ ...base, playhead: 12, held: false, lastTouchMs: releasedAt, nowMs: releasedAt + FOLLOW_HOLD_MS - 1 })).toBe(0);
+    expect(followPage({ ...base, playhead: 12, held: false, lastTouchMs: releasedAt, nowMs: releasedAt + FOLLOW_HOLD_MS })).toBe(1);
+    // held never MOVES a page either (a stopped or desktop grid is unchanged by it)
+    expect(followPage({ ...base, layout: desk, playhead: 12, held: true })).toBe(0);
+  });
+  it('a 92 BPM bar with a finger resting on step 4 from the playhead\'s step 7 on: 0 page turns while it is down', () => {
+    // one 16th at 92 BPM = 163 ms; the finger is down for 6 sixteenths (~1 s) across the page line at step 8
+    let page = 0;
+    const turns: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const playhead = 7 + i;
+      const next = followPage({ ...base, page, playhead, held: true, nowMs: base.nowMs + i * 163 });
+      if (next !== page) turns.push(playhead);
+      page = next;
+    }
+    expect(turns).toEqual([]);
+    expect(page).toBe(0);
+    // the old rule (no `held`, the last edit long ago) turned at the first 16th past step 8 — the page under the finger
+    expect(followPage({ ...base, page: 0, playhead: 8 })).toBe(1);
+  });
+  it('the room holds on the press, not on the edit: StepGrid onPress, the NoteRow open/close, the release stamps the hold', () => {
+    const src = readFileSync(join(__dirname, '..', 'StudioMode.tsx'), 'utf8');
+    expect(src).toContain('const held = gridHeldRef.current || openNote !== null || cursor !== null;');
+    expect(src).toContain('onOpenNote={openNoteRow} onPress={pressGrid}');
+    expect(src).toContain("onClose={() => openNoteRow(null)}");
+    expect(src).toContain("window.addEventListener('pointerup', up);");
+    expect(src).not.toContain('onOpenNote={setOpenNote}');
+    const grid = readFileSync(join(__dirname, 'StepGrid.tsx'), 'utf8');
+    expect(grid).toContain('p.onPress?.();');
   });
 });

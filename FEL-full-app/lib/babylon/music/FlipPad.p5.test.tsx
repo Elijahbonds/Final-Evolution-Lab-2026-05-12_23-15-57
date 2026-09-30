@@ -159,6 +159,13 @@ describe('the room\'s wiring (source pins)', () => {
     expect(pad).toContain('recordStep(clock.now - clock.latencySec, clock.marks,');
     expect(pad).toContain('<Waveform ');
   });
+  // MUSIC-SUITE P10 (2026-09-29): the lesson demo is started ahead of time on the audio clock through the same pad start
+  it('P10: the lesson demo starts every hit at its audio-clock time through startPad (the tap\'s own path)', () => {
+    expect(pad).toContain('const plan = lessonSchedule(hits, ctx.currentTime);');
+    expect(pad).toContain('const s = startPad(h.pad, h.when);');
+    expect(pad).toContain('if (when === undefined) node.start(); else node.start(when);');
+    expect(pad).toContain('onDemo={scheduleDemo}');
+  });
   it('a row is baked the same way after a reload; song mode swaps a section\'s own chops; sources the project no longer plays are let go', () => {
     expect(room).toContain('const b = bakedBuffer(eng.context, d, row);');
     expect(room).toContain('onSongNow={songNowChanged}');

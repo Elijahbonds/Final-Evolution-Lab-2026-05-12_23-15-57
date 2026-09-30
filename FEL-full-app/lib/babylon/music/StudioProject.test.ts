@@ -1,12 +1,13 @@
 // MUSIC-SUITE P3 (2026-09-25): the StudioProject model — round-trip, migrate, and what a damaged record does.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BPM_RANGE, MAX_TITLE, PROJECT_STEPS, STUDIO_PROJECT_VERSION, cleanTitle, defaultProjectTitle, duplicateProject,
-  emptyKitTracks, flipSampleId, migrateProject, newAudioKey, newProject, newProjectId, projectAudioKeys, projectSignature,
+  emptyKitTracks, flipSampleId, idSuffix, migrateProject, newAudioKey, newProject, newProjectId, newTakeId, projectAudioKeys, projectSignature,
   projectSummary, refusalLine, renameProject, repairLine, withFlipHit, withFlipRow,
   type ProjectFlipRow, type StudioProject,
 } from './StudioProject';
 import { PERFORM_STEPS_PER_BAR } from './performSet';
+import { audioKeyTime } from './studioStore';
 import { KIT_SLOTS } from './SynthKit';
 import { PAD_COUNT } from './Flip';
 import { expandChainSwing } from './SongPanel';
@@ -34,6 +35,26 @@ describe('a new project', () => {
     const ids = new Set(Array.from({ length: 200 }, () => newProjectId(NOW)));
     expect(ids.size).toBe(200);
     expect(newAudioKey(NOW)).toMatch(new RegExp(`^aud_${NOW.toString(36)}[0-9a-z]{4}$`));
+  });
+  // MUSIC-SUITE P10 (2026-09-29): the test above failed ~1 % of runs — 4 RANDOM base-36 characters, 200 ids at one `now`
+  // (birthday: 200² / 2 / 36⁴ ≈ 1.2 %). The suffix is a per-page counter now; these pin that it can't collide, even when
+  // Math.random is a constant (the old ids were then ALL the same) and across a 36⁴ wrap-around's worth of ids.
+  it('P10: ids minted in one millisecond never collide — not dependent on Math.random, and every kind shares one counter', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const ids = Array.from({ length: 50_000 }, (_, i) => (i % 3 === 0 ? newProjectId(NOW) : i % 3 === 1 ? newAudioKey(NOW) : newTakeId(NOW)));
+      const suffixes = new Set(ids.map((id) => id.slice(-4)));
+      expect(suffixes.size).toBe(ids.length);
+      expect(new Set(ids).size).toBe(ids.length);
+    } finally { spy.mockRestore(); }
+  });
+  it('P10: the suffix keeps the shape studioStore reads the time back out of (4 × [0-9a-z]) and wraps inside it', () => {
+    const seen = new Set<string>();
+    let bad = 0;
+    for (let i = 0; i < 36 ** 4 + 5; i++) { const s = idSuffix(); if (!/^[0-9a-z]{4}$/.test(s)) bad++; if (i < 36 ** 4) seen.add(s); }
+    expect(bad).toBe(0);
+    expect(seen.size).toBe(36 ** 4);                   // one full cycle: every value once, none twice
+    expect(audioKeyTime(newAudioKey(NOW))).toBe(NOW);  // the store's sweep still reads the time back
   });
 });
 
