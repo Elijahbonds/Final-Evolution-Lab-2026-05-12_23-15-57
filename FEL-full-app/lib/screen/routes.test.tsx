@@ -105,8 +105,10 @@ describe('S-2: the back arrow never leaves the screen', () => {
       privacy: renderToStaticMarkup(createElement((await import('@/app/screen/privacy/page')).default)),
     };
     const got = Object.fromEntries(Object.entries(pages).map(([k, h]) => [k, backHref(h)]));
-    expect(got).toEqual({ frameDefault: '/screen', start: '/screen', results: '/screen', program: '/play/mirror/assess/results', privacy: '/screen' });
+    // S-14: intro back is a button (history), not /screen (307 loop). Privacy uses PrivacyFrame (function back).
+    expect(got).toEqual({ frameDefault: '/screen', start: null, results: '/screen', program: '/play/mirror/assess/results', privacy: null });
     for (const [k, href] of Object.entries(got)) {
+      if (!href) continue;
       expect(isQuickScreenPath(href!), k).toBe(true);
       expect(href, k).not.toMatch(/^\/(login|try)\b|^\/play\/mirror$/);
     }
@@ -125,7 +127,7 @@ describe('S-2: the back arrow never leaves the screen', () => {
     const { join } = await import('node:path');
     const root = join(__dirname, '../..');
     const files = ['app/play/mirror/assess/_components/assess-app.tsx', 'app/play/mirror/assess/_components/results-page.tsx',
-      'app/screen/program/[lane]/program-lane.tsx', 'app/screen/privacy/page.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx'];
+      'app/screen/program/[lane]/program-lane.tsx', 'app/screen/privacy/privacy-frame.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx'];
     const backs = new Set<string>();
     for (const f of files) {
       const src = readFileSync(join(root, f), 'utf8');
@@ -135,7 +137,7 @@ describe('S-2: the back arrow never leaves the screen', () => {
     expect([...backs].sort()).toEqual(['RESULTS_PATH', 'SCREEN_HOME', 'back']);
     // the page's own `back`: the flow's step back, and /screen from the start card
     const app = readFileSync(join(root, 'app/play/mirror/assess/_components/assess-app.tsx'), 'utf8');
-    expect(app).toMatch(/const back: string \| \(\(\) => void\) = phase === 'intro' \|\| phase === 'toResults' \? SCREEN_HOME/);
+    expect(app).toMatch(/const back: string \| \(\(\) => void\) = phase === 'intro' \|\| phase === 'toResults' \? introBack/);
     expect(readFileSync(join(root, 'app/play/mirror/assess/_components/screen-ui.tsx'), 'utf8')).toMatch(/back = SCREEN_HOME/);
   });
 });

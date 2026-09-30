@@ -1,7 +1,7 @@
 import { PRIVACY_CONTACT, PRIVACY_POINTS, PRIVACY_TITLE } from '@/lib/screen/copy';
-import { SCREEN_HOME } from '@/lib/screen/routes';
-import { ScreenFrame, StepCard } from '@/app/play/mirror/assess/_components/screen-ui';
+import { StepCard } from '@/app/play/mirror/assess/_components/screen-ui';
 import { ClearResults } from './clear-results';
+import { PrivacyFrame } from './privacy-frame';
 
 /**
  * /screen/privacy — how the Quick Screen keeps things private, in plain words (SCREEN-FIX, 2026-09-29). Linked from the
@@ -16,7 +16,7 @@ import { ClearResults } from './clear-results';
  */
 export default function ScreenPrivacyPage() {
   return (
-    <ScreenFrame back={SCREEN_HOME} title="Privacy">
+    <PrivacyFrame>
       <StepCard testId="privacy">
         <div data-privacy-text>
           <h2 className="text-[21px] font-black leading-tight">{PRIVACY_TITLE}</h2>
@@ -27,6 +27,6 @@ export default function ScreenPrivacyPage() {
         </div>
         <div className="mt-4"><ClearResults /></div>
       </StepCard>
-    </ScreenFrame>
+    </PrivacyFrame>
   );
 }
