@@ -309,7 +309,8 @@ export function timeBonus(elapsed: number): number {
 export const STALL_SPEED = 1.2;
 export const STALL_NUDGE_SEC = 3;
 export const STALL_END_SEC = 14;
-export const RUN_CAP_SEC = 240;
+/** Hard session ceiling — par × 2 (GC-F1 / RESULTS-TRUTH). A missed-gate run must still post. */
+export const RUN_CAP_SEC = TIME_PAR_SEC * 2;
 export type StallAction = 'ride' | 'nudge' | 'end';
 /** What `stillSec` seconds of stall (and `elapsed` of run) call for; the mode nudges once per STALL_NUDGE_SEC. */
 export function stallAction(stillSec: number, elapsed: number): StallAction {

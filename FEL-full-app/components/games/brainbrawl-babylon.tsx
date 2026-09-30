@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { GameProps, GameResult } from './game-shell';
+import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -176,10 +177,13 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
     // one sink for a finish either way: the mode reports through card() on this continuous host (end() elsewhere)
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return; endedRef.current = true;
-      const won = r.outcome === 'win';
       const duration = replayAtRef.current !== null ? Math.round((performance.now() - replayAtRef.current) / 100) / 10 : r.durationSec;
-      const result: GameResult = { score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: Number(r.stats?.p2score ?? 0), won, duration, headline: won ? 'BIG BRAIN' : 'BRAWL OVER' };
-      onEndRef.current(result);
+      onEndRef.current(gameResultFromSession(r, {
+        won: r.outcome === 'win',
+        opponentScore: opponentScoreFromStats(r.stats),
+        duration,
+        headline: r.outcome === 'win' ? 'BIG BRAIN' : 'BRAWL OVER',
+      }));
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;

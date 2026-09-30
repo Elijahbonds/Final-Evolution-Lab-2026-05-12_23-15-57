@@ -96,8 +96,8 @@ export default function TiebreakGame({ grade, prq, onEnd, gamepad }: GameProps) 
       endedRef.current = true;
       const won = myPts > aiPts;
       onEndRef.current?.({
-        score: myPts * 120 + bestRally * 30,
-        opponentScore: aiPts * 120,
+        score: myPts,
+        opponentScore: aiPts,
         won,
         duration: Math.round((Date.now() - startTime) / 1000),
         headline: won ? `${myPts}-${aiPts} — TIEBREAK ICE IN THE VEINS` : `${myPts}-${aiPts} — NEXT BREAKER IS YOURS`,

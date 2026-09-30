@@ -12,6 +12,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { footballHeadline, footballSessionWon, gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 /** FOOTBALL UPGRADE: the breakaway meter's lines arrive as '0.333,0.667'. */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -37,17 +38,8 @@ export default function FootballBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'TOUCHDOWN';
-      const yards = Number(r.stats?.yards ?? 0);
-      const result: GameResult = {
-        score: r.score,
-        stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-        opponentScore: 0,
-        won,
-        duration: r.durationSec,
-        headline: won ? 'TOUCHDOWN!' : `TACKLED · ${yards} YD`,
-      };
-      onEnd(result);
+      const won = footballSessionWon(r.outcome);
+      onEnd(gameResultFromSession(r, { won, headline: footballHeadline(r, won) }));
     };
 
     runMode(MODES.football, {

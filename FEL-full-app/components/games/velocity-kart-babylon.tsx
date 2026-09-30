@@ -18,6 +18,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
 
@@ -48,12 +49,11 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
       const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
       const place = Number(r.stats?.place ?? 0), field = Number(r.stats?.field ?? 0), medal = ['none', 'bronze', 'silver', 'gold'][Number(r.stats?.medal ?? 0)] ?? 'none';
       const ord = place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`;
-      onEnd({
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'win', duration: r.durationSec,
+      onEnd(gameResultFromSession(r, {
+        won: r.outcome === 'win',
         headline: r.outcome === 'dnf' ? `DNF · ${ord} OF ${field}`
           : place > 0 ? `${ord} OF ${field} · ${t.toFixed(1)}s${medal !== 'none' ? ` · ${medal.toUpperCase()}` : ''}` : `RACE COMPLETE · ${t.toFixed(1)}s`,
-      } satisfies GameResult);
+      }));
     };
 
     const startTimer = setTimeout(() => {
