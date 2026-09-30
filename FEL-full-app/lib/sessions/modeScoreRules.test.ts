@@ -60,7 +60,7 @@ describe('deriveRule: one arithmetic for every mode', () => {
     expect(deriveRule('surfing', [])).toBeNull();
     expect(deriveRule('karateEndless', [run(null, 60, 'upper')])).toBeNull();
     // a rules mode with an unscored run still has its exact maximum
-    expect(deriveRule('soccer', [run(null, 60, 'upper')], { killSwitch: false })).toMatchObject({ maxScoreFrom: 'rules', maxScore: 5560 });
+    expect(deriveRule('soccer', [run(null, 60, 'upper')], { killSwitch: false })).toMatchObject({ maxScoreFrom: 'rules', maxScore: 6660 });
   });
 
   it('music free play is endless: never capped at the Arena set\'s maximum', () => {

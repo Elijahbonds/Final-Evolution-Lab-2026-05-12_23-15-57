@@ -104,7 +104,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   let down = 1, toGo = 10, lineOfScrimmage = 0, yards = 0, score = 0, evades = 0;
   // Owner decision (2026-09-05): a session is THREE drives. Each ends on a touchdown or a turnover on downs; the
   // session ends after the third. Before this, a runner who kept gaining reset to first down forever and never posted.
-  const DRIVES = 3; let drive = 1;
+  const DRIVES = 5; let drive = 1;   // FIELD-DEPTH W4: three drives ended in ~23 s — five keeps a full session
   let driveEvades = 0, breakawaySec = 0;
   /** A+ mission #9 (Madden readability): the drive card between drives — yards, evades, how it ended. */
   let driveLog: { name: string; score: number | string; line: string }[] = [];
@@ -610,7 +610,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'football', mood: 'nightGame', camPreset: 'runner',
+    modeId: 'football', mood: 'nightGame', camPreset: 'gridiron',   // WA-24: runner sat inside defenders; gridiron pulls back
 
     async load(ctx: ModeContext) {
       tier = readProfile();

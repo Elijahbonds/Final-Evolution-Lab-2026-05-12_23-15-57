@@ -116,7 +116,7 @@ export const PCI_MISS_M = 0.78;
 export const PUTTER: WiiClub = WII_PUTTER;
 
 /** Strokes each hole is expected to take. Golf is scored against this. */
-export const GOLF_PAR = [3, 4, 3] as const;
+export const GOLF_PAR = [3, 4, 4, 3, 5] as const;   // FIELD-DEPTH W4: five-hole loop
 /** Within this many metres the ball is holed. */
 export const HOLED_M = 1.6;
 /** Stick pulled past this is a backswing; pushed past it is the strike. */
@@ -308,7 +308,7 @@ export const GolfMode: ModeDefinition = (() => {
   let gallery: Onlookers | null = null;
   let flag: AbstractMesh | null = null;
   let ended = false;
-  const TOTAL = 3;
+  const TOTAL = 5;   // FIELD-DEPTH W4: matches GOLF_PAR length
   /** phase 8: the golfer's RHYTHM gauge (the shared FLOW chip): clean strikes build it, at 70+ the strike is steadier (path error halved) */
   let golfFlow = 0;
   const GOLF_FLOW_CLEAN = 35, GOLF_FLOW_RHYTHM = 70, GOLF_FLOW_FORGIVE = 0.5;
@@ -920,7 +920,7 @@ export const DerbyMode: ModeDefinition = (() => {
   let pending = false;
   /** A+ mission #7 (MLB Home Run Derby presentation): the round is OUTS_CAP outs or TOTAL pitches, whichever first —
    *  a swing that is not a homer is an out. Ten pitches used to be the whole round; twenty is the cap now that outs end it. */
-  const TOTAL = 20;
+  const TOTAL = 30;   // FIELD-DEPTH W4: twenty pitches with ten outs ended in ~34 s
   let tally: DerbyTally = freshDerby();
   let rivalTarget = 0;                 // the rival's homers for the round, ticking in through it
   let homerLatch = false;              // A+ P0 juice: the homer's ONE punch per pitch
@@ -954,13 +954,7 @@ export const DerbyMode: ModeDefinition = (() => {
       const pil = MeshBuilder.CreateCylinder(`park_pillar_${deg}`, { diameter: 0.6, height: PARK.wallTop }, ctx.scene);
       pil.position.copyFrom(onWall(deg, PARK.wallR - 0.7, PARK.wallTop / 2)); pil.material = pillarMat; pil.isPickable = false; furniture.push(pil);
     }
-    for (const tg of TARGETS) {
-      const disc = MeshBuilder.CreateDisc(`park_target_${tg.id}`, { radius: tg.r, tessellation: 28 }, ctx.scene);
-      disc.position.copyFrom(onWall(tg.bearingDeg, PARK.wallR - 0.35, tg.y)); disc.rotation.y = (tg.bearingDeg * Math.PI) / 180;
-      const m = VenueKit.paint(ctx.scene, `park_target_mat_${tg.id}`, tg.kind === 'glass' ? '#9ad7ff' : '#ff2d78', tg.kind === 'glass' ? 0.25 : 0.45, 0.4); if (tg.kind === 'glass') m.alpha = 0.55;
-      disc.material = m; disc.isPickable = false; furniture.push(disc); targetMeshes.set(tg.id, disc);
-      if (tg.kind === 'bullseye') { const ring = MeshBuilder.CreateDisc(`park_target_ring_${tg.id}`, { radius: tg.r * 0.4, tessellation: 24 }, ctx.scene); ring.position.copyFrom(onWall(tg.bearingDeg, PARK.wallR - 0.38, tg.y)); ring.rotation.y = disc.rotation.y; ring.material = VenueKit.paint(ctx.scene, `park_target_ring_mat_${tg.id}`, '#fff7ed', 0.5, 0.4); ring.isPickable = false; furniture.push(ring); ring.parent = disc; ring.position.set(0, 0, -0.03); ring.rotation.set(0, 0, 0); }
-    }
+    // WA-17: target zones score on the wall arc only — no floating pink/glass discs in the outfield.
   }
   function tickFielders(dt: number): void {
     for (const f of fielders) {
