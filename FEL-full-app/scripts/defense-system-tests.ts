@@ -18,13 +18,29 @@ import assert from 'node:assert';
 import { Vector3 } from '@babylonjs/core';
 import {
   DefenseController, applyDefenseOutcome, GUARD_IMPACT_WINDOW_MS,
-  GUARD_IMPACT_STAGGER_SEC, SUBSTITUTION_CHI_COST, SUBSTITUTION_COOLDOWN_SEC,
+  GUARD_IMPACT_STAGGER_SEC, GUARD_IMPACT_RECOVERY_SEC, SUBSTITUTION_CHI_COST, SUBSTITUTION_COOLDOWN_SEC,
 } from '../lib/babylon/core/DefenseSystem';
 import { FighterState, KARATE_ATTACKS, PARRY_WINDOW_MS } from '../lib/babylon/core/FightCore';
 
 let pass = 0;
 const ok = (n: string, fn: () => void) => { fn(); pass++; console.log(`  ✓ ${n}`); };
 const NOW = 10_000;
+
+/** The test owns the clock. `inImpactRecovery` reads `performance.now()` instead of taking a time, so pin
+ *  that to `ms` for the length of `fn` and restore the real clock after, even on a throw. Unpinned, the
+ *  check compared NOW with the process's own uptime and failed whenever the run took over 10.5 s (a
+ *  loaded ci-suite). */
+function atClock<T>(ms: number, fn: () => T): T {
+  const own = Object.getOwnPropertyDescriptor(performance, 'now');
+  Object.defineProperty(performance, 'now', { value: () => ms, configurable: true, writable: true });
+  try {
+    assert.equal(performance.now(), ms, 'the fake clock pins performance.now()');
+    return fn();
+  } finally {
+    if (own) Object.defineProperty(performance, 'now', own);
+    else delete (performance as { now?: unknown }).now;
+  }
+}
 
 console.log('\nA. four distinct answers to the same heavy');
 ok('none / block / parry / guard-impact are all different', () => {
@@ -71,8 +87,13 @@ ok('flick without timing is NOT an impact; timing without flick is a parry', () 
 });
 ok('whiffed impact leaves you open (self recovery)', () => {
   const dc = new DefenseController();
+  const RECOVERY_MS = GUARD_IMPACT_RECOVERY_SEC * 1000;
+  atClock(NOW, () => assert.ok(!dc.inImpactRecovery, 'no recovery before a whiff'));
   dc.whiffImpact(NOW);
-  assert.ok(dc.inImpactRecovery);
+  atClock(NOW, () => assert.ok(dc.inImpactRecovery));
+  // the window is GUARD_IMPACT_RECOVERY_SEC long, from both sides
+  atClock(NOW + RECOVERY_MS - 1, () => assert.ok(dc.inImpactRecovery, 'still open 1 ms before recovery ends'));
+  atClock(NOW + RECOVERY_MS + 1, () => assert.ok(!dc.inImpactRecovery, 'recovered 1 ms after it ends'));
 });
 
 console.log('\nC. substitution');
