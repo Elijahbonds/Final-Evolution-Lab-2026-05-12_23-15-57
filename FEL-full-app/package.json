@@ -5,9 +5,9 @@
     "node": "22"
   },
   "scripts": {
-    "postinstall": "prisma generate",
+    "postinstall": "node scripts/prisma-generate.mjs",
     "dev": "next dev",
-    "build": "node scripts/copy-prisma-schema.mjs && prisma generate && next build",
+    "build": "node scripts/copy-prisma-schema.mjs && node scripts/prisma-generate.mjs && next build",
     "build:check": "NEXT_DIST_DIR=.next-verify next build && NEXT_DIST_DIR=.next-verify node scripts/copy-prisma-schema.mjs",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
@@ -16,7 +16,8 @@
     "seed:rewards": "tsx scripts/seed-reward-rules.ts",
     "playtest:ensure": "tsx scripts/ensure-playtest-user.ts",
     "test:suites": "tsx scripts/ci-suite.ts",
-    "test:ci": "tsx scripts/ci-suite.ts --require-db"
+    "test:ci": "tsx scripts/ci-suite.ts --require-db",
+    "prisma:generate": "node scripts/prisma-generate.mjs"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/safe-seed.ts",
