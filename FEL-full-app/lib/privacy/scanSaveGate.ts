@@ -118,17 +118,15 @@ export interface ScanSaveRoute {
 }
 
 /** GAP 1's table, as data (lib/privacy/scan-save-coverage.test.ts holds every movement write site to it). */
-// 1a, 1e and 1g: the route files are free, but each has a test another lane holds that pins "an adult's numbers are
-// saved" (lib/mirror/screen-route*.test.ts and lib/workout/scan-route.test.ts: mirror-coach, the first also in open PR
-// #47; lib/creator/athlete-route.test.ts: creator-platform). The gate would turn them red and the lane may not edit
-// them (LANES §3.2), so each is routed WITH its test's opt-in fixture.
+// Every row is gated (TEEN-WRITE-BLOCK-2, FE PM 23:05 PT: 1a, 1b, 1d, 1e, 1f and 1g joined 1c and 1h, the held test files
+// given their opt-in fixture in the same commit). 1g gates only the prq snapshot; 1f only the form write.
 export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
-  { id: '1a', file: 'app/api/mirror/screen/route.ts', handler: 'POST, PATCH', writes: 'WorkoutScan kind mirror_screen (create; the answers update)', status: 'routed', holder: 'mirror-coach, through its tests lib/mirror/screen-route.test.ts (open PR #47) and screen-route-live.test.ts' },
-  { id: '1b', file: 'app/api/mirror/sessions/route.ts', handler: 'POST', writes: 'MirrorSession', status: 'routed', holder: 'mirror-coach (lane/mirror-coach; PR #29 merged, P4 637ab3b inside its 24 h until 2026-09-30 06:46 PT)' },
+  { id: '1a', file: 'app/api/mirror/screen/route.ts', handler: 'POST, PATCH', writes: 'WorkoutScan kind mirror_screen (create; the answers update)', status: 'gated', holder: null },
+  { id: '1b', file: 'app/api/mirror/sessions/route.ts', handler: 'POST', writes: 'MirrorSession', status: 'gated', holder: null },
   { id: '1c', file: 'app/api/mirror/dunks/route.ts', handler: 'POST', writes: 'WorkoutScan kind dunk', status: 'gated', holder: null },
-  { id: '1d', file: 'app/api/mirror/assessment/route.ts', handler: 'POST', writes: 'WorkoutScan kind assessment, PrqEntry source camera; its parent-email (GuardianConsent) branch', status: 'routed', holder: 'mirror-assess (LANES §2: app/api/mirror/assessment/**)' },
-  { id: '1e', file: 'app/api/v1/workout/scan/route.ts', handler: 'POST', writes: 'WorkoutScan (movement_screen and the other SCAN_ROUTE_KINDS)', status: 'routed', holder: 'mirror-coach, through its test lib/workout/scan-route.test.ts (LANES §2: lib/workout/**)' },
-  { id: '1f', file: 'app/api/sessions/route.ts', handler: 'POST (body.form)', writes: 'WorkoutScan.createMany + PrqEntry source camera via writeFormPlan', status: 'routed', holder: 'econ-harden (LANES §2: app/api/sessions/*; 40d34167 inside its 24 h until 2026-09-30 04:36 PT); lib/move/** is movement-play', via: ['lib/move/formWrite.ts'] },
-  { id: '1g', file: 'app/api/v1/creator/athlete/route.ts', handler: 'POST', writes: 'AthleteBuild.prq snapshot (the build and the look still save)', status: 'routed', holder: 'creator-platform, through its test lib/creator/athlete-route.test.ts (LANES §2: lib/creator/*)' },
+  { id: '1d', file: 'app/api/mirror/assessment/route.ts', handler: 'POST', writes: 'WorkoutScan kind assessment, PrqEntry source camera (its parent-email branch is removed)', status: 'gated', holder: null },
+  { id: '1e', file: 'app/api/v1/workout/scan/route.ts', handler: 'POST', writes: 'WorkoutScan (movement_screen and the other SCAN_ROUTE_KINDS)', status: 'gated', holder: null },
+  { id: '1f', file: 'app/api/sessions/route.ts', handler: 'POST (body.form)', writes: 'WorkoutScan.createMany + PrqEntry source camera via writeFormPlan', status: 'gated', holder: null, via: ['lib/move/formWrite.ts'] },
+  { id: '1g', file: 'app/api/v1/creator/athlete/route.ts', handler: 'POST', writes: 'AthleteBuild.prq snapshot (the build and the look still save)', status: 'gated', holder: null },
   { id: '1h', file: 'app/api/v1/camp/sessions/route.ts', handler: 'POST', writes: "CampSession prqDelta + movementDelta (the mentee's numbers; the facilitator's record still saves)", status: 'gated', holder: null },
 ];

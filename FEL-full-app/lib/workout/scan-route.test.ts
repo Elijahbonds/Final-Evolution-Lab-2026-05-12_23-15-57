@@ -9,6 +9,9 @@ vi.mock('next-auth', () => ({ getServerSession: async () => m.session }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({
   prisma: {
+    // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): u1 is an adult on file (1990) who has NOT opted in (there is no opt-in yet,
+    // PRIVACY-CORE/AB-04), so the save gate refuses them; who it refuses is lib/privacy/scan-save-workout-scan.test.ts's.
+    user: { findUnique: async () => ({ dobYear: 1990 }) },
     workoutScan: {
       create: async (a: { data: Record<string, unknown> }) => { const row = { id: `s${m.rows.length + 1}`, ...a.data }; m.rows.push(row); return row; },
     },
@@ -59,10 +62,14 @@ describe('POST /api/v1/workout/scan writes only its own kind', () => {
     expect(m.rows).toEqual([]);
   });
 
-  it('its own kind, and no kind at all, still write a movement_screen row', async () => {
-    expect((await post({ metrics: {} })).status).toBe(200);
-    expect((await post({ kind: 'movement_screen', metrics: {} })).status).toBe(200);
-    expect(m.rows.map((r) => r.kind)).toEqual(['movement_screen', 'movement_screen']);
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT, approved): before → 'its own kind, and no kind at all, still write a movement_screen
+  // row' (200 twice, two rows). That happy-path save is REMOVED here and moves to PRIVACY-CORE (a save needs its opt-in);
+  // the opted-in positive control is lib/privacy/scan-save-workout-scan.test.ts's. After → the same two posts from u1, who
+  // has not opted in, are 403 with zero rows; the kind checks below it are unchanged.
+  it('its own kind, and no kind at all, are refused for a user who has not opted in (403, zero rows)', async () => {
+    expect(await post({ metrics: {} })).toEqual({ status: 403, json: { error: 'scan_save_adults_only', saved: false } });
+    expect(await post({ kind: 'movement_screen', metrics: {} })).toEqual({ status: 403, json: { error: 'scan_save_adults_only', saved: false } });
+    expect(m.rows).toEqual([]);
     expect(SCAN_ROUTE_KINDS).toEqual(['movement_screen']);
     expect(scanRouteKind(undefined)).toBe('movement_screen');
     expect(scanRouteKind(MIRROR_SCREEN_KIND)).toBeNull();

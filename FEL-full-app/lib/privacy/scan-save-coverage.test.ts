@@ -79,8 +79,7 @@ describe('every movement write site is gated, routed, or named as not movement',
   });
 
   it('the table tells the truth the other way too: a row whose file calls canSaveScanNumbers is marked gated', () => {
-    // each routed diff (~/Claude/outbox/teen-write-block-routed.md) flips its own row when it lands; at this lane's
-    // commit the gated rows are 1c and 1h
+    // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): every row is gated now (1a, 1b, 1d, 1e, 1f and 1g joined 1c and 1h)
     for (const r of SCAN_SAVE_ROUTES) {
       const calls = /canSaveScanNumbers\(prisma, /.test(readFileSync(join(ROOT, r.file), 'utf8'));
       expect(r.status === 'gated', `${r.id} ${r.file}`).toBe(calls);
