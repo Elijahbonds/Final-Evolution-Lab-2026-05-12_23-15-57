@@ -10,6 +10,7 @@ import type { CharacterAnimator } from '../CharacterAnimator';
 import { ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } from '../clipScope';
 import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
+import { buildDunkLandAbsorb } from './dunkLandAbsorb';
 import { buildMocapDunk } from './mocapDunk';
 import { buildCarryUpOne, buildCarryUpLeft, buildCarryUpTwo, buildFlushOne, buildFlushLeft, buildFlushTwo } from './dunkFlush';   // DUNK MOTION phase 4
 import { buildGatherOne, buildGatherTwo, buildTakeOffOne } from './dunkTakeoff';   // DUNK MOTION phase 7: push 1-2 and the one-foot take-off
@@ -109,6 +110,7 @@ export function registerAuthoredClips(
     ['dunk_celeb_its_over', () => buildCelebItsOver(scene, skeleton)],
     ['dunk_celeb_roar', () => buildCelebRoar(scene, skeleton)],
     ['dunk_celeb_too_small', () => buildCelebTooSmall(scene, skeleton)],
+    ['dunk_land_absorb', () => buildDunkLandAbsorb(scene, skeleton)],
     ['football_juke_left', () => buildJuke(scene, skeleton, 'left')],
     ['football_juke_right', () => buildJuke(scene, skeleton, 'right')],
     ['football_spin_move', () => buildSpinMove(scene, skeleton)],
