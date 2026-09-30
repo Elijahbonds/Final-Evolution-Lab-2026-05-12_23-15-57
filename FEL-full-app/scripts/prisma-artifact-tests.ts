@@ -15,11 +15,9 @@
  *     Untracked, it is simply absent from the function: "ENGINE NOT FOUND", which is the failure that cost roughly
  *     ten deploys (prisma/schema.prisma's generator block records the whole hunt).
  *
- * The 44 MB was the owner's deliberate call, taken for a deterministic deploy. The schema pins binaryTargets
- * ["native", "debian-openssl-3.0.x"], so a raw `prisma generate` resolves `native` to whatever machine ran it
- * (darwin-arm64 on the Mac that committed the blob, debian-openssl-3.0.x on Linux) and rewrites index.js/edge.js.
- * scripts/prisma-generate.mjs puts that back to the committed pair and both engine annotations, so a Linux generate
- * matches the blob. .gitattributes marks the tree generated so that churn stays out of reviews.
+ * The 44 MB was the owner's deliberate call, taken for a deterministic deploy. The file going dirty on a non-Mac is
+ * EXPECTED, not a defect: the schema pins binaryTargets ["native", "debian-openssl-3.0.x"], so `native` resolves to
+ * whatever machine generated it. .gitattributes marks the tree generated so that churn stays out of reviews.
  *
  * lib/db/prismaSchemaSync.test.ts already guards that the artifact's CONTENT is current. This guards that it EXISTS
  * in git at all — the one property a reasonable-sounding cleanup can quietly delete.
