@@ -7,9 +7,9 @@ import { healthEraseToast, healthStoredLine } from './healthDataCopy';
 
 describe('the Health data panel names every kind of row the health erase deletes', () => {
   it('the erase toast, from the erase\'s own counts', () => {
-    expect(healthEraseToast({ healthIntakes: 1, painCheckIns: 2, readinessCheckIns: 0, breathLogs: 2, healthConsents: 1 }))
-      .toBe('Deleted 1 intake, 2 pain check-ins, 0 daily check-ins, 2 Dial-Up Breath uses and 1 consent record');
-    expect(healthEraseToast({})).toBe('Deleted 0 intakes, 0 pain check-ins, 0 daily check-ins, 0 Dial-Up Breath uses and 0 consent records');
+    expect(healthEraseToast({ healthIntakes: 1, painCheckIns: 2, readinessCheckIns: 0, breathLogs: 2, healthConsents: 0 }))
+      .toBe('Deleted 1 intake, 2 pain check-ins, 0 daily check-ins and 2 Dial-Up Breath uses. Consent records are kept as proof of agreement and withdrawal.');
+    expect(healthEraseToast({})).toBe('Deleted 0 intakes, 0 pain check-ins, 0 daily check-ins and 0 Dial-Up Breath uses. Consent records are kept as proof of agreement and withdrawal.');
   });
   it('the stored line, with an older response (no breathLogs) read as 0', () => {
     expect(healthStoredLine({ healthIntakes: 1, painCheckIns: 0, readinessCheckIns: 3, breathLogs: 1 })).toBe('1 intake, 0 pain check-ins, 3 daily check-ins, 1 Dial-Up Breath use stored.');
@@ -23,6 +23,6 @@ describe('the Health data panel names every kind of row the health erase deletes
     const view = readFileSync('components/profile-view.tsx', 'utf8');
     expect(view).toContain('toast.success(healthEraseToast(e))');
     expect(view).toContain('healthStoredLine(view?.counts)');
-    expect(view).toMatch(/Deletes your intake, every pain check-in, every daily check-in, your Dial-Up Breath uses and your consent records/);
+    expect(view).toMatch(/Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses\. Your consent records are kept as proof of agreement and withdrawal/);
   });
 });

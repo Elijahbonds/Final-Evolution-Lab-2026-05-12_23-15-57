@@ -12,18 +12,22 @@
 // (/api/v1/workout/scan) is the one that also clears plans; Profile does not send anyone there.
 //
 // MIRROR-COACH P5 (2026-09-29): HEALTH DATA RIDES ALONG, on the same "everything you told FEL" promise. Privacy §5
-// says a full export/erase covers the health intake, pain check-ins and the consent records themselves — not just
-// the PRQ/movement history this file already carried. A DIFFERENT lane owns the actual intake flow and the pain
-// rule (lib/health/intake.ts, lib/health/painRule.ts); this file only reads and deletes by userId, the same way it
-// already treats WorkoutScan as "every kind, no interpretation".
+// says a full export covers the health intake, pain check-ins and the consent records, and an erase covers the
+// intake and pain check-ins — not just the PRQ/movement history this file already carried. A DIFFERENT lane owns the
+// actual intake flow and the pain rule (lib/health/intake.ts, lib/health/painRule.ts); this file only reads and
+// deletes by userId, the same way it already treats WorkoutScan as "every kind, no interpretation".
 //
 // TWO ERASE PATHS, ON PURPOSE. `eraseHealthData` is the narrow one: Health data in account settings offers it next
-// to "withdraw", and it touches only the three health tables — Privacy §5 promises that action "never touches a
+// to "withdraw", and it touches only the health-data tables — Privacy §5 promises that action "never touches a
 // workout plan or your PRQ history", so it cannot also be the function behind the existing account-wide "DELETE PRQ
 // + MOVEMENT HISTORY" button. `erasePrqData` is the wide one, and now calls the narrow one internally: erasing
-// EVERYTHING FEL holds about your training has always meant everything, so health data rides along there too. The
-// consent ledger (HealthConsent) is erased by both — it is not "health data" a coach reads, it is the record of who
-// was allowed to, but an account-level "leave no trace" erase means the ledger as well, not just the data it gated.
+// EVERYTHING FEL holds about your training has always meant everything, so health data rides along there too.
+//
+// MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT, "No wait and fix"): both erases KEEP every HealthConsent row.
+// A live grant stays live. A row with revokedAt set stays, revokedAt and all. That ledger is the proof of what was
+// agreed and when it was withdrawn. Erase does not create, re-date, or un-revoke a consent row, and it does not
+// restart the Dial-Up Breath's 7-day clock (lib/breath/rampGate.ts consentOldEnough still reads the oldest
+// health_data grant).
 //
 // MIRROR-COACH P6 (2026-09-29): THE DAILY READINESS CHECK-IN RIDES ALONG TOO (schema.prisma ReadinessCheckIn, lib/health
 // /readiness.ts). Sleep, soreness, energy and mood are health-adjacent data collected under the same 'health_data'
@@ -39,11 +43,11 @@
 // MIRROR-COACH P7 FIX (2026-09-29, review): this paragraph used to end "erasing them also resets FEL's weekly count,
 // which is harmless — nothing can be dialled up again until the athlete opts back in". Opting back in is one intake POST
 // (lib/health/intake.ts submitIntake grants consent), so erase → re-take → dial up was a third use in three days: the
-// limit was only as strong as the athlete's willingness to press erase. It is not reset now, and nothing an erase
-// promises to delete is kept to do it: the gate needs the OLDEST health-data grant FEL holds to be a full limit window
-// old (lib/breath/rampGate.ts RAMP_LIMIT.firstUseAfterDays, consentOldEnough). After either erase the ledger starts
-// again, so the breath waits a week — by which time every erased use has rolled out of the window anyway. Privacy §5
-// says so (lib/policies.ts), and lib/breath/ramp-route.test.ts runs erase → re-intake → POST through this function.
+// limit was only as strong as the athlete's willingness to press erase. The gate still needs the OLDEST health-data
+// grant FEL holds to be a full limit window old (lib/breath/rampGate.ts RAMP_LIMIT.firstUseAfterDays, consentOldEnough).
+// MIRROR-COACH-ERASE (owner 07:53 PT): that clock is NOT restarted by deleting the ledger. The rows stay, so a grant
+// already a full window old stays old enough after an erase. BreathLog rows are still deleted, so the rolling use
+// count can clear; the owner accepted that. A first opt-in, whose oldest grant is new, still waits the week.
 //
 // Kept out of the route files so it can be tested against a fake client (vitest does not collect app/).
 
@@ -113,7 +117,7 @@ export interface HealthErasedCounts {
   healthIntakes: number;
   /** PainCheckIn rows deleted. */
   painCheckIns: number;
-  /** HealthConsent rows deleted (both scopes: health_data and every coach_view grant). */
+  /** Always 0. HealthConsent rows are kept (live grants and revoked rows); erase does not delete them. */
   healthConsents: number;
   /** ReadinessCheckIn rows deleted (MIRROR-COACH P6): every daily check-in. */
   readinessCheckIns: number;
@@ -129,34 +133,32 @@ export interface ErasedCounts extends HealthErasedCounts {
 }
 
 /**
- * Erase ONLY the health data: the intake, every pain check-in, every daily readiness check-in (MIRROR-COACH P6), every
- * breath-toolbox use (MIRROR-COACH P7), and the consent ledger itself (both scopes). This is the narrow action Health data in account settings offers next to
- * "withdraw" — see the file header for why it has to stay separate from `erasePrqData`. Idempotent, same as that
- * function. The ledger goes LAST, so a failure part-way through (outside a transaction) never leaves health rows
- * behind with no consent record explaining why they were collected.
+ * Erase ONLY the health data: the intake, every pain check-in, every daily readiness check-in (MIRROR-COACH P6) and
+ * every breath-toolbox use (MIRROR-COACH P7). HealthConsent is not touched — live grants and revoked rows stay, as
+ * proof of agreement and withdrawal (MIRROR-COACH-ERASE). `healthConsents` in the result is always 0. This is the
+ * narrow action Health data in account settings offers next to "withdraw". Idempotent.
  */
 export async function eraseHealthData(
-  db: Pick<Db, 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'>,
+  db: Pick<Db, 'healthIntake' | 'painCheckIn' | 'readinessCheckIn' | 'breathLog'>,
   userId: string,
 ): Promise<HealthErasedCounts> {
   const healthIntakes = await db.healthIntake.deleteMany({ where: { userId } });
   const painCheckIns = await db.painCheckIn.deleteMany({ where: { userId } });
   const readinessCheckIns = await db.readinessCheckIn.deleteMany({ where: { userId } });
   const breathLogs = await db.breathLog.deleteMany({ where: { userId } });
-  const healthConsents = await db.healthConsent.deleteMany({ where: { userId } });
   return {
-    healthIntakes: healthIntakes.count, painCheckIns: painCheckIns.count, healthConsents: healthConsents.count,
+    healthIntakes: healthIntakes.count, painCheckIns: painCheckIns.count, healthConsents: 0,
     readinessCheckIns: readinessCheckIns.count, breathLogs: breathLogs.count,
   };
 }
 
 /**
  * Erase the user's PRQ entries, movement history and health data (intake, pain check-ins, readiness check-ins,
- * breath-toolbox uses, consent records). Pass a transaction client, so all of it goes together or not at all. Idempotent: a second call
+ * breath-toolbox uses). HealthConsent rows are kept. Pass a transaction client, so all of it goes together or not at all. Idempotent: a second call
  * deletes nothing and says so.
  */
 export async function erasePrqData(
-  db: Pick<Db, 'prqEntry' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog'>,
+  db: Pick<Db, 'prqEntry' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'readinessCheckIn' | 'breathLog'>,
   userId: string,
 ): Promise<ErasedCounts> {
   const prq = await db.prqEntry.deleteMany({ where: { userId } });

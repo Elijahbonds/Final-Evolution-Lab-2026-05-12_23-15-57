@@ -432,7 +432,7 @@ function HealthDataSection() {
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in, your Dial-Up Breath uses and your consent records. Never touches a workout plan or your PRQ history. This is permanent.</span>
+            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
             <button
               onClick={handleErase}
               disabled={erasing}

@@ -140,10 +140,10 @@ describe('eraseHealthData: the narrow health-only erase (Health data settings)',
   it('deletes only the health tables (readiness check-ins included), of this user only, and never a PRQ entry or a movement-history row', async () => {
     const f = fakeDb();
     const erased = await eraseHealthData(f.db, 'u1');
-    expect(erased).toEqual({ healthIntakes: 1, painCheckIns: 2, healthConsents: 1, readinessCheckIns: 2, breathLogs: 2 });
+    expect(erased).toEqual({ healthIntakes: 1, painCheckIns: 2, healthConsents: 0, readinessCheckIns: 2, breathLogs: 2 });
     expect(f.store.healthIntake.map((r) => r.id)).toEqual(['hi9']);
     expect(f.store.painCheckIn.map((r) => r.id)).toEqual(['pc9']);
-    expect(f.store.healthConsent.map((r) => r.id)).toEqual(['hc9']);
+    expect(f.store.healthConsent.map((r) => r.id).sort()).toEqual(['hc1', 'hc9']);
     expect(f.store.readinessCheckIn.map((r) => r.id)).toEqual(['rc9']);
     // MIRROR-COACH P7: the breath log goes with it, this user's only
     expect(f.store.breathLog.map((r) => r.id)).toEqual(['bl9']);
@@ -163,20 +163,19 @@ describe('the delete erases the movement history too', () => {
   it('deletes the PRQ entries, every WorkoutScan row and the health data too; nobody else\'s, and not a bought plan', async () => {
     const f = fakeDb();
     const erased = await erasePrqData(f.db, 'u1');
-    expect(erased).toEqual({ prqEntries: 2, movementHistory: KINDS.length, healthIntakes: 1, painCheckIns: 2, healthConsents: 1, readinessCheckIns: 2, breathLogs: 2 });
+    expect(erased).toEqual({ prqEntries: 2, movementHistory: KINDS.length, healthIntakes: 1, painCheckIns: 2, healthConsents: 0, readinessCheckIns: 2, breathLogs: 2 });
     expect(f.store.prqEntry.map((r) => r.id)).toEqual(['p9']);
     expect(f.store.workoutScan.map((r) => r.id)).toEqual(['w9']);
     expect(f.store.healthIntake.map((r) => r.id)).toEqual(['hi9']);
     expect(f.store.painCheckIn.map((r) => r.id)).toEqual(['pc9']);
-    expect(f.store.healthConsent.map((r) => r.id)).toEqual(['hc9']);
+    expect(f.store.healthConsent.map((r) => r.id).sort()).toEqual(['hc1', 'hc9']);
     expect(f.store.readinessCheckIn.map((r) => r.id)).toEqual(['rc9']);
     expect(f.store.breathLog.map((r) => r.id)).toEqual(['bl9']);
     expect(f.store.workoutPlan).toHaveLength(1);                      // WorkoutPlan.scanId is SetNull: plans stay
-    // MIRROR-COACH P6: readiness check-ins go before the consent ledger — the ledger is always the last thing erased,
-    // so no health row is ever left behind without the consent record that explains it.
+    // MIRROR-COACH-ERASE: the consent ledger is not deleted. Health rows go; HealthConsent stays.
     expect(f.calls).toEqual([
       'prqEntry.deleteMany', 'workoutScan.deleteMany',
-      'healthIntake.deleteMany', 'painCheckIn.deleteMany', 'readinessCheckIn.deleteMany', 'breathLog.deleteMany', 'healthConsent.deleteMany',
+      'healthIntake.deleteMany', 'painCheckIn.deleteMany', 'readinessCheckIn.deleteMany', 'breathLog.deleteMany',
     ]);
   });
 

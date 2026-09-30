@@ -11,7 +11,8 @@
 // WHAT IT READS, and from where (P5/P6's modules, never re-derived):
 //   · User.dobYear — the age gate (lib/mirror/youth.ts via rampGate);
 //   · the 'health_data' consent ledger — lib/health/consent.ts activeHealthDataConsent, and the ledger's OLDEST grant
-//     (rampGate.ts consentOldEnough: an erase-and-re-opt-in cannot reset the weekly count). WITHOUT a live grant this
+//     (rampGate.ts consentOldEnough: a first opt-in waits a full window; erase keeps the ledger, so it does not
+//     restart that clock). WITHOUT a live grant this
 //     file does not read the pain, readiness or intake-history rows at all (P6's rule for readiness: FEL does not keep
 //     processing health data after consent is withdrawn), and the verdict is simply "no".
 //     MIRROR-COACH P7 FIX (2026-09-29, review): this line used to say the INTAKE was not read either, but loadToday
