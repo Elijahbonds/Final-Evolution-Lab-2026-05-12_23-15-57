@@ -4,9 +4,15 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
 import { prqScore, prqGrade, PRQ_ATTRS } from '@/lib/prq';
+import { withPainSafety } from '@/lib/coach/aiSystemPrompt';
+import { isMinorForMirror } from '@/lib/mirror/youth';
 
 export const dynamic = 'force-dynamic';
 
+// MIRROR-COACH P5 (2026-09-29): this is the LIVE AI coach — lib/coach-service.ts's buildSystemPrompt has no real
+// caller anywhere in the app (see lib/coach/aiSystemPrompt.ts's own header) and is not what this route uses. The
+// pain-safety addendum (FEL's disclosure + the same four rules lib/health/painRule.ts's decide() enforces in the
+// check-in loop) is appended below, once, to whatever this SYSTEM_PROMPT ends up being for a given request.
 const SYSTEM_PROMPT = `You are Coach Elijah Bonds — a Neuro-Performance Coach and Professional Dunker.
 You teach the Bonds Bounce Blueprint and exercise catalogue through the Final Evolution Lab platform.
 
@@ -56,6 +62,12 @@ export async function POST(req: Request) {
     // Fetch lesson completion count
     const lessonCount = await prisma.lessonProgress.count({ where: { userId } });
 
+    // MIRROR-COACH P5 FIX (2026-09-29, code review): the chat's minor-safety rule (aiSystemPrompt.ts PAIN_SAFETY_RULES
+    // rule 2) used to depend entirely on the model inferring age from conversation. Ground it in the same fact every
+    // other age gate in this app reads (lib/mirror/youth.ts isMinorForMirror(User.dobYear)).
+    const learnerUser = await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } });
+    const isMinor = isMinorForMirror(learnerUser?.dobYear ?? null);
+
     // Fetch full exercise catalogue for context
     const exercises = await prisma.exercise.findMany({
       where: { published: true },
@@ -77,7 +89,7 @@ export async function POST(req: Request) {
 
     const learnerContext = `\n\nLEARNER PROFILE:\n- PRQ Score: ${score} (${grade.label})\n- Attributes: ${PRQ_ATTRS.map(a => `${a}: ${Math.round(attrs[a])}`).join(', ')}\n- Weakest stat: ${weakest} (${Math.round(weakestVal)})\n- Lessons completed: ${lessonCount}\n- Streak days: ${profile?.streakDays ?? 0}`;
 
-    const fullSystem = SYSTEM_PROMPT + learnerContext + `\n\nEXERCISE CATALOGUE:\n${catalogueText}`;
+    const fullSystem = withPainSafety(SYSTEM_PROMPT + learnerContext + `\n\nEXERCISE CATALOGUE:\n${catalogueText}`, { isMinor });
 
     // Call LLM with streaming
     const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {

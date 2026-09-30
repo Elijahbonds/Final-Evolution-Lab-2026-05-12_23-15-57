@@ -138,23 +138,24 @@ describe('S-2: the back arrow never leaves the screen', () => {
 });
 
 describe('/screen/privacy: plain words, no request, no form', () => {
-  it('renders what the screen keeps and where, the clear button, the contact address and the stop line', async () => {
+  // CHANGED (SCREEN-FIX-2, retest 1 S-11): the owner's verbatim text (lib/screen/link-walk.test.tsx pins it word for
+  // word); was the SCREEN-FIX points, a mailto link, the stop line and a link to the app's /privacy
+  it('renders the owner\'s text, the clear button and the contact address as plain text; no link out', async () => {
     const { default: Page } = await import('@/app/screen/privacy/page');
-    const { SCREEN_CONTACT_EMAIL, PRIVACY_POINTS, DONE_CLEAR, STOP_LINE } = await import('./copy');
+    const { SCREEN_CONTACT_EMAIL, PRIVACY_POINTS, DONE_CLEAR } = await import('./copy');
     const h = renderToStaticMarkup(createElement(Page));
     const t = text(h);
     for (const p of PRIVACY_POINTS) expect(t).toContain(p);
-    expect(t).toMatch(/Nothing leaves this device/);
-    expect(t).toMatch(/never recorded and never sent/);
-    expect(t).toMatch(/session storage until you clear them or close the tab/);
+    expect(t).toMatch(/The video isn't uploaded, recorded or saved/);
+    expect(t).toMatch(/The only thing kept is your age answer, in this tab/);
+    expect(t).toMatch(/your results stay in this browser tab only/);
     expect(h).toMatch(/<button[^>]*data-done-clear[^>]*>Done, clear my results</);
     expect(t).toContain(DONE_CLEAR);
-    expect(t).toContain(STOP_LINE);
     expect(SCREEN_CONTACT_EMAIL).toBe('FinalEvolution.us@gmail.com');
-    expect(h).toContain(`href="mailto:${SCREEN_CONTACT_EMAIL}"`);
-    expect(t).toContain(SCREEN_CONTACT_EMAIL);
+    expect(h).not.toContain('mailto:');
+    expect(t).toContain(`Questions? Final Evolution LLC, ${SCREEN_CONTACT_EMAIL}`);
     expect(h).not.toMatch(/<form|<input|CONTACT_EMAIL/);
-    expect(h).toMatch(/href="\/privacy"/);                      // the app-wide policy, linked, not changed
+    expect(h).not.toMatch(/href="\/privacy"/);
   });
 });
 
