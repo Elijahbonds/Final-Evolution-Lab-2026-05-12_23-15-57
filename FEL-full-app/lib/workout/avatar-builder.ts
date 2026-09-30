@@ -1,43 +1,27 @@
 /**
- * lib/workout/avatar-builder.ts
- * =============================
- * PURE mini-avatar spec builder. From movement metrics we derive body
- * proportions + a palette so the rendered mini-avatar reads as "you". This is a
- * deterministic spec; the R3F renderer applies it to the canonical rig (or a
- * preset fallback if the model lacks blendshapes).
+ * lib/workout/avatar-builder.ts — RETIRED (REACH-FREEZE, 2026-09-29; Gameplay Systems' spec, Decision 4)
+ * ======================================================================================================
+ * This mapped a movement scan onto the body: jump height → heightScale, squat depth → buildScale, running cadence →
+ * reachScale. So jumping higher made the avatar taller, and resolveIdentity played that height in every mode. Owner rule:
+ * body shape is cosmetic, and scans and fitness data never write body scales.
+ *
+ * What is left is a shim, because components/workout-view.tsx still imports it and that file is held by another lane
+ * (mirror-coach). `buildAvatarSpec` ignores the metrics: every scan is the standard frame, with the palette overrides
+ * still honoured. /api/v1/workout/scan stores and returns that neutral spec; old rows keep what they were saved with and
+ * nothing reads them for a body. DELETE this file when workout-view.tsx imports standardAvatarSpec instead
+ * (~/Claude/outbox/reach-freeze-routed.md R1, then R7).
  */
 
 import type { MovementMetrics } from './movement-screen';
+import { standardAvatarSpec, type AvatarSpec } from '../babylon/core/avatarSpec';
 
-export interface AvatarSpec {
-  heightScale: number;   // 0.9 .. 1.12
-  buildScale: number;    // torso/limb thickness 0.9 .. 1.15
-  reachScale: number;    // arm length 0.95 .. 1.1
-  palette: { skin: string; primary: string; accent: string };
-  stance: 'athletic' | 'tall' | 'compact';
-}
+export type { AvatarSpec } from '../babylon/core/avatarSpec';
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.max(0, Math.min(1, t));
-
+/** @deprecated The metrics are ignored — a scan never sets a body's size. Use standardAvatarSpec. */
 export function buildAvatarSpec(
   m: MovementMetrics,
   opts?: { skin?: string; primary?: string; accent?: string }
 ): AvatarSpec {
-  // Taller jumpers/longer cadence bias toward a taller stance; deeper squat
-  // depth biases toward a more athletic/compact build. Purely cosmetic.
-  const heightScale = lerp(0.94, 1.1, (m.jumpHeightCm - 30) / 45);
-  const buildScale = lerp(1.12, 0.94, (m.depthDeg - 70) / 50);
-  const reachScale = lerp(0.97, 1.08, (m.cadenceSpm - 150) / 50);
-  const stance: AvatarSpec['stance'] = heightScale > 1.05 ? 'tall' : buildScale > 1.05 ? 'compact' : 'athletic';
-  return {
-    heightScale: Number(heightScale.toFixed(3)),
-    buildScale: Number(buildScale.toFixed(3)),
-    reachScale: Number(reachScale.toFixed(3)),
-    palette: {
-      skin: opts?.skin ?? '#C68642',
-      primary: opts?.primary ?? '#00E5FF',
-      accent: opts?.accent ?? '#A855F7',
-    },
-    stance,
-  };
+  void m;
+  return standardAvatarSpec(opts);
 }

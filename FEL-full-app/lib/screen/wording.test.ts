@@ -98,7 +98,8 @@ describe('owner addendum 1 (and the 8:13 AM update): one contact address, in one
 });
 
 describe('owner addendum 3: the stop line', () => {
-  it('reads "Not a medical exam. If anything hurts, stop."', () => {
-    expect(COPY.STOP_LINE).toBe('Not a medical exam. If anything hurts, stop.');
+  // CHANGED (SCREEN-FIX-2, retest 1 S-13): was 'Not a medical exam. If anything hurts, stop.' (DISCLAIMER says the first half, once)
+  it('reads "If anything hurts, stop."', () => {
+    expect(COPY.STOP_LINE).toBe('If anything hurts, stop.');
   });
 });

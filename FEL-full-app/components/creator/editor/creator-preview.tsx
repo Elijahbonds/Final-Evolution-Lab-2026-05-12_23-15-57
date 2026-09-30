@@ -16,7 +16,7 @@
 // carries no `Kit_*` meshes at all. It is not naked — it is a scan of a DRESSED person, jacket, shorts,
 // shoes and hair baked into that one mesh, which is precisely why none of it can be swapped.
 //
-// So on today's hero the preview shows skin tone and the three proportions, and CANNOT show garments,
+// So on today's hero the preview shows skin tone and the proportions, and CANNOT show garments,
 // hair or the kit tints — there is nothing in the scene for `applyKit`, `applyHairStyle` or the palette
 // tints to act on. The forge body on disk (fel-hero.glb) does carry all of them: Kit_tops_top_lab,
 // Kit_shoes_shoes_evo, six Hair_* meshes. The Closet's preview has exactly the same gap, for the same
@@ -39,7 +39,9 @@
 // multiplied the hero by 1.01 ten times instead of showing 110%, and the bug would have looked like a
 // runaway animation rather than an arithmetic one. So the root is set ABSOLUTELY here, from the scale the
 // spawn arrived with. (2026-09-14: that is now playerIdentity.applyProportions itself — absolute from the base, girth on
-// the root, reach on the arm joints — so the preview and the game share one implementation, not two lists.)
+// the root — so the preview and the game share one implementation, not two lists. REACH-FREEZE, 2026-09-29: the same pipe
+// clamps height and build to the cosmetic range and keeps the arms at their bind length, so the preview can show nothing a
+// spawn would not.)
 
 import { useEffect, useRef } from 'react';
 import type { PreviewBinding } from '@/lib/creator/editor/previewBinding';

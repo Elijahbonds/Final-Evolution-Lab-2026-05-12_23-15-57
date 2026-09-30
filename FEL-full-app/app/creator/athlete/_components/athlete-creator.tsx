@@ -20,6 +20,7 @@ const CreatorPreview = dynamic(() => import('@/components/creator/editor/creator
 import { SIDEBAR } from '@/lib/creator/schema/sections';
 import { resolve, LOOK_SECTIONS, type CreatorBuild, type Issue } from '@/lib/creator/schema/resolve';
 import { emptyAthleteProfile, exportProfile, importProfile } from '@/lib/creator/schema/athleteProfile';
+import { normalizeVitals } from '@/lib/creator/schema/vitals';
 import type { RowValue } from '@/lib/creator/editor/rowState';
 import type { PrqAxisId } from '@/lib/creator/schema/types';
 
@@ -145,7 +146,7 @@ export default function AthleteCreator({ axes, profileId }: Props) {
       traits: r.profile.traits as Record<string, RowValue>,
       hotZones: r.profile.hot_zones as Record<string, RowValue>,
       mechanics: r.profile.mechanics as Record<string, RowValue>,
-      vitals: r.profile.vitals as Record<string, RowValue>,
+      vitals: normalizeVitals(r.profile.vitals) as Record<string, RowValue>,   // REACH-FREEZE: an old file's Height/Build clamped, no Reach
       appearance: r.profile.appearance as Record<string, RowValue>,
       body: r.profile.body as Record<string, RowValue>,
       // Split back out by asking each table which ids are its own, rather than by remembering the merge.
