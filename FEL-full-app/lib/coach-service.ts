@@ -19,6 +19,8 @@
  */
 
 import { prisma } from '@/lib/db';
+import { abacusEnabled } from '@/lib/abacus/killSwitch';
+import { AI_COMING_SOON_MESSAGE } from '@/lib/abacus/aiStatus';
 
 // ---------------------------------------------------------------------------
 // LLM endpoint
@@ -358,6 +360,8 @@ export async function callCoachLLM(
   systemPrompt: string,
   history: ChatMessage[],
 ): Promise<string> {
+  // ABACUS-KILL: no request leaves while the switch is off (lib/abacus/killSwitch.ts).
+  if (!abacusEnabled()) throw new CoachServiceError(AI_COMING_SOON_MESSAGE.coach, 503);
   const apiKey = process.env.ABACUSAI_API_KEY;
   if (!apiKey) {
     throw new CoachServiceError('Coach is not configured (missing ABACUSAI_API_KEY).', 503);

@@ -1,3 +1,4 @@
+import { abacusEnabled, aiComingSoonResponse } from '@/lib/abacus/killSwitch';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -31,6 +32,7 @@ BLUEPRINT PHILOSOPHY:
 
 export async function POST(req: Request) {
   try {
+    if (!abacusEnabled()) return aiComingSoonResponse('coach');
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
