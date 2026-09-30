@@ -67,6 +67,7 @@ import {
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
+import { kartHudWords, setRingGlyph, RideHudSwitch } from './rideHud';   // SKATE-SCORE (GC-13): a body's words, and no gamepad puck
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -148,6 +149,8 @@ const KART_FIELD_EDGE = 0.15;
 let worldHeight: ((x: number, z: number) => number) | null = null;
 let race: RaceProgress = startRace();
 const prevPos = new Vector3();
+/** SKATE-SCORE (GC-13): whose words the HUD says (a body's, or a pad's / the keys' / touch's), and the ring puck's switch. */
+const hudSwitch = new RideHudSwitch();
 
 const S = {
   input: { steer: 0, throttle: 0, brake: 0, drift: false, fire: false } as KartInput,
@@ -724,6 +727,9 @@ function tickField(ctx: ModeContext, dt: number): void {
 function pushHud(ctx: ModeContext): void {
   if (!state) return;
   const { dist } = toNextGate(race, course, state.pos);
+  // SKATE-SCORE (GC-13): the words of whoever drives — a body the camera sees grips, turns and hops; the boost (RB) and the
+  // items (A) stay on the pad / touch deck by design, and the HUD says so instead of "hold RB / Shift"
+  const words = kartHudWords(!!(ctx.body?.() ?? null), S.start.go);
   ctx.setHud({
     speed: Math.round(state.speed * 3.6),                 // km/h reads better than m/s on a kart
     ...boost.hud(),
@@ -744,8 +750,8 @@ function pushHud(ctx: ModeContext): void {
     delta: bestGhost ? deltaLabel(ghostDelta) : '',
     chasing: bestGhost ? `PB ${(bestGhost.timeMs / 1000).toFixed(1)}s` : '',
     cup: cupLine,
-    hint: S.start.go ? 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item'
-      : 'THROTTLE DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" IT BOGS',
+    hint: words.hint,   // the pad's words exactly as they were (rideHud.KART_PAD_HINT / KART_PAD_START_HINT) unless a body drives
+    boostHint: words.boostHint,
   } satisfies Record<string, HudValue>);
 }
 
@@ -824,6 +830,7 @@ return {
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
+    hudSwitch.reset();   // SKATE-SCORE (GC-13)
     S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0, minis: 0 };
     S.draft = noDraft(); S.draftSaid = false; S.mini = noMini();
     S.start = newStart(); S.burnT = 0; S.wrongT = 0;
@@ -1083,6 +1090,13 @@ return {
     } else { offRoadTick = 0; offRoadSaid = false; }
     const bev = boost.update(dt, S.boostHeld, true);
     ctx.stamina?.(boost.meter);   // PLAYER RING: the ring's arc is the boost tank
+    // SKATE-SCORE (GC-13): the ring's puck — the player's icon, a gamepad for most players — is off while a body drives and
+    // back for a pad; the ring (the boost tank) stays. Once per switch, re-asserted once a second (the harness may mount late).
+    {
+      const sw = hudSwitch.next(!!(ctx.body?.() ?? null));
+      if (sw !== null) setRingGlyph(ctx.scene.meshes, !sw);
+      else if (hudSwitch.isBody && hudSwitch.glyphDue(dt)) setRingGlyph(ctx.scene.meshes, false);
+    }
     S.input.boostK = boost.k;
     // ITEMS: a boost balloon's ZIP rides the same ramp the meter does; the shield and a spin count down
     if (S.zipT > 0) { S.zipT = Math.max(0, S.zipT - dt); S.input.boostK = Math.max(S.input.boostK, 1); }

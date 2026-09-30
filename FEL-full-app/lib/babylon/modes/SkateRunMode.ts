@@ -998,7 +998,11 @@ export const SkateRunMode: ModeDefinition = (() => {
       bodyVerbs(ctx);
       // MOVEMENT PLAY P8: a BODY's carve never nudges the spin — held from before the player's hop into the rider's longer
       // air it spun the skater (the pad's own stick keeps its air control)
-      if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickFromBody ? 0 : stickX, 0);
+      // SKATE-SCORE (SK-2 follow-up, owner-approved): nor does the pad's once a NAMED spin is caught — the direction held to
+      // choose it (right + B is the BS 180) kept turning the rider back after the catch: 46° off an uncharged pop, 74° off a
+      // half-charged one (a sketchy landing), 103° off a full one. A straight air keeps the stick's air control exactly.
+      const caughtSpin = air.state.spinTarget !== 0;
+      if (!rig.rider.grounded && air.state.airborne) air.update(dt, stickFromBody || caughtSpin ? 0 : stickX, 0);
       if (rig.rider.grounded && air.state.airborne && air.state.airtime > 0.15 && bailBeatT > 0) {
         // a rider who was ALREADY falling (a slipped grind, a slam) hitting the ground is the bail landing, not a landing
         // to grade — grading it read "touchdown clean" and paid a land punch on top of the fall (SKATE-MAJOR)

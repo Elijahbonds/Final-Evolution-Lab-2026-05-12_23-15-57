@@ -52,11 +52,13 @@ function popFlat(vy: number): Flight {
   const air = new AirControl(); air.launch();
   return { air, book: new GrabBook(), y: 0, vy, t: 0 };
 }
-/** Fly `sec` seconds (or to the ground), the pad's L stick held at `stickX` (SkateRunMode feeds it to the air as it is). */
+/** Fly `sec` seconds (or to the ground), the pad's L stick held at `stickX` — SkateRunMode feeds it to the air until a NAMED
+ *  spin is caught, then holds it (`caughtSpin`, the SK-2 follow-up). */
 function fly(f: Flight, sec = Infinity, stickX = 0): boolean {
   for (let n = 0; n < 1000 && f.t < sec; n++) {
     f.vy -= SKATE_GRAVITY * DT; f.y += f.vy * DT; f.t += DT;
-    f.air.update(DT, stickX, 0);
+    const caughtSpin = f.air.state.spinTarget !== 0;
+    f.air.update(DT, caughtSpin ? 0 : stickX, 0);
     if (f.y <= 0) return true;
   }
   return f.y <= 0;
@@ -178,17 +180,23 @@ describe('SK-2: a spin or flip that finishes lands clean; an unfinished one stil
     expect(touchdown(f, landed, combo, ROLLING / 16.8).grade).toBe('clean');   // speed01 at 6 m/s (SKATE_TUNING.maxSpeed 16.8)
     expect(landed.total).toBe(1);
   });
-  it('ROUTED (skate-score-routed.md §2): the held stick un-spins a caught BS 180 — sketchy off a charged pop until the hold lands', () => {
-    // the air nudge is movement-play's pinned pad line (rideBody.gate.test.ts G10), so this lane does not change it; measured
-    // here so the routed proposal carries its numbers: 46° short off an uncharged pop, 74° off a half-charged one
+  it('SK-2 follow-up (owner-approved): a caught spin holds the pad\'s yaw — a charged BS 180 with the stick held lands clean', () => {
     const t = trick('bs180');
+    // what the held stick did before the hold (the air nudged every frame): 46° short off an uncharged pop, 74° off a half one
     const unheld = (charge: number): { error: number; deg: number } => {
-      const g = popFlat(popVy(ROLLING, charge)); fly(g, 0.08, 1); throwTrick(g.air, g.book, t); fly(g, Infinity, 1);
+      const g = popFlat(popVy(ROLLING, charge)); fly(g, 0.08, 1); throwTrick(g.air, g.book, t);
+      for (let n = 0; n < 200 && g.y > 0; n++) { g.vy -= SKATE_GRAVITY * DT; g.y += g.vy * DT; g.air.update(DT, 1, 0); }
       return { error: skateLandingError01(g.air.state), deg: Math.abs(g.air.state.rotation.y) * 180 / Math.PI };
     };
     expect(unheld(0).deg).toBeLessThan(140);
-    expect(unheld(0).error).toBeLessThan(0.25);                                                  // clean at a roll
     expect(gradeLanding({ error01: unheld(0.5).error, slopeMismatch01: 0, speed01: 0.3 })).toBe('sketchy');
+    // with the hold, as the mode flies it: every charge lands the 180 clean, turned within 10° of the half turn
+    for (const charge of [0, 0.5, 1]) {
+      const f = popFlat(popVy(ROLLING, charge)), landed = new LandedTricks(), combo = new ComboChain(undefined, 'air');
+      fly(f, 0.08, 1); throwTrick(f.air, f.book, t); fly(f, Infinity, 1);
+      expect(Math.abs(f.air.state.rotation.y) * 180 / Math.PI, `charge ${charge}`).toBeGreaterThan(170);
+      expect(touchdown(f, landed, combo, 0.3).grade, `charge ${charge}`).toBe('clean');
+    }
   });
   it('pad B / Y after a flat ollie with the stick forward: INDY lands clean; Y throws the JAPAN AIR off a charged pop', () => {
     const f = popFlat(popVy(ROLLING, 0)), landed = new LandedTricks(), combo = new ComboChain(undefined, 'air');
@@ -356,6 +364,7 @@ describe('the wiring: SkateRunMode uses all of it (source scan)', () => {
     expect(src).toMatch(/fitToAir\(\(b\) => airTrickFor\('skate', held, e\.btn as BoardTrick\['btn'\], b\), a\.budget, a\.left\)/);
     expect(src).toMatch(/fitToAir\(\(b\) => spinTrickFor\('skate', it\.dir, b\), a\.budget, a\.left\)/);
     expect(src).toMatch(/const still = !!named && named\.spinDeg === 0 && named\.flipDeg === 0 && named\.grab === 'none';/);
+    expect(src).toMatch(/const caughtSpin = air\.state\.spinTarget !== 0;\s*if \(!rig\.rider\.grounded && air\.state\.airborne\) air\.update\(dt, stickFromBody \|\| caughtSpin \? 0 : stickX, 0\);/);
   });
   it('SK-3: the card reads the landed count, and the touchdown and the save feed it', () => {
     expect(src).toMatch(/tricksLanded: landed\.total \}/);

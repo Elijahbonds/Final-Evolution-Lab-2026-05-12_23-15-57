@@ -83,6 +83,18 @@ describe('GC-13: the ring\'s glyph puck', () => {
   });
 });
 
+describe('GC-13 wiring: VelocityKartMode says the words of whoever drives (source scan)', () => {
+  const src = readFileSync(path.join(__dirname, 'VelocityKartMode.ts'), 'utf8');
+  it('the hint and the boost line come from rideHud, and the puck switches with the body', () => {
+    expect(src).toMatch(/const words = kartHudWords\(!!\(ctx\.body\?\.\(\) \?\? null\), S\.start\.go\);/);
+    expect(src).toMatch(/hint: words\.hint,/);
+    expect(src).toMatch(/boostHint: words\.boostHint,/);
+    expect(src).toMatch(/const sw = hudSwitch\.next\(!!\(ctx\.body\?\.\(\) \?\? null\)\);\s*if \(sw !== null\) setRingGlyph\(ctx\.scene\.meshes, !sw\);/);
+    expect(src).toMatch(/hudSwitch\.reset\(\);/);
+    expect(src).not.toContain('hold RB / Shift to burn it');   // the pad's words live in rideHud only
+  });
+});
+
 describe('GC-13 wiring: SkateRunMode says the words of whoever rides (source scan)', () => {
   const src = readFileSync(path.join(__dirname, 'SkateRunMode.ts'), 'utf8');
   it('switches the HUD and the puck on the body, and starts on the pad\'s words', () => {
