@@ -93,7 +93,7 @@ import {
 import Waveform from './ui/Waveform';
 import FlipLesson from './FlipLesson';
 import { UploadPicker, shelfSources, uploadSourceMeta, useFlipPack } from './FlipShelf';
-import { lessonAutoLoaded, lessonDismissed, padsFromCuts, rememberLessonAutoLoaded, rememberLessonDismissed, type LessonStore } from './flipPack';
+import { lessonAutoLoaded, lessonDismissed, lessonSchedule, padsFromCuts, rememberLessonAutoLoaded, rememberLessonDismissed, stopDemoHits, type LessonHit, type LessonStore } from './flipPack';
 import { OWN_RIGHTS_TICK, tickedUploadNote, uploadNeedsTick } from './uploadPrivacy';
 import { padGain } from './phonePad';
 
@@ -269,6 +269,8 @@ declare global {
       quantize?: boolean; lastRecordedStep?: number | null; cuts?: number[];
       /** the decoded source's length and rate (the waveform's samples) and every pad's slice, in the stored units */
       sourceLength?: number | null; liveRate?: number | null; slicesAll?: (Slice | null)[];
+      /** MUSIC-SUITE P10: the lesson demo's last plan — each hit's pad and its audio-clock start */
+      demoPlan?: { pad: number; when: number }[];
     };
   }
 }
@@ -481,18 +483,28 @@ export default function FlipPad({ engine, playing, playhead, steps, flip: flipAl
   const tickSaid = useRef(false);
   const lastRec = useRef<number | null>(null);
   /**
+   * Start pad `pad`'s sound at `when` on the audio clock (now when left out): the BAKED chop (the buffer its row plays),
+   * heard through the strip of the row it goes to (MUSIC-SUITE P5). Null when there is no engine or no sound on the pad.
+   * MUSIC-SUITE P10: shared by a tap (play) and the lesson's demo (scheduleDemo), which starts every hit ahead of time.
+   */
+  const startPad = useCallback((pad: number, when?: number, velocity?: number | null): { node: AudioBufferSourceNode; gain: GainNode } | null => {
+    if (!engine) return null;
+    const b = padBuffer(pad); if (!b) return null;
+    const ctx = engine.context; if (ctx.state === 'suspended') void ctx.resume();
+    const i = rowSlotFor(flipRows, trackIds, bank, pad)?.slot ?? pad;
+    const node = ctx.createBufferSource(); node.buffer = b;
+    const g = ctx.createGain(); g.gain.value = padGain(velocity); node.connect(g).connect(engine.channelInput(flipSampleId(i)));
+    if (when === undefined) node.start(); else node.start(when);
+    return { node, gain: g };
+  }, [engine, padBuffer, flipRows, trackIds, bank]);
+  /**
    * Play pad `pad` of the bank on the pads; ARM REC writes it into its row unless it is an `audition` (the waveform).
    * MUSIC-SUITE P5 (phone-mpc): a paired phone's `hit` brings its measured velocity (the hit's gain, like a grid step's —
    * phonePad.padGain — and the recorded step's) and its tap time (moved back by half the round trip), which ARM REC places.
    */
   const play = useCallback((pad: number, audition = false, hit?: PadHit) => {
-    if (!engine) return;
-    const b = padBuffer(pad); if (!b) return;
-    const ctx = engine.context; if (ctx.state === 'suspended') void ctx.resume();
-    // MUSIC-SUITE P5: the BAKED chop (the buffer its row plays), heard through the strip of the row it goes to
-    const i = rowSlotFor(flipRows, trackIds, bank, pad)?.slot ?? pad;
-    const node = ctx.createBufferSource(); node.buffer = b;
-    const g = ctx.createGain(); g.gain.value = padGain(hit?.velocity); node.connect(g).connect(engine.channelInput(flipSampleId(i))); node.start();
+    const b = padBuffer(pad);
+    if (!b || !startPad(pad, undefined, hit?.velocity)) return;
     setLit(pad); setTimeout(() => setLit((l) => (l === pad ? null : l)), 120);
     if (!audition && recArmRef.current && playingRef.current && needsTickRef.current) {
       if (!tickSaid.current) { tickSaid.current = true; say(TICK_LINE); }   // MUSIC-SUITE P5 FIX PASS: not recorded before the tick
@@ -504,7 +516,42 @@ export default function FlipPad({ engine, playing, playhead, steps, flip: flipAl
     }
     const w = window.__FEL_FLIP__;
     if (w) window.__FEL_FLIP__ = { ...w, lastPlayed: pad, lastRecordedStep: lastRec.current };
-  }, [engine, padBuffer, onRecordHit, steps, chopRow, flipRows, trackIds, bank, say]);
+  }, [startPad, padBuffer, onRecordHit, steps, chopRow, say]);
+
+  /**
+   * MUSIC-SUITE P10 (2026-09-29): THE LESSON'S DEMO ON THE AUDIO CLOCK. FlipLesson fired each demo hit from its own
+   * setTimeout — P5 measured the "PADS 1 → 16" playback drifting up to 14.0 ms (18.7 ms in the worst of 4 runs) off the
+   * theme's cuts, the timer's jitter, audible as a smeared groove at 90 BPM. Every hit is now started ahead of time at
+   * its exact audio-clock time (flipPack.lessonSchedule: one clock read, each hit's own offset), through the same row
+   * strip a tap uses; only the pad's light and the probe's lastPlayed follow on a timer (they are what you SEE). The
+   * returned stop fades whatever is sounding (10 ms) and silences every hit not yet started. Demo hits are auditions:
+   * never recorded (ARM REC reads only play()). Null when there is no engine (FlipLesson then falls back to its timer).
+   */
+  const scheduleDemo = useCallback((hits: readonly LessonHit[]): (() => void) | null => {
+    if (!engine || !hits.length) return null;
+    const ctx = engine.context;
+    const plan = lessonSchedule(hits, ctx.currentTime);
+    const started: { node: AudioBufferSourceNode; gain: GainNode }[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const h of plan) {
+      const s = startPad(h.pad, h.when);
+      if (!s) continue;
+      started.push(s);
+      timers.push(setTimeout(() => {
+        setLit(h.pad); setTimeout(() => setLit((l) => (l === h.pad ? null : l)), 120);
+        const w = window.__FEL_FLIP__;
+        if (w) window.__FEL_FLIP__ = { ...w, lastPlayed: h.pad };
+      }, Math.max(0, (h.when - ctx.currentTime) * 1000)));
+    }
+    const w = window.__FEL_FLIP__;
+    if (w) window.__FEL_FLIP__ = { ...w, demoPlan: plan.map((h) => ({ pad: h.pad, when: h.when })) };
+    return () => {
+      for (const t of timers) clearTimeout(t);
+      // a 10 ms fade on each hit's own gain, then its gain leaves the strip: a hit not started yet starts into nothing
+      // (MUSIC-SUITE P10 FIX: the plan is flipPack.stopDemoHits, pure and tested — it was inline Web Audio here)
+      stopDemoHits(started.map((x) => x.gain), ctx.currentTime);
+    };
+  }, [engine, startPad]);
 
   useEffect(() => { if (triggerRef) triggerRef.current = (pad, hit) => play(pad, false, hit); return () => { if (triggerRef) triggerRef.current = null; }; }, [play, triggerRef]);
   useEffect(() => {
@@ -652,7 +699,7 @@ export default function FlipPad({ engine, playing, playhead, steps, flip: flipAl
       {/* MUSIC-SUITE P5 (flip-content): CHOP THE FEL THEME — the first lesson, once per player (FlipLesson.tsx) */}
       {lessonOpen && (
         <FlipLesson pack={pack} packError={packError} loadedId={source?.id ?? null} ready={!!live}
-          onLoad={lessonLoad} onPad={(i) => play(i, true)} onClose={closeLesson} />
+          onLoad={lessonLoad} onPad={(i) => play(i, true)} onDemo={scheduleDemo} onClose={closeLesson} />
       )}
       {/* MUSIC-SUITE P5: FOUR BANKS — each its own source, slices and chops; a dot = the bank holds a sound */}
       <div data-qa="flip-banks" role="group" aria-label="Banks" style={S.row}>

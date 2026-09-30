@@ -148,6 +148,26 @@ export function toDb(x: number): number { return x > 0 ? Math.max(-90, 20 * Math
 /** The meter's fill (0..1) for a level: -60 dBFS empty, 0 dBFS full. */
 export function meterFill(x: number): number { return Math.max(0, Math.min(1, (toDb(x) + 60) / 60)); }
 
+/**
+ * MUSIC-SUITE P10 (2026-09-29): ONE FRAME OF THE BOOTH'S INPUT METER — the bar and its number from the same value.
+ * What was wrong (P4's open item, RecordBooth.tsx:563-566 then): the bar eased down (fast up, ×0.9 a frame) while the
+ * number beside it was the NEWEST block's raw peak, so one frame showed the bar at 89 % next to "−90 dB" — a loud hit
+ * the bar still showed and a number that said silence. Now the number reads the level the BAR shows (its fill on the
+ * −60…0 dBFS scale), so the two can never disagree; a bar eased below 1 % is empty and reads −∞.
+ */
+export const METER_DECAY = 0.9;
+export function meterFrame(prevFill: number, peak: number): { fill: number; label: string } {
+  const raw = Math.max(meterFill(peak), (Number.isFinite(prevFill) ? prevFill : 0) * METER_DECAY);
+  const fill = raw < 0.01 ? 0 : raw;
+  return { fill, label: meterLabel(fill) };
+}
+/** The number for a meter fill: the bar's own dBFS (−60…0), '−∞ dB' when the bar is empty. */
+export function meterLabel(fill: number): string {
+  if (!(fill > 0)) return '−∞ dB';
+  const db = Math.round(Math.min(1, fill) * 60 - 60);
+  return db === 0 ? '0 dB' : `−${Math.abs(db)} dB`;
+}
+
 /** The index of the first sample at or above `threshold` (absolute), or -1. The tests' and the probes' onset finder. */
 export function firstTransient(pcm: Float32Array, threshold = 0.2): number {
   for (let i = 0; i < pcm.length; i++) if (Math.abs(pcm[i]) >= threshold) return i;

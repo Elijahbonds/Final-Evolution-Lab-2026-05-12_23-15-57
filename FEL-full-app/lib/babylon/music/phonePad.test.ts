@@ -3,9 +3,12 @@
 // and the round-trip correction a phone tap gets before ARM REC records it and PERFORM judges it. The phone's half (the
 // velocity rule, the buzz, the controller page left unchanged for every other mode) is lib/controller-link/schemas/
 // padFeel.test.ts and components/controller-link/controller-page.test.tsx.
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { toastSpot } from './ui/gridMath';
 import {
-  MAX_ONE_WAY_MS, PAD_GAIN, PHONE_BANKS, RTT_WINDOW, medianRtt, oneWaySec, padGain, padVelocity, phoneBadgeShown, phoneCommand,
+  MAX_ONE_WAY_MS, PAD_GAIN, PHONE_BADGE_ANCHOR, PHONE_BADGE_ROW, PHONE_BANKS, RTT_WINDOW, medianRtt, oneWaySec, padGain, padVelocity, phoneBadgeRow, phoneBadgeRowStyle, phoneBadgeShown, phoneCommand,
   phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, judgesPhoneTap,
   phonePadRole,
 } from './phonePad';
@@ -192,7 +195,8 @@ describe('the room\'s wiring (source pins)', () => {
     expect(room.indexOf('<HostLobby ', lobby + 1)).toBe(-1);                    // one room, not one per tab
     expect(lobby).toBeLessThan(flipTab);
     // MUSIC-SUITE P6 phone-replay: + the room's live state for the phone (roomState, phonePad.phoneRoomState)
-    expect(room).toMatch(/\{phoneRoom && \(\s*<div data-qa="phone-room"[^>]*>\s*<HostLobby config=\{MODE_CONTROLLERS\.music_flip\} collapsed onInput=\{phoneInput\} onPeers=\{phonePeers\} roomState=\{phoneState\} \/>/);
+    // MUSIC-SUITE P10 (2026-09-29): + the badge's own row (anchor={PHONE_BADGE_ANCHOR}: it floated over the header before)
+    expect(room).toMatch(/\{phoneRoom && \(\s*<div data-qa="phone-room"[^>]*>\s*<HostLobby config=\{MODE_CONTROLLERS\.music_flip\} collapsed onInput=\{phoneInput\} onPeers=\{phonePeers\} roomState=\{phoneState\} anchor=\{PHONE_BADGE_ANCHOR\} \/>/);
     expect(room).toContain('useEffect(() => { setPhoneRoom((on) => phoneRoomOpen(on, view)); }, [view]);');
   });
   it('the bank and ARM REC are the room\'s; a phone pad is judged in PERFORM at its corrected time; FLIP records through the room', () => {
@@ -241,5 +245,44 @@ describe('P6 fix pass: the phone in PERFORM', () => {
     expect(phoneBadgeShown('studio', 0, true)).toBe(true);
     expect(phoneBadgeShown('flip', 0)).toBe(true);
     expect(phoneBadgeShown('library', 1)).toBe(true);
+  });
+});
+
+// MUSIC-SUITE P10 (2026-09-29): P5's open items on a phone — the badge over the header / "Calibrate ↗", and the room's
+// toast over the FLIP waveform right after a source loads. Measured live in musicsuite/p10/parked (the badge's and the
+// toast's rects against the title, the link and the waveform); here the wiring is pinned.
+describe('P10: the badge has its own row; the toast keeps clear of the waveform', () => {
+  const room = fs.readFileSync(path.resolve(__dirname, 'StudioMode.tsx'), 'utf8');
+  it('the badge row is positioned in the flow and the lobby is anchored inside it (not the page\'s top right)', () => {
+    expect(PHONE_BADGE_ROW.position).toBe('relative');
+    expect(PHONE_BADGE_ROW.minHeight).toBeGreaterThanOrEqual(24);      // the pill's height: nothing below slides under it
+    expect(PHONE_BADGE_ANCHOR).toBe('right-0 top-0');
+    // MUSIC-SUITE P10 FIX: the row's style comes from phoneBadgeRowStyle (shown / reserved / gone), not a bare ternary
+    expect(room).toContain('style={phoneBadgeRowStyle(badgeRow)}');
+    expect(room).toContain('const badgeRow = phoneBadgeRow(badgeShownNow, badgeViewRef.current === badgeViewKey);');
+    expect(room).toContain('anchor={PHONE_BADGE_ANCHOR}');
+  });
+  it('P10 FIX: once the badge showed on a view its row is reserved (a dropped phone never collapses it under a set)', () => {
+    // a phone paired from FLIP, PERFORM mid-set: shown; the phone drops (phones 1 → 0, no PAIR asked here): reserved
+    const onPerform = phoneBadgeShown('studio', 1, false);
+    expect(phoneBadgeRow(onPerform, true)).toBe('show');
+    expect(phoneBadgeRow(phoneBadgeShown('studio', 0, false), true)).toBe('reserve');
+    // a view it never showed on: no row at all (no dead space on a tab with no phone)
+    expect(phoneBadgeRow(false, false)).toBe('none');
+    // reserve keeps the SAME box (no shift), drawn invisible and untappable
+    const show = phoneBadgeRowStyle('show'), keep = phoneBadgeRowStyle('reserve');
+    expect([keep.position, keep.minHeight, keep.margin]).toEqual([show.position, show.minHeight, show.margin]);
+    expect(keep.visibility).toBe('hidden');
+    expect(keep.pointerEvents).toBe('none');
+    expect(phoneBadgeRowStyle('none')).toEqual({ display: 'none' });
+    expect(show).toBe(PHONE_BADGE_ROW);
+  });
+  it('the toast\'s keep-clear list includes the FLIP waveform, read by the same toastSpot the grid and transport use', () => {
+    expect(room).toContain("const TOAST_KEEP_CLEAR_QA = ['flip-waveform'] as const;");
+    expect(room).toContain('const rects = [...els, ...more]');
+    // the waveform in the bottom band, nothing else on screen: the line goes up (toastSpot's own rule)
+    expect(toastSpot(812, [{ top: 640, bottom: 760 }])).toBe('top');
+    // in the top band: it stays down
+    expect(toastSpot(812, [{ top: 40, bottom: 160 }])).toBe('bottom');
   });
 });

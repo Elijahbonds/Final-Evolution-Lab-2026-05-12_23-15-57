@@ -12,10 +12,10 @@
 //
 // Lines: 3-5 variants per moment (DANCE_MOMENTS' `n`, moments.ts), FEL's own words extended from HOST-DRAFT.md's
 // approved samples. Word counts checked by hand against DANCE_MOMENTS' maxWords when these were written; hostVoice
-// .test.ts / stoop.test.ts hold them to it going forward. `dance.freestyle` and `dance.callbar` are written and
-// counted but UNWIRED in DanceMode.ts today — there is no freestyle-bar or call-bar mechanic on the chart yet (PLAN.md
-// phase 9, "after movement play's gated dance commit"); the moment and its lines ship now so phase 9 only has to
-// call sayStoop, not write copy under a deadline.
+// .test.ts / stoop.test.ts hold them to it going forward. `dance.freestyle` and `dance.callbar` were written here in P8
+// ahead of their mechanic; MUSIC-SUITE P9 (2026-09-29) WIRED them — DanceMode.ts queues one a bar ahead of each switch
+// between a freestyle bar and a called bar (dance/freestyle.ts barCue), through the same SpeechQueue judge-window guard
+// as every other in-chart line. (MUSIC-SUITE P10, 2026-09-29: this note said "unwired" until now — P9's open item.)
 
 import type { HostCast, HostLine } from '../hostVoice';
 
@@ -64,13 +64,13 @@ export const STOOP_LINES: readonly HostLine[] = [
     'Reset your feet. The pocket is still there.',
     'Breathe, find the one, and step back in.',
     'Every dancer loses the pocket sometimes. Find it again.'),
-  // P9 (unwired today: no freestyle-bar mechanic on the chart yet — see the file header)
+  // P9: queued a bar ahead of a freestyle bar (DanceMode.ts via dance/freestyle.ts barCue — see the file header)
   ...L('dance.freestyle',
     "Freestyle bar, it's all yours. Show the block something new.",
     'No steps written down here, make one up.',
     'This bar is yours. Show the circle something they have not seen.',
     "Open floor, open bar, whatever you've got, bring it."),
-  // P9 (unwired today: no call-bar mechanic on the chart yet — see the file header)
+  // P9: queued a bar ahead of a called bar after freestyle (DanceMode.ts via barCue — see the file header)
   ...L('dance.callbar',
     'Call bar coming. Match the move right on the beat.',
     "Here's the call, answer it on the beat.",

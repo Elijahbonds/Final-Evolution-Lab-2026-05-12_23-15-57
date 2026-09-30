@@ -24,6 +24,11 @@ export const SCORE_ROUTES: [string, string][] = [
 export const DEV_PATHS: Record<string, string> = {
   music: '/dev/music?stage=perform',
 };
+// MUSIC-SUITE P10 FIX (2026-09-29): the music INTENT driver (_intent-drivers.mts `music`) reaches the room's PerformSet
+// through the webpack module cache — by its dev path, else by its export's shape. On a production build whose exports
+// are mangled it finds nothing, presses nothing and says so in window.__INTENT_VARIANT ('NONE — …DEV-ONLY'): a release
+// capture of /play/music scores the intent row as a non-player. Score music's intent row on a DEV=1 run.
+export const DEV_ONLY_INTENT: readonly string[] = ['music'];
 export const devPath = (slug: string): string => DEV_PATHS[slug] ?? `/dev/mode/${slug}`;
 
 /**

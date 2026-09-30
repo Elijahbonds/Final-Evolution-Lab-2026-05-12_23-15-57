@@ -153,6 +153,8 @@ import { moveFadeSec, holdPoseDue, HOLD_POSE_SPEED } from '../dance/floorPhase';
 import { phonePadLink, phonePressBackdateSec } from '../dance/phonePadLink';
 import { FREESTYLE_PAD } from '../dance/chart';
 import { timingLean, parseGradeBook, recordBest, withBest, GRADES_KEY } from '../dance/coaching';
+// MUSIC-SUITE P10 (2026-09-29): Stoop's guard looks past a missed step still pending (dance/stoopWindows.ts).
+import { stoopJudgeWindows, STOOP_LOOKAHEAD } from '../dance/stoopWindows';
 // MUSIC-SUITE P9 (2026-09-29), fair dance duels (owner decision #10): an Arena run dances the duel's HOUSE SONG
 // (dance/houseSong.ts — the same song, chart and judge the server rejudges with), says ONE ATTEMPT before its count-in,
 // posts its start and its press list through the Groove Academy's own attempt client (music/arenaAttempt.ts — the route
@@ -227,14 +229,31 @@ function savedOffsetMs(): number | null {
 /** MUSIC-SUITE P8: decision #8's "still camera" comfort setting — see the `stillCam` field's doc for why this reads
  *  a query param / a localStorage key rather than a settings-screen flag no file in this task's scope can add. */
 const STILL_CAMERA_KEY = 'fel-dance-camera';
-function stillCameraPref(): boolean {
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): REDUCED MOTION HOLDS THE STAGE CAMERA. Pure (tested in node). P10 made the P8
+ * camera move for the first time (applyStageCamera's CameraDirector.update: a ±0.22 m sway every beat, a push, a 0.7 m
+ * drop on freezes, a +1.8 m widen on streaks) — and the only thing that could stop it was `?camera=still` or a
+ * localStorage key nothing in the app writes. load() read the app/OS reduced-motion policy (lib/a11y/reducedMotion.ts:
+ * Profile → MOTION & FLASHES, or the OS setting) for the lamps only (`reduceFlash`), so a Reduced player got still lamps
+ * and a camera that swayed on every beat. Before P10 nobody's camera moved, so this is a behaviour change of the newly
+ * live camera: FLAGGED. The order: an explicit `?camera=still|move` wins (a shared link, a test), then the stored key
+ * ('still' | 'move'), then the motion policy — reduced → still.
+ */
+export function stillCameraFor(query: string | null, stored: string | null, reducedMotion: boolean): boolean {
+  if (query === 'still') return true;
+  if (query === 'move') return false;
+  if (stored === 'still') return true;
+  if (stored === 'move') return false;
+  return reducedMotion === true;
+}
+function stillCameraPref(reducedMotion: boolean): boolean {
   try {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') return reducedMotion;
     const q = new URLSearchParams(window.location.search).get('camera');
-    if (q === 'still') return true;
-    if (q === 'move') return false;
-    return window.localStorage.getItem(STILL_CAMERA_KEY) === 'still';
-  } catch { return false; }
+    let stored: string | null = null;
+    try { stored = window.localStorage.getItem(STILL_CAMERA_KEY); } catch { /* storage blocked: the policy decides */ }
+    return stillCameraFor(q, stored, reducedMotion);
+  } catch { return reducedMotion; }
 }
 
 /**
@@ -306,6 +325,35 @@ export function nudgeClearOfRing(offset: Vec2, ringRadius: number, clearance: nu
   const scale = target / dist;
   return { x: offset.x * scale, z: offset.z * scale };
 }
+
+/**
+ * MUSIC-SUITE P10 (2026-09-29): the cypher's ring of onlookers, with the AUDIENCE SIDE left open. The ring is 16 bodies
+ * at `radius` round the dancer (SCORECARD VISUALS, 2026-09-15: "a cypher IS the circle of people around the dancer"),
+ * and two of them (slots 7 and 8: 167.8° and 190.3°) stood 0.8–1.0 m either side of the one line P8's front-audience
+ * camera films down (dancer → AUDIENCE, 180°), 4.5 m out. While that camera never moved (it sat at 5.2 m, 0.7 m behind
+ * them, and they fell outside its frame) nobody saw them; once it moved (the P10 fix in applyStageCamera) the streak
+ * widen (7.1 m) and every freeze put a body between the camera and the dancer — measured live on :3121, the left third
+ * of the 16:9 streak and freeze frames was one onlooker's back (p10/scorecard-perf/stage/*-streak.png / *-freeze.png,
+ * before this). A real cypher filmed from the front opens to the camera, so this leaves out every slot within `gapRad`
+ * of the audience direction. Everything else (count, radius, phase, facing) is the ring it was.
+ * NEW TUNED NUMBER (flag): the gap's half-width. 0.35 rad (~20°) drops exactly slots 7 and 8 — the two measured in the
+ * frame — and keeps the pair at 33° / 35° (2.5–2.6 m off the line: at the widest 16:9 shot they stand at the frame's
+ * edges, framing it, where slot 8 stood 17° off the axis — a third of the way in from the left edge).
+ * Pure: danceStageCameraDrive.test.ts checks every kept body stands outside the central 90 % of the widest shot.
+ */
+export function onlookerRing(count: number, radius: number, phaseRad: number, audience: Vec2, gapRad: number): Vec2[] {
+  const toAudience = Math.atan2(audience.x, audience.z);   // the same sin/cos(angle) convention the slots use
+  const out: Vec2[] = [];
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + phaseRad;
+    const d = Math.abs(Math.atan2(Math.sin(a - toAudience), Math.cos(a - toAudience)));
+    if (d < gapRad) continue;
+    out.push({ x: Math.sin(a) * radius, z: Math.cos(a) * radius });
+  }
+  return out;
+}
+/** MUSIC-SUITE P10: onlookerRing's gap half-width (radians) — see its doc. NEW TUNED NUMBER. */
+export const ONLOOKERS_AUDIENCE_GAP = 0.35;
 
 type Phase = 'pick' | 'countin' | 'playing';
 
@@ -411,6 +459,9 @@ export const DanceMode: ModeDefinition = (() => {
   /** MUSIC-SUITE P8 FIX (2026-09-29): half-width of the exclusion band applyStageCamera keeps clear around
    *  ONLOOKERS_RADIUS — see that function's own comment for why this exists and what it does not fully solve. */
   const ONLOOKERS_CLEARANCE = 0.6;
+  /** MUSIC-SUITE P10 (2026-09-29): the velocity handed to CameraDirector.update from applyStageCamera — its fixed branch
+   *  reads only the subject (and an objective, here none), so this is never read; one shared zero, not one per frame. */
+  const STAGE_CAM_NO_VELOCITY = new Vector3(0, 0, 0);
   /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one results punch per routine. */
   let resultLatch = false;
   /** MUSIC-SUITE P7 (six-songs): the pick screen's preview.mp3, playing while its song is focused (playPreview /
@@ -608,12 +659,17 @@ export const DanceMode: ModeDefinition = (() => {
 
   /** The judge window(s) Stoop must not start a new line inside right now: only while a chart is actually being
    *  judged (phase 'playing') — the pick screen and the count-in's clicks are not judged beats, so nothing queues
-   *  there is ever held back. A short pad (0.12 s) around the very next step's own time — perf.upcoming is the same
-   *  lookahead the cue lane already reads off. */
+   *  there is ever held back. A short pad (0.12 s) around each upcoming step's own time — perf.upcoming is the same
+   *  lookahead the cue lane already reads off.
+   *  MUSIC-SUITE P10 (2026-09-29): EVERY upcoming window that has not closed, not just upcoming()[0]. upcoming() lists
+   *  pending steps first, and a missed step stays pending ~80 ms past its padded window (MISS_AFTER 0.20 s vs the 0.12 s
+   *  pad): the one window this read was already over, so a line started over the NEXT scored step (P9, live on CYPHER:
+   *  2 of 8 lines, after a missed double, ran 1.333 s and 0.279 s into the next window). dance/stoopWindows.ts passes
+   *  over the stale ones and guards the live steps behind them (STOOP_LOOKAHEAD of them, so a missed double's two
+   *  stale steps can never crowd the live one out); stoopWindows.test.ts replays that missed double. */
   function stoopWindows(heardNow: number): JudgeWindow[] {
     if (phase !== 'playing' || !perf) return [];
-    const next = perf.upcoming(heardNow, 1)[0];
-    return next ? [{ from: next.time - 0.12, to: next.time + 0.12 }] : [];
+    return stoopJudgeWindows(perf.upcoming(heardNow, STOOP_LOOKAHEAD), heardNow);
   }
 
   /** Queue a Stoop line for `moment` (hostVoice.SpeechQueue) — for anything said WHILE a chart may be judging (the
@@ -707,8 +763,9 @@ export const DanceMode: ModeDefinition = (() => {
   }
 
   /**
-   * The front audience camera, one call per frame (plus one static call for the pick screen — see update()'s two
-   * call sites). `beatPhase`/`streak` are 0 outside a live song, which parks the camera at its neutral framing
+   * The front audience camera, one call per frame of the count-in and the song (update()'s two call sites), plus a
+   * hard-cut neutral shot for the pick screen: load()'s first frame and, MUSIC-SUITE P10 FIX, backToPick (this doc
+   * promised "one static call for the pick screen" that did not exist until then). `beatPhase`/`streak` are 0 outside a live song, which parks the camera at its neutral framing
    * rather than mid-sway. `snap` hard-cuts the camera in (load()'s first frame, the same `true` convention
    * OneVOneMode/DunkMode's own setFixed calls use); every other call eases at CameraDirector's own built-in rate,
    * which IS the "gentle" in decision #8's "a gentle push/sway" — the sway ITSELF is locked to the beat phase, never
@@ -741,6 +798,18 @@ export const DanceMode: ModeDefinition = (() => {
     const groundOffset = clearOnlookersRing(frame.groundOffset);
     const pos = new Vector3(me.root.position.x + groundOffset.x, frame.heightM, me.root.position.z + groundOffset.z);
     ctx.camDirector.setFixed(pos, frame.targetHeight, snap);
+    // MUSIC-SUITE P10 (2026-09-29): THE STAGE CAMERA NEVER MOVED. setFixed only STORES the shot (CameraDirector.ts:481-486
+    // — it moves the camera itself on `snap` alone); the glide toward it and the aim both live in CameraDirector.update's
+    // fixed branch (:540-546), and every mode that owns a camera calls that itself each frame (ThreePointMode.ts:1123,
+    // OneVOneMode.ts:1673, KarateVSMode.ts:940). DanceMode never did — before P8 it had one snapTo and a still shot, so it
+    // did not need to. Measured live on :3121 (scripts/probes/_music-p10-stagecam-diag.mts, WARM UP at 16:9): the shot
+    // this function asked for walked 5.39 → 6.66 m as the combo built (the streak widen, the sway ±0.2 m across the line)
+    // while the camera sat at load()'s snap for the whole song — 5.200 m flat, 1.59–1.61 m high, aimed level at its own
+    // height — so none of P8's DEFAULT_STAGE_CAMERA motion (sway, push, freeze drop, streak widen, aim height) had ever
+    // been on screen. One update per stage-camera call: the glide is CameraDirector's own 0.1 lerp (the "gentle" decision
+    // #8 asked for), the aim is the dancer + frame.targetHeight. A paused song never reaches the per-frame call (the
+    // `clock.paused` return in update()), so the camera still freezes with the stage.
+    ctx.camDirector.update(me.root.position, STAGE_CAM_NO_VELOCITY, null);
     pulseStage(beatPhase, cheerGlow);
   }
 
@@ -1062,6 +1131,12 @@ export const DanceMode: ModeDefinition = (() => {
     body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
     stoopQueue.clear();
     ctx.setHud({ cues: [], nextStep: '', nextStepIn: null, instruments: '', hint: '' });
+    // MUSIC-SUITE P10 FIX (2026-09-29): the pick screen gets the neutral stage shot back. The pick branch of update()
+    // returns before any applyStageCamera call, so after a free-dance song the repick screen kept the song's LAST frame
+    // — the streak-widened ~7 m shot (free dance frames as a streak), part-way through a sway, or 0.89 m high if the
+    // last clip was a freeze — until the next count-in glided it back. Invisible before P10 (the camera never left
+    // load()'s snap); visible once it moved. The same hard cut load() gives the pick screen's first frame.
+    applyStageCamera(ctx, 0, 0, 0, true);
     showPick(ctx);
   }
 
@@ -1453,10 +1528,10 @@ export const DanceMode: ModeDefinition = (() => {
       // SCORECARD VISUALS (2026-09-15): a cypher IS the circle of people around the dancer, and the frame review found a
       // lone body on a lit disc in a dark room. The ring watches the floor (the same Onlookers the dojo and the courts use).
       crowd?.dispose(); crowd = null;
-      crowd = new Onlookers(ctx.scene, Array.from({ length: 16 }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2 + 0.18;
-        return new Vector3(Math.sin(a) * ONLOOKERS_RADIUS, 0, Math.cos(a) * ONLOOKERS_RADIUS);
-      }), '#d946ef', new Vector3(0, 1.2, 0));
+      // MUSIC-SUITE P10 (2026-09-29): the ring opens on the audience side, where the stage camera films from — see
+      // onlookerRing (module scope) for the two bodies that stood in the camera's shot once it moved.
+      crowd = new Onlookers(ctx.scene, onlookerRing(16, ONLOOKERS_RADIUS, 0.18, { x: AUDIENCE.x, z: AUDIENCE.z }, ONLOOKERS_AUDIENCE_GAP)
+        .map((p) => new Vector3(p.x, 0, p.z)), '#d946ef', new Vector3(0, 1.2, 0));
 
       me = await CharacterLibrary.spawn(ctx.scene, SHARED_CFG.heroUrl, {
         // Stand on the stage deck, not in it — podium scale 1.4 -> surface y 0.7.
@@ -1517,8 +1592,10 @@ export const DanceMode: ModeDefinition = (() => {
       // visit after the first would pick up rotating exactly where the last one left off.
       stoopRnd = mulberry32(newRunSeed()); stoopLast = new Map(); stoopQueue.clear(); stoopCaptionUntil = 0; stoopSpeakingUntil = 0; missStreak = 0;
       // MUSIC-SUITE P8: read once per load, not every frame — see the `stillCam`/`reduceFlash` fields' own doc.
-      stillCam = stillCameraPref();
-      reduceFlash = !motionPolicy().flash;
+      // MUSIC-SUITE P10 FIX: one policy read, and Reduced motion now holds the camera too (stillCameraFor's doc).
+      const motion = motionPolicy();
+      stillCam = stillCameraPref(motion.reduced);
+      reduceFlash = !motion.flash;
       beatBus?.dispose();
       beatBus = new BeatBus({ bpm: 120, reduceFlashing: () => reduceFlash });   // retuned to the real track's tempo/startAt in update(), the instant the count-in arms one
 

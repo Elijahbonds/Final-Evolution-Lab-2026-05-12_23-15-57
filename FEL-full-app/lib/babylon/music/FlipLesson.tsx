@@ -11,6 +11,10 @@
 // A picker switches to the other two themes. GOT IT closes it for good for this player (THEME LESSON reopens it).
 // The demo taps go to the pads as plain hits — never recorded into the grid, even with ARM REC on (FlipPad play(i, true)).
 // Timing: setTimeout from the press (a demo, not the sequencer; a few ms of timer jitter is inaudible at 90–100 BPM).
+// MUSIC-SUITE P10 (2026-09-29): that was measured, and it was not a few ms — P5's live run drifted up to 14.0 ms (18.7 ms
+// in the worst of 4 runs) off the theme's cuts. With `onDemo` (the room passes FlipPad's scheduleDemo) every hit is
+// started ahead of time on the AUDIO clock (flipPack.lessonSchedule) and the timer only ends the ■ STOP state; ■ STOP
+// calls the stop the room handed back. Without it (no engine yet) the old timer path still plays the pads.
 import React, { useEffect, useRef, useState } from 'react';
 import { flipPatternCells, lessonFlip, lessonInOrder, type FlipPackIndex, type LessonHit } from './flipPack';
 
@@ -25,6 +29,8 @@ export interface FlipLessonProps {
   onLoad: (themeId: string) => void;
   /** play one pad as a demo hit */
   onPad: (pad: number) => void;
+  /** MUSIC-SUITE P10: schedule a whole demo on the audio clock; returns its stop, or null when it can't (then onPad plays it) */
+  onDemo?: (hits: LessonHit[]) => (() => void) | null;
   /** GOT IT: close, remembered for this player */
   onClose: () => void;
 }
@@ -43,13 +49,16 @@ const S: Record<string, React.CSSProperties> = {
   cellHit: { background: '#ffb347', color: '#2a1a10', fontWeight: 800 },
 };
 
-export default function FlipLesson({ pack, packError, loadedId, ready, onLoad, onPad, onClose }: FlipLessonProps) {
+export default function FlipLesson({ pack, packError, loadedId, ready, onLoad, onPad, onDemo, onClose }: FlipLessonProps) {
   const [chosen, setChosen] = useState<string | null>(null);
   const [demo, setDemo] = useState<'order' | 'flip' | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** MUSIC-SUITE P10: the scheduled demo's stop (null = none running, or the timer path) */
+  const demoStop = useRef<(() => void) | null>(null);
   const onPadRef = useRef(onPad); onPadRef.current = onPad;
-  const stop = (): void => { for (const t of timers.current) clearTimeout(t); timers.current = []; setDemo(null); };
-  useEffect(() => () => { for (const t of timers.current) clearTimeout(t); }, []);
+  const halt = (): void => { for (const t of timers.current) clearTimeout(t); timers.current = []; demoStop.current?.(); demoStop.current = null; };
+  const stop = (): void => { halt(); setDemo(null); };
+  useEffect(() => () => halt(), []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const themes = pack?.themes ?? [];
   const pickId = chosen ?? (themes.some((t) => t.id === loadedId) ? loadedId : pack?.themeDefault ?? null);
@@ -62,8 +71,10 @@ export default function FlipLesson({ pack, packError, loadedId, ready, onLoad, o
     if (!hits.length) return;
     setDemo(what);
     const end = hits[hits.length - 1].at;
-    timers.current = hits.map((h) => setTimeout(() => onPadRef.current(h.pad), h.at * 1000));
-    timers.current.push(setTimeout(() => setDemo(null), end * 1000 + 400));
+    const scheduled = onDemo ? onDemo(hits) : null;          // MUSIC-SUITE P10: on the audio clock when the room can
+    if (scheduled) demoStop.current = scheduled;
+    else timers.current = hits.map((h) => setTimeout(() => onPadRef.current(h.pad), h.at * 1000));
+    timers.current.push(setTimeout(() => { demoStop.current = null; setDemo(null); }, end * 1000 + 400));
   };
 
   if (!pack || !theme || !theme.lesson) {

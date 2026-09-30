@@ -56,7 +56,7 @@ import { chromiumExe } from './_chromium.mts';
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3121';
 const OUT = process.env.OUT ?? '/Users/elijahbonds/Claude/outbox/finish-release/musicsuite/p3';
 fs.mkdirSync(OUT, { recursive: true });
-// MUSIC-SUITE P3: the fake capture device, so RECORD TAKE records (a steady test tone) with no dialog.
+// MUSIC-SUITE P3: the fake capture device, so the booth (RECORD TAKE until P4) records (a steady test tone) with no dialog.
 const ARGS = ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist',
   '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'];
 const ONLY = process.env.ONLY ?? '';
@@ -98,6 +98,7 @@ const GRID = `(() => {
 })()`;
 const grid = (p: Page) => p.evaluate(GRID) as Promise<Any>;
 const song = (p: Page) => p.evaluate(() => (window as Any).__FEL_SONG__ ?? null);
+const running = (p: Page): Promise<boolean> => p.evaluate(() => !!(window as Any).__FEL_STUDIO__?.engine()?.running);   // MUSIC-SUITE P10
 const flip = (p: Page) => p.evaluate(() => (window as Any).__FEL_FLIP__ ?? null);
 const engine = (p: Page) => p.evaluate(() => (window as Any).__FEL_STUDIO__?.engine() ?? null);
 const proj = (p: Page) => p.evaluate(() => (window as Any).__FEL_PROJECT__ ?? null);
@@ -187,10 +188,14 @@ function hiddenAudible(eng: Any, g: Any, audible: Any): Any {
 }
 
 /** TAP at `offsetMs` from the next scheduled step-0 note, on the engine's clock; the status line's text right after. */
+// MUSIC-SUITE P10 (2026-09-29): P6 replaced PERFORM's one TAP button with four lanes — a step-0 note is the KICK lane's
+// (lane 0), pressed on its pad (a script's click() has detail 0: PerformLanes tapHandlers takes it as a tap); the status
+// line is data-qa perform-status.
 const TAP_AT = `async (offsetMs) => {
   const P = window.__FEL_STUDIO__;
-  const tapBtn = [...document.querySelectorAll('button')].find((b) => b.textContent === 'TAP');
-  const status = tapBtn.nextElementSibling;
+  const tapBtn = document.querySelector('[data-qa="perform-pad"][data-lane="0"]');
+  const status = [...document.querySelectorAll('[data-qa="perform-status"]')].find((e) => e.offsetParent !== null) || document.querySelector('[data-qa="perform-status"]');
+  if (!tapBtn || !status) return { err: 'no kick lane pad / status line' };
   const seen = [];
   const mo = new MutationObserver(() => seen.push({ at: P.now(), text: status.textContent }));
   mo.observe(status, { childList: true, characterData: true, subtree: true });
@@ -282,6 +287,26 @@ async function newPage(ctx: BrowserContext, name: string): Promise<Page> {
   return p;
 }
 
+// MUSIC-SUITE P10 (2026-09-29): the probe's stale steps, brought up to the room as it is (P4's open item). P5 replaced the
+// eight single 808 sources with the FEL pack's shelf — the 808 stems are one source now, "808 Kit" on the KITS shelf (one
+// stem per pad: kick, snare, hat, openhat, clap, bass, lead, fx) — and P4 replaced RECORD TAKE with the recording booth.
+async function load808(p: Page): Promise<void> {
+  await p.evaluate(() => { const g = [...document.querySelectorAll('[data-qa^="flip-shelf-"]')].find((x) => /KITS/i.test(x.textContent ?? '')) as HTMLButtonElement | undefined; g?.click(); });
+  await p.waitForTimeout(150);
+  await btn(p, '808 Kit').click();
+  await p.waitForFunction(() => { const f = (window as Any).__FEL_FLIP__; return f?.source === 'bank_808' && f?.decoded && (f?.slices ?? 0) >= 8; }, undefined, { timeout: 30000 });
+}
+/** One booth take over the running beat: ARM MIC (the fake capture device), RECORD (the default region), wait for it. */
+async function boothTake(p: Page, n: number): Promise<void> {
+  if (!(await p.locator('[data-qa="mic-on"]').count())) {
+    await p.locator('[data-qa="booth-arm"]').click();
+    await p.locator('[data-qa="mic-on"]').waitFor({ timeout: 20000 });
+  }
+  await p.locator('[data-qa="booth-record"]').click();
+  await p.waitForFunction((k) => ((window as Any).__FEL_BOOTH__?.takes ?? 0) >= k && (window as Any).__FEL_BOOTH__?.phase === 'armed', n, { timeout: 30000 });
+  await p.locator('[data-qa="booth-close"]').click().catch(() => undefined);
+}
+
 // ── MUSIC-SUITE P3: THE WORK-SURVIVAL MATRIX (its own context) ──────────────────────────────────────────────────────
 /** The STUDIO view: what the grid and the song panel show, plus the open project. */
 async function studioView(p: Page): Promise<Any> {
@@ -304,6 +329,16 @@ async function flipView(p: Page): Promise<Any> {
 }
 const takesBack = (p: Page, n: number) => p.waitForFunction((k) => ((window as Any).__FEL_SONG__?.takesLoaded ?? 0) >= k, n, { timeout: 15000 }).catch(() => undefined);
 
+/** MUSIC-SUITE P10: the dev card's REPLAY restarts the room IN PLACE since P6 phone-replay (academyReplay — the phone stays
+ *  paired; ?replay=remount keeps the old remount): TAP TO START shows only on a remount. Either way, back to the room. */
+async function backFromReplay(p: Page): Promise<'in place' | 'remount'> {
+  const splash = await p.getByRole('button', { name: 'TAP TO START' }).waitFor({ timeout: 8000 }).then(() => true, () => false);
+  if (splash) { await startRoom(p); return 'remount'; }
+  await p.locator('[data-qa="kit-grid"]').waitFor({ timeout: 60000 });
+  await p.waitForTimeout(400);
+  return 'in place';
+}
+
 async function survivalMatrix(browser: Browser): Promise<void> {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['microphone'] });
   let p = await newPage(ctx, 'matrix');
@@ -325,10 +360,10 @@ async function survivalMatrix(browser: Browser): Promise<void> {
   R.rowsByTier = { ...tiers, how: 'kit rows drawn: fresh device; after the 14-cell beat is PLAYED; after 2 sections saved (each save also chains it)' };
   log('rows by tier', JSON.stringify(tiers));
 
-  // CHOPS — the FLIP tab: the 808 bass, pad 3 reversed, pad 2 pitched −5 and SENT TO TRACK (its row, flip_1)
+  // CHOPS — the FLIP tab: the 808 Kit (P10: the 808 stems are one source now), pad 3 reversed, pad 2 pitched −5 and SENT
+  // TO TRACK (its row, flip_1)
   await btn(p, 'FLIP').click();
-  await btn(p, '808 bass').click();
-  await p.waitForFunction(() => ((window as Any).__FEL_FLIP__?.slices ?? 0) > 2 && (window as Any).__FEL_FLIP__?.decoded, undefined, { timeout: 20000 });
+  await load808(p);
   await p.getByRole('button', { name: 'pad 3', exact: true }).click();
   await btn(p, 'REVERSE').click();
   await p.getByRole('button', { name: 'pad 2', exact: true }).click();
@@ -337,14 +372,11 @@ async function survivalMatrix(browser: Browser): Promise<void> {
   await btn(p, 'STUDIO').click(); await p.waitForTimeout(250);
   await clickCellId(p, 'flip_1', 2); await clickCellId(p, 'flip_1', 10);
 
-  // A TAKE — the fake mic: PLAY, RECORD TAKE (starts on the next bar), ~1.5 s, STOP TAKE, STOP
-  await btn(p, 'PLAY').click();
-  await btn(p, '● RECORD TAKE').click();
-  await p.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent === '■ STOP TAKE'), undefined, { timeout: 10000 });
-  await p.waitForTimeout(1500);
-  await btn(p, '■ STOP TAKE').click();
+  // A TAKE — the fake mic through the booth (P10: RECORD TAKE is gone since P4): ARM MIC, RECORD (the booth starts the
+  // transport, counts in and records its region on the bar), then STOP
+  await boothTake(p, 1);
   await p.waitForFunction(() => ((window as Any).__FEL_SONG__?.takes ?? 0) >= 1, undefined, { timeout: 10000 }).catch(() => undefined);
-  await btn(p, 'STOP').click();
+  if (await running(p)) await p.locator('[data-qa="transport"] button').first().click();
   await takesBack(p, 1);
   const builtStatus = await saved(p);
   const built = { ...(await studioView(p)), flip: await flipView(p), stored: await p.evaluate(STORED), savedLine: builtStatus };
@@ -352,8 +384,8 @@ async function survivalMatrix(browser: Browser): Promise<void> {
   log('built', JSON.stringify(built).slice(0, 600));
   check('matrix build: a beat + Flip-row hits, 2 sections chained, 1 take (decoded), 2 edited chops, autosaved',
     built.kitLit === 15 && built.flipLit === 2 && built.sections === 2 && built.chainEntries === 2 && built.takes === 1 && built.takesLoaded === 1
-      && built.flip.source === 'fel_808_bass' && built.flip.edited === 2 && built.flip.decoded === true && /Saved on this device ·/.test(builtStatus),
-    built, 'kit 15 + flip 2 lit, 2 sections / 2 chain, 1 take loaded, fel_808_bass with 2 edited chops, saved');
+      && built.flip.source === 'bank_808' && built.flip.edited === 2 && built.flip.decoded === true && /Saved on this device ·/.test(builtStatus),
+    built, 'kit 15 + flip 2 lit, 2 sections / 2 chain, 1 take loaded, bank_808 (the 808 Kit) with 2 edited chops, saved');
   await frame(p, 'matrix-built', true);
 
   const rows: Any[] = [];
@@ -396,8 +428,8 @@ async function survivalMatrix(browser: Browser): Promise<void> {
   await btn(p, 'PERFORM').click(); await p.waitForTimeout(200);
   await btn(p, 'END SET').click(); await p.waitForTimeout(300);
   await p.locator('[data-dev="replay"]').click();
-  await startRoom(p);
-  await record('END SET + REPLAY (remount)', 'PERFORM → END SET → the dev end card REPLAY, which remounts StudioMode as GameShell does (bumps its key)');
+  const how = await backFromReplay(p);
+  await record(`END SET + REPLAY (${how})`, `PERFORM → END SET → the dev end card REPLAY (${how}: P6 made the shell's REPLAY restart the Academy in place; a remount — GameShell bumping its key — is ?replay=remount)`);
   // 5. navigate away and back
   await toStudio();
   await p.goto(`${BASE}/robots.txt`, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -538,8 +570,7 @@ async function mainRun(browser: Browser): Promise<void> {
 
   // 2. HIDDEN BUT AUDIBLE — (a) the Flip: SEND TO TRACK pad 1, ARM REC, tap pads 1 and 2 while playing
   await btn(p, 'FLIP').click();
-  await btn(p, '808 bass').click();
-  await p.waitForFunction(() => ((window as Any).__FEL_FLIP__?.slices ?? 0) > 2 && (window as Any).__FEL_FLIP__?.decoded, undefined, { timeout: 20000 }).catch(() => undefined);
+  await load808(p).catch(() => undefined);
   await p.getByRole('button', { name: 'pad 1', exact: true }).dispatchEvent('pointerdown');
   await p.waitForTimeout(150);
   await p.locator('[data-qa="flip-send"]').click();
@@ -554,7 +585,7 @@ async function mainRun(browser: Browser): Promise<void> {
   const playFlip = await playBars(p, 2);
   const engFlip = await engine(p);
   R.hiddenAfterFlip = { ...hiddenAudible(engFlip, gFlip, playFlip.audible), audibleOver2Bars: playFlip.audible, flipRowsHead: await p.locator('[data-qa="flip-rows-head"]').textContent().catch(() => null),
-    how: 'FLIP: 808 bass, pad 1 → SEND TO TRACK, ARM REC, PLAY, keys 1×4 and 2×2 (330 ms apart), STOP; STUDIO: drawn row ids vs __FEL_STUDIO__.engine().tracks, then 2 bars of PLAY counting the hits scheduleStep started' };
+    how: 'FLIP: the 808 Kit, pad 1 → SEND TO TRACK, ARM REC, PLAY, keys 1×4 and 2×2 (330 ms apart), STOP; STUDIO: drawn row ids vs __FEL_STUDIO__.engine().tracks, then 2 bars of PLAY counting the hits scheduleStep started' };
   log('hidden after flip', JSON.stringify(R.hiddenAfterFlip.audibleNotDrawn), 'silent', JSON.stringify(R.hiddenAfterFlip.writtenButSilent), 'drawn', JSON.stringify(gFlip.ids));
   await frame(p, 'flip-rows-studio', true);
   check('after SEND TO TRACK + ARM REC: 0 audible rows off screen, 0 silent written rows, the Flip rows drawn and heard',
@@ -592,7 +623,7 @@ async function mainRun(browser: Browser): Promise<void> {
     await p.waitForTimeout(250);
   }
   await frame(p, 'perform');
-  const statusBefore = await p.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent === 'TAP')?.nextElementSibling?.textContent ?? null);
+  const statusBefore = await p.evaluate(() => ([...document.querySelectorAll('[data-qa="perform-status"]')].find((e) => (e as HTMLElement).offsetParent !== null) ?? null)?.textContent ?? null);
   await btn(p, 'STOP').click();   // before END SET: the dev end card covers the room
   const beforeEnd = await grid(p);
   await btn(p, 'END SET').click();
@@ -604,7 +635,7 @@ async function mainRun(browser: Browser): Promise<void> {
 
   // P1's matrix row "END SET → REPLAY" again in this context (P1: 17 lit → 0, Flip rows gone)
   await p.locator('[data-dev="replay"]').click();
-  await startRoom(p);
+  R.replayMode = await backFromReplay(p);   // MUSIC-SUITE P10: in place since P6
   const afterReplay = await grid(p);
   const engReplay = await engine(p);
   R.replayInMainRun = { litBefore: beforeEnd.lit, litAfter: afterReplay.lit, idsBefore: beforeEnd.ids, idsAfter: afterReplay.ids,
@@ -614,6 +645,9 @@ async function mainRun(browser: Browser): Promise<void> {
     R.replayInMainRun, `${beforeEnd.lit} lit, flip rows loaded`);
 
   // 5b. PERFORM on an EMPTY grid — P3 keeps the beat across REPLAY, so the empty grid is a NEW project
+  // (MUSIC-SUITE P10: an in-place REPLAY — P6 — comes back INTO the PERFORM set, and MY PROJECTS is held while a set
+  // runs (P3's switch lock): back to BUILD first, as a player would)
+  if (await btn(p, 'BUILD').count()) { await btn(p, 'BUILD').click(); await p.waitForTimeout(300); }
   await p.locator('[data-qa="projects-toggle"]').click();
   await p.locator('[data-qa="project-new"]').click(); await p.waitForTimeout(600);
   await p.locator('[data-qa="projects-toggle"]').click();
@@ -633,7 +667,7 @@ async function mainRun(browser: Browser): Promise<void> {
     how: 'MY PROJECTS → + NEW PROJECT (0 lit; P1 used REPLAY, which no longer clears the grid); PERFORM, PLAY, TAP at step-0 + offset; END SET' };
   log('empty perform', JSON.stringify(emptyTaps.map((t) => [t.offsetMs, t.statusRightAfter])), 'won', endEmpty?.won);
   await p.locator('[data-dev="replay"]').click();
-  await startRoom(p);
+  await backFromReplay(p);   // MUSIC-SUITE P10: in place since P6
 
   // 4. PUBLISH — 20 in a row (stops at the first that fails), then DELETE one from the LIBRARY
   if (((await grid(p))?.lit ?? 0) === 0) { await buildPattern(p); await saved(p, 3000); }
@@ -751,7 +785,13 @@ async function phoneRun(browser: Browser): Promise<void> {
   R.cellSize.phone375 = { rows: g4.rows, cellW: g4.cellW, cellH: g4.cellH, gridW: g4.gridW, vw: g4.vw, pageScrollW: await pp.evaluate(() => document.documentElement.scrollWidth),
     how: 'fresh 375×812 context (isMobile, DPR 2), first-visit tier; getBoundingClientRect of step cell 1 in CSS px' };
   log('phone cell', g4.cellW, 'x', g4.cellH, 'rows', g4.rows);
-  for (const s of [0, 4, 8, 12]) await pp.locator(`[data-qa="cell"][data-row="kick"][data-step="${s}"]`).tap();
+  // MUSIC-SUITE P10: steps 9 and 13 (8, 12) are on the phone grid's page 2 since P4 (pages of 8)
+  for (const s of [0, 4, 8, 12]) {
+    const pg = s < 8 ? 0 : 1;
+    if ((await pp.locator('[data-qa="step-grid"]').getAttribute('data-page')) !== String(pg)) await pp.locator(`[data-qa="grid-page"][data-page="${pg}"]`).tap();
+    await pp.locator(`[data-qa="cell"][data-row="kick"][data-step="${s}"]`).tap();
+  }
+  await pp.locator('[data-qa="grid-page"][data-page="0"]').tap();
   await pp.waitForTimeout(200);
   await frame(pp, 'studio-phone');
   // CELL on the first-visit tier: how many rows sound that the player cannot see? (P3: 4 taps no longer open the chain —

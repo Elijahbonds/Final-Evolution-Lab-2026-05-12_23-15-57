@@ -394,7 +394,42 @@ export const INTENT_DRIVERS: Record<string, string> = {
   // interval + 4 ms, capped at 38 (inside PERFECT's 40 ms) — and the step is taken by the early path as PERFECT.
   // window.__DANCE_LEAD pins LEAD (ms; 8 = aim at the step, the dance-dry1 driver); window.__DANCE_OFF_MS shifts every
   // tap (a late / early dancer). window.__DANCE_LOG keeps [plannedAt, in, name] for a probe.
+  // MUSIC-SUITE P10 (2026-09-29): THE AUTHORED CHARTS. P9 replaced the generated steps with charts that have freeze HOLDS
+  // (hold the button to the note's end), DOUBLE taps a sixteenth apart and FREESTYLE slots — and this driver's one 45 ms
+  // A per cue, deduped inside 120 ms, drops every hold (HOLD DROPPED) and every double's second tap. On the dev route
+  // (`__FEL_DEV__.danceClock`, DanceMode's dev seam) it now plays the chart the way P9's live proof did
+  // (_music-p9-live-proof.mts DRIVER: 99.7 % GRADE S on CYPHER): the room's own DancePerformance (observed through the
+  // webpack cache — every wrapper runs the original), each step pressed on the judge's HEARD clock, holds held to their
+  // end, doubles tapped twice, freestyle slots varied (J K L I = A B X Y). Off the dev route (a production capture, no
+  // clock seam) the cue-lane driver below runs as before.
   dance: loop(`
+    if (window.__FEL_DEV__ && window.__FEL_DEV__.danceClock) {
+      window.__INTENT_VARIANT = 'heard-clock chart driver (P9)'; window.__DANCE_PLANNED = 0;
+      const hook = () => {
+        if (!window.__wreq) { try { self.webpackChunk_N_E.push([['p10intent' + Date.now()], {}, (r) => { window.__wreq = r; }]); } catch (e) { return; } }
+        const mod = Object.values(window.__wreq.c).find((m) => { try { return m && m.exports && m.exports.DancePerformance; } catch (e) { return false; } });
+        if (!mod) return; const PR = mod.exports.DancePerformance.prototype; if (PR.__p10i) return; PR.__p10i = true;
+        const ou = PR.update; PR.update = function (now) { if (this.onJudged) window.__DPERF = this; return ou.call(this, now); };
+      };
+      let lastPick = 0, planned = false;
+      const iv = setInterval(() => {
+        const h = Q.rawHud ? Q.rawHud() : {}; const now = performance.now();
+        if (typeof h.nextStep === 'string' && /TRACK/.test(h.nextStep)) { if (now - lastPick > 1000) { lastPick = now; btn(A, 70); } return; }
+        if (!window.__DPERF) { hook(); return; }
+        const d = window.__DPERF;
+        if (planned || !d.running || !d.steps || !d.steps.length) return;
+        planned = true; clearInterval(iv);
+        const dc = window.__FEL_DEV__.danceClock; const bd = 60 / d.bpm; const FREE = ['j', 'k', 'l', 'i']; let freeN = 0;
+        const plan = d.steps.map((s) => { const t = d.started + s.beat * bd; const kind = s.pressFree ? 'free' : (s.pressHoldBeats > 0 ? 'hold' : (s.pressKind || 'move'));
+          const key = kind === 'free' ? FREE[(freeN++) % 4] : 'j'; return { t, at: t, key, kind, upAt: kind === 'hold' ? t + s.pressHoldBeats * bd + 0.02 : null }; });
+        for (let k = 0; k < plan.length; k++) { const q = plan[k]; if (q.upAt !== null) continue; const nx = plan[k + 1]; q.upAt = q.at + Math.min(0.06, nx ? Math.max(0.01, (nx.at - q.at) * 0.5) : 0.06); }
+        const ev = []; for (const q of plan) { ev.push({ at: q.at, type: 'keydown', key: q.key }); ev.push({ at: q.upAt, type: 'keyup', key: q.key }); }
+        ev.sort((a, b) => a.at - b.at || (a.type === 'keyup' ? -1 : 1));
+        window.__DANCE_PLANNED = plan.length; let k = 0;
+        const run = setInterval(() => { if (dc.state().paused) return; const hh = dc.heard(); while (k < ev.length && hh >= ev[k].at) { const e = ev[k++]; window.dispatchEvent(new KeyboardEvent(e.type, { key: e.key, bubbles: true })); } if (k >= ev.length) clearInterval(run); }, 1);
+      }, 20);
+      return;
+    }
     const PIN = window.__DANCE_LEAD, OFF = Number(window.__DANCE_OFF_MS ?? 0);
     let lastPick = 0, lastRef = null; const planned = []; const frames = []; let lastF = 0;
     window.__DANCE_PLANNED = 0; window.__DANCE_LOG = [];
@@ -448,46 +483,48 @@ export const INTENT_DRIVERS: Record<string, string> = {
   //   'offered' — the best the judge allows: taps the moment the playhead moves (the drain offered the note), read off the
   //             grid's playhead outline (StudioMode.tsx:470). The fallback on /play/music, which has no schedule readout.
   // window.__INTENT_VARIANT says which one ran (a production run can only be 'offered').
+  // MUSIC-SUITE P10 (2026-09-29): THE LANES. P6 made a note exist only where the song hits, in its own lane (KICK SNARE
+  // HATS FLIP), and the one TAP button went — every P1 variant here clicked a TAP that is not on the page. This is the P6
+  // live proof's perfect player (_music-p6-live-proof.mts DRIVE 'right': 208,800, S 100 %): the notes the judge was
+  // OFFERED (PerformSet.step / chartStep's own return, observed through the webpack cache — each wrapper runs the
+  // original), each tapped on its lane's key (H J K L) at its heard time (the note's audio time + the set's latencySec),
+  // on the engine clock (/dev/music's __FEL_STUDIO__.now(); off the dev route, the newest running AudioContext through
+  // _dom-room's AUDIO_CLOCK_INIT). A note already 30 ms gone when first seen is left (the driver was late, not the player).
   music: `(() => {
-    const S = window.__FEL_STUDIO__;
-    const clock = () => (window.__ACS || []).filter((c) => c.state === 'running').slice(-1)[0] || null;
-    const tap = () => window.__DOM_CLICK && window.__DOM_CLICK('TAP');
-    let want = window.__PERFORM_TAP || (S && clock() ? 'onbeat' : 'offered');
-    if (want !== 'offered' && !(S && clock())) want = 'offered';
-    window.__INTENT_VARIANT = want; window.__MUSIC_TAPS = 0;
-    const HITS = new Set();
-    if (want === 'hits') {
-      // lay the beat on the STUDIO grid (the grid stays on screen in PERFORM): label cell, then 16 step cells per row
-      const lay = (row, steps) => {
-        const lab = Array.from(document.querySelectorAll('div')).find((d) => (d.textContent || '').trim() === row && d.nextElementSibling);
-        if (!lab) return; let c = lab.nextElementSibling, i = 0;
-        while (c && i < 16) { if (steps.includes(i)) c.click(); c = c.nextElementSibling; i++; }
-      };
-      lay('Kick', [0, 4, 8, 12]); lay('Snare', [4, 12]);
-      for (const i of [0, 4, 8, 12]) HITS.add(i);
+    const W = window;
+    if (!W.__wreq) { try { self.webpackChunk_N_E.push([['p10music' + Date.now()], {}, (r) => { W.__wreq = r; }]); } catch (e) {} }
+    // MUSIC-SUITE P10 FIX (2026-09-29): found by its path (dev module ids) OR by its export's shape — a production build
+    // names modules by number, so the path test alone pressed nothing there (the review: P1's 'offered' DOM fallback was
+    // deleted with the TAP button). If neither finds it (a production build whose exports are mangled), the driver says
+    // so and presses NOTHING: the music intent row is DEV-ONLY then (run the scorecard with DEV=1 — _scorecard-routes).
+    const req = W.__wreq;
+    const id = req && (Object.keys(req.c).find((k) => /lib\\/babylon\\/music\\/performSet\\.ts$/.test(k))
+      || Object.keys(req.c).find((k) => { try { const e = req.c[k] && req.c[k].exports; return !!(e && typeof e.PerformSet === 'function' && e.PerformSet.prototype && e.PerformSet.prototype.chartStep); } catch (e) { return false; } }));
+    W.__INTENT_VARIANT = id ? 'lanes (P6 perfect player)' : 'NONE — no PerformSet reachable (a production build?): the music intent driver is DEV-ONLY, run with DEV=1'; W.__MUSIC_TAPS = 0;
+    if (!id) return;
+    const PS = req(id).PerformSet.prototype; W.__OFF__ = W.__OFF__ || [];
+    if (!PS.__p10intent) {
+      PS.__p10intent = true;
+      for (const m of ['step', 'chartStep']) { const o = PS[m]; PS[m] = function (step, time, now, lanes) { const r = o.call(this, step, time, now, lanes); if (!this.__judge) { W.__SET__ = this; if (r && r.lanes && r.lanes.length) W.__OFF__.push({ time, lanes: r.lanes.slice() }); if (W.__OFF__.length > 4000) W.__OFF__.splice(0, 1000); } return r; }; }
     }
-    if (want === 'offered') {
-      const col = () => { const el = document.querySelector('div[style*="outline"]'); if (!el || !el.parentElement) return -1; return Array.prototype.indexOf.call(el.parentElement.children, el); };
-      let last = col();
-      new MutationObserver(() => { const c = col(); if (c !== last) { last = c; if (c >= 0) { tap(); window.__MUSIC_TAPS++; } } })
-        .observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style'] });
-      return;
-    }
+    const KEYS = ['h', 'j', 'k', 'l'];
+    const press = (k) => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true, cancelable: true })); };
+    const clock = () => { const S = W.__FEL_STUDIO__; if (S && S.now) { const t = S.now(); if (t !== null) return t; } const c = (W.__ACS || []).filter((x) => x.state === 'running').slice(-1)[0]; return c ? c.currentTime : null; };
     const done = new Set();
-    setInterval(() => {
-      const c = clock(); if (!c || !S) return;
-      const nowA = c.currentTime;
-      const lag = want === 'heard' ? (c.baseLatency || 0) + (c.outputLatency || 0) : 0;
-      for (const s of S.steps) {
-        const key = s.time.toFixed(4);
-        if (done.has(key) || s.time + lag < nowA) continue;
-        if (want === 'hits' && !HITS.has(s.step)) continue;
-        const ms = (s.time + lag - nowA) * 1000;
-        if (ms > 300) continue;
-        done.add(key);
-        setTimeout(() => { tap(); window.__MUSIC_TAPS++; }, Math.max(0, ms));
+    const tick = () => {
+      const now = clock();
+      if (now !== null) {
+        const lat = W.__SET__ ? W.__SET__.latencySec : 0;
+        for (const o of W.__OFF__) {
+          const key = o.time.toFixed(5); if (done.has(key)) continue;
+          const at = o.time + lat; if (now < at - 0.0015) continue;
+          done.add(key); if (now - at > 0.03) continue;
+          for (const l of o.lanes) { press(KEYS[l]); W.__MUSIC_TAPS++; }
+        }
       }
-    }, 5);
+      setTimeout(tick, 0);
+    };
+    tick();
   })()`,
 };
 
@@ -502,15 +539,18 @@ export const MASHER_DRIVERS: Record<string, string> = {
   // A / B / RT (all three are TAP in the cypher), 40 ms down, 50–120 ms up: ~8 presses a second. No stick: the cypher
   // reads none while dancing, and on the pick screen a random stick changes the SONG (dance-dry1's masher landed on
   // BATTLE, 112 BPM, while the intent driver danced THE CYPHER) — so the masher's first A locks the same default song.
+  // MUSIC-SUITE P10: X and Y join A / B / RT — since P9 all four face buttons press on every called step (and pick the
+  // move in a freestyle bar), so a masher that skipped two of them was the weaker masher.
   dance: loop(`
-    const V = [A, B, RT]; window.__MASH_PRESSES = 0;
+    const V = [A, B, X, Y, RT]; window.__MASH_PRESSES = 0;
     const go = () => { btn(V[Math.floor(Math.random() * V.length)], 40); window.__MASH_PRESSES++; setTimeout(go, 90 + Math.random() * 70); };
     go();
   `),
-  // TAP clicked at random, 60–190 ms apart: ~8 a second.
+  // MUSIC-SUITE P10: the lanes (P6) — a random lane key (H J K L), 60–190 ms apart: ~8 a second, the P6 live proof's
+  // masher (4,550, D, against the perfect player's 208,800).
   music: `(() => {
-    window.__MASH_PRESSES = 0;
-    const go = () => { if (window.__DOM_CLICK && window.__DOM_CLICK('TAP')) window.__MASH_PRESSES++; setTimeout(go, 60 + Math.random() * 130); };
+    window.__MASH_PRESSES = 0; const K = ['h', 'j', 'k', 'l'];
+    const go = () => { const k = K[Math.floor(Math.random() * 4)]; document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true, cancelable: true })); window.__MASH_PRESSES++; setTimeout(go, 60 + Math.random() * 130); };
     go();
   })()`,
 };
