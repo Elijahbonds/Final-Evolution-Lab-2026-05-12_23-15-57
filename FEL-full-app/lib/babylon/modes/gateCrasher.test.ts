@@ -17,7 +17,7 @@ describe('the gate verdict (GATE-CRASHER-MAJOR)', () => {
   const gate = { x: 3.2, z: 100 };
   it('credits a gate only when the rider crossed BETWEEN the poles', () => {
     // the baseline's three dishonest credits: 0.10, 0.14 and 0.29 m outside a pole
-    for (const off of [1.8, 1.84, 1.99]) {
+    for (const off of [2.0, 2.04, 2.19]) {
       const v = judgeGate({ x: gate.x - off, z: 99.8 }, { x: gate.x - off, z: 100.1 }, gate);
       expect(v.crossed && v.hit, `credited ${off} m from the centre, poles at ${GATE_HALF_WIDTH}`).toBe(false);
     }

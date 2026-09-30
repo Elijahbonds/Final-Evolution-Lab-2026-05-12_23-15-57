@@ -22,6 +22,7 @@ describe('player ring rollout', () => {
     expect(h).toContain('modeOwnsPlayerRing(scene)');
     expect(h).toContain('ring?.dispose(); ring = null; ringRoot = null;');
     expect(h).toContain('stamina(v01) { ring?.set(v01); }');
+    expect(h).toContain('setPlayVisible(phase !== \'playing\')');
   });
   it('a mode-owned ring marks the scene; the harness ring does not', () => {
     const r = src('lib/babylon/visual/PlayerRing.ts');

@@ -50,7 +50,7 @@ const CUTBACK_RATE = 6;
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
 let baseFov: number | null = null;
 
-export const POCKET = { min: 2, max: 9 };
+export const POCKET = { min: 1, max: 9 };
 /** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against.
  *  BOARD-SPEED (2026-09-21): it rides the shared pace now (9 × BOARD_PACE = 14.4), so the next pace change reaches surf too. */
 export const MAX_FORWARD_SPEED = 9 * BOARD_PACE;
@@ -63,7 +63,7 @@ export const FLAT_LEASH = 8;
 /** BOARD-SPEED (2026-09-21): what the RIDER does — trim up, drop in, drive off the rail — moves with the shared pace
  *  (+18.5% with skate and snow). What the WAVE does (flat / slide / trim) does not: the wave is the wave. */
 const RIDE_PACE = BOARD_PACE / 1.35;
-export const DRIFT = { flat: -1.7, slide: 0.9, trim: 0.6, climb: 2.4 * RIDE_PACE, drop: 2.2 * RIDE_PACE, rail: 2.6 * RIDE_PACE };
+export const DRIFT = { flat: -1.2, slide: 0.9, trim: 0.6, climb: 2.4 * RIDE_PACE, drop: 2.2 * RIDE_PACE, rail: 2.6 * RIDE_PACE };
 export const BARREL_HOLD_SEC = 1.5;
 export const BARREL_BONUS = 250;
 /** Carve depth at which the rider commits and starts SPENDING flow. */
@@ -76,7 +76,7 @@ export const SURGE_SPEED_BONUS = 4;
 /** Ceiling on the flow meter. */
 export const FLOW_MAX = 200;
 /** Flow gained per second riding the pocket (doubled inside the tube). */
-export const FLOW_FILL_PER_SEC = 22;
+export const FLOW_FILL_PER_SEC = 28;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
   let faceHeightAt: (x: number, z: number, t: number) => number;
@@ -109,7 +109,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   const WAVE_MOVE_LOCK_SEC = 0.55;
   /** phase 7: lateral speed INTO the channel wall that is a wipe rather than a turn-back (a hard carve tops ~4 m/s). */
   const SURF_EDGE_SLAM_MS = 4.5;
-  const PUMP_WINDOW_SEC = 0.9, PUMP_DRIVE = 1.6, PUMP_DECAY = 1.1;
+  const PUMP_WINDOW_SEC = 1.15, PUMP_DRIVE = 1.8, PUMP_DECAY = 1.1;
   const SURF_LATERAL_MAX = 7;
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
