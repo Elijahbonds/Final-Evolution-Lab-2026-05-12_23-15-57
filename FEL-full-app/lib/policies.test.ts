@@ -10,6 +10,7 @@ import { CURRENT_POLICY_VERSION, PRIVACY_CONTENT, TERMS_CONTENT } from './polici
 const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-24-draft': 'ffc1193b4f45a4c8',   // + §6 Camera and Body Tracking (movement play, phase 2)
   '2026-09-25-draft': '2950422a8d3c13c7',   // + §6's space check paragraph (movement play, phase 4)
+  '2026-09-29-draft': 'da452d02a10d392e',   // + §5 Health-Adjacent Data rewrite (mirror-coach, phase 5)
 };
 
 describe('the policy version', () => {
@@ -27,6 +28,7 @@ describe('the policy version', () => {
   it('is past the version signed up to before the camera section, and both pages print it', () => {
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-07-15-draft');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-09-24-draft');   // live without the space check paragraph
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-09-25-draft');   // live with the old three-sentence §5
     expect(CURRENT_POLICY_VERSION.length).toBeLessThanOrEqual(60);   // /api/signup's zod cap on policyVersion
     expect(TERMS_CONTENT).toContain(`**Version: ${CURRENT_POLICY_VERSION}**`);
     expect(PRIVACY_CONTENT).toContain(`**Version: ${CURRENT_POLICY_VERSION}**`);
@@ -75,6 +77,76 @@ describe('privacy policy, the camera', () => {
     expect(section).not.toContain('_');
     const paragraphs = section.split('\n\n').slice(1).map((p) => p.trim()).filter(Boolean);
     expect(paragraphs.length).toBe(4);
+    for (const p of paragraphs) expect(p).not.toContain('\n');
+  });
+});
+
+// MIRROR-COACH P5 (2026-09-29): owner decisions #4, #17, #18 — a health intake and per-exercise pain check-ins are
+// opt-in, FEL-only, never sold/advertised/shared/scored/paid, coach-visible only with a live grant, exportable and
+// erasable on their own, gated behind a guardian for a minor, and addressed against consumer-health-data laws (e.g.
+// Washington's My Health My Data Act) rather than left to ordinary privacy language. §5 has to say all of this.
+describe('privacy policy, health-adjacent data (P5)', () => {
+  const start = PRIVACY_CONTENT.indexOf('## 5. Health-Adjacent Data');
+  const section = PRIVACY_CONTENT.slice(start, PRIVACY_CONTENT.indexOf('## 6.', start));
+  const text = section.toLowerCase();
+
+  it('exists as its own section, before the camera section', () => {
+    expect(start).toBeGreaterThan(-1);
+    expect(PRIVACY_CONTENT.indexOf('## 6.')).toBeGreaterThan(start);
+  });
+
+  it('says what is collected: intake answers, pain check-ins, birth year', () => {
+    expect(text).toContain('intake');
+    expect(text).toContain('pain check-in');
+    expect(text).toContain('birth year');
+  });
+
+  it('requires a separate opt-in before any of it is collected', () => {
+    expect(text).toMatch(/none of this is collected until you say yes to it/);
+    expect(text).toMatch(/separately from creating an account or accepting this policy/);
+  });
+
+  it('says it is never sold, never used for ads, never on a share link, never scored or paid', () => {
+    expect(text).toContain('we do not sell this data');
+    expect(text).toMatch(/target advertising/);
+    expect(text).toMatch(/never appears on a share link/);
+    expect(text).toMatch(/never used to compute your prq/);
+    expect(text).toMatch(/never earns lab credits, shards or any other reward/);
+  });
+
+  it('says who can see it: the person, and a coach only with access turned on', () => {
+    expect(text).toMatch(/only you, by default/);
+    expect(text).toMatch(/turning on coach access for one specific coach/);
+  });
+
+  it('points to Health data in account settings for view/export/erase and for withdrawing consent', () => {
+    const mentions = section.match(/Health data in your account settings/g) ?? [];
+    expect(mentions.length).toBeGreaterThanOrEqual(2);
+    expect(text).toMatch(/view, export or erase this data/);
+    expect(text).toMatch(/withdrawing consent stops new collection immediately/);
+  });
+
+  it('requires a guardian for a minor, and sends a minor to an adult rather than anything else', () => {
+    expect(text).toMatch(/a parent or guardian has to give that consent/);
+    expect(text).toMatch(/always tells you to stop and tell an adult/);
+  });
+
+  it('addresses consumer-health-data law by name and extends the rights everywhere', () => {
+    expect(text).toContain('consumer health data');
+    expect(text).toMatch(/my health my data act/);
+    expect(text).toMatch(/we extend the same protections everywhere, to everyone/);
+  });
+
+  it('describes camera reads honestly: no diagnosis, and never a claim to reduce risk or prevent injury (honesty rule)', () => {
+    expect(text).toMatch(/do not diagnose/);
+    expect(text).toMatch(/builds capacity for/);
+    expect(text).toMatch(/never what it prevents or reduces the risk of/);
+  });
+
+  it('is written the way the page renderer reads it: one line per paragraph, no underscores', () => {
+    expect(section).not.toContain('_');
+    const paragraphs = section.split('\n\n').slice(1).map((p) => p.trim()).filter(Boolean);
+    expect(paragraphs.length).toBeGreaterThanOrEqual(7);
     for (const p of paragraphs) expect(p).not.toContain('\n');
   });
 });

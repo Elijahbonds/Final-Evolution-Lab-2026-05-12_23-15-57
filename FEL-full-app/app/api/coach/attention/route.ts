@@ -5,6 +5,7 @@ import { currentUserId, bad } from '@/lib/camp/server';
 import { attentionBoard, gradedScreenTimes, type ClientFacts } from '@/lib/coach/attention';
 import { LOGGED_WORK_WHERE } from '@/lib/coach/setLog';
 import { MIRROR_SCREEN_KIND } from '@/lib/mirror/screen';
+import { coachPainFlag, type PainCheckInHistoryRow } from '@/lib/health/pain';
 
 /**
  * GET /api/coach/attention — who on my roster needs me today, and who is drifting.
@@ -13,6 +14,13 @@ import { MIRROR_SCREEN_KIND } from '@/lib/mirror/screen';
  * only fetches. Every query is batched across the whole roster rather than run per client: a coach with fifty
  * athletes is the case this feature exists for, and a per-client loop would be fifty round trips to answer one
  * screen.
+ *
+ * MIRROR-COACH P5 (2026-09-29): `painFlags` is read and built entirely separately from attentionBoard() above —
+ * lib/coach/attention.ts's triage/compliance pipeline is untouched, on purpose, so this stays a pure addition with
+ * no risk to its own large test suite. A client's pain check-ins never enter triage, compliance or any PRQ/readiness
+ * signal (decision #4/#12): this is its OWN small, consent-gated list, read by lib/health/pain.ts's coachPainFlag —
+ * without a live 'coach_view' HealthConsent grant for THIS coach, an entry says only "Client paused an exercise",
+ * never which exercise, where, or how bad.
  */
 const HISTORY_DAYS = 60;
 
@@ -26,7 +34,7 @@ export async function GET() {
     prisma.coachClient.findMany({ where: { coachId: userId, endedAt: null }, select: { clientId: true, createdAt: true } }),
   ]);
   const clientIds = [...new Set([...linked.map((l) => l.clientId), ...programs.map((p) => p.clientId)])];
-  if (!clientIds.length) return NextResponse.json({ triage: { flags: [], totalFlagged: 0, clear: 0, summary: 'No athletes on your roster yet.' }, drift: [], headline: null });
+  if (!clientIds.length) return NextResponse.json({ triage: { flags: [], totalFlagged: 0, clear: 0, summary: 'No athletes on your roster yet.' }, drift: [], headline: null, painFlags: [] });
   const programIds = programs.map((p) => p.id);
 
   const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000);
@@ -60,11 +68,26 @@ export async function GET() {
     prisma.workoutScan.findMany({ where: { userId: { in: clientIds }, kind: MIRROR_SCREEN_KIND }, select: { userId: true, createdAt: true, metrics: true }, orderBy: { createdAt: 'desc' } }),
   ]);
 
+  // painFlags: batched the same way as everything above, but read and merged separately (see the file header).
+  const [painRows, coachViewGrants] = await Promise.all([
+    prisma.painCheckIn.findMany({
+      where: { userId: { in: clientIds }, createdAt: { gte: since } },
+      select: { id: true, userId: true, exerciseName: true, bodyArea: true, programExerciseId: true, score: true, kind: true, decision: true, createdAt: true },
+    }),
+    prisma.healthConsent.findMany({ where: { coachId: userId, scope: 'coach_view', userId: { in: clientIds }, revokedAt: null }, select: { userId: true } }),
+  ]);
+
   const by = <T,>(rows: readonly T[], key: (r: T) => string) => {
     const m = new Map<string, T[]>();
     for (const r of rows) { const k = key(r); (m.get(k) ?? m.set(k, []).get(k)!).push(r); }
     return m;
   };
+  const painByClient = by(painRows, (r) => r.userId);
+  const consentedClients = new Set(coachViewGrants.map((g) => g.userId));
+  const painFlags = clientIds
+    .map((cid) => ({ clientId: cid, name: users.find((u) => u.id === cid)?.name ?? users.find((u) => u.id === cid)?.email?.split('@')[0] ?? 'player', view: coachPainFlag((painByClient.get(cid) ?? []) as PainCheckInHistoryRow[], consentedClients.has(cid)) }))
+    .filter((f) => f.view.present);
+
   const gamesBy = by(games, (s) => s.userId);
   const coachedBy = by(coached, (s) => s.clientId);
   const logsBy = by([
@@ -105,5 +128,5 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json(attentionBoard(facts, Date.now()));
+  return NextResponse.json({ ...attentionBoard(facts, Date.now()), painFlags });
 }

@@ -16,9 +16,13 @@ export type Row = Record<string, any>; // eslint-disable-line @typescript-eslint
 export interface TodayStore {
   seq: number; clock: number;
   program: Row[]; block: Row[]; session: Row[]; se: Row[]; pe: Row[]; user: Row[]; cs: Row[]; log: Row[]; setLog: Row[];
+  // MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
+  // red-flag hard stop": loadToday/saveClientLog now read the client's latest HealthIntake the same way
+  // lib/health/intake.ts's own latestIntake() does. Empty by default, same as every athlete with no intake on file.
+  healthIntake: Row[];
 }
 
-export const newTodayStore = (): TodayStore => ({ seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [] });
+export const newTodayStore = (): TodayStore => ({ seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [], healthIntake: [] });
 
 /** ExerciseLog columns a write may name (prisma/schema.prisma model ExerciseLog, less id / timestamps / relations). */
 export const EXERCISE_LOG_WRITABLE = ['clientSessionId', 'sessionExerciseId', 'actualSets', 'actualReps', 'actualLoad', 'rpe', 'clientNote', 'videoUrl', 'coachComment', 'coachCommentAt', 'completedAt'] as const;
@@ -83,6 +87,15 @@ export function todayMemoryDb(s: TodayStore) {
     user: {
       findUnique: async (a: Row) => { const u = s.user.find((x) => x.id === a.where.id); return u ? pick(u, a.select) : null; },
       findMany: async (a: Row) => s.user.filter((u) => (a.where.id?.in ?? []).includes(u.id)).map((u) => pick(u, a.select)),
+    },
+    // MIRROR-COACH P5 FIX (2026-09-29, code review): same shape lib/health/intake.ts's latestIntake() reads for real
+    // (findFirst by userId, newest createdAt first).
+    healthIntake: {
+      findFirst: async (a: Row) => {
+        const rows = s.healthIntake.filter((r) => r.userId === a.where.userId);
+        if (!rows.length) return null;
+        return clone([...rows].sort((x, y) => time(y.createdAt) - time(x.createdAt))[0]);
+      },
     },
     programExercise: {
       findMany: async (a: Row) => s.pe.filter((p) => (a.where.id?.in ?? []).includes(p.id) && (a.where.coachId === undefined || p.coachId === a.where.coachId)).map((p) => pick(p, a.select)),

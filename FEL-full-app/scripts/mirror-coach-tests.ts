@@ -151,7 +151,12 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   const h = readFileSync(new URL('../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8');
   // Matched on the pattern title map rather than one literal tuple, and case-insensitively on the stage copy:
   // the guided flow is the contract, the exact shouting is not.
-  ok(/squat:\s*'Corrective Squat'/.test(h), 'the picker offers the guided corrective squat');
+  // MIRROR-COACH P4 lane 1 (registry-and-lunge, 2026-09-25): the title now reads from the pattern-audit registry
+  // (lib/mirror/patterns.ts MIRROR_PATTERNS, squat entry one) rather than a literal string in the harness itself —
+  // checked at the SOURCE (squatPattern.ts's own label) rather than re-asserting a copy of it here.
+  const squatPatternSrc = readFileSync(new URL('../lib/mirror/squatPattern.ts', import.meta.url), 'utf8');
+  ok(/squat:\s*SQUAT_PATTERN\.label/.test(h) && /label:\s*'Corrective Squat'/.test(squatPatternSrc),
+    'the picker offers the guided corrective squat (its title comes from the pattern registry, entry one)');
   ok(h.includes("patternRef.current === 'squat'"), 'the squat pattern runs its own analysis');
   ok(h.includes("analysis: patternRef.current === 'squat' ? 'squat' : 'zones'"), 'the compositor is routed by pattern');
   ok(h.includes('cueEngineRef.current.decide('), 'measured faults feed the cue engine');
@@ -162,7 +167,9 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   const code = h.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   // MIRROR-COACH P1 (2026-09-25): there is no band, and an unverified knee read is never painted as a correction
   ok(!/MY BAND|band pulls/i.test(code), 'no overlay claims a band');
-  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)))'), 'the knee overlay only paints a CUEABLE knee fault');
+  // MIRROR-COACH P4 review (2026-09-25): a 4th argument (squat.valgusBySide) now rides along, so the overlay can paint
+  // only the side actually caving (kneeOverlay.ts's own `sides` filter) instead of both knees for a one-sided cave.
+  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)), squat.valgusBySide)'), 'the knee overlay only paints a CUEABLE knee fault, on the side actually caving');
   ok(/VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)/.test(h), 'the knee overlay is behind VALGUS_CUE_VERIFIED');
   // MIRROR-COACH P1 review (2026-09-25): "Recording" on a live camera page reads as the video being recorded, and
   // nothing is — the row says the knee is MEASURED, and no knee copy the athlete sees says "record".

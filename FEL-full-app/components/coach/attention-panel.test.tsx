@@ -60,6 +60,26 @@ describe('panelLists', () => {
   });
 });
 
+// MIRROR-COACH P5 (2026-09-29): pain flags are read from `board.painFlags` — absent on an older cached response,
+// which must read exactly like an empty list (never a crash), and never render `items` unless the API itself
+// marked the row `detailed` (a live coach_view consent grant, decided server-side in lib/health/pain.ts).
+describe('panel source: pain flags', () => {
+  it('treats a missing painFlags field as an empty list, not a crash', () => {
+    const src = readSource();
+    expect(src).toMatch(/board\.painFlags\s*\?\?\s*\[\]/);
+  });
+
+  it('only renders the detailed item list when the API marked the row detailed — never derives detail client-side', () => {
+    const src = readSource();
+    expect(src).toMatch(/p\.view\.detailed\s*&&\s*p\.view\.items/);
+  });
+
+  it('the empty-state line accounts for pain flags too, so a coach with only a pain flag never sees "nothing to do"', () => {
+    const src = readSource();
+    expect(src).toMatch(/painFlags\.length === 0/);
+  });
+});
+
 function readSource(): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('node:fs').readFileSync(new URL('./attention-panel.tsx', import.meta.url), 'utf8');
