@@ -1,3 +1,7 @@
+// GATE-HYGIENE (measured 2026-09-30): npm's arborist Shrinkwrap.save rewrites yarn.lock per-OS during reify
+// (yarnLock.fromTree, before this postinstall). prisma generate does not touch yarn.lock. Gates already accept
+// yarn.lock as the only allowed dirty file. This script does not restore or overwrite it.
+//
 // scripts/prisma-generate.mjs — `prisma generate`, then make the COMMITTED client path-independent (PRISMA-PATH,
 // 2026-09-30).
 //

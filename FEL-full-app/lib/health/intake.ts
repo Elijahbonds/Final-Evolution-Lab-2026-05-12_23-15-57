@@ -316,8 +316,14 @@ export interface SubmitIntakeInput {
  * adult, the parent path is gone). THE GUARDIAN ALLOWANCE ABOVE IS REMOVED: no GuardianConsent is read here any more,
  * and an accepted one unlocks nothing. The whole submission is refused (IntakeValidationError 'health_data_adults_only',
  * answered 403 by the route) unless the DATABASE's User.dobYear is verified 18+ (lib/privacy/verifiedAdult.ts, pure,
- * because client components import this file). This submission's own birth_year answer is never used for it (there is
- * no `effectiveDobYear` any more). So the dobYear write below, which only ran for a BLANK dobYear, is now unreachable.
+ * because client components import this file).
+ *
+ * AGE-SCREEN MUST (1) (FE PM 04:19 PT): the answer can now only REFUSE, never unlock. The younger of the database
+ * year and this submission's birth_year decides: if the answer says under 18, the save is refused even when the
+ * stored year says adult. A skipped birth_year (null) leaves the database check alone. The answer never writes or
+ * overwrites dobYear. An under-13 answer here is a refusal, not a lock. REFUSE-ONLY; LOCK-ON-INTAKE IS DEFERRED to
+ * PRIVACY-CORE's `lockedUnder13At` column. So the dobYear write below, which only ran for a BLANK dobYear, stays
+ * unreachable.
  */
 export async function submitIntake(db: IntakeDb, input: SubmitIntakeInput) {
   if (input.consent !== true) throw new IntakeValidationError('consent_required');
@@ -327,8 +333,10 @@ export async function submitIntake(db: IntakeDb, input: SubmitIntakeInput) {
 
   const birthYear = birthYearFrom(answers);
   const user = await db.user.findUnique({ where: { id: input.userId }, select: { dobYear: true } });
-  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the DB's User.dobYear only (never the answer, never a guardian); else nothing is written.
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the DB's User.dobYear only (never a guardian); else nothing is written.
   if (!verifiedAdult(user?.dobYear ?? null, now)) throw new IntakeValidationError('health_data_adults_only');
+  // AGE-SCREEN MUST (1): the answer can only refuse. Nothing is written before this throw.
+  if (birthYear !== null && !verifiedAdult(birthYear, now)) throw new IntakeValidationError('health_data_adults_only');
 
   await grantHealthDataConsent(db, input.userId, now);
 

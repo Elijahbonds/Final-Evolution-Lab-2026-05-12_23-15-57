@@ -34,7 +34,7 @@ export const REAL_CLIPS = new Set<string>([
   'guard', 'high_kick', 'hook', 'jab', 'jumpshot', 'roundhouse', 'run', 'uppercut', 'walk',
   // authored/code-driven procedural clips (always safe)
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
-  'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch',
+  'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
   'dunk_self_lob', 'dunk_bounce_throw', 'dunk_kick_up', 'dunk_back_handspring', 'dunk_cartwheel', 'dunk_backflip', 'dunk_flush_scorpion', 'dunk_720_spin', 'dunk_celeb_spiderman_splits', 'dunk_celeb_its_over', 'dunk_celeb_roar', 'dunk_celeb_too_small', 'prop_stack_base', 'prop_stack_rider', 'prop_row_stand', 'prop_row_crouch', 'prop_dubble_hold', 'prop_dubble_kneel', 'prop_bike_rider', 'prop_skate_rider', 'dunk_double_up', 'dunk_scorpion', 'dunk_lost_found', 'dunk_hide_seek', 'dunk_360_spin', 'dunk_between_legs', 'dunk_cradle', 'dunk_double_clutch', 'dunk_behind_back', 'dunk_fake_back', 'dunk_double_eastbay', 'dunk_360_windmill', 'dunk_fake_eastbay', 'dunk_tap',   // DUNK-CONTROL-JUICE (2026-09-08): the named dunks
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall', 'football_td_spike',

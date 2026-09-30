@@ -58,7 +58,10 @@ describe('(d) /screen: one stable QR address', () => {
     const { readFileSync, existsSync } = await import('node:fs');
     const { join } = await import('node:path');
     expect(readFileSync(join(__dirname, '../../app/screen/page.tsx'), 'utf8')).not.toMatch(/getServerSession|authOptions/);
-    expect(existsSync(join(__dirname, '../../middleware.ts'))).toBe(false);
+    // SCREEN-HARDEN: middleware adds screen-path headers only; it must not gate auth.
+    if (existsSync(join(__dirname, '../../middleware.ts'))) {
+      expect(readFileSync(join(__dirname, '../../middleware.ts'), 'utf8')).not.toMatch(/getServerSession|authOptions|next-auth/);
+    }
   });
 });
 

@@ -31,9 +31,23 @@ describe('a new project', () => {
   });
 
   it('ids and audio keys are unique and carry the time they were made', () => {
-    const ids = new Set(Array.from({ length: 200 }, () => newProjectId(NOW)));
-    expect(ids.size).toBe(200);
-    expect(newAudioKey(NOW)).toMatch(new RegExp(`^aud_${NOW.toString(36)}[0-9a-z]{4}$`));
+    // rand36 is four base36 characters (1,679,616 values). Two hundred draws at one timestamp collide about 2% of
+    // the time (birthday paradox; measured 38/2000), which is the intermittent failure under a repeated gate — there
+    // is no sleep in this file. A fixed sequence of distinct draws keeps the assertion (200 unique ids, the time in
+    // the key) and takes the dice roll out.
+    let n = 0;
+    const space = 36 ** 4;
+    const random = Math.random;
+    // Mid-bucket, not k/space: floor((k/space) * space) collapses under float error and the ids collide again.
+    Math.random = () => (n++ + 0.5) / space;
+    try {
+      const ids = new Set(Array.from({ length: 200 }, () => newProjectId(NOW)));
+      expect(ids.size).toBe(200);
+      expect([...ids].every((id) => id.startsWith(`prj_${NOW.toString(36)}`))).toBe(true);
+      expect(newAudioKey(NOW)).toMatch(new RegExp(`^aud_${NOW.toString(36)}[0-9a-z]{4}$`));
+    } finally {
+      Math.random = random;
+    }
   });
 });
 
