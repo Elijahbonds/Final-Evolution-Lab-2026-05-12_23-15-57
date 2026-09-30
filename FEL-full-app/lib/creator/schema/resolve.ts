@@ -27,7 +27,7 @@ import { TRAITS } from './traits';
 import { ceilingFor } from './ceilings';
 import { HOT_ZONES, ZONE_STATES, ZONE_POINT_CAP, zonePointsSpent } from './hotZones';
 import { MECHANICS, slotGate } from './mechanics';
-import { VITALS } from './vitals';
+import { VITALS, RETIRED_VITALS, isLegacyVital } from './vitals';
 import { APPEARANCE } from './appearance';
 import { BODY } from './body';
 import { GEAR, ACCESSORIES } from './gear';
@@ -199,10 +199,13 @@ export function resolve(build: CreatorBuild): Resolution {
   // longer ships. §9 says report it and let them fix it, so it is reported next to the row.
   for (const [sectionKey, table] of Object.entries(LOOK_SECTIONS)) {
     for (const [id, value] of Object.entries(build.look?.[sectionKey] ?? {})) {
+      if (sectionKey === 'vitals' && RETIRED_VITALS.includes(id)) continue;   // REACH-FREEZE: an old save's Reach, ignored silently
       const row = table.rows.find((r) => r.id === id);
       if (!row) { issues.push({ kind: 'warning', rowId: id, section: sectionKey, message: `Unknown "${id}" — kept, not editable here.` }); continue; }
       if (row.kind === 'rated') {
         const v = Number(value);
+        // REACH-FREEZE: a Height or Build saved in the old 88–118 % loads clamped (saveBuild, the creator's import) — not a violation
+        if (sectionKey === 'vitals' && isLegacyVital(id, v)) continue;
         if (!Number.isFinite(v) || v < row.min || v > row.max) {
           issues.push({ kind: 'violation', rowId: id, section: sectionKey, message: `${row.label} must be between ${row.min} and ${row.max}.` });
         }

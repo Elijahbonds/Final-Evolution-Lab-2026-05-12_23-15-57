@@ -22,7 +22,7 @@ const FULL: Values = {
   traits: {},
   hotZones: { cornerThreeR: 'BURNING', paint: 'COLD' },
   mechanics: { jsBase: 'Loaded Hinge' },
-  vitals: { heightScale: 106, buildScale: 97, reachScale: 103, jerseyNumber: 23 },
+  vitals: { heightScale: 103, buildScale: 97, jerseyNumber: 23 },   // REACH-FREEZE: inside the cosmetic rows, and no Reach row
   body: { bodyType: 'female', archetype: 'powerful', stance: 'tall' },
   appearance: { hairStyle: 'Locs', skinTone: '#6F4321', jawOpen: 40 },
   gear: { tops: 'Bonds Signature Jersey', shoes: 'Evolution Hi-Tops', headwear: null, paletteJersey: '#FFD700' },
@@ -43,7 +43,7 @@ describe('the split sends each part where it already belongs', () => {
   it('keeps the build out of AvatarLook and the look out of the build', () => {
     const build = toBuild(FULL);
     expect(build.attributes.threePoint).toBe(80);
-    expect(build.frame.heightScale).toBe(106);
+    expect(build.frame.heightScale).toBe(103);
     expect(build.frame.archetype).toBe('powerful');
     expect(build.palette.paletteJersey).toBe('#FFD700');
     // the face, the garments and the plate are NOT duplicated here
@@ -67,7 +67,7 @@ describe('the round trip loses nothing', () => {
     expect(back.tendencies).toEqual(FULL.tendencies);
     expect(back.hotZones).toEqual(FULL.hotZones);
     expect(back.mechanics).toEqual(FULL.mechanics);
-    expect(back.vitals).toMatchObject({ heightScale: 106, buildScale: 97, reachScale: 103, jerseyNumber: 23 });
+    expect(back.vitals).toMatchObject({ heightScale: 103, buildScale: 97, jerseyNumber: 23 });
     expect(back.body).toEqual({ bodyType: 'female', archetype: 'powerful', stance: 'tall' });
     expect(back.appearance!.hairStyle).toBe('Locs');
     expect(back.appearance!.skinTone).toBe('#6F4321');

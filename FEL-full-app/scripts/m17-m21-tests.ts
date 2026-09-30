@@ -73,12 +73,13 @@ check('4-week plan has 4 weeks, 12-week has 12', () => {
 });
 
 console.log('\n=== Avatar spec ===');
-check('buildAvatarSpec clamps scales and honours palette overrides', () => {
+check('buildAvatarSpec is the standard frame (REACH-FREEZE: a scan never sets a size) and honours palette overrides', () => {
   const spec = buildAvatarSpec(defaultMetrics(), { skin: '#123456' });
-  assert.ok(spec.heightScale >= 0.9 && spec.heightScale <= 1.12);
-  assert.ok(spec.buildScale >= 0.9 && spec.buildScale <= 1.15);
+  assert.equal(spec.heightScale, 1);
+  assert.equal(spec.buildScale, 1);
+  assert.equal(spec.reachScale, 1);
   assert.equal(spec.palette.skin, '#123456');
-  assert.ok(['athletic', 'tall', 'compact'].includes(spec.stance));
+  assert.equal(spec.stance, 'athletic');
 });
 
 console.log('\n=== Closet catalog (inclusivity) ===');

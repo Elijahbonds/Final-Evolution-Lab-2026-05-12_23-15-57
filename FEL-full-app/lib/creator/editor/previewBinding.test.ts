@@ -77,10 +77,12 @@ describe('what the player changes is what the preview shows', () => {
   });
 
   it('turns percent rows into the scan\'s own fractions, which is what the rig multiplies by', () => {
-    const b = bindPreview({ vitals: { heightScale: 110, buildScale: 94, reachScale: 105 } });
-    expect(b.proportions.heightScale).toBeCloseTo(1.1, 5);
+    const b = bindPreview({ vitals: { heightScale: 103, buildScale: 94, reachScale: 105 } });
+    expect(b.proportions.heightScale).toBeCloseTo(1.03, 5);
     expect(b.proportions.buildScale).toBeCloseTo(0.94, 5);
-    expect(b.proportions.reachScale).toBeCloseTo(1.05, 5);
+    expect(b.proportions.reachScale).toBe(1);   // REACH-FREEZE: a saved reach is ignored
+    // REACH-FREEZE: a value from the old 88–118 % range is shown clamped, never as a body a spawn would not play
+    expect(bindPreview({ vitals: { heightScale: 110 } }).proportions.heightScale).toBeCloseTo(1.04, 5);
   });
 
   it('turns percent morphs into the 0–1 weights the sanitiser keeps, and drops the zeroes', () => {

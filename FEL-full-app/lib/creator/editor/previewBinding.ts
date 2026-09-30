@@ -18,7 +18,8 @@
 
 import type { FaceConfig, JerseyConfig } from '../../closet/wearable-catalog';
 import { sanitizeFaceSliders, sanitizeJersey, defaultFace } from '../../closet/wearable-catalog';
-import type { AvatarSpec } from '../../workout/avatar-builder';
+import type { AvatarSpec } from '../../babylon/core/avatarSpec';
+import { clampCosmetic } from '../../babylon/core/playFrame';
 import { APPEARANCE } from '../schema/appearance';
 import { BODY } from '../schema/body';
 import { VITALS } from '../schema/vitals';
@@ -94,17 +95,17 @@ export function bindWardrobe(gear: ValueMap, accessories: ValueMap): Record<stri
 }
 
 /**
- * The three scales, as the scan's own shape.
+ * The body's scales, in the spec's own shape.
  *
- * `applyIdentity` multiplies the root by `heightScale` and the torso and arm bones by the other two, so a
- * Vitals row moving is a body changing on screen — which is the only way a player can tell that these
- * numbers are real.
+ * `applyProportions` multiplies the root by `heightScale` and its girth by `buildScale`, so a Vitals row moving
+ * is a body changing on screen — which is the only way a player can tell that these numbers are real. Both are
+ * cosmetic and clamped the way every spawn clamps them; reach is frozen at 1 (REACH-FREEZE, 2026-09-29).
  */
 export function bindProportions(vitals: ValueMap, body: ValueMap, face: FaceConfig, palette: PreviewBinding['palette']): AvatarSpec {
   const pct = (id: string) => num(valueOf(VITALS, vitals, id), 100) / 100;
   const stance = str(valueOf(BODY, body, 'stance'), 'athletic') as AvatarSpec['stance'];
   return {
-    heightScale: pct('heightScale'), buildScale: pct('buildScale'), reachScale: pct('reachScale'),
+    heightScale: clampCosmetic(pct('heightScale'), 'height'), buildScale: clampCosmetic(pct('buildScale'), 'build'), reachScale: 1,
     palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent },
     stance,
   };
