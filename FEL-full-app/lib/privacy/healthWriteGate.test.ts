@@ -117,7 +117,7 @@ describe('the refusal and the table', () => {
     expect(HEALTH_WRITE_ROUTES.map((r) => r.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
     for (const r of HEALTH_WRITE_ROUTES) {
       const src = readFileSync(join(__dirname, '../..', r.file), 'utf8');
-      // both ways: a file that calls the gate is marked gated (R-HEALTH flips d and e when it lands)
+      // both ways: a file that calls the gate is marked gated (TEEN-WRITE-BLOCK-2 flipped d and e)
       expect(r.status === 'gated', `${r.id} ${r.file}`).toBe(/canWriteHealthData\(prisma, userId\)/.test(src));
       if (r.status === 'routed') expect(r.holder, r.id).toBeTruthy();
     }

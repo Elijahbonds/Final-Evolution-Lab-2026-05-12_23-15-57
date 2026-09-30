@@ -1,6 +1,6 @@
 // TEEN-WRITE-BLOCK (2026-09-29; FE PM 19:19 PT): taking your own health data BACK needs no age. Revoke and erase
 // (app/api/health/consent) stay open to everyone — proved here for a 15-year-old and an unknown-age account — while the
-// grants (d, e) are routed as R-HEALTH (open PR #47 changes that file). The readiness clear is proved in
+// grants (d, e) are gated (TEEN-WRITE-BLOCK-2: lib/health/health-adults-only-consent-grant.test.ts). The readiness clear is proved in
 // health-adults-only-pain-readiness.test.ts. Run for real over the write-spy client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

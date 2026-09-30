@@ -15,7 +15,7 @@ import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/health/intake/route';
 import { INTAKE_VERSION } from './intake';
 import {
-  HEALTH_ADULT, HEALTH_REFUSED_CASES, argsOf, callsOn, newSpyDb, seedUser, spyPrisma, writesOf, type AgeCase, type SpyDb,
+  HEALTH_ADULT, HEALTH_REFUSED_CASES, THIS_YEAR, argsOf, callsOn, newSpyDb, seedUser, spyPrisma, writesOf, type AgeCase, type SpyDb,
 } from '@/tests/helpers/writeSpyDb';
 
 const UID = 'athlete-intake-1';
@@ -81,6 +81,20 @@ describe('a) intake submit', () => {
     h.userId = null;
     expect((await post({ answers: ANSWERS, consent: true })).status).toBe(401);
     expect(writesOf(db)).toEqual([]);
+  });
+
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): the guardian allowance inside submitIntake is removed, and with it the route's 412
+  // mapping. A minor's birth_year answer (what used to trip it) now gets 403 for the three refused users and, for the
+  // adult on file, is just an answer: the DB's year decides (assumption: the ruling's "DB dobYear only" includes this).
+  it.each([...HEALTH_REFUSED_CASES, HEALTH_ADULT].map((c) => [c.id, c] as const))('%s: no 412 guardian_consent_required is ever answered', async (_id, c) => {
+    for (const answers of [ANSWERS, { ...ANSWERS, birth_year: THIS_YEAR - 14 }]) {
+      as(c);
+      const r = await post({ answers, consent: true });
+      expect(r.status).not.toBe(412);
+      expect(r.json.error).not.toBe('guardian_consent_required');
+      expect(r.status).toBe(c === HEALTH_ADULT ? 200 : 403);
+      expect(callsOn(db, 'guardianConsent')).toEqual([]);
+    }
   });
 });
 

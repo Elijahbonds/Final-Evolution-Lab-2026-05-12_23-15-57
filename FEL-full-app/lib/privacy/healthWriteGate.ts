@@ -42,16 +42,15 @@ export interface HealthWriteRoute {
 }
 
 /**
- * The health writes (FE PM 19:19 PT, H2 a–f), as data. d and e are routed: app/api/health/consent/route.ts is changed by
- * open PR #47 (lane/mirror-coach, MIRROR-COACH P7). a's route-level check is here; the guardian allowance inside
- * lib/health/intake.ts submitIntake (also changed by PR #47) is routed with it, and can no longer unlock anyone this
- * check refused.
+ * The health writes (FE PM 19:19 PT, H2 a–f), as data. All six are gated (TEEN-WRITE-BLOCK-2, FE PM 23:05 PT: d and e in
+ * app/api/health/consent/route.ts despite open PR #47, which rebases after). The guardian allowance inside
+ * lib/health/intake.ts submitIntake is removed: it checks the DB's User.dobYear itself (lib/privacy/verifiedAdult.ts).
  */
 export const HEALTH_WRITE_ROUTES: readonly HealthWriteRoute[] = [
   { id: 'a', file: 'app/api/health/intake/route.ts', handler: 'POST (submit)', writes: 'HealthIntake, the health_data grant, User.dobYear when blank', status: 'gated', holder: null },
   { id: 'b', file: 'app/api/health/pain/route.ts', handler: 'POST', writes: 'PainCheckIn', status: 'gated', holder: null },
   { id: 'c', file: 'app/api/health/readiness/route.ts', handler: 'POST (not the clear)', writes: 'ReadinessCheckIn upsert', status: 'gated', holder: null },
-  { id: 'd', file: 'app/api/health/consent/route.ts', handler: "POST action 'grant' scope health_data", writes: 'HealthConsent health_data', status: 'routed', holder: 'mirror-coach (open PR #47, lane/mirror-coach, changes this file)' },
-  { id: 'e', file: 'app/api/health/consent/route.ts', handler: "POST action 'grant' scope coach_view", writes: 'HealthConsent coach_view', status: 'routed', holder: 'mirror-coach (open PR #47, lane/mirror-coach, changes this file)' },
+  { id: 'd', file: 'app/api/health/consent/route.ts', handler: "POST action 'grant' scope health_data", writes: 'HealthConsent health_data', status: 'gated', holder: null },
+  { id: 'e', file: 'app/api/health/consent/route.ts', handler: "POST action 'grant' scope coach_view", writes: 'HealthConsent coach_view', status: 'gated', holder: null },
   { id: 'f', file: 'app/api/health/intake/route.ts', handler: "POST action 'clear'", writes: 'HealthIntake.clearedAt', status: 'gated', holder: null },
 ];

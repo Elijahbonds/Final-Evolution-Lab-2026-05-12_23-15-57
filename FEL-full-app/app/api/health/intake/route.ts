@@ -115,17 +115,12 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     if (err instanceof IntakeValidationError) {
-      // MIRROR-COACH P5 FIX (2026-09-29, code review): 'guardian_consent_required' is submitIntake()'s own signal
-      // that it wrote NOTHING because this athlete reads as needing a guardian first (see its own doc comment) — same
-      // 412 status and error shape app/api/health/pain/route.ts already uses for the identical reason, so the client
-      // (health-intake-gate.tsx) can tell "held for a guardian" apart from an ordinary validation failure.
-      // TEEN-WRITE-BLOCK (2026-09-29): after the check above, only a DB-verified adult reaches submitIntake, so this 412
-      // is left only for an adult whose own birth_year answer reads as a minor — it can refuse, never unlock. It goes
-      // when R-HEALTH (~/Claude/outbox/teen-write-block-routed.md) replaces that allowance in lib/health/intake.ts with
-      // the DB-dobYear check, which throws 'health_data_adults_only' (answered as the same 403 here).
+      // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the guardian allowance inside submitIntake is gone, and with it the 412
+      // 'guardian_consent_required' this used to answer (MIRROR-COACH P5 FIX): nothing throws it any more. submitIntake's own
+      // check is the DB-dobYear one (lib/health/intake.ts), which throws 'health_data_adults_only', answered as the same 403
+      // as the check above. Every other validation code is a 400.
       if (err.code === HEALTH_WRITE_REFUSED.error) return refuseHealthWrite();
-      const status = err.code === 'guardian_consent_required' ? 412 : 400;
-      return NextResponse.json({ error: err.code, details: err.details }, { status });
+      return NextResponse.json({ error: err.code, details: err.details }, { status: 400 });
     }
     throw err;
   }
