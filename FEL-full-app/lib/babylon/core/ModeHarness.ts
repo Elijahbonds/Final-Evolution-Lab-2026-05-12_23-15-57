@@ -47,6 +47,7 @@ import { makeAnimProbe } from '../anim/animProbe';   // SHARED-ANIM-BUS: the pro
 import type { PrqGrade } from '../../prq';
 type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
+import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { isWakeInput, WakeLatch, PauseLedger } from './StartWake';   // SHARED-START-UNSTICK: any press/push/pull → playing
 // MOVEMENT PLAY P3 (2026-09-24): the body seam — the mode's profile, the floor that presses it, the session that starts and
 // pauses the game on the body (all built by bodySeamFor), and the one store the UI reads (plan §4.4).
@@ -321,7 +322,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // MECHANICS PASS (2026-09-15): CAUSE → EFFECT, measured. Under `?agent=1` only, every press the mode receives and
   // every answer a player can perceive (HUD news, a juice beat, an impact, a sound, the hero's clip changing) goes on
   // one timeline, published as `window.__FEL_QA__` for the mechanics probe. See QaTrace.ts. Off in play: `qa` is null.
-  const qa = agentEnabled() ? new QaTrace() : null;
+  const qa = devOrAgentHooks() ? new QaTrace() : null;
   const qaRawHud: Record<string, unknown> = {};
   /** What each captioned HUD key last said, so one banner is announced once and not once a frame. */
   const saidHud: Record<string, string> = {};
@@ -479,9 +480,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
   // four live chips, and its reload timed out. Production now publishes the INPUT seam alone: no scene, no hero,
   // nothing that retains a disposed mount. The full handle stays development-only.
-  const probeHandle = process.env.NODE_ENV === 'development' ? devHandle : { modeId: def.modeId, input, anim: animProbe };
+  const probeHandle = devOrAgentHooks() ? devHandle : undefined;
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
-  devWindow.__FEL_DEV__ = probeHandle;
+  if (probeHandle) devWindow.__FEL_DEV__ = probeHandle;
+  else delete devWindow.__FEL_DEV__;
   setDiagMode(def.modeId);
   // a lost WebGL context is the one failure the player cannot recover from by playing on
   engine.onContextLostObservable.add(() => {

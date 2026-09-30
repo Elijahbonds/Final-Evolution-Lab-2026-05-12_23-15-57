@@ -87,7 +87,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
           ? `${n('stalled') ? 'RUN STALLED' : won ? 'GATE CRASHER' : 'RUN FINISHED'} · ${n('gatesHit')}/${n('gates', 30)}`
           : modeKey === 'surf'
             ? `${won ? 'EPIC SESSION' : 'SESSION OVER'} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`
-            : `${won ? 'LEGENDARY RUN' : 'RUN OVER'} · x${combo} BEST CHAIN · ${n('tricksLanded')} TRICKS · ${n('coinsCollected')} COINS`;
+            : `${won ? 'LEGENDARY RUN' : 'RUN OVER'} · x${combo} BEST CHAIN · ${n('tricksLanded')} TRICKS · ${n('coinsCollected')} PICKUPS`;
         const result: GameResult = {
           score: r.score,
           stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
