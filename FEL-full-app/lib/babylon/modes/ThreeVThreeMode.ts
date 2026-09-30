@@ -272,6 +272,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
   let carrierId: 'me' | 'mate0' | 'mate1' | 'foeTeam' = 'me';
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
+  let buzzer = false;   // HOOPS-TO-75 WA-1: the horn fired — wait for live shots before posting the final score
   /** HOOPS MOTION phase 3b: a MATE's shot is up (the one-shot-at-a-time guard). teammateShoots used to raise the hero's own `shooting`,
    *  which nothing cleared when their ball followed his make (opponentPossession leaves it): the hero looped `bball_shoot_jumper` while
    *  sliding on defence and was slewed toward the rim until the next possession of ours (V:3v3 C6). */
@@ -447,6 +448,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function unplant(b: Body): void { b.plant?.release(); b.wasPlanting = false; }
   const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
   const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
+  const TEAM_SHORTS = { mine: '#0e7490', theirs: '#9d174d' } as const;   // HOOPS-TO-75 HP-5: shorts tint when the jersey mesh name misses
   const AI_REACH_COOLDOWN_SEC = 1.2, AI_STEAL_CHANCE = 0.22, AI_STEAL_ON_BUMP = 0.6, AI_REACH_GATE = 0.5;   // measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions — a foul every other trip   // the AI defender's reach: its cadence and its odds (open / on the bump)
   const STANDING_GATHER_MS = 220;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
   const DUNK_SHARE = 0.55;          // of the OPEN lanes, the share the rival throws down (the rest are layups); nerve tilts it
@@ -596,9 +598,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // is (DribbleController) — so with the hero spawned facing +z and the rim at −z, push-forward ran him BACKWARDS
     // to the rim for the whole drive (measured: facing·travel −1 for 4.4 m/s). 1v1 has always called setFacing(π).
     me.char.root.rotation.y = Math.PI; me.drib.setFacing(Math.PI);
-    mates[0].char.root.position.set(-3.5, 0, 4);
-    mates[1].char.root.position.set(3.5, 0, 4);
-    foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
+    mates[0].char.root.position.set(-4.8, 0, 5.8);
+    mates[1].char.root.position.set(4.8, 0, 5.8);
+    foes.forEach((f, i) => f.char.root.position.set(-4.5 + i * 4.5, 0, -0.8 - i * 1.1));
     ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
     shooting = false; mateShooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
@@ -638,7 +640,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // had no way to tell a teammate from a defender but the hero's purple. The AI bodies wear their team's jersey
         // (the tint used to be only a roster SEED; the roster's baked kit ignored it); the hero keeps the wardrobe he
         // chose, because he is the one you steer and that is how you find him.
-        if (ai) tintGarmentSlot(char, SLOT_KEYS.jersey, aiKind === 'teammate' ? TEAM_JERSEY.mine : TEAM_JERSEY.theirs);
+        if (ai) {
+          const side = aiKind === 'teammate' ? 'mine' : 'theirs';
+          tintGarmentSlot(char, SLOT_KEYS.jersey, TEAM_JERSEY[side]);
+          tintGarmentSlot(char, SLOT_KEYS.shorts, TEAM_SHORTS[side]);
+        }
         char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
@@ -695,17 +701,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       mates = [
-        await spawnBody(new Vector3(-3.5, 0, 4), '#22d3ee', true, 'teammate', Math.PI * 0.25),
-        await spawnBody(new Vector3(3.5, 0, 4), '#22d3ee', true, 'teammate', -Math.PI * 0.25),
+        await spawnBody(new Vector3(-4.8, 0, 5.8), '#22d3ee', true, 'teammate', Math.PI * 0.25),
+        await spawnBody(new Vector3(4.8, 0, 5.8), '#22d3ee', true, 'teammate', -Math.PI * 0.25),
       ];
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
       // 0/1/2 is a real matchup. Three defenders with no assignment all solved
       // for the same point between the ball and the rim and arrived in a heap,
       // which is what the first 3v3 screenshot showed.
       foes = [
-        await spawnBody(new Vector3(-2, 0, 2), '#ff2d78', true, 'defender', 0, 0),
-        await spawnBody(new Vector3(0, 0, 1.5), '#ff2d78', true, 'defender', 0, 1),
-        await spawnBody(new Vector3(2, 0, 2), '#ff2d78', true, 'defender', 0, 2),
+        await spawnBody(new Vector3(-4.5, 0, -0.8), '#ff2d78', true, 'defender', 0, 0),
+        await spawnBody(new Vector3(0, 0, -1.9), '#ff2d78', true, 'defender', 0, 1),
+        await spawnBody(new Vector3(4.5, 0, -3.0), '#ff2d78', true, 'defender', 0, 2),
       ];
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -832,17 +838,19 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       else if (!driver) { driverPrevFor = null; driverVelEst.setAll(0); }
       { const sv = Math.round(synergy.value), od = Math.ceil(synergy.overdriveLeft); if (sv !== synHud || od !== odHud) { synHud = sv; odHud = od; ctx.setHud({ synergy: sv, overdrive: od }); } }
-      timeLeft -= dt;
-      if (timeLeft <= 0) {
-        ended = true; SoundKit.play('whistle');
-        // A TIE IS NOT A WIN (2026-09-12 mechanic pass). This read `myScore >= foeScore`, so a
-        // game that ran out of clock level — 21-21 — reported WIN and the recap said GAME WON.
-        // It is a rule the game never states, and a player who ties and is told they won has
-        // been given a reason not to trust the scoreboard. Reaching TARGET_SCORE is still an
-        // outright win; only the buzzer can produce a level game, and it says so now.
-        const verdict = myScore > foeScore ? 'WIN' : myScore === foeScore ? 'DRAW' : 'LOSS';
-        micEnd(verdict);   // THE MIC: the buzzer's result, called before the harness stops ticking the mode
-        return ctx.end(verdict, myScore, { foeScore, assists });
+      if (timeLeft > 0) timeLeft -= dt;
+      else if (!buzzer) { buzzer = true; SoundKit.play('whistle'); }
+      const liveAtBuzzer = arc.active || mateArc.active || !!foeDunkFlight || dunking || shooting || mateShooting;
+      if (buzzer && !ended) {
+        if (!liveAtBuzzer) {
+          ended = true;
+          // A TIE IS NOT A WIN (2026-09-12 mechanic pass). Reaching TARGET_SCORE is still an outright win;
+          // only the buzzer can produce a level game, and it says so now.
+          const verdict = myScore > foeScore ? 'WIN' : myScore === foeScore ? 'DRAW' : 'LOSS';
+          ctx.setHud({ score: myScore, foeScore, time: 0 });
+          micEnd(verdict);   // THE MIC: the buzzer's result, called before the harness stops ticking the mode
+          return ctx.end(verdict, myScore, { foeScore, assists });
+        }
       }
       // THE MIC: ten seconds on the game clock, once (never inside my dunk's flight, where the booth is holding)
       if (!micClock && timeLeft <= 10 && !dunking) { micClock = true; mic?.say({ moment: 'game.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } }); }
@@ -3046,7 +3054,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         foeDunkFlight = null; driver = null;
         shooter.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });
         if (made) {
-          foeScore += 2;
+          foeScore += 2; foeShotScored = true;
           SoundKit.play('score', { pitch: 0.9 }); SoundKit.play('crowdGroan', { volume: 0.5 });
           contactPunch(ctx);
           EffectsKit.burst(ctx.scene, RIM, 'net');
