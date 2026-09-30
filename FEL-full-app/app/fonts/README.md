@@ -22,4 +22,6 @@ Each file is byte-for-byte the latin-subset file `next/font/google` (next 14.2.3
 All three families are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org), as
 listed in github.com/google/fonts `ofl/barlowcondensed`, `ofl/ibmplexsans` and `ofl/jetbrainsmono`. Copyright
 belongs to their authors: The Barlow Project Authors; IBM Corp. (IBM Plex); The JetBrains Mono Project Authors.
-The files are unmodified. See also the credits entry `fonts` in `lib/credits/credits.ts`.
+The files are unmodified. The full licence text, with the three copyright lines from those google/fonts `OFL.txt`
+files, ships beside the fonts in [`OFL.txt`](./OFL.txt). See also the credits entry `fonts` in
+`lib/credits/credits.ts`.
