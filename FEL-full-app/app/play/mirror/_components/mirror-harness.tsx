@@ -45,9 +45,15 @@ import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, type CueEvent } from '@/
 // MIRROR-COACH P1 (2026-09-25): the guided squat's stage clock is a pure step now (lib/mirror/squatStage.ts) — see
 // the onFrame squat branch for why it left the setSquatStage updater.
 import {
-  BREATH_CYCLES, DEEPER_LINE, EMPTY_KNEE_RECORD, SQUARE_UP_LINE, SQUAT_CHECK_REPS, SQUAT_FAULT_LABEL, SQUAT_WORK_REPS, initialSquatSession,
-  kneeReadLine, paintableFaults, squatReviewVerdict, stepKneeRecord, stepSquatSession, type KneeRecord, type SquatStage,
+  DEEPER_LINE, EMPTY_KNEE_RECORD, SQUARE_UP_LINE, SQUAT_BREATH_PACER, SQUAT_CHECK_REPS, SQUAT_FAULT_LABEL, SQUAT_WORK_REPS, squatBreathLine,
+  breathElapsedSec, initialSquatSession, kneeReadLine, paintableFaults, squatReviewVerdict, stepKneeRecord, stepSquatSession,
+  type KneeRecord, type SquatStage,
 } from '@/lib/mirror/squatStage';
+// MIRROR-COACH P7 (2026-09-29): the breathe-first stage draws the ONE pacer (lib/breath/pacer.ts, components/breath/
+// Pacer.tsx) — the same ring and count as the warm-up's Pressurize, the cool-down's breath and the settle between sets —
+// on the stage's own pose clock. It was a CSS loop (app/globals.css .fel-breath) timed from the moment the div mounted,
+// beside the pose clock that actually ends the stage, with no count on screen. The 4-2-6 × 3 count is unchanged.
+import { BreathPacer } from '@/components/breath/Pacer';
 // MIRROR-COACH P2 (2026-09-26): the knee arrows' geometry and the top-left chip are pure modules now, so their tests
 // hold what this file paints — the arrows point out from the hip midline, and the Movement Screen's chip names its
 // station (it read BREATHE through the whole screen).
@@ -148,6 +154,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const jumpTrackerRef = useRef(new DunkTracker());
   const cueEngineRef = useRef(new CueEngine());
   const [squatStage, setSquatStage] = useState<SquatStage>('breathe');
+  // seconds into the breathe stage on the POSE clock (squatStage.ts breathElapsedSec) — what the pacer is drawn at
+  const [breathSec, setBreathSec] = useState(0);
   const [squatReps, setSquatReps] = useState(0);
   const [squatFaults, setSquatFaults] = useState<SquatFault[]>([]);
   // Whether the latest squat read saw a body. The four checks said "Estimated stable" with nobody in frame — and
@@ -336,6 +344,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     jumpTrackerRef.current.reset();
     cueEngineRef.current.reset();
     setSquatStage('breathe');
+    setBreathSec(0);
     setSquatReps(0);
     setSquatFaults([]);
     setSquatSeen(false);
@@ -456,6 +465,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
               nowMs: now, phase: squat.phase, present: squat.present, faults: squat.faults, square: squat.square, hipDrop: squat.hipDrop,
             });
             squatSessionRef.current = step.state;
+            // the pacer rides the same pose clock the step ends the breath on (MIRROR-COACH P7)
+            if (step.state.stage === 'breathe') setBreathSec(breathElapsedSec(step.state, now));
             // the knee read over the check and the work set, per POSE frame, square frames only (kept in memory for
             // this session's review — nothing is sent or saved)
             kneeRecordRef.current = stepKneeRecord(kneeRecordRef.current, was, squat, now);
@@ -958,10 +969,13 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 )}
               </div>
 
-              {/* the breath pacer, centred on the stage where the eye already is */}
+              {/* the breath pacer, centred on the stage where the eye already is — the one pacer (MIRROR-COACH P7), drawn
+                  at the stage's pose-clock seconds, so its last breath out ends on the frame the check begins */}
               {pattern === 'squat' && squatStage === 'breathe' && (
                 <div className="pointer-events-none absolute inset-0 grid place-items-center">
-                  <div className="fel-breath" />
+                  <div className="rounded-3xl bg-black/40 px-5 py-4 backdrop-blur-sm">
+                    <BreathPacer id="mirror-breathe" spec={SQUAT_BREATH_PACER} elapsedSec={breathSec} size="lg" />
+                  </div>
                 </div>
               )}
 
@@ -1036,7 +1050,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
         {pattern === 'squat' && live && (
           <p className="mt-4 text-[13px] leading-relaxed text-white/55">
             {squatStage === 'breathe' && (
-              <><span className="font-bold text-white">Breathe first.</span> In through the nose 4s · hold 2s · out slow 6s, {BREATH_CYCLES} cycles. The breath is the bedrock — everything else builds on it.</>
+              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} The breath is the bedrock — everything else builds on it.</>
             )}
             {squatStage === 'check' && (
               <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees (face the camera square-on)' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>

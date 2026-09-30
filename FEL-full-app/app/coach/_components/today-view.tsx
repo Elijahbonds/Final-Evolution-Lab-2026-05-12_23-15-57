@@ -47,6 +47,24 @@
 //     own Cool-down section is both), and simple logging (minutes or reps, no weight or reps-left for a walk).
 //   · THIS WEEK: the week's sessions in order, done / today / next, off days named as off days — a coached client's week
 //     view. Before this Today showed one session and "Session N of M", so a week's off days were not there at all.
+//
+// MIRROR-COACH P7 (2026-09-29): <RampBreath> (components/coach/ramp-breath.tsx) on the flagged KEY SET's card only — the
+// adults-only Dial-Up Breath, before the first set (owner decision #11). The card asks app/api/breath/ramp and shows the
+// option ONLY when the server says eligible (age, consent, intake, today's pain and check-in, FEL's weekly limit, the set
+// not started — lib/breath/rampGate.ts); otherwise nothing at all. Never on an off day; never once a set row of the key
+// set has anything typed in it (`started`); and when the breath ends the card scrolls to its sets: "after it, the set
+// starts". With no `ramp` endpoint (the dev harnesses) it is never offered.
+//
+// MIRROR-COACH P7 FIX (2026-09-29, review), the key set's card:
+//   · `started` is typed rows OR any of the card's timers started (keySetUnderWay). The offer used to stay live after an
+//     untyped set 1 while the rest timer ran — the server's set_started gate sees only SAVED sets — and on a timed key
+//     set it could be started while the Work or Hold timer ran, mid-set. SetTimer now reports every run it starts
+//     (`onRunChange`) and the card latches it for the visit; RampBreath closes everything before the breath and cuts a
+//     breath that is running (components/coach/ramp-breath.tsx rampShown).
+//   · ONE BREATH AT A TIME: while the Dial-Up runs (or its Start is in flight) the Settle chip stays in place, disabled
+//     (`settleBlocked`); the other way round needs nothing extra, since a settle starts a rest and that closes the offer.
+//   · A timed breath item (the off day's 4-6 Recovery Breath) passes its pacer to its timer (`breath`), so its Work run
+//     draws the one pacer's ring instead of a bare countdown (lib/breath/presets.ts workBreathFor).
 // `api` points the view at other endpoints (the dev harness app/dev/coach-today runs the same server code in memory).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -58,16 +76,30 @@ import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-c
 import { ReadinessCheckInCard } from '@/components/coach/readiness-checkin';
 import { WarmupPrep } from '@/components/coach/warmup-prep';
 import { CooldownCard } from '@/components/coach/cooldown-card';
+import { RAMP_API, RampBreath } from '@/components/coach/ramp-breath';
 import { needsAutoCooldown, showsGeneratedWarmup, todayWarmupKind } from '@/lib/coach/cooldown';
 import { OFF_DAY_LINE, type WeekEntry } from '@/lib/coach/offDay';
 import type { WarmupReadiness } from '@/lib/coach/warmup';
-import { SET_LOG_ERROR_COPY, convertDrafts, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
+import { SET_LOG_ERROR_COPY, convertDrafts, draftIsEmpty, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
 import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown' };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API };
+
+/**
+ * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
+ * the card's timers (work, hold or rest) has been started this visit. A rest counts: on a card whose first set has not
+ * been started, a rest timer means a set went before it. assumption: a settle tapped before set 1 (it starts the rest)
+ * closes the Dial-Up offer too — the two breaths pull opposite ways, and an optional breath lost is the careful side.
+ */
+export const keySetUnderWay = (rows: readonly SetDraft[], timerUsed: boolean): boolean => timerUsed || rows.some((r) => !draftIsEmpty(r));
+
+/** The Dial-Up Breath's endpoint for one card (MIRROR-COACH P7): only the flagged key set, never on an off day, and
+ *  only when the view has one (the dev harnesses do not). The server decides the rest. */
+export const rampEndpointFor = (e: { isKeySet?: boolean | null }, kind: string | null | undefined, api: Pick<TodayApi, 'ramp'>): string | null =>
+  (e.isKeySet && kind !== 'recovery' ? api.ramp ?? null : null);
 
 /** The session just marked Done, kept on screen for its cool-down (MIRROR-COACH P6). */
 interface FinishedSession { programId: string; sessionId: string; label: string; exercises: TodayExercise[] }
@@ -187,6 +219,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     const put = (patch: Partial<ExerciseDraft>) => setDrafts((s) => ({ ...s, [e.id]: { ...s[e.id], ...patch } }));
     return (
       <ExerciseCard key={e.id} e={e} label={label} draft={d} unit={unit} error={errors[e.id] ?? null} simpleLog={recovery}
+        rampEndpoint={rampEndpointFor(e, today.session.kind, api)}
         prev={data.open?.logs.find((l) => l.sessionExerciseId === e.id) ?? null}
         onSets={(sets) => put({ sets })} onNote={(clientNote) => put({ clientNote })} onVideo={(videoUrl) => put({ videoUrl })} />
     );
@@ -283,13 +316,24 @@ export function WeekStrip({ label, entries }: { label: string; entries: readonly
 }
 
 /** One prescribed exercise: what to do, how to do it, and its sets. */
-function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, onSets, onNote, onVideo }: {
+function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, rampEndpoint = null, onSets, onNote, onVideo }: {
   e: TodayExercise; label: string | null; draft: ExerciseDraft; unit: WeightUnit; error: string | null; prev: OpenLog | null;
   /** An off day logs minutes or reps only (MIRROR-COACH P6): no weight, reps left or effort to ask about a walk. */
   simpleLog?: boolean;
+  /** MIRROR-COACH P7: GET/POST /api/breath/ramp for the flagged key set (rampEndpointFor), else null — no Dial-Up offer. */
+  rampEndpoint?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
   const [demo, setDemo] = useState(false);
+  // MIRROR-COACH P7 FIX: a timer on this card was started this visit (the set is under way), and the Dial-Up is running
+  const [timerUsed, setTimerUsed] = useState(false);
+  const [rampBusy, setRampBusy] = useState(false);
+  const onRunChange = useCallback((kind: string | null) => { if (kind) setTimerUsed(true); }, []);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  // MIRROR-COACH P7: after the Dial-Up Breath, the set starts — bring its set-up line (or its first set row) into view
+  const toTheSet = useCallback(() => {
+    cardRef.current?.querySelector('[data-setup], [data-set-row]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, []);
   const c = e.coaching;
   const timed = !!e.workSeconds;
   const earlier = prev ? logLines(prev, unit) : null;
@@ -301,7 +345,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
     onSets(draft.sets.map((r, k) => (k === i ? { ...r, workSeconds: String(seconds) } : r)));
   }, [draft.sets, onSets]);
   return (
-    <div className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-[#FFD700]/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
+    <div ref={cardRef} className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-[#FFD700]/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
       <div className="space-y-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {label && <span className="rounded bg-[#00E5FF]/15 px-1 text-[10px] font-semibold text-[#00E5FF]" data-label>{label}</span>}
@@ -312,6 +356,8 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
         {tags && <div className="text-[11px] text-white/35">{tags}</div>}
         {e.isKeySet && <div className="text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</div>}
       </div>
+      {/* MIRROR-COACH P7: the Dial-Up Breath, before set-up and the first set — rendered only when the server says so */}
+      {rampEndpoint && <RampBreath sessionExerciseId={e.id} endpoint={rampEndpoint} started={keySetUnderWay(draft.sets, timerUsed)} onDone={toTheSet} onRunningChange={setRampBusy} />}
 
       {c.band && <div className="text-xs text-white/70" data-band={c.band.id}><span className="font-medium text-white">{c.band.label}</span> <span className="text-white/40">({c.band.rir})</span>: {c.band.meaning}</div>}
       {c.setup.length > 0 && (
@@ -350,7 +396,8 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
         </div>
       )}
 
-      <SetTimer timers={e.timers} onWorkLogged={timed ? onWork : undefined} testId={`timer-${e.id}`} />
+      <SetTimer timers={e.timers} onWorkLogged={timed ? onWork : undefined} testId={`timer-${e.id}`}
+        onRunChange={onRunChange} settleBlocked={rampBusy} breath={e.breath ?? null} />
       {earlier?.kind === 'legacy' && (
         <div className="rounded-lg border border-white/8 bg-white/[0.03] px-2 py-1.5 text-xs text-white/55" data-legacy-log>
           Saved earlier: {earlier.lines[0]}

@@ -15,6 +15,11 @@
 // rock and hold rounds. The clock arithmetic is the warm-up's (lib/coach/warmup.ts GuidedRun) and cooldown.ts's
 // cooldownAt; this file owns only requestAnimationFrame.
 //
+// MIRROR-COACH P7 (2026-09-29): the breath is drawn by the one pacer (components/breath/Pacer.tsx — a ring that fills
+// on the breath in and empties on the breath out, the count inside it, the part's name and the breath number under it)
+// where it was a text line ("Breathe in · 3 (breath 1)"). Its spec is the post-session preset's (lib/breath/presets.ts,
+// the owner's recovery breath) and it runs on this run's own clock (the step's seconds), so Pause pauses the ring too.
+//
 // DATA. Nothing is sent until the done tap, and that sends two ids (program, session). Nothing here is scored, paid
 // or streaked now; P9 counts done cool-downs toward PRQ recovery (owner decision #12), which is why the card does not
 // promise "not scored".
@@ -22,15 +27,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Pause, Play, SkipForward, Square } from 'lucide-react';
 import {
   BREATH_SOURCE_LINE, COOLDOWN_DONE_LINE, COOLDOWN_TITLE, cooldownAt, cooldownErrorText, cooldownMeaning, generateCooldown, needsAutoCooldown,
-  nextCooldownStep, type BreathPhase, type CooldownItemLike, type CooldownPlan, type CooldownStep,
+  coolBreathPacer, nextCooldownStep, type BreathPhase, type CooldownItemLike, type CooldownPlan, type CooldownStep,
 } from '@/lib/coach/cooldown';
 import { guidedElapsed, pauseGuided, resumeGuided, startGuided, type GuidedRun } from '@/lib/coach/warmup';
 import { SESSION_SECTIONS } from '@/lib/coach/taxonomy';
 import { formatClock } from '@/lib/coach/setTimer';
+import { PACER_WORDS } from '@/lib/breath/pacer';
+import { BreathPacer } from '@/components/breath/Pacer';
 
 const COOLDOWN = SESSION_SECTIONS.find((s) => s.id === 'cooldown')!;
 const KIND_LABEL: Record<CooldownStep['kind'], string> = { breath: 'Breath', rock_hold: 'Stretch' };
-export const BREATH_WORD: Record<BreathPhase, string> = { in: 'Breathe in', hold: 'Hold', out: 'Breathe out', rest: 'Pause' };
+/** The breath's part names: the one pacer's captions (lib/breath/pacer.ts PACER_WORDS). */
+export const BREATH_WORD: Record<BreathPhase, string> = PACER_WORDS;
 export const DONE_BUTTON = 'I did the cool-down';
 
 export interface CooldownCardProps {
@@ -183,7 +191,11 @@ function RunPanel({ plan, at, paused, onPause, onNext, onStop }: {
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#00E5FF]" style={{ width: `${Math.round(fraction * 100)}%` }} /></div>
       <div className="text-sm text-white/85" aria-live="polite" data-run-line>{at.line}</div>
-      {at.breath && <div className="text-sm font-medium text-[#00E5FF]" data-run-breath={at.breath.phase}>{BREATH_WORD[at.breath.phase]} · {at.breath.left} <span className="text-white/40">(breath {at.breath.round})</span></div>}
+      {at.breath && s.breath && (
+        <div className="flex justify-center py-1" data-run-breath={at.breath.phase}>
+          <BreathPacer id="cooldown" spec={coolBreathPacer(s.breath)} elapsedSec={at.stepSec} size="md" />
+        </div>
+      )}
       <div className="flex items-center gap-1.5">
         <button type="button" onClick={onPause} aria-label={paused ? 'Resume' : 'Pause'} className="rounded-md border border-white/10 p-1.5 text-white/70">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>
         <button type="button" onClick={onNext} aria-label="Next step" className="rounded-md border border-white/10 p-1.5 text-white/70"><SkipForward className="h-3.5 w-3.5" /></button>

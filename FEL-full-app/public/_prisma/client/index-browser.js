@@ -1229,6 +1229,15 @@ exports.Prisma.ReadinessCheckInScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.BreathLogScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  kind: 'kind',
+  sessionId: 'sessionId',
+  seconds: 'seconds',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.ShareLinkScalarFieldEnum = {
   id: 'id',
   token: 'token',
@@ -1545,6 +1554,7 @@ exports.Prisma.ModelName = {
   PainCheckIn: 'PainCheckIn',
   HealthConsent: 'HealthConsent',
   ReadinessCheckIn: 'ReadinessCheckIn',
+  BreathLog: 'BreathLog',
   ShareLink: 'ShareLink',
   CoachInvite: 'CoachInvite',
   CoachClient: 'CoachClient'

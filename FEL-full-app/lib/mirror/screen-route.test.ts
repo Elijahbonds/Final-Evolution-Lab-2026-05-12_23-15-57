@@ -27,6 +27,9 @@ const m = vi.hoisted(() => ({
     // MIRROR-COACH P6 (2026-09-29): readinessCheckIn added empty for the same reason — collectPrqExport now also
     // hands over the daily readiness check-ins (lib/health/readiness.ts).
     readinessCheckIn: [] as Row[],
+    // MIRROR-COACH P7 (2026-09-29): breathLog added empty for the same reason — collectPrqExport now also hands over the
+    // breath toolbox's use log (lib/breath/rampGate.ts).
+    breathLog: [] as Row[],
   },
   grants: [] as unknown[],
   updates: 0,

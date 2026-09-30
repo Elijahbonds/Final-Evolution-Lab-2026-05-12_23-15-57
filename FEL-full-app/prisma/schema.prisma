@@ -125,6 +125,9 @@ model User {
   // MIRROR-COACH P6 (2026-09-29): the daily readiness check-in (lib/health/readiness.ts). Additive only — see the
   // ReadinessCheckIn model below.
   readinessCheckIns  ReadinessCheckIn[]
+  // MIRROR-COACH P7 (2026-09-29): the breath toolbox's use log (lib/breath/rampGate.ts). Additive only — see the
+  // BreathLog model below.
+  breathLogs         BreathLog[]
 
   // M4 compliance stubs
   dobYear         Int?        // Year of birth for 18+ attestation
@@ -2129,6 +2132,34 @@ model ReadinessCheckIn {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, date])
+}
+
+/// MIRROR-COACH P7 (2026-09-29): one row per use of a breath from FEL's breath toolbox. Today it holds kind 'ramp' —
+/// the adults-only Dial-Up Breath before a session's flagged key set (lib/breath/rampGate.ts), written by
+/// POST /api/breath/ramp at the moment the athlete starts it, and counted against FEL's own weekly limit
+/// (RAMP_LIMIT). A NEW table rather than a column on P5/P6's: a use is not an intake answer, a pain reading or a daily
+/// check-in, and the limit needs a row per use with its time.
+///
+/// It stores no health answer — only that a breath was used, for which coached session, and when. It is still in the
+/// export and in both erases (lib/prq-data-rights.ts), because the ramp kind is only ever written behind the health
+/// gates. NEVER read by anything that scores, pays, ranks or keeps a streak (lib/breath/ramp-never-scored.test.ts).
+/// `seconds` is for a kind that logs time (phase 9 may count breath minutes toward recovery, owner decision #12); a
+/// ramp use leaves it null.
+model BreathLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'ramp' (lib/breath/rampGate.ts BREATH_LOG_KINDS). A string, not an enum, so a new breath kind is a code change
+  /// and never a schema change.
+  kind      String
+  /// The coached Session (Session.id) the breath was for, when it was for one — how "one key set per session" is
+  /// held. No foreign key on purpose: a coach deleting the session must not erase, or fail on, the athlete's record.
+  sessionId String?
+  /// Seconds breathed, for a kind that logs time. Null for 'ramp'.
+  seconds   Int?
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind, createdAt])
 }
 
 // ===========================================================================

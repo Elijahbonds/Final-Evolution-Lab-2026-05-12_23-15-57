@@ -98,6 +98,12 @@ export function todayMemoryDb(s: TodayStore) {
         if (!rows.length) return null;
         return clone([...rows].sort((x, y) => time(y.createdAt) - time(x.createdAt))[0]);
       },
+      // MIRROR-COACH P7 FIX (2026-09-29): the Dial-Up Breath reads every intake inside the year (lib/breath/rampServer.ts
+      // loadRampFacts), newest first — a re-take does not erase an earlier lasting "yes"
+      findMany: async (a: Row) => s.healthIntake
+        .filter((r) => r.userId === a.where.userId && (!a.where.createdAt?.gte || time(r.createdAt) >= time(a.where.createdAt.gte)))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .map((r) => pick(r, a.select)),
     },
     programExercise: {
       findMany: async (a: Row) => s.pe.filter((p) => (a.where.id?.in ?? []).includes(p.id) && (a.where.coachId === undefined || p.coachId === a.where.coachId)).map((p) => pick(p, a.select)),
