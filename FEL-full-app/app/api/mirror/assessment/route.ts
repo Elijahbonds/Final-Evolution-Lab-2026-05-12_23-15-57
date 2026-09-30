@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { computeTraceablePrq, createPrqEntry, getLatestPrqVector } from '@/lib/prq-entries';
 import { PRQ_CAMERA_SOURCE, prqGrade } from '@/lib/prq';
-import { needsGuardianConsent } from '@/lib/camp/certification';
+import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 import { ASSESSMENT_KIND, MAX_RECORD_BYTES, mediaIn, prqWritesFor, validateRecord, type AssessmentRecord } from '@/lib/assess/prqWrite';
 import { mqs as mqsOf, type TestResult } from '@/lib/assess/scoring';
 
@@ -25,8 +25,9 @@ import { mqs as mqsOf, type TestResult } from '@/lib/assess/scoring';
  *     landmark stream is ever accepted, let alone stored (spec §10)
  *   · a record that does not validate (400): strict, an unknown field is refused
  *   · a screen that stopped for pain (422): pain is a referral, nothing from it is saved
- *   · an athlete who may be a minor without an accepted guardian consent (412): fails closed, the same rule as the camp's
- *     plans (needsGuardianConsent: an unknown age needs consent too)
+ *   · anyone but a verified 18+ account that has opted in (403 scan_save_adults_only; TEEN-WRITE-BLOCK, FE PM 23:05 PT):
+ *     lib/privacy/scanSaveGate.ts, today nobody. The parent path is GONE: until 2026-09-30 a minor with an accepted
+ *     GuardianConsent was saved here (412 without one); a parent's yes is no longer grounds to store anyone's scan.
  *
  * THE CLIENT'S NUMBERS ARE NOT TRUSTED FOR PRQ. The axis values are recomputed here from the record's measured values
  * (prqWritesFor), the MQS from its test scores, and an axis that did not score writes nothing: never a 50.
@@ -71,13 +72,8 @@ export async function POST(req: NextRequest) {
   const rec = v.value;
   if (rec.tests.some((t) => t.status === 'painStop')) return NextResponse.json({ error: 'pain_stop', saved: false }, { status: 422 });
 
-  // minors: no saved scores without an accepted guardian consent (the camp's rule; an unknown age counts as a minor)
-  const me = await prisma.user.findUnique({ where: { id: uid }, select: { dobYear: true } });
-  const consent = await prisma.guardianConsent.findFirst({ where: { menteeId: uid, acceptedAt: { not: null }, revokedAt: null }, orderBy: { acceptedAt: 'desc' } });
-  const birthYear = consent?.menteeBirthYear ?? me?.dobYear ?? null;
-  if (needsGuardianConsent(birthYear) && !consent) {
-    return NextResponse.json({ error: 'guardian_consent_required', saved: false }, { status: 412 });
-  }
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the parent path is removed; verified 18+ AND opted in, before every read and write below.
+  if (!(await canSaveScanNumbers(prisma, uid))) return refuseScanSave();
 
   // a retried post: the row that is already there, nothing new written
   const recent = await prisma.workoutScan.findMany({

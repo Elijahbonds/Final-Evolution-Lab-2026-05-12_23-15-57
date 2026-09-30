@@ -15,6 +15,11 @@ vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 const axesFor = vi.fn();
 vi.mock('@/lib/creator/athleteAxes-server', () => ({ axesFor: (...a: unknown[]) => axesFor(...a) }));
 
+// TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): u1 is an OPTED-IN ADULT (dobYear 1990 below, the opt-in mocked true), so the measured
+// axes are kept as 'Finalize with measured axes stores them' has always asserted. For everyone the save gate refuses,
+// Finalize keeps the look and the build and leaves the snapshot alone: lib/privacy/scan-save-athlete.test.ts.
+vi.mock('@/lib/privacy/scanSaveOptIn', () => ({ scanSaveOptIn: async () => true }));
+
 const buildRow = vi.fn();
 const buildUpsert = vi.fn();
 vi.mock('@/lib/db', () => ({
@@ -22,6 +27,7 @@ vi.mock('@/lib/db', () => ({
     athleteBuild: { findUnique: (...a: unknown[]) => buildRow(...a), upsert: (...a: unknown[]) => buildUpsert(...a) },
     avatarLook: { findUnique: async () => null, upsert: async () => ({}) },
     ownedWearable: { findMany: async () => [] },
+    user: { findUnique: async () => ({ dobYear: 1990 }) },
     $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
   },
 }));

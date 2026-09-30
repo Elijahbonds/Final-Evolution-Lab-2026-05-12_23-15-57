@@ -34,6 +34,8 @@ const m = vi.hoisted(() => ({
   grants: [] as unknown[],
   updates: 0,
   clock: 0,
+  /** TEEN-WRITE-BLOCK-2: the save gate's opt-in (lib/privacy/scanSaveOptIn, false for everyone until PRIVACY-CORE/AB-04). */
+  optedIn: true,
 }));
 
 const match = (row: Row, where: Row = {}) => Object.entries(where).every(([k, v]) => v === null ? row[k] == null : row[k] === v);
@@ -68,6 +70,11 @@ vi.mock('@/lib/camp/server', () => ({
 vi.mock('@/lib/wallet/wallet-service', () => ({
   grantServerReward: vi.fn(async (_db: unknown, args: unknown) => { m.grants.push(args); return { granted: { shards: 25 } }; }),
 }));
+// TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): every screen this file posts is an OPTED-IN ADULT's (athlete-1, dobYear 1990), which
+// is what it has always tested. Until PRIVACY-CORE/AB-04 adds the opt-in, the real reader answers false for everyone and the
+// route refuses (403 scan_save_adults_only); the one case below that sets m.optedIn = false shows it, and the rest of the
+// refusals are lib/privacy/scan-save-screen.test.ts's.
+vi.mock('@/lib/privacy/scanSaveOptIn', () => ({ scanSaveOptIn: async () => m.optedIn }));
 vi.mock('@/lib/db', () => ({
   prisma: new Proxy({}, {
     get: (_t, prop) => {
@@ -128,6 +135,7 @@ beforeEach(() => {
   m.db.user = [{ id: 'athlete-1', dobYear: 1990 }];
   m.grants = [];
   m.updates = 0;
+  m.optedIn = true;
 });
 
 describe('the test\'s own claims are what the graders would say (so the tests below test the route)', () => {
@@ -435,6 +443,16 @@ describe('POST: the rest of the P1 contract still holds', () => {
     expect((await patch({ screenId: 'x', answers: [] })).status).toBe(401);
     expect(stored()).toEqual([]);
   });
+
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): the same adult who has NOT opted in (no one has, until PRIVACY-CORE/AB-04).
+  it('an adult who has not opted in: 403 on the screen and on the answers, nothing stored, updated or paid', async () => {
+    m.optedIn = false;
+    expect((await post({ screenId: 'n-1', screen: 'modified', checks: allClaims() })).json).toEqual({ error: 'scan_save_adults_only', saved: false });
+    expect((await patch({ screenId: 'n-1', answers: [{ questionId: 'lowerRibsWiden', answer: 'yes' }] })).status).toBe(403);
+    expect(stored()).toEqual([]);
+    expect(m.updates).toBe(0);
+    expect(m.grants).toEqual([]);
+  });
 });
 
 describe('PATCH: the breath answers are kept on the screen, and nothing else moves', () => {
@@ -460,6 +478,7 @@ describe('PATCH: the breath answers are kept on the screen, and nothing else mov
   it('404 for a screen that is not the caller\'s; 400 for no real answer; 400 without an id', async () => {
     await post({ screenId: 'a-2', screen: 'modified', checks: allClaims() });
     m.session = { user: { id: 'someone-else' } };
+    m.db.user.push({ id: 'someone-else', dobYear: 1985 });   // TEEN-WRITE-BLOCK-2: an adult too, so the 404 is about whose screen it is
     expect((await patch({ screenId: 'a-2', answers: [{ questionId: 'lowerRibsWiden', answer: 'yes' }] })).status).toBe(404);
     m.session = { user: { id: 'athlete-1' } };
     expect((await patch({ screenId: 'nope', answers: [{ questionId: 'lowerRibsWiden', answer: 'yes' }] })).status).toBe(404);
@@ -580,7 +599,10 @@ describe('GET /api/coach/prescribe — the review\'s cases', () => {
   });
 
   it('a youth client (no birth year on file): no written blocks, pin rows not offered, and the draft says why', async () => {
-    m.db.user = [{ id: 'athlete-1', dobYear: null }];
+    // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): before → the birth year was blanked BEFORE the post. A screen is only STORED
+    // for a verified, opted-in adult now, so after → it is stored while the athlete reads as an adult and the year is
+    // blank by the time the coach reads it (a row from before the gate, or a year taken back): the draft's youth rules,
+    // which this test is about, are decided at read time.
     m.db.coachClient = [{ id: 'cc1', coachId: 'coach-1', clientId: 'athlete-1', endedAt: null }];
     m.db.programExercise = [
       { id: 'pe-pin', coachId: 'coach-1', name: 'Calf pin and stretch', category: 'mobility', pattern: null, skillLayer: 'joints', defaultTempo: null },
@@ -588,6 +610,7 @@ describe('GET /api/coach/prescribe — the review\'s cases', () => {
     ];
     asAthlete();
     await post({ screenId: 'y-1', screen: 'modified', checks: allClaims({ heelLine: claim('heelLine', { status: 'flag', value: 14, bySide: { left: 14, right: 2 } }), hipLevel: claim('hipLevel', { status: 'flag', value: -0.12 }) }) });
+    m.db.user = [{ id: 'athlete-1', dobYear: null }];
     const { json } = await asCoach();
     expect(json).toMatchObject({ youth: 'unknownAge', pinRowsSkipped: 1 });
     expect(json.youthNote).toMatch(/youth rules apply/);
