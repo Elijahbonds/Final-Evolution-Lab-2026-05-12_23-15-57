@@ -40,6 +40,12 @@ const NOT_IMPORTED: Record<string, string> = {
   // rows plus the captured moves). The engine itself was never instantiated (understand-wf map). It is left in place, not
   // deleted: removing a file this lane did not write is the owner's call — the phase report names it.
   'lib/modes/dance/choreography-engine.ts': 'ORPHANED by MUSIC-SUITE P9 (the dance builder reads lib/babylon/dance/moves.ts now); legacy M28 engine awaiting the owner\'s delete',
+  // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
+  // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
+  // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this
+  // module in the SAME changeset. This orphan-check never re-verifies a NOT_IMPORTED excuse against real usage, so a
+  // stale entry like this one sits here silently defeating its own point; the line is deleted now that it has a real
+  // caller, per this file's own rule ("wiring one up means deleting its line").
 };
 
 /** Whole subtrees that are entered by a runtime lookup rather than an import from elsewhere. */
@@ -78,6 +84,9 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
   'lib/locomotion/moves/MoveGraph.ts',
+  // MIRROR-COACH P4 (2026-09-25/29): the hinge-and-setup lane's own fixture builder for lib/mirror/hingeAudit.ts /
+  // setupLine.ts's tests, landed the same day as this line, not this lane's (registry-and-lunge) file to wire up.
+  'lib/mirror/fixtures/hingeSetupBuild.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',

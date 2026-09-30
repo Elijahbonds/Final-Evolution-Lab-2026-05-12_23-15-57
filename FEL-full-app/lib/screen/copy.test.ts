@@ -15,6 +15,7 @@ const SCREEN_FILES = [
   ...readdirSync(join(ROOT, 'app/play/mirror/assess/_components')).filter((f) => /\.tsx?$/.test(f)).map((f) => `app/play/mirror/assess/_components/${f}`),
   'app/play/mirror/assess/page.tsx', 'app/play/mirror/assess/results/page.tsx', 'app/screen/page.tsx',
   'app/screen/program/[lane]/page.tsx', 'app/screen/program/[lane]/program-lane.tsx',
+  'app/screen/privacy/page.tsx', 'app/screen/privacy/clear-results.tsx',
   ...readdirSync(join(ROOT, 'lib/screen')).filter((f) => /\.ts$/.test(f) && !f.endsWith('.test.ts')).map((f) => `lib/screen/${f}`),
 ];
 /** The string literals a file can show (quotes and template text, comments dropped). */
@@ -32,7 +33,12 @@ describe('the safety copy (the research draft, verbatim)', () => {
   it('the end of the results', () => {
     expect(COPY.SCREENSHOT_LINE).toBe('Screenshot this to keep your results.');
     expect(COPY.DONE_CLEAR).toBe('Done, clear my results');
-    expect(COPY.BUILD_PROGRAM).toBe('Build my Dunk Program');
+    // CHANGED (SCREEN-FIX-2, retest 1 L5): BUILD_PROGRAM and FREE_GAME are gone; the adults' one next step is the book
+    expect(COPY).not.toHaveProperty('BUILD_PROGRAM');
+    expect(COPY).not.toHaveProperty('FREE_GAME');
+    expect(COPY.KINDLE_BOOK_URL).toBe('https://www.amazon.com/dp/B0H5J1M18H');
+    // CHANGED (SCREEN-FIX-2, retest 1 S-13): was 'Not a medical exam. If anything hurts, stop.'
+    expect(COPY.STOP_LINE).toBe('If anything hurts, stop.');
     expect(COPY.WIN_LINE).toBe('Clean screen. You\'re ready for Dunking & Plyometrics.');
     expect(COPY.NOT_SAVED_TITLE).toBe('Your results aren\'t saved. Run the screen again');
     expect(COPY.TRACKING_LOSS_PROMPT).toBe('Step back into the light');

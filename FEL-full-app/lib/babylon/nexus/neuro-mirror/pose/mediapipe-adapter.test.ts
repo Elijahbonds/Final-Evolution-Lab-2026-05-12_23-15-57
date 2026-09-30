@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MediaPipePoseAdapter, onVideoFrames, type VideoFrameTick } from './mediapipe-adapter';
-import { AssetResolver, CDN_WASM_BASE, cdnModelUrl } from '../../../../pose/assets';
+import { AssetResolver } from '../../../../pose/assets';
 
 // tasks-vision without its wasm: records what it was asked to build, and can hold a build open (a slow download).
 const tv = vi.hoisted(() => ({
@@ -71,10 +71,11 @@ describe('loading the landmarker (movement play, phase 2)', () => {
     expect(tv.built.at(-1)).toMatchObject({ wasm: '/pose/wasm', model: '/pose/models/pose_landmarker_full.task' });
   });
 
-  it('falls back to the MediaPipe CDN when our copy is missing, and lite is still the default', async () => {
+  // CHANGED (SCREEN-FIX-2, Cyber F3): was "falls back to the MediaPipe CDN when our copy is missing"
+  it('keeps our copy even when the probe says it is missing (no CDN fallback), and lite is still the default', async () => {
     const a = new MediaPipePoseAdapter({ assets: new AssetResolver(async () => false) });
     await a.init();
-    expect(tv.built.at(-1)).toMatchObject({ wasm: CDN_WASM_BASE, model: cdnModelUrl('lite') });
+    expect(tv.built.at(-1)).toMatchObject({ wasm: '/pose/wasm', model: '/pose/models/pose_landmarker_lite.task' });
   });
 
   it('two concurrent init() calls build one landmarker', async () => {

@@ -96,6 +96,12 @@ export interface SquatThresholds {
   squareWindowFrames: number;
   /** …and with the shoulders at least this wide against the torso (framing.ts SIDE_WIDTH_MAX, reused). */
   squareMinWidth: number;
+  /**
+   * A heel read must hold this many consecutive POSE frames before heelRise is reported — the same discipline
+   * valgusPersistFrames gives the knee (MIRROR-COACH P4 review, 2026-09-25; painfree/p2/REPORT.md row 2, deferred
+   * to P4). See the heel block in read().
+   */
+  heelPersistFrames: number;
 }
 export const SQUAT_THRESHOLDS: SquatThresholds = {
   minVis: 0.5,
@@ -110,6 +116,7 @@ export const SQUAT_THRESHOLDS: SquatThresholds = {
   squareMaxYawDeg: 4,                       // MIRROR-COACH P2 (2026-09-26): conservative, under the ~5° P1 measured; see squareOn
   squareWindowFrames: 20,                   // ~0.67 s at 30 fps — the calibration's own length
   squareMinWidth: SIDE_WIDTH_MAX,           // 0.35: a coarse side-on read only (it cannot see 5–8°; see squareOn)
+  heelPersistFrames: 3,                     // MIRROR-COACH P4 (2026-09-25): same window as the knee's; see the heel block
 };
 
 /** An image point: x, y normalised, y DOWN. */
@@ -269,8 +276,12 @@ export class SquatAudit {
   private prevHipY: number | null = null;
   private prevTs: number | null = null;
   private settleFrames = 0;
+  /** Running sum of ankleY over the settle window, so standAnkleY calibrates as an AVERAGE (see the heel block). */
+  private ankleYSum = 0;
   /** Consecutive readable, non-standing POSE frames with the knee over the warn line (see valgusPersistFrames). */
   private valgusRun = 0;
+  /** Consecutive square, descending POSE frames with the ankle over the heel-rise line (see heelPersistFrames). */
+  private heelRun = 0;
   /** The last squareWindowFrames pose frames' torsoTurnSample reads (see squareOn). */
   private turn: { dz: number; dx: number }[] = [];
   /** The last frame read, by its timestamp, and what it read — a repeated camera frame gets the same answer back. */
@@ -284,7 +295,8 @@ export class SquatAudit {
   reset(): void {
     this.standHipY = null; this.standHipX = null; this.standShoulderX = null;
     this.standAnkleY = null; this.kneeLineY = null;
-    this.prevHipY = null; this.prevTs = null; this.settleFrames = 0; this.valgusRun = 0;
+    this.prevHipY = null; this.prevTs = null; this.settleFrames = 0; this.ankleYSum = 0;
+    this.valgusRun = 0; this.heelRun = 0;
     this.turn = []; this.lastTs = null; this.lastResult = null;
   }
 
@@ -343,9 +355,17 @@ export class SquatAudit {
     // (same self-calibrating pattern as the dunk tracker's floor).
     if (this.standHipY == null) {
       this.settleFrames++;
+      // MIRROR-COACH P4 review (2026-09-25) — THE ANKLE LINE WAS ONE FRAME. Every other standing line here still is
+      // (the hip, the shoulder, the knee line), which is fine for them: the knee's own read is gated on persistence
+      // and squareness before it can fault, so one noisy calibration frame cannot cue anything by itself. The heel
+      // read had neither gate, so one unlucky settle frame set standAnkleY a few pixels off and the very next noisy
+      // frame could cross heelRiseWarnPx with the feet never having moved (painfree/p2/REPORT.md row 2: fired on 7
+      // of 20 flat-heeled squats under the synth's default jitter). The ankle line is now the settle window's
+      // AVERAGE, which the rest of the fix (heelRun below) still backs up.
+      this.ankleYSum += ankleY;
       if (this.settleFrames >= 20) {
         this.standHipY = hipY; this.standHipX = hipX;
-        this.standShoulderX = shoulderMidX; this.standAnkleY = ankleY;
+        this.standShoulderX = shoulderMidX; this.standAnkleY = this.ankleYSum / this.settleFrames;
         this.kneeLineY = kneeY;
       }
       return { ...absent, present: true, note: 'Calibrating the standing line' };
@@ -401,8 +421,19 @@ export class SquatAudit {
     const standShoulderX = this.standShoulderX!;
     const standHipX = this.standHipX!;
 
-    // HEEL RISE — ankles lift while descending (dorsiflexion ran out)
-    if (phase === 'descending' && ankleY < standAnkleY - this.t.heelRiseWarnPx) faults.push('heelRise');
+    // HEEL RISE — ankles lift while descending (dorsiflexion ran out).
+    //
+    // MIRROR-COACH P4 review (2026-09-25) — THE FALSE HEEL CUE (painfree/p2/REPORT.md row 2, deferred here). This used
+    // to fire on the first frame over heelRiseWarnPx, with no persistence and no squareness gate — the only fault here
+    // that had neither. On a jittered, perfectly flat-heeled, square squat it fired on 7 of 20 takes, and because
+    // cue-engine.ts's hold-down blocks ANY new cue for HOLD_DOWN_MS regardless of which fault is speaking, a false
+    // heel spike could take the mic from a real, ongoing knee fault for the length of the hold. Gated like the knee
+    // now: square to the camera (the ankle line calibrated well is not enough on its own — a body turned from the
+    // lens foreshortens its own height, which moves ankleY the same way a real heel lift would) and held
+    // heelPersistFrames pose frames running.
+    const heelDown = phase === 'descending' && square && ankleY < standAnkleY - this.t.heelRiseWarnPx;
+    this.heelRun = heelDown ? this.heelRun + 1 : 0;
+    if (this.heelRun >= this.t.heelPersistFrames) faults.push('heelRise');
 
     // ARM FALL — the shoulder midpoint SIDEWAYS off the standing line as depth comes on (image x; see the header)
     // (a frontal read: off when the body is turned, like the knee)

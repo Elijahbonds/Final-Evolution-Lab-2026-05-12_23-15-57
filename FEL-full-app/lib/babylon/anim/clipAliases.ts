@@ -56,6 +56,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   karate_victory_pose: ['dunk_celebrate_big', 1.0],   // ANIM-READABILITY (combat): arms overhead, not a slow uppercut
   // basketball
   bball_dribble_run: ['run', 0.9],
+  bball_idle_stand: ['idle_stand', 1.0],   // HOOPS MOTION phase 3b (review): a rig that did not build the hoops watch stands in the base idle
   bball_shoot_jumper: ['jumpshot', 1.0],
   bball_score_celebrate: ['dunk_celebrate_big', 1.0],   // RECOGNISABLE: arms up for a make (was the karate uppercut)
   bball_defend_stance: ['bball_defend_slide_left', 0.45],   // low, wide, slow sway

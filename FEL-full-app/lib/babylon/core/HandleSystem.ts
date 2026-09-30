@@ -119,6 +119,16 @@ export function moveClip(move: HandleMove, dir: 'left' | 'right'): string | null
 }
 
 /**
+ * HOOPS MOTION phase 3d (review): THE BODY OF A LEFT-STICK FLICK — the move's own clip, or, for a move the mode renders another way,
+ * the crossover's: the flick's floor, so the hands always move. `off_the_head` (handle ≥ 92, chest to chest, deep in a chain) has no
+ * clip — the mode throws the ball — and once 1v1's move picker became the flick's one beat source (S2) its flick played no beat at all:
+ * the ball changed hands, or went off his head, under a dribble loop. The tree's own crossover beat had been its body until then.
+ */
+export function flickClip(move: HandleMove, dir: 'left' | 'right'): string {
+  return moveClip(move, dir) ?? `bball_crossover_${dir}`;
+}
+
+/**
  * HOW AN ANKLE BREAK LOOKS FROM THE OTHER SIDE.
  *
  * The defender's answer to the whole vocabulary above was `karate_hit_react`, and a floored one was

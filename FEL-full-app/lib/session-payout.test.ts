@@ -565,3 +565,48 @@ describe('MUSIC-SUITE P3 FIX PASS: when a creation that did not count may count'
     expect(streakStep(p, at, 'creation').due).toBe(true);
   });
 });
+
+// ── ECONOMY-SESSIONS-HARDEN follow-up (2026-09-29): the finite pay cap ─────────────────────────────────────────────────
+describe('skateboarding and surfing are paid at most what 4 × their best run seen would pay', async () => {
+  const sp = await import('./session-payout');
+  const { finitePayCapScore, FINITE_PAY_BASIS, FINITE_PAY_HEADROOM, sessionPayout: pay, sessionXp: xpOf, sessionShards: shardsOf } = sp;
+  const { derivedBounds } = await import('./sessions/modeScoreRules');
+
+  it('the caps: 4 × 80,832 and 4 × 14,213; no other mode has one', () => {
+    expect(FINITE_PAY_HEADROOM).toBe(4);
+    expect(finitePayCapScore('skateboarding')).toBe(323_328);
+    expect(finitePayCapScore('surfing')).toBe(56_852);
+    for (const m of ['snowboarding', 'dunkContest', 'music', 'karateEndless', 'freerun', 'notAMode']) expect(finitePayCapScore(m), m).toBeNull();
+    expect(Object.keys(FINITE_PAY_BASIS).sort()).toEqual(['skateboarding', 'surfing']);
+  });
+
+  it('a forged run inside the derived bound pays the cap, not 1.5 × the bound (~653M XP)', () => {
+    const bound = derivedBounds({ killSwitch: false }).skateboarding.maxScore;
+    const forged = pay({ score: bound, won: true, endless: false, durationSec: 90, payCapScore: finitePayCapScore('skateboarding') });
+    expect(forged).toMatchObject({ xp: xpOf(323_328, true), shards: shardsOf(323_328, true), capped: true });
+    expect(forged.xp).toBe(485_042);
+    expect(xpOf(bound, true)).toBeGreaterThan(650_000_000);
+    const surf = pay({ score: derivedBounds({ killSwitch: false }).surfing.maxScore, won: false, endless: false, durationSec: 90, payCapScore: finitePayCapScore('surfing') });
+    expect(surf).toMatchObject({ xp: xpOf(56_852, false), capped: true });
+  });
+
+  it('the honest runs are paid in full (the endless ceiling would have cut 80,832 to ~14K XP)', () => {
+    const honest = pay({ score: 80_832, won: true, endless: false, durationSec: 90, payCapScore: finitePayCapScore('skateboarding') });
+    expect(honest).toMatchObject({ xp: xpOf(80_832, true), capped: false });
+    expect(honest.xp).toBe(121_298);
+    expect(pay({ score: 1_530, won: false, endless: false, durationSec: 90, payCapScore: finitePayCapScore('surfing') })).toMatchObject({ capped: false });
+    // and no cap means exactly the old formula
+    expect(pay({ score: 80_832, won: true, endless: false, durationSec: 90 })).toEqual(pay({ score: 80_832, won: true, endless: false, durationSec: 90, payCapScore: null }));
+  });
+
+  it('where the captures are on this machine, both cited files hold the cited score', () => {
+    const outbox = join(process.env.HOME ?? '', 'Claude', 'outbox');
+    let present = false;
+    try { present = statSync(outbox).isDirectory(); } catch { /* CI: the captures live on the owner's machine */ }
+    if (!present) return;
+    for (const b of Object.values(FINITE_PAY_BASIS)) {
+      const file = b.source.split(' ')[0].replace('~/Claude/outbox/', '').replace(/:\d+$/, '');
+      expect(readFileSync(join(outbox, file), 'utf8'), b.source).toContain(String(b.bestScore));
+    }
+  });
+});

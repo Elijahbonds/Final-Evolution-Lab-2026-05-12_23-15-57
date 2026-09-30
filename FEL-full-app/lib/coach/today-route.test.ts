@@ -112,7 +112,7 @@ describe('GET /api/coach/me/today: the read model', () => {
   });
 
   it('a stranger, or a client with nothing active, gets nothing', async () => {
-    expect((await today('someone-else')).json).toEqual({ program: null, today: null, open: null, recentComments: [] });
+    expect((await today('someone-else')).json).toEqual({ program: null, today: null, open: null, recentComments: [], hardStopped: false, redFlagCopy: null });
     h.user = null;
     expect((await todayGET()).status).toBe(401);
   });
@@ -192,7 +192,9 @@ describe('POST /api/coach/me/log: per-set logging', () => {
     expect(r.json.clientSession.completedAt).toBeTruthy();
     expect(r.json.clientSession.exerciseLogs[0].setLogs).toHaveLength(1);
     // it answered { program: null } here too, so the client who just finished read "No active program yet"
-    expect((await today()).json).toEqual({ program: { id: PID, name: 'Base block', coachName: 'Coach One' }, today: null, open: null, recentComments: [] });
+    // MIRROR-COACH P5 FIX (2026-09-29, code review): hardStopped/redFlagCopy added to every TodayPayload return —
+    // this client has no HealthIntake on file at all, so both read as the un-flagged default.
+    expect((await today()).json).toEqual({ program: { id: PID, name: 'Base block', coachName: 'Coach One' }, today: null, open: null, recentComments: [], hardStopped: false, redFlagCopy: null });
   });
 
   // MIRROR-COACH P2 review (2026-09-26): Today sends EVERY exercise on Save; an untouched one used to create an empty
@@ -221,7 +223,7 @@ describe('POST /api/coach/me/log: per-set logging', () => {
     h.store.program.forEach((p) => { if (p.id === PID) p.isActive = false; });
     const empty = seedProgram(h.store, { coachId: 'coach-1', clientId: 'client-1', name: 'Empty plan', blockLabel: 'W', sessions: [] });
     expect(empty.sessionIds).toEqual([]);
-    expect((await today()).json).toEqual({ program: null, today: null, open: null, recentComments: [] });
+    expect((await today()).json).toEqual({ program: null, today: null, open: null, recentComments: [], hardStopped: false, redFlagCopy: null });
     // …and beside a FINISHED program, the finished one is named, never the empty one
     h.store.program.forEach((p) => { if (p.id === PID) p.isActive = true; });
     h.store.cs.push({ id: 'cs2', programId: PID, sessionId: S2, clientId: 'client-1', completedAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
@@ -235,6 +237,62 @@ describe('POST /api/coach/me/log: per-set logging', () => {
     expect((await log({ programId: PID, sessionId: S2, logs: [{ sessionExerciseId: SE[0][0], sets: [] }] })).json.error).toBe('exercise_not_in_session');
     h.user = 'client-1';
     expect((await logPOST(new NextRequest('http://fel.test/api/coach/me/log', { method: 'POST', body: '[1]' }))).status).toBe(400);
+  });
+});
+
+// MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training (coach Today view / prescribed programs)
+// is not gated by the intake's red-flag hard stop": lib/health/intake.ts's own RED_FLAG_COPY doc comment claims it
+// is shown "whenever a red-flag answer hard-stops the Mirror, pain check-ins AND training features" — nothing wired
+// this surface to that claim until this fix. Both halves (the read Today shows, and the write the server refuses)
+// are covered here rather than only in lib/health/intake.test.ts's pure isHardStopped() unit tests, because the
+// bug was specifically that a REAL route never called it at all.
+describe('Today is paused by a standing HealthIntake red flag (MIRROR-COACH P5 FIX)', () => {
+  const redFlagIntake = (overrides: Partial<Row> = {}) => ({
+    id: 'hi-1', userId: 'client-1', redFlags: ['heart_or_bp_condition'], clearedAt: null, createdAt: new Date('2026-09-01'), ...overrides,
+  });
+
+  it('GET Today reports hardStopped + the copy when a red flag has not been cleared', async () => {
+    h.store.healthIntake.push(redFlagIntake());
+    const { json } = await today();
+    expect(json.hardStopped).toBe(true);
+    expect(json.redFlagCopy).toMatch(/clinician/i);
+  });
+
+  it('a CLEARED red flag reads as not hard-stopped', async () => {
+    h.store.healthIntake.push(redFlagIntake({ clearedAt: new Date('2026-09-05') }));
+    const { json } = await today();
+    expect(json.hardStopped).toBe(false);
+    expect(json.redFlagCopy).toBeNull();
+  });
+
+  it('an intake with NO red flags at all reads as not hard-stopped', async () => {
+    h.store.healthIntake.push(redFlagIntake({ redFlags: [] }));
+    const { json } = await today();
+    expect(json.hardStopped).toBe(false);
+  });
+
+  it('a hard-stopped client\'s POST /api/coach/me/log is refused, and nothing is written', async () => {
+    h.store.healthIntake.push(redFlagIntake());
+    const before = h.store.log.length;
+    const r = await log({ programId: PID, sessionId: S2, logs: [{ sessionExerciseId: SE[1][0], sets: [{ reps: 5, weight: 60 }] }] });
+    expect(r.status).toBe(403);
+    expect(r.json.error).toBe('health_hard_stopped');
+    expect(h.store.log).toHaveLength(before);
+  });
+
+  it('another client\'s red flag never hard-stops THIS client', async () => {
+    h.store.healthIntake.push(redFlagIntake({ id: 'hi-other', userId: 'someone-else' }));
+    const { json } = await today();
+    expect(json.hardStopped).toBe(false);
+  });
+
+  it('only the NEWEST intake decides it — an old cleared one does not un-clear a newer red flag', async () => {
+    h.store.healthIntake.push(
+      redFlagIntake({ id: 'hi-old', createdAt: new Date('2026-08-01'), clearedAt: new Date('2026-08-02') }),
+      redFlagIntake({ id: 'hi-new', createdAt: new Date('2026-09-01'), clearedAt: null }),
+    );
+    const { json } = await today();
+    expect(json.hardStopped).toBe(true);
   });
 });
 

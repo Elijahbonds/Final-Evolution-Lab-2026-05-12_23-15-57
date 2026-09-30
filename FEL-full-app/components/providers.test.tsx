@@ -29,7 +29,7 @@ const render = (path: string) => { m.path = path; m.providerMounts = 0; return r
 
 describe('isQuickScreenPath', () => {
   it('is the screen\'s own paths, and nothing else', () => {
-    for (const p of ['/screen', '/screen/', '/screen/program/dunking', '/play/mirror/assess', '/play/mirror/assess/results']) expect(isQuickScreenPath(p), p).toBe(true);
+    for (const p of ['/screen', '/screen/', '/screen/program/dunking', '/screen/privacy', '/play/mirror/assess', '/play/mirror/assess/results']) expect(isQuickScreenPath(p), p).toBe(true);
     for (const p of ['/', '/play/mirror', '/play/brain-brawl', '/screening', '/play/mirror/assessment', '/try', '/screens']) expect(isQuickScreenPath(p), p).toBe(false);
   });
 });
@@ -39,6 +39,8 @@ describe('Providers', () => {
     expect(render('/play/mirror/assess')).toContain('unauthenticated');
     expect(m.providerMounts).toBe(0);
     expect(render('/screen/program/posture')).toContain('unauthenticated');
+    expect(m.providerMounts).toBe(0);
+    expect(render('/screen/privacy')).toContain('unauthenticated');          // SCREEN-FIX: the privacy page too
     expect(m.providerMounts).toBe(0);
   });
 

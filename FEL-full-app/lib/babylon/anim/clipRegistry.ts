@@ -55,6 +55,7 @@ export const REAL_CLIPS = new Set<string>([
   'golf_address_idle', 'golf_swing_full', 'golf_putt', 'golf_finish_hold',
   'soccer_kick_shoot', 'keeper_set', 'keeper_dive', 'keeper_dive_hold', 'keeper_rise',
   // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
+  'bball_idle_stand',   // HOOPS MOTION phase 3b: the ball-less watch with its own knees (authored + aliased, never listed here)
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
   'bball_block_reach', 'bball_steal_reach',

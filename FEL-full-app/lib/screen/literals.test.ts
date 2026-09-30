@@ -34,10 +34,12 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/prqWrite.ts': [[['32', '1024', '3', '10', '64', '8', '9', '31', '16', '1000', '100', '50', '240', '5000', '7', '21', '8192'], 'record-validation bounds (sizes, key lengths, plausible ranges) and rounding: what the server would accept, not a grade (no server save in this ship)']],
   'lib/assess/thresholds.ts': [],
   'lib/screen/checks.ts': [], 'lib/screen/store.ts': [], 'lib/screen/flow.ts': [], 'lib/screen/copy.ts': [], 'lib/screen/PROPOSED-program-lanes.ts': [],
+  'lib/screen/age.ts': [], 'lib/screen/routes.ts': [],
+  'lib/screen/kid.ts': [[['10'], 'one decimal of rounding for the change line (as lib/assess/why.ts rounds the jump)']],
   'lib/screen/config.ts': [[['9'], 'a regex character class (a-z0-9)']],
   'lib/screen/ui.ts': [[['16', '3', '0.5', '6', '1200'], 'UI constants: the skeleton\'s One Euro (1, 16, 3), its visibility floor, the tracking-loss window and the Done beat — grade nothing (gate 2)'], [LANDMARKS, 'landmark indices and count']],
   'app/play/mirror/assess/_components/assess-app.tsx': [[['33'], 'the landmark count'], [['500'], 'how often the camera check re-reads the pose rate (UI)'], [['4', '3'], 'the 4:3 default picture aspect'], [['60'], 'the camera frame-rate asked for on the jump (spec §3.1)']],
-  'app/play/mirror/assess/_components/gate-steps.tsx': [[['18'], '"Under 18" in the age copy (the age of majority needsGuardianConsent uses)']],
+  'app/play/mirror/assess/_components/gate-steps.tsx': [],
   'app/play/mirror/assess/_components/live-hud.tsx': [[['100', '1000'], 'percent, ms → s']],
   'app/play/mirror/assess/_components/skeleton.ts': [[LANDMARKS, 'the bones and joints drawn'], [['0.35', '160', '0.9', '2.5', '110', '6', '1.5', '240', '200', '2.4', '0.2', '0.08', '1e-6'], 'drawing: visibility for the frozen view, line widths, alpha, radii, guide lengths, padding']],
   'app/play/mirror/assess/_components/use-voice.ts': [[['1.02'], 'speech rate']],
@@ -46,6 +48,10 @@ const NONE = [
   'app/play/mirror/assess/_components/camera-help.tsx', 'app/play/mirror/assess/_components/not-saved.tsx', 'app/play/mirror/assess/_components/results-page.tsx',
   'app/play/mirror/assess/_components/results-view.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx', 'app/play/mirror/assess/page.tsx',
   'app/play/mirror/assess/results/page.tsx', 'app/screen/page.tsx', 'app/screen/program/[lane]/page.tsx', 'app/screen/program/[lane]/program-lane.tsx',
+  'app/screen/privacy/page.tsx', 'app/screen/privacy/clear-results.tsx', 'app/play/mirror/assess/_components/use-leave-guard.ts',
+  // SCREEN-FIX-2
+  'app/play/mirror/assess/_components/kid-results.tsx', 'app/play/mirror/assess/_components/screen-pose.ts',
+  'app/play/mirror/assess/_components/screen-error-boundary.tsx', 'app/play/mirror/assess/layout.tsx', 'app/screen/layout.tsx',
 ];
 /** lib/assess/replay.ts is the synthetic athlete (QA data for tests and probes): it grades nothing. */
 const EXEMPT = ['lib/assess/replay.ts', 'lib/screen/PROPOSED-thresholds.ts', 'lib/screen/PROPOSED-program-lanes.ts'];

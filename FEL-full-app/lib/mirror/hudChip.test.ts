@@ -2,10 +2,10 @@
 // squat's first stage, BREATHE, through the whole Movement Screen — the screen fell into the squat's arm of a ternary.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { chipLabel, screenChip, shortCheckLabel } from './hudChip';
+import { chipLabel, lungeChip, screenChip, shortCheckLabel } from './hudChip';
 import { FULL_SCREEN, MODIFIED_SCREEN } from './screen';
 
-const base = { phase: 'hold', jumpState: 'ready', squatStage: 'breathe' as const, runner: null };
+const base = { phase: 'hold', jumpState: 'ready', squatStage: 'breathe' as const, lungeStage: 'left' as const, runner: null };
 
 describe('the chip', () => {
   it('the Movement Screen shows its station — never the squat\'s BREATHE — on every station of both screens', () => {
@@ -40,12 +40,21 @@ describe('the chip', () => {
     expect(chipLabel({ ...base, pattern: 'jump', jumpState: 'landing' })).toBe('landing');
     expect(chipLabel({ ...base, pattern: 'squat', squatStage: 'work' })).toBe('work');
   });
+
+  // MIRROR-COACH P4 lane 1 (registry-and-lunge, 2026-09-25): the lunge names which leg's set is on, or the review.
+  it('the lunge names which leg\'s set is on, or the review', () => {
+    expect(chipLabel({ ...base, pattern: 'lunge', lungeStage: 'left' })).toBe('left leg');
+    expect(chipLabel({ ...base, pattern: 'lunge', lungeStage: 'right' })).toBe('right leg');
+    expect(chipLabel({ ...base, pattern: 'lunge', lungeStage: 'review' })).toBe('Review');
+    expect(lungeChip('left')).toBe('left leg');
+    expect(lungeChip('review')).toBe('Review');
+  });
 });
 
 describe('the harness', () => {
   const h = readFileSync(new URL('../../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8');
   it('renders the chip from chipLabel, not a ternary that ends in squatStage', () => {
-    expect(h).toContain('{chipLabel({ pattern, phase, jumpState, squatStage, runner })}');
+    expect(h).toContain('{chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner })}');
     expect(h).not.toMatch(/: pattern === 'jump' \? \(jumpState === 'ready'/);
   });
 
