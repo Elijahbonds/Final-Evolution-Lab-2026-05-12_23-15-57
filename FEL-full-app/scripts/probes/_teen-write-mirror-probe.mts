@@ -115,7 +115,9 @@ const SAVE_ROUTE = /\/api\/(mirror\/|v1\/workout\/scan)/;
 async function browserPass(ctxName: string, a: Acct, drive: (ctx: BrowserContext, reqs: Json[]) => Promise<Json>) {
   const browser = await chromium.launch({
     executablePath: chromiumExe(), headless: true,
-    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+    // WebGL on (the Mirror's overlay needs it; headless has none by default), as the other Mirror probes launch it
+    args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist',
+      '--use-fake-device-for-media-stream=fps=30', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
   });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['camera'] });
   const [name, value] = (await signIn(a.email)).split(/=(.*)/s);
@@ -127,7 +129,15 @@ async function browserPass(ctxName: string, a: Acct, drive: (ctx: BrowserContext
   });
   const before = await rows(a.id);
   let result: Json = {};
-  try { result = await drive(ctx, reqs); } catch (e) { result = { error: String((e as Error)?.message ?? e).slice(0, 300) }; }
+  try { result = await drive(ctx, reqs); } catch (e) {
+    // a pass that could not get where it meant to go says so, with what the page showed — never a silent "0 requests"
+    result = { error: String((e as Error)?.message ?? e).slice(0, 300) };
+    const page = ctx.pages()[0];
+    if (page) {
+      await page.screenshot({ path: join(OUT, `${ctxName}-failed.png`) }).catch(() => {});
+      result.shownAtFailure = (await page.locator('body').innerText().catch(() => '')).slice(0, 1200);
+    }
+  }
   const after = await rows(a.id);
   const saves = reqs.filter((r) => (r.method === 'POST' || r.method === 'PATCH') && SAVE_ROUTE.test(r.path));
   out.browser[ctxName] = {
@@ -169,9 +179,13 @@ async function main() {
   const pass3 = await browserPass('harness', legacy, async (ctx, reqs) => {
     const page = await ctx.newPage();
     await page.goto(`${BASE}/play/mirror`, { waitUntil: 'domcontentloaded', timeout: 180_000 });
+    // the first authenticated visit compiles the harness's client bundle under next dev (MediaPipe, the Mirror runtime):
+    // minutes, not seconds, on a cold dist dir
+    await page.getByRole('button', { name: 'Start session' }).waitFor({ timeout: 480_000 });
     const steps: Json[] = [];
     for (const pattern of ['Movement Screen', 'Vertical Jump']) {
-      await page.getByRole('button', { name: pattern }).first().click({ timeout: 120_000 });
+      // the pattern picker is a tablist; each tab's accessible name is the full pattern title (mirror-harness.tsx)
+      await page.getByRole('tab', { name: pattern }).click({ timeout: 120_000 });
       await page.getByRole('button', { name: 'Start session' }).click({ timeout: 60_000 });
       const live = await page.getByRole('button', { name: 'End session' }).waitFor({ timeout: 90_000 }).then(() => true).catch(() => false);
       await page.waitForTimeout(6000);
