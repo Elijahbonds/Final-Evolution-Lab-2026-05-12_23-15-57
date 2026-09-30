@@ -5,7 +5,8 @@
  * this same module (never fork a core). Covers challenge-code generation and
  * winner resolution from two final scores.
  */
-import { isStakingPaused } from '../stakingPause';
+import { isStakingPaused, stakingPausedDetail } from '../stakingPause';
+import { canonicalModeKey, MODE_INFO } from '../game-data';
 
 // Unambiguous alphabet (no 0/O/1/I) so codes read cleanly aloud / over text.
 export const MP_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -121,11 +122,42 @@ export function mpModeLabel(mode: string): string {
  * no challenge key today; if one is added while music is paused, it is refused here the same way.
  */
 export function isMpChallengeOpen(mode: string): boolean {
-  return isValidMpMode(mode) && !isStakingPaused(sessionModeFor(mode));
+  return isValidMpMode(mode) && !isStakingPaused(sessionModeFor(mode)) && !isMpHouseSetOnly(mode);
+}
+
+/**
+ * MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("Arena dance (fixed): same house song for both players, accuracy-based
+ * score; own songs free play only; FRIEND CHALLENGES SAME RULE"). Dance staking comes back in the Arena this phase
+ * (lib/stakingPause.ts), but a friend challenge cannot follow that rule yet, so it stays closed on this gate of its own:
+ *   · this engine settles STORED BEST SCORES (lib/mp/service.ts bestScoreFor: the player's best GameSession in the mode,
+ *     at create for the host and at join for the guest) — nobody plays anything for the challenge;
+ *   · a GameSession row holds a mode and a number (prisma/schema.prisma: no song, no chart, no attempt), so the two bests
+ *     are on whatever songs each player picked — a flawless set is worth 9,555 on MORNING BOARDWALK and 19,740 on EVOLUTION,
+ *     and 79,680 on an own 64-bar song: the exact "the song decides the duel" P1 paused;
+ *   · and MatchEvent rows (where an Arena attempt lives) belong to CompetitionMatch, not MpMatch.
+ * So "the same house song for both" needs either a schema change (a played attempt on the challenge) or the challenge
+ * played as an Arena duel — an owner decision (outbox musicsuite/p9, fair-duels). Until then a NEW dance challenge is
+ * refused (create, pass-and-play), and an open one is not accepted (join), exactly as during the P1 pause. Music has no
+ * challenge key; it is listed so one added later cannot bypass the house beat either. Keyed by the session mode.
+ */
+export const MP_HOUSE_SET_ONLY: ReadonlySet<string> = new Set<string>(['music', 'dance']);
+
+/** Is this challenge key's mode one whose friend challenge is closed until it can follow the house-set rule? */
+export function isMpHouseSetOnly(mode: string): boolean {
+  return MP_HOUSE_SET_ONLY.has(canonicalModeKey(sessionModeFor(mode)));
+}
+
+/** The line a player reads when a challenge on this key is refused (a paused mode, or a house-set-only one). */
+export function mpChallengeClosedDetail(mode: string): string {
+  const session = sessionModeFor(mode);
+  if (!isMpHouseSetOnly(mode)) return stakingPausedDetail(session);
+  const name = MODE_INFO[canonicalModeKey(session)]?.name ?? mpModeLabel(mode);
+  return `Friend challenges on ${name} are closed: its duels are the same house song for both players, played once and checked by the Arena — challenge in the Arena instead. Free play is open.`;
 }
 
 /** The modes the multiplayer lobby offers for a NEW challenge (MP_MODES minus the paused ones), in roster order. */
 export const MP_CHALLENGE_MODES: { key: string; label: string }[] = MP_MODES.filter((m) => isMpChallengeOpen(m.key));
 
-/** The challenge modes whose staking is paused — the lobby names them instead of dropping them silently. */
+/** The challenge modes whose staking is paused — the lobby names them instead of dropping them silently. (MUSIC-SUITE P9:
+ *  with dance's Arena staking back, dance is here for MP_HOUSE_SET_ONLY.) */
 export const MP_PAUSED_MODES: { key: string; label: string }[] = MP_MODES.filter((m) => !isMpChallengeOpen(m.key));

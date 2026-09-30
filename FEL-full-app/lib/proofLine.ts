@@ -1,6 +1,7 @@
 // proofLine — pass 5 phase 3: one line that says what happened, per mode, from the mode's own session stats. Rendered on
 // the results card ("Share proof · …") and minted onto the challenge card as `display`. Dunk keeps its make/miss line.
 import { gradeFor } from '@/lib/babylon/core/danceTracks';
+import { leanTag } from '@/lib/babylon/dance/coaching';
 /** ARENA-10PHASE (2026-09-07): an outside verdict overrides the mode's own W/L — a Triumph Arena run is settled against the
  *  house rival, not the mode's in-game rival, and the card must say ONE thing. TIE = both entries refunded; PENDING = the
  *  opponent has not posted yet. */
@@ -48,7 +49,10 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'dance': {
       const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');
       const grade = acc !== null ? gradeFor(acc / 100) : null;
-      return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}${acc !== null ? ` · ${acc}%` : ''}${grade ? ` · GRADE ${grade}` : ''}${combo !== null ? ` · ×${combo} COMBO` : ''}`;
+      // MUSIC-SUITE P9 FIX PASS (2026-09-29): the rush/drag lean stays on the card (coaching.leanTag, from stats.offsetMs —
+      // DanceMode adds it when the run had enough hits to read one); a card without it reads exactly as before
+      const lean = leanTag(n(s, 'offsetMs'));
+      return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}${acc !== null ? ` · ${acc}%` : ''}${grade ? ` · GRADE ${grade}` : ''}${combo !== null ? ` · ×${combo} COMBO` : ''}${lean ? ` · ${lean}` : ''}`;
     }
     case 'who_scene_it': case 'whoSceneIt': {
       const c = n(s, 'correct'), t = n(s, 'total'), p = n(s, 'players'), p2 = n(s, 'p2score'), w = n(s, 'winner');

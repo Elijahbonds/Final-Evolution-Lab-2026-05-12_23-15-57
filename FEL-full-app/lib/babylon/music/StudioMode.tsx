@@ -2257,7 +2257,9 @@ export default function StudioMode({
   /** The finished set that has not reached the Arena yet (SEND AGAIN posts it; it is also kept in sessionStorage). */
   const arenaUnsentRef = useRef<{ taps: HouseTap[]; seconds: number } | null>(null);
   const arenaStore = (): Storage | null => { try { return typeof window === 'undefined' ? null : window.sessionStorage; } catch { return null; } };
-  const postAttempt = (body: Record<string, unknown>) => postArenaAttempt((u, i) => fetch(u, i), body);
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): every post names the room — /api/arena/music-attempt serves music AND dance duels
+  // from one URL, and refuses a room that is not the duel's (400 WRONG_ROOM) before anything is used
+  const postAttempt = (body: Record<string, unknown>) => postArenaAttempt((u, i) => fetch(u, i), { ...body, room: 'music' });
 
   /**
    * The end of an Arena run — a set played and in, or an attempt that was already used: the recap, the room's own sound

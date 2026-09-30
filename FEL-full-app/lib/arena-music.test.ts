@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  isMusicDuel, readMusicAttempt, musicAttemptScore, MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, type MusicAttempt,
+  isMusicDuel, readMusicAttempt, musicAttemptScore, MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, DANCE_ATTEMPT_FINISH, type MusicAttempt,
   musicSeat, houseSeatOf, isStartReplay, cleanAttemptId, HOUSE_START_RETRY_MS, musicTapPlausibility, PLAUSIBILITY_MIN_HITS,
   PLAUSIBILITY_MIN_SPREAD_MS,
 } from './arena-music';
@@ -93,14 +93,15 @@ describe('the rival: old music scores stop counting (owner decision #12)', () =>
 
   it('music bands only on duels carrying the player\'s finished attempt', () => {
     expect(RIVAL_FROM_DUEL_SCORES.has('music')).toBe(true);
-    expect(RIVAL_SCORE_EVENT).toEqual({ music: MUSIC_ATTEMPT_FINISH });
+    // (MUSIC-SUITE P9, 2026-09-29: dance joined the table with its own finish event — its describe is at the end)
+    expect(RIVAL_SCORE_EVENT).toEqual({ music: MUSIC_ATTEMPT_FINISH, dance: DANCE_ATTEMPT_FINISH });
     expect(ownDuelScores(rows, 'u1', Infinity, RIVAL_SCORE_EVENT.music)).toEqual([12_000, 15_000]);
   });
 
   it('without the event rule every score in reach counts, as before (no other mode is filtered)', () => {
     expect(ownDuelScores(rows, 'u1')).toEqual([90_000, 0, 70_000, 12_000, 15_000]);
     expect(ownDuelScores(rows, 'u1', 50_000)).toEqual([0, 12_000, 15_000]);
-    expect(Object.keys(RIVAL_SCORE_EVENT)).toEqual(['music']);
+    expect(Object.keys(RIVAL_SCORE_EVENT)).toEqual(['music', 'dance']);   // MUSIC-SUITE P9: + dance, and only those two
   });
 
   it('with nothing left, the draw is the music baseline (12,000 since the P6 fix pass — see below)', () => {
@@ -224,10 +225,10 @@ describe('P6 fix pass: a seat as settlement counts it (musicSeat), the start rep
 });
 
 describe('music is staked again, and the lobby says how (P6 step e)', () => {
-  it('music is out of the pause (dance stays paused until phase 9)', () => {
+  it('music is out of the pause (dance stayed paused until phase 9 — MUSIC-SUITE P9, 2026-09-29: now out too)', () => {
     expect(isStakingPaused('music')).toBe(false);
     expect(isStakingPaused('musicAcademy')).toBe(false);
-    expect(isStakingPaused('dance')).toBe(true);
+    expect(isStakingPaused('dance')).toBe(false);
   });
 
   it('the Arena lobby shows the house-beat rules when music is picked', () => {

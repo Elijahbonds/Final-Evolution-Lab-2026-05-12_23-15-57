@@ -5,8 +5,7 @@ import { prisma } from '@/lib/db';
 import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
 import { joinAndSettle } from '@/lib/mp/service';
 import { readWallet } from '@/lib/wallet/wallet-service';
-import { isValidMatchCode, resolveOutcome } from '@/lib/mp/match-core';
-import { stakingPausedDetail } from '@/lib/stakingPause';
+import { isValidMatchCode, resolveOutcome, mpChallengeClosedDetail } from '@/lib/mp/match-core';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +28,8 @@ export async function POST(req: Request) {
   if ('error' in result) {
     const status = result.error === 'not_found' ? 404 : result.error === 'cannot_join_own' ? 400 : 409;
     // MUSIC-SUITE P1: a paused mode's open challenge answers with the same player-facing line the Arena uses
-    const detail = result.error === 'staking_paused' ? stakingPausedDetail(result.mode) : undefined;
+    // (MUSIC-SUITE P9: or, for a house-set mode — dance — why its friend challenge is closed: match-core MP_HOUSE_SET_ONLY)
+    const detail = result.error === 'staking_paused' ? mpChallengeClosedDetail(result.mode) : undefined;
     return NextResponse.json({ error: result.error, ...(detail ? { detail } : {}) }, { status });
   }
   const m = result.match;

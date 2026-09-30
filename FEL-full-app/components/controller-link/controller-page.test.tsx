@@ -48,6 +48,7 @@ describe('controller page: a schema without hints renders exactly as before P5',
   it('no other mode picks up a hint\'s markup (no select-none, touch-action, compact row, or feel line)', () => {
     for (const [id, c] of Object.entries(MODE_CONTROLLERS)) {
       if (id === 'music_flip' || id === 'music_perform') continue;   // MUSIC-SUITE P6: the Academy's two pages ask for hints
+      if (id === 'dance_pad') continue;   // MUSIC-SUITE P9: the Cypher's NEW dance pad asks for the buzz (its own test below)
       const html = page(c);
       expect(html, id).not.toMatch(/select-none|touch-action|py-3 text-sm|data-testid="pad-feel"/);
       // and the same schemas with every hint explicitly OFF render the same
@@ -81,6 +82,29 @@ describe('controller page: PERFORM\'s four lanes (MUSIC-SUITE P6)', () => {
     press(bs.find((b) => b.label === 'HATS')!, { pointerType: 'touch', pressure: 0.9, width: 40, height: 40 });
     press(bs.find((b) => b.label === '❚❚ PAUSE')!);
     expect(sent).toEqual([['lane_2'], ['pause']]);
+    expect(vibrate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('controller page: the Cypher\'s dance pad (MUSIC-SUITE P9)', () => {
+  it('the song-pick d-pad, then TOP ROCK · TWO STEP · ARM WAVE · SPIN two by two, touch-safe', () => {
+    const html = page(MODE_CONTROLLERS.dance_pad);
+    const labels = [...html.matchAll(/<button[^>]*>([^<]+)<\/button>/g)].map((m) => m[1]);
+    expect(labels).toEqual(['▲', '◀', '▶', '▼', 'TOP ROCK', 'TWO STEP', 'ARM WAVE', 'SPIN']);
+    expect(html).toContain('grid-template-columns:repeat(2, minmax(0, 1fr))');
+    expect(html).toContain('touch-action:manipulation');
+    expect(html).not.toMatch(/data-testid="pad-feel"[^>]*velocity/);
+  });
+  it('a move press sends its :down and buzzes once; letting go sends its :up (a freeze hold ends there)', () => {
+    const vibrate = vi.fn(() => true);
+    vi.stubGlobal('navigator', { vibrate });
+    const { client, sent } = fakeClient();
+    const bs = buttonsOf(MODE_CONTROLLERS.dance_pad, client);
+    const b = bs.find((x) => x.label === 'TOP ROCK')!;
+    press(b, { pointerType: 'touch', pressure: 0.9, width: 40, height: 40 });
+    b.el.props.onPointerUp();
+    press(bs.find((x) => x.label === 'SPIN')!);
+    expect(sent).toEqual([['A:down'], ['A:up'], ['Y:down']]);
     expect(vibrate).toHaveBeenCalledTimes(2);
   });
 });

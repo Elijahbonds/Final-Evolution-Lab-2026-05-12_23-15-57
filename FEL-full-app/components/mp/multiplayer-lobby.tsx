@@ -117,10 +117,13 @@ function ModeSelect({ value, onChange }: { value: string; onChange: (v: string) 
           <option key={m.key} value={m.key} className="bg-[#0a0a0a]">{m.label}</option>
         ))}
       </select>
+      {/* MUSIC-SUITE P9 (2026-09-29): what closes a mode here now is the house-set gate (lib/mp/match-core.ts
+          MP_HOUSE_SET_ONLY — The Cypher: its duels are the same house song for both players, which a friend challenge
+          can't give yet), not a pause; and an open code on it is not accepted either (the old line said it was). */}
       {MP_PAUSED_MODES.length > 0 && (
         <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-white/35">
-          Challenges paused: {MP_PAUSED_MODES.map((m) => m.label).join(', ')} &mdash; while their duels are made fair.
-          Free play is open, and a challenge code you already have can still be accepted.
+          Challenges closed: {MP_PAUSED_MODES.map((m) => m.label).join(', ')} &mdash; their duels are played in the Arena,
+          on the same house song for both players. Free play is open.
         </p>
       )}
     </>

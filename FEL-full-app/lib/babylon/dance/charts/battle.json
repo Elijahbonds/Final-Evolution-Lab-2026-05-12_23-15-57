@@ -1,0 +1,32 @@
+{
+  "format": "fel-dance-chart/1",
+  "song": "battle",
+  "bpm": 112,
+  "bars": 48,
+  "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
+  "about": "Difficulty 4. The horn hook carries the accents (0.5, the 2.25 / 2.75 pair as an eighth double, the 4.5 / 4.75 sixteenth double); the breakbeat kick on 2.75 in the verses; a two-and-a-half-beat freeze hold on each break bar; freestyle every beat in both hooks. MUSIC-SUITE P9 moves: captured breaking in the calls — the KICK STEP in the verses, the HELICOPTER in the second hook, the SIDE FREEZE on the second break bar.",
+  "phrases": {
+    "bin": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 3 }, { "b": 4, "m": "spin" } ] },
+    "bin2": { "bars": 2, "notes": [ { "b": 0, "m": "toprock", "mir": 1 }, { "b": 3 }, { "b": 4, "m": "babyfreeze", "hold": 1.5 }, { "b": 6, "m": "spin" } ] },
+    "bvA": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 1.5 }, { "b": 2.75 }, { "b": 4, "m": "kickstep" } ] },
+    "bvB": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep" }, { "b": 2.5, "x2": 0.25 }, { "b": 5 }, { "b": 7, "m": "spin" } ] },
+    "bvC": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 2.5, "x2": 0.25 }, { "b": 4, "m": "sixstep" }, { "b": 6.5 } ] },
+    "bhA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 0.5 }, { "b": 2.25, "x2": 0.5 }, { "b": 4, "m": "toprock" }, { "b": 4.5, "x2": 0.25 }, { "b": 6, "m": "twostep" } ] },
+    "bhB": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 1.5 }, { "b": 2.25, "x2": 0.5 }, { "b": 4, "m": "helicopter" }, { "b": 5.75 }, { "b": 7, "m": "wave" } ] },
+    "bfree": { "bars": 2, "free": { "every": 1 } },
+    "bbrkA": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "babyfreeze", "hold": 2.5 }, { "b": 7, "m": "spin" } ] },
+    "bbrkB": { "bars": 2, "notes": [ { "b": 0, "m": "shoulder" }, { "b": 2.5 }, { "b": 4, "m": "sidefreeze", "hold": 2.5, "mir": 1 }, { "b": 7, "m": "spin" } ] },
+    "bout1": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 2.75 }, { "b": 4, "m": "windmill" }, { "b": 5.5 } ] },
+    "bout2": { "bars": 2, "notes": [ { "b": 0, "m": "shoulder" }, { "b": 1.5 }, { "b": 4, "m": "spin" }, { "b": 6, "m": "babyfreeze", "hold": 1.5 } ] }
+  },
+  "sections": [
+    { "name": "intro", "bar": 1, "bars": 4, "play": ["bin", "bin2"] },
+    { "name": "verse", "bar": 5, "bars": 8, "play": ["bvA", "bvB", "bvA", "bvB"] },
+    { "name": "hook", "bar": 13, "bars": 8, "play": ["bhA", "bfree", "bhA", "bfree"] },
+    { "name": "break", "bar": 21, "bars": 4, "play": ["bbrkA", "bbrkB"] },
+    { "name": "verse", "bar": 25, "bars": 8, "play": ["bvA", "bvC", "bvA", "bvB"] },
+    { "name": "build", "bar": 33, "bars": 4, "play": ["bvB", "bhA"] },
+    { "name": "hook", "bar": 37, "bars": 8, "play": ["bhB", "bfree", "bhA", "bfree"] },
+    { "name": "outro", "bar": 45, "bars": 4, "play": ["bout1", "bout2"] }
+  ]
+}

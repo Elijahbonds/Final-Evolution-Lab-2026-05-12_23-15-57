@@ -247,8 +247,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // four stay inert rather than pretending a button matters.
   sprint: verbs({}),
 
-  // Rhythm dance. No movement stick use — the body IS the game; one TAP verb
-  // judged against the beat. B also taps (mode reads A or B).
+  // Rhythm dance. No movement stick use — the body IS the game (the four moves: see the `dance` entry below).
   // 3PT Shootout: one verb, the release. Timing is the whole mechanic.
   threepoint: verbs({ A: { label: 'SHOOT', emit: A('A') } }),   // (a pad's SQUARE shoots here too — the mode accepts X — but one SHOOT on the diamond is enough)
 
@@ -265,7 +264,21 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     B: { label: 'BLOCK', emit: A('B') },
   }),
 
-  dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): the Cypher's FOUR-MOVE pad on touch too. It was one TAP (A), and padMove turns
+  // an A into Top Rock (lib/babylon/dance/freestyle.ts), so a touch player's every freestyle pick was the same move — the
+  // variety floor on every slot (measured on BATTLE with flawless timing: 73,730 points on one button vs 90,350 with all
+  // four, −18 % at the same accuracy, and paid XP on points), told MIX IT UP on every hit with no way to, and free dance
+  // danced Top Rock only — owner decision #3 ("the buttons pick the move") unmet on phones and tablets. The four slots are
+  // the freestyle pad's (chart.ts FREESTYLE_PAD: A Top Rock, B Two Step, X Arm Wave, Y Spin), labelled by their moves as
+  // the phone's dance_pad is; plain buttons, so a press and its release both fire and a freeze hold ends on letting go.
+  // Every slot presses on every step (a called step takes any input). scripts/verb-key-alignment-tests.ts holds the slots
+  // to the pad, and dancePad.test.ts the labels to the moves.
+  dance: verbs({
+    A: { label: 'TOP ROCK', emit: A('A') },
+    B: { label: 'TWO STEP', emit: A('B') },
+    X: { label: 'ARM WAVE', emit: A('X') },
+    Y: { label: 'SPIN', emit: A('Y') },
+  }),
   // lane 3 W1 — the four answers ride the four face buttons
   who_scene_it: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
   // VERB-KEY (2026-09-07): Brain Brawl reads the same answer diamond (FACE index 0..3 → option A/B/C/D, the HUD's

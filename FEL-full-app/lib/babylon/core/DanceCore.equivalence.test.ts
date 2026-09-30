@@ -32,12 +32,36 @@
 //      gives the OLD core that same catch-up before every press (oldCatchUp: its own update() firing loop, run from
 //      outside) and still requires identical answers; the tally counts the presses the catch-up fired a step for. Its
 //      test at the bottom shows the old answer next to the new one.
+//   4. MUSIC-SUITE P9 (2026-09-29): THE AUTHORED CHARTS' PRESS-ONLY FIELDS (lib/babylon/dance/chart.ts; DanceStep
+//      pressHoldBeats / pressFree / pressKind). A step with `pressHoldBeats` is a press HOLD: after its press is judged
+//      exactly as before, its TAIL is a second judgement the old core never made (kept to the end = a PERFECT, its
+//      points and a combo step; let go early, or never pressed = a MISS that breaks the combo) — so the counts, the
+//      combo and the score after it differ. A step with `pressFree` is a FREESTYLE slot: its press is judged exactly as
+//      before (same label, same combo), but its AWARD is multiplied by the variety factor of the move the press picked
+//      (DanceCore.varietyFactor) — so the score differs. `pressKind` (accent / double) is display-only: the judge never
+//      reads it. Nothing else changes, and no chart before P9 carries any of the three. The differential below now also
+//      runs the SIX AUTHORED CHARTS (what ships since P9: swung sixteenths, eighth and sixteenth doubles, accents inside
+//      moves, freestyle slots every half beat) with those three fields left off, through every player model: their
+//      presses judge identically. Its test at the bottom shows the old answer next to the new one on a hold and on two
+//      freestyle slots. Movement play's terms held: no body step, window or clock changed (DanceCore.pressPath.test.ts).
+//   5. MUSIC-SUITE P9 moves (2026-09-29, owner decision #17): A CAPTURED MOVE IS NAMED ON THE LANE. The authored charts now
+//      call the captured breaking / popping moves (lib/babylon/dance/moves.ts CAPTURED_MOVES: kick step, side freeze,
+//      helicopter, headstand spin, moonwalk, robot). They are not DANCE_LIBRARY rows (DANCE_LIBRARY is unchanged —
+//      generateRoutine reads it), so the frozen lane, which only knew DANCE_LIBRARY, drew such a press cue as "MOVE" in the
+//      transition colour; the lane now asks the room's vocabulary (danceMove) and draws it with its own name, its family's
+//      glyph and colour — exactly as a DANCE_LIBRARY cue has always been drawn. Display only: the judge never reads a clip
+//      id, and every other cue (every DANCE_LIBRARY move, a body cue, an unknown clip) is compared unchanged. The
+//      differential accepts ONLY that exact substitution (pinnedCapturedCue: the old cue must be the MOVE/transition
+//      fallback and the new one a captured move's name in its family's colours) and counts it (capturedCues).
 
 import { describe, it, expect } from 'vitest';
 import * as NEW from './DanceCore';
 import * as OLD from '@/tests/fixtures/dance-pre-p9/DanceCore.base';
 import { DANCE_TRACKS, cueLane } from './danceTracks';
+import { chartStepsFor } from '../dance/chart';
 import { cueLane as oldCueLane } from '@/tests/fixtures/dance-pre-p9/danceTracks.base';
+import { FAMILY_COLOR, FAMILY_GLYPH, type HudCue } from './danceTracks';
+import { CAPTURED_MOVES } from '../dance/moves';
 import { routineFromGroove, type DrumRole, type GrooveHit } from '../music/DanceExport';
 import { LIMBS, MOVE_KINDS, type BodyHit } from './bodyTargets';
 
@@ -142,6 +166,13 @@ CHARTS.push(
   { id: 'single-beat0', bpm: 96, shipped: false, steps: mk([0], 4) },
   { id: 'empty', bpm: 96, shipped: false, steps: [] },
 );
+// MUSIC-SUITE P9 (2026-09-29): the six AUTHORED charts — what every shipped track plays now — with the three
+// press-only fields left off (pinned difference 4). Not "shipped" in this file's sense (every clock × stamp): they take
+// the seven or eight rotating combos per model the other stress charts get, which keeps the file's run time in reach.
+const pressCore = ({ pressHoldBeats: _h, pressFree: _f, pressKind: _k, ...s }: Step): Step => s;
+for (const t of DANCE_TRACKS) {
+  CHARTS.push({ id: `chart:${t.id} (press core)`, bpm: t.bpm, shipped: false, steps: chartStepsFor(t.song!)!.map(pressCore) });
+}
 
 // ── the players ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -266,11 +297,25 @@ interface Tally {
   comparisons: number; differences: number; zeroStartFrames: number; zeroStartDiffers: number;
   /** Presses that arrived after a step's beat and before the frame fired it (pinned difference 3). */
   catchUps: number;
+  /** Lane cues of a captured move, drawn by name in the new lane and as the MOVE fallback in the old (pinned difference 5). */
+  capturedCues: number;
 }
 const newTally = (): Tally => ({
   runs: 0, frames: 0, presses: 0, judged: 0, fired: 0, bodyEvents: 0, comparisons: 0, differences: 0,
-  zeroStartFrames: 0, zeroStartDiffers: 0, catchUps: 0,
+  zeroStartFrames: 0, zeroStartDiffers: 0, catchUps: 0, capturedCues: 0,
 });
+
+/** Pinned difference 5: the ONE lane change a captured move may make — the old lane's MOVE / transition fallback, where
+ *  the new lane draws the captured move's own name in its family's glyph and colour. Anything else is left for the
+ *  comparison to catch. */
+function pinnedCapturedCue(old: HudCue, now: HudCue | undefined, tally: Tally): HudCue {
+  const cap = now ? CAPTURED_MOVES.find((m) => m.name === now.name) : undefined;
+  if (!now || !cap || now.move !== 'tap') return old;
+  if (old.name !== 'MOVE' || old.family !== 'transition' || old.glyph !== FAMILY_GLYPH.transition || old.color !== FAMILY_COLOR.transition) return old;
+  if (now.family !== cap.category || now.glyph !== FAMILY_GLYPH[cap.category] || now.color !== FAMILY_COLOR[cap.category]) return old;
+  tally.capturedCues++;
+  return { ...old, name: now.name, family: now.family, glyph: now.glyph, color: now.color };
+}
 
 /** Pinned difference 3: the old core's own update() firing loop (DanceCore.base.ts:206-216), run before a press the
  *  way the new hit() runs fireDue — firing only, no expiry. Returns how many steps it fired. */
@@ -368,7 +413,8 @@ function simulate(r: Run, tally: Tally): string | null {
     if (b2) return b2;
     // the cue lane: the same upcoming list into both lanes; a press cue gains `move: 'tap'` and nothing else changes
     const laneN = cueLane(upN, t), laneO = oldCueLane(upN, t);
-    return check('cueLane()', laneN, laneO.map((c) => ({ ...c, move: 'tap' })));
+    // (MUSIC-SUITE P9 moves: a captured move's cue is named in the new lane — pinned difference 5, nothing else)
+    return check('cueLane()', laneN, laneO.map((c, i) => pinnedCapturedCue({ ...c, move: 'tap' } as HudCue, laneN[i], tally)));
   };
 
   const timeline = (s0: number, e: number): Timeline => {
@@ -560,13 +606,15 @@ describe('DanceCore phase 9: button play is unchanged (differential against the 
     expect(TOTAL.runs).toBe(all.length);
     expect(TOTAL.differences).toBe(0);
     expect(TOTAL.catchUps).toBeGreaterThan(0);                            // difference 3 is exercised, not just pinned
+    expect(TOTAL.capturedCues).toBeGreaterThan(0);                        // difference 5 too (the authored charts call captured moves)
     console.info(
       `[dance-equivalence] ${CHARTS.length} charts (${CHARTS.filter((c) => c.shipped).length} shipped-track × difficulty) `
       + `× ${MODEL_NAMES.length} models: `
       + `${TOTAL.runs} runs, ${TOTAL.frames} frames, ${TOTAL.presses} presses, ${TOTAL.judged} judgements, ${TOTAL.fired} steps fired, `
       + `${TOTAL.bodyEvents} stray body events, ${TOTAL.comparisons} comparisons, ${TOTAL.differences} differences; `
       + `start(0) frames ${TOTAL.zeroStartFrames} (old cue gate changed the answer on ${TOTAL.zeroStartDiffers}); `
-      + `presses between a step's beat and its frame ${TOTAL.catchUps} (difference 3)`,
+      + `presses between a step's beat and its frame ${TOTAL.catchUps} (difference 3); `
+      + `captured-move cues named ${TOTAL.capturedCues} (difference 5)`,
     );
   });
 
@@ -674,5 +722,62 @@ describe('DanceCore phase 9: button play is unchanged (differential against the 
     expect(n.result()).toEqual(u.result());
     expect(o.result().counts).toEqual({ PERFECT: 0, GREAT: 0, GOOD: 1, MISS: 1 });
     expect(n.result().counts).toEqual({ PERFECT: 1, GREAT: 0, GOOD: 0, MISS: 1 });
+  });
+
+  it('pinned difference 4 (MUSIC-SUITE P9): a press hold\'s tail and a freestyle slot\'s variety are new; every press judges as before', () => {
+    const steps = mk([1, 2, 3, 4]);
+    // step 1 is a half-beat press hold, steps 3 and 4 are freestyle slots; step 2 is plain; accents/doubles are display-only
+    const ext: Step[] = steps.map((s, i) => (i === 0 ? { ...s, pressHoldBeats: 0.5 } : i >= 2 ? { ...s, pressFree: true } : { ...s, pressKind: 'accent' as const }));
+    const n = new NEW.DancePerformance(60), o = new OLD.DancePerformance(60);
+    n.setRoutine(ext.map((s) => ({ ...s }))); o.setRoutine(steps.map((s) => ({ ...s })));
+    n.start(0.5); o.start(0.5);
+    const pairs: [string, string][] = [];
+    // the hold's head at 1.5 (then held past its end at 2.0), a plain press, and the same move picked on both slots
+    for (const [t, move] of [[1.5, 'A'], [2.52, 'B'], [3.5, 'X'], [4.5, 'X']] as const) {
+      n.update(t); o.update(t);
+      pairs.push([n.hit(t, { key: 'A', move }), o.hit(t)]);
+    }
+    n.update(6); o.update(6);
+    for (const [a, b] of pairs) expect(a).toBe(b);                          // every press: the same judgement
+    expect(pairs.map((p) => p[0])).toEqual(['PERFECT', 'PERFECT', 'PERFECT', 'PERFECT']);
+    // the old core: four PERFECTs in one combo — 305 + 310 + 315 + 320
+    expect(o.result()).toMatchObject({ score: 1250, maxCombo: 4, counts: { PERFECT: 4, GREAT: 0, GOOD: 0, MISS: 0 } });
+    // the new core: the kept tail is a fifth PERFECT (and a combo step), and the second X on a freestyle slot is a repeat
+    // (factor 0.5): 305 + 310 (tail) + 315 + 320 × 1 + round(325 × 0.5)
+    expect(n.result()).toMatchObject({ score: 305 + 310 + 315 + 320 + 163, maxCombo: 5, counts: { PERFECT: 5, GREAT: 0, GOOD: 0, MISS: 0 } });
+    expect(n.result().holds).toEqual({ kept: 1, dropped: 0 });
+    expect(n.result().variety).toBeCloseTo(0.75, 12);
+    expect(o.result()).not.toHaveProperty('variety');
+    // and with the three fields stripped the new core is the old one again (what the differential above runs)
+    const back = new NEW.DancePerformance(60);
+    back.setRoutine(ext.map(({ pressHoldBeats: _h, pressFree: _f, pressKind: _k, ...s }) => s));
+    back.start(0.5);
+    for (const t of [1.5, 2.52, 3.5, 4.5]) { back.update(t); back.hit(t, { key: 'A', move: 'X' }); }
+    back.update(6);
+    expect(back.result()).toEqual(o.result());
+  });
+
+  it('pinned difference 5 (MUSIC-SUITE P9 moves): a captured move\'s press cue is named by the lane; its judging is the old core\'s', () => {
+    // a kick step (captured, not a DANCE_LIBRARY row) between two DANCE_LIBRARY moves
+    const steps: Step[] = [
+      { clipId: 'dance_toprock_basic', beat: 1, holdBeats: 4, mirrored: false },
+      { clipId: 'dance_toprock_kick', beat: 2, holdBeats: 4, mirrored: false },
+      { clipId: 'dance_wave_arm', beat: 2.5, holdBeats: 2, mirrored: false },   // inside the lane's 2.4 s lookahead from 0.5
+    ];
+    const n = new NEW.DancePerformance(60), o = new OLD.DancePerformance(60);
+    n.setRoutine(steps.map((x) => ({ ...x }))); o.setRoutine(steps.map((x) => ({ ...x })));
+    n.start(0); o.start(0);
+    const up = n.upcoming(0.5, 6);
+    const laneN = cueLane(up, 0.5), laneO = oldCueLane(up, 0.5);
+    expect(laneO.map((c) => c.name)).toEqual(['Top Rock', 'MOVE', 'Arm Wave']);             // the frozen lane never knew it
+    expect(laneN.map((c) => c.name)).toEqual(['Top Rock', 'Kick Step', 'Arm Wave']);
+    expect(laneN[1]).toMatchObject({ family: 'toprock', glyph: FAMILY_GLYPH.toprock, color: FAMILY_COLOR.toprock, move: 'tap' });
+    expect(laneO[1]).toMatchObject({ family: 'transition', glyph: FAMILY_GLYPH.transition, color: FAMILY_COLOR.transition });
+    expect(laneN[0]).toEqual({ ...laneO[0], move: 'tap' });                                  // a DANCE_LIBRARY cue: unchanged
+    expect(laneN[2]).toEqual({ ...laneO[2], move: 'tap' });
+    // the judging never reads the clip: the same presses, the same answers
+    for (const t of [1.02, 2.05, 2.56]) { n.update(t); o.update(t); expect(n.hit(t)).toBe(o.hit(t)); }
+    n.update(5); o.update(5);
+    expect(n.result()).toEqual(o.result());
   });
 });

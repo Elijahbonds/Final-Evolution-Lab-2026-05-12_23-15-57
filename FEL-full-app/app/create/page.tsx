@@ -122,8 +122,9 @@ export default function CreatePage() {
     }
   };
 
+  // MUSIC-SUITE P9 (2026-09-29): the builder's BPM rides on the card now — it was dropped here, so a played card lost its tempo
   const onDance = (p: DancePublishPayload) => submit(
-    { kind: 'dance', choreographyId: p.choreographyId, sequence: p.sequence },
+    { kind: 'dance', choreographyId: p.choreographyId, sequence: p.sequence, bpm: p.bpm },
     `${p.sequence.length}-step routine`,
   );
 

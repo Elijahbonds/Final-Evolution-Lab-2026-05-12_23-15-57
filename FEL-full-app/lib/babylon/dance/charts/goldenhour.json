@@ -1,0 +1,32 @@
+{
+  "format": "fel-dance-chart/1",
+  "song": "goldenhour",
+  "bpm": 104,
+  "bars": 44,
+  "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
+  "about": "Difficulty 3. Accents follow the whistle lead (1.5, 2, 3.5) and the kick and clap in the verses (2.5 / 3 as an eighth double inside the six-step); each break bar is a three-beat freeze hold; freestyle every two beats, one bar-pair every beat in the last hook; the outro breathes out to its last spin. MUSIC-SUITE P9 moves: the second hook opens on the captured KICK STEP (CMU 85_14).",
+  "phrases": {
+    "gin": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "windmill" }, { "b": 6.5 } ] },
+    "gin2": { "bars": 2, "notes": [ { "b": 0, "m": "wave", "mir": 1 }, { "b": 2, "m": "spin" }, { "b": 4, "m": "wave" }, { "b": 6, "m": "spin", "mir": 1 } ] },
+    "gvA": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 1 }, { "b": 2.5 }, { "b": 4, "m": "toprock" }, { "b": 7, "m": "spin" } ] },
+    "gvB": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep" }, { "b": 2.5, "x2": 0.5 }, { "b": 5 }, { "b": 6, "m": "wave" } ] },
+    "gvC": { "bars": 2, "notes": [ { "b": 0, "m": "shoulder" }, { "b": 1 }, { "b": 2.5 }, { "b": 3 }, { "b": 4, "m": "windmill" }, { "b": 6.5, "x2": 0.5 } ] },
+    "ghA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1.5 }, { "b": 2 }, { "b": 3.5 }, { "b": 4, "m": "wave" }, { "b": 6, "m": "twostep" } ] },
+    "ghB": { "bars": 2, "notes": [ { "b": 0, "m": "kickstep" }, { "b": 1.5 }, { "b": 2 }, { "b": 3 }, { "b": 4, "m": "windmill" }, { "b": 5 }, { "b": 6.5, "x2": 0.5 } ] },
+    "free2": { "bars": 2, "free": { "every": 2 } },
+    "free1": { "bars": 2, "free": { "every": 1 } },
+    "gbrk": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 3 }, { "b": 4, "m": "wave" }, { "b": 6, "m": "spin" } ] },
+    "gbrk2": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 3, "mir": 1 }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" } ] },
+    "gout1": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "windmill" } ] },
+    "gout2": { "bars": 2, "notes": [ { "b": 0, "m": "wave", "mir": 1 }, { "b": 4, "m": "spin" } ] }
+  },
+  "sections": [
+    { "name": "intro", "bar": 1, "bars": 4, "play": ["gin", "gin2"] },
+    { "name": "verse", "bar": 5, "bars": 8, "play": ["gvA", "gvB", "gvA", "gvB"] },
+    { "name": "hook", "bar": 13, "bars": 8, "play": ["ghA", "free2", "ghA", "free2"] },
+    { "name": "break", "bar": 21, "bars": 4, "play": ["gbrk", "gbrk2"] },
+    { "name": "verse", "bar": 25, "bars": 8, "play": ["gvA", "free2", "gvB", "gvC"] },
+    { "name": "hook", "bar": 33, "bars": 8, "play": ["ghB", "free1", "ghA", "free2"] },
+    { "name": "outro", "bar": 41, "bars": 4, "play": ["gout1", "gout2"] }
+  ]
+}

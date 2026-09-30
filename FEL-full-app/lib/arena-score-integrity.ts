@@ -30,6 +30,11 @@
  *      beat and its taps are recorded (lib/arena-music.ts); the route rejudges them with the room's judge and passes the
  *      result in as `rejudged`, and a posted score that is not exactly it is refused (REJUDGED_STAKE_MODES).
  *
+ *   4. MUSIC-SUITE P9 (2026-09-29): SO IS A DANCE SCORE, on its own scale. An Arena dance set is danced on the duel's house
+ *      song (lib/babylon/dance/houseSong.ts) and scored on accuracy, 0..10,000; its presses are recorded and rejudged the
+ *      same way (judgeDanceSet), and its stake is held to ARENA_STAKE_CEILINGS.dance — while dance free play keeps its
+ *      points scale in SCORE_CEILINGS.dance, which the session routes read.
+ *
  * Constants that live in pure modules are IMPORTED, so a tuning change moves the ceiling with it. Constants that live
  * inside a Babylon mode file (which a server route must not import) are MIRRORED below with the file they come from;
  * the test reads those files and fails the moment one drifts.
@@ -46,9 +51,10 @@ import { RUN } from '@/lib/babylon/core/RushRun';
 import { challengeScore } from '@/lib/babylon/core/BrainBrawlCore';
 import { WHO_SCENE_IT, scoreAnswer } from '@/lib/babylon/core/QuizCore';
 import { SCENE_CATEGORIES } from '@/lib/babylon/core/SceneBuzz';
-import { JUDGE_WINDOWS, DANCE_LIBRARY } from '@/lib/babylon/core/DanceCore';
+import { JUDGE_WINDOWS, DANCE_LIBRARY, isPressHold, type DanceStep } from '@/lib/babylon/core/DanceCore';
 import { MAX_SONG_BARS } from '@/lib/babylon/music/Song';
 import { HOUSE_SET_MAX, HOUSE_SET_BARS, HOUSE_SET_NOTES } from '@/lib/babylon/music/houseBeat';
+import { HOUSE_SONG_CHOICES, houseSongSteps, houseSongMax, DANCE_ARENA_SCALE } from '@/lib/babylon/dance/houseSong';
 import { EVENTS_PER_NIGHT } from '@/lib/babylon/core/CarnivalNight';
 import { REPEAT_NO_MULT } from '@/lib/babylon/core/ComboChain';
 import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, basePts } from '@/lib/babylon/core/BoardTricks';
@@ -250,12 +256,41 @@ export function whoSceneItCeiling(): number {
   return total;
 }
 
-/** Dance: the longest chart a player's exported song can hold (every step on its shortest clip), every step PERFECT. */
-export function danceCeiling(): number {
-  const minClipBeats = Math.min(...DANCE_LIBRARY.map((c) => c.beats));
-  const steps = Math.floor((MAX_SONG_BARS * 4) / minClipBeats);
+/** A dance chart of `steps` press steps danced flawlessly in one combo: Σ (PERFECT 300 + combo × 5) — DanceCore hit(). */
+export function danceChartPerfect(steps: number): number {
   const perfect = Math.max(...JUDGE_WINDOWS.map((w) => w.points));
   return steps * perfect + MIRRORED.danceComboPts * (steps * (steps + 1)) / 2;
+}
+
+/**
+ * The most judgements a flawless set of a chart makes: one per step, and one more for every press hold's tail (a kept
+ * hold scores a PERFECT tail on top of its head — DanceCore.ts endHold, MUSIC-SUITE P9).
+ */
+export function danceChartJudgements(steps: readonly DanceStep[]): number {
+  return steps.length + steps.filter(isPressHold).length;
+}
+
+/**
+ * Dance FREE PLAY (the mode's session scale — lib/sessions/modeScoreRules.ts and lib/session-payout.ts read this row's
+ * max): the longest chart a player's exported song can hold (every step on its shortest clip), every step PERFECT — or
+ * the densest chart an FEL song ships, if that is more.
+ *
+ * MUSIC-SUITE P9 (2026-09-29): IT IS MORE NOW. The authored charts (lib/babylon/dance/chart.ts) are up to four times
+ * the P7 generated ones — measured on this tree at the end of this phase's run (outbox musicsuite/p9/fair-duels-proof.json):
+ * 49 / 80 / 106 / 135 / 173 / 205 steps (+ 3 / 3 / 2 / 4 / 4 / 4 press holds) for warmup … evolution, where P7's ran
+ * 26–47 — and a flawless free-play set scores 22,490 / 42,330 / 61,830 / 90,350 / 131,865 / 172,425 points on them.
+ * Against the old 79,680 (the export's 128 steps) a flawless or near-flawless set on BATTLE, CANALS or EVOLUTION would be
+ * refused by the sessions route (SCORE_INVALID above_max: nothing paid). So the bound is now the most of both, read from
+ * the shipped charts themselves (every house song — lib/babylon/dance/houseSong.ts HOUSE_SONG_CHOICES — with its hold
+ * tails): EVOLUTION's 209 judgements, 172,425, as measured; it moves with the charts. A variety factor on a freestyle slot
+ * only ever scales an award DOWN (DanceCore varietyFactor ≤ 1), so it cannot lift a set past this.
+ * A staked Arena dance set is NOT on this scale: see ARENA_STAKE_CEILINGS.
+ */
+export function danceCeiling(): number {
+  const minClipBeats = Math.min(...DANCE_LIBRARY.map((c) => c.beats));
+  const exportSteps = Math.floor((MAX_SONG_BARS * 4) / minClipBeats);
+  const shipped = HOUSE_SONG_CHOICES.map((c) => danceChartJudgements(houseSongSteps(c)));
+  return danceChartPerfect(Math.max(exportSteps, ...shipped));
 }
 
 /** Iron Paradise: the most reps the power ramp allows in the minute (four on each of the first exercises, then the fastest). */
@@ -501,10 +536,13 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
     why: `the match ends at ${m.versusRoundsToWin} round wins`,
     basis: 'MixedCombatMode myWins × 100 − foeWins × 40, myWins ≤ ROUNDS_TO_WIN',
   },
+  // MUSIC-SUITE P9 (2026-09-29): this row is dance's SESSION scale (free play, on points — what the sessions route and
+  // the session payout read). A staked Arena dance set is scored on accuracy on the duel's house song, and its stake is
+  // held to ARENA_STAKE_CEILINGS.dance (10,000) instead — see that table.
   dance: {
     max: danceCeiling(), kind: 'rules', swapsUnderKillSwitch: false,
-    why: 'the longest chart a song can hold, every step PERFECT',
-    basis: 'MAX_SONG_BARS × 4 beats ÷ the shortest DANCE_LIBRARY clip = steps; Σ (PERFECT 300 + combo × 5)',
+    why: 'the densest chart a song can hold, every step PERFECT',
+    basis: 'the most judgements of: MAX_SONG_BARS × 4 beats ÷ the shortest DANCE_LIBRARY clip (an exported song), or the densest shipped FEL chart (its steps + its press-hold tails); Σ (PERFECT 300 + combo × 5)',
   },
   training: {
     max: trainingCeiling(), kind: 'rules', swapsUnderKillSwitch: false,
@@ -588,6 +626,35 @@ export function canonicalStakeMode(mode: string): string {
 export function scoreCeilingFor(mode: string): ScoreCeiling | null {
   const key = canonicalStakeMode(String(mode ?? ''));
   return own(SCORE_CEILINGS, key) ? SCORE_CEILINGS[key] : null;
+}
+
+/**
+ * MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("Arena dance: same house song for both players, accuracy-based score;
+ * own songs free play only"): modes whose STAKED run is on another scale than the mode's sessions, and so is held to its
+ * own ceiling here instead of its SCORE_CEILINGS row (which the sessions route and the session payout keep reading).
+ *
+ *   dance — an Arena dance set is danced on the duel's house song (lib/babylon/dance/houseSong.ts: one of the six FEL
+ *   songs, from the match id) and scored on ACCURACY, 0..DANCE_ARENA_SCALE: a flawless set is 10,000 on every house song
+ *   (houseSongMax). Free play keeps its points scale (SCORE_CEILINGS.dance, 79,680 — a player's own 64-bar export), and
+ *   own songs are free play only, so no staked set can reach it: the Arena's dance ceiling moves from 79,680 to 10,000.
+ *   The score is also REJUDGED (REJUDGED_STAKE_MODES): it must equal the server's judgeDanceSet of the recorded presses.
+ */
+export const ARENA_STAKE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
+  dance: {
+    max: Math.max(...HOUSE_SONG_CHOICES.map((c) => houseSongMax(c))), kind: 'rules', swapsUnderKillSwitch: false,
+    why: 'an Arena dance set on the duel\'s house song, every step PERFECT — 100.00 % accuracy',
+    basis: `houseSong danceArenaScore: DanceCore.accuracyOf (PERFECT 1, GREAT 0.75, GOOD 0.4, MISS 0) × ${DANCE_ARENA_SCALE} on the house chart, the same for every house song (houseSongMax); the server rejudges the recorded presses (judgeDanceSet) and the score must equal it`,
+  },
+};
+
+/**
+ * The ceiling a STAKE on this mode is held to: its ARENA_STAKE_CEILINGS row where its staked run has its own scale
+ * (dance), else its SCORE_CEILINGS row. checkStakeScore, the house rival's draw and the expiry sweep read this one.
+ */
+export function stakeCeilingFor(mode: string): ScoreCeiling | null {
+  const key = canonicalStakeMode(String(mode ?? ''));
+  if (own(ARENA_STAKE_CEILINGS, key)) return ARENA_STAKE_CEILINGS[key];
+  return scoreCeilingFor(key);
 }
 
 /**
@@ -682,7 +749,10 @@ export function checkDunkCard(score: number, raw: unknown): { ok: true; card: Du
  * on its taps and passes the result as `rejudged`. A route that has no rejudge to pass (the dark competition engine's
  * submit-score, which knows no attempts) is refused: a music score it cannot check is never settled.
  */
-export const REJUDGED_STAKE_MODES: ReadonlySet<string> = new Set(['music']);
+// MUSIC-SUITE P9 (2026-09-29): and dance — /api/arena/submit-score reads the dancer's one attempt on the duel's house song
+// (lib/arena-music.ts HOUSE_SET_RULES.dance), runs judgeDanceSet (lib/babylon/dance/houseSong.ts) on its presses and passes
+// the accuracy score as `rejudged`. The dark engine refuses a dance stake at create and join (NOT_STAKEABLE_HERE) like music.
+export const REJUDGED_STAKE_MODES: ReadonlySet<string> = new Set(['music', 'dance']);
 
 /** Is this mode (any spelling a row or a client carries) one whose stake only the Arena can settle? */
 export function isRejudgedStakeMode(mode: string | null | undefined): boolean {
@@ -709,7 +779,9 @@ export function checkStakeScore(input: { mode: string; score: unknown; card?: un
     return { ok: false, code: 'SCORE_INVALID', detail: 'score must be a non-negative integer' };
   }
   const key = canonicalStakeMode(String(input.mode ?? ''));
-  const ceiling = scoreCeilingFor(key);
+  // MUSIC-SUITE P9 (2026-09-29): the STAKE's ceiling — a dance duel is held to its house song's 10,000, not free play's
+  // 79,680 (ARENA_STAKE_CEILINGS); every other mode's is its SCORE_CEILINGS row, exactly as before
+  const ceiling = stakeCeilingFor(key);
   if (!ceiling) {
     return { ok: false, code: 'NO_SCORE_CEILING', detail: `"${input.mode}" has no score ceiling, so a stake on it cannot be settled. ${NOT_RECORDED}` };
   }

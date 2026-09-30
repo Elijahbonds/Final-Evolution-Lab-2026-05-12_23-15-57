@@ -19,13 +19,25 @@
 //
 // Seeds are fixed per track ON PURPOSE, for the exported/legacy path (stepsForSong needs no seed argument — it is
 // deterministic from the song's OWN id via a local PRNG, so a retry or a share still hands back the same chart).
+//
+// MUSIC-SUITE P9 (2026-09-29): every shipped track now plays its AUTHORED chart (lib/babylon/dance/chart.ts +
+// lib/babylon/dance/charts/<song>.json — accents inside moves, double taps, freeze holds, freestyle bars; the charts'
+// own header has what the generated steps measured and why they were replaced). stepsFor answers chartStepsFor first;
+// stepsForSong below is UNCHANGED and still exported and callable (movement play's condition: body routines may lean
+// on it) — it is now the fallback for a song whose chart is missing or fails validation (which chart.test.ts fails
+// loudly on, and chartStepsFor logs with console.error, never silently). The DanceTrack shape is unchanged. The cue
+// lane learns the chart's press kinds (a hold's length, a double's second tap, an accent, a freestyle slot) on press
+// cues only: a body cue and a plain press cue are drawn exactly as before.
 
 import type { DanceClip, DanceStep, Judgement } from './DanceCore';
 import type { CueZone, Limb, MoveKind } from './bodyTargets';
 import { readExportedTrack } from '../music/DanceExport';
-import { DANCE_LIBRARY, isBodyStep, stepLimb } from './DanceCore';
+import { DANCE_LIBRARY, isBodyStep, stepLimb, beatDuration } from './DanceCore';
 import { CATEGORY_STEM } from '../audio/StemBand';
 import { FEL_SONGS, sectionAtBar, type FelSong, type FelSongSection, type FelStem } from '../dance/felSongs';
+import { chartStepsFor } from '../dance/chart';
+import { danceMove } from '../dance/moves';
+import { readCardTrack } from '../dance/danceCard';
 
 export interface DanceTrack {
   id: string;
@@ -102,6 +114,10 @@ export const DEFAULT_TRACK_ID = 'cypher';
  */
 export function allTracks(): readonly DanceTrack[] {
   const mine = readExportedTrack();
+  // MUSIC-SUITE P9 (2026-09-29): a published dance card put on this device by My Creations' DANCE IT (dance/danceCard.ts)
+  // is the last entry — after the six songs and the player's own export. Absent, the list is exactly what it was.
+  const card = readCardTrack();
+  if (card) return [...DANCE_TRACKS, ...(mine ? [mine.track] : []), card.track];
   return mine ? [...DANCE_TRACKS, mine.track] : DANCE_TRACKS;
 }
 
@@ -126,11 +142,18 @@ export function cycleTrack(id: string, dir: 1 | -1): DanceTrack {
  * track is one of the six FEL songs (MUSIC-SUITE P7): its steps come from stepsForSong, generated from the song's
  * own section map, not from a seed (stepsForSong is itself deterministic — same song in, same steps out — so this
  * still answers a retry or a share with the same chart, just without needing an RNG seed argument to do it).
+ *
+ * MUSIC-SUITE P9 (2026-09-29): a shipped track plays its AUTHORED chart (chartStepsFor, a fresh copy each call);
+ * stepsForSong is the fallback only for a song with no valid chart (see the file header).
  */
 export function stepsFor(t: DanceTrack): DanceStep[] | null {
   const mine = readExportedTrack();
   if (mine && mine.track.id === t.id) return mine.steps;
-  return t.song ? stepsForSong(t.song) : null;
+  // MUSIC-SUITE P9: a dance card plays its own routine (dance/danceCard.ts cardTrack — parsed, press steps only, looped)
+  const card = readCardTrack();
+  if (card && card.track.id === t.id) return card.steps;
+  if (!t.song) return null;
+  return chartStepsFor(t.song) ?? stepsForSong(t.song);
 }
 
 // ── MUSIC-SUITE P7: press steps authored from a song's own section map ──────────────────────────────────────────
@@ -329,7 +352,20 @@ export interface HudCue {
   zone?: CueZone;
   /** A target to hold after it is hit: how long (s), for the lane's tail. */
   holdSec?: number;
+  /** MUSIC-SUITE P9 (press cues only — never set on a body cue): what kind of charted press this is, when it is more
+   *  than a move's first press — an accent inside the running move, a double's second tap, or a freestyle slot. */
+  pressKind?: 'accent' | 'double' | 'free';
+  /** MUSIC-SUITE P9 (press cues only): a press hold's length (s) — keep the press down this long. Its own field, not
+   *  `holdSec` (a body target's hold, which the body lane reads). Present only when cueLane was given the bpm. */
+  pressHoldSec?: number;
 }
+
+/** MUSIC-SUITE P9: how the lane draws the chart's press kinds (press cues only). A freestyle slot is gold and names
+ *  no move — the button picks it; an accent and a double's second tap are a dot in the running move's colour (the
+ *  instrument the press earns); a hold says HOLD. */
+export const FREE_CUE = { name: 'YOUR MOVE', glyph: '★', color: '#FDE047' } as const;
+export const ACCENT_CUE = { name: 'HIT', glyph: '●' } as const;
+export const DOUBLE_CUE = { name: '×2', glyph: '●●' } as const;
 
 // Body targets (movement play, phase 9): one glyph and colour per move, the same couch-legible idea as the families.
 export const MOVE_GLYPH: Record<MoveKind, string> = {
@@ -350,11 +386,13 @@ export const CUE_LOOKAHEAD_SEC = 2.4;
 /** A marker lingers this long past its beat so the hit reads, then leaves. */
 export const CUE_LINGER_SEC = 0.2;
 
-/** Build the lane from the performance's upcoming steps (audio-clock times). */
+/** Build the lane from the performance's upcoming steps (audio-clock times). MUSIC-SUITE P9: `bpm` (optional) turns a
+ *  press hold's beats into the cue's pressHoldSec; without it a hold is still named HOLD. */
 export function cueLane(
   upcoming: readonly { time: number; step: DanceStep }[],
   now: number,
   lookahead: number = CUE_LOOKAHEAD_SEC,
+  bpm?: number,
 ): HudCue[] {
   const out: HudCue[] = [];
   for (const u of upcoming) {
@@ -377,9 +415,11 @@ export function cueLane(
       });
       continue;
     }
-    const clip = DANCE_LIBRARY.find((c) => c.id === u.step.clipId);
+    // MUSIC-SUITE P9 moves: named from the room's vocabulary (dance/moves.ts danceMove — DANCE_LIBRARY's own row first,
+    // so every old press cue is drawn exactly as before; a captured move is named and coloured by its family)
+    const clip = danceMove(u.step.clipId);
     const family = clip?.category ?? 'transition';
-    out.push({
+    const cue: HudCue = {
       in: Math.round(dt * 1000) / 1000,
       name: clip?.name ?? 'MOVE',
       family,
@@ -387,7 +427,17 @@ export function cueLane(
       color: FAMILY_COLOR[family],
       mirrored: u.step.mirrored,
       move: 'tap',
-    });
+    };
+    // MUSIC-SUITE P9: the chart's press kinds. A step with none of these fields is drawn exactly as before (the
+    // equivalence test holds a plain press cue to the frozen pre-P9 lane).
+    if (u.step.pressFree) Object.assign(cue, { name: FREE_CUE.name, glyph: FREE_CUE.glyph, color: FREE_CUE.color, family: 'free', mirrored: false, pressKind: 'free' });
+    else if (u.step.pressKind === 'accent') Object.assign(cue, { name: ACCENT_CUE.name, glyph: ACCENT_CUE.glyph, pressKind: 'accent' });
+    else if (u.step.pressKind === 'double') Object.assign(cue, { name: DOUBLE_CUE.name, glyph: DOUBLE_CUE.glyph, pressKind: 'double' });
+    if (u.step.pressHoldBeats && u.step.pressHoldBeats > 0) {
+      cue.name = `HOLD ${cue.name}`;
+      if (bpm) cue.pressHoldSec = Math.round(u.step.pressHoldBeats * beatDuration(bpm) * 1000) / 1000;
+    }
+    out.push(cue);
   }
   return out.sort((a, b) => a.in - b.in);
 }

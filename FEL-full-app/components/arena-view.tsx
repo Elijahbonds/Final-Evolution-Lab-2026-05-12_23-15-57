@@ -21,6 +21,10 @@ import {
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DuelCards } from '@/components/arena/duel-cards';
 import { HOUSE_ARENA_RULES } from '@/lib/babylon/music/houseBeat';
+import { DANCE_ARENA_RULES } from '@/lib/babylon/dance/houseSong';
+// MUSIC-SUITE P9 FIX PASS (2026-09-29): a dance duel's house song, shown before anyone stakes on it (arenaDance.houseSongLine)
+import { houseSongLine } from '@/lib/babylon/dance/arenaDance';
+import { canonicalModeKey } from '@/lib/game-data';
 
 // ---------------------------------------------------------------------------
 // Types mirroring the /api/arena/* responses.
@@ -414,6 +418,14 @@ export function ArenaView() {
               Groove Academy duels: {HOUSE_ARENA_RULES}
             </p>
           )}
+          {/* MUSIC-SUITE P9 (2026-09-29, owner decision #10): dance is staked again, on the match's house song with one
+              attempt and an accuracy score — said here before anything is staked, and by the room again before its count-in.
+              Your own songs stay free play. */}
+          {pickMode === 'dance' && (
+            <p className="mt-2 font-mono text-[10px] leading-relaxed text-[#00E5FF]/70">
+              Cypher duels: {DANCE_ARENA_RULES} Your own songs stay free play.
+            </p>
+          )}
         </div>
 
         <div className="mt-5">
@@ -518,6 +530,9 @@ export function ArenaView() {
                       by {d.creator ?? 'Athlete'} &middot; winner takes{' '}
                       <span className="text-[#00FF9D]">{pv.payout} LC</span>
                     </div>
+                    {canonicalModeKey(d.mode) === 'dance' && (
+                      <div className="truncate font-mono text-[10px] text-[#00E5FF]/70">{houseSongLine(d.id)}</div>
+                    )}
                   </div>
                   <div className="ml-3 flex flex-col items-end gap-1.5">
                     <span className="font-mono text-xs text-[#FFD700]">{d.feeLc} LC</span>
@@ -593,6 +608,10 @@ export function ArenaView() {
                         {d.status === 'VOIDED' && <span className="text-[#A855F7]"> &middot; refunded</span>}
                         {left && <span className="text-white/35"> &middot; {left}</span>}
                       </div>
+                      {/* MUSIC-SUITE P9 FIX PASS (2026-09-29): a dance duel names its house song (the one both of you dance) */}
+                      {canonicalModeKey(d.mode) === 'dance' && (
+                        <div className="mt-0.5 truncate font-mono text-[10px] text-[#00E5FF]/70">{houseSongLine(d.id)}</div>
+                      )}
                       {/* MUSIC-SUITE P6 (owner decision #30): what an expiry did, in words */}
                       {d.expired === 'refunded' && (
                         <div className="mt-1 font-mono text-[11px] text-[#A855F7]/80">

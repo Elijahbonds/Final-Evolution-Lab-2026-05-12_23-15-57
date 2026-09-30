@@ -19,6 +19,15 @@
 // by hitBody() on the body's own clock. Only the matching move and limb scores such a step (a press, or a jump on a
 // punch target, scores nothing); the camera's latency is a parameter; and no body window is narrower than a pose
 // frame can resolve. A step with no move is a press step and judges exactly as before.
+//
+// MUSIC-SUITE P9 (2026-09-29, "charts, freestyle and fair dance duels"): the authored charts (lib/babylon/dance/
+// chart.ts) bring three PRESS-ONLY things, on terms movement play set when it approved this phase editing this file
+// (docs/LANES.md): a press HOLD (pressHoldBeats — press, keep it down to the note's end, let go: release()), a
+// FREESTYLE slot (pressFree — the button picks the move, the award is timing × varietyFactor), and display-only
+// accents and double taps (pressKind — plain press steps the judge never reads). None of them touches the body path:
+// hitBody, bodyWindows, setBody, consumedEarly, nextPressIdx, windowScale, lateGraceSec and holdSec behave exactly as
+// before, and a chart without pressHoldBeats / pressFree judges byte-for-byte as before (DanceCore.equivalence.test.ts,
+// pinned difference 4, runs the six authored charts with those two fields left off against the frozen core).
 
 import {
   type BodyHit, type CueZone, type Limb, type MoveKind, MAX_WINDOW_SCALE, SELF_VIEW_ASPECT, inZone, limbSatisfies,
@@ -61,6 +70,30 @@ export interface DanceStep {
   label?: string;
   /** A body target the player must stay in after hitting it (s): a stuck landing, a squat's pause. */
   holdSec?: number;
+
+  // ── MUSIC-SUITE P9 (2026-09-29): PRESS-ONLY fields, written by the authored charts (lib/babylon/dance/chart.ts). ──
+  // Movement play approved this phase editing this file on the PRESS PATH ONLY (docs/LANES.md, 2026-09-29): none of
+  // these three is ever read for a body step. hit() only ever takes a step stepAccepts(step, null) lets through (a
+  // press step), registerMiss() and the hold/variety helpers below check !isBodyStep() before reading them, and
+  // hitBody / bodyWindows / expiryOf / consumedEarly / nextPressIdx do not read them at all. A body step that carried
+  // one by mistake judges exactly as it does without it.
+  /**
+   * A press kept DOWN to the note's end, in BEATS (charts are beat-based). The press is judged as ever (the head); the
+   * hold then ends KEPT (a PERFECT tail) when the key comes up no earlier than holdReleaseEarlySec before the end,
+   * or stays down through it, and DROPPED (a MISS tail, the combo breaks) when it comes up earlier. A hold whose head is
+   * never pressed drops its tail too, so every hold is two judgements whatever happens (DDR's freeze arrow: the arrow,
+   * then OK / NG). PRESS-ONLY and its own field on purpose: `holdSec` is a BODY step's seconds-in-a-pose judged from
+   * the camera, and `holdBeats` is the clip's length (the routine's end reads last.beat + last.holdBeats) — neither is
+   * a press hold, and neither changes meaning.
+   */
+  pressHoldBeats?: number;
+  /** A freestyle slot (owner decision #3): the button picks the move, and the press scores its timing × varietyFactor
+   *  of that move against the last few freestyle picks (a repeated move decays). PRESS-ONLY; the "same move" key is
+   *  the press's own pick (DancePress.move), never a body event. */
+  pressFree?: boolean;
+  /** How the chart drew this press, for the lane and the dancer only — the judge never reads it: 'accent' = a press
+   *  inside the running move (no new clip), 'double' = the second tap of a double. Both are plain press steps. */
+  pressKind?: 'accent' | 'double';
 }
 
 export interface DanceClip {
@@ -237,7 +270,66 @@ export interface DanceResult {
   /** 0–5. What the results screen shows. */
   stars: number;
   accuracy: number;
+  /** MUSIC-SUITE P9: the mean variety factor over the freestyle presses that scored (0.25..1). ABSENT when no
+   *  freestyle slot was hit, so a chart without freestyle returns exactly the old keys. */
+  variety?: number;
+  /** MUSIC-SUITE P9: press holds that ended, kept to the end or dropped (their tails are already in `counts` as
+   *  PERFECT / MISS). ABSENT when no hold ended. */
+  holds?: { kept: number; dropped: number };
 }
+
+// ── MUSIC-SUITE P9 (2026-09-29): press holds and freestyle variety — PRESS PATH ONLY ──────────────────────────────────
+
+/**
+ * How early (s) before a press hold's end the key may come up and still keep it: the GOOD window's width (MISS_AFTER)
+ * — a release is a looser act than a press, the ear marks where a note STARTS, not where it ends — but never more than
+ * a quarter of the hold itself (holdReleaseEarlySec), so a short hold still has to be HELD: a one-beat hold at 126 BPM
+ * (476 ms) keeps its last 119 ms, a three-beat hold at 88 BPM its last 200. NEW TUNED NUMBERS (flag for the owner's
+ * feel pass).
+ */
+export const HOLD_RELEASE_EARLY_SEC = MISS_AFTER;
+export const HOLD_RELEASE_EARLY_SHARE = 0.25;
+/** The release allowance (s) for a hold lasting `holdSec`. */
+export const holdReleaseEarlySec = (holdSec: number): number => Math.min(HOLD_RELEASE_EARLY_SEC, Math.max(0, holdSec) * HOLD_RELEASE_EARLY_SHARE);
+/** A kept hold's tail scores a PERFECT press's points (its combo bonus on top, like any hit). */
+export const HOLD_KEPT_POINTS = JUDGE_WINDOWS[0].points;
+
+/**
+ * Freestyle variety (owner decision #3: "scored on timing + VARIETY — repeating one move scores less"). Each of the
+ * last three freestyle picks that matches this pick takes this much off, the most recent first; never below
+ * VARIETY_FLOOR. So, with the four-move pad:
+ *   every pick the same move ......... 1 − (0.5 + 0.3 + 0.15) → floored to 0.25
+ *   the same move twice in a row ..... 0.5
+ *   two moves alternating (A B A B) .. 0.7   (the pick two ago matches)
+ *   three moves in turn (A B X A) .... 0.85  (the pick three ago matches)
+ *   four moves in turn, or no repeat . 1.0
+ * The factor multiplies the whole award (the judgement's points and the combo bonus); the judgement itself (PERFECT…
+ * MISS, and so the accuracy and the grade) stays pure timing. NEW TUNED NUMBERS (flag for the owner's feel pass).
+ */
+export const VARIETY_PENALTY: readonly number[] = [0.5, 0.3, 0.15];
+export const VARIETY_FLOOR = 0.25;
+
+/** The variety factor for picking `move` after `recent` (oldest first, newest last). Pure. */
+export function varietyFactor(recent: readonly string[], move: string): number {
+  let loss = 0;
+  for (let i = 0; i < VARIETY_PENALTY.length; i++) {
+    if (recent[recent.length - 1 - i] === move) loss += VARIETY_PENALTY[i];
+  }
+  return Math.max(VARIETY_FLOOR, 1 - loss);
+}
+
+/** What a press is beyond its time (all optional: a bare hit(now) is the press it always was). */
+export interface DancePress {
+  /** Which physical input made it: a press hold ends on THIS input's release (release(now, key)). */
+  key?: string;
+  /** The move the button picked (a DANCE_LIBRARY clip id) — read only on a freestyle slot (pressFree). */
+  move?: string;
+}
+
+/** A press hold's step: a press step (never a body step) with a positive pressHoldBeats. */
+export const isPressHold = (s: DanceStep): boolean => !isBodyStep(s) && typeof s.pressHoldBeats === 'number' && s.pressHoldBeats > 0;
+/** A freestyle slot: a press step with pressFree. */
+export const isFreeSlot = (s: DanceStep): boolean => !isBodyStep(s) && s.pressFree === true;
 
 /**
  * Scores a performance against a routine.
@@ -276,6 +368,24 @@ export class DancePerformance {
   maxCombo = 0;
   counts: Record<Judgement, number> = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
   running = false;
+
+  // ── MUSIC-SUITE P9 (2026-09-29): press holds and freestyle variety. All of it is idle on a chart with no
+  // pressHoldBeats / pressFree step (every chart before this phase, and every body routine): activeHold stays null,
+  // freePicks stays empty, and result() adds no key. ──
+  /** The press hold in progress: its step, when it ends (clock s), and which input holds it. At most one — the chart
+   *  validator ends every hold before the next note (beginHold still settles an old one if a hand-made chart overlaps). */
+  private activeHold: { step: DanceStep; endAt: number; key: string | undefined; earlySec: number } | null = null;
+  /** The moves the last freestyle presses picked, newest last (only as many as VARIETY_PENALTY reads). */
+  private freePicks: string[] = [];
+  private varietySum = 0;
+  private varietyN = 0;
+  private holdsKept = 0;
+  private holdsDropped = 0;
+  /** The freestyle pick behind the judgement being reported — set just before onJudged for a freestyle slot, null for
+   *  every other judgement (the mode reads it inside onJudged to dance the picked move and turn up ITS instrument). */
+  lastFree: { move: string; factor: number } | null = null;
+  /** A press hold ended: kept (its PERFECT tail scored `points`, combo now `combo`) or dropped (a MISS tail, combo 0). */
+  onHoldEnd: ((kept: boolean, step: DanceStep, points: number, combo: number) => void) | null = null;
 
   /** Fired when a step's animation should play. */
   onStepFired: ((s: DanceStep) => void) | null = null;
@@ -324,6 +434,11 @@ export class DancePerformance {
     this.counts = { PERFECT: 0, GREAT: 0, GOOD: 0, MISS: 0 };
     this.lastWildAt = -Infinity;
     this.consumedEarly.clear();
+    // MUSIC-SUITE P9: a GO AGAIN on the same instance starts with no hold down and no freestyle history
+    this.activeHold = null;
+    this.freePicks = [];
+    this.varietySum = 0; this.varietyN = 0; this.holdsKept = 0; this.holdsDropped = 0;
+    this.lastFree = null;
     this.running = true;
   }
 
@@ -359,6 +474,9 @@ export class DancePerformance {
         this.registerMiss(expired.step);
       } else i++;
     }
+
+    // MUSIC-SUITE P9: a press hold still down when its end comes is kept (the key need not come up at all)
+    if (this.activeHold && now >= this.activeHold.endAt) this.endHold(true);
   }
 
   /**
@@ -391,6 +509,82 @@ export class DancePerformance {
     this.counts.MISS++;
     if (!step) { this.score = Math.max(0, this.score - WILD_TAP_COST); if (now !== undefined) this.lastWildAt = now; }
     this.onJudged?.('MISS', 0, 0, step, deltaMs);
+    // MUSIC-SUITE P9: a press hold whose head was never pressed drops its tail as well — every hold is two judgements,
+    // so a player who skips holds cannot out-grade one who drops them (isPressHold: never a body step)
+    if (step && isPressHold(step)) {
+      this.counts.MISS++;
+      this.holdsDropped++;
+      this.onHoldEnd?.(false, step, 0, 0);
+    }
+  }
+
+  /**
+   * MUSIC-SUITE P9 (2026-09-29): the key that holds a press hold came up at `now` (same clock as hit()). `key` must be
+   * the one the head was pressed with (DancePress.key; both undefined for a caller that never names keys). Returns
+   * true = kept (the release came no earlier than the hold's allowance before the end: holdReleaseEarlySec), false = dropped, null = no
+   * hold of this key was down (every other release, which costs nothing).
+   */
+  release(now: number, key?: string): boolean | null {
+    const h = this.activeHold;
+    if (!h || h.key !== key) return null;
+    const kept = now >= h.endAt - h.earlySec;
+    this.endHold(kept);
+    return kept;
+  }
+
+  /** A press hold is down right now (the mode draws the held bar from this). */
+  get holding(): boolean { return this.activeHold !== null; }
+
+  /** Seconds of the current press hold left at `now` (0 when none is down). */
+  holdLeftSec(now: number): number {
+    return this.activeHold ? Math.max(0, this.activeHold.endAt - now) : 0;
+  }
+
+  /** The step a press just took begins its hold, if it is a press hold. `time` is the step's charted time. */
+  private beginHold(step: DanceStep, time: number, press: DancePress | undefined, now: number): void {
+    if (!isPressHold(step)) return;
+    // a hand-made chart that starts a hold inside another (the validator refuses one): settle the old one first, kept
+    // only if it was already inside its release window
+    if (this.activeHold) this.endHold(now >= this.activeHold.endAt - this.activeHold.earlySec);
+    const holdSec = step.pressHoldBeats! * beatDuration(this.bpm);
+    this.activeHold = { step, endAt: time + holdSec, key: press?.key, earlySec: holdReleaseEarlySec(holdSec) };
+  }
+
+  private endHold(kept: boolean): void {
+    const h = this.activeHold;
+    if (!h) return;
+    this.activeHold = null;
+    if (kept) {
+      this.combo++;
+      if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+      this.score += HOLD_KEPT_POINTS + this.combo * 5;
+      this.counts.PERFECT++;
+      this.holdsKept++;
+      this.onHoldEnd?.(true, h.step, HOLD_KEPT_POINTS, this.combo);
+    } else {
+      this.combo = 0;
+      this.counts.MISS++;
+      this.holdsDropped++;
+      this.onHoldEnd?.(false, h.step, 0, 0);
+    }
+  }
+
+  /**
+   * What a press on `step` adds to the score once the combo has counted it: the judgement's points plus 5 × combo —
+   * exactly the old award on every step but a freestyle slot, whose award is scaled by the variety factor of the move
+   * the press picked (its `move`, else the slot's own clip). Sets lastFree for the onJudged that follows.
+   */
+  private pressAward(step: DanceStep, points: number, press: DancePress | undefined): number {
+    const award = points + this.combo * 5;
+    if (!isFreeSlot(step)) { this.lastFree = null; return award; }
+    const move = press?.move ?? step.clipId;
+    const factor = varietyFactor(this.freePicks, move);
+    this.freePicks.push(move);
+    if (this.freePicks.length > VARIETY_PENALTY.length) this.freePicks.shift();
+    this.varietySum += factor;
+    this.varietyN++;
+    this.lastFree = { move, factor };
+    return Math.round(award * factor);
   }
 
   /** The next step to be judged and WHEN (audio-clock seconds) — pending
@@ -425,8 +619,11 @@ export class DancePerformance {
     return out;
   }
 
-  /** A press on the audio clock. It scores press steps only: a body target is not a button. */
-  hit(now: number): Judgement {
+  /** A press on the audio clock. It scores press steps only: a body target is not a button.
+   *  MUSIC-SUITE P9: `press` (optional) names the input (a press hold ends on its release) and the move a freestyle
+   *  slot's button picked. Left out, a press is judged exactly as before on every step. */
+  hit(now: number, press?: DancePress): Judgement {
+    this.lastFree = null;
     // MUSIC-SUITE P2 (2026-09-25): A PRESS JUST AFTER THE BEAT IS NOT A WILD TAP. A press arrives on the input event,
     // between frames; a step only joined `pending` when the NEXT frame's update() fired it. A tap 1–30 ms after a step's
     // beat that beat the frame to it found the step in neither place — not pending (unfired), and not upcoming (the
@@ -464,8 +661,9 @@ export class DancePerformance {
           const { label, points } = this.capAfterSpam(judgeDelta(earlyBy), now);
           this.combo++;
           if (this.combo > this.maxCombo) this.maxCombo = this.combo;
-          this.score += points + this.combo * 5;
+          this.score += this.pressAward(s, points, press);   // MUSIC-SUITE P9: = points + combo × 5 but on a freestyle slot
           this.counts[label]++;
+          this.beginHold(s, t, press, now);                   // MUSIC-SUITE P9: a press hold starts on its head
           this.onStepFired?.(s);
           this.onJudged?.(label, points, this.combo, s, -earlyBy * 1000);
           return label;
@@ -478,8 +676,9 @@ export class DancePerformance {
     const { label, points } = this.capAfterSpam(judgeDelta(best), now);
     this.combo++;
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
-    this.score += points + this.combo * 5;
+    this.score += this.pressAward(hitStep.step, points, press);   // MUSIC-SUITE P9: = points + combo × 5 but on a freestyle slot
     this.counts[label]++;
+    this.beginHold(hitStep.step, hitStep.time, press, now);         // MUSIC-SUITE P9: a press hold starts on its head
     this.onJudged?.(label, points, this.combo, hitStep.step, bestSigned * 1000);
     return label;
   }
@@ -563,7 +762,11 @@ export class DancePerformance {
 
   result(): DanceResult {
     const accuracy = accuracyOf(this.counts);
-    return { score: this.score, maxCombo: this.maxCombo, counts: { ...this.counts }, stars: starsFor(accuracy), accuracy };
+    const r: DanceResult = { score: this.score, maxCombo: this.maxCombo, counts: { ...this.counts }, stars: starsFor(accuracy), accuracy };
+    // MUSIC-SUITE P9: only when the run had them — a chart with no freestyle slot and no hold reports the old keys only
+    if (this.varietyN > 0) r.variety = this.varietySum / this.varietyN;
+    if (this.holdsKept + this.holdsDropped > 0) r.holds = { kept: this.holdsKept, dropped: this.holdsDropped };
+    return r;
   }
 }
 

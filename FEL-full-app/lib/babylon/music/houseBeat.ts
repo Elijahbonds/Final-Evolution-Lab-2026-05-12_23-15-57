@@ -173,6 +173,12 @@ function rng(seed: string): () => number {
   };
 }
 const pick = <T,>(r: () => number, list: readonly T[]): T => list[r() % list.length];
+/**
+ * MUSIC-SUITE P9 (2026-09-29), fair dance duels: the same seeded integer PRNG, shared — lib/babylon/dance/houseSong.ts
+ * picks an Arena dance duel's house song from the match id with it, so the client and the server draw the same sequence
+ * for the same reason this file does (integer ops only). Namespaced by the caller's own seed string.
+ */
+export const seededHouseRng = rng;
 
 type Role = 'A' | 'turn' | 'B' | 'fill';
 const ROLES: readonly Role[] = ['A', 'A', 'A', 'turn', 'B', 'B', 'B', 'fill'];

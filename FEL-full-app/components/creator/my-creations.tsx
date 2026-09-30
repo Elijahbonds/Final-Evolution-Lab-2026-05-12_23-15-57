@@ -3,12 +3,19 @@
 // My Creations — lists the player's published creative cards and exposes the
 // round-trip actions: apply an ART card to the venue, equip a DANCE routine as a
 // dunk celebration. Music/acting cards show their review state.
+//
+// MUSIC-SUITE P9 (2026-09-29), dance cards playable: a dance card also gets DANCE IT — the routine goes on this device
+// (lib/babylon/dance/danceCard.ts writeCardPlay) and the Cypher opens on it (/play/dance?card=<id>): the card's own moves,
+// called on their beats at the card's own tempo, free play. EQUIP stays (its dunk-celebration reader has no consumer yet —
+// that wiring is the hoops lane's DunkMode, not this pass), and now keeps the card's BPM instead of a hard-coded 100.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { CreativeCard } from '@/lib/creator/creative-card-types';
 import { applyCardAsSkin } from '@/lib/modes/art/active-skin';
 import { setEquippedRoutine } from '@/lib/modes/dance/active-routine';
+import { useRouter } from 'next/navigation';
+import { cardPlayFrom, writeCardPlay } from '@/lib/babylon/dance/danceCard';
 
 const BADGE: Record<string, string> = {
   approved: 'bg-emerald-500/20 text-emerald-300',
@@ -19,6 +26,7 @@ const BADGE: Record<string, string> = {
 export default function MyCreations({ refreshKey }: { refreshKey?: number }) {
   const [cards, setCards] = useState<CreativeCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,8 +47,15 @@ export default function MyCreations({ refreshKey }: { refreshKey?: number }) {
 
   const equipDance = (c: CreativeCard) => {
     if (c.art.kind !== 'dance') return;
-    setEquippedRoutine({ steps: c.art.sequence, bpm: 100 });
+    setEquippedRoutine({ steps: c.art.sequence, bpm: c.art.bpm ?? 100 });
     toast.success('Routine equipped — land a dunk to see it celebrate.');
+  };
+
+  /** MUSIC-SUITE P9: dance the card in the Cypher. */
+  const danceIt = (c: CreativeCard) => {
+    const play = cardPlayFrom(c);
+    if (!play || !writeCardPlay(play)) { toast.error('Could not open this routine on this device.'); return; }
+    router.push(`/play/dance?card=${encodeURIComponent(c.id)}`);
   };
 
   if (loading) return <p className="px-5 py-4 text-sm text-neutral-500">Loading your creations…</p>;
@@ -71,6 +86,9 @@ export default function MyCreations({ refreshKey }: { refreshKey?: number }) {
             </div>
             {c.art.kind === 'art' && (
               <button onClick={() => applyArt(c.id)} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-bold text-black">Apply</button>
+            )}
+            {c.art.kind === 'dance' && (
+              <button onClick={() => danceIt(c)} className="rounded-lg bg-fuchsia-300 px-3 py-1.5 text-xs font-bold text-black">Dance it</button>
             )}
             {c.art.kind === 'dance' && (
               <button onClick={() => equipDance(c)} className="rounded-lg bg-fuchsia-500 px-3 py-1.5 text-xs font-bold text-black">Equip</button>

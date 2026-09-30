@@ -359,9 +359,15 @@ describe('the sweep — each rule moves the Lab Credits through the normal paths
   });
 
   it('ALL MODES (#30), a paused dance duel included — the pause stops new stakes, not a refund or a payout', async () => {
-    expect(isStakingPaused('dance')).toBe(true);
+    // MUSIC-SUITE P9 (2026-09-29): dance left the pause (owner decision #10 — its house-song duels landed), so it is no
+    // longer the paused case this test was written around; it stays in the sweep as a dance duel like any other. And a
+    // dance score now counts only with a house-song attempt behind it (lib/arena-music.ts HOUSE_SET_RULES.dance), so u1's
+    // 1,200 gets one — the P6 fix pass did the same for the old-key music duel below; the pre-house-song case is its own
+    // test in the P9 describe at the end of this file.
+    expect(isStakingPaused('dance')).toBe(false);
     const hoops = duel({ mode: 'hoops1v1', status: 'WAITING', player2Id: null });
     const dance = duel({ mode: 'dance', player1Score: 1200 });
+    h.store.events.push({ matchId: dance.id, seq: 0, eventType: 'dance_attempt_start', userId: 'u1', payload: '{}', createdAt: past(40) });
     const music = duel({ mode: 'music' });
     const oldMusic = duel({ mode: 'musicAcademy', player2Score: 42 });
     const golfGhost = duel({ mode: 'golf', matchType: 'GHOST_DUEL', player2Id: 'house' });
@@ -798,5 +804,58 @@ describe('P6 fix pass: the lobby row says an attempt is used, and a deadline set
     expect(duelRowView({ ...base, status: 'SETTLED', expired: 'lost_at_deadline' }, at).meta.label).toBe('Lost at the deadline');
     const view = readFileSync(join(process.cwd(), 'components/arena-view.tsx'), 'utf8');
     expect(view).toMatch(/the \{d\.feeLc\} LC stake went to the house/);
+  });
+});
+
+// MUSIC-SUITE P9 (2026-09-29), owner decision #10: a dance duel's seats are its house-song ATTEMPTS, exactly as a music
+// duel's are its house-beat ones (lib/arena-music.ts HOUSE_SET_RULES.dance) — the same sweep, the other table row.
+describe('P9: a dance duel at the deadline is counted on its house-song attempts', () => {
+  it('decision #10 at the deadline: a dance score with no attempt behind it (a points total on an own pick) counts for nothing', async () => {
+    const d = duel({ mode: 'dance', player2Score: 79_680 });              // u2's own-song points total from before phase 9
+    await reclaimExpiredArenaDuels(h.prisma as never, { now: NOW });
+    expect(d.status).toBe('VOIDED');                                       // it used to win u2 the pot by forfeit
+    expect(eventsOf(d.id)).toEqual([expect.objectContaining({ type: 'REFUNDED', reason: 'expired', legacyScores: ['p2'] })]);
+    expect(h.store.balances).toEqual({ u1: 50, u2: 50 });
+  });
+
+  it('a dance Quick Match started and left scores 0 and goes to the house; started beats never-showed in a human duel', async () => {
+    const qm = duel({ mode: 'dance', matchType: 'GHOST_DUEL', player2Id: 'house', seed: 'seed-qm-dance' });
+    h.store.events.push({ matchId: qm.id, seq: 0, eventType: 'dance_attempt_start', userId: 'u1', payload: '{}', createdAt: past(40) });
+    const human = duel({ mode: 'dance' });
+    h.store.events.push({ matchId: human.id, seq: 0, eventType: 'dance_attempt_start', userId: 'u2', payload: '{}', createdAt: past(40) });
+    await reclaimExpiredArenaDuels(h.prisma as never, { now: NOW });
+    expect(qm).toMatchObject({ status: 'SETTLED', winnerId: 'house', player1Score: 0 });
+    // the house was drawn under the DANCE STAKE ceiling (10,000), off the 5,000 baseline: a grade-C set
+    expect(qm.player2Score).toBeGreaterThanOrEqual(4100);
+    expect(qm.player2Score).toBeLessThanOrEqual(5900);
+    expect(human).toMatchObject({ status: 'SETTLED', winnerId: 'u2' });
+  });
+
+  it('the lobby row of a live dance duel whose one attempt is used says so (dance_attempt_start / _finish), as music\'s does', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: NOW });
+    const started = duel({ mode: 'dance', expiresAt: future(5) });
+    const done = duel({ mode: 'dance', expiresAt: future(5) });
+    const theirs = duel({ mode: 'dance', expiresAt: future(5) });
+    h.store.events.push(
+      { matchId: started.id, seq: 0, eventType: 'dance_attempt_start', userId: 'u1', payload: '{}', createdAt: past(1) },
+      { matchId: done.id, seq: 0, eventType: 'dance_attempt_start', userId: 'u1', payload: '{}', createdAt: past(1) },
+      { matchId: done.id, seq: 1, eventType: 'dance_attempt_finish', userId: 'u1', payload: '{"taps":[]}', createdAt: past(1) },
+      { matchId: theirs.id, seq: 0, eventType: 'dance_attempt_start', userId: 'u2', payload: '{}', createdAt: past(1) },
+    );
+    const j = await (await listGET()).json() as Row;
+    const row = (id: string) => j.mine.find((m: Row) => m.id === id);
+    expect(row(started.id)).toMatchObject({ mode: 'dance', musicAttempt: 'started' });
+    expect(row(done.id)).toMatchObject({ mode: 'dance', musicAttempt: 'finished' });
+    expect(row(theirs.id)).toMatchObject({ mode: 'dance', musicAttempt: null });   // the other player's attempt is not mine
+    const { duelRowView } = await import('../components/arena-view');
+    expect(duelRowView(row(started.id), NOW.getTime()).meta.label).toBe('Attempt used — PLAY posts it');
+  });
+
+  it('a music attempt on a dance duel is not a dance attempt: each mode reads only its own two event names', async () => {
+    const d = duel({ mode: 'dance', player1Score: 4000 });
+    h.store.events.push({ matchId: d.id, seq: 0, eventType: 'music_attempt_start', userId: 'u1', payload: '{}', createdAt: past(40) });
+    await reclaimExpiredArenaDuels(h.prisma as never, { now: NOW });
+    expect(d.status).toBe('VOIDED');
+    expect(eventsOf(d.id).filter((e) => e.type === 'REFUNDED')).toEqual([expect.objectContaining({ reason: 'expired', legacyScores: ['p1'] })]);
   });
 });

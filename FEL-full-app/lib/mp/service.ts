@@ -13,7 +13,7 @@
  * settle never double-pays.
  */
 import 'server-only';
-import { sessionModeFor } from './match-core';
+import { sessionModeFor, isMpHouseSetOnly } from './match-core';
 import { isStakingPaused } from '@/lib/stakingPause';
 import type { PrismaClient } from '@/public/_prisma/client';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
@@ -73,6 +73,12 @@ export async function joinAndSettle(
   // and then accept — the exact song-decides duel the pause stops. Accepting is refused like /api/arena/join refuses a
   // paused duel. Nothing is locked on a friend challenge, so nothing is stranded: the host's challenge simply stays open.
   if (isStakingPaused(sessionModeFor(match.mode))) return { error: 'staking_paused' as const, mode: sessionModeFor(match.mode) };
+  // MUSIC-SUITE P9 (2026-09-29), owner decision #10 — "friend challenges same rule": a dance duel is the same house song
+  // for both, danced once and rejudged (lib/babylon/dance/houseSong.ts), and bestScoreFor below compares two stored bests
+  // on whatever songs each player picked (a GameSession carries no song). With dance staking back in the Arena, the pause
+  // no longer refuses this, so the house-set gate does (match-core MP_HOUSE_SET_ONLY): an open dance challenge — every
+  // one was posted before the P1 pause — is still not accepted, and nothing is paid on it. Same answer the pause gave.
+  if (isMpHouseSetOnly(match.mode)) return { error: 'staking_paused' as const, mode: sessionModeFor(match.mode), houseSetOnly: true as const };
 
   const guestScore = await bestScoreFor(prisma, args.guestId, match.mode);
   const updated = await prisma.mpMatch.update({

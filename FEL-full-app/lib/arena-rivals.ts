@@ -27,7 +27,7 @@
 import type { DbClient } from '@/lib/ledger';
 import { applyLc, getOrCreateWallet } from '@/lib/wallet/wallet-service';
 import { canonicalModeKey, LEGACY_MODE_KEYS } from '@/lib/game-data';
-import { MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
+import { MUSIC_ATTEMPT_FINISH, DANCE_ATTEMPT_FINISH } from '@/lib/arena-music';
 
 // ---------------------------------------------------------------------------
 // House rival roster
@@ -189,6 +189,19 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
   // 12,400–13,200; a beginner at ±90 ms: median 14,950) — so the house plays a grade-C set, the line owner decision #13
   // already draws for a music win. TUNE(elijah).
   music: 12_000,
+  // MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("5,000 baseline kept"): the number is kept, and the SCALE under it
+  // changed — an Arena dance set now scores its accuracy on the duel's house song, 0..10,000 (lib/babylon/dance/
+  // houseSong.ts danceArenaScore), so 5,000 is a 50 % set: a grade C, the line decision #13 draws for a win. Measured on
+  // the six authored house charts as they stood at the end of this phase's run (scripts/probes/_music-p9-fair-duels.ts →
+  // outbox musicsuite/p9/fair-duels-proof.json; the charts were still being authored, so re-run it for today's numbers):
+  // a masher at ~8 presses a second scores 295–1,016 and one press on every 16th 403–958 — far under the cold-start band
+  // of 4,100–5,900 — while a beginner at ±90 ms who skips 1 step in 10 has a median of 6,345–6,689 (21 runs a song) and a
+  // steady ±30 ms dancer scores 9,423–9,604. FLAGGED FOR THE OWNER: one press on EVERY BEAT, never reading the cue,
+  // scores 3,562–4,691 on the four easier songs but 5,542 on CANALS and 6,067 on EVOLUTION (their charts sit mostly on
+  // the beat), so on those two songs it usually beats this cold-start house — only in a player's FIRST dance Quick Matches
+  // (after one, the band is theirs). The P6 music precedent raised its baseline (owner #40); here the owner's 5,000 is
+  // kept as decided — a baseline above every beat-tapper (~7,400) would also sit above most ±90 ms beginners. TUNE(elijah).
+  // On the OLD points scale a flawless BATTLE run topped out at 4,355 against this same 5,000.
   dance: 5000,
   training: 50,
 };
@@ -205,7 +218,10 @@ export const RIVAL_BAND = 0.18;
  * history can only RAISE the house above the grade-C baseline, never lower it: the least a music win takes is a grade-C
  * set (decision #13's line), whatever the history holds.
  */
-export const RIVAL_BASELINE_FLOOR: ReadonlySet<string> = new Set(['music']);
+// MUSIC-SUITE P9 (2026-09-29): and dance, for the same reason — a finished dance attempt with no presses is a real,
+// rejudged 0 (every step a MISS), so a history of zeros would draw a house of 0 that any press beats; with the floor the
+// least a dance win takes is a grade-C set.
+export const RIVAL_BASELINE_FLOOR: ReadonlySet<string> = new Set(['music', 'dance']);
 
 /**
  * Modes whose sessions are not on the scale of a staked run, so the rival is banded on the player's own past Arena
@@ -215,7 +231,11 @@ export const RIVAL_BASELINE_FLOOR: ReadonlySet<string> = new Set(['music']);
  * both save a session under 'music'. The combo multiplier grows with the set, so a 4-minute free set scores two to three
  * times a 32-bar set played as well, and a rival centred on free sets would outscore the player on every staked set.
  */
-export const RIVAL_FROM_DUEL_SCORES: ReadonlySet<string> = new Set(['music']);
+// MUSIC-SUITE P9 (2026-09-29): and dance. A dance SESSION is free play's points total (a flawless set pays 9,555 on MORNING
+// BOARDWALK and 19,740 on EVOLUTION, and an own song up to 79,680), while a staked dance set is its accuracy on the house
+// song, 0..10,000 — so a rival centred on sessions would sit off the staked scale (above 10,000 on every good session).
+// A dance rival is banded on the player's own rejudged Arena dance sets only (RIVAL_SCORE_EVENT), and the baseline until then.
+export const RIVAL_FROM_DUEL_SCORES: ReadonlySet<string> = new Set(['music', 'dance']);
 
 /**
  * MUSIC-SUITE P6 (2026-09-26, owner decision #12: "old music duel scores stop counting; 5,000 baseline kept until real
@@ -225,7 +245,11 @@ export const RIVAL_FROM_DUEL_SCORES: ReadonlySet<string> = new Set(['music']);
  * no such event, so it no longer counts; nor does a forfeit (started, never finished: it submits 0 and is no measure of
  * the player). With none left, the draw falls to the 5,000 baseline.
  */
-export const RIVAL_SCORE_EVENT: Readonly<Record<string, string>> = { music: MUSIC_ATTEMPT_FINISH };
+// MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("old dance duel scores stop counting; 5,000 baseline kept"): for dance,
+// a FINISHED house-song attempt (lib/arena-music.ts DANCE_ATTEMPT_FINISH) — every dance duel score from before phase 9 was
+// a points total on the player's own pick (up to 79,680) with no such event, so it no longer counts; nor does a forfeit.
+// With none left, the draw falls to the 5,000 baseline (a grade-C set on the new scale).
+export const RIVAL_SCORE_EVENT: Readonly<Record<string, string>> = { music: MUSIC_ATTEMPT_FINISH, dance: DANCE_ATTEMPT_FINISH };
 
 /** Every key a duel of this mode may be stored under: the current one and its old spellings (LEGACY_MODE_KEYS). */
 export function storedModeKeys(mode: string): string[] {

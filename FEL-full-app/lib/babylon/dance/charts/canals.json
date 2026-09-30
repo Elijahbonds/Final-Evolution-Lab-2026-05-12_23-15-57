@@ -1,0 +1,35 @@
+{
+  "format": "fel-dance-chart/1",
+  "song": "canals",
+  "bpm": 118,
+  "bars": 52,
+  "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
+  "about": "Difficulty 5. Four on the floor, so the accents sit on the off-beat eighths and the keys hook (0.75, 1.5, 2.5) against the kick; eighth doubles on the claps, sixteenth doubles only where the drums play sixteenths (3.5 / 3.75 in the second verse, 3 / 3.25 in the last hook); a build of quarters into straight eighths; freeze holds on both break bars; freestyle every beat after each called pair. MUSIC-SUITE P9 moves: the MOONWALK and the HEADSTAND SPIN in the verses, the KICK STEP in the second hook, the SIDE FREEZE on the second break bar.",
+  "phrases": {
+    "kin": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 2 }, { "b": 4, "m": "wave" }, { "b": 6, "m": "spin" } ] },
+    "kin2": { "bars": 2, "notes": [ { "b": 0, "m": "toprock", "mir": 1 }, { "b": 2 }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" } ] },
+    "kvA": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 0.5 }, { "b": 1.5 }, { "b": 3 }, { "b": 4, "m": "toprock" }, { "b": 6.5, "x2": 0.5 } ] },
+    "kvB": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep" }, { "b": 1 }, { "b": 2.5, "x2": 0.5 }, { "b": 4, "m": "wave" }, { "b": 5 }, { "b": 6, "m": "babyfreeze", "hold": 1 } ] },
+    "kvC": { "bars": 2, "notes": [ { "b": 0, "m": "shoulder" }, { "b": 1 }, { "b": 2.5, "x2": 0.5 }, { "b": 4, "m": "headstand" }, { "b": 5.5 }, { "b": 6.5 } ] },
+    "kvD": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep", "mir": 1 }, { "b": 1 }, { "b": 2.5 }, { "b": 3, "x2": 0.5 }, { "b": 4, "m": "moonwalk" }, { "b": 5.5 }, { "b": 7, "m": "spin" } ] },
+    "kbA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1 }, { "b": 2 }, { "b": 3 }, { "b": 4, "m": "sixstep" }, { "b": 5 }, { "b": 6 }, { "b": 7, "x2": 0.5 } ] },
+    "kbB": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 0.5 }, { "b": 1 }, { "b": 1.5 }, { "b": 2 }, { "b": 2.5 }, { "b": 3 }, { "b": 3.5 }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
+    "khA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 0.75 }, { "b": 1.5 }, { "b": 2.5, "x2": 0.5 }, { "b": 4, "m": "wave" }, { "b": 5.5 } ] },
+    "khB": { "bars": 2, "notes": [ { "b": 0, "m": "kickstep" }, { "b": 0.75 }, { "b": 1.5 }, { "b": 3, "x2": 0.25 }, { "b": 4, "m": "windmill" }, { "b": 4.75 }, { "b": 5.5 }, { "b": 6.5, "x2": 0.5 } ] },
+    "kfree": { "bars": 2, "free": { "every": 1 } },
+    "kbrk": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 3 }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
+    "kbrk2": { "bars": 2, "notes": [ { "b": 0, "m": "sidefreeze", "hold": 3, "mir": 1 }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
+    "kout1": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 1 }, { "b": 3 }, { "b": 4, "m": "toprock" }, { "b": 5.5 } ] },
+    "kout2": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1 }, { "b": 3 }, { "b": 4, "m": "spin" }, { "b": 6, "m": "babyfreeze", "hold": 1.5 } ] }
+  },
+  "sections": [
+    { "name": "intro", "bar": 1, "bars": 8, "play": ["kin", "kin2", "kin", "kin2"] },
+    { "name": "verse", "bar": 9, "bars": 8, "play": ["kvA", "kvB", "kvA", "kfree"] },
+    { "name": "build", "bar": 17, "bars": 4, "play": ["kbA", "kbB"] },
+    { "name": "hook", "bar": 21, "bars": 8, "play": ["khA", "kfree", "khA", "kfree"] },
+    { "name": "break", "bar": 29, "bars": 4, "play": ["kbrk", "kbrk2"] },
+    { "name": "verse", "bar": 33, "bars": 8, "play": ["kvA", "kvC", "kfree", "kvD"] },
+    { "name": "hook", "bar": 41, "bars": 8, "play": ["khB", "kfree", "khA", "kfree"] },
+    { "name": "outro", "bar": 49, "bars": 4, "play": ["kout1", "kout2"] }
+  ]
+}

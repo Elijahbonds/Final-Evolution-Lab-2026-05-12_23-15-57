@@ -27,6 +27,8 @@ import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 // drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
 // renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
 import { MicCaption } from './mic-caption';
+// MUSIC-SUITE P9 (2026-09-29): the Cypher's phone dance pad (dance only — gated below like every dance block here).
+import { DancePhonePad } from '@/lib/babylon/dance/ui/DancePhonePad';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -527,6 +529,11 @@ export function makeTimingHost(opts: TimingHostOpts) {
         )}
 
         {modeKey === 'dance' && <MicCaption text={hud.mic} who={hud.micWho} className="bottom-[10%]" />}
+
+        {/* MUSIC-SUITE P9 (2026-09-29): the Cypher's phone dance pad (owner decision #16) — a lazy pairing badge serving
+            registry.ts dance_pad (four move buttons + the d-pad song pick) onto this room's own bus. Dance only: every other
+            timing sport this host drives renders exactly as before. */}
+        {modeKey === 'dance' && busRef.current && <DancePhonePad bus={busRef.current} playing={phase === 'playing'} />}
       </div>
     );
   }

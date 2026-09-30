@@ -63,11 +63,15 @@ import type { ModeContext, ModeDefinition, BodyView } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import {
-  DancePerformance, generateRoutine, beatDuration, DANCE_LIBRARY, MISS_AFTER, type Judgement, type DanceStep,
+  DancePerformance, generateRoutine, beatDuration, MISS_AFTER, type Judgement, type DanceStep,
 } from '../core/DanceCore';
+// MUSIC-SUITE P9 (2026-09-29), moves (owner decision #17): every move-by-id lookup here asks the room's vocabulary
+// (dance/moves.ts danceMove — DANCE_LIBRARY's own rows first, then the captured breaking and popping moves), so a charted
+// or picked captured move is named, earns its family's instrument and drops the camera on a freeze like any other.
+import { danceMove as moveOf } from '../dance/moves';
 import {
   DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor,
-  gradeFor, bodySpeedFor, cueLane, type DanceTrack,
+  gradeFor, bodySpeedFor, cueLane, allTracks, type DanceTrack,
 } from '../core/danceTracks';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the stage family (SPEC-FEL-BIOMECH-GAMEWIDE asks dance for "G2 +
 // G5 minimum"). Measured on 2942860: danceClips' procedural steps key the hips, the arms and ONE spine bone and never
@@ -100,11 +104,14 @@ import { readDeviceAudio } from '../music/StudioLibrary';
 import { SongStemBand } from '../audio/SongStemBand';
 import { songPreviewUrl, outroRange } from '../dance/felSongs';
 import { KitPulse, kitPattern } from '../audio/KitPulse';
-import { SongClock, danceTap, tapLatencySec, type TriggerLatch } from '../audio/SongClock';
+import { SongClock, tapLatencySec, type TriggerLatch } from '../audio/SongClock';   // MUSIC-SUITE P9: danceTap now runs inside dance/freestyle.pressEdge
 import { loadRoomCalibration } from '@/lib/feel/rhythm-calibrate';
 // MUSIC-SUITE P2 FIX PASS (2026-09-25): the room's decisions, pure and tested (danceRoomFlow.test.ts), and the audio
 // session claimed for this room only (it was set for every mode inside SoundKit).
 import { holdAction, countBackFirstBeat, pickTimer, countInTapReaches } from './danceRoomFlow';
+// MUSIC-SUITE P9 (2026-09-29), dance cards playable (PLAN phase 9): a published dance card, put on this device by My
+// Creations' DANCE IT, is a pick-list track (danceTracks.allTracks / stepsFor read it — dance/danceCard.ts has the rules).
+import { cardIdFromQuery } from '../dance/danceCard';
 import { claimPlaybackSession } from '@/lib/audio/session';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 // MUSIC-SUITE P8 (2026-09-25), "a stage that performs" (PLAN phase 8, owner decision #8): the beat bus (song clock ->
@@ -126,9 +133,85 @@ import {
   pickHostLine, mulberry32, newRunSeed, estimateSec, hostCaption, clipId, seenFirstTime, SpeechQueue, stillSpeaking,
   type JudgeWindow, type HostLine,
 } from '../audio/mic/hostVoice';
+// MUSIC-SUITE P9 (2026-09-29), "charts, freestyle and fair dance duels" (owner decisions #3, #10): the authored charts
+// (dance/chart.ts — the steps themselves arrive through danceTracks.stepsFor, unchanged here), freestyle and call bars
+// and the free-dance toggle (dance/freestyle.ts — the input edges, the bar cues, the pad), and the rush/drag line and
+// the per-song best grades (dance/coaching.ts). All pure and tested without a browser; this file only wires them to
+// the scene, the HUD, the band and Stoop. Every press reaches the judge through judgePress / judgeRelease (below):
+// the one seam a recorded press list (a duel's rejudge, dance/houseSong.ts) hangs off.
+import { isFreeSlot, isPressHold } from '../core/DanceCore';
+import { barKindsFor, type BarKind } from '../dance/chart';
+import {
+  pressEdge, padMove, barKindAt, barCue, freeDanceFromQuery, FREESTYLE_CAMERA_STREAK, FULL_BAND_HITS,
+  freestylePickSwitch, upcomingHoldLine, holdingLine, padMovesLine, FREESTYLE_MIN_SHOW_BEATS,
+  type PressKey,
+} from '../dance/freestyle';
+// MUSIC-SUITE P9 FIX PASS (2026-09-29): the floor phase of a move (a switch off the floor rises; a held freeze holds its
+// pose — dance/floorPhase.ts), the phone pad's link (a phone press judged half its round trip earlier in free play; the pick
+// screen waits while the pad is being paired — dance/phonePadLink.ts), the pad's move names, and the Arena's set end.
+import { moveFadeSec, holdPoseDue, HOLD_POSE_SPEED } from '../dance/floorPhase';
+import { phonePadLink, phonePressBackdateSec } from '../dance/phonePadLink';
+import { FREESTYLE_PAD } from '../dance/chart';
+import { timingLean, parseGradeBook, recordBest, withBest, GRADES_KEY } from '../dance/coaching';
+// MUSIC-SUITE P9 (2026-09-29), fair dance duels (owner decision #10): an Arena run dances the duel's HOUSE SONG
+// (dance/houseSong.ts — the same song, chart and judge the server rejudges with), says ONE ATTEMPT before its count-in,
+// posts its start and its press list through the Groove Academy's own attempt client (music/arenaAttempt.ts — the route
+// takes dance duels too), and hands the shell the ACCURACY score. dance/arenaDance.ts holds the decisions (pure, tested).
+import {
+  houseSongFor, houseSongTrack, houseSongSteps, houseSongEndSec, dancePress, DANCE_MAX_PRESSES, type HouseSong, type HousePress,
+} from '../dance/houseSong';
+import {
+  arenaMatchFromQuery, arenaReadyHud, keepDanceFinish, readDanceFinish, clearDanceFinish, arenaFinishEnd, arenaUsedEnd,
+  arenaScoreWords, ARENA_DANCE_UNSENT_HINT, ARENA_DANCE_NO_PAUSE, type ArenaDancePhase, type ArenaDanceEnd,
+} from '../dance/arenaDance';
+import { postArenaAttempt, arenaStartVerdict, arenaFinishVerdict, makeAttemptId } from '../music/arenaAttempt';
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
+/**
+ * MUSIC-SUITE P9 (2026-09-29): seconds the room holds its own results beat — the grade banner, the rush/drag line in
+ * the top chip, Stoop's grade call and the song's outro — before ctx.end raises the shell's results card over it. It
+ * used to be 0: finish() set the banner and called ctx.end in the same tick, and the card (a fixed overlay at 75 %
+ * black with a blur, game-shell.tsx) covered every word the room put up, P8's grade line included. NEW TIMING NUMBER
+ * (flag for the owner's feel pass). A leave during the beat cancels it (dispose): nothing is posted for a room that is
+ * gone.
+ */
+export const RESULTS_BEAT_SEC = 2.2;
+
+/**
+ * MUSIC-SUITE P9: the words a freestyle judgement shows — the judgement, the move the button picked, and a nudge when
+ * the variety factor (DanceCore.varietyFactor) took something off. Pure, for the banner.
+ */
+export function freestyleBanner(label: Judgement, moveName: string, factor: number, combo: number): string {
+  const head = combo >= 4 && label !== 'MISS' ? `${label}  ×${combo}` : label;
+  return `${head} · ${moveName.toUpperCase()}${factor < 1 ? ' · MIX IT UP' : ''}`;
+}
+
+/**
+ * MUSIC-SUITE P9: the run's ending, pure. A judged run ENDS (ctx.end → the shell's card and the session POST, after the
+ * results beat); a free-dance run does not end at all — it goes back to the pick screen, so no session is ever posted
+ * for it and nothing can pay it (owner decision #3: "a no-score free-dance toggle — no judge, no pay"). The payout test
+ * (lib/babylon/dance/freeDancePayout.test.ts) walks this into the real session rules.
+ */
+export function runEnding(freeDance: boolean): 'end' | 'repick' {
+  return freeDance ? 'repick' : 'end';
+}
+
+/** MUSIC-SUITE P9: the "next move" line during a freestyle slot and in free dance — the pad picks the move.
+ *  MUSIC-SUITE P9 FIX PASS (2026-09-29): by the moves' names ('YOUR MOVE · TOP ROCK / TWO STEP / ARM WAVE / SPIN'), not
+ *  'A B X Y' — the phone pad and the touch rig label their buttons with these names, and the keyboard's A/B/X/Y are J/K/L/I. */
+export const FREE_NEXT_STEP = padMovesLine({
+  A: moveOf(FREESTYLE_PAD.A)?.name ?? 'A', B: moveOf(FREESTYLE_PAD.B)?.name ?? 'B',
+  X: moveOf(FREESTYLE_PAD.X)?.name ?? 'X', Y: moveOf(FREESTYLE_PAD.Y)?.name ?? 'Y',
+});
+
+/** MUSIC-SUITE P9: the pick screen's top chip while free dance is on (it replaces the blurb / calibration flip). */
+export const FREE_DANCE_CHIP = 'FREE DANCE · NO SCORE · NO PAY';
+
+/** MUSIC-SUITE P9: the pick screen's control line — d-pad UP toggles free dance, and the line names what it does next. */
+export function pickHint(freeDance: boolean): string {
+  return freeDance ? '◀ ▶  TRACK   ·   A  DANCE   ·   ▲  SCORED' : '◀ ▶  TRACK   ·   A  START   ·   ▲  FREE';
+}
 /** MUSIC-SUITE P2: the pick screen's top chip swaps the track's blurb for the calibration line this often (s). */
 const PICK_CAL_FLIP_SEC = 3;
 
@@ -334,6 +417,55 @@ export const DanceMode: ModeDefinition = (() => {
    *  stopPreview, below). Plain HTMLAudioElement — see playPreview's own comment for why. */
   let previewAudio: HTMLAudioElement | null = null;
 
+  // ── MUSIC-SUITE P9 (2026-09-29): freestyle bars, call bars, free dance, coaching ──
+  /** Which bars of the locked-in chart are called and which are freestyle (dance/chart.ts barKindsFor; null for a
+   *  track with no authored chart — an export — which is all called bars, as it always was). */
+  let barKinds: BarKind[] | null = null;
+  /** The last bar (0-based from beat 0, on the heard clock) whose cue was raised — a bar's cue fires once. */
+  let lastBar = -1;
+  /** Free dance (owner decision #3): no judge, no pay, the band plays everything. Toggled on the pick screen (d-pad UP) or
+   *  opened by `?free=1`; kept across songs in one visit. */
+  let freeDance = false;
+  /** The hits' signed offsets this run (ms; − early), for the rush/drag line (coaching.timingLean). */
+  let offsets: number[] = [];
+  /** The results beat's timer (RESULTS_BEAT_SEC): ctx.end fires from it; dispose clears it. */
+  let resultTimer: ReturnType<typeof setTimeout> | null = null;
+  /** MUSIC-SUITE P9 FIX PASS (2026-09-29): the ctx.end the results beat is holding back — a leave during the beat FLUSHES it
+   *  (dispose) instead of dropping it: the run was danced to its end, and before P9 ctx.end ran in the same tick, so a
+   *  player who left as the grade banner showed lost the session (XP, shards, the daily streak) for a whole song. */
+  let resultEnd: (() => void) | null = null;
+
+  // ── MUSIC-SUITE P9 FIX PASS (2026-09-29): the dancer's move, its floor, its held pose, its freestyle picks ──
+  /** The move the dancer is on (its clip id as charted — a mirror is the same move) and the heard time its clip started:
+   *  danceMove sets both when the clip CHANGES (a repeat keeps the running loop, and its time). */
+  let moveClipId: string | null = null;
+  let moveStartHeard = 0;
+  /** The press hold's move while one is down (set when its head is judged; onHoldEnd clears it). */
+  let heldClipId: string | null = null;
+  /** The heard time the held move was stopped on its floor pose (floorPhase.holdPoseDue), or null: it is playing. */
+  let posedAt: number | null = null;
+  /** The song beat of the last move change a freestyle PICK made (null: the running move came from the chart), and the
+   *  newest pick waiting for FREESTYLE_MIN_SHOW_BEATS (freestyle.freestylePickSwitch). */
+  let pickSwitchBeat: number | null = null;
+  let queuedPick: string | null = null;
+  /** The move the last freestyle pick danced (a missed slot ducks ITS instrument, or none — never the slot's default). */
+  let lastPickMove: string | null = null;
+  /** Presses this run that came from the phone pad (their lean is the radio's: no /play/calibrate suggestion). */
+  let phonePresses = 0;
+  /** An Arena run's START overlay has said ARENA_DANCE_NO_PAUSE (once per pause). */
+  let arenaPauseSaid = false;
+
+  // ── MUSIC-SUITE P9 (2026-09-29): THE ARENA RUN (owner decision #10; dance/arenaDance.ts has the why) ──
+  /**
+   * The duel this run is staked in (`?arena=<matchId>`), or null for free play. `house` is its house song (the track and
+   * chart are its, never a pick); `presses` the list every judged press and release goes on (judgePress / judgeRelease),
+   * on the heard clock from beat 0; `attemptId` makes a retried START the same start (one per page — a reload is a new one).
+   */
+  let arena: {
+    matchId: string; house: HouseSong; phase: ArenaDancePhase; presses: HousePress[]; attemptId: string | null;
+    unsent: HousePress[] | null; ended: ArenaDanceEnd | null;
+  } | null = null;
+
   // ── MUSIC-SUITE P8 (2026-09-25), Stoop — the Cypher's own MC (see the import block's header) ──
   /** This run's line-picking order: a fresh seed every load() (hostVoice's own lesson: never a fixed one — the
    *  ModeMic.ts comment it quotes is "a fixed seed opened every session with the same shouts"). */
@@ -414,8 +546,9 @@ export const DanceMode: ModeDefinition = (() => {
   function syncHold(ctx: ModeContext): void {
     // MUSIC-SUITE P2 FIX PASS: the decision is danceRoomFlow.holdAction (pure, tested); what it does stays here
     const hidden = typeof document !== 'undefined' && document.hidden;
-    const act = holdAction({ ended, hidden, harnessPhase: ctx.phase(), clockPaused: clock.paused, roomPhase: phase });
-    if (act === 'none') return;
+    // MUSIC-SUITE P9 FIX PASS (2026-09-29): an Arena run's song never holds (`arena` — danceRoomFlow.holdAction's doc)
+    const act = holdAction({ ended, hidden, harnessPhase: ctx.phase(), clockPaused: clock.paused, roomPhase: phase, arena: !!arena });
+    if (act === 'none') { if (arena) arenaRunsOn(ctx); return; }
     const a = audioNow();
     if (act === 'pause') {
       clock.pause(a);
@@ -433,6 +566,23 @@ export const DanceMode: ModeDefinition = (() => {
       clock.resume(a, 0);
       if (act === 'resume-rearm') countArmed = false;   // the next update() arms a fresh count-in
     }
+  }
+
+  /**
+   * MUSIC-SUITE P9 FIX PASS (2026-09-29): AN ARENA SET RUNS TO ITS END. While the harness is paused (START — its overlay is
+   * the harness's, held) the song clock runs on (holdAction's `arena`) but the harness stops calling update(), so this —
+   * called on every rendered frame by syncHold, which the harness renders in every phase — keeps the judge on time (a step
+   * passes as a MISS the moment its window closes; a hold still down is kept at its end), ends the set when the song does,
+   * and says once per pause why nothing stopped (ARENA_DANCE_NO_PAUSE, P6's words). A playing frame is update()'s.
+   */
+  function arenaRunsOn(ctx: ModeContext): void {
+    if (ended || !arena || phase === 'pick') return;
+    if (ctx.phase() === 'playing') { if (arenaPauseSaid) { arenaPauseSaid = false; ctx.setHud({ round: track.name }); } return; }
+    if (!arenaPauseSaid) { arenaPauseSaid = true; ctx.setHud({ round: ARENA_DANCE_NO_PAUSE }); }
+    if (!countArmed || !perf) return;   // a count-in not yet armed has no clock to run on (update() arms it)
+    const heard = clock.song(audioNow()) - latencySec;
+    perf.update(heard);
+    if (phase === 'playing' && (heard - startAt) / beatDuration(track.bpm) > perf.totalBeats + 1) finish(ctx);
   }
 
   /** MUSIC-SUITE P2 (2026-09-25): THE BODY JUDGE'S SEAM — a no-op until movement play P9 plugs the body in.
@@ -627,14 +777,51 @@ export const DanceMode: ModeDefinition = (() => {
   }
 
   function playStep(s: DanceStep): void {
+    // MUSIC-SUITE P9: a freestyle slot names no move — the button's pick is danced when the press lands (danceMove,
+    // from onJudged); until then the dancer keeps whatever it was dancing. (An accent or a double's second tap carries
+    // the running move's clip, so the line below keeps that loop running — "the same step twice in a row keeps the
+    // loop".)
+    if (isFreeSlot(s)) return;
+    // MUSIC-SUITE P9 FIX PASS: a charted move ends any freestyle pick's hold on the body (and drops a waiting pick)
+    pickSwitchBeat = null; queuedPick = null;
+    danceMove(s.clipId, s.mirrored);
+  }
+
+  /** Dance one clip as a loop the next move crossfades over (the ONE owner, BeatOwner). MUSIC-SUITE P9: split out of
+   *  playStep so a freestyle pick and a free-dance press dance through exactly the same path as a charted step. */
+  function danceMove(clipIdToPlay: string, mirrored: boolean): void {
+    const s = { clipId: clipIdToPlay, mirrored };
     const id = resolveDanceClip(s.clipId, (x) => registered.has(x));
     // Mirrored steps play `<id>.M` — resolved via the merged DANCE_ALIASES
     // table to the mirrored base groups registered at character spawn.
-    currentClip = s.mirrored ? `${id}.M` : id;
+    const next = s.mirrored ? `${id}.M` : id;
+    // MUSIC-SUITE P9 FIX PASS (2026-09-29): a switch made while the running move is on the FLOOR rises (floorPhase.ts
+    // moveFadeSec: a half-beat crossfade, not 0.12 s — the charts cut floor moves mid-floor 49 times across the six songs,
+    // and the body went from the floor to standing in 120 ms); a held pose is let go first; a repeat keeps the loop
+    const heardNow = clock.song(audioNow()) - latencySec;
+    const bd = beatDuration(track.bpm);
+    const changing = next !== currentClip;
+    if (changing) releasePose(heardNow);
+    const fade = changing && moveClipId
+      ? moveFadeSec(moveClipId, (heardNow - moveStartHeard) / bd, bd, moveOf(moveClipId)?.beats)
+      : 0.12;
+    currentClip = next;
     // MUSIC-SUITE P8: which category this step is — the stage camera drops low on a 'freeze' (decision #8).
-    currentCategory = DANCE_LIBRARY.find((c) => c.id === s.clipId)?.category ?? null;
-    body?.loop(currentClip, { fadeSec: 0.12, speedRatio: clipSpeed() });
+    currentCategory = moveOf(s.clipId)?.category ?? null;   // MUSIC-SUITE P9 moves: the vocabulary (captured moves too)
+    body?.loop(currentClip, { fadeSec: fade, speedRatio: clipSpeed() });
     me.animator.setSpeed(currentClip, clipSpeed());   // the same step twice in a row keeps the loop; a GOOD's drag is undone here
+    if (changing) { moveClipId = s.clipId; moveStartHeard = heardNow; }
+  }
+
+  /**
+   * MUSIC-SUITE P9 FIX PASS (2026-09-29): let a held floor pose go (floorPhase.holdPoseDue): the clip runs on from where it
+   * stopped — into its rise — and the time it stood still is added to its start, so its beat count stays the clip's own.
+   */
+  function releasePose(heardNow: number): void {
+    if (posedAt === null) return;
+    if (currentClip) me.animator.setSpeed(currentClip, clipSpeed());
+    moveStartHeard += Math.max(0, heardNow - posedAt);
+    posedAt = null;
   }
 
   function onJudged(ctx: ModeContext, label: Judgement, _pts: number, combo: number, step?: DanceStep, deltaMs?: number): void {
@@ -646,6 +833,30 @@ export const DanceMode: ModeDefinition = (() => {
     // MUSIC-SUITE P8: Stoop calls a NEW instrument joining (never a drop-out — "Hear that horn? You earned it" makes
     // no sense said of a part leaving), so this tracks the join half of joinBanner separately from its text.
     let instrumentJoined = false;
+    // MUSIC-SUITE P9: a freestyle slot is judged as the move its button PICKED (DancePerformance.lastFree, set just
+    // before this callback for a freestyle hit — and stale on an expiry, hence the MISS guard): the dancer dances the
+    // pick, and it is the pick's instrument that answers. Every other step answers with its own clip, as before.
+    const pick = step && label !== 'MISS' && isFreeSlot(step) ? perf.lastFree : null;
+    // MUSIC-SUITE P9 FIX PASS (2026-09-29): the body changes to a pick at most once every FREESTYLE_MIN_SHOW_BEATS
+    // (freestyle.freestylePickSwitch — every slot restarted a clip, so at 1-beat and ½-beat slots no move was ever seen
+    // whole); a sooner pick waits and update() dances the newest one when the time is up. Everything else about the pick —
+    // judgement, banner, instrument, variety — is the pick's now.
+    if (pick) {
+      lastPickMove = pick.move;
+      const nowBeat = (clock.song(audioNow()) - latencySec - startAt) / beatDuration(track.bpm);
+      const sw = freestylePickSwitch({ pick: pick.move, dancing: moveClipId, lastPickBeat: pickSwitchBeat, nowBeat });
+      if (sw === 'now') { danceMove(pick.move, false); pickSwitchBeat = nowBeat; queuedPick = null; }
+      else if (sw === 'later') queuedPick = pick.move;
+      else queuedPick = null;
+    }
+    // MUSIC-SUITE P9 FIX PASS: an unpressed freestyle slot ducks the instrument of the move the player has been picking —
+    // or none yet — never the slot's default clip (Top Rock's percussion, which a B/X/Y freestyler never used)
+    const missedFree = !!step && label === 'MISS' && isFreeSlot(step);
+    const judgedClip = pick?.move ?? (missedFree ? lastPickMove ?? undefined : step?.clipId);
+    // MUSIC-SUITE P9 FIX PASS: a press hold's head was just hit — its move holds its floor pose while the key stays down
+    if (step && label !== 'MISS' && isPressHold(step) && perf.holding) heldClipId = step.clipId;
+    // the rush/drag line (finish): every hit's signed offset — a miss has no timing to learn from
+    if (label !== 'MISS' && typeof deltaMs === 'number' && Number.isFinite(deltaMs)) offsets.push(deltaMs);
     if (band instanceof YourSongBand) {
       // MUSIC-SUITE P7 ("your beat"): a dance step carries no per-instrument lane the way a PERFORM note does, so
       // every judged hit — whichever move it was — counts toward the next of YOUR song's own parts joining; a MISS
@@ -658,8 +869,8 @@ export const DanceMode: ModeDefinition = (() => {
         const joined = band.hit();
         if (joined) { joinBanner = `${band.name(joined)}${band.isFel(joined) ? ' · FEL' : ''} JOINS THE BAND`; instrumentJoined = true; }
       }
-    } else if (band && step) {
-      const cat = DANCE_LIBRARY.find((c) => c.id === step.clipId)?.category;
+    } else if (band && step && judgedClip) {
+      const cat = moveOf(judgedClip)?.category;   // MUSIC-SUITE P9: the pick's, on a freestyle slot (moves: a captured move's family)
       if (cat) {
         const before = band.level(cat);
         band.judge(cat, label);
@@ -690,8 +901,10 @@ export const DanceMode: ModeDefinition = (() => {
     const dirTag = label === 'MISS' && typeof deltaMs === 'number'
       ? (deltaMs < 0 ? ' — EARLY' : ' — LATE')
       : '';
+    // MUSIC-SUITE P9: a freestyle hit names the move picked, and says so when repeating it cost (freestyleBanner)
+    const pickName = pick ? (moveOf(pick.move)?.name ?? 'MOVE') : '';
     ctx.setHud({
-      banner: joinBanner ?? (combo >= 4 ? `${label}  ×${combo}` : `${label}${dirTag}`),
+      banner: joinBanner ?? (pick ? freestyleBanner(label, pickName, pick.factor, combo) : combo >= 4 ? `${label}  ×${combo}` : `${label}${dirTag}`),
       score: perf.score,
       combo,
       // MUSIC-SUITE P7 (2026-09-29): instrument chips replace the one MIX bar (energy/energyLabel) — one chip per
@@ -761,6 +974,109 @@ export const DanceMode: ModeDefinition = (() => {
     setTimeout(() => ctx.setHud({ banner: '' }), joinBanner ? 1000 : 380);
   }
 
+  /**
+   * MUSIC-SUITE P9 (2026-09-29): a press hold ended (DancePerformance.onHoldEnd) — kept to its end (a PERFECT tail) or
+   * dropped (a MISS tail: let go early, or a hold whose head was never pressed). Its tail answers like any judgement:
+   * the held move's instrument (a freeze's horns) comes up or ducks, the miss streak counts it, the banner says which.
+   */
+  function onHoldEnd(ctx: ModeContext, kept: boolean, step: DanceStep, combo: number): void {
+    // MUSIC-SUITE P9 FIX PASS: the hold is over — a held floor pose goes into its rise now (kept at its end, or let go)
+    heldClipId = null;
+    releasePose(clock.song(audioNow()) - latencySec);
+    if (band instanceof YourSongBand) { if (kept) band.hit(); else band.miss(); }
+    else {
+      const cat = moveOf(step.clipId)?.category;   // MUSIC-SUITE P9 moves: a captured freeze's hold earns HORNS too
+      if (band && cat) band.judge(cat, kept ? 'PERFECT' : 'MISS');
+    }
+    if (kept) missStreak = 0;
+    else { missStreak++; if (missStreak === 3) queueStoop('dance.missstreak'); }
+    ctx.setHud({
+      banner: kept ? (combo >= 4 ? `HELD  ×${combo}` : 'HELD') : 'HOLD DROPPED',
+      score: perf.score, combo, instruments: instrumentsHud(),
+    });
+    if (kept) ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.1, 0)), 'HELD', '#fde047');
+    setTimeout(() => ctx.setHud({ banner: '' }), 380);
+  }
+
+  /** MUSIC-SUITE P9: THE ONE SEAM every judged press goes through — `heard` on the judge's clock, `key` the input (a
+   *  press hold ends on its release), the pad's move for a freestyle pick. A duel's press list (dance/houseSong.ts
+   *  records {tMs, key, move}) hangs off here and judgeRelease. */
+  function judgePress(heard: number, key: PressKey): void {
+    // MUSIC-SUITE P9 (fair dance duels): an Arena run records every press it judges, exactly as judged (houseSong.ts
+    // dancePress: heard seconds from beat 0, the key, the pad's move) — the list the server rejudges. A list is capped
+    // (DANCE_MAX_PRESSES, the server's own limit): past it a press is neither judged nor recorded, so the two never part.
+    if (arena) {
+      // MUSIC-SUITE P9 FIX PASS (2026-09-29): nothing after the set's end is judged or recorded — the rejudge ignores it
+      // (housePressJudged), and parseDancePresses refuses a WHOLE list with a time over the set's end + 1 s, so a press
+      // handled after a ~1 s main-thread stall at the song's end lost the set (a final refusal: the attempt scored 0)
+      if (arena.phase !== 'playing' || heard - startAt > houseSongEndSec(arena.house)) return;
+      if (!recordArena(dancePress(heard - startAt, { key, move: padMove(key) }))) return;
+    }
+    void perf.hit(heard, { key, move: padMove(key) });   // onJudged already reported it
+  }
+
+  /** MUSIC-SUITE P9: a key came up on the judge's clock — it ends a press hold held by that key (anything else is a
+   *  no-op that costs nothing). */
+  function judgeRelease(heard: number, key: PressKey): void {
+    if (!perf?.holding) return;
+    // MUSIC-SUITE P9 (fair dance duels): a release that reaches the judge is on the list too (it can end a hold)
+    // (MUSIC-SUITE P9 FIX PASS: not past the set's end — see judgePress)
+    if (arena && (arena.phase !== 'playing' || heard - startAt > houseSongEndSec(arena.house))) return;
+    if (arena && !recordArena(dancePress(heard - startAt, { key, up: true }))) return;
+    void perf.release(heard, key);
+  }
+
+  /** MUSIC-SUITE P9 (fair dance duels): put one input on the Arena list; false = the list is full (nothing judged). */
+  function recordArena(p: HousePress): boolean {
+    if (!arena || arena.presses.length >= DANCE_MAX_PRESSES) return false;
+    arena.presses.push(p);
+    return true;
+  }
+
+  /** MUSIC-SUITE P9 (free dance): a press dances the pad's move on the spot — no judge, no score. */
+  function freeDanceMove(ctx: ModeContext, key: PressKey): void {
+    danceMove(padMove(key), false);
+    const name = moveOf(padMove(key))?.name ?? 'MOVE';
+    ctx.setHud({ banner: name.toUpperCase() });
+    setTimeout(() => ctx.setHud({ banner: '' }), 380);
+  }
+
+  /** MUSIC-SUITE P9 (free dance): the whole band from the first beat — every stem up through the band's own public
+   *  judge (FULL_BAND_HITS clean hits takes a silent stem to full), or every part of your own song joined. */
+  function fillBand(): void {
+    if (!band) return;
+    if (band instanceof YourSongBand) { for (let i = 0; i < band.parts().length; i++) if (!band.hit()) break; return; }
+    for (const cat of STEM_ORDER) for (let i = 0; i < FULL_BAND_HITS; i++) band.judge(cat, 'PERFECT');
+  }
+
+  /** MUSIC-SUITE P9 (free dance): the song is over — back to the pick screen, never ctx.end (runEnding): no session
+   *  is posted, so nothing pays a run nobody judged. Free dance stays on for the next pick. */
+  function backToPick(ctx: ModeContext): void {
+    perf?.stop();
+    const a = audioNow();
+    band?.dispose(); band = null;
+    kit?.cancelFrom(a);
+    phase = 'pick'; countArmed = false; startAt = 0; lastBar = -1; pickSec = 0; pickShownSec = 0;
+    currentClip = null; currentCategory = null; dragClip = null; bio.beat = null; beatUntil = 0;
+    moveClipId = null; heldClipId = null; posedAt = null; pickSwitchBeat = null; queuedPick = null;   // MUSIC-SUITE P9 FIX PASS
+    body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
+    stoopQueue.clear();
+    ctx.setHud({ cues: [], nextStep: '', nextStepIn: null, instruments: '', hint: '' });
+    showPick(ctx);
+  }
+
+  /** MUSIC-SUITE P9: the per-song best grades (coaching.GradeBook), device-local. */
+  function readGradeBook(): ReturnType<typeof parseGradeBook> {
+    try { return parseGradeBook(typeof localStorage === 'undefined' ? null : localStorage.getItem(GRADES_KEY)); } catch { return {}; }
+  }
+  function saveBest(songId: string, accuracy: number): void {
+    try {
+      const book = readGradeBook();
+      const next = recordBest(book, songId, accuracy);
+      if (next !== book) localStorage.setItem(GRADES_KEY, JSON.stringify(next));
+    } catch { /* storage blocked: the grade shows on the card, it just is not remembered */ }
+  }
+
   function finish(ctx: ModeContext): void {
     if (ended) return;
     ended = true;
@@ -769,6 +1085,7 @@ export const DanceMode: ModeDefinition = (() => {
     bio.beat = null; beatUntil = 0;
     body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
     currentClip = null;
+    moveClipId = null; heldClipId = null; posedAt = null; queuedPick = null;   // MUSIC-SUITE P9 FIX PASS
     const r = perf.result();
     const cleanHits = r.counts.PERFECT + r.counts.GREAT + r.counts.GOOD;
     const rounds = cleanHits + r.counts.MISS;
@@ -808,16 +1125,25 @@ export const DanceMode: ModeDefinition = (() => {
     // update()'s own early return means pollStoop() will never run again to flush anything left in the queue.
     if (grade === 'S') speakStoopNow(ctx, 'dance.topgrade');
     else if (grade === 'D') speakStoopNow(ctx, 'dance.lowgrade');
+    // MUSIC-SUITE P9: the rush/drag line (coaching.timingLean — the hits' signed mean offset, in plain words) takes the
+    // top chip for the results beat, and this song's best grade is remembered for the pick screen (a shipped song only:
+    // an export's chart is the player's own and changes with every export).
+    const lean = timingLean(offsets, { recalibrate: phonePresses === 0 });   // MUSIC-SUITE P9 FIX PASS: a phone's lean is its radio
+    if (track.song) saveBest(track.id, r.accuracy);
     ctx.setHud({
       banner: `${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}  ${accuracy}%  ·  GRADE ${grade}  ·  MIX ${mixPct}%`,
       cues: [],
       nextStep: '',
       instruments: '',   // MUSIC-SUITE P7: the chip row goes with the cue lane — the results screen has its own MIX %
+      ...(lean ? { round: lean.line } : {}),
     });
     // Results screen: the timing host reads outcome ('GREAT' => won),
     // stats.hits/stats.rounds for its headline, and score. The proof line
     // (lib/proofLine.ts 'dance') reads stars / accuracy / maxCombo.
-    ctx.end(r.stars >= 3 ? 'GREAT' : 'GOOD', r.score, {
+    // MUSIC-SUITE P9: after RESULTS_BEAT_SEC (its own doc), so the room's results beat is seen before the card covers
+    // it; the new stats (offsetMs, variety, holds) are additive — nothing that reads the old keys changes.
+    const outcome = r.stars >= 3 ? 'GREAT' : 'GOOD';
+    const stats: Record<string, number> = {
       hits: cleanHits,
       rounds,
       stars: r.stars,
@@ -829,7 +1155,112 @@ export const DanceMode: ModeDefinition = (() => {
       miss: r.counts.MISS,
       bpm: track.bpm,
       difficulty: track.difficulty,
-    });
+      ...(lean ? { offsetMs: lean.meanMs } : {}),
+      ...(r.variety !== undefined ? { variety: Math.round(r.variety * 100) } : {}),
+      ...(r.holds ? { holdsKept: r.holds.kept, holdsDropped: r.holds.dropped } : {}),
+    };
+    // MUSIC-SUITE P9 (fair dance duels): an Arena run ends through its own path — its press list posted (kept on the
+    // device until the Arena has it), then the shell handed the ACCURACY score the server rejudges, never r.score
+    if (arena) { void sendArena(ctx, arena.presses.slice(), performance.now()); return; }
+    holdResults(() => ctx.end(outcome, r.score, stats), RESULTS_BEAT_SEC * 1000);
+  }
+
+  /** MUSIC-SUITE P9 FIX PASS (2026-09-29): hold ctx.end for the results beat — and let dispose FLUSH it (resultEnd's doc). */
+  function holdResults(end: () => void, waitMs: number): void {
+    if (resultTimer) clearTimeout(resultTimer);
+    resultEnd = end;
+    resultTimer = setTimeout(() => { resultTimer = null; const f = resultEnd; resultEnd = null; f?.(); }, waitMs);
+  }
+
+  // ── MUSIC-SUITE P9 (2026-09-29): THE ARENA RUN'S POSTS (dance/arenaDance.ts decides; music/arenaAttempt.ts posts) ──
+  const arenaStore = (): Storage | null => { try { return typeof window === 'undefined' ? null : window.sessionStorage; } catch { return null; } };
+  // (MUSIC-SUITE P9 FIX PASS: every post names the room — the route refuses a Cypher on a music duel's id, 400 WRONG_ROOM,
+  // before anything is used)
+  const postAttempt = (body: Record<string, unknown>) => postArenaAttempt((u, i) => fetch(u, i), { ...body, room: 'dance' });
+
+  /** The ready screen before START: the house song on the banner, ONE ATTEMPT and the rules (said before the count-in). */
+  function showArenaReady(ctx: ModeContext, line?: string): void {
+    if (!arena) return;
+    const hud = arenaReadyHud(arena.house);
+    // (the timing host draws round / banner / nextStep for dance, not hint: a line to say goes on the top chip)
+    ctx.setHud({ ...hud, ...(line ? { round: line, hint: line } : {}), nextStepIn: null, score: 0, combo: 0 });
+  }
+
+  /**
+   * START on the ready screen: the attempt's start is posted FIRST (/api/arena/music-attempt {phase: 'start', attemptId})
+   * and only a 'play' answer counts in — the attempt is used the moment START is pressed (DANCE_ARENA_RULES). A used
+   * attempt (a reload, another tab) settles now; no answer is said as unknown and START can be pressed again (the same
+   * attemptId: the same start); a refusal is the Arena's final word.
+   */
+  async function startArena(ctx: ModeContext): Promise<void> {
+    if (!arena || arena.phase !== 'ready') return;
+    SoundKit.unlock();   // inside the press, before any await (assumption, as the Academy's: a WebKit resume needs a gesture)
+    arena.phase = 'starting';
+    ctx.setHud({ nextStep: 'STARTING…' });
+    if (!arena.attemptId) arena.attemptId = makeAttemptId();
+    const res = await postAttempt({ matchId: arena.matchId, phase: 'start', attemptId: arena.attemptId });
+    // MUSIC-SUITE P9 FIX PASS: a 'play' answer must be a DANCE start (it carries the house `song`; a music start answers
+    // `beat`) — a server from before the room check could take a Cypher's start on a music duel
+    const v = arenaStartVerdict(res).kind === 'play' && !(res.body && typeof res.body.song === 'object')
+      ? { kind: 'refused' as const, line: 'This duel is not a Cypher dance duel — open it where it was made.' }
+      : arenaStartVerdict(res);
+    if (!arena || ended || arena.phase !== 'starting') return;   // the room was left while the Arena answered
+    if (v.kind === 'retry') { arena.phase = 'ready'; showArenaReady(ctx, v.line); return; }
+    if (v.kind === 'refused') { arena.phase = 'refused'; ctx.setHud({ round: v.line, nextStep: 'THE ARENA SAID NO', hint: v.line }); return; }
+    if (v.kind === 'used') {
+      const u = arenaUsedEnd(arena.house, readDanceFinish(arenaStore(), arena.matchId), v);
+      ended = true;
+      if (u.kind === 'send') { ctx.setHud({ round: 'Your set was danced but never reached the Arena — sending it now.' }); await sendArena(ctx, u.presses, performance.now()); return; }
+      clearDanceFinish(arenaStore(), arena.matchId);
+      endArena(ctx, u.end, performance.now());
+      return;
+    }
+    // the attempt is on: a fresh list, and the house song's count-in (beginCountIn builds the house chart)
+    arena.phase = 'playing';
+    arena.presses = [];
+    beginCountIn(ctx);
+  }
+
+  /**
+   * Post a finished set's list (kept on the device first), retried; the shell is handed the score only once the Arena HAS
+   * the set. Unsent: the room says so, keeps the list, and A sends it again (a final refusal is said and left there).
+   */
+  async function sendArena(ctx: ModeContext, presses: HousePress[], since: number): Promise<void> {
+    if (!arena) return;
+    arena.phase = 'finishing';
+    keepDanceFinish(arenaStore(), arena.matchId, presses);
+    ctx.setHud({ nextStep: 'SENDING YOUR SET TO THE ARENA…' });
+    const v = arenaFinishVerdict(await postAttempt({ matchId: arena.matchId, phase: 'finish', taps: presses }));
+    if (!arena) return;
+    if (v.kind === 'unsent') {
+      arena.unsent = presses;
+      arena.phase = v.final ? 'refused' : 'unsent';
+      if (v.final) clearDanceFinish(arenaStore(), arena.matchId);
+      ctx.setHud({ round: v.line, nextStep: v.final ? 'SET REFUSED' : ARENA_DANCE_UNSENT_HINT, hint: v.line });
+      return;
+    }
+    clearDanceFinish(arenaStore(), arena.matchId);
+    arena.unsent = null;
+    endArena(ctx, arenaFinishEnd(arena.house, presses, v), since);
+  }
+
+  /** The end of an Arena run: the score the server rejudges, said, then the shell's card after the results beat. */
+  function endArena(ctx: ModeContext, end: ArenaDanceEnd, since: number): void {
+    if (!arena) return;
+    arena.phase = 'done';
+    arena.ended = end;
+    // the score the Arena checks on the bottom line (finish()'s grade banner and rush/drag chip stay); a set settled at
+    // START (a used attempt — no finish ran here) says why on the top chip
+    ctx.setHud({ nextStep: `ARENA SCORE ${arenaScoreWords(end.score)}`, nextStepIn: null, hint: end.line, ...(phase === 'pick' ? { round: end.line } : {}) });
+    const v = end.verdict;
+    const hits = v.counts.PERFECT + v.counts.GREAT + v.counts.GOOD;
+    const stats: Record<string, number> = {
+      hits, rounds: hits + v.counts.MISS, stars: v.stars, accuracy: Math.round(v.accuracy * 100), maxCombo: v.maxCombo,
+      perfect: v.counts.PERFECT, great: v.counts.GREAT, good: v.counts.GOOD, miss: v.counts.MISS,
+      bpm: track.bpm, difficulty: track.difficulty, arenaScore: end.score,
+    };
+    const wait = Math.max(0, RESULTS_BEAT_SEC * 1000 - (performance.now() - since));
+    holdResults(() => ctx.end(v.stars >= 3 ? 'GREAT' : 'GOOD', end.score, stats), wait);
   }
 
   // ── the pick screen ───────────────────────────────────────────────────
@@ -837,6 +1268,7 @@ export const DanceMode: ModeDefinition = (() => {
   /** MUSIC-SUITE P2: where to fix a late-feeling room. The pick screen publishes only round / banner / nextStep, and the
    *  timing host (not this lane's file) draws no hint there, so the top chip alternates the track's blurb with this. */
   function pickRound(): string {
+    if (freeDance) return FREE_DANCE_CHIP;   // MUSIC-SUITE P9: while it is on, the chip says so — every time
     if (Math.floor(pickShownSec / PICK_CAL_FLIP_SEC) % 2 === 0) return track.blurb.toUpperCase();
     const cal = loadRoomCalibration();
     const saved = cal.offsetMs;
@@ -875,12 +1307,21 @@ export const DanceMode: ModeDefinition = (() => {
     playPreview(track);
     ctx.setHud({
       round: pickRound(),
-      banner: pickBanner(track),
-      nextStep: '◀ ▶  TRACK   ·   A  START',        // short: on a phone this panel sits beside the TAP button
+      // MUSIC-SUITE P9: the song's best grade on this device, beside its name (coaching.withBest)
+      banner: withBest(pickBanner(track), track.song ? readGradeBook()[track.id] : undefined),
+      nextStep: pickHint(freeDance),        // short: on a phone this panel sits beside the TAP button
       nextStepIn: null,
       score: 0,
       combo: 0,
     });
+  }
+
+  /** MUSIC-SUITE P9: d-pad UP on the pick screen turns free dance on or off (owner decision #3's toggle). */
+  function toggleFreeDance(ctx: ModeContext): void {
+    freeDance = !freeDance;
+    pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;   // choosing, not idle: the auto-start waits
+    SoundKit.play('uiTick', { pitch: freeDance ? 1.4 : 0.8, volume: 0.3 });
+    showPick(ctx);
   }
 
   function movePick(ctx: ModeContext, dir: 1 | -1): void {
@@ -903,7 +1344,9 @@ export const DanceMode: ModeDefinition = (() => {
     perf = new DancePerformance(track.bpm);
     // A player's exported song carries its OWN steps — they are the song's drums, and re-rolling them from a
     // seed would discard the only thing the export exists to preserve. Shipped tracks generate as before.
-    const mine = stepsFor(track);
+    // MUSIC-SUITE P9 (fair dance duels): an Arena run dances its HOUSE SONG's chart — houseSongSteps, the function the
+    // server rejudges with, never stepsFor (whose first answer is the player's own export: own songs are free play only)
+    const mine = arena ? houseSongSteps(arena.house) : stepsFor(track);
     // MUSIC-SUITE P7 (six-songs): mine is non-null for every shipped track too now (stepsFor falls through to
     // stepsForSong), so this generateRoutine call is unreachable for a shipped song — it only still runs for the
     // rare pre-P7 export with steps but no real-audio payload.
@@ -917,6 +1360,13 @@ export const DanceMode: ModeDefinition = (() => {
     // pass ALL of onJudged's args through — a 3-arg arrow here silently
     // dropped the step (no band motion ever) and the delta (no EARLY/LATE)
     perf.onJudged = (l, p, c, step, deltaMs) => onJudged(ctx, l, p, c, step, deltaMs);
+    // MUSIC-SUITE P9: a press hold's tail, and which bars are freestyle (null: an export — all called bars, as ever)
+    perf.onHoldEnd = (kept, step, _pts, combo) => onHoldEnd(ctx, kept, step, combo);
+    barKinds = track.song ? barKindsFor(track.song) : null;
+    lastBar = -1;
+    offsets = [];
+    // MUSIC-SUITE P9 FIX PASS: a new run starts with no pose, pick or phone press carried over
+    heldClipId = null; posedAt = null; pickSwitchBeat = null; queuedPick = null; lastPickMove = null; phonePresses = 0;
 
     SoundKit.unlock();   // the shared context: a no-op once running (the harness unlocks it on the first gesture)
     band?.dispose();
@@ -927,7 +1377,10 @@ export const DanceMode: ModeDefinition = (() => {
     // stepsFor(track) now ALSO answers every SHIPPED track (danceTracks.stepsForSong), so `mine` alone can no
     // longer tell "an export" from "a shipped song" apart; a shipped track still never pays for the extra
     // localStorage read, it just asks its own `song` field instead of asking `mine`.
-    const myExport = !track.song ? readExportedTrack() : null;
+    // MUSIC-SUITE P9 (dance cards): the export only when THIS track is the export — a dance card has no song either, and
+    // used to fall through here into the export's own band (dance/danceCard.ts: a card dances to the FEL synth band)
+    const exported = !track.song ? readExportedTrack() : null;
+    const myExport = exported && exported.track.id === track.id ? exported : null;
     if (myExport?.song && audioCtx && bus) {
       const ac = audioCtx;
       const deps: YourSongRenderDeps = {
@@ -946,6 +1399,7 @@ export const DanceMode: ModeDefinition = (() => {
     }
     band?.setClock((sec) => clock.audio(sec));
     bandJoined = new Set();
+    if (freeDance) fillBand();   // MUSIC-SUITE P9: free dance — the band plays everything from the first beat
     kit?.retune(track.bpm, kitPattern(track.id));
 
     // The clock is armed on the first PLAYING tick (update), not here: on a
@@ -954,7 +1408,8 @@ export const DanceMode: ModeDefinition = (() => {
     startAt = 0;
     countArmed = false;
     ctx.setHud({ round: track.name, banner: '4', nextStep: '', nextStepIn: null });
-    console.log(`[FEL-DANCE] track ${track.id} ${track.bpm}bpm ${track.bars} bars d${track.difficulty} · kit voices ${kit?.voices ?? 0}`);
+    console.log(`[FEL-DANCE] track ${track.id} ${track.bpm}bpm ${track.bars} bars d${track.difficulty} · ${routine.length} steps · `
+      + `${barKinds ? barKinds.filter((k) => k === 'free').length : 0} freestyle bars${freeDance ? ' · FREE DANCE (no judge)' : ''} · kit voices ${kit?.voices ?? 0}`);
   }
 
   /**
@@ -1050,6 +1505,14 @@ export const DanceMode: ModeDefinition = (() => {
       currentCategory = null;   // MUSIC-SUITE P8: reset with everything else — playStep fills it in per step
       dragClip = null; dragUntil = 0;   // MUSIC-SUITE P8 FIX: no stale drag carried from a previous run's last step
       bio.dejected = false;   // MUSIC-SUITE P8 FIX: no stale dejected pose carried from a previous run's D grade
+      // MUSIC-SUITE P9: no bars, offsets or results beat carried over; free dance opens from `?free=1` (else off)
+      barKinds = null; lastBar = -1; offsets = [];
+      if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
+      resultEnd = null;
+      // MUSIC-SUITE P9 FIX PASS: no move, pose, pick or phone count carried over
+      moveClipId = null; moveStartHeard = 0; heldClipId = null; posedAt = null; pickSwitchBeat = null; queuedPick = null;
+      lastPickMove = null; phonePresses = 0; arenaPauseSaid = false;
+      freeDance = typeof window !== 'undefined' && freeDanceFromQuery(window.location.search);
       // MUSIC-SUITE P8: Stoop's own per-run state — a fresh seed and no memory of the last visit's lines, else every
       // visit after the first would pick up rotating exactly where the last one left off.
       stoopRnd = mulberry32(newRunSeed()); stoopLast = new Map(); stoopQueue.clear(); stoopCaptionUntil = 0; stoopSpeakingUntil = 0; missStreak = 0;
@@ -1079,8 +1542,12 @@ export const DanceMode: ModeDefinition = (() => {
       if (process.env.NODE_ENV === 'development') {
         // MUSIC-SUITE P2 probe seam (dev only, like stagePosture above): a probe that times a press "on the beat" needs
         // the song clock's mapping — song time is not the audio clock once the game has been held (READY counts too)
-        const dev = (window as unknown as { __FEL_DEV__?: { danceClock?: unknown } }).__FEL_DEV__;
+        const dev = (window as unknown as { __FEL_DEV__?: { danceClock?: unknown; danceMove?: unknown; danceRegistered?: unknown } }).__FEL_DEV__;
         if (dev) {
+          // MUSIC-SUITE P9 moves probe seam (dev only): dance one move by id through the room's own path (danceMove: the
+          // resolver, the BeatOwner loop, the root layer), and list what registered — how the captured moves are looked at
+          dev.danceMove = (id: string, mirrored = false) => { danceMove(id, mirrored); return currentClip; };
+          dev.danceRegistered = () => [...registered];
           dev.danceClock = {
             audioNow: () => audioNow(),
             song: () => clock.song(audioNow()),
@@ -1096,8 +1563,18 @@ export const DanceMode: ModeDefinition = (() => {
 
       // The kit loads its stems now (retuned to the picked track later) so the
       // count-in clicks are audible the moment the player locks a track in.
-      const deepLink = typeof window !== 'undefined' ? trackFromQuery(window.location.search) : null;
-      track = deepLink ?? trackById(DEFAULT_TRACK_ID);
+      // MUSIC-SUITE P9 (fair dance duels): `?arena=<matchId>` — the duel's HOUSE SONG is the track (no pick, no deep link,
+      // no free dance), and nothing starts until START posts the one attempt (startArena)
+      const arenaId = typeof window !== 'undefined' ? arenaMatchFromQuery(window.location.search) : null;
+      arena = arenaId ? { matchId: arenaId, house: houseSongFor(arenaId), phase: 'ready', presses: [], attemptId: null, unsent: null, ended: null } : null;
+      if (arena) freeDance = false;
+      const deepLink = arena ? null : typeof window !== 'undefined' ? trackFromQuery(window.location.search) : null;
+      // MUSIC-SUITE P9 (dance cards): `?card=<id>` (My Creations' DANCE IT) opens the pick screen ON the card put on this
+      // device — focused, not started (the player sees the routine's name and tempo, may toggle free dance, presses A).
+      // A link whose card is not on this device finds nothing and opens the pick screen as ever. Never in an Arena run.
+      const cardId = arena || deepLink || typeof window === 'undefined' ? null : cardIdFromQuery(window.location.search);
+      const cardPick = cardId ? allTracks().find((t) => t.id === cardId) ?? null : null;
+      track = arena ? houseSongTrack(arena.house) : deepLink ?? cardPick ?? trackById(DEFAULT_TRACK_ID);
       kit = audioCtx && bus ? new KitPulse(audioCtx, bus, track.bpm, kitPattern(track.id)) : null;
       kit?.setClock((sec) => clock.audio(sec));
       void kit?.load().catch(() => 0);
@@ -1115,7 +1592,8 @@ export const DanceMode: ModeDefinition = (() => {
       if (deepLink) beginCountIn(ctx);       // ?track=<id>: straight to the count-in — Stoop's open/walk-out both
                                                // fit a browsed pick screen, not a link dropped straight onto the floor
       else {
-        showPick(ctx);
+        // MUSIC-SUITE P9 (fair dance duels): an Arena run's ready screen — the house song, ONE ATTEMPT, the rules
+        if (arena) { playPreview(track); showArenaReady(ctx); } else showPick(ctx);
         // MUSIC-SUITE P8: exactly one of the two — a first-ever visit to the Cypher (device-local) hears
         // dance.newdancer instead of dance.open, never both.
         const seen = seenFirstTime(readDanceSeen(), 'newdancer');
@@ -1125,6 +1603,12 @@ export const DanceMode: ModeDefinition = (() => {
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
+      // MUSIC-SUITE P9 (fair dance duels): a finished set the Arena has not got yet — A (or B) sends it again. Read before
+      // the `ended` gate: the run has ended, its list has not landed.
+      if (arena?.phase === 'unsent' && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B') && arena.unsent) {
+        void sendArena(ctx, arena.unsent, performance.now());
+        return;
+      }
       if (ended) return;
       syncHold(ctx);   // a resume's own events (the resync) must see the count back in
       // MUSIC-SUITE P2 (2026-09-25): ONE PHYSICAL PRESS = ONE JUDGED TAP (SongClock.danceTap). R2 tapped on every event
@@ -1133,18 +1617,44 @@ export const DanceMode: ModeDefinition = (() => {
       // the trigger is edge-latched (a pull from under 0.3 to 0.5, nothing again until it is let go), SPACE taps on its
       // key-down marker, and SPACE's made-up key-up A is ignored. The latch reads every trigger event in every phase, so
       // a trigger held through the count-in (or re-sent by the resume) is not a tap.
-      const t = danceTap(trig, e);
-      trig = t.latch;
+      // MUSIC-SUITE P9 (2026-09-29): pressEdge (dance/freestyle.ts) is danceTap underneath, UNCHANGED — the same inputs
+      // tap, on the same edges — and it also names the key (a press hold ends on its release; a freestyle press picks
+      // the key's move), reads X / Y (presses like A / B — the FIX PASS; they also pick in freestyle), and reports releases.
+      const edge = pressEdge(trig, e);
+      trig = edge.latch;
       if (phase === 'pick') {
+        // MUSIC-SUITE P9 (fair dance duels): the ready screen takes START (A / B) and nothing else — no browse, no free dance
+        if (arena) {
+          if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) void startArena(ctx);
+          return;
+        }
         if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) movePick(ctx, e.dir === 'right' ? 1 : -1);
         else if (e.t === 'stick' && e.side === 'L') {
           if (!stickLatch && Math.abs(e.x) > 0.6) { stickLatch = true; movePick(ctx, e.x > 0 ? 1 : -1); }
           else if (Math.abs(e.x) < 0.3) stickLatch = false;
         } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) beginCountIn(ctx);
+        // MUSIC-SUITE P9: d-pad UP turns free dance on or off — on the d-pad, not a face button, so every input reaches it:
+        // a pad, the keyboard's ArrowUp (its d-pad event; the stick it also sends is ignored here) and the touch rig's
+        // d-pad (the dance overlay offers one face verb, TAP — scripts/verb-key-alignment-tests.ts holds the two together)
+        else if (e.t === 'dpad' && e.pressed && e.dir === 'up') toggleFreeDance(ctx);
         return;
       }
-      if (!t.tap) return;
+      // MUSIC-SUITE P9 FIX PASS (2026-09-29): a PHONE event (dance/phonePadLink.ts — the pad marks it for the length of this
+      // call) is judged half its measured round trip earlier in free play, as PERFORM corrects a phone tap (P6); an Arena
+      // run offers no phone pad and corrects nothing (phonePressBackdateSec). Its presses keep the lean line off
+      // /play/calibrate (finish): the radio is not the screen or the speakers.
+      const phone = phonePadLink.current();
+      const phoneBack = phone ? phonePressBackdateSec(phone.rttMs, !!arena) : 0;
+      if (phone && edge.down) phonePresses++;
+      // MUSIC-SUITE P9: a key coming up ends a press hold held by it — while the song takes input. A release during a
+      // pause or the count back in is not judged: that hold then runs to its end and is KEPT (a pause never drops it).
+      if (edge.up && !freeDance && (phase === 'playing' || phase === 'countin')) {
+        const ar = audioNow();
+        if (clock.accepting(ar, MISS_AFTER)) judgeRelease(clock.song(ar) - latencySec - phoneBack, edge.up);
+      }
+      if (!edge.down) return;
       if (phase === 'countin') {
+        if (freeDance) return;   // MUSIC-SUITE P9: nothing to judge — the first press after GO dances
         // MUSIC-SUITE P2 FIX PASS (2026-09-25): a tap inside beat 0's early window is a tap on beat 0. This returned for
         // every count-in tap, and the room leaves the count-in on the first frame whose SONG time reaches beat 0 while
         // taps are judged on the HEARD clock, so a tap up to 200 ms early on the first step (every shipped chart starts
@@ -1152,16 +1662,19 @@ export const DanceMode: ModeDefinition = (() => {
         // (update), so hit() takes beat 0 early; earlier count-in taps are counting along, and stay ignored.
         const ac = audioNow();
         if (!clock.accepting(ac, MISS_AFTER)) return;
-        const heardNow = clock.song(ac) - latencySec;
-        if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) void perf.hit(heardNow);
+        const heardNow = clock.song(ac) - latencySec - phoneBack;
+        if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) judgePress(heardNow, edge.down);
         return;
       }
       if (phase !== 'playing') return;
       const a = audioNow();
       if (!clock.accepting(a, MISS_AFTER)) return;   // paused, or counting back in (syncHold)
+      if (freeDance) { freeDanceMove(ctx, edge.down); return; }   // MUSIC-SUITE P9: no judge — the press dances
       // judged on the HEARD clock: the song time the press lands at, minus the latency (the step times are when the
       // band SOUNDS them on the song clock)
-      void perf.hit(clock.song(a) - latencySec);   // onJudged already reported it
+      const heard = clock.song(a) - latencySec - phoneBack;
+      // (MUSIC-SUITE P9 FIX PASS: every pad button presses on every step — X and Y were dropped on called steps: freestyle.ts)
+      judgePress(heard, edge.down);   // onJudged already reported it
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -1171,10 +1684,13 @@ export const DanceMode: ModeDefinition = (() => {
 
       syncHold(ctx);
       if (phase === 'pick') {
+        // MUSIC-SUITE P9 (fair dance duels): an Arena attempt never starts itself — it is used the moment START is pressed
+        if (arena) return;
         // A viewer with no controller (or a capture harness) still gets a
         // routine: the default track starts itself after a few seconds.
         // (MUSIC-SUITE P2: pickSec restarts on every browse — movePick.)
-        const pt = pickTimer(pickSec, { type: 'tick', dt }, PICK_TIMEOUT_SEC);   // danceRoomFlow: tested in node
+        // (MUSIC-SUITE P9 FIX PASS: `held` while the phone pad is being paired — the pick screen waits for a press)
+        const pt = pickTimer(pickSec, { type: 'tick', dt, held: phonePadLink.armed() }, PICK_TIMEOUT_SEC);   // danceRoomFlow: tested in node
         pickSec = pt.sec;
         const flip = Math.floor(pickShownSec / PICK_CAL_FLIP_SEC);
         pickShownSec += dt;
@@ -1199,7 +1715,8 @@ export const DanceMode: ModeDefinition = (() => {
       // jump on a resume (syncHold's count-back), which a setTimeout would miss entirely.
       if (dragClip) {
         if (now >= dragUntil) {
-          if (currentClip === dragClip) me.animator.setSpeed(currentClip, clipSpeed());
+          // (MUSIC-SUITE P9 FIX PASS: never over a held floor pose — releasePose restores the speed when the hold ends)
+          if (currentClip === dragClip && posedAt === null) me.animator.setSpeed(currentClip, clipSpeed());
           dragClip = null;
         }
       }
@@ -1245,17 +1762,37 @@ export const DanceMode: ModeDefinition = (() => {
         // rather than waiting for the player's first judged step to publish it at all.
         // MUSIC-SUITE P7 ("your beat"): the hint names what is actually being earned — your song's own parts, not a
         // generic "move family", when the room is playing YourSongBand.
-        const goHint = band instanceof YourSongBand
-          ? "Your song is the band — hit on the beat and each of your own parts joins it"
-          : 'Every move family is an instrument — hit on the beat and the band builds';
-        ctx.setHud({ banner: 'GO', hint: goHint, instruments: instrumentsHud() });
+        // MUSIC-SUITE P9: free dance says what it is — no judge, every button a move, the whole band already playing
+        const goHint = freeDance
+          ? 'Free dance — no score. A, B, X and Y each dance a move; the band plays it all'
+          : band instanceof YourSongBand
+            ? "Your song is the band — hit on the beat and each of your own parts joins it"
+            : 'Every move family is an instrument — hit on the beat and the band builds';
+        ctx.setHud({ banner: freeDance ? 'FREE DANCE' : 'GO', hint: goHint, instruments: instrumentsHud() });
         setTimeout(() => ctx.setHud({ banner: '' }), 500);
         // MUSIC-SUITE P8: the GO-beat opener — your own song gets its own call, everything else gets the
         // call-and-response hype (mutually exclusive: exactly one queues, dance.ownsong OR dance.callresponse).
         queueStoop(band instanceof YourSongBand ? 'dance.ownsong' : 'dance.callresponse');
       }
 
-      perf.update(heard);
+      // MUSIC-SUITE P9: free dance runs no judge — nothing fires, nothing expires, nothing scores (a press dances in
+      // onInput); the song plays to its end and the room goes back to the pick screen (runEnding: never ctx.end)
+      if (!freeDance) perf.update(heard);
+      // MUSIC-SUITE P9 FIX PASS (2026-09-29): A HELD FREEZE HOLDS. While a press hold is down on a floor move, the clip stops
+      // on its last floor pose before the rise (floorPhase.holdPoseDue) — the baby freeze is a 2-beat loop that stood the
+      // dancer up at 1½ beats in the middle of 2½–3-beat holds, and a player who let go when the body stood was ~0.9 s early
+      // (HOLD DROPPED). onHoldEnd lets it go into its rise the moment the hold ends: the body holds as long as the button.
+      if (posedAt === null && currentClip && holdPoseDue({ holding: perf.holding, heldClipId, playingClipId: moveClipId, beatsInto: (heard - moveStartHeard) / bd })) {
+        me.animator.setSpeed(currentClip, HOLD_POSE_SPEED);
+        posedAt = heard;
+      }
+      // MUSIC-SUITE P9 FIX PASS: a freestyle pick that waited (freestyle.freestylePickSwitch) is danced once its time is up
+      if (queuedPick && pickSwitchBeat !== null && (heard - startAt) / bd - pickSwitchBeat >= FREESTYLE_MIN_SHOW_BEATS - 1e-9) {
+        const q = queuedPick;
+        queuedPick = null;
+        danceMove(q, false);
+        pickSwitchBeat = (heard - startAt) / bd;
+      }
       band?.update(now);
       if (!isSongTrack) kit?.update(now);   // MUSIC-SUITE P7 (six-songs): the song's own bed+drums stems are the floor
 
@@ -1270,6 +1807,19 @@ export const DanceMode: ModeDefinition = (() => {
       const songBeat = (heard - startAt) / bd;
       if (songBeat >= 0) hud.beatPulse = 1 - (songBeat % 1);
 
+      // MUSIC-SUITE P9: FREESTYLE AND CALL BARS (owner decision #3). On entering a bar (heard clock, 0-based from beat
+      // 0) its cue fires once: Stoop's dance.freestyle / dance.callbar line is QUEUED a bar ahead of the switch it
+      // announces — through the same SpeechQueue + judge-window guard P8 built (queueStoop), so it is only said in a gap
+      // and never over a scored window — and the banner is raised on the switch itself (freestyle.barCue).
+      const barIdx = Math.floor(songBeat / 4 + 1e-9);
+      const inFreeBar = !freeDance && barKindAt(barKinds, barIdx) === 'free';
+      if (songBeat >= 0 && barIdx > lastBar) {   // only forward: a count back in replays a bar, it does not re-announce it
+        lastBar = barIdx;
+        const cue = freeDance ? null : barCue(barKinds, barIdx);
+        if (cue?.stoop) queueStoop(cue.stoop);
+        if (cue?.banner) { hud.banner = cue.banner; setTimeout(() => ctx.setHud({ banner: '' }), 900); }
+      }
+
       // MUSIC-SUITE P8 (2026-09-25): the front audience camera + the lamp/LED-wall/podium pulse — the SAME heard
       // clock the beat-pulse dot above reads, so what the camera does and what the HUD shows agree. `perf.combo`
       // drives "wide on streaks"; `currentCategory === 'freeze'` (read inside applyStageCamera) drives "low on
@@ -1277,7 +1827,10 @@ export const DanceMode: ModeDefinition = (() => {
       // camera and the stage dressing freeze with everything else — decision #8 + PLAN phase 8 item 1.
       {
         const bp = beatBus?.phase(heard) ?? { beatIndex: 0, beatPhase: 0, barIndex: 0, barPhase: 0 };
-        applyStageCamera(ctx, bp.beatPhase, perf.combo, beatBus?.cheerPulse(heard) ?? 0);
+        // MUSIC-SUITE P9: a freestyle bar is the dancer's showcase — framed by the SAME "wide on streaks" behaviour
+        // (a streak value, never a new camera); free dance is framed as a long streak throughout
+        const streak = inFreeBar || freeDance ? Math.max(perf.combo, FREESTYLE_CAMERA_STREAK) : perf.combo;
+        applyStageCamera(ctx, bp.beatPhase, streak, beatBus?.cheerPulse(heard) ?? 0);
       }
 
       // THE CUE — the next move and when it lands. Without it the judging
@@ -1286,22 +1839,43 @@ export const DanceMode: ModeDefinition = (() => {
       // LANE of the next few moves (couch-readable, A+ mission #1) plus the
       // one-line "NOW" call the bezel already drew.
       // (MUSIC-SUITE P2: on the heard clock, so a cue reaches the line when its beat reaches the ear)
-      const upcoming = perf.upcoming(heard, 6);
-      hud.cues = cueLane(upcoming, heard);
+      // MUSIC-SUITE P9: the lane draws the chart's press kinds (a hold, an accent, a double, a freestyle slot —
+      // danceTracks.cueLane, given the bpm for a hold's length); free dance has no lane (no judge, nothing to cue)
+      const upcoming = freeDance ? [] : perf.upcoming(heard, 6);
+      hud.cues = cueLane(upcoming, heard, undefined, track.bpm);
       const next = upcoming[0];
-      if (next) {
-        const clip = DANCE_LIBRARY.find((c) => c.id === next.step.clipId);
-        hud.nextStep = clip?.name?.toUpperCase() ?? 'MOVE';
+      if (!freeDance && perf.holding) {
+        // MUSIC-SUITE P9 FIX PASS (2026-09-29): a hold being held says so, and counts down — the next move is not named
+        // until it ends (freestyle.holdingLine's doc: the line named the next move mid-freeze, and players let go)
+        hud.nextStep = holdingLine(moveOf(heldClipId ?? moveClipId ?? '')?.name ?? 'IT', perf.holdLeftSec(heard));
+        hud.nextStepIn = null;
+      } else if (next) {
+        const clip = moveOf(next.step.clipId);   // MUSIC-SUITE P9 moves: a captured move is named too
+        // (MUSIC-SUITE P9 FIX PASS: a hold's cue says how long — freestyle.upcomingHoldLine)
+        hud.nextStep = isFreeSlot(next.step) ? FREE_NEXT_STEP
+          : isPressHold(next.step) ? upcomingHoldLine(clip?.name ?? 'MOVE', next.step.pressHoldBeats!)
+            : `${clip?.name?.toUpperCase() ?? 'MOVE'}`;
         hud.nextStepIn = Math.max(0, Math.round((next.time - heard) * 100) / 100);
-      }
+      } else if (freeDance) { hud.nextStep = FREE_NEXT_STEP; hud.nextStepIn = null; }
       ctx.setHud(hud);
 
       // The routine is over one full beat after the last step's window closes,
       // so a final PERFECT is never cut off by the results screen.
-      if (songBeat > perf.totalBeats + 1) finish(ctx);
+      // MUSIC-SUITE P9: a free-dance song goes back to the pick screen instead (runEnding — no ctx.end, no session)
+      if (songBeat > perf.totalBeats + 1) {
+        if (runEnding(freeDance) === 'repick') backToPick(ctx);
+        else finish(ctx);
+      }
     },
 
     dispose() {
+      // MUSIC-SUITE P9: the results beat's timer goes with the room. MUSIC-SUITE P9 FIX PASS (2026-09-29): and the ctx.end it
+      // was holding is FLUSHED, not dropped — a song danced to its end still posts its session (resultEnd's doc)
+      if (resultTimer) { clearTimeout(resultTimer); resultTimer = null; }
+      { const f = resultEnd; resultEnd = null; try { f?.(); } catch (err) { console.error('[FEL-DANCE] the held results could not be posted on leave:', err); } }
+      // MUSIC-SUITE P9 (fair dance duels): an Arena post still in flight finishes on its own (its list is kept on the
+      // device), but nothing is handed to a shell that is gone — the next visit's START settles the used attempt
+      arena = null;
       stopPreview();   // MUSIC-SUITE P7 (six-songs): leaving the room is a blur too
       stoopQueue.clear(); VoiceKit.stop('booth', 0.12);   // MUSIC-SUITE P8: Stoop never bleeds into the next room
       releaseSession?.(); releaseSession = null;   // MUSIC-SUITE P2 FIX PASS: the audio session goes back
