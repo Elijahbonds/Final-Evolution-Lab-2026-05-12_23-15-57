@@ -1,4 +1,4 @@
-import { Barlow_Condensed, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import { TabBar } from '@/components/shell/tab-bar'
 import { StatusRail } from '@/components/shell/status-rail'
 import './globals.css'
@@ -13,9 +13,30 @@ import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 
 export const dynamic = 'force-dynamic'
 
-const barlow = Barlow_Condensed({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-display' })
-const plexSans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-sans' })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
+// FONT-LOCAL (2026-09-30): the three faces load from files committed in app/fonts (next/font/local), not from
+// next/font/google, which fetched them from Google at build time and failed CI's builds whenever that fetch did
+// (the next/font loader error in this file). Same families, weights and CSS variables; the files are the latin
+// subsets next/font/google itself served (provenance and licence: app/fonts/README.md).
+const barlow = localFont({
+  src: [
+    { path: './fonts/barlow-condensed-latin-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-600.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-700.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-800.woff2', weight: '800', style: 'normal' },
+  ],
+  variable: '--font-display',
+  display: 'swap',
+})
+const plexSans = localFont({
+  src: [{ path: './fonts/ibm-plex-sans-latin-variable.woff2', weight: '400 700', style: 'normal' }],
+  variable: '--font-sans',
+  display: 'swap',
+})
+const jetbrainsMono = localFont({
+  src: [{ path: './fonts/jetbrains-mono-latin-variable.woff2', weight: '100 800', style: 'normal' }],
+  variable: '--font-mono',
+  display: 'swap',
+})
 
 // A shared link is the product's first impression, so the card carries the page's own
 // promise. It used to read "Premium athlete-development game — train, compete, evolve":
