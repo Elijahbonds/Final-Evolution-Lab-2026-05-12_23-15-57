@@ -305,6 +305,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
 
   return {
     modeId: 'surf', camPreset: 'surf',
+    hideRingInPlay: true,
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab, the cutback and the spin this mode reads itself
     body: { lines: rideLines('surf') },
     // Per-venue light and horizon, read at mount (see SkateRunMode). This is also what finally mounts the painted

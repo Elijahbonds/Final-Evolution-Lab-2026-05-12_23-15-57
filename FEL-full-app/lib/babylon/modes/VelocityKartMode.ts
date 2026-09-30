@@ -817,6 +817,7 @@ function finish(ctx: ModeContext): void {
 
 return {
   modeId: 'velocitykart',
+  hideRingInPlay: true,
   // A GETTER, read at mount after the course has been picked: a plain value would be evaluated when the mode
   // definition is built, which is before anybody has chosen a map, and every track would be lit for Venice.
   get mood(): ModeDefinition['mood'] { return readCourse('kart').mood; },

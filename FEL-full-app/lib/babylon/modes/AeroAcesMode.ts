@@ -314,6 +314,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
   return {
     modeId: 'aeroaces',
+    hideRingInPlay: true,
     get mood(): ModeDefinition['mood'] { return readCourse('aero').mood; },
     camPreset: 'flyer',
 

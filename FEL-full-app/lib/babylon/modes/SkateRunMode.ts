@@ -547,6 +547,7 @@ export const SkateRunMode: ModeDefinition = (() => {
 
   return {
     modeId: 'skateboard', camPreset: 'board',
+    hideRingInPlay: true,
     // MOVEMENT PLAY P8: the step is the mode's — a kick-push with the back foot is the PUSH (the row binds no step); the card
     // says the floor's lines, then the grab, the spin and the push this mode reads itself
     body: { claims: ['step'], lines: rideLines('skateboard', ['step']) },
