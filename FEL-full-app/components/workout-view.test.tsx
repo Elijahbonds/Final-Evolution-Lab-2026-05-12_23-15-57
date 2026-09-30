@@ -8,6 +8,7 @@ import { HELD_LINE, PLAN_REVISED_NOTE, PLAN_REVISED_NOTE_YOUTH, planRevisionNote
 import { PLAN_SALE_PAUSED } from '@/lib/workout/plan-sale';
 import { screenText } from '@/lib/share/screen';
 import { DEMO_CONSENT, demoScan, SavedPlans, WorkoutView, type SavedPlan } from './workout-view';
+import { OFF_DAY_WEEK_LINE } from '@/lib/coach/offDay';
 
 // /workout has no camera capture. Its "scan" used to POST random numbers to /api/v1/workout/scan, which stored them
 // as a real WorkoutScan — and playerIdentity reads the newest scan's avatarSpec as a measured body. What it shows now
@@ -154,6 +155,37 @@ describe('SavedPlans, a buyer\'s plans', () => {
 
   it('survives a stored plan of a shape it does not know', () => {
     expect(() => renderToStaticMarkup(createElement(SavedPlans, { saved: [plan(null, null), plan([{ days: [null] }], null)] }))).not.toThrow();
+  });
+});
+
+// MIRROR-COACH P6 (2026-09-29): the plan's week showed Mon, Wed and Fri and nothing else — four blanks a week. Every
+// week now runs Mon → Sun and the days the plan does not name are off days that say what an off day is.
+describe('SavedPlans, the whole week', () => {
+  const plan = (weeks: unknown): SavedPlan => ({ id: 'p1', tier: 'plan_4w', focus: 'Mobility & Range', weeks, revisionNote: null });
+  const weeks = generatePlan(analyzeMovement(defaultMetrics()), 'plan_4w').weeks;
+
+  it('every week of a bought plan has seven days in order, Tue/Thu/Sat/Sun as off days with the off-day line', () => {
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [plan(weeks)] }));
+    const days = [...html.matchAll(/data-plan-day="(\w+)" data-kind="(\w+)"/g)].map((m) => `${m[1]}:${m[2]}`);
+    expect(days).toHaveLength(7 * weeks.length);
+    expect(days.slice(0, 7)).toEqual(['Mon:training', 'Tue:off', 'Wed:training', 'Thu:off', 'Fri:training', 'Sat:off', 'Sun:off']);
+    expect(html.split(OFF_DAY_WEEK_LINE).length - 1).toBe(4 * weeks.length);
+    expect(html).toContain('Tue — Off day');
+    // the training days are exactly what they were
+    for (const d of weeks[0].days) for (const ex of d.exercises) expect(html).toContain(`${ex.name} · ${ex.sets}×${ex.reps}`);
+  });
+
+  it('a youth reader\'s week has the same off days: the off day is youth-safe (a walk, stretches, a breath)', () => {
+    const youth = revisePlan(JSON.parse(JSON.stringify(weeks)), 'youth').weeks as unknown[];
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [plan(youth)] }));
+    expect(html.split(OFF_DAY_WEEK_LINE).length - 1).toBe(4 * youth.length);
+  });
+
+  it('a plan whose days are not days of the week shows as it always did, with no invented off days', () => {
+    const html = renderToStaticMarkup(createElement(SavedPlans, { saved: [plan([{ week: 1, days: [{ day: 'Day 1', exercises: [{ name: 'Goblet Squat', sets: 3, reps: '8' }] }] }])] }));
+    expect(html).toContain('Goblet Squat · 3×8');
+    expect(html).not.toContain(OFF_DAY_WEEK_LINE);
+    expect(html).not.toContain('data-plan-day');
   });
 });
 

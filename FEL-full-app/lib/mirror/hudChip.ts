@@ -7,8 +7,9 @@
 import { screenFor, type ScreenId } from './screen';
 import type { RunnerPhase } from './screenRunner';
 import type { SquatStage } from './squatStage';
+import type { LungeStage } from './lungeStage';
 
-export type MirrorPattern = 'pressRow' | 'jump' | 'squat' | 'screen';
+export type MirrorPattern = 'pressRow' | 'jump' | 'squat' | 'lunge' | 'screen';
 
 export interface ChipInput {
   pattern: MirrorPattern;
@@ -17,6 +18,8 @@ export interface ChipInput {
   /** Jump: the DunkTracker's state. */
   jumpState: string;
   squatStage: SquatStage;
+  /** The lunge's per-side session stage (MIRROR-COACH P4 lane 1) — 'left', 'right' or 'review'. */
+  lungeStage: LungeStage;
   /** Screen: the runner's latest state (null before its first tick). */
   runner: { screen: ScreenId; phase: RunnerPhase; stationIndex: number } | null;
 }
@@ -40,11 +43,17 @@ export function screenChip(runner: ChipInput['runner']): string {
   return `Station ${i + 1} of ${stations.length}${what ? ` · ${shortCheckLabel(what)}` : ''}`;
 }
 
+/** The lunge's chip: which leg's set is on, or the review — MIRROR-COACH P4 lane 1. */
+export function lungeChip(stage: LungeStage): string {
+  return stage === 'review' ? 'Review' : `${stage} leg`;
+}
+
 export function chipLabel(c: ChipInput): string {
   const by: Record<MirrorPattern, () => string> = {
     pressRow: () => c.phase,
     jump: () => JUMP[c.jumpState] ?? c.jumpState,
     squat: () => c.squatStage,
+    lunge: () => lungeChip(c.lungeStage),
     screen: () => screenChip(c.runner),
   };
   return by[c.pattern]();

@@ -21,3 +21,11 @@ export const PRIVACY_LINK_TARGET = { href: '/screen/privacy' } as const;
 export const PRIVACY_PATH = PRIVACY_LINK_TARGET.href;
 /** A program lane's sample page: the address carries only the lane. */
 export const programPath = (lane: LaneSlug): string => `/screen/program/${lane}`;
+
+/**
+ * The Quick Screen's own paths: /screen, /screen/**, /play/mirror/assess/**. There the app mounts no next-auth
+ * SessionProvider (components/providers.tsx, which re-exports this) and no crash report is sent (SCREEN-FIX-2 amend 4:
+ * app/global-error.tsx, and the screen's own boundary). Moved here from components/providers.tsx, unchanged, so the
+ * crash screen can read it without importing next-auth.
+ */
+export const isQuickScreenPath = (p: string): boolean => /^\/(screen|play\/mirror\/assess)(\/|$)/.test(p);

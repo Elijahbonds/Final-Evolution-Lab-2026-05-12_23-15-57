@@ -8,9 +8,11 @@
 // `simple` (a breath or mobility item): reps or seconds only. A weight box, reps-in-reserve and an effort rating on
 // crocodile breathing are questions with no answer, and a client who meets them on every prep item learns to skip
 // the boxes on the lifts too.
+import { useEffect, useState } from 'react';
 import { Copy, Minus, Plus } from 'lucide-react';
 import {
-  EFFORT_ANCHOR, RIR_ANCHORS, effortOptions, SET_LIMITS, copyPrevious, emptySetDraft, isWeightUnit, rirAnchor, type SetDraft, type WeightUnit,
+  EFFORT_ANCHOR, RIR_ANCHORS, effortOptions, SET_LIMITS, copyPrevious, emptySetDraft, isWeightUnit, logsInMinutes, minutesText,
+  minutesToSecondsText, rirAnchor, type SetDraft, type WeightUnit,
 } from '@/lib/coach/setLog';
 
 /** The client's kg/lb choice: a per-device convenience (localStorage), in try/catch because storage can be blocked. */
@@ -30,6 +32,22 @@ export function UnitSwitch({ unit, onChange }: { unit: WeightUnit; onChange: (u:
 }
 
 const input = 'w-full min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm placeholder:text-white/25';
+
+/**
+ * A long timed set's box, in MINUTES (MIRROR-COACH P6 FIX, 2026-09-29 — lib/coach/setLog.ts logsInMinutes): the off
+ * day's walk read "12 min" on its dose line and asked for seconds, so "12" logged 12 seconds. The draft keeps seconds;
+ * only the box speaks minutes. Its own text state lets "12." sit mid-typing; a timer run that fills the set re-syncs it.
+ */
+function MinutesBox({ n, workSeconds, hintSeconds, onSeconds }: { n: number; workSeconds: string; hintSeconds: string; onSeconds: (s: string) => void }) {
+  const [text, setText] = useState(() => minutesText(workSeconds));
+  useEffect(() => { if (minutesToSecondsText(text) !== workSeconds) setText(minutesText(workSeconds)); }, [workSeconds]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-white/40">
+      <input aria-label={`Set ${n} minutes`} value={text} inputMode="decimal" placeholder={minutesText(hintSeconds)} className={input}
+        onChange={(e) => { const t = e.target.value.replace(/[^0-9.]/g, ''); setText(t); const sec = minutesToSecondsText(t); if (sec !== null) onSeconds(sec); }} />min
+    </label>
+  );
+}
 const RIR_HINT = 'Reps left: how many more clean reps you could have done.';
 
 export function SetLogger({ name, rows, unit, timed, simple = false, youth = false, repsHint, workHint, onChange }: {
@@ -59,7 +77,9 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
           <div key={i} className="rounded-lg border border-white/6 bg-white/[0.02] p-2 space-y-1.5" data-set-row={i}>
             <div className="flex items-center gap-2">
               <div className="w-10 shrink-0 text-[11px] uppercase tracking-wider text-white/40">Set {n}</div>
-              {timed ? (
+              {timed && logsInMinutes(workHint) ? (
+                <MinutesBox n={n} workSeconds={r.workSeconds} hintSeconds={workHint} onSeconds={(workSeconds) => set(i, { workSeconds })} />
+              ) : timed ? (
                 <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-white/40">
                   <input aria-label={`Set ${n} seconds`} value={r.workSeconds} onChange={(e) => set(i, { workSeconds: e.target.value })} inputMode="numeric" placeholder={workHint} className={input} />s
                 </label>

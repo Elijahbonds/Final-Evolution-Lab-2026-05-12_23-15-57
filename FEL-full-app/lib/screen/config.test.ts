@@ -17,8 +17,10 @@ describe('the free game is /try, the guest dunk contest', () => {
     expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(/if \(!session\) redirect\('\/login'\)/);
   });
 
-  it('13 and older, signed out: /try, or the env route when it is valid and open to a guest', () => {
-    for (const age of ['13-17', '18+'] as const) {
+  // CHANGED (SCREEN-FIX-2, S-10): was 13 and older; 13–17 lose the /try link (no page reads this now: the results'
+  // free-game button is gone, retest 1 L5)
+  it('18 or older, signed out: /try, or the env route when it is valid and open to a guest', () => {
+    for (const age of ['18+'] as const) {
       expect(screenNextTarget(age, undefined), age).toBe('/try');
       expect(screenNextTarget(age, ''), age).toBe('/try');
       expect(screenNextTarget(age, '/try?c=abc'), age).toBe('/try?c=abc');
@@ -26,8 +28,8 @@ describe('the free game is /try, the guest dunk contest', () => {
     }
   });
 
-  it('under 13, "rather not say" and no answer: no target at all', () => {
-    for (const age of ['under-13', 'unknown', null, undefined] as const) {
+  it('under 18, "rather not say" and no answer: no target at all', () => {
+    for (const age of ['under-13', '13-17', 'unknown', null, undefined] as const) {
       expect(screenNextTarget(age, undefined), String(age)).toBeNull();
       expect(screenNextTarget(age, '/try'), String(age)).toBeNull();
     }

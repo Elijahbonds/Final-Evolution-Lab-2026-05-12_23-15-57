@@ -6,6 +6,7 @@ import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isValidEmail, normalizeEmail, hashIp } from '@/lib/marketing/funnel';
 import { sendWelcomeEmail, notifyAdminNewLead } from '@/lib/marketing/email';
+import { joinLabEnabled } from '@/lib/marketing/joinLab';
 
 /**
  * POST /api/marketing/subscribe  (PUBLIC)
@@ -16,6 +17,10 @@ import { sendWelcomeEmail, notifyAdminNewLead } from '@/lib/marketing/email';
  * emails. A referral code (?ref) is recorded for the referral loop (Phase 5).
  */
 export async function POST(req: Request) {
+  // JOIN-LAB-HIDE: closed while the Join the Lab form is hidden (lib/marketing/joinLab.ts). Nothing below runs: no rate
+  // limit, no body read, no database read or write, no email.
+  if (!joinLabEnabled()) return NextResponse.json({ error: 'closed' }, { status: 404 });
+
   const ip = clientKeyFromHeaders(req.headers);
   const rl = rateLimit(`subscribe:${ip}`, 8, 15 * 60 * 1000);
   if (!rl.ok) {

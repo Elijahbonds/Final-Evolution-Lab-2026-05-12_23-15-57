@@ -21,8 +21,10 @@ import { TREE_INCLUDE, toTree } from './server';
 import { logEntryIsEmpty, summaryToWrite, type CleanSet } from './setLog';
 import { todayExercise, variationIds, type CatalogueCoachingRow, type TodayExercise } from './today';
 import { youthRules } from './taxonomy';
+import { isHardStopped, latestIntake, RED_FLAG_COPY } from '../health/intake';
+import { weekView, type WeekEntry } from './offDay';
 
-export type TodayDb = Pick<PrismaClient, 'coachingProgram' | 'user' | 'exerciseLog' | 'programExercise' | 'session' | 'clientSession' | 'setLog' | '$transaction'>;
+export type TodayDb = Pick<PrismaClient, 'coachingProgram' | 'user' | 'exerciseLog' | 'programExercise' | 'session' | 'clientSession' | 'setLog' | 'healthIntake' | '$transaction'>;
 
 export interface OpenSetLog { id: string; setIndex: number; reps: number | null; weightKg: number | null; rir: number | null; effort: number | null; workSeconds: number | null; note: string | null }
 export interface OpenLog {
@@ -34,17 +36,41 @@ export interface TodayPayload {
   program: { id: string; name: string; coachName: string } | null;
   today: {
     block: { id: string; order: number; label: string; targetDate: string | null };
-    session: { id: string; order: number; label: string; exercises: TodayExercise[] };
+    /**
+     * MIRROR-COACH P6 (2026-09-29): `kind` — 'recovery' for an off day (lib/coach/offDay.ts): Today shows it as an off
+     * day, with no generated warm-up and no automatic cool-down (its own Cool-down section is both).
+     */
+    session: { id: string; order: number; label: string; kind: 'training' | 'recovery'; exercises: TodayExercise[] };
     index: number; total: number;
+    /** MIRROR-COACH P6: this week (today's block), every session in order with its state, off days named. */
+    week: { label: string; entries: WeekEntry[] };
   } | null;
-  open: { id: string; logs: OpenLog[] } | null;
+  /** `cooldownDone` (MIRROR-COACH P6): the open session's automatic cool-down was already tapped done. */
+  open: { id: string; logs: OpenLog[]; cooldownDone: boolean } | null;
   recentComments: { exercise: string; comment: string | null; at: Date | string | null }[];
+  /**
+   * MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
+   * red-flag hard stop": lib/health/intake.ts's own doc comment on RED_FLAG_COPY claims it is "shown whenever a
+   * red-flag answer hard-stops the Mirror, pain check-ins and training features" — Today (this payload) is that
+   * third surface, and until this fix nothing here ever read it. True only while a standing HealthIntake red flag
+   * has not been self-attested cleared (lib/health/intake.ts isHardStopped). today-view.tsx blocks logging on this,
+   * and saveClientLog below refuses a save server-side too — a client is never trusted to enforce this alone.
+   */
+  hardStopped: boolean;
+  redFlagCopy: string | null;
 }
 
 const SET_ORDER = { setLogs: { orderBy: { setIndex: 'asc' as const } } };
 
 /** GET /api/coach/me/today — the client's next session across their active programs, with the open log and recent coach comments. */
 export async function loadToday(db: TodayDb, userId: string): Promise<TodayPayload> {
+  // MIRROR-COACH P5 FIX (2026-09-29, code review): computed once, ahead of the program loop, so it lands in every
+  // return below regardless of which one this call takes (a live session, a finished program, or no program at all —
+  // a standing red flag should read as blocked on every one of those, not just the common case).
+  const intake = await latestIntake(db, userId);
+  const hardStopped = isHardStopped(intake);
+  const redFlagCopy = hardStopped ? RED_FLAG_COPY : null;
+
   const programs = await db.coachingProgram.findMany({
     where: { clientId: userId, isActive: true }, orderBy: { startDate: 'asc' },
     include: { ...TREE_INCLUDE, clientSessions: { where: { clientId: userId }, include: { exerciseLogs: { include: SET_ORDER } }, orderBy: { createdAt: 'desc' } } },
@@ -79,11 +105,16 @@ export async function loadToday(db: TodayDb, userId: string): Promise<TodayPaylo
       program: { id: p.id, name: p.name, coachName: coach?.name ?? coach?.email?.split('@')[0] ?? 'coach' },
       today: {
         block: { id: next.block.id, order: next.block.order, label: next.block.label, targetDate: next.block.targetDate },
-        session: { id: next.session.id, order: next.session.order, label: next.session.label, exercises: next.session.exercises.map((e) => todayExercise(e, rows.get(e.id), names, { youth })) },
+        session: {
+          id: next.session.id, order: next.session.order, label: next.session.label, kind: next.session.kind === 'recovery' ? 'recovery' : 'training',
+          exercises: next.session.exercises.map((e) => todayExercise(e, rows.get(e.id), names, { youth })),
+        },
         index: next.index, total: next.total,
+        week: { label: next.block.label, entries: weekView(next.block.sessions, done, next.session.id) },
       },
-      open: open ? { id: open.id, logs: open.exerciseLogs as unknown as OpenLog[] } : null,
+      open: open ? { id: open.id, logs: open.exerciseLogs as unknown as OpenLog[], cooldownDone: !!open.cooldownDoneAt } : null,
       recentComments: recentComments.map((l) => ({ exercise: l.sessionExercise.exercise.name, comment: l.coachComment, at: l.coachCommentAt })),
+      hardStopped, redFlagCopy,
     };
   }
   // Every active program is finished. This used to answer { program: null } too, so a client who had just pressed Done
@@ -93,9 +124,9 @@ export async function loadToday(db: TodayDb, userId: string): Promise<TodayPaylo
   // read "Program complete — nothing left on the plan"; that falls through to "no active program", as before P2.
   if (finished) {
     const coach = await db.user.findUnique({ where: { id: finished.coachId }, select: { name: true, email: true } });
-    return { program: { id: finished.id, name: finished.name, coachName: coach?.name ?? coach?.email?.split('@')[0] ?? 'coach' }, today: null, open: null, recentComments: [] };
+    return { program: { id: finished.id, name: finished.name, coachName: coach?.name ?? coach?.email?.split('@')[0] ?? 'coach' }, today: null, open: null, recentComments: [], hardStopped, redFlagCopy };
   }
-  return { program: null, today: null, open: null, recentComments: [] };
+  return { program: null, today: null, open: null, recentComments: [], hardStopped, redFlagCopy };
 }
 
 export type SaveResult =
@@ -113,6 +144,11 @@ const fail = (status: number, error: string, extra: { sessionExerciseId?: string
  * program. Every entry is validated before anything is written, so a refused set saves nothing.
  */
 export async function saveClientLog(db: TodayDb, userId: string, body: Record<string, unknown>): Promise<SaveResult> {
+  // MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
+  // red-flag hard stop": the client is never trusted to enforce loadToday's own `hardStopped` flag by itself —
+  // this is the server-side half, checked before any read or write below.
+  if (isHardStopped(await latestIntake(db, userId))) return fail(403, 'health_hard_stopped');
+
   const programId = String(body.programId ?? ''), sessionId = String(body.sessionId ?? '');
   const program = await db.coachingProgram.findUnique({ where: { id: programId }, select: { id: true, clientId: true, isActive: true } });
   if (!program || program.clientId !== userId) return fail(403, 'forbidden');

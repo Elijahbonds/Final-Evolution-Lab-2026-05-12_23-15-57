@@ -104,8 +104,25 @@ const PROTOCOLS: Record<ZoneId, Omit<PinAndStretch, 'zone' | 'comOrder' | 'becau
  *
  * Takes the same drift signals RNT reads, so an athlete gets ONE coherent plan — release the
  * restriction, then re-pattern it — rather than two tools disagreeing about what is wrong.
+ *
+ * MIRROR-COACH P5 (2026-09-29), owner decision #6: "no pin-and-stretch" for a minor. Pinning tissue under sustained
+ * pressure and holding a breath pattern through it is unsupervised self-administered bodywork — exactly what the
+ * conservative youth rules exist to keep out of a session nobody is reviewing (decision #15: no clinician review, so
+ * stay conservative, stop sooner). Pass lib/mirror/youth.ts isMinorForMirror(User.dobYear), the one age gate the
+ * whole app already shares, the same input painRule.ts's `decide()` and the pain check-in route take.
+ *
+ * MIRROR-COACH P5 FIX (2026-09-29, code review): `isMinor` defaults to `false`, not required. The header above used
+ * to claim "this function had no caller at all before this phase (grep found none outside this file)" — false: it
+ * was wrong. tests/mirror/correctives.test.ts (pre-existing, untouched by this phase) calls this with ONE argument
+ * at six call sites. A required second parameter compiled there only because tsconfig.json's test-file exclude glob
+ * keeps tsc from ever checking that file, and ran there only because a JS `undefined` argument is falsy, which
+ * `if (isMinor) return [];` happened to treat the same as `false` — an accident, not a guarantee. The default keeps
+ * every existing and future untyped caller safe without weakening the check: a caller that explicitly passes `true`
+ * still gets `[]`, and the one thing that changes is that forgetting the argument no longer depends on `undefined`
+ * being falsy.
  */
-export function prescribePinAndStretch(s: MirrorSessionLike, max = 3): PinAndStretch[] {
+export function prescribePinAndStretch(s: MirrorSessionLike, isMinor = false, max = 3): PinAndStretch[] {
+  if (isMinor) return [];
   const minutes = Math.max(s.durationMs, 1) / 60_000;
   const zones = Object.keys(PROTOCOLS) as ZoneId[];
 
