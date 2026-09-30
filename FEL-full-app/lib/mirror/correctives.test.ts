@@ -143,6 +143,18 @@ describe('one press/row set', () => {
     expect(sessionLikeFromSummary(summary({ avgTempo: { pullSec: NaN, pressSec: 1 } })).avgTempo).toBeNull();
   });
 
+  it('the saved set posts the same ms-per-rep tempo (it posted the { pullSec, pressSec } object, which the route stores as 0)', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const harness = readFileSync(resolve(here, '../../app/play/mirror/_components/mirror-harness.tsx'), 'utf8');
+    expect(harness).toMatch(/avgTempoMs: sessionLikeFromSummary\(s\)\.avgTempo,/);
+    expect(harness).not.toMatch(/avgTempoMs: s\.avgTempo\b/);
+    // the route keeps a finite number and zeroes anything else (app/api/mirror/sessions/route.ts num()), so an object
+    // would land as 0 — the adapter's output is a finite number or null
+    const route = readFileSync(resolve(here, '../../app/api/mirror/sessions/route.ts'), 'utf8');
+    expect(route).toMatch(/avgTempoMs: body\.avgTempoMs == null \? null : Math\.round\(num\(body\.avgTempoMs\)\)/);
+    expect(route).toMatch(/const num = \(v: unknown\): number => \(typeof v === 'number' && Number\.isFinite\(v\) \? v : 0\);/);
+  });
+
   it('one band drill per camera signal, even though each of two signals is read into two zones', () => {
     const c = setCorrectives(drifted, null);
     expect(c.band.map((b) => b.signal).sort()).toEqual(['elbowPath', 'shoulderRise', 'trunkShift']);
