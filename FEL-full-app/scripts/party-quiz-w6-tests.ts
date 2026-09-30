@@ -6,7 +6,7 @@
 // Run: npx tsx scripts/party-quiz-w6-tests.ts
 
 import { readFileSync } from 'node:fs';
-import { scriptedNormalRun } from '../lib/babylon/core/TiebreakBlitz';
+import { NORMAL_FEEL, postedScore, scriptedCueRun } from '../lib/babylon/core/TiebreakBlitz';
 import { scriptedSoloClaims } from '../lib/babylon/core/BrainBrawlCore';
 import { whoSceneItStageBox } from '../lib/babylon/modes/whoSceneItFrame';
 import { makeVenueShelf } from '../lib/babylon/modes/whoSceneItVenues';
@@ -18,20 +18,35 @@ const fail: string[] = [];
 const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(label); };
 const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
-// ── tiebreak: a normal run is a contest, and the 2D overlay is gone ──
+// ── tiebreak: the window decides the point, and the 2D overlay is gone ──
 {
-  let under = 0;
-  let sweep = 0;
+  ok(NORMAL_FEEL.gapSec >= 1.2 && NORMAL_FEEL.gapSec <= 1.6, 'tiebreak: the between-point hold is a short beat');
+  const humanError = [0.06, 0.075, 0.09];
   let open = 0;
-  for (let seed = 1; seed <= 40; seed++) {
-    const run = scriptedNormalRun(seed);
-    if (!run.over) open++;
-    if (run.elapsed < 60) under++;
-    if (run.myPts === 0 || run.aiPts === 0) sweep++;
+  let sweep = 0;
+  let kept = 0;
+  let unposted = 0;
+  for (const error of humanError) {
+    for (let seed = 1; seed <= 40; seed++) {
+      const run = scriptedCueRun(seed, error);
+      if (!run.over || (run.myPts < 7 && run.aiPts < 7)) open++;
+      if (run.myPts === 7 && run.aiPts === 0) sweep++;
+      if (run.aiPts === 0 || run.myPts === 0) kept++;
+      if (!Number.isFinite(postedScore(run.myPts, run.bestRally))) unposted++;
+    }
   }
-  ok(open === 0, 'tiebreak: every seeded run ends');
-  ok(under === 0, 'tiebreak: no seeded run finishes inside 60s');
-  ok(sweep === 0, 'tiebreak: both sides score in every seeded run');
+  ok(open === 0, 'tiebreak: every on-cue human run ends');
+  ok(sweep === 0, 'tiebreak: on-cue human timing does not win 7-0');
+  ok(kept === 0, 'tiebreak: on-cue human timing loses some points and still scores');
+  ok(unposted === 0, 'tiebreak: a finished match posts a score');
+  let perfectOpen = 0;
+  let perfectLoss = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = scriptedCueRun(seed, 0);
+    if (!run.over) perfectOpen++;
+    if (!(run.myPts === 7 && run.myPts > run.aiPts)) perfectLoss++;
+  }
+  ok(perfectOpen === 0 && perfectLoss === 0, 'tiebreak: perfect timing still wins');
   const host = src('components/games/tiebreak-game.tsx');
   ok(!host.includes("getContext('2d')"), 'tiebreak host: no 2D canvas');
   ok(!host.includes('/backdrops/tennis.jpg'), 'tiebreak host: no photo backdrop');

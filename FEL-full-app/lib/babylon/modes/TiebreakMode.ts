@@ -12,7 +12,7 @@ import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { SoundKit } from '../audio/SoundKit';
 import {
-  commitSwing, freshBlitz, mulberry32, postedScore, tickBlitz, TARGET,
+  commitSwing, freshBlitz, mulberry32, postedScore, skipGap, tickBlitz, TARGET,
   type BlitzFeel, type BlitzState, type Side, NORMAL_FEEL,
 } from '../core/TiebreakBlitz';
 
@@ -86,6 +86,8 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
 
   function applySwing(ctx: ModeContext, dir: Side): void {
     if (ended) return;
+    // A press during the result beat serves the next ball. The hold is readable, not a lockout.
+    if (skipGap(state)) return;
     const before = state.rally;
     const early = state.ballT < state.windowOpenAt;
     const result = commitSwing(state, dir, rng, reactBase, feel, opts.aiNets);

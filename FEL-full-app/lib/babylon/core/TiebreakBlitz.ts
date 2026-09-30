@@ -33,20 +33,22 @@ export interface BlitzFeel {
 }
 
 /**
- * Opening window is the last 30% of the flight (was the last 38%, and a label named the side).
- * It closes toward the last 12% when a lead and a long rally stack.
- * Between-point hold is 4.0 s (was 1.1 s): seven points used to be over in about 23 s.
+ * The hit window is a short beat at the end of the flight, and it closes further when a lead or a
+ * rally stacks. A swing aimed at the middle still connects; one that is early or late by a realistic
+ * human error does not, and a stacked rally makes that miss more likely — that is how the opponent
+ * takes the point. The between-point hold is a readable result beat (1.4 s, was 4.0 s, originally
+ * 1.1 s). Dead time is not the challenge.
  */
 export const NORMAL_FEEL: BlitzFeel = {
-  windowOpen: 0.70,
-  tightenPerLead: 0.03,
-  tightenPerRally: 0.02,
-  windowOpenMax: 0.88,
-  easePerTrail: 0.025,
-  flight0: 1.55,
-  flightPerRally: 0.06,
-  flightMin: 0.78,
-  gapSec: 4.0,
+  windowOpen: 0.905,
+  tightenPerLead: 0.012,
+  tightenPerRally: 0.014,
+  windowOpenMax: 0.935,
+  easePerTrail: 0.02,
+  flight0: 1.05,
+  flightPerRally: 0.045,
+  flightMin: 0.74,
+  gapSec: 1.4,
   humanSigma: 0.13,
   misreadBase: 0.1,
   misreadPerLead: 0.055,
@@ -122,6 +124,13 @@ function serve(s: BlitzState, rng: () => number, reactBase: number, feel: BlitzF
   s.pendingDir = null;
 }
 
+/** A press during the between-point hold cuts it. The next tick serves. */
+export function skipGap(s: BlitzState): boolean {
+  if (s.over || s.awaiting || s.gap <= 0) return false;
+  s.gap = 0;
+  return true;
+}
+
 function award(s: BlitzState, mine: boolean, feel: BlitzFeel): void {
   if (mine) s.myPts += 1;
   else s.aiPts += 1;
@@ -162,6 +171,16 @@ function gaussian(rng: () => number): number {
   const u = Math.max(1e-9, rng());
   const v = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(Math.PI * 2 * v);
+}
+
+/**
+ * On-cue swing: the correct side, aimed at the middle of the window, plus a timing error uniform in
+ * [-errorSec, errorSec]. errorSec 0 is a perfect read of the cue.
+ */
+export function planCueSwing(s: BlitzState, rng: () => number, errorSec: number): { at: number; dir: Side } {
+  const center = (s.windowOpenAt + s.ballLen) / 2;
+  const error = (rng() * 2 - 1) * Math.max(0, errorSec);
+  return { at: Math.max(0, center + error), dir: s.incoming };
 }
 
 /** A normal player: correct side most of the time, swing aimed at the middle of the window, with noise. */
@@ -218,15 +237,35 @@ export interface ScriptedRun {
   over: boolean;
 }
 
-/** A seeded normal player through a whole tiebreak. `dt` is the sim step in seconds. */
-export function scriptedNormalRun(seed: number, reactBase = 0.95, feel: BlitzFeel = NORMAL_FEEL, dt = 1 / 60): ScriptedRun {
+function runScripted(
+  seed: number,
+  plan: (s: BlitzState, rng: () => number, feel: BlitzFeel) => { at: number; dir: Side },
+  reactBase: number,
+  feel: BlitzFeel,
+  dt: number,
+): ScriptedRun {
   const rng = mulberry32(seed);
   const s = freshBlitz();
-  const cap = 240;
+  const cap = 180;
   while (!s.over && s.elapsed < cap) {
-    tickBlitz(s, dt, { rng, reactBase, feel, aiNets: aiNetsIt, plan: planNormalSwing });
+    tickBlitz(s, dt, { rng, reactBase, feel, aiNets: aiNetsIt, plan });
   }
   return { myPts: s.myPts, aiPts: s.aiPts, bestRally: s.bestRally, elapsed: s.elapsed, over: s.over };
+}
+
+/** A seeded normal player through a whole tiebreak. `dt` is the sim step in seconds. */
+export function scriptedNormalRun(seed: number, reactBase = 0.95, feel: BlitzFeel = NORMAL_FEEL, dt = 1 / 60): ScriptedRun {
+  return runScripted(seed, planNormalSwing, reactBase, feel, dt);
+}
+
+/**
+ * A seeded player who hits the correct side on the cue, with a timing error of ±errorSec.
+ * errorSec 0 is perfect timing. The match uses the same net rate and the same window as live play.
+ */
+export function scriptedCueRun(
+  seed: number, errorSec: number, reactBase = 0.95, feel: BlitzFeel = NORMAL_FEEL, dt = 1 / 60,
+): ScriptedRun {
+  return runScripted(seed, (s, rng) => planCueSwing(s, rng, errorSec), reactBase, feel, dt);
 }
 
 export function mulberry32(seed: number): () => number {
