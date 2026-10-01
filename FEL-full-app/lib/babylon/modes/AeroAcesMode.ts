@@ -725,6 +725,8 @@ export function makeAeroAcesMode(): ModeDefinition {
       ctx.camDirector.update(flight.pos, fwd.scale(flight.speed), null);
       baseFov ??= ctx.camera.fov;
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt);
+      // SPEED-VIGNETTE (racing HUD pass): same opt-in as the kart — report the fraction, the harness frames it.
+      ctx.feel.speedVignette01(flight.speed / (tune.top * 1.4));
       pushHud(ctx);
     },
 
