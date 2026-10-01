@@ -129,7 +129,7 @@ describe('the runner\'s beats (gate 2)', () => {
     expect(run.steps[0]).toBe('framing');
     expect(run.steps).toContain('calibrate');
     expect(run.steps).not.toContain('pain');
-    expect(run.steps.slice(i, i + 5)).toEqual(['position', 'countdown3', 'countdown2', 'countdown1', 'active']);
+    expect(run.steps.slice(i, i + 6)).toEqual(['position', 'countdownnull', 'countdown3', 'countdown2', 'countdown1', 'active']);
     expect(run.steps).toContain('partDone');
     // the third counted rep ends the part on its own frame: the count is said with the done line
     expect(run.counts).toEqual([0, 1, 2]);
