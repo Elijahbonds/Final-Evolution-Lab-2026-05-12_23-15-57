@@ -37,7 +37,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
-import { readCourse, startRace, stepRace, type RaceProgress } from '../core/RaceCourse';
+import { readCourse, startRace, stepRace, toNextGate, type RaceProgress } from '../core/RaceCourse';
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
   makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine, lapProgress,
@@ -78,7 +78,7 @@ const BANANA_RESPAWN_SEC = 10;
 // 1.22 (racing pass phase 6, was 1.16): measured over five circuits, the best rival flew 3.5–6 % slower than a pilot
 // racing the line with the items and the boost, and a pilot with NO items, stunts or boost still won two of them (NEON
 // SKYLINE by 309 m). The field now holds a pilot who only flies the line.
-const RIVAL_PACE = 1.22;
+const RIVAL_PACE = 1.10;
 /** How much a bend slows an aero rival (0..1 of pace at a hairpin) — racing pass phase 6, see the rivals' step. */
 const RIVAL_CORNER_BITE = 0.1;
 /** Racer ids in the item system: 0 is the player, rivals are 1..FIELD. */
@@ -162,11 +162,13 @@ export function makeAeroAcesMode(): ModeDefinition {
   function pushHud(ctx: ModeContext): void {
     if (!flight) return;
     const place = playerPosition(playerDist(), rivals);
+    const { dist } = toNextGate(race, circuit.course, flight.pos);
     const hud: Record<string, HudValue> = {
       lap: `${Math.min(race.lap, circuit.course.laps)}/${circuit.course.laps}`,
       pos: `${ordinal(place)} / ${rivals.length + 1}`,
       place,
       gap: gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist() })), flight.speed),   // phase 5: the gap under the place
+      toGate: Math.round(dist),
       item: S.held ? `${ITEM_LABEL[S.held.kind]}${S.held.level > 1 ? ` ×${S.held.level}` : ''}` : '',
       itemKind: S.held?.kind ?? '',
       itemLevel: S.held?.level ?? 0,
@@ -314,6 +316,9 @@ export function makeAeroAcesMode(): ModeDefinition {
     modeId: 'aeroaces',
     get mood(): ModeDefinition['mood'] { return readCourse('aero').mood; },
     camPreset: 'flyer',
+    // GC-7. After mood/camPreset: pickerReach's modesById() only recognises a modeId whose next property
+    // is mood or camPreset (see VelocityKartMode).
+    hideRingInPlay: true,
 
     async load(ctx: ModeContext): Promise<void> {
       baseFov = null;
@@ -709,6 +714,9 @@ export function makeAeroAcesMode(): ModeDefinition {
         if (finalLap) { SoundKit.play('whistle', { pitch: 1.3 }); ctx.juice.callout('FINAL LAP', '#fde047', 900); }
       }
       if (res.finished || S.graceLeft === 0) { finish(ctx); return; }
+
+      const { gate } = toNextGate(race, circuit.course, flight.pos);
+      ctx.objectiveRef.current = gate?.at.clone() ?? null;
 
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 

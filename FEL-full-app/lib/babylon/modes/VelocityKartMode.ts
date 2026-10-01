@@ -36,7 +36,7 @@ import {
   type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
-  KART_COURSES, readCourse, startRace, stepRace, toNextGate, medalFor, onTrack, TRACK_HALF_WIDTH, courseLength,
+  KART_COURSES, readCourse, startRace, stepRace, toNextGate, trackReturnCue, medalFor, onTrack, TRACK_HALF_WIDTH, courseLength,
   type Course, type RaceProgress,
 } from '../core/RaceCourse';
 import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
@@ -71,6 +71,8 @@ import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
 
+/** WA-16: leader-done grace was 15 s — a clean lap is ~56 s, so lap 1/2 at 121 s was a DNF on the clock. 45 s fits a recovery lap. */
+const KART_FINISH_GRACE_SEC = 45;
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
 let baseFov: number | null = null;
 /** Last frame's finishing place, so an OVERTAKE can be detected as a change rather than a state. */
@@ -723,7 +725,8 @@ function tickField(ctx: ModeContext, dt: number): void {
 }
 function pushHud(ctx: ModeContext): void {
   if (!state) return;
-  const { dist } = toNextGate(race, course, state.pos);
+  const { gate, dist } = toNextGate(race, course, state.pos);
+  const off = !(S.air.airborne || onTrack(state.pos, course));
   ctx.setHud({
     speed: Math.round(state.speed * 3.6),                 // km/h reads better than m/s on a kart
     ...boost.hud(),
@@ -735,6 +738,7 @@ function pushHud(ctx: ModeContext): void {
     // THE GAP under the place (phase 5): seconds to the kart ahead, or the lead
     gap: rivals.length ? gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist })), state.speed) : '',
     toGate: Math.round(dist),
+    trackCue: off ? trackReturnCue(state.pos, course, race, state.heading) : '',
     drift: state.drifting ? Math.round(driftQuality(state) * 100) : 0,
     pos: rivals.length ? `${ordinal(playerPosition(playerDist, rivals))} / ${rivals.length + 1}` : '',
     item: S.held ? `${S.held.kind === 'missile' ? 'SHELL' : ITEM_LABEL[S.held.kind]}${S.held.level > 1 ? ` L${S.held.level}` : ''}` : '',
@@ -817,6 +821,9 @@ return {
   // definition is built, which is before anybody has chosen a map, and every track would be lit for Venice.
   get mood(): ModeDefinition['mood'] { return readCourse('kart').mood; },
   camPreset: 'runner',
+  // GC-7. After mood/camPreset, not before: pickerReach's modesById() only recognises a modeId whose next
+  // property is mood or camPreset, and flag-first here made the mode invisible to that guard.
+  hideRingInPlay: true,
 
   async load(ctx: ModeContext): Promise<void> {
     // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
@@ -1073,14 +1080,16 @@ return {
     // AIRBORNE COUNTS AS ON-ROAD. Off-track costs grip and top speed, and a kart over a rooftop gap is off the
     // polyline by definition — taxing a jump for leaving the road is the opposite of the intent.
     const on = S.air.airborne || onTrack(state.pos, course);
+    const nextGate = toNextGate(race, course, state.pos).gate;
     if (!on) {
       S.offRoadSec += dt;
+      if (nextGate) ctx.objectiveRef.current = nextGate.at.clone();
       // SCORECARD FEEL (2026-09-15): OFF THE ROAD was a number on the HUD and nothing else — the grass is a penalty you
       // should feel and hear, and it is most of what a driver who leaves the line experiences
       offRoadTick -= dt;
       if (offRoadTick <= 0) { offRoadTick = 0.45; ctx.feel.impact(0.12); SoundKit.play('rattle', { pitch: 0.8, volume: 0.22 }); EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust'); }
       if (!offRoadSaid) { offRoadSaid = true; ctx.juice.callout('OFF THE ROAD', '#fca5a5', 600); }
-    } else { offRoadTick = 0; offRoadSaid = false; }
+    } else { offRoadTick = 0; offRoadSaid = false; ctx.objectiveRef.current = null; }
     const bev = boost.update(dt, S.boostHeld, true);
     ctx.stamina?.(boost.meter);   // PLAYER RING: the ring's arc is the boost tank
     S.input.boostK = boost.k;
@@ -1294,7 +1303,7 @@ return {
     // crossing the line on the clock's last frame still finishes rather than being called out.
     if (line && rivals.length) {
       const leader = S.graceLeft === null ? fieldLeaderDone(rivals, line, course.laps) : null;
-      const g = stepFinishGrace(S.graceLeft, dt, !!leader);
+      const g = stepFinishGrace(S.graceLeft, dt, !!leader, KART_FINISH_GRACE_SEC);
       S.graceLeft = g.left;
       if (g.started && leader) { SoundKit.play('whistle'); say(`${leader.name} FINISHED — ${Math.ceil(g.left ?? 0)}s TO THE LINE`, 1.8); }
       else if (g.tick !== null && g.tick > 0 && g.tick <= 5) { SoundKit.play('uiTick', { pitch: 1 + (5 - g.tick) * 0.08 }); say(`FINISH IN ${g.tick}`, 0.9); }

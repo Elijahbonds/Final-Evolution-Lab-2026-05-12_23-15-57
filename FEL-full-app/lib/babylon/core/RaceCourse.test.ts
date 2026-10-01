@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import {
-  AERO_COURSES, KART_COURSES, courseById, passedGate, startRace, stepRace, toNextGate, medalFor,
+  AERO_COURSES, KART_COURSES, courseById, passedGate, startRace, stepRace, toNextGate, trackReturnCue, medalFor,
   distToSegment, distToTrack, onTrack, TRACK_HALF_WIDTH,
   type Course, type Gate,
 } from './RaceCourse';
@@ -159,6 +159,13 @@ describe('the gameplay loop', () => {
     expect(a.dist).toBeCloseTo(50, 5);
     hop(p, -10, 10);
     expect(toNextGate(p, course, new Vector3(0, 0, 10)).gate).toBe(course.gates[1]);
+  });
+
+  it('off-road, the return cue names a direction and a distance (KT-4)', () => {
+    const p = startRace();
+    const cue = trackReturnCue(new Vector3(40, 0, 0), course, p, 0);
+    expect(cue).toMatch(/m TO TRACK/);
+    expect(cue).toMatch(/[←→↑]/);
   });
 });
 
