@@ -44,7 +44,7 @@ import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kart
 import { locate, pointAlong, cornerRadiusAt, holdableSpeed } from '../racing/racingLine';
 import { edgeLimit, edgeReturn } from '../racing/courseEdge';   // the outside of the course: off-road is a cost, not a door out
 import { steerLane, resolveContact, nearMisses, personalityFor, CONTACT } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, bumps and punts
-import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, ITEM_KINDS, ITEM_LABEL, type Balloon, type HeldItem, type Missile, type Mine, type ItemKind, type Target } from '../racing/AeroItems';   // the kart's items are the flyers' items on the road
+import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, ITEM_KINDS, ITEM_LABEL, weightedItemKind, type Balloon, type HeldItem, type Missile, type Mine, type ItemKind, type Target } from '../racing/AeroItems';   // the kart's items are the flyers' items on the road
 import { AeroPickups } from '../racing/aeroPickups';
 import {
   buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
@@ -692,11 +692,14 @@ function tickField(ctx: ModeContext, dt: number): void {
   for (const b of balloonsHit(balloons, prevPos, state.pos, 2.4)) {
     b.respawn = 3;
     const before = S.held;
-    S.held = collectBalloon(S.held, b.kind); S.events.picked++;
+    // ITEM WEIGHTING BY PLACE (gap 12): the kind is drawn at collection, weighted by where you sit — the
+    // leader meets shield/mine, the back meets missile/boost. The balloon's grid colour is gone.
+    const kind = weightedItemKind(playerPosition(playerDist, rivals), rivals.length + 1, Math.random);
+    S.held = collectBalloon(S.held, kind); S.events.picked++;
     SoundKit.play('powerUp', { pitch: 1 + S.held.level * 0.12, volume: 0.55 });
     EffectsKit.burst(ctx.scene, b.pos.clone(), 'confetti'); ctx.feel.impact(0.15);
-    say(before && before.kind === b.kind ? `${ITEM_LABEL[b.kind] === 'MISSILE' ? 'SHELL' : ITEM_LABEL[b.kind]} LEVEL ${S.held.level}` : (ITEM_LABEL[b.kind] === 'MISSILE' ? 'SHELL' : ITEM_LABEL[b.kind]), 0.8);
-    console.info(`[RACE] picked ${b.kind}`);
+    say(before && before.kind === kind ? `${ITEM_LABEL[kind] === 'MISSILE' ? 'SHELL' : ITEM_LABEL[kind]} LEVEL ${S.held.level}` : (ITEM_LABEL[kind] === 'MISSILE' ? 'SHELL' : ITEM_LABEL[kind]), 0.8);
+    console.info(`[RACE] picked ${kind}`);
   }
   const targets: Target[] = [
     { id: PLAYER_ID, pos: state.pos.add(new Vector3(0, 0.6, 0)), protected: S.shieldT > 0 },

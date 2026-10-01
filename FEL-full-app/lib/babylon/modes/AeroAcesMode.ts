@@ -58,7 +58,7 @@ import {
 } from '../racing/AeroTricks';
 import {
   collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, bananasAfterHit, segDist,
-  BALLOON_RESPAWN_SEC, BANANA_RADIUS, BANANA_CAP, ITEM_LABEL, ITEM_KINDS,
+  BALLOON_RESPAWN_SEC, BANANA_RADIUS, BANANA_CAP, ITEM_LABEL, ITEM_KINDS, weightedItemKind,
   type Balloon, type Banana, type HeldItem, type Missile, type Mine, type Target, type ItemKind,
 } from '../racing/AeroItems';
 import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/aeroCircuits';
@@ -560,7 +560,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       for (const b of balloonsHit(balloons, prevPos, flight.pos)) {
         b.respawn = BALLOON_RESPAWN_SEC;
         const before = S.held;
-        S.held = collectBalloon(S.held, b.kind);
+        // ITEM WEIGHTING BY PLACE (gap 12), same as the kart: drawn at collection, weighted by place.
+        const kind = weightedItemKind(playerPosition(playerDist(), rivals), rivals.length + 1, Math.random);
+        S.held = collectBalloon(S.held, kind);
         S.popped++;
         SoundKit.play('powerUp', { pitch: 1 + S.held.level * 0.12, volume: 0.55 });
         EffectsKit.burst(ctx.scene, b.pos.clone(), 'confetti');

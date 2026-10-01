@@ -47,6 +47,40 @@ export function collectBalloon(held: HeldItem | null, kind: ItemKind): HeldItem 
   return { kind, level: 1 };
 }
 
+// ITEM WEIGHTING BY PLACE (racing 10-phase, the decode's gap 12: "items are not weighted by place"). The draw
+// used to be the balloon's fixed grid colour, so the leader and the backmarker pulled the same table. Now the
+// kind is drawn when the balloon is COLLECTED, weighted by the collector's place: the leader meets defence
+// (shield/mine), the back of the field meets offence (missile/boost). Mario Kart's rubber-band, stated as a
+// table so a test can pin it.
+//
+// The weight ramp (owner-eye feel numbers, flagged): the field runs place 1..N. Place fraction p = (place-1)/(N-1)
+// (0 = leading, 1 = last). Each kind's weight lerps between its leader weight (at p=0) and its trailer weight
+// (at p=1). A mode with one racer reports p=0.5 — the mid table, so solo play is unchanged from a fair draw.
+const ITEM_WEIGHT_LEADER: Record<ItemKind, number> = { missile: 1, boost: 2, shield: 5, mine: 4 };
+const ITEM_WEIGHT_TRAILER: Record<ItemKind, number> = { missile: 6, boost: 5, shield: 1, mine: 1 };
+
+/**
+ * Draw the item a balloon hands out, weighted by where the collector sits in the field.
+ * `place` is 1-based (1 = leading); `fieldSize` counts every racer including the collector. `rng` in [0,1).
+ * Pure: no scene, no mode state — the sims and the rollout test drive it directly.
+ */
+export function weightedItemKind(place: number, fieldSize: number, rng: () => number): ItemKind {
+  const n = Math.max(1, Math.floor(fieldSize));
+  const p = n <= 1 ? 0.5 : Math.max(0, Math.min(1, (place - 1) / (n - 1)));
+  let total = 0;
+  const weights = ITEM_KINDS.map((kind) => {
+    const w = ITEM_WEIGHT_LEADER[kind] + (ITEM_WEIGHT_TRAILER[kind] - ITEM_WEIGHT_LEADER[kind]) * p;
+    total += w;
+    return w;
+  });
+  let roll = rng() * total;
+  for (let i = 0; i < ITEM_KINDS.length; i++) {
+    roll -= weights[i];
+    if (roll < 0) return ITEM_KINDS[i];
+  }
+  return ITEM_KINDS[ITEM_KINDS.length - 1];
+}
+
 export interface Balloon { id: number; kind: ItemKind; pos: Vector3; respawn: number }
 
 /** Balloons within reach of the travel segment prev → now pop (swept: 30 m/s covers a balloon in a frame). */
