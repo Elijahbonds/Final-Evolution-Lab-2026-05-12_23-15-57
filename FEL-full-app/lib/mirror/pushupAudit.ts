@@ -89,17 +89,20 @@ export const PUSHUP_THRESHOLDS: PushupThresholds = {
   minReadableFrames: 10,
 };
 
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const PUSHUP_CUES: readonly CueRule[] = [
   { faultId: 'depth', cue: 'All the way down — chest to a fist off the floor.',
     escalate: 'Still stopping short. Slow the descent and own the bottom before you press.',
     regress: 'Knees down. Same line, same depth, less weight to press.' },
-  { faultId: 'bodyLine', cue: 'One straight line, head to heels — set it before you move.',
-    escalate: 'Your hips are leading. Squeeze the glutes and the line holds itself.',
+  { faultId: 'bodyLine', cue: 'Be one stiff plank from the floor up — a straight line, head to heels, before you move.',
+    escalate: 'Still bending in the middle. Push the floor away and move as one stiff plank.',
     regress: 'Knees down, or hands on a box — same line, less line to hold.' },
   { faultId: 'headLine', cue: 'Eyes on the floor just past your hands — a long neck, not a reaching chin.',
-    escalate: 'The chin is leading again. Pack it back and let the eyes drop.',
+    escalate: 'Still reaching. Eyes back down to a spot on the floor just past your hands.',
     regress: 'Pause at the top. Set the neck first, THEN start the rep.' },
-  { faultId: 'handSetup', cue: 'Hands stacked under your shoulders before you go down.',
+  { faultId: 'handSetup', cue: 'Set the hands on the floor right under the shoulders before you go down.',
     escalate: 'Still walked out. Reset the top position — hands under shoulders, then descend.',
     regress: 'From your knees: set the hands under the shoulders, hold two seconds, then rep.' },
 ];

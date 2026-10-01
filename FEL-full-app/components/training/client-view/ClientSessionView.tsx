@@ -11,14 +11,26 @@
 // with the section and key set named, times timed work (components/coach/set-timer.tsx) and logs per set
 // (components/coach/set-logger.tsx: reps, weight in kg or lb, reps left 0–5, effort 1–10). The generic lines stay
 // only as a fallback for an exercise whose catalogue row has no cues at all.
+//
+// MIRROR-COACH P8 (2026-09-29): the protocol gate's one line (components/coach/protocol-gate-line.tsx GateSwapLine) under
+// the dose of an item the server swapped for its ladder's easier step (lib/coach/todayServer.ts), as on the Today tab.
+//
+// MIRROR-COACH P8 FIX (2026-09-30, code review — "The /training step-through never shows held items"): the server moves
+// a gated item with no ungated easier step out of `session.exercises` into `session.held`, and this view read only the
+// first. So a held Pogo Hops simply vanished here with no line saying why (rule (b): "the athlete sees why in one
+// line"), and a session where everything was held said "Your coach has created this session but has not prescribed
+// exercises yet" — false — with no way to finish it, parking the athlete on it. Now the held lines show on the Ready
+// card (<GateHeldList>, the Today tab's), and a held-only session shows them with a Done that makes the same complete
+// call the Today tab makes (logs: [], complete: true). `initialData` lets a static render test both states.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, KeyRound, Loader2 } from 'lucide-react';
+import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 import { SetTimer } from '@/components/coach/set-timer';
 import { SET_LOG_ERROR_COPY, convertDrafts, draftsFor, draftsToInput, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
-import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, simpleLogging } from '@/lib/coach/today';
+import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, servedClaim, simpleLogging } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
 import { sectionLabel } from '@/lib/coach/taxonomy';
 import { timedRepsSuffix } from '@/lib/coach/structure';
@@ -35,10 +47,28 @@ interface ExerciseDraft {
  *  (which depends on it) would refetch forever. */
 const SESSION_API = { today: '/api/coach/me/today', log: '/api/coach/me/log' };
 
-/** `api` points the view at other endpoints (the dev harness app/dev/coach-today?view=training runs the same server code in memory). */
-export function ClientSessionView({ api = SESSION_API }: { api?: { today: string; log: string } } = {}) {
-  const [data, setData] = useState<TodayPayload | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, ExerciseDraft>>({});
+/** The line over a session whose every item the protocol gate holds back today (MIRROR-COACH P8 FIX). */
+export const HELD_ONLY_LINE = 'Everything in this session waits today, for the reasons below. Mark it done to move on to your next session.';
+
+/** One draft per exercise: blank rows, the prescription as placeholders, and anything already saved on the open log. */
+function draftsOf(next: TodayPayload, u: WeightUnit): Record<string, ExerciseDraft> {
+  const out: Record<string, ExerciseDraft> = {};
+  if (!next.today) return out;
+  for (const exercise of next.today.session.exercises) {
+    const prior = next.open?.logs.find((log) => log.sessionExerciseId === exercise.id);
+    // blank rows, the prescription as placeholders: an untouched set logs nothing (it used to copy "RPE7" into the load)
+    out[exercise.id] = { sets: draftsFor(exercise.sets, prior?.setLogs, u), clientNote: prior?.clientNote ?? '', videoUrl: prior?.videoUrl ?? '' };
+  }
+  return out;
+}
+
+/**
+ * `api` points the view at other endpoints (the dev harness app/dev/coach-today?view=training runs the same server code
+ * in memory). `initialData` (tests, a harness) is a payload already in hand: the view starts from it and does not fetch.
+ */
+export function ClientSessionView({ api = SESSION_API, initialData = null }: { api?: { today: string; log: string }; initialData?: TodayPayload | null } = {}) {
+  const [data, setData] = useState<TodayPayload | null>(initialData);
+  const [drafts, setDrafts] = useState<Record<string, ExerciseDraft>>(() => (initialData ? draftsOf(initialData, 'kg') : {}));
   const [unit, setUnit] = useState<WeightUnit>('kg');
   // the unit the drafts are in right now: a load that resolves after a kg/lb switch builds its rows in the new unit
   const unitRef = useRef<WeightUnit>('kg');
@@ -56,16 +86,7 @@ export function ClientSessionView({ api = SESSION_API }: { api?: { today: string
       const next = payload as TodayPayload;
       setData(next);
       setCurrentExerciseIndex(0);
-      if (next.today) {
-        const u = unitRef.current;
-        const nextDrafts: Record<string, ExerciseDraft> = {};
-        for (const exercise of next.today.session.exercises) {
-          const prior = next.open?.logs.find((log) => log.sessionExerciseId === exercise.id);
-          // blank rows, the prescription as placeholders: an untouched set logs nothing (it used to copy "RPE7" into the load)
-          nextDrafts[exercise.id] = { sets: draftsFor(exercise.sets, prior?.setLogs, u), clientNote: prior?.clientNote ?? '', videoUrl: prior?.videoUrl ?? '' };
-        }
-        setDrafts(nextDrafts);
-      }
+      if (next.today) setDrafts(draftsOf(next, unitRef.current));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load workout');
@@ -76,8 +97,9 @@ export function ClientSessionView({ api = SESSION_API }: { api?: { today: string
     const u = readWeightUnit();
     unitRef.current = u;
     setUnit(u);
+    if (initialData) { if (u !== 'kg') setDrafts(draftsOf(initialData, u)); return; }
     void loadToday();
-  }, [loadToday]);
+  }, [loadToday, initialData]);
 
   const session = data?.today?.session ?? null;
   const currentExercise = session?.exercises[currentExerciseIndex] ?? null;
@@ -122,7 +144,8 @@ export function ClientSessionView({ api = SESSION_API }: { api?: { today: string
     setSaving(true);
     setSaveError(null);
     try {
-      const logs = session.exercises.map((exercise) => ({ sessionExerciseId: exercise.id, sets: draftsToInput(drafts[exercise.id].sets, unit), clientNote: drafts[exercise.id].clientNote, videoUrl: drafts[exercise.id].videoUrl }));
+      // MIRROR-COACH P8 FIX: what this view served on each slot (the gate's easier step, or null), for the coach's inbox
+      const logs = session.exercises.filter((exercise) => drafts[exercise.id]).map((exercise) => ({ sessionExerciseId: exercise.id, sets: draftsToInput(drafts[exercise.id].sets, unit), clientNote: drafts[exercise.id].clientNote, videoUrl: drafts[exercise.id].videoUrl, servedExerciseId: servedClaim(exercise) }));
       const res = await fetch(api.log, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,14 +194,23 @@ export function ClientSessionView({ api = SESSION_API }: { api?: { today: string
     );
   }
 
+  const held = session.held ?? [];
   if (session.exercises.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{session.label}</CardTitle>
-            <CardDescription>Your coach has created this session but has not prescribed exercises yet.</CardDescription>
+            <CardDescription>{held.length ? HELD_ONLY_LINE : 'Your coach has created this session but has not prescribed exercises yet.'}</CardDescription>
           </CardHeader>
+          {held.length > 0 && (
+            <CardContent className="space-y-4" data-held-only>
+              <GateHeldList items={held} />
+              <Button onClick={handleCompleteSession} disabled={saving} className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Mark the session done'}
+              </Button>
+            </CardContent>
+          )}
         </Card>
       </div>
     );
@@ -197,6 +229,8 @@ export function ClientSessionView({ api = SESSION_API }: { api?: { today: string
               <h3 className="font-semibold mb-2">{data.today?.block.label} - {session.label}</h3>
               <p className="text-sm text-slate-400">{session.exercises.length} exercises</p>
             </div>
+            {/* MIRROR-COACH P8 FIX: what the protocol gate holds back today, one line each, as on the Today tab */}
+            {held.length > 0 && <GateHeldList items={held} />}
             <Button
               onClick={() => setSessionActive(true)}
               className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg"
@@ -229,6 +263,7 @@ export function ClientSessionView({ api = SESSION_API }: { api?: { today: string
                 {currentExercise.isKeySet && <p className="mb-1 text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</p>}
                 <CardTitle className="text-2xl">{currentExercise.name}</CardTitle>
                 <CardDescription>{currentExercise.dose}</CardDescription>
+                {currentExercise.protocolGate && <div className="mt-2"><GateSwapLine note={currentExercise.protocolGate} /></div>}
               </div>
             </div>
           </CardHeader>

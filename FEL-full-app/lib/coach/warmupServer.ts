@@ -10,7 +10,11 @@
 //   · today's pain decision — the PainCheckIn rows' stored decisions (lib/health/painRule.ts decide(), never re-decided),
 //     read for the JUMP GATE whatever the consent state now is (PAIN_GATE_OUTLIVES_WITHDRAWAL below);
 //   · the intake hard stop (lib/health/intake.ts isHardStopped) — Today already blocks on it; this says it again so a
-//     warm-up is never offered under one.
+//     warm-up is never offered under one;
+//   · MIRROR-COACH P8 FIX (2026-09-30): P8's protocol gate — lib/coach/protocolGateServer.ts loadProtocolFacts →
+//     protocolGate.ts protocolReasons, its non-youth reasons only (the youth rule stays isYouth's, so a coach's Prime
+//     jumps can still lift it) — as `jumpGate`: closed, and the gate's own one line. A read that fails closes it
+//     (GATE_UNREAD_LINE), never opens it. See lib/coach/warmup.ts THE JUMP GATE.
 // Nothing here writes anything: a warm-up is guidance, not a record, and never touches PRQ, pay, a score or a streak.
 //
 // Takes the database as an argument (the Today pattern: lib/coach/todayServer.ts), so the route test runs the real code
@@ -24,7 +28,9 @@ import { outcomesOf } from './mirrorToProgram';
 import { activeHealthDataConsent, type ConsentRow } from '../health/consent';
 import { isHardStopped, latestIntake } from '../health/intake';
 import type { PainDecision } from '../health/painRule';
-import { PAIN_LOOKBACK_DAYS, painDecisionToday, weakestZone, type WarmupContext } from './warmup';
+import { PAIN_LOOKBACK_DAYS, painDecisionToday, weakestZone, type JumpGate, type WarmupContext } from './warmup';
+import { GATE_UNREAD_LINE, YOUTH_REASONS, athleteWhy, protocolReasons } from './protocolGate';
+import { loadProtocolFacts } from './protocolGateServer';
 import { ZONE_WORDS } from './warmupContent';
 
 export type { WarmupContext } from './warmup';
@@ -96,5 +102,23 @@ export async function loadWarmupContext(db: WarmupDb, userId: string, now: Date 
     painDecision,
     ...zoneFromScreens(scans),
     hardStopped: isHardStopped(intake),
+    jumpGate: await jumpGateFor(db, userId, now, { dobYear: user?.dobYear ?? null, latestIntake: intake }),
   };
+}
+
+/**
+ * P8's protocol gate for the warm-up (MIRROR-COACH P8 FIX, 2026-09-30): the same facts and rule Today's Prime is gated by
+ * (protocolGateServer.ts loadProtocolFacts, protocolGate.ts protocolReasons), less the youth rule's reasons — those stay
+ * with isYouth, which a coach's Prime jumps can lift and nothing else can. A failed read closes it.
+ */
+export async function jumpGateFor(db: WarmupDb, userId: string, now: Date, pre: { dobYear: number | null; latestIntake: Awaited<ReturnType<typeof latestIntake>> }): Promise<JumpGate> {
+  try {
+    const reasons = protocolReasons(await loadProtocolFacts(db, userId, now, pre), now).filter((r) => !YOUTH_REASONS.includes(r));
+    if (!reasons.length) return { closed: false, why: '', href: null };
+    const { why, href } = athleteWhy(reasons);
+    return { closed: true, why, href };
+  } catch (e) {
+    console.error('[coach/warmup] the protocol gate could not be read; the warm-up keeps its jumps out on this read', e);
+    return { closed: true, why: GATE_UNREAD_LINE, href: null };
+  }
 }

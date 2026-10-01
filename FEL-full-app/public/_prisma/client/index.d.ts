@@ -97713,6 +97713,7 @@ export namespace Prisma {
     coachComment: string | null
     coachCommentAt: Date | null
     completedAt: Date | null
+    servedExerciseId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -97730,6 +97731,7 @@ export namespace Prisma {
     coachComment: string | null
     coachCommentAt: Date | null
     completedAt: Date | null
+    servedExerciseId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -97747,6 +97749,7 @@ export namespace Prisma {
     coachComment: number
     coachCommentAt: number
     completedAt: number
+    servedExerciseId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -97776,6 +97779,7 @@ export namespace Prisma {
     coachComment?: true
     coachCommentAt?: true
     completedAt?: true
+    servedExerciseId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -97793,6 +97797,7 @@ export namespace Prisma {
     coachComment?: true
     coachCommentAt?: true
     completedAt?: true
+    servedExerciseId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -97810,6 +97815,7 @@ export namespace Prisma {
     coachComment?: true
     coachCommentAt?: true
     completedAt?: true
+    servedExerciseId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -97914,6 +97920,7 @@ export namespace Prisma {
     coachComment: string | null
     coachCommentAt: Date | null
     completedAt: Date | null
+    servedExerciseId: string | null
     createdAt: Date
     updatedAt: Date
     _count: ExerciseLogCountAggregateOutputType | null
@@ -97950,6 +97957,7 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -97971,6 +97979,7 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -97990,6 +97999,7 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -98009,11 +98019,12 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type ExerciseLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "clientSessionId" | "sessionExerciseId" | "actualSets" | "actualReps" | "actualLoad" | "rpe" | "clientNote" | "videoUrl" | "coachComment" | "coachCommentAt" | "completedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["exerciseLog"]>
+  export type ExerciseLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "clientSessionId" | "sessionExerciseId" | "actualSets" | "actualReps" | "actualLoad" | "rpe" | "clientNote" | "videoUrl" | "coachComment" | "coachCommentAt" | "completedAt" | "servedExerciseId" | "createdAt" | "updatedAt", ExtArgs["result"]["exerciseLog"]>
   export type ExerciseLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
     sessionExercise?: boolean | SessionExerciseDefaultArgs<ExtArgs>
@@ -98049,6 +98060,7 @@ export namespace Prisma {
       coachComment: string | null
       coachCommentAt: Date | null
       completedAt: Date | null
+      servedExerciseId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["exerciseLog"]>
@@ -98489,6 +98501,7 @@ export namespace Prisma {
     readonly coachComment: FieldRef<"ExerciseLog", 'String'>
     readonly coachCommentAt: FieldRef<"ExerciseLog", 'DateTime'>
     readonly completedAt: FieldRef<"ExerciseLog", 'DateTime'>
+    readonly servedExerciseId: FieldRef<"ExerciseLog", 'String'>
     readonly createdAt: FieldRef<"ExerciseLog", 'DateTime'>
     readonly updatedAt: FieldRef<"ExerciseLog", 'DateTime'>
   }
@@ -119787,6 +119800,7 @@ export namespace Prisma {
     coachComment: 'coachComment',
     coachCommentAt: 'coachCommentAt',
     completedAt: 'completedAt',
+    servedExerciseId: 'servedExerciseId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -126641,6 +126655,7 @@ export namespace Prisma {
     coachComment?: StringNullableFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     clientSession?: XOR<ClientSessionScalarRelationFilter, ClientSessionWhereInput>
@@ -126661,6 +126676,7 @@ export namespace Prisma {
     coachComment?: SortOrderInput | SortOrder
     coachCommentAt?: SortOrderInput | SortOrder
     completedAt?: SortOrderInput | SortOrder
+    servedExerciseId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     clientSession?: ClientSessionOrderByWithRelationInput
@@ -126684,6 +126700,7 @@ export namespace Prisma {
     coachComment?: StringNullableFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     clientSession?: XOR<ClientSessionScalarRelationFilter, ClientSessionWhereInput>
@@ -126704,6 +126721,7 @@ export namespace Prisma {
     coachComment?: SortOrderInput | SortOrder
     coachCommentAt?: SortOrderInput | SortOrder
     completedAt?: SortOrderInput | SortOrder
+    servedExerciseId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: ExerciseLogCountOrderByAggregateInput
@@ -126729,6 +126747,7 @@ export namespace Prisma {
     coachComment?: StringNullableWithAggregatesFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableWithAggregatesFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableWithAggregatesFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableWithAggregatesFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"ExerciseLog"> | Date | string
   }
@@ -134873,6 +134892,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
@@ -134893,6 +134913,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
@@ -134909,6 +134930,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -134929,6 +134951,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
@@ -134947,6 +134970,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -134962,6 +134986,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -134979,6 +135004,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -141283,6 +141309,7 @@ export namespace Prisma {
     coachComment?: SortOrder
     coachCommentAt?: SortOrder
     completedAt?: SortOrder
+    servedExerciseId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -141305,6 +141332,7 @@ export namespace Prisma {
     coachComment?: SortOrder
     coachCommentAt?: SortOrder
     completedAt?: SortOrder
+    servedExerciseId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -141322,6 +141350,7 @@ export namespace Prisma {
     coachComment?: SortOrder
     coachCommentAt?: SortOrder
     completedAt?: SortOrder
+    servedExerciseId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -171240,6 +171269,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
@@ -171258,6 +171288,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
@@ -171387,6 +171418,7 @@ export namespace Prisma {
     coachComment?: StringNullableFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
   }
@@ -171464,6 +171496,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     sessionExercise: SessionExerciseCreateNestedOneWithoutExerciseLogsInput
@@ -171482,6 +171515,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
@@ -171828,6 +171862,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
@@ -171847,6 +171882,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -171878,6 +171914,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -171897,6 +171934,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -181512,6 +181550,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -181527,6 +181566,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -181545,6 +181585,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
@@ -181562,6 +181603,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -181578,6 +181620,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -181593,6 +181636,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessionExercise?: SessionExerciseUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -181611,6 +181655,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
@@ -181628,6 +181673,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

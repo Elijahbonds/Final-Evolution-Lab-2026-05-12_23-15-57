@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { TabPage } from '@/components/shell/tab-page';
 import { ChapterList } from '@/components/education/chapter-list';
+// MIRROR-COACH P9 (2026-09-30), owner decisions #8 and #25: a plain citation as further reading, under the course.
+import { FurtherReading } from '@/components/education/further-reading';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +20,7 @@ export default async function PlaybookPage() {
       accent="#00FF9D"
     >
       <ChapterList />
+      <FurtherReading />
     </TabPage>
   );
 }

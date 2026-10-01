@@ -64,10 +64,30 @@ import { REASON, type WalletCurrency } from './reward-rules';
  *                 PLAN_CLAIM_WINDOW_MS. A row no plan claims is refunded. delete-my-data (DELETE /api/v1/workout/scan)
  *                 erases every plan, so a plan that was delivered and then erased is paid back too: the owner's call
  *                 (2026-09-25), over holding every unmatched charge back for want of proof.
- *                 MIRROR-COACH P1 (2026-09-25): Workout sells no plan now (its route refuses, and both SKUs are in
- *                 NOT_ON_SALE), so no new charge or plan of either SKU is written. The revision of a stored plan
+ *                 MIRROR-COACH P1 (2026-09-25): Workout stopped selling (its route refused, both SKUs in NOT_ON_SALE),
+ *                 so no new charge or plan of either SKU was written. The revision of a stored plan
  *                 (lib/workout/plan-revision.ts) rewrites its weeks only, never its tier or createdAt, so every plan
  *                 still claims the charge it claimed before.
+ *                 MIRROR-COACH P8 (2026-09-29), owner decision #24: Workout sells again, at the same prices, and a
+ *                 relaunch charge is NEVER a candidate here: its key is composed on the server, workout:<player>:<the
+ *                 browser's key> (lib/workout/pastBuyer.ts workoutChargeKey), so isClientMadeKey refuses it. It needs no
+ *                 claim: the route writes its plan in the same request under an id fixed by the charge (paidPlanId),
+ *                 so a retry of the same key finds or finishes that plan instead of charging again. So this rule — and
+ *                 the owner's "an erased plan is paid back too" — covers only charges from before the relaunch, which
+ *                 all carry the browser's key; assumption: a relaunch plan its buyer erases is not paid back (it was
+ *                 delivered, and the charge and the plan can now be told apart, which was the reason for the call).
+ *                 Relaunch plans keep the old tiers (plan_4w, program_12w), so they count as deliveries here too; one
+ *                 can claim only a charge made up to PLAN_CLAIM_WINDOW_MS before it, and every past charge is days
+ *                 older than the relaunch (dead-buys.test.ts).
+ *                 MIRROR-COACH P8 FIX (2026-09-30, code review): a relaunch charge whose plan did not save, or was
+ *                 erased since, is not stranded without a refund path: the purchase route writes its plan, uncharged,
+ *                 on the buyer's next press of that product (lib/workout/pastBuyer.ts unfinishedCharges). And every
+ *                 past workout charge makes its buyer a past buyer, who gets the relaunched plans free (#23, #24,
+ *                 P8 rule (c)) whether or not this sweep paid it back — pastBuyer.ts no longer reads these rules, and
+ *                 nothing here changed for a past charge. OWNER CALLS, flagged in the P8 report (none is made here):
+ *                 whether "an erased plan is paid back too" should hold for relaunch charges (today: never refunded,
+ *                 re-delivered instead), and whether #23's "Refunds: NONE" should stop this sweep refunding legacy
+ *                 /workout charges.
  *   first_charge  the entitlement row IS the delivery, and spend() writes it with the first charge of the SKU; nothing
  *                 else writes it and nothing deletes it. The player's earliest charge of the SKU (whatever its key)
  *                 delivered; a later one whose key the browser made upserted the same row and delivered nothing.
@@ -110,8 +130,8 @@ export const DEAD_CATALOG_BUYS: Readonly<Record<string, DeadCatalogBuy>> = {
   music_kit_neon: { currency: 'shards', name: 'NEON kit', match: 'client_key', why: 'the Music Room charges a kit under music:<player>:<sku>, and its entitlement read (GET /api/music/unlock) counts a row only with a charge this file keeps (backedEntitlements)' },
   music_kit_dust: { currency: 'shards', name: 'DUST kit', match: 'client_key', why: 'the Music Room charges a kit under music:<player>:<sku>, and its entitlement read (GET /api/music/unlock) counts a row only with a charge this file keeps (backedEntitlements)' },
   music_cell_assist: { currency: 'shards', name: 'Cell foundation', match: 'client_key', why: 'the Music Room charges each foundation as it is used, under its own key; a bought one was never used' },
-  workout_plan_4w: { currency: 'shards', name: '4-Week Workout Plan', match: 'workout_plan', deliveredAs: 'plan_4w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too)' },
-  workout_program_12w: { currency: 'shards', name: '12-Week Workout Program', match: 'workout_plan', deliveredAs: 'program_12w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too)' },
+  workout_plan_4w: { currency: 'shards', name: '4-Week Workout Plan', match: 'workout_plan', deliveredAs: 'plan_4w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too); a relaunch charge (key workout:) is never a candidate' },
+  workout_program_12w: { currency: 'shards', name: '12-Week Workout Program', match: 'workout_plan', deliveredAs: 'program_12w', why: 'a plan is a WorkoutPlan row, which only Workout writes (an erased plan is paid back too); a relaunch charge (key workout:) is never a candidate' },
   class_pass_single: { currency: 'shards', name: 'Single Class Pass', match: 'client_key', undo: 'entitlement', reason: CLASS_PASS_REASON, why: 'no live class has ever run, so nothing has read the pass; only the generic spend route sold it' },
   class_monthly: { currency: 'shards', name: 'Monthly All-Access Pass', match: 'client_key', undo: 'entitlement', reason: CLASS_PASS_REASON, why: 'no live class has ever run, so nothing has read the pass; only the generic spend route sold it' },
   session_group_workout: { currency: 'shards', name: 'Group Workout session', match: 'session', deliveredAs: 'group_workout', why: 'a seat is a SessionBooking row, which only Sessions writes' },

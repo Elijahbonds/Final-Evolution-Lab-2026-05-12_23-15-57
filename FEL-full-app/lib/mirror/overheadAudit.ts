@@ -62,18 +62,21 @@ export const OVERHEAD_THRESHOLDS: OverheadThresholds = {
   minReadableFrames: 10,
 };
 
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const OVERHEAD_CUES: readonly CueRule[] = [
-  { faultId: 'elevation', cue: 'All the way up — reach past your ears, not out to the sides.',
+  { faultId: 'elevation', cue: 'Reach for the ceiling — all the way up, past your ears, not out to the sides.',
     escalate: 'Still stopping short. Slow the press and finish tall before you come back down.',
     regress: 'Half the range, both arms even — build the reach before you chase the top.' },
-  { faultId: 'asymmetry', cue: 'Match the arms — both reach the same height, together.',
-    escalate: 'One arm is still leading. Slow down and let the short side catch up.',
+  { faultId: 'asymmetry', cue: 'Touch the ceiling with both hands at once — the same height, together.',
+    escalate: 'Still uneven. Slow down until both hands reach the same spot on the ceiling together.',
     regress: 'One arm at a time, in front of a mirror, until they match.' },
-  { faultId: 'shrug', cue: 'Shoulders down and away from your ears as you press.',
-    escalate: 'The shoulders are climbing again. Set them down first, then reach.',
+  { faultId: 'shrug', cue: 'Reach up for the ceiling, long and easy — shoulders stay away from your ears.',
+    escalate: 'Still climbing. Let the arms hang long first, then reach for the ceiling.',
     regress: 'Lighter reach, shoulders pinned — the arm does the reaching, not the neck.' },
   { faultId: 'elbowBend', cue: 'Lock it out at the top — arm straight, not stopping bent.',
-    escalate: 'Still finishing bent. Press through to a straight arm before you lower.',
+    escalate: 'Still finishing bent. Punch the ceiling at the top before you lower.',
     regress: 'Smaller range, but straight at the top every time.' },
 ];
 

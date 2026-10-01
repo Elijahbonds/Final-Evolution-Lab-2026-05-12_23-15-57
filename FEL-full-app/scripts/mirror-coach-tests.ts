@@ -174,7 +174,8 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(!/MY BAND|band pulls/i.test(code), 'no overlay claims a band');
   // MIRROR-COACH P4 review (2026-09-25): a 4th argument (squat.valgusBySide) now rides along, so the overlay can paint
   // only the side actually caving (kneeOverlay.ts's own `sides` filter) instead of both knees for a one-sided cave.
-  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)), squat.valgusBySide)'), 'the knee overlay only paints a CUEABLE knee fault, on the side actually caving');
+  // (MIRROR-COACH P9 fix, 2026-09-30: the painter also takes the voice's fade — CueEngine.isVoiceable)
+  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide)'), 'the knee overlay only paints a CUEABLE knee fault, on the side actually caving — and only on a rep the fade lets it be cued');
   ok(/VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)/.test(h), 'the knee overlay is behind VALGUS_CUE_VERIFIED');
   // MIRROR-COACH P1 review (2026-09-25): "Recording" on a live camera page reads as the video being recorded, and
   // nothing is — the row says the knee is MEASURED, and no knee copy the athlete sees says "record".
