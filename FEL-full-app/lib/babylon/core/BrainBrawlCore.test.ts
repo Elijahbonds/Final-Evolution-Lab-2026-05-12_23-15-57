@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CATEGORIES, mulberry32, makeChallenge, drawChallenge, solveCard, cardFaults, challengeScore, freshClaims, spinWheel, resolveClaim, claimedBy, matchWinner, boardRows, wheelLanding, wedgeAtPin, wedgeAngle, verdicts, claimLine, type Tier } from './BrainBrawlCore';
+import { CATEGORIES, mulberry32, makeChallenge, drawChallenge, solveCard, cardFaults, challengeScore, freshClaims, spinWheel, resolveClaim, claimedBy, matchWinner, boardRows, wheelLanding, wedgeAtPin, wedgeAngle, verdicts, claimLine, scriptedSoloClaims, type Tier } from './BrainBrawlCore';
 
 describe('Brain Brawl — challenge generators', () => {
   it('every category and tier produces valid, unique, non-repeating challenges', () => {
@@ -207,6 +207,21 @@ describe('Brain Brawl — every card has exactly one right answer', () => {
       expect(c.options.every((o) => Number(o) >= 0)).toBe(true);
     }
     expect(zeros).toBeGreaterThan(20);
+  });
+  it('a scripted solo run claims all five, and a miss stays open', () => {
+    const perfect = scriptedSoloClaims(7, (c) => c.answer);
+    expect(perfect.done).toBe(true);
+    expect(perfect.claimed).toBe(5);
+    expect(perfect.rounds).toBe(5);
+    let missed = false;
+    const retry = scriptedSoloClaims(11, (c) => {
+      if (!missed) { missed = true; return (c.answer + 1) % 4; }
+      return c.answer;
+    });
+    expect(retry.done).toBe(true);
+    expect(retry.claimed).toBe(5);
+    expect(retry.rounds).toBe(6);
+    expect(retry.rounds).toBeLessThanOrEqual(15);
   });
   it('LOGIC shows the sequence and its gap on ONE line', () => {
     for (let seed = 1; seed <= 200; seed++) {

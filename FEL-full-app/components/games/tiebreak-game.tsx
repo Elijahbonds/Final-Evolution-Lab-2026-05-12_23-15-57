@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import type { GameProps } from '@/components/games/game-shell';
-import { SessionRecorder } from '@/lib/game-systems';
+// Tiebreak Blitz — thin host. The rally is a 3D court (TiebreakMode). This file keeps the start card and
+// posts the score the arena ceiling is built from. There is no photo backdrop and no 2D court overlay.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { useStartWake } from '@/components/games/use-start-wake';
+import { BootSplash } from '@/components/games/boot-splash';
+import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
+import { gradeReactBase } from '@/lib/babylon/core/TiebreakBlitz';
+import { makeTiebreakMode } from '@/lib/babylon/modes/TiebreakMode';
 
-const W = 960;
-const H = 540;
 const TARGET = 7;
 
-type Dir = 'left' | 'right';
+type Hud = Record<string, HudValue>;
 
-export default function TiebreakGame({ grade, prq, onEnd, gamepad }: GameProps) {
+const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
+
+export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const busRef = useRef<InputBus | null>(null);
   const [started, setStarted] = useState(false);
   const endedRef = useRef(false);
   const onEndRef = useRef(onEnd);
@@ -21,192 +27,122 @@ export default function TiebreakGame({ grade, prq, onEnd, gamepad }: GameProps) 
   gradeRef.current = grade;
   // SHARED-START-UNSTICK: any key, pad button, stick or tap on the card serves — not only a click on the pill.
   const wake = useStartWake(!started, () => setStarted(true));
+  const [phase, setPhase] = useState<ModePhase>('loading');
+  const [hud, setHud] = useState<Hud>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!started) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const token = {};
+    canvasOwner.set(canvas, token);
+    const bus = new InputBus();
+    busRef.current = bus;
+    let stop: (() => void) | null = null;
+    let disposed = false;
 
-    const bg = new Image();
-    bg.src = '/backdrops/tennis.jpg';
-    let bgReady = false;
-    bg.onload = () => { bgReady = true; };
-
-    const reactBase = grade.key === 'ELITE' ? 1.15 : grade.key === 'PRIMED' ? 1.05 : grade.key === 'READY' ? 0.95 : 0.85;
-
-    const startTime = Date.now();
-    let myPts = 0;
-    let aiPts = 0;
-    let rallies = 0;
-    let bestRally = 0;
-    let rally = 0;
-    const rec = new SessionRecorder();
-    // ball state
-    let incoming: Dir = 'left';
-    let ballT = 0;
-    let ballLen = 1.3;
-    let awaiting = false; // waiting for player return
-    // The first ball is in the air inside half a second of the wake (was 1.0 s of an empty court after the card left).
-    let gap = 0.3;
-    let msg = '';
-    let msgColor = '#FFF';
-    let msgTimer = 0;
-
-    function serve() {
-      incoming = Math.random() > 0.5 ? 'left' : 'right';
-      ballLen = Math.max(0.55, (1.25 - rally * 0.07) * reactBase);
-      ballT = 0;
-      awaiting = true;
-    }
-
-    function point(mine: boolean, text: string, color: string) {
-      if (mine) { myPts += 1; rec.recordHit(); rec.recordChain(rally); } else { aiPts += 1; rec.recordMiss(); }
-      bestRally = Math.max(bestRally, rally);
-      rallies += rally;
-      rally = 0;
-      msg = text; msgColor = color; msgTimer = 1.0;
-      awaiting = false;
-      gap = 1.1;
-      if (myPts >= TARGET || aiPts >= TARGET) finish();
-    }
-
-    function swing(dir: Dir) {
-      if (endedRef.current || !awaiting) return;
-      const inWindow = ballT > ballLen * 0.62;
-      if (dir === incoming && inWindow) {
-        rally += 1;
-        // chance AI misses grows with rally
-        if (Math.random() < 0.16 + rally * 0.05) {
-          point(true, rally >= 4 ? 'WINNER DOWN THE LINE!' : 'AI NETS IT! POINT YOU', '#00FF9D');
-        } else {
-          msg = `RETURNED x${rally}`; msgColor = '#00E5FF'; msgTimer = 0.5;
-          serve();
-        }
-      } else if (dir !== incoming) {
-        point(false, 'WRONG SIDE! POINT AI', '#FF3366');
-      } else {
-        point(false, 'SWUNG EARLY! POINT AI', '#FF3366');
-      }
-    }
-
-    function finish() {
+    const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = myPts > aiPts;
-      onEndRef.current?.({
+      const myPts = Number(r.stats?.myPts ?? 0);
+      const aiPts = Number(r.stats?.aiPts ?? 0);
+      const bestRally = Number(r.stats?.bestRally ?? 0);
+      const won = r.outcome === 'WIN' || r.outcome === 'win';
+      const result: GameResult = {
+        // WA-22 (RESULTS-TRUTH): post the game score (7-0), not the points scale.
         score: myPts,
         opponentScore: aiPts,
         won,
-        duration: Math.round((Date.now() - startTime) / 1000),
-        headline: won ? `${myPts}-${aiPts} — TIEBREAK ICE IN THE VEINS` : `${myPts}-${aiPts} — NEXT BREAKER IS YOURS`,
-        tallies: rec.tallies(), maxCombo: bestRally,
-      });
-    }
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'ArrowLeft') { e.preventDefault(); swing('left'); }
-      else if (e.code === 'ArrowRight') { e.preventDefault(); swing('right'); }
+        duration: r.durationSec,
+        headline: won ? `${myPts}-${aiPts} — TIEBREAK` : `${myPts}-${aiPts} — NEXT BREAKER`,
+        stats: r.stats,
+        outcome: r.outcome,
+        maxCombo: bestRally,
+      };
+      onEndRef.current(result);
     };
-    window.addEventListener('keydown', onKey);
-    (canvas as any).felTiebreak = { swing };
 
-    let raf = 0;
-    let last = performance.now();
-    const loop = (now: number) => {
-      const rawDt = (now - last) / 1000;
-      last = now;
-      if (msgTimer > 0) msgTimer -= rawDt;
-
-      if (!endedRef.current) {
-        if (awaiting) {
-          ballT += rawDt;
-          if (ballT >= ballLen) point(false, 'ACE PAST YOU!', '#FF3366');
-        } else {
-          gap -= rawDt;
-          if (gap <= 0) serve();
-        }
-      }
-
-      // draw
-      ctx.clearRect(0, 0, W, H);
-      if (bgReady) { ctx.drawImage(bg, 0, 0, W, H); ctx.fillStyle = 'rgba(5,10,8,0.55)'; ctx.fillRect(0, 0, W, H); }
-      else { ctx.fillStyle = '#0B1F14'; ctx.fillRect(0, 0, W, H); }
-
-      // court
-      ctx.fillStyle = 'rgba(13,51,39,0.8)';
-      ctx.fillRect(W / 2 - 300, 140, 600, 320);
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
-      ctx.strokeRect(W / 2 - 300, 140, 600, 320);
-      ctx.beginPath(); ctx.moveTo(W / 2 - 300, 300); ctx.lineTo(W / 2 + 300, 300); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(W / 2, 140); ctx.lineTo(W / 2, 460); ctx.stroke();
-
-      // ball incoming
-      if (awaiting) {
-        const p = ballT / ballLen;
-        const bx = incoming === 'left' ? W / 2 - 180 : W / 2 + 180;
-        const by = 170 + p * 240;
-        ctx.fillStyle = '#DFFF4F';
-        ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill();
-        // hit window indicator
-        if (p > 0.62) {
-          ctx.strokeStyle = '#00FF9D'; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(bx, by, 18, 0, Math.PI * 2); ctx.stroke();
-        }
-        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = 'bold 16px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(incoming === 'left' ? '← COMING LEFT' : 'COMING RIGHT →', bx, 158);
-      }
-
-      // player paddle marker
-      ctx.fillStyle = '#00E5FF';
-      ctx.fillRect(W / 2 - 40, 470, 80, 8);
-
-      // HUD
-      ctx.fillStyle = 'rgba(5,5,5,0.72)'; ctx.fillRect(W * 0.2, 10, W * 0.6, 52);
-      ctx.strokeStyle = 'rgba(0,255,157,0.35)'; ctx.strokeRect(W * 0.2, 10, W * 0.6, 52);
-      ctx.fillStyle = '#FFF'; ctx.font = 'bold 22px "Barlow Condensed", sans-serif';
-      ctx.textAlign = 'left'; ctx.fillText(`YOU ${myPts}`, W * 0.2 + 16, 44);
-      ctx.textAlign = 'center'; ctx.fillText(`TIEBREAK TO ${TARGET}`, W / 2, 44);
-      ctx.textAlign = 'right'; ctx.fillText(`AI ${aiPts}`, W * 0.8 - 16, 44);
-      ctx.fillStyle = 'rgba(0,229,255,0.8)'; ctx.font = '12px "JetBrains Mono", monospace';
-      ctx.textAlign = 'right'; ctx.fillText(`PRQ ${prq.toFixed(0)} · ${gradeRef.current.label}`, W - 14, 24);
-
-      if (msgTimer > 0) {
-        ctx.fillStyle = msgColor; ctx.font = 'bold 32px "Barlow Condensed", sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(msg, W / 2, 110);
-      }
-
-      if (!endedRef.current) raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
+    runMode(makeTiebreakMode({
+      reactBase: gradeReactBase(gradeRef.current.key),
+      // Live miss check. The arena ceiling reads this exact rate off this file.
+      aiNets: (rally) => Math.random() < 0.16 + rally * 0.05,
+    }), {
+      canvas,
+      input: bus,
+      onPhase: (p, cd) => {
+        setPhase(p);
+        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        // The card already woke the player. The harness has its own ready gate; open it so play starts.
+        if (p === 'ready') bus.emit({ t: 'button', btn: 'A', pressed: true });
+      },
+      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+      resultSink,
+    }).then((s) => {
+      if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+      stop = s;
+    }).catch((e) => console.error('[FEL-TIEBREAK] boot failed', e));
 
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('keydown', onKey);
-      delete (canvas as any).felTiebreak;
+      disposed = true;
+      if (canvasOwner.get(canvas) === token) stop?.();
+      busRef.current = null;
     };
-  }, [started, prq]);
+  }, [started]);
+
+  const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
+  const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
+
+  const myPts = Number(hud.myPts ?? 0);
+  const aiPts = Number(hud.aiPts ?? 0);
+  const banner = typeof hud.banner === 'string' ? hud.banner : '';
 
   return (
     <div className="relative w-full">
-      <div className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#0B1F14]" style={{ aspectRatio: '16/9' }}>
-        <canvas ref={canvasRef} width={W} height={H} className="h-full w-full" />
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
+        {started && phase === 'playing' && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3 font-mono">
+            <span className="fel-panel px-3 py-1 text-lg text-white">YOU {myPts}</span>
+            <span className="fel-panel px-3 py-1 text-sm text-white/80">TO {TARGET}</span>
+            <span className="fel-panel px-3 py-1 text-lg text-white">AI {aiPts}</span>
+          </div>
+        )}
+        {started && banner && (
+          <div className="pointer-events-none absolute inset-x-0 top-[18%] flex justify-center px-4">
+            <span className="fel-panel px-4 py-2 text-center text-xl font-black text-[#00FF9D]">{banner}</span>
+          </div>
+        )}
+        {started && phase === 'playing' && (
+          <div className="pointer-events-none absolute bottom-3 right-3 font-mono text-[11px] text-white/50">
+            PRQ {prq.toFixed(0)} · {gradeRef.current.label}
+          </div>
+        )}
+        <BootSplash
+          modeId="tiebreak"
+          title="TIEBREAK BLITZ"
+          phase={phase}
+          detail={phase === 'error' ? (loadError ?? undefined) : undefined}
+          onStart={tapStart}
+          onRetry={tapStart}
+        />
         {!started && (
-          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
+          <div onPointerDown={wake.onPointerDown} className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">TIEBREAK BLITZ</h2>
             <p className="max-w-md text-sm text-gray-300">
-              Sudden-death tiebreak to {TARGET}. Balls fire left or right — swing with <span className="text-[#00FF9D]">← / →</span> when the green ring appears. Long rallies force AI errors. Wrong side or early swing = point lost.
+              First to {TARGET}. The ball comes in on one side — swing <span className="text-[#00FF9D]">← / →</span> when the green ring closes on it. The window tightens as the rally and the lead grow.
             </p>
             <button onClick={() => setStarted(true)} className="rounded-lg bg-[#00FF9D] px-8 py-3 font-bold text-black transition hover:bg-[#00d986]">FIRST SERVE</button>
             <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
           </div>
         )}
       </div>
-      <div className="mt-3 flex justify-center gap-3 !hidden">
-        <button className="rounded-lg bg-[#00FF9D]/20 px-12 py-4 font-bold text-[#00FF9D] active:bg-[#00FF9D]/40" onClick={() => (canvasRef.current as any)?.felTiebreak?.swing('left')}>← SWING</button>
-        <button className="rounded-lg bg-[#00FF9D]/20 px-12 py-4 font-bold text-[#00FF9D] active:bg-[#00FF9D]/40" onClick={() => (canvasRef.current as any)?.felTiebreak?.swing('right')}>SWING →</button>
-      </div>
+      {started && (
+        <div className="mt-3 flex justify-center gap-3">
+          <button className="rounded-lg bg-[#00FF9D]/20 px-12 py-4 font-bold text-[#00FF9D] active:bg-[#00FF9D]/40" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'left', pressed: true }); }}>← SWING</button>
+          <button className="rounded-lg bg-[#00FF9D]/20 px-12 py-4 font-bold text-[#00FF9D] active:bg-[#00FF9D]/40" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'dpad', dir: 'right', pressed: true }); }}>SWING →</button>
+        </div>
+      )}
     </div>
   );
 }

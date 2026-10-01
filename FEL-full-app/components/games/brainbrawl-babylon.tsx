@@ -244,16 +244,23 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
           <span className="text-[10px] tracking-wider text-[#22d3ee]">{twoP ? 'P1' : 'YOU'}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.score, 0)}</span>
           {twoP && <><span className="mx-2 text-white/40">·</span><span className="text-[10px] tracking-wider text-[#facc15]">P2</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.p2score, 0)}</span></>}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
-          {CATEGORIES.map((c: Category) => {
-            const holder = claims[c];
-            const mine = holder === '0', theirs = holder === '1';
-            return (
-              <span key={c} className="rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider sm:px-2 sm:py-1 sm:text-[10px]" style={{ background: mine || theirs ? CATEGORY_COLOR[c] : 'rgba(0,0,0,0.5)', color: mine || theirs ? '#111' : CATEGORY_COLOR[c], outline: hud.category === c ? '2px solid #fff' : 'none' }}>
-                {c}{twoP && (mine || theirs) ? ` · ${mine ? 'P1' : 'P2'}` : ''}
-              </span>
-            );
-          })}
+        <div data-bb="claims" className="flex max-w-[58%] flex-col items-center gap-1">
+          <span className="font-mono text-[11px] font-bold tracking-widest text-white sm:text-xs">
+            {CATEGORIES.filter((c) => claims[c] === '0' || claims[c] === '1').length}/5 CLAIMED
+            {Number(hud.streak) > 1 ? ` · STREAK ×${hnode(hud.streak)}` : ''}
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
+            {CATEGORIES.map((c: Category) => {
+              const holder = claims[c];
+              const mine = holder === '0', theirs = holder === '1';
+              const held = mine || theirs;
+              return (
+                <span key={c} className="rounded-md px-2 py-1 text-[11px] font-bold tracking-wide sm:px-2.5 sm:py-1.5 sm:text-xs" style={{ background: held ? CATEGORY_COLOR[c] : 'rgba(0,0,0,0.55)', color: held ? '#111' : CATEGORY_COLOR[c], outline: hud.category === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.18)' }}>
+                  {held ? '✓ ' : ''}{c}{twoP && held ? ` ${mine ? 'P1' : 'P2'}` : ''}
+                </span>
+              );
+            })}
+          </div>
         </div>
         {typeof hud.clock === 'number' && <span className={`fel-panel px-2 py-0.5 fel-stat text-lg sm:px-3 sm:py-1 sm:text-2xl ${hud.clock <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>{hud.clock}s</span>}
       </div>
