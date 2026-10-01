@@ -238,6 +238,7 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
       <main className="min-h-[70vh] flex-1 rounded-2xl bg-white/[0.02]">
         {entry.table ? (
           <CreatorEditor
+            key={entry.key}
             table={entry.table}
             values={values[entry.key] ?? {}}
             onChange={(rowId, next) => onChange(entry.key, rowId, next)}
