@@ -51,6 +51,11 @@ export function defaultValueFor(row: AnyRow): RowValue {
   return row.allowNone ? null : (row.options[0] ?? null);
 }
 
+/** A slider commit. Same clamp as the stepper, so a drag cannot pass a PRQ ceiling either. */
+export function commitRated(row: RatedRow, raw: number, axes: Axes): number {
+  return clampToCeiling(row, raw, axes);
+}
+
 /** The ceiling shown beside a rated row, or null when nothing caps it. */
 export function rowCeiling(row: AnyRow, axes: Axes): number | null {
   return row.kind === 'rated' ? ceilingFor(row as RatedRow, axes) : null;

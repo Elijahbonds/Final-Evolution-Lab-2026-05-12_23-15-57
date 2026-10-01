@@ -6,6 +6,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { defaultFace, defaultEquipped, sanitizeJersey, sanitizeFaceSliders, type FaceConfig } from '@/lib/closet/wearable-catalog';
 import { filterEquipped } from '@/lib/closet/ownership';
+import { readDobYear } from '@/lib/privacy/scanSaveGate';
+import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
+import { decideLookHold, holdFace, payloadHasImage, privacyRecord } from '@/lib/creator/lookPrivacy';
 
 /** GET /api/v1/closet — current look + owned wearables + applied card skin. */
 export async function GET() {
@@ -30,10 +33,15 @@ export async function POST(req: NextRequest) {
 
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
-  const face: FaceConfig = { ...defaultFace(), ...(body?.face ?? {}) };
-  // Phase 3: sliders are free-form JSON from the client — clamp and whitelist.
+  // Pictures never land in the row. A data URL, a remote image, or an image field refuses the save.
+  if (payloadHasImage(body)) return NextResponse.json({ error: 'images_not_stored', saved: false }, { status: 400 });
+  const adult = verifiedAdult(await readDobYear(prisma, userId, 'look_hold'));
+  const hold = decideLookHold(adult, body?.saveLookNumbers === true, body?.modelTraining === true);
+  const posted: FaceConfig = { ...defaultFace(), ...(body?.face ?? {}) };
   const sliders = sanitizeFaceSliders(body?.face?.sliders);
-  if (sliders) face.sliders = sliders; else delete face.sliders;
+  if (sliders) posted.sliders = sliders; else delete posted.sliders;
+  // Under 18 the written face is the catalog default. Adults without the numbers opt-in keep presets, not sliders.
+  const face = holdFace(posted, hold);
   const equipped = body?.equipped ?? defaultEquipped();
 
   // Only equip owned wearables (server-side ownership check). The rule — owned OR one of the free
@@ -58,5 +66,5 @@ export async function POST(req: NextRequest) {
     update: { face: face as any, equipped: cleanEquipped as any, skinCardId, ...(jersey ? { jersey: jersey as any } : {}) },
     create: { userId, face: face as any, equipped: cleanEquipped as any, skinCardId, ...(jersey ? { jersey: jersey as any } : {}) },
   });
-  return NextResponse.json({ look });
+  return NextResponse.json({ look, privacy: privacyRecord(hold), lookLocal: !hold.uploadFace });
 }
