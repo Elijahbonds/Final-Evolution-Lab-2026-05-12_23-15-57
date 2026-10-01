@@ -24,6 +24,7 @@ const config = [
       'coverage/**',
       'node_modules/**',
       'public/loaders/**',
+      'public/pose/wasm/**',
       'public/_prisma/**',
       'scripts/**',
       'server/netd/dist/**',
