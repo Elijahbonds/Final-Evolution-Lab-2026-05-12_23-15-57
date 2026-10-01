@@ -374,6 +374,24 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       result: () => qaResult,
       /** RUN-CAPTURE: this session as a saveable artifact (modeId + timeline + result). */
       transcript: () => qa.transcript(def.modeId, qaResult),
+      /** RUN-CAPTURE save loop: download the transcript as a JSON file, so a headed run's evidence lands in
+       *  a file without console copy-paste. QA-only (the handle exists at all only under ?agent=1). */
+      saveTranscript: (label?: string) => {
+        const t = qa.transcript(def.modeId, qaResult);
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const name = `${def.modeId}${label ? `-${label.replace(/[^\w-]+/g, '-')}` : ''}-${stamp}.json`;
+        const blob = new Blob([JSON.stringify(t, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        console.info(`[FEL-QA] transcript saved: ${name} (${t.events.length} events)`);
+        return name;
+      },
       reset: () => qa.reset(),
       /** The live scene for an INTENT driver (the ball in flight, a pitch on its way): QA sessions only (`?agent=1`). */
       scene: () => (scene.isDisposed ? null : scene),
