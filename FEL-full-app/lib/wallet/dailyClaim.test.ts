@@ -401,6 +401,7 @@ describe('daily_streak (POST /api/wallet/earn → awardCredits): once per player
 });
 
 describe('TEST ACCOUNTS get 0 from both wallet earn routes (as their session runs do)', () => {
+  beforeEach(() => { vi.stubEnv('NODE_ENV', 'production'); });
   const cases: Array<[string, (u: Row) => void, string]> = [
     ['by FEL_TEST_ACCOUNTS email (any case)', (u) => { process.env.FEL_TEST_ACCOUNTS = `someone@else.test, ${u.email.toUpperCase()}`; }, 'player'],
     ['by FEL_TEST_ACCOUNTS id', (u) => { process.env.FEL_TEST_ACCOUNTS = u.id; }, 'player'],

@@ -78,6 +78,7 @@ interface RecapData {
   grade?: { label: string; color: string };
   season?: SeasonRecap | null;
   mastery?: MasteryRecap | null;
+  capMessage?: string;
 }
 
 export function GameShell(props: {
@@ -170,8 +171,20 @@ function GameShellInner({
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
       .then((r) => (r?.ok ? r.json() : null))
-      .then((j) => (typeof j?.runId === 'string' ? j.runId : null))
-      .catch(() => null);
+      .then((j) => {
+        if (j && typeof j.runId === 'string') {
+          import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => {
+            setAgentRunHooksAllowed(Boolean(j.agentRun));
+          });
+          return j.runId as string;
+        }
+        import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
+        return null;
+      })
+      .catch(() => {
+        import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
+        return null;
+      });
   }, [mode, agentRun, playtestRun]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
@@ -271,6 +284,8 @@ function GameShellInner({
         .then((r) => (r ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
+            // ECONOMY-CAPS (c): a replayed finish returns the stored body verbatim — no second reward card.
+            if (j?.replayed) return;
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
@@ -282,6 +297,7 @@ function GameShellInner({
               grade: j?.grade,
               season: j?.season ?? null,
               mastery: j?.mastery ?? null,
+              capMessage: typeof j?.capMessage === 'string' ? j.capMessage : undefined,
             });
             // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
             // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,
@@ -684,22 +700,35 @@ function GameShellInner({
                       <div className="mt-0.5 text-[11px] text-white/40">{unpaidLine(recap.unpaid)}</div>
                     </div>
                   )}
+                  {recap.capMessage && (
+                    <div data-recap="cap" className="fel-card mt-4 rounded-lg p-3 text-center">
+                      <div className="font-mono text-xs text-white/60">{recap.capMessage}</div>
+                    </div>
+                  )}
+                  {!recap.unpaid && (
                   <div className="mt-6 grid grid-cols-2 gap-3">
+                    {recap.xp > 0 && (
                     <div className="fel-card rounded-lg p-3">
                       <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
                       <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
                     </div>
+                    )}
+                    {recap.shards > 0 && (
                     <div className="fel-card rounded-lg p-3">
                       <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
                       <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
                     </div>
+                    )}
+                    {recap.credits > 0 && (
                     <div className="fel-card rounded-lg p-3">
                       <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
                       <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
                     </div>
+                    )}
+                    {recap.prqDelta !== 0 && (
                     <div className="fel-card rounded-lg p-3">
                       {recap.prqDelta >= 0 ? (
                         <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
@@ -712,16 +741,18 @@ function GameShellInner({
                       </div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
                     </div>
-                    {recapCoins !== null && (
+                    )}
+                    {recapCoins !== null && recapCoins.coins > 0 && (
                       <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
                         <Coins className="h-4 w-4 text-[#FFB020]" />
-                        {recapCoins.coins > 0 && <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>}
+                        <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>
                         <span className="text-[10px] uppercase tracking-wider text-white/40">
-                          {recapCoins.coins > 0 ? (recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins') : 'Wallet coin limit reached for now'}
+                          {recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins'}
                         </span>
                       </div>
                     )}
                   </div>
+                  )}
                   </>
                   )}
                   {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}

@@ -482,12 +482,23 @@ describe('the probe hook', () => {
     return win.__FEL_BODY__ as BodyHook | undefined;
   }
 
-  it('__FEL_BODY__ stays behind the feed\'s gate: development, or a production build on this machine with ?agent=1', async () => {
+  it('__FEL_BODY__ stays behind the feed\'s gate: development, or production loopback with the server agent-run marker', async () => {
     expect(await load('production', 'finalevolution.us')).toBeUndefined();
     expect(await load('production', 'finalevolution.us', '?agent=1')).toBeUndefined();   // a query anyone can type
     expect(await load('production', 'localhost')).toBeUndefined();
-    const bench = await load('production', 'localhost', '?agent=1');
-    expect(Object.keys(bench ?? {}).sort()).toEqual(['snapshot', 'start', 'stop']);
+    expect(await load('production', 'localhost', '?agent=1')).toBeUndefined();             // ?agent=1 alone never arms hooks
+    vi.resetModules();
+    env.NODE_ENV = 'production';
+    const kept = new Map<string, string>();
+    const win: Record<string, unknown> = {
+      location: { hostname: 'localhost', search: '?agent=1' },
+      sessionStorage: { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => { kept.set(k, v); }, removeItem: (k: string) => { kept.delete(k); } },
+    };
+    g.window = win;
+    const hooks = await import('@/lib/agentRunHooks');
+    hooks.setAgentRunHooksAllowed(true);
+    await import('./poseSource');
+    expect(Object.keys((win.__FEL_BODY__ as BodyHook | undefined) ?? {}).sort()).toEqual(['snapshot', 'start', 'stop']);
     const dev = await load('development', 'fel.example');
     expect(typeof dev?.start).toBe('function');
     expect(dev?.snapshot()).toEqual({ state: 'idle', detail: '', body: false });

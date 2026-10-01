@@ -85,11 +85,11 @@ describe('wallet client — the grant a report was paid', () => {
 describe('the shell\'s coins tile (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
   it('no tile for a refused earn or a zero grant nothing capped; a capped coin earn says so instead of "+0"', () => {
-    expect(shell).toContain('if (coins > 0 || capped) setRecapCoins({ coins, capped });');
-    // ECONOMY-SESSIONS-HARDEN: the figures are the session answer's (the run pays its coins), never an earn report's
+    // ECONOMY-CAPS F-P1: hide +0 tiles on paid cards; coins tile only when coins > 0
+    expect(shell).toContain('if (mine() && j?.paid === true)');
     expect(shell).toContain('const capped = Boolean(j?.coinsCapped);');
     expect(shell).toContain('const coins = Number.isFinite(j?.coins) ? Number(j.coins) : 0;');
-    expect(shell).toContain('{recapCoins.coins > 0 && <span');
-    expect(shell).toContain("'Wallet coin limit reached for now'");
+    expect(shell).toContain('recapCoins !== null && recapCoins.coins > 0');
+    expect(shell).toContain('{recap.xp > 0 &&');
   });
 });

@@ -570,7 +570,7 @@ describe('MUSIC-SUITE P3 FIX PASS: when a creation that did not count may count'
 describe('skateboarding and surfing are paid at most what 4 × their best run seen would pay', async () => {
   const sp = await import('./session-payout');
   const { finitePayCapScore, FINITE_PAY_BASIS, FINITE_PAY_HEADROOM, sessionPayout: pay, sessionXp: xpOf, sessionShards: shardsOf } = sp;
-  const { derivedBounds } = await import('./sessions/modeScoreRules');
+  const { MODE_SCORE_RULES } = await import('./sessions/modeScoreRules');
 
   it('the caps: 4 × 80,832 and 4 × 14,213; no other mode has one', () => {
     expect(FINITE_PAY_HEADROOM).toBe(4);
@@ -580,14 +580,17 @@ describe('skateboarding and surfing are paid at most what 4 × their best run se
     expect(Object.keys(FINITE_PAY_BASIS).sort()).toEqual(['skateboarding', 'surfing']);
   });
 
-  it('a forged run inside the derived bound pays the cap, not 1.5 × the bound (~653M XP)', () => {
-    const bound = derivedBounds({ killSwitch: false }).skateboarding.maxScore;
-    const forged = pay({ score: bound, won: true, endless: false, durationSec: 90, payCapScore: finitePayCapScore('skateboarding') });
+  it('a forged run inside the score-rule bound pays the cap, not 1.5 × the bound (~653M XP)', () => {
+    const payCap = finitePayCapScore('skateboarding')!;
+    const forged = pay({ score: payCap + 1_000_000, won: true, endless: false, durationSec: 90, payCapScore: payCap });
     expect(forged).toMatchObject({ xp: xpOf(323_328, true), shards: shardsOf(323_328, true), capped: true });
     expect(forged.xp).toBe(485_042);
-    expect(xpOf(bound, true)).toBeGreaterThan(650_000_000);
-    const surf = pay({ score: derivedBounds({ killSwitch: false }).surfing.maxScore, won: false, endless: false, durationSec: 90, payCapScore: finitePayCapScore('surfing') });
+    expect(xpOf(payCap + 1_000_000, true)).toBeGreaterThan(xpOf(323_328, true));
+    expect(MODE_SCORE_RULES.skateboarding.maxScore).toBeLessThan(payCap);
+    const surfCap = finitePayCapScore('surfing')!;
+    const surf = pay({ score: surfCap + 1_000_000, won: false, endless: false, durationSec: 90, payCapScore: surfCap });
     expect(surf).toMatchObject({ xp: xpOf(56_852, false), capped: true });
+    expect(MODE_SCORE_RULES.surfing.maxScore).toBeLessThan(surfCap);
   });
 
   it('the honest runs are paid in full (the endless ceiling would have cut 80,832 to ~14K XP)', () => {

@@ -16,5 +16,5 @@ const spinner = () => (
 const Game = dynamicImport(() => import('@/components/games/velocity-kart-babylon'), { ssr: false, loading: spinner });
 
 export function VelocityKartLoader() {
-  return <GameShell mode="velocityKart" title="VELOCITY KART" venue="The Circuit" Game={Game} ownControls />;
+  return <GameShell mode="velocityKart" title="VELOCITY KART" venue="Sovereign Circuit" Game={Game} ownControls />;
 }
