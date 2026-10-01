@@ -444,16 +444,16 @@ export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
   { id: 'kickup_eastbay', runway: 'kickup', air: ['eastbay'], name: 'THE KICK-UP EASTBAY', by: 'Elijah Bonds', nod: 1.2 },
   // DUNK MOTION phase 10b (owner, 2026-09-24). Jus Fly's, from the Nike dunk contest: the cartwheel, the grab off the bounce, under the
   // legs, the right hand. And the 720 — two whole turns before the slam — first thrown by Taurian "Air Up There" Fontenette (AND1, 2006).
-  { id: 'cartwheel_eastbay', runway: 'cartwheel', air: ['eastbay'], name: 'THE CARTWHEEL EASTBAY', by: 'Jus Fly', nod: 1.6 },
-  { id: '720', air: ['spin720'], name: 'THE 720', by: 'Taurian Fontenette', nod: 1.4 },
+  { id: 'cartwheel_eastbay', runway: 'cartwheel', air: ['eastbay'], name: 'THE CARTWHEEL EASTBAY', by: 'FLIGHT NIGHT', nod: 1.6 },
+  { id: '720', air: ['spin720'], name: 'THE 720', by: 'FLIGHT NIGHT', nod: 1.4 },
   // THE CHAINS (owner, 2026-09-16). Named combinations, in the order they have to be thrown — a signature is a
   // sequence, not a set, so throwing the same two the other way round is a combo but not THIS combo.
-  { id: 'btb_btl', air: ['behindback', 'betweenlegs'], name: 'BEHIND THE BACK BETWEEN THE LEGS', by: 'Team Flight Brothers', nod: 1.4 },
-  { id: 'btb_scorpion', air: ['behindback', 'scorpion'], name: 'BEHIND THE BACK SCORPION', by: 'Jordan Kilganon', nod: 1.6 },
-  { id: 'fake_btb_scorpion', air: ['fakeback', 'scorpion'], name: 'FAKE BEHIND THE BACK SCORPION', by: 'Jordan Kilganon', nod: 1.5 },
-  { id: '360_double_eastbay', air: ['spin360', 'doubleeastbay'], name: '360 DOUBLE EASTBAY', by: 'Guy Dupuy', nod: 1.8 },
+  { id: 'btb_btl', air: ['behindback', 'betweenlegs'], name: 'BEHIND THE BACK BETWEEN THE LEGS', by: 'FLIGHT NIGHT', nod: 1.4 },
+  { id: 'btb_scorpion', air: ['behindback', 'scorpion'], name: 'BEHIND THE BACK SCORPION', by: 'FLIGHT NIGHT', nod: 1.6 },
+  { id: 'fake_btb_scorpion', air: ['fakeback', 'scorpion'], name: 'FAKE BEHIND THE BACK SCORPION', by: 'FLIGHT NIGHT', nod: 1.5 },
+  { id: '360_double_eastbay', air: ['spin360', 'doubleeastbay'], name: '360 DOUBLE EASTBAY', by: 'FLIGHT NIGHT', nod: 1.8 },
   // the three-piece: the whole air budget, and the top of the mode
-  { id: '360_eastbay_scorpion', air: ['spin360', 'eastbay', 'scorpion'], name: '360 EASTBAY SCORPION', by: 'Team Flight Brothers', nod: 2.2 },
+  { id: '360_eastbay_scorpion', air: ['spin360', 'eastbay', 'scorpion'], name: '360 EASTBAY SCORPION', by: 'FLIGHT NIGHT', nod: 2.2 },
   // MORE CHAINS (owner, 2026-09-16). `by` is a CREDIT, so it only ever names a person or crew when the dunk is
   // genuinely theirs; a combination this contest made up says so instead of borrowing somebody's name for it.
   { id: '360_fake_eastbay', air: ['spin360', 'fakeeastbay'], name: '360 FAKE EASTBAY', by: 'FLIGHT NIGHT', nod: 1.5 },
@@ -467,7 +467,7 @@ export const SIGNATURE_DUNKS: readonly SignatureDunk[] = [
   // turn a full revolution and pass the ball under the leg, the Jordan-in-Barcelona of this vocabulary. Both pieces
   // fire at the rise and are done by the hang, and they cost 0.34 + 0.40 of the air, so it fits a good flight and not
   // a lazy one — which is the gate the owner asked for ("free to all"), enforced by the air budget rather than a lock.
-  { id: '360_eastbay', air: ['spin360', 'eastbay'], name: '360 EASTBAY', by: 'Team Flight Brothers', nod: 2.0 },
+  { id: '360_eastbay', air: ['spin360', 'eastbay'], name: '360 EASTBAY', by: 'FLIGHT NIGHT', nod: 2.0 },
   { id: 'windmill360_scorpion', air: ['windmill360', 'scorpion'], name: '360 WINDMILL SCORPION', by: 'FLIGHT NIGHT', nod: 1.9 },
   { id: 'windmill360_btl', air: ['windmill360', 'betweenlegs'], name: '360 WINDMILL BETWEEN THE LEGS', by: 'FLIGHT NIGHT', nod: 1.9 },
   { id: 'lob_tap', runway: 'selflob', air: ['tap'], name: 'THE TAP DUNK', by: 'FLIGHT NIGHT', nod: 1.3 },
