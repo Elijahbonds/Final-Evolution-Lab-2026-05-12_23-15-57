@@ -9,7 +9,7 @@ import { arenaModeKey } from '@/lib/arena';
 import { parseCard } from '@/lib/mp/dunkCard';
 import { isStakingPaused, STAKING_PAUSED } from '@/lib/stakingPause';
 import { expiredOutcomeOf, isExpired, reclaimOnRead, type ExpiredOutcome } from '@/lib/arena-reclaim';
-import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
+import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, DANCE_ATTEMPT_START, DANCE_ATTEMPT_FINISH } from '@/lib/arena-music';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
   if (!userId) return null;
@@ -107,12 +107,15 @@ export async function GET() {
   const attemptByMatch = new Map<string, 'started' | 'finished'>();
   try {
     const evs = await prisma.matchEvent.findMany({
-      where: { matchId: { in: mineRaw.map((m) => m.id) }, eventType: { in: ['SCORE_SUBMITTED', 'REFUNDED', 'SETTLED', MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH] } },
+      // MUSIC-SUITE P9 (2026-09-29): a dance duel's one attempt too (its own event names — lib/arena-music.ts HOUSE_SET_RULES)
+      where: { matchId: { in: mineRaw.map((m) => m.id) }, eventType: { in: ['SCORE_SUBMITTED', 'REFUNDED', 'SETTLED', MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, DANCE_ATTEMPT_START, DANCE_ATTEMPT_FINISH] } },
       orderBy: { seq: 'asc' },
     });
     for (const e of evs) {
-      if (e.eventType === MUSIC_ATTEMPT_START || e.eventType === MUSIC_ATTEMPT_FINISH) {
-        if (e.userId === userId) attemptByMatch.set(e.matchId, e.eventType === MUSIC_ATTEMPT_FINISH || attemptByMatch.get(e.matchId) === 'finished' ? 'finished' : 'started');
+      const isStart = e.eventType === MUSIC_ATTEMPT_START || e.eventType === DANCE_ATTEMPT_START;
+      const isFinish = e.eventType === MUSIC_ATTEMPT_FINISH || e.eventType === DANCE_ATTEMPT_FINISH;
+      if (isStart || isFinish) {
+        if (e.userId === userId) attemptByMatch.set(e.matchId, isFinish || attemptByMatch.get(e.matchId) === 'finished' ? 'finished' : 'started');
         continue;
       }
       if (e.eventType === 'REFUNDED' || e.eventType === 'SETTLED') {

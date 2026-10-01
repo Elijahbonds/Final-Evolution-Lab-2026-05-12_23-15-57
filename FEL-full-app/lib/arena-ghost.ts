@@ -16,6 +16,33 @@ import { arenaModeKey } from '@/lib/arena';
 import {
   drawRivalScore, median, ownDuelScores, RIVAL_FROM_DUEL_SCORES, RIVAL_SCORE_EVENT, storedModeKeys, type RivalDraw,
 } from '@/lib/arena-rivals';
+import { houseSongFor } from '@/lib/babylon/dance/houseSong';
+
+/**
+ * MUSIC-SUITE P9 FIX PASS (2026-09-29): A DANCE HOUSE RIVAL IS BANDED ON THE DUEL'S OWN SONG. drawHouseScore banded on the
+ * player's finished dance duels by MODE only, but the house song is any of six charts, difficulty 1 to 6 — 29.9 to 115.3
+ * taps a minute, 49 to 205 steps, a least press gap of 682 ms on WARMUP against 114 ms on CANALS — and accuracy is not
+ * song-independent (fair-duels-proof.json: the one reading-sensitive player on file moves from 3,562 to 6,067 across the
+ * songs). assumption: a human's accuracy falls on the denser charts. For a player whose history mixes songs, the house
+ * centred on their average across songs, so an easy house song was mostly a win and a hard one mostly a loss whoever
+ * danced better that day — P1's "the song decides the duel", against the house. Now only this duel's song counts: the
+ * player's finished dance duels are read (DANCE_SAME_SONG_READ of them, newest first), those on another song are left
+ * out, and the newest 10 on this one band the house; with none on this song, the cold-start baseline (flagged in the
+ * report: a per-song baseline, or a measured per-song factor on a cross-song history, is the owner's call).
+ * A past duel's song is the one its finish recorded (the route writes `songId` since this pass), else the one its match
+ * id picks. Human-vs-human duels were never affected: both dancers get the same song.
+ */
+export const DANCE_SAME_SONG_READ = 60;
+/** The song a finished dance duel was danced on: its finish's recorded songId, else its match id's current pick. Pure. */
+export function danceSongOfRow(row: { id?: string; events?: readonly { payload?: unknown }[] }): string | null {
+  for (const e of row.events ?? []) {
+    let p: unknown = e.payload;
+    if (typeof p === 'string') { try { p = JSON.parse(p); } catch { p = null; } }
+    const id = p && typeof p === 'object' ? (p as { songId?: unknown }).songId : undefined;
+    if (typeof id === 'string' && id) return id;
+  }
+  return typeof row.id === 'string' ? houseSongFor(row.id).songId : null;
+}
 
 export interface HouseDraw { score: number; draw: RivalDraw }
 
@@ -25,7 +52,7 @@ export interface HouseDraw { score: number; draw: RivalDraw }
  */
 export async function drawHouseScore(
   tx: any,
-  match: { mode: string; seed: string; createdAt: Date | string },
+  match: { mode: string; seed: string; createdAt: Date | string; id?: string },
   humanId: string,
   ceilingMax: number,
 ): Promise<HouseDraw> {
@@ -41,6 +68,8 @@ export async function drawHouseScore(
   const fromDuels = RIVAL_FROM_DUEL_SCORES.has(sessionMode);
   const scoreEvent: string | undefined = RIVAL_SCORE_EVENT[sessionMode];
   const createdAt = new Date(match.createdAt);
+  // MUSIC-SUITE P9 FIX PASS: a dance duel's house is banded on this duel's song only (DANCE_SAME_SONG_READ's doc)
+  const danceSong = sessionMode === 'dance' && typeof match.id === 'string' && match.id ? houseSongFor(match.id).songId : null;
   const [recent, population] = await Promise.all([
     fromDuels
       ? tx.competitionMatch.findMany({
@@ -50,13 +79,13 @@ export async function drawHouseScore(
           ...(scoreEvent ? { events: { some: { eventType: scoreEvent, userId: humanId } } } : {}),
         },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: danceSong ? DANCE_SAME_SONG_READ : 10,
         select: {
-          player1Id: true, player1Score: true, player2Score: true,
-          ...(scoreEvent ? { events: { where: { eventType: scoreEvent, userId: humanId }, select: { eventType: true, userId: true }, take: 1 } } : {}),
+          player1Id: true, player1Score: true, player2Score: true, ...(danceSong ? { id: true } : {}),
+          ...(scoreEvent ? { events: { where: { eventType: scoreEvent, userId: humanId }, select: { eventType: true, userId: true, ...(danceSong ? { payload: true } : {}) }, take: 1 } } : {}),
         },
-      }).then((rows: { player1Id: string; player1Score: number | null; player2Score: number | null; events?: { eventType: string; userId: string | null }[] }[]) =>
-        ownDuelScores(rows, humanId, ceilingMax, scoreEvent))
+      }).then((rows: { id?: string; player1Id: string; player1Score: number | null; player2Score: number | null; events?: { eventType: string; userId: string | null; payload?: unknown }[] }[]) =>
+        ownDuelScores(danceSong ? rows.filter((r) => danceSongOfRow(r) === danceSong).slice(0, 10) : rows, humanId, ceilingMax, scoreEvent))
       : tx.gameSession.findMany({
         where: { userId: humanId, mode: sessionMode, createdAt: { lt: createdAt } },
         orderBy: { createdAt: 'desc' },

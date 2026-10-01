@@ -13,7 +13,7 @@ import {
   arenaModeKey,
 } from '@/lib/arena';
 import {
-  isMusicDuel, readMusicAttempt, musicAttemptScore, readMusicSeats, houseSeatOf, musicTapPlausibility, PRE_HOUSE_BEAT_REASON,
+  houseSetModeOf, HOUSE_SET_RULES, readHouseAttempt, houseAttemptScore, readHouseSeats, houseSeatOf, houseTapPlausibility,
 } from '@/lib/arena-music';
 import { drawHouseScore } from '@/lib/arena-ghost';
 import { recordServerEvent } from '@/lib/analytics-server';
@@ -52,6 +52,16 @@ import { isExpired } from '@/lib/arena-reclaim';
  *     the refund commits. (/api/arena/music-attempt does the same at START, so a set is not played for nothing.)
  *   · The house's draw moved to lib/arena-ghost.ts (the expiry sweep draws it too, identically); and a music set's timing
  *     spread is recorded for review (lib/arena-music.ts musicTapPlausibility — nothing is refused on it).
+ *
+ * MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("Arena dance: same house song for both players, accuracy-based score;
+ * own songs free play only") — A CYPHER DUEL TAKES THE SAME PATH. Until now a dance score was the client's number up to
+ * 79,680, on whichever song each player picked. A dance duel is now one recorded attempt on its house song (posted
+ * through /api/arena/music-attempt, lib/arena-music.ts HOUSE_SET_RULES.dance): no attempt, 409 NO_ATTEMPT; started and
+ * never finished, 0; finished, judgeDanceSet on its presses — accuracy, 0..10,000 — and the posted score must equal it
+ * (422 SCORE_MISMATCH); past the deadline 409 EXPIRED, as for every mode. A stored dance score with no attempt behind it
+ * is from before the house song (a points score on the player's own pick): the duel is voided and both refunded (409
+ * PRE_HOUSE_SONG, reason 'pre_house_song'). The house rival is drawn under the dance stake ceiling (10,000,
+ * lib/arena-score-integrity.ts ARENA_STAKE_CEILINGS). The music path is the same code it was, through the same table.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -95,21 +105,24 @@ export async function POST(req: NextRequest) {
       // MUSIC-SUITE P6: a music duel's score is what the server makes of the player's one recorded attempt — no attempt,
       // no score (409 NO_ATTEMPT); an unfinished one, 0; a finished one, judgeHouseSet on its taps. checkStakeScore then
       // requires the posted score to equal it (422 SCORE_MISMATCH).
-      const attempt = isMusicDuel(match.mode) ? await readMusicAttempt(tx, match.id, userId) : null;
-      const rejudge = attempt ? musicAttemptScore(match.id, attempt) : null;
+      // MUSIC-SUITE P9: and a dance duel's, on its house song (judgeDanceSet: accuracy 0..10,000) — HOUSE_SET_RULES.dance.
+      const setMode = houseSetModeOf(match.mode);
+      const attempt = setMode ? await readHouseAttempt(tx, setMode, match.id, userId) : null;
+      const rejudge = setMode && attempt ? houseAttemptScore(setMode, match.id, attempt) : null;
       if (rejudge && !rejudge.ok) throw new ArenaError(rejudge.code, rejudge.detail, rejudge.status);
       // MUSIC-SUITE P6 FIX PASS: the other seat's stored score from before the house beat (no attempt by its player) is
       // not a score to settle against — the duel is refunded to both, and the refusal says so (after the refund commits)
-      if (attempt && houseSeatOf(match) === null) {
-        const seats = await readMusicSeats(tx, match);
+      // (MUSIC-SUITE P9: a dance score from before the house song, the same way — reason 'pre_house_song')
+      if (setMode && attempt && houseSeatOf(match) === null) {
+        const seats = await readHouseSeats(tx, setMode, match);
         const other = isP1 ? seats.p2 : seats.p1;
         if (other.legacy) {
           const feeLc = match.entryFeeCents;
           await arenaRefund(tx, { userId: match.player1Id, matchId, feeLc });
           await arenaRefund(tx, { userId: match.player2Id, matchId, feeLc });
           await tx.competitionMatch.update({ where: { id: matchId, status: { in: ['ACTIVE', 'WAITING'] } }, data: { status: 'VOIDED' } });
-          await appendMatchEvent(tx, matchId, 'REFUNDED', null, { reason: PRE_HOUSE_BEAT_REASON, feeLc, legacySide: isP1 ? 'p2' : 'p1' });
-          return { preHouseBeat: true, feeLc } as const;
+          await appendMatchEvent(tx, matchId, 'REFUNDED', null, { reason: HOUSE_SET_RULES[setMode].legacy.reason, feeLc, legacySide: isP1 ? 'p2' : 'p1' });
+          return { preHouse: setMode, feeLc } as const;
         }
       }
 
@@ -148,8 +161,8 @@ export async function POST(req: NextRequest) {
           if (isP1) match.player2Score = written.player2Score ?? match.player2Score;
           else match.player1Score = written.player1Score ?? match.player1Score;
         }
-        const plaus = attempt?.finish ? musicTapPlausibility(match.id, attempt.finish.taps) : null;
-        if (plaus?.flagged) console.warn(`[arena/submit-score] ${matchId}: a music set timed to ${plaus.spreadMs} ms over ${plaus.hits} hits — machine-exact; recorded for review`);
+        const plaus = setMode && attempt?.finish ? houseTapPlausibility(setMode, match.id, attempt.finish.taps, attempt.recorded?.v) : null;   // MUSIC-SUITE P9 FIX PASS: on the attempt's recorded house-song version (dance)
+        if (plaus?.flagged) console.warn(`[arena/submit-score] ${matchId}: a ${setMode} set timed to ${plaus.spreadMs} ms over ${plaus.hits} hits — machine-exact; recorded for review`);
         await appendMatchEvent(tx, matchId, 'SCORE_SUBMITTED', userId, {
           player: isP1 ? 'p1' : 'p2', score, ...(card ? { card: forWire(card) } : {}),
           ...(rejudge?.ok ? { rejudged: true, taps: rejudge.taps, ...(rejudge.forfeit ? { forfeit: 'unfinished_attempt' } : {}) } : {}),
@@ -234,11 +247,11 @@ export async function POST(req: NextRequest) {
     });
 
     // MUSIC-SUITE P6 FIX PASS: a duel refunded because the other score is from before the house beat (committed above)
-    if ((outcome as any).preHouseBeat) {
-      return NextResponse.json({
-        error: 'PRE_HOUSE_BEAT', refunded: true,
-        detail: "Your opponent's score in this duel is from before the house beat, so the two can't be compared: both stakes were refunded.",
-      }, { status: 409 });
+    // (MUSIC-SUITE P9: or, for a dance duel, the house song — 409 PRE_HOUSE_SONG)
+    const preHouse = (outcome as { preHouse?: 'music' | 'dance' }).preHouse;
+    if (preHouse) {
+      const legacy = HOUSE_SET_RULES[preHouse].legacy;
+      return NextResponse.json({ error: legacy.code, refunded: true, detail: legacy.atSubmit }, { status: 409 });
     }
     if ((outcome as any).settled) {
       recordServerEvent({ name: 'arena_match_settled', props: { matchId, status: (outcome as any).status }, userId }).catch(() => {});

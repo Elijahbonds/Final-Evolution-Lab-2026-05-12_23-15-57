@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3121';
-const OUT = process.env.OUT ?? '/Users/elijahbonds/Claude/outbox/finish-release/musicsuite/p3';
+const OUT = process.env.OUT ?? '/Users/elijahbonds/Claude/outbox/finish-release/musicsuite/p3';   // P10 re-run: OUT=…/p10/parked/p3-tiers
 fs.mkdirSync(OUT, { recursive: true });
 const ARGS = ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist',
   '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'];
@@ -126,9 +126,12 @@ async function room(browser: Browser): Promise<void> {
   await btn(p, 'STOP').click();
 
   // ── 2. FLIP ROWS ──
+  // MUSIC-SUITE P10 (2026-09-29): P5 made the 808 stems ONE source — "808 Kit" on the KITS shelf (pad 1 kick, pad 2 snare…)
   await btn(p, 'FLIP').click();
-  await btn(p, '808 bass').click();
-  await p.waitForFunction(() => ((window as Any).__FEL_FLIP__?.slices ?? 0) > 1 && (window as Any).__FEL_FLIP__?.decoded, undefined, { timeout: 20000 });
+  await p.evaluate(() => { const g = [...document.querySelectorAll('[data-qa^="flip-shelf-"]')].find((x) => /KITS/i.test(x.textContent ?? '')) as HTMLButtonElement | undefined; g?.click(); });
+  await p.waitForTimeout(150);
+  await btn(p, '808 Kit').click();
+  await p.waitForFunction(() => { const f = (window as Any).__FEL_FLIP__; return f?.source === 'bank_808' && !!f?.decoded && (f?.slices ?? 0) >= 8; }, undefined, { timeout: 30000 });
   await p.getByRole('button', { name: 'pad 1', exact: true }).click();
   const sendLabel0 = await qa(p, 'flip-send').textContent();
   await qa(p, 'flip-send').click(); await p.waitForTimeout(300);
@@ -182,17 +185,19 @@ async function room(browser: Browser): Promise<void> {
   check('CLEAR asks first, clears every hit (rows kept), and UNDO brings them all back', /Clear all \d+ hits/.test(confirmText ?? '') && cleared === 0 && rowsAfterClear.includes('flip_0') && restored === litNow, { confirmText, litNow, cleared, restored }, `asked, 0, ${litNow}`);
 
   // ── 4 + 5 + 6. THE CHAIN TIER, SONG MODE, SECTIONS ──
-  const chainGates = { take: await btn(p, '● RECORD TAKE').count(), render: await btn(p, 'RENDER SONG + STEMS').count(), note: await p.getByText('Recording takes opens at THE STUDIO').count() };
-  check('chain: RECORD TAKE and RENDER SONG + STEMS are not offered (STUDIO features, MusicTiers takes / mixdown)', chainGates.take === 0 && chainGates.render === 0, chainGates, '0 / 0');
+  // MUSIC-SUITE P10: RECORD TAKE became the recording booth in P4 (ui/RecordBooth: ARM MIC, RECORD) — the gate is the booth's
+  const chainGates = { booth: await qa(p, 'record-booth').count(), arm: await qa(p, 'booth-arm').count(), render: await btn(p, 'RENDER SONG + STEMS').count() };
+  check('chain: the recording booth and RENDER SONG + STEMS are not offered (STUDIO features, MusicTiers takes / mixdown)', chainGates.booth === 0 && chainGates.arm === 0 && chainGates.render === 0, chainGates, '0 / 0 / 0');
   // section A = the current grid; then a different grid → section B (the 2nd save opens the studio)
   await btn(p, 'SAVE GRID AS SECTION').click(); await p.waitForTimeout(150);
   await qa(p, 'clear').click(); await qa(p, 'clear-yes').click();
   for (const s of [0, 2, 4, 6, 8, 10, 12, 14]) await cell(p, 'hat', s);
   await cell(p, 'kick', 0);
-  await p.locator('select').first().selectOption('hook');
+  // MUSIC-SUITE P10: the page's first <select> is the KEY picker since P4 — the section name is the SONG panel's
+  await p.locator('[data-qa="song-panel"] select').first().selectOption('hook');
   await btn(p, 'SAVE GRID AS SECTION').click(); await p.waitForTimeout(300);
-  const studioGates = { take: await btn(p, '● RECORD TAKE').count(), render: await btn(p, 'RENDER SONG + STEMS').count(), chips: (await chips(p)).map((c) => c.state) };
-  check('studio: two sections chained open THE STUDIO, and only now RECORD TAKE + RENDER appear', studioGates.take === 1 && studioGates.render === 1 && studioGates.chips[2] === 'current', studioGates, '1 / 1 / studio current');
+  const studioGates = { booth: await qa(p, 'record-booth').count(), arm: await qa(p, 'booth-arm').count(), render: await btn(p, 'RENDER SONG + STEMS').count(), chips: (await chips(p)).map((c) => c.state) };
+  check('studio: two sections chained open THE STUDIO, and only now the booth (ARM MIC) + RENDER appear', studioGates.booth === 1 && studioGates.arm === 1 && studioGates.render === 1 && studioGates.chips[2] === 'current', studioGates, '1 / 1 / 1 / studio current');
   // the working grid C, distinct from both sections
   await qa(p, 'clear').click(); await qa(p, 'clear-yes').click();
   for (const s of [3, 7, 11]) await cell(p, 'clap', s);
@@ -250,9 +255,10 @@ async function room(browser: Browser): Promise<void> {
     const idx = JSON.parse(localStorage.getItem('fel_studio_library_v2') ?? 'null');
     const list = Array.isArray(idx) ? idx : idx?.tracks ?? idx?.entries ?? [];
     const t = list.find((x: Any) => x.title === 'p3 chops');
-    return t ? t.sequencer.tracks.map((r: Any) => ({ id: r.sampleId, chop: r.chop ? { pad: r.chop.pad, src: r.chop.source?.url ?? r.chop.source?.audio?.key, slice: r.chop.slice } : null })) : null;
+    return t ? t.sequencer.tracks.map((r: Any) => ({ id: r.sampleId, chop: r.chop ? { pad: r.chop.pad, src: r.chop.source?.url ?? r.chop.source?.audio?.key ?? null, sourceId: r.chop.source?.id ?? null, slice: r.chop.slice } : null })) : null;
   });
-  check('publish: the record keeps the heard rows, each Flip row WITH its chop', !!rec && rec.some((r: Any) => r.id === 'flip_0' && r.chop?.src === '/audio/kits/808/bass.wav') && rec.every((r: Any) => !r.id.startsWith('flip_') || r.chop), rec, 'flip_0 with the 808 bass chop');
+  // MUSIC-SUITE P10: the chop comes from the 808 Kit now (its pad 1 is the kick stem) — the record must name that source
+  check('publish: the record keeps the heard rows, each Flip row WITH its chop', !!rec && rec.some((r: Any) => r.id === 'flip_0' && r.chop && (r.chop.sourceId === 'bank_808' || /\/audio\/kits\/808\//.test(String(r.chop.src)))) && rec.every((r: Any) => !r.id.startsWith('flip_') || r.chop), rec, 'flip_0 with its 808 Kit chop');
   await btn(p, 'LIBRARY').click();
   await p.locator('div', { hasText: 'p3 chops' }).getByRole('button', { name: 'REMIX' }).last().click();
   await p.waitForTimeout(1500);
@@ -292,8 +298,11 @@ async function kitsPerPlayer(browser: Browser): Promise<void> {
   await startRoom(p);
   const anaKits = await p.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.textContent ?? '').filter((t) => /^(STREET|NEON|DUST)/.test(t)));
   R.kits = { ana, benKits, anaKits };
-  check('kits per player: Ana\'s NEON is cached under her id, the old shared key is gone',
-    /neon/.test(ana.keyed ?? '') && ana.shared === null, ana, 'keyed has neon, shared null');
+  // MUSIC-SUITE P10: P6 (owner decision #23, purchases.ts:224-227) KEEPS the old shared key — it is the only record of a
+  // kit handed out free before 4b766804 — until the grandfather claim settles; /dev/music never sends that claim (P6's
+  // open item). What P3 promised still holds: it is never ADOPTED as this player's cache, and never rewritten.
+  check('kits per player: Ana\'s NEON is cached under her id; the old shared key is kept for the kit claim, never adopted or rewritten',
+    /neon/.test(ana.keyed ?? '') && ana.shared === '["street","neon","dust"]' && !/dust/.test(ana.keyed ?? ''), ana, 'keyed has neon (not dust), shared unchanged');
   check('kits per player: Ben on the same device (server offline) sees NEON and DUST for sale, not Ana\'s', benKits.includes('NEON · 200◈') && benKits.includes('DUST · 400◈'), benKits, 'NEON · 200◈, DUST · 400◈');
   check('kits per player: Ana (server offline) still sees her NEON from her own cache', anaKits.includes('NEON') && anaKits.includes('DUST · 400◈'), anaKits, 'NEON owned, DUST for sale');
   await ctx.close();

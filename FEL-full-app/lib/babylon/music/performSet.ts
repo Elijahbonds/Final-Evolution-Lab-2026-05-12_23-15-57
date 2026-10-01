@@ -220,6 +220,17 @@ export function performCapLanes(stepInBar: number, lanes: readonly PerformLane[]
 }
 
 /**
+ * MUSIC-SUITE P10 (2026-09-29): THE ROWS THE LANES DRAW are the rows the engine would START — let through by the desk
+ * (mute / solo) AND holding a sound. P6's open item: a Flip row whose chop failed to load (or was silenced by a song-mode
+ * swap that couldn't get its chop — StudioMode swapFailed → engine.unloadSample) starts nothing (AudioEngine.scheduleStep
+ * skips a row with no sample, so StepSound.rows never names it and the judge offers none of its notes), yet its lane
+ * still drew them: notes on screen a player could never score. `loaded` is the engine's own hasSample.
+ */
+export function performDrawnRows<T extends { sampleId: string }>(rows: readonly T[], gate: (id: string) => boolean, loaded: (id: string) => boolean): T[] {
+  return rows.filter((t) => gate(t.sampleId) && loaded(t.sampleId));
+}
+
+/**
  * MUSIC-SUITE P6: what each lane shows for one bar — `rowsAt(step)` = the rows that hit on that step (the ones that will
  * sound: drawn, not muted), through the lanes and the 8th cap exactly as the live set offers them. [lane][step] = a note.
  */

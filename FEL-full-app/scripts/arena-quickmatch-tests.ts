@@ -135,6 +135,30 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   ok(/Math\.max\(0, Math\.round\(res\?\.score \?\? 0\)\)/.test(shell), 'arena submissions are rounded to integers (fractional-score modes)');
 }
 
+// ── E. MUSIC-SUITE P9 (2026-09-29): the house-set rivals — music and dance band on rejudged sets, never below the baseline
+// Owner decision #10: "Arena dance (fixed): same house song for both players, accuracy-based score … 5,000 baseline kept".
+// A dance Quick Match's house is drawn on the accuracy scale (0..10,000): off the player's own rejudged dance sets only,
+// never their free-play sessions (points, up to 79,680+), and floored at the 5,000 cold start — a grade-C set.
+{
+  const rivals = readFileSync(new URL('../lib/arena-rivals.ts', import.meta.url), 'utf8');
+  ok(ARENA_SCORE_BASELINES.dance === 5000, 'the dance cold-start baseline is kept at 5,000 (decision #10)');
+  ok(/RIVAL_FROM_DUEL_SCORES[^\n]*new Set\(\['music', 'dance'\]\)/.test(rivals), 'dance rivals band on past Arena dance duels, not sessions');
+  ok(/RIVAL_BASELINE_FLOOR[^\n]*new Set\(\['music', 'dance'\]\)/.test(rivals), 'the dance band never centres below its baseline');
+  ok(/dance: DANCE_ATTEMPT_FINISH/.test(rivals), 'only a duel carrying the player\'s finished house-song attempt counts');
+  const cold = drawRivalScore({ seed: 'dance-cold', mode: 'dance', playerHistory: [] });
+  ok(cold.source === 'baseline' && cold.center === 5000, 'a first dance Quick Match draws off the 5,000 baseline');
+  const zeros = drawRivalScore({ seed: 'dance-zeros', mode: 'dance', playerHistory: [0, 0, 0, 0] });
+  ok(zeros.center === 5000, 'a history of empty (0) dance finishes cannot sink the house below the baseline');
+  let inBand = true;
+  for (let i = 0; i < 200; i++) {
+    const d = drawRivalScore({ seed: `dance-${i}`, mode: 'dance', playerHistory: [] });
+    if (d.score < Math.floor(5000 * (1 - RIVAL_BAND)) || d.score > Math.ceil(5000 * (1 + RIVAL_BAND))) inBand = false;
+  }
+  ok(inBand, 'every cold dance draw sits in 4,100–5,900 (200 seeds) — under the 10,000 stake ceiling');
+  const hot = drawRivalScore({ seed: 'dance-hot', mode: 'dance', playerHistory: [9200, 8800, 9400] });
+  ok(hot.source === 'player-history' && hot.center === 9200, 'a strong dancer\'s own sets raise the house to their level');
+}
+
 if (fail.length) {
   console.error(`arena-quickmatch-tests: ${fail.length} FAILED of ${checks}`);
   for (const f of fail) console.error(`  ✗ ${f}`);

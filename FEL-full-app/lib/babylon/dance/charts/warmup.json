@@ -1,0 +1,29 @@
+{
+  "format": "fel-dance-chart/1",
+  "song": "warmup",
+  "bpm": 88,
+  "bars": 36,
+  "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
+  "about": "Difficulty 1. Quarter notes a beat apart at the least; moves on the downbeats, one accent inside a long move on the snare (beat 4); two freeze holds on the break; freestyle every two beats, alternating with the hook's called bars.",
+  "phrases": {
+    "intro": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 4, "m": "spin" } ] },
+    "intro2": { "bars": 2, "notes": [ { "b": 0, "m": "wave", "mir": 1 }, { "b": 4, "m": "spin", "mir": 1 } ] },
+    "verseA": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 4, "m": "twostep" } ] },
+    "verseB": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep" }, { "b": 7 } ] },
+    "verseC": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "shoulder" }, { "b": 7 } ] },
+    "hookA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 5 } ] },
+    "hookB": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 3 }, { "b": 4, "m": "windmill" }, { "b": 7 } ] },
+    "free2": { "bars": 2, "free": { "every": 2 } },
+    "break": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 2 }, { "b": 4, "m": "babyfreeze", "hold": 2, "mir": 1 } ] },
+    "outro": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "babyfreeze", "hold": 2 } ] }
+  },
+  "sections": [
+    { "name": "intro", "bar": 1, "bars": 4, "play": ["intro", "intro2"] },
+    { "name": "verse", "bar": 5, "bars": 8, "play": ["verseA", "verseB", "verseA", "verseB"] },
+    { "name": "hook", "bar": 13, "bars": 8, "play": ["hookA", "free2", "hookA", "free2"] },
+    { "name": "break", "bar": 21, "bars": 2, "play": ["break"] },
+    { "name": "verse", "bar": 23, "bars": 4, "play": ["verseA", "verseC"] },
+    { "name": "hook", "bar": 27, "bars": 8, "play": ["hookB", "free2", "hookA", "free2"] },
+    { "name": "outro", "bar": 35, "bars": 2, "play": ["outro"] }
+  ]
+}

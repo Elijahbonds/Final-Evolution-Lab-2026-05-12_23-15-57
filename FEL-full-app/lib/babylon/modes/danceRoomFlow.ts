@@ -32,9 +32,23 @@ export type RoomPhase = 'pick' | 'countin' | 'playing';
  */
 export type HoldAction = 'pause' | 'resume-count-back' | 'resume-rearm' | 'resume' | 'none';
 
-/** The song holds whenever the page is hidden or the harness is not 'playing' (START, the 3-2-1, the results). */
-export function holdAction(o: { ended: boolean; hidden: boolean; harnessPhase: HarnessPhase; clockPaused: boolean; roomPhase: RoomPhase }): HoldAction {
+/**
+ * The song holds whenever the page is hidden or the harness is not 'playing' (START, the 3-2-1, the results).
+ *
+ * MUSIC-SUITE P9 FIX PASS (2026-09-29): EXCEPT IN AN ARENA RUN (`arena`), once its count-in has begun: an Arena set runs
+ * to its end — there is no pause (owner decision #40, "everything else as P6 built it": StudioMode.tsx's Arena set). The
+ * count back in replays the bar before the pause point and reopens presses MISS_AFTER before it, and the press list is on
+ * song time, which leaves the pause out — so a staked dancer could pause just after each beat (the step still pending),
+ * rest, and hit the replayed beat on time, and the server's rejudge could not tell: measured on CANALS (the real
+ * SongClock, DancePerformance and judgeDanceSet, 120 Hz), a dancer 150 ms late on every step scored 4,145 straight and
+ * 10,000 pausing. Now the song clock never holds there: the band plays on (its stems are scheduled whole), every step the
+ * pause covers passes as a MISS, and the harness's START overlay is only an overlay. A clock already held when the run
+ * reached its count-in (it cannot be — START is refused while paused) just carries on. The ready screen ('pick') holds as
+ * ever: nothing is scheduled there, and the attempt is not used until START.
+ */
+export function holdAction(o: { ended: boolean; hidden: boolean; harnessPhase: HarnessPhase; clockPaused: boolean; roomPhase: RoomPhase; arena?: boolean }): HoldAction {
   if (o.ended) return 'none';
+  if (o.arena && o.roomPhase !== 'pick') return o.clockPaused ? 'resume' : 'none';
   const hold = o.hidden || o.harnessPhase !== 'playing';
   if (hold && !o.clockPaused) return 'pause';
   if (!hold && o.clockPaused) return o.roomPhase === 'playing' ? 'resume-count-back' : o.roomPhase === 'countin' ? 'resume-rearm' : 'resume';
@@ -51,8 +65,14 @@ export function countBackFirstBeat(startAt: number, songNow: number, beatSec: nu
  * browse starts that wait again (P1 measured the default starting 6.07–6.28 s after wake while d-pad presses at +2, +4
  * and +5.5 s were browsing).
  */
-export function pickTimer(sec: number, ev: { type: 'tick'; dt: number } | { type: 'browse' }, timeoutSec: number): { sec: number; start: boolean } {
+export function pickTimer(sec: number, ev: { type: 'tick'; dt: number; held?: boolean } | { type: 'browse' }, timeoutSec: number): { sec: number; start: boolean } {
   if (ev.type === 'browse') return { sec: 0, start: false };
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): `held` — the player is pairing the phone dance pad (they touched its badge, or a
+  // phone joined: dance/phonePadLink.ts). Tapping the badge, scanning the QR and loading the page are not bus inputs, the
+  // QR flow takes longer than the 6 s wait, and the default song used to start, be judged and END while the player was
+  // still pairing — decision #16's song pick from the phone could not happen. Once the pad is armed the pick screen waits
+  // for a press (A, or the phone's own pick): a player who reached for the phone is here to choose.
+  if (ev.held) return { sec: 0, start: false };
   const next = sec + (Number.isFinite(ev.dt) && ev.dt > 0 ? ev.dt : 0);
   return { sec: next, start: next >= timeoutSec };
 }

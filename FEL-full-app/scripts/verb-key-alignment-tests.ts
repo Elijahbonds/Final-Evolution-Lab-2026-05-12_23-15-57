@@ -158,6 +158,26 @@ for (const { key, file, symbol } of modeSources()) {
   }
 }
 
+// ── The Cypher's four-move pad (MUSIC-SUITE P9 FIX PASS, 2026-09-29) ──────────────────────────────────────────────
+// DanceMode reads its buttons through lib/babylon/dance/freestyle.ts (pressEdge: A, B, X and Y, one line — a single
+// disjunction to the scan above, so a ONE-button overlay passed it), and each face button picks its own move in a
+// freestyle bar (chart.ts FREESTYLE_PAD). Touch shipped one TAP: every freestyle pick on a phone was Top Rock. Every pad
+// button must be its own live slot on the overlay, emitting that button.
+{
+  const freestyle = readFileSync(join(process.cwd(), 'lib', 'babylon', 'dance', 'freestyle.ts'), 'utf8');
+  const chart = readFileSync(join(process.cwd(), 'lib', 'babylon', 'dance', 'chart.ts'), 'utf8');
+  const padKeys = [...(/export const FREESTYLE_PAD = \{([\s\S]*?)\} as const;/.exec(chart)?.[1] ?? '').matchAll(/^\s*([ABXY]):/gm)].map((m) => m[1]);
+  ok(padKeys.join('') === 'ABXY', `D1 chart.ts FREESTYLE_PAD names A, B, X and Y (got ${padKeys.join(',') || 'none'})`);
+  ok(/e\.btn === 'X'/.test(freestyle) && /e\.btn === 'Y'/.test(freestyle), 'D2 dance/freestyle.ts reads X and Y (the pad\'s picks)');
+  const dance = MODE_VERBS.dance;
+  (['A', 'B', 'X', 'Y'] as const).forEach((k, i) => {
+    const b = dance?.buttons[i];
+    const e = b?.emit;
+    ok(!!b && !!b.label && !!e && e.t === 'button' && e.btn === k,
+      `D3-${k} the dance overlay offers ${k} as its own live slot emitting ${k} — a freestyle pick on touch needs every pad move`);
+  });
+}
+
 if (fail.length) {
   console.error(`verb-key-alignment-tests: ${fail.length} FAILED of ${checks}`);
   for (const f of fail) console.error('  ✗ ' + f);

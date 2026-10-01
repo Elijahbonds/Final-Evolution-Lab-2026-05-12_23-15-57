@@ -28,6 +28,8 @@ import {
   DANCE_LIBRARY, DancePerformance, generateRoutine, beatDuration, JUDGE_WINDOWS, type DanceStep, type DanceClip,
 } from '@/lib/babylon/core/DanceCore';
 import { allTracks, stepsFor, gradeFor, type DanceTrack } from '@/lib/babylon/core/danceTracks';
+import { chartStepsFor } from '@/lib/babylon/dance/chart';
+import { ALL_DANCE_MOVES } from '@/lib/babylon/dance/moves';
 import { StemBand, CATEGORY_STEM } from '@/lib/babylon/audio/StemBand';
 import { exportSongToDance } from '@/lib/babylon/music/DanceExport';
 import { MAX_SONG_BARS, barStartSec, renderLengthSec, type Section, type SongChain } from '@/lib/babylon/music/Song';
@@ -40,7 +42,7 @@ import {
 import {
   sessionWon as serverSessionWon, sessionScoreCap, isEndlessSession, sessionPayout as serverSessionPayout,
 } from '@/lib/session-payout';
-import { StudioLibrary } from '@/lib/babylon/music/StudioLibrary';
+import { LIBRARY_MAX, createStudioLibrary, type LibraryBlobStore } from '@/lib/babylon/music/StudioLibrary';
 import { KIT_SLOTS } from '@/lib/babylon/music/SynthKit';
 import { ARENA_SCORE_BASELINES, RIVAL_BAND } from '@/lib/arena-rivals';
 import { SCORE_CEILINGS, danceCeiling } from '@/lib/arena-score-integrity';
@@ -62,7 +64,10 @@ const ms = (s: number): number => r(s * 1000, 2);
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 const CATEGORIES = [...new Set(DANCE_LIBRARY.map((c) => c.category))] as DanceClip['category'][];
-const clipOf = (s: DanceStep): DanceClip => DANCE_LIBRARY.find((c) => c.id === s.clipId)!;
+// MUSIC-SUITE P10 (2026-09-29): through dance/moves.ts (DANCE_LIBRARY first, then P9's captured moves). The authored charts
+// dance captured moves DANCE_LIBRARY does not hold, so DANCE_LIBRARY.find(...)! was undefined and this sim crashed on its
+// first chart ("reading 'category'") from P9 on — nobody had re-run it since.
+const clipOf = (s: DanceStep): DanceClip => ALL_DANCE_MOVES.find((c) => c.id === s.clipId)!;
 
 /** Every step tapped dead on its beat through the real DancePerformance (DanceCore.ts:199-215 update, :255-294 hit). */
 function perfectRun(steps: DanceStep[], bpm: number): { score: number; maxCombo: number; stars: number; accuracy: number; counts: Record<string, number> } {
@@ -169,7 +174,10 @@ function danceSection() {
   const tracks = allTracks().map((t) => {
     const mine = stepsFor(t);
     const steps = mine ?? generateRoutine({ bars: t.bars, difficulty: t.difficulty, seed: t.seed });
-    return chartReport(t, steps, mine ? (t.song ? 'stepsForSong (its own section map)' : 'exported') : 'generateRoutine(bars, difficulty, seed) fallback — unreachable for a shipped track');
+    // MUSIC-SUITE P9 (2026-09-29): a shipped track now plays its AUTHORED chart (dance/chart.ts), stepsForSong only if the
+    // chart failed validation (chartStepsFor logs that loudly)
+    const src = t.song ? (chartStepsFor(t.song) ? 'authored chart (dance/charts)' : 'stepsForSong fallback (chart invalid)') : 'exported';
+    return chartReport(t, steps, mine ? src : 'generateRoutine(bars, difficulty, seed) fallback — unreachable for a shipped track');
   });
 
   // THE 64-BAR EXPORT. SongPanel ids a song `s${Date.now()}` per mount (SongPanel.tsx:25), and the export's seed is
@@ -694,8 +702,35 @@ function performSection(fake: FakeWebAudio) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-// PUBLISH — the library's data URLs against a localStorage quota
+// PUBLISH — the room's publish (publishWithAudio) against the device's two stores
 // ════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// MUSIC-SUITE P10 (2026-09-29): P3's open item ("baseline-sim.ts still calls the compat publish"). P1 measured the
+// pre-P3 library: every publish wrote its 2-bar WAV as a ~1.5 MB data URL INTO localStorage, and the 4th threw
+// QuotaExceededError out of an unhandled rejection. P3 moved the audio into the device's file store (IndexedDB) and
+// left only a small index row in localStorage; the room publishes through StudioLibrary.publishWithAudio, which never
+// throws and hands back the line to show. This section kept driving the COMPAT `publish` (the old synchronous shape,
+// kept only for the migration tests) — so its "publishes that fit" measured a path no player takes. It now drives the
+// room's own call on a fresh library over the same FakeStorage quota plus an in-memory file store with a byte budget.
+// THE SURVIVAL MATRIX CHANGED ON PURPOSE: the answer is no longer "3 songs, then a crash" but "LIBRARY_MAX songs (the
+// index is ~1 KB a song), or the file store's budget, then a refusal line" — compare P1's rows by meaning, not number.
+
+/** An in-memory LibraryBlobStore that refuses a put past `budgetBytes` the way IndexedDB does (QuotaExceededError). */
+function budgetStore(budgetBytes: number): LibraryBlobStore & { usedBytes: () => number } {
+  const m = new Map<string, Blob>();
+  const used = (): number => [...m.values()].reduce((n, b) => n + b.size, 0);
+  return {
+    async get(k) { return m.get(k) ?? null; },
+    async put(k, blob) {
+      if (used() - (m.get(k)?.size ?? 0) + blob.size > budgetBytes) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+      m.set(k, blob);
+    },
+    async delete(k) { m.delete(k); },
+    async list(prefix = '') { return [...m.keys()].filter((k) => k.startsWith(prefix)); },
+    persistent: true,
+    usedBytes: used,
+  };
+}
 
 async function publishSection(fake: FakeWebAudio) {
   const rows = [];
@@ -703,44 +738,53 @@ async function publishSection(fake: FakeWebAudio) {
     const tracks = emptyTracks().map((t, i) => (i < 3 ? { ...t, pattern: t.pattern.map((_, j) => j % (i + 2) === 0) } : t));
     const eng = new AudioEngine({ bpm, steps: STEPS, tracks, swing: ACADEMY_SWING });
     for (const k of KIT_SLOTS) eng.loadBuffer(k.id, k.name, silentBuffer(), k.category);
-    const blob = await eng.renderMixdown(2);                       // StudioMode.tsx:282
+    const blob = await eng.renderMixdown(2);                       // the room's publishTrack → renderMixdown(2)
     const frames = FakeOfflineAudioContext.created[FakeOfflineAudioContext.created.length - 1].length;
-    // REPRODUCED: FileReader.readAsDataURL (StudioLibrary.ts:135-142) → `data:<blob.type>;base64,<bytes>`
-    const dataUrl = `data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`;
     eng.dispose();
     const quotas: Record<string, unknown> = {};
-    for (const [label, quota] of [['5 MiB chars (Chromium: 10 MiB of UTF-16)', 5 * 1024 * 1024], ['5,000,000 chars', 5_000_000]] as const) {
+    const cases = [
+      // [label, localStorage chars, file-store bytes]
+      ['5 MiB localStorage + a 50 MB file store (assumption: a small phone budget; Chromium grants far more)', 5 * 1024 * 1024, 50_000_000],
+      ['5 MiB localStorage + an unbounded file store', 5 * 1024 * 1024, Number.POSITIVE_INFINITY],
+      ['a nearly full localStorage (64 KiB) + an unbounded file store', 64 * 1024, Number.POSITIVE_INFINITY],
+    ] as const;
+    for (const [label, quotaChars, budget] of cases) {
       fake.storage.clear();
-      fake.storage.quotaChars = quota;
-      let ok = 0, error = '';
-      for (let i = 0; i < 50; i++) {
+      fake.storage.quotaChars = quotaChars;
+      const store = budgetStore(budget);
+      let t = 1_000;
+      const lib = createStudioLibrary({ storage: () => fake.storage, store: () => store, autoMigrate: false, now: () => (t += 1_000) });
+      let ok = 0, threw = '', refusal: { reason: string; line: string } | null = null;
+      for (let i = 0; i < LIBRARY_MAX + 5; i++) {
         try {
-          StudioLibrary.publish({                                 // the REAL publish → writeAll (StudioLibrary.ts:43-46, 54-65)
+          const r = await lib.publishWithAudio({
             title: `T${i}`, authorId: 'me', authorName: 'You', kit: 'street', bpm, swing: ACADEMY_SWING, polished: false,
-            sequencer: { bpm, steps: STEPS, tracks, swing: ACADEMY_SWING }, mixdownDataUrl: dataUrl, remixOf: null, streamingLinks: [],
-          });
-          ok++;
-        } catch (e) { error = (e as Error).name; break; }
+            sequencer: { bpm, steps: STEPS, tracks, swing: ACADEMY_SWING }, remixOf: null, streamingLinks: [],
+          }, blob);
+          if (r.ok) { ok++; continue; }
+          refusal = { reason: r.reason, line: r.line };
+          break;
+        } catch (e) { threw = (e as Error).name || String(e); break; }
       }
-      quotas[label] = { quotaChars: quota, publishesThatFit: ok, failsOnPublish: ok + 1, error, usedCharsAfter: fake.storage.usedChars };
+      quotas[label] = {
+        quotaChars, fileStoreBudgetBytes: Number.isFinite(budget) ? budget : 'unbounded', publishesThatFit: ok, refusal, threw: threw || null,
+        indexCharsAfter: fake.storage.usedChars, fileStoreBytesAfter: store.usedBytes(), listed: lib.list().length,
+      };
     }
-    const recordChars = JSON.stringify(StudioLibrary.list()[0] ?? {}).length;
     rows.push({
       bpm,
       renderSec: r(frames / 44100, 4),
       frames,
       wavBytes: blob.size,
-      dataUrlChars: dataUrl.length,
-      dataUrlMB: r(dataUrl.length / 1e6, 3),
-      recordJsonChars: recordChars,
       quotas,
     });
   }
   return {
-    how: 'renderMixdown(2) on the real AudioEngine (length = ceil(44100 × (stepDur × 16 × 2 + 1.2)) frames, AudioEngine.ts:191-193), the real encodeWav (16-bit stereo, 44-byte header, :291-316), the data URL as FileReader makes it, then the REAL StudioLibrary.publish until localStorage throws, on an otherwise empty origin',
+    how: 'renderMixdown(2) on the real AudioEngine, then the ROOM\'s StudioLibrary.publishWithAudio (MUSIC-SUITE P3+) on a fresh createStudioLibrary over the FakeStorage quota and an in-memory file store with a byte budget, until it refuses (it never throws — a throw would be recorded as `threw`)',
     lengthDependsOn: 'bpm only (not the pattern, not swing)',
+    libraryMax: LIBRARY_MAX,
     rows,
-    failureHandling: 'writeAll has no try/catch (StudioLibrary.ts:43-46) and publishTrack is try/finally with no catch (StudioMode.tsx:280-301): the QuotaExceededError escapes as an unhandled rejection and the player sees no message',
+    failureHandling: 'publishWithAudio returns { ok: false, reason, line } — the room shows the line and keeps the title (P3); the P1 behaviour (QuotaExceededError escaping as an unhandled rejection on the 4th publish) is gone. P1 numbers: p1/sim-baseline.json',
   };
 }
 
@@ -852,10 +896,11 @@ function printSummary(res: any, out: string): void {
     L(`  P2 server (stats forwarded): ${sv(f.serverPayoutP2.statsForwarded)} | today's shell (no stats): ${sv(f.serverPayoutP2.todaysShellNoStats)}`);
   }
   L(`empty grid: arena set ${res.perform.emptyGrid.arenaSetNotesOffered} notes / ${res.perform.emptyGrid.arenaSetSoundsScheduled} sounds; free play ${res.perform.emptyGrid.freePlayNotesPerMinute} notes/min`);
-  L('\nPUBLISH');
+  L('\nPUBLISH (the room\'s publishWithAudio — MUSIC-SUITE P10)');
   for (const p of res.publish.rows) {
-    const q = Object.values(p.quotas)[0] as { publishesThatFit: number };
-    L(`  ${p.bpm} BPM: WAV ${p.wavBytes} B, data URL ${p.dataUrlChars} chars → ${q.publishesThatFit} fit in 5 MiB`);
+    for (const [label, q] of Object.entries(p.quotas) as [string, { publishesThatFit: number; refusal: { reason: string; line: string } | null; threw: string | null }][]) {
+      L(`  ${p.bpm} BPM, WAV ${p.wavBytes} B — ${label}: ${q.publishesThatFit} fit, then ${q.threw ? `THREW ${q.threw}` : q.refusal ? `${q.refusal.reason}: "${q.refusal.line}"` : 'no refusal'}`);
+    }
   }
   L('\nARENA MUSIC');
   L(`  ceiling ${res.arenaMusic.ceiling}; perfect 32-bar sets: ${res.arenaMusic.perfectSets.map((s: { swing: number; score: number; setEndsAtSec: number }) => `s=${s.swing} ${s.score} (ends ${s.setEndsAtSec}s)`).join(', ')}`);

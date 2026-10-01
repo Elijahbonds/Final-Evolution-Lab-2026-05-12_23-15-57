@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { DancePhonePad } from '@/lib/babylon/dance/ui/DancePhonePad';
 // MOVEMENT PLAY P3 (2026-09-24): no Body button here, so the body source is loaded for its probe hook alone —
 // window.__FEL_BODY__ (dev / agent only), which a probe switches on before it feeds frames (scripts/probes/_body-seam-live.mts)
 import '@/lib/input/poseSource';
@@ -89,6 +90,11 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
       {busRef.current && (phase === 'playing' || phase === 'countdown') && (
         <TouchOverlay bus={busRef.current} modeId={modeKey} visible />
       )}
+
+      {/* MUSIC-SUITE P9 (2026-09-29): the Cypher's phone dance pad, as the dance room's host (timing-babylon.tsx) mounts
+          it — here too, so a phone can pair with /dev/mode/dance (every /play route is auth-gated and the dev database
+          is down). Dance only; lazy: no room is opened until the badge is tapped. */}
+      {modeKey === 'dance' && busRef.current && <DancePhonePad bus={busRef.current} playing={false} />}
     </div>
   );
 }

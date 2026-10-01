@@ -32,7 +32,7 @@ export function sampleRootTrack(track: RootTrack, t: number): { q: Quaternion; h
 export class MoveRootLayer {
   private tracks = new Map<string, RootTrack>();
   private groups = new Map<string, AnimationGroup>();
-  private saved: { q: Nullable<Quaternion>; pos: Vector3 } | null = null;
+  private saved: { q: Nullable<Quaternion>; rot: Vector3; pos: Vector3 } | null = null;
   private hipsH: number;
   private afterAnim: Nullable<Observer<Scene>>;
   private afterRender: Nullable<Observer<Scene>>;
@@ -80,7 +80,7 @@ export class MoveRootLayer {
     const { q, h } = sampleRootTrack(best.track, best.t);
     const qTrack = best.w >= 0.999 ? q : Quaternion.Slerp(Quaternion.Identity(), q, best.w);
     const root = this.root;
-    this.saved = { q: root.rotationQuaternion ? root.rotationQuaternion.clone() : null, pos: root.position.clone() };
+    this.saved = { q: root.rotationQuaternion ? root.rotationQuaternion.clone() : null, rot: root.rotation.clone(), pos: root.position.clone() };
     const base = root.rotationQuaternion ? root.rotationQuaternion.clone() : Quaternion.FromEulerAngles(root.rotation.x, root.rotation.y, root.rotation.z);
     const turned = base.multiply(qTrack);   // the track is in the body's own frame: applied inside the mode's facing
     root.rotationQuaternion = turned;
@@ -93,9 +93,20 @@ export class MoveRootLayer {
     root.computeWorldMatrix(true);
   }
 
+  /**
+   * MUSIC-SUITE P9 FIX (2026-09-29): THE DANCER TURNED HIS BACK ON THE AUDIENCE. A root turned by EULER angles (no
+   * rotationQuaternion — CharacterLibrary.spawn sets `root.rotation = (0, yawRad, 0)`) lost its yaw for good the first
+   * time a captured move played: Babylon's rotationQuaternion setter zeroes `rotation` whenever a quaternion is assigned
+   * (apply() assigns `turned`), and this put back only the quaternion (null) — so the Euler yaw it had wiped stayed 0.
+   * MEASURED on the Cypher (:3121, /dev/mode/dance, dev seam __FEL_DEV__.danceMove): root yaw 180° (facing P8's audience
+   * camera, chest-to-camera dot +1.00) before the SHIPPED windmill, 0° and dot −0.83 during it, and still 0° / −0.79 on
+   * the shoulder bop after it — the rest of the song danced with the back to the room. Now the Euler rotation is saved
+   * and put back too; a quaternion-driven root is unchanged (the same `q` goes back, the Euler is not touched).
+   */
   private restore(): void {
     if (!this.saved) return;
     this.root.rotationQuaternion = this.saved.q;
+    if (!this.saved.q) this.root.rotation.copyFrom(this.saved.rot);
     this.root.position.copyFrom(this.saved.pos);
     this.saved = null;
   }

@@ -9,7 +9,8 @@
 // everywhere, and that a new duel is stored under the new key even when an old client posts the old one.
 //
 // MUSIC-SUITE P6 (2026-09-26): music staking is open again (lib/stakingPause.ts), so the P1 twins that proved the paused
-// refusal are gone (the pause is still proven on dance in lib/stakingPause.test.ts). A music duel's score is now the
+// refusal are gone (the pause is still proven in lib/stakingPause.test.ts — on dance until MUSIC-SUITE P9, 2026-09-29, and
+// on that file's own test list since dance came back too). A music duel's score is now the
 // server's rejudge of the player's one recorded attempt (lib/arena-music.ts), so every submit below first plays a set
 // (played(): the start and finish events the room posts), and a past duel counts toward the rival only when it carries
 // the player's finished attempt (RIVAL_SCORE_EVENT) — the old scores stop counting.

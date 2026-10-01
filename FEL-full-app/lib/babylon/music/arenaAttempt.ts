@@ -21,6 +21,11 @@
 //     it. The 409 now says what the used attempt scores ({finished, score}) and arenaStartVerdict makes it 'used': the room
 //     hands the shell that score (0 for a set left after START) so it is submitted NOW. (The sweep scores it too, at the
 //     deadline, for a cheater who never submits a 0 against himself — lib/arena-reclaim.ts.)
+//
+// MUSIC-SUITE P9 (2026-09-29): the Cypher's Arena dance attempt posts through this same client (postArenaAttempt and the
+// start / finish verdicts, unchanged) — /api/arena/music-attempt takes a dance duel through the same route code
+// (lib/arena-music.ts HOUSE_SET_RULES). Its press list is kept on the device by lib/babylon/dance/arenaDance.ts (the
+// {lane, tMs} check in readArenaFinish below is music's own).
 
 import type { HouseTap } from './houseBeat';
 

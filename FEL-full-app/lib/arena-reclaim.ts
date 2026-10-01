@@ -70,9 +70,9 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { arenaPayWinner, arenaRefund, appendMatchEvent, resolveArena } from '@/lib/arena';
-import { isMusicDuel, readMusicSeats, houseSeatOf } from '@/lib/arena-music';
+import { houseSetModeOf, readHouseSeats, houseSeatOf } from '@/lib/arena-music';
 import { drawHouseScore } from '@/lib/arena-ghost';
-import { scoreCeilingFor, killSwitchOn } from '@/lib/arena-score-integrity';
+import { stakeCeilingFor, killSwitchOn } from '@/lib/arena-score-integrity';
 
 /** The states a duel can still be reclaimed from (the only two the Arena leaves open). */
 export const RECLAIMABLE_STATES: readonly string[] = ['WAITING', 'ACTIVE'];
@@ -254,9 +254,11 @@ export async function reclaimOne(db: ReclaimDb, matchId: string, now: Date = new
       return { matchId, mode: m.mode, outcome: 'skipped', why: plan.why } as ReclaimResult;
     }
     // MUSIC-SUITE P6 FIX PASS: a music duel's seats are its ATTEMPTS (a start has played; a pre-house-beat score has not)
+    // MUSIC-SUITE P9 (2026-09-29): and a dance duel's — one attempt on its house song (lib/arena-music.ts HOUSE_SET_RULES)
     let legacy: string[] = [];
-    if (m.player2Id && isMusicDuel(m.mode)) {
-      const seats = await readMusicSeats(tx, m as never);
+    const setMode = houseSetModeOf(m.mode);
+    if (m.player2Id && setMode) {
+      const seats = await readHouseSeats(tx, setMode, m as never);
       legacy = (['p1', 'p2'] as const).filter((k) => seats[k].legacy);
       plan = planReclaim(m, now, { p1: seats.p1.score, p2: seats.p2.score });
     }
@@ -266,11 +268,11 @@ export async function reclaimOne(db: ReclaimDb, matchId: string, now: Date = new
     if (plan.kind === 'settle') {
       p1Score = plan.p1; p2Score = plan.p2;
       if (plan.drawHouse) {
-        const c = scoreCeilingFor(String(m.mode ?? ''));
+        const c = stakeCeilingFor(String(m.mode ?? ''));   // MUSIC-SUITE P9: the stake's ceiling (a dance duel's is 10,000)
         const max = c && !(killSwitchOn() && c.swapsUnderKillSwitch) ? c.max : Infinity;
         const humanId = plan.drawHouse === 'p2' ? m.player1Id : m.player2Id!;
         const row = m as ReclaimRow & { seed?: string | null; createdAt?: Date | string };
-        const d = await drawHouseScore(tx, { mode: String(m.mode ?? ''), seed: String(row.seed ?? m.id), createdAt: row.createdAt ?? new Date(0) }, humanId, max);
+        const d = await drawHouseScore(tx, { mode: String(m.mode ?? ''), seed: String(row.seed ?? m.id), createdAt: row.createdAt ?? new Date(0), id: m.id }, humanId, max);   // MUSIC-SUITE P9 FIX PASS: `id` — a dance house is banded on the duel's song
         if (plan.drawHouse === 'p1') p1Score = d.score; else p2Score = d.score;
         houseDraw = { center: d.draw.center, source: d.draw.source };
       }

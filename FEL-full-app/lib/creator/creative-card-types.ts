@@ -42,7 +42,7 @@ export type ArtPayload =
   | { kind: 'sport'; highlightReelUrl?: string; routineId?: string; signatureMoveId?: string }
   | { kind: 'music'; trackId: string; stemUrls: string[]; coverArtUrl: string; bpm: number; keySignature: string }
   | { kind: 'art'; canvasDataUrl: string; palette: string[]; brushSetId: string; appliedSurface: 'court' | 'board' | 'kit' | 'ui' }
-  | { kind: 'dance'; choreographyId: string; sequence: DanceStep[]; routineVideoUrl?: string }
+  | { kind: 'dance'; choreographyId: string; sequence: DanceStep[]; routineVideoUrl?: string; /** MUSIC-SUITE P9 (2026-09-29): the builder's tempo — it was dropped at publish, so a card lost it. Optional: older cards have none. */ bpm?: number }
   | { kind: 'acting'; sceneId: string; performanceUrl: string; voiceLineIds: string[] }
   | { kind: 'scene'; venueId: string; cameraPath: string; questions: SceneQuestion[]; freeUse?: boolean }
   | { kind: 'cooking'; steps: string[]; ingredients: string[]; photoUrl?: string; fuelTags: string[] }
@@ -111,7 +111,10 @@ export function validateArtPayload(art: unknown): { ok: true } | { ok: false; er
     case 'sport': return { ok: true };
     case 'music': return strs(a.stemUrls, 16, 600) && typeof a.bpm === 'number' && a.bpm >= 40 && a.bpm <= 300 ? { ok: true } : { ok: false, error: 'music: stemUrls and bpm 40–300' };
     case 'art': return isDataOrHttp(a.canvasDataUrl) && ['court', 'board', 'kit', 'ui'].includes(String(a.appliedSurface)) ? { ok: true } : { ok: false, error: 'art: canvas image and a surface' };
-    case 'dance': return Array.isArray(a.sequence) && a.sequence.length > 0 && a.sequence.length <= 64 ? { ok: true } : { ok: false, error: 'dance: 1–64 steps' };
+    case 'dance':
+      if (!(Array.isArray(a.sequence) && a.sequence.length > 0 && a.sequence.length <= 64)) return { ok: false, error: 'dance: 1–64 steps' };
+      // MUSIC-SUITE P9: the tempo now rides on the card (the builder's 60–140 slider); absent is fine (an older card)
+      return a.bpm === undefined || (typeof a.bpm === 'number' && Number.isFinite(a.bpm) && a.bpm >= 40 && a.bpm <= 300) ? { ok: true } : { ok: false, error: 'dance: bpm 40–300' };
     case 'acting': return isHttp(a.performanceUrl) && text(a.sceneId, 1, 64) ? { ok: true } : { ok: false, error: 'acting: sceneId and performance url' };
     case 'scene': {
       if (!text(a.venueId, 1, 64) || !text(a.cameraPath, 1, 64)) return { ok: false, error: 'scene: venueId and cameraPath' };

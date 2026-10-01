@@ -169,7 +169,7 @@ import { bakedBuffer, monoOf, sourceKey, type DecodedSource, type StepClock } fr
 // MUSIC-SUITE P5 (2026-09-25), phone-mpc: the phone's room lives at ROOM level, its pads play the room's bank on any tab
 // (the pad_N parse moved from Flip.padFromAction to phonePad.phoneCommand, which also reads PLAY / STOP / REC / BANK A–D)
 import { padRowFor, readBankView, readQuantize, tapStep, writeBankView, type PadHit } from './FlipPad';
-import { medianRtt, padGain, phoneBadgeShown, phoneCommand, phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, PHONE_BANKS, PHONE_LATE_S } from './phonePad';
+import { medianRtt, padGain, phoneBadgeRow, phoneBadgeRowStyle, phoneBadgeShown, phoneCommand, phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, PHONE_BADGE_ANCHOR, PHONE_BANKS, PHONE_LATE_S } from './phonePad';
 import { bankOf, flipSampleId } from './StudioProject';
 import { rowSlotFor } from './chopEdit';
 import type { ControlEvent, LobbyPeer, PeerId } from '@/lib/controller-link/types';
@@ -199,7 +199,7 @@ import { isRepeatedActivation } from './performSet';
 // keyboard / pad / phone (performInput.ts), the lanes on screen (ui/PerformLanes.tsx), and the Arena's house beat and its
 // one attempt (lane 2's houseBeat.ts: the beat, the rules line, the tap record and THE judge the server reruns).
 import {
-  PERFORM_LANE_COLORS, PERFORM_LANE_LABELS, performBarCells, performLanesOf,
+  PERFORM_LANE_COLORS, PERFORM_LANE_LABELS, performBarCells, performDrawnRows, performLanesOf,
   type PerformLane, type PerformResult,
 } from './performSet';
 // MUSIC-SUITE P6 FIX PASS (2026-09-26): the band only while a set runs, the song's own foundation, the takes in the band
@@ -245,8 +245,9 @@ import { VoiceKit } from '../audio/mic/VoiceKit';
 import { OKTA, oktaLines } from '../audio/mic/script/okta';
 import { pickHostLine, mulberry32, newRunSeed, estimateSec, hostCaption, clipId, seenFirstTime, stillSpeaking } from '../audio/mic/hostVoice';
 import { KEY_HELP, cancelsKeyUp, keyTargetOf, studioKeyAction, type StudioKeyAction } from './ui/keys';
-import { PHONE_PAD_PX, gridLayout, moveCursor, pageOfStep, stepsOnPage, toastSpot } from './ui/gridMath';
-import { cellNoteLabel, nudgeNote, pickNote } from './ui/noteMath';
+import { PHONE_PAD_PX, followPage, gridLayout, moveCursor, pageOfStep, stepsOnPage, toastSpot } from './ui/gridMath';
+import { HeardQueue, sectionShownOnSchedule } from './heardQueue';   // MUSIC-SUITE P10: song mode's section on screen when its bar is HEARD
+import { cellNoteLabel, noteEditPatch, nudgeNote, pickNote, type NoteEdit } from './ui/noteMath';
 import { CHECK_BPM, CHECK_COUNT_BARS, CHECK_TAPS, acceptsTap, checkClicks, checkLine, checkWindow, formatOffset, heardClicks, readTimingCheck } from './ui/timingCheck';
 
 // HOTFIX (2026-09-24): the grid's steps and PERFORM's set are one number, so the set's length in bars is the grid's bars.
@@ -313,10 +314,15 @@ function readSavedCal(): { offsetMs: number; age: string | null } | null {
   } catch { return null; }
 }
 
-/** MUSIC-SUITE P4: where the transient line goes — the band covering less of these (the grid, the transport). */
+/** MUSIC-SUITE P4: where the transient line goes — the band covering less of these (the grid, the transport).
+ *  MUSIC-SUITE P10 (2026-09-29): …and the FLIP tab's waveform (TOAST_KEEP_CLEAR_QA). On a phone the "N slices on bank A"
+ *  line a source load says landed right over the waveform — the one moment the player is looking at it (P5's open item,
+ *  frame p5flip-phone-flip.png). A hidden element's rect is empty and keeps nothing clear. */
+const TOAST_KEEP_CLEAR_QA = ['flip-waveform'] as const;
 function toastSpotFor(els: readonly (HTMLElement | null)[]): 'top' | 'bottom' {
   if (typeof window === 'undefined') return 'bottom';
-  const rects = els.filter((e): e is HTMLElement => !!e).map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
+  const more = TOAST_KEEP_CLEAR_QA.map((q) => document.querySelector<HTMLElement>(`[data-qa="${q}"]`));
+  const rects = [...els, ...more].filter((e): e is HTMLElement => !!e).map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
   return toastSpot(window.innerHeight, rects);
 }
 
@@ -528,6 +534,12 @@ export default function StudioMode({
   const [songMode, setSongMode] = useState(false);
   const songModeRef = useRef(songMode); songModeRef.current = songMode;   // MUSIC-SUITE P6 FIX PASS: PERFORM's foundation reads it
   const [songNow, setSongNow] = useState<string | null>(null);
+  const songNowRef = useRef(songNow); songNowRef.current = songNow;   // MUSIC-SUITE P10 FIX: songNowChanged reads it
+  /** MUSIC-SUITE P10 (2026-09-29): the section the engine is SCHEDULING (SongPanel's onSongNow, up to ~250 ms ahead of the
+   *  ear), and each scheduled step's section waiting to be HEARD — `songNow` (the lanes, the read-only grid) changes only
+   *  when its step is heard (heardQueue.ts). P6 measured the lanes jumping 233–255 ms early at 5 of 5 section changes. */
+  const songSchedRef = useRef<string | null>(null);
+  const heardSectionRef = useRef(new HeardQueue<string | null>());
   const [confirmClear, setConfirmClear] = useState(false);
   /** MUSIC-SUITE P3: CELL's foundation, made when CELL is pressed and shown in the confirm; the yes lays exactly this. */
   const [cellPreview, setCellPreview] = useState<Record<string, boolean[]> | null>(null);
@@ -649,6 +661,9 @@ export default function StudioMode({
    * same room (opt-in, as FLIP's first visit is) and the badge shows where the player asked (phoneBadgeShown `pairing`).
    */
   const [phonePairAsked, setPhonePairAsked] = useState(false);
+  /** MUSIC-SUITE P10 FIX (2026-09-29): the view (tab + stage) the phone badge last showed on — its row stays reserved
+   *  there (phonePad phoneBadgeRow). Written during render: idempotent for a given render's inputs. */
+  const badgeViewRef = useRef<string | null>(null);
   const pairPhone = useCallback((): void => { setPhoneRoom(true); setPhonePairAsked(true); }, []);
   // MUSIC-SUITE P6 (2026-09-25): THE PHONE IN PERFORM. The room serves ONE page for its life — the MPC (music_flip): a
   // HostLobby whose config changes is a new session (a new code, the phone dropped — P5 fixed exactly that, and REPLAY in
@@ -657,6 +672,12 @@ export default function StudioMode({
   // parsed and tested) needs the host to hand a paired phone a new page live (heldFileRequests: HostSession.setConfig).
   /** Phones connected now (the badge stays on screen on every tab while one is). */
   const [phones, setPhones] = useState(0);
+  // MUSIC-SUITE P10 FIX: the badge row — shown, reserved (shown earlier on this same view), or gone (phonePad phoneBadgeRow)
+  const badgeShownNow = phoneBadgeShown(view, phones, phonePairAsked && mode === 'perform');
+  const badgeViewKey = `${view}:${mode}`;
+  if (badgeShownNow) badgeViewRef.current = badgeViewKey;
+  else if (badgeViewRef.current !== badgeViewKey) badgeViewRef.current = null;
+  const badgeRow = phoneBadgeRow(badgeShownNow, badgeViewRef.current === badgeViewKey);
   /** Each phone's recent round trips, ms (the lobby's rttMs — host.ts:149), for moving its taps back (phonePad.phoneTapSec). */
   const rttRef = useRef(new Map<PeerId, number[]>());
   /** The Flip bank on the pads (FlipPad's view, held here): per project for this browser tab, as FlipPad kept it. */
@@ -698,10 +719,41 @@ export default function StudioMode({
   }, []);
   const layout = useMemo(() => gridLayout(vw, STEPS), [vw]);
   const [page, setPage] = useState(0);
+  /** MUSIC-SUITE P10: when the player last touched the grid (performance.now ms) — the phone grid follows the playhead
+   *  only while they leave it alone (ui/gridMath followPage). */
+  const gridTouchRef = useRef(Number.NEGATIVE_INFINITY);
+  const touchGrid = (): void => { gridTouchRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now(); };
+  const turnPage = (p: number): void => { touchGrid(); setPage(p); };
+  /** MUSIC-SUITE P10 FIX (2026-09-29): a pointer that went down on the grid (StepGrid onPress) and is not up yet. The
+   *  page holds while it is down — a touch is `pending` until it lifts or moves, so an edit-time touchGrid came too
+   *  late (ui/gridMath followPage's `held` doc has the traced failure: a tap that became a 9-step stroke). */
+  const gridHeldRef = useRef(false);
+  const pressGrid = (): void => { gridHeldRef.current = true; touchGrid(); };
+  useEffect(() => {
+    // the release anywhere (a finger that slid off the grid included) ends the hold; FOLLOW_HOLD_MS counts from here
+    const up = (): void => {
+      if (!gridHeldRef.current) return;
+      gridHeldRef.current = false;
+      gridTouchRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    };
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => { window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  }, []);
   /** The key cursor (a row id and a step), shown from the first arrow key. */
   const [cursor, setCursor] = useState<{ row: string; step: number } | null>(null);
   /** The pitched row whose NoteRow is open. */
   const [openNote, setOpenNote] = useState<string | null>(null);
+  /** MUSIC-SUITE P10 FIX: opening or closing a NoteRow is a touch of the grid (the hold then runs from the close). */
+  const openNoteRow = (row: string | null): void => { touchGrid(); setOpenNote(row); };
+  // MUSIC-SUITE P10 (2026-09-29): while the beat plays, the phone grid turns to the playhead's page — unless the player
+  // touched the grid in the last FOLLOW_HOLD_MS (ui/gridMath followPage; desktop and a stopped transport never move it).
+  // P10 FIX: and never while a pointer is down on the grid, a NoteRow is open, or the key cursor is shown (`held`).
+  useEffect(() => {
+    const held = gridHeldRef.current || openNote !== null || cursor !== null;
+    const next = followPage({ layout, playing, playhead, page, lastTouchMs: gridTouchRef.current, nowMs: performance.now(), held });
+    if (next !== page) setPage(next);
+  }, [layout, playing, playhead, page, openNote, cursor]);
   const [helpOpen, setHelpOpen] = useState(false);
   /** MUSIC-SUITE P4 FIX PASS: the key map's panel (scrolled into view when it opens), and a touch-only device (no '?'). */
   const helpRef = useRef<HTMLDivElement>(null);
@@ -953,6 +1005,7 @@ export default function StudioMode({
     // nothing open and scored EARLY in 25 of 25 timer phases). The judge listens where the player does: the saved
     // calibration, else the device's output delay (performLatencySec). An empty grid offers no notes (performNoteAt).
     eng.onStepScheduled = (s, t, sound) => {
+      heardSectionRef.current.push(t, songSchedRef.current);   // MUSIC-SUITE P10: shown when this step is heard
       // MUSIC-SUITE P5 (2026-09-25): the FLIP's ARM REC places a tap by these (chopEdit.recordStep — the nearest step on
       // the audio clock, swing included); the last three bars are plenty
       const marks = stepMarksRef.current;
@@ -987,7 +1040,11 @@ export default function StudioMode({
       // playhead — the lanes showed the NEXT bar's chart (a turn or a fill charts differently) under step 15
       perfBarQueueRef.current.push(set.bar);
     };
-    eng.onStepAudible = () => {
+    eng.onStepAudible = (_s, heardAt) => {
+      // MUSIC-SUITE P10: the section this heard step was scheduled under is now the one on screen (every mode: the
+      // read-only grid in song mode reads it too)
+      const sec = heardSectionRef.current.take(heardAt);
+      if (sec) setSongNow(sec.v);
       if (modeRef.current !== 'perform') return;
       const set = setRef.current;
       const heardBar = perfBarQueueRef.current.shift();
@@ -1219,7 +1276,24 @@ export default function StudioMode({
     swapSig.current = '';
     if (swapNow.current !== null) swapRef.current(swapNow.current, p);
   }, []);
-  const songNowChanged = useCallback((id: string | null): void => { setSongNow(id); swapSectionChops(id); }, [swapSectionChops]);
+  // MUSIC-SUITE P10: the chops swap at once (they are what the engine plays next); the picture waits for the ear —
+  // onStepAudible hands it the heard step's section. Stopped, nothing will be heard, so it shows at once.
+  // MUSIC-SUITE P10 FIX (2026-09-29): …and SONG MODE switched on mid-play shows its section at once (heardQueue
+  // sectionShownOnSchedule: the first cut showed the chain's FIRST section until a step was heard). The queue is cleared
+  // with it, so the steps already scheduled under "no section" can't flip the picture back when they are heard.
+  const songNowChanged = useCallback((id: string | null): void => {
+    songSchedRef.current = id;
+    swapSectionChops(id);
+    if (sectionShownOnSchedule(songNowRef.current, id, !!engineRef.current?.isRunning) === 'now') { heardSectionRef.current.clear(); setSongNow(id); }
+  }, [swapSectionChops]);
+  // MUSIC-SUITE P10 FIX: a STOP drops the scheduled steps unheard (AudioEngine.stop) — a stop inside the lookahead after
+  // a bar line left the old section on screen while the engine held the new one, until the next PLAY. Stopped, the
+  // picture is the section the engine holds.
+  useEffect(() => {
+    if (playing) return;
+    heardSectionRef.current.clear();
+    setSongNow(songSchedRef.current);
+  }, [playing]);
   /**
    * MUSIC-SUITE P5 FIX PASS (2026-09-25): RENDER SONG and STEMS — what each bar's Flip rows play: its section's own chops
    * (else the grid's), every one baked first (studioEdit.songBarSounds). The renders read the engine's sounds, i.e. the
@@ -1342,6 +1416,7 @@ export default function StudioMode({
     setHistDepth(historyRef.current.depth);
     setSongMode(false);
     setSongNow(null);
+    songSchedRef.current = null; heardSectionRef.current.clear();   // MUSIC-SUITE P10: nothing of the last project waits to show
     setConfirmClear(false);
   }, [room.generation]);
 
@@ -1444,6 +1519,7 @@ export default function StudioMode({
 
   /** A cell, by row id (the grid draws a filtered list, so its index is not the project's). An undo step. */
   const toggleCell = (sampleId: string, si: number): void => {
+    touchGrid();   // MUSIC-SUITE P10: the page being edited holds (followPage)
     if (gridLock === 'song') { say(`SONG MODE is playing "${songSection?.name ?? 'the song'}" — turn it off to edit your own grid`); return; }
     if (gridLock === 'preview') { say("That's CELL's preview — BUY it or CANCEL to edit your grid"); return; }
     edit((p) => ({ ...p, tracks: toggleStep(p.tracks, sampleId, si) }));
@@ -1462,17 +1538,30 @@ export default function StudioMode({
    * stroke is ONE undo step (grouped by its number).
    */
   const paintCells = (cells: readonly { row: string; step: number }[], value: boolean, stroke: number): void => {
+    touchGrid();   // MUSIC-SUITE P10
     if (gridLock) { say(lockLine()); return; }
     edit((p) => ({ ...p, tracks: cells.reduce((t, c) => withTrackStep(t, c.row, c.step, { on: value }, p.key), p.tracks) }), `paint:${stroke}`);
     academyFirst('firstBeat', 'academy.firstbeat');   // MUSIC-SUITE P8
   };
   /** A NoteRow tap (ui/noteMath pickNote): the step lights on that note, or goes off if it already plays it. Locked to the key. */
   const pickStepNote = (rowId: string, step: number, midi: number): void => {
+    touchGrid();   // MUSIC-SUITE P10
     if (gridLock) { say(lockLine()); return; }
     edit((p) => {
       const t = p.tracks.find((x) => x.sampleId === rowId);
       return t ? { ...p, tracks: withTrackStep(p.tracks, rowId, step, pickNote(t, step, midi, p.key), p.key) } : p;
     });
+    academyFirst('firstBeat', 'academy.firstbeat');   // MUSIC-SUITE P8
+  };
+  /**
+   * MUSIC-SUITE P10 (2026-09-29): A NOTE-ROW STROKE (ui/NoteRow drag-to-paint, noteMath.noteStrokeEdits): each edit lights
+   * its step on a note or turns it off, through StudioProject.withTrackStep (the key lock), and the whole stroke is ONE
+   * undo step — grouped by the row and the stroke's number, as paintCells groups the grid's.
+   */
+  const strokeStepNotes = (rowId: string, edits: readonly NoteEdit[], stroke: number): void => {
+    touchGrid();
+    if (gridLock) { say(lockLine()); return; }
+    edit((p) => ({ ...p, tracks: edits.reduce((t, e) => withTrackStep(t, rowId, e.step, noteEditPatch(e), p.key), p.tracks) }), `notes:${rowId}:${stroke}`);
     academyFirst('firstBeat', 'academy.firstbeat');   // MUSIC-SUITE P8
   };
   /** THE KEY: every note row's notes move with it (StudioProject.setProjectKey); one undo step (the key is in the slice). */
@@ -2024,8 +2113,8 @@ export default function StudioMode({
       case 'escape':
         if (checkRef.current) { finishCheck(true); return true; }
         if (helpOpen) { setHelpOpen(false); return true; }
-        if (openNote) { setOpenNote(null); return true; }
-        if (cursor) { setCursor(null); return true; }
+        if (openNote) { openNoteRow(null); return true; }
+        if (cursor) { touchGrid(); setCursor(null); return true; }   // MUSIC-SUITE P10 FIX: the follow hold runs from here
         return false;
       case 'undo': stepHistory('undo'); return true;
       case 'redo': stepHistory('redo'); return true;
@@ -2036,7 +2125,7 @@ export default function StudioMode({
         const next = moveCursor(cursorCell(), a.dRow, a.dStep, drawn.length, STEPS, stepsOnPage(page, layout)[0] ?? 0);
         if (!next) return false;
         setCursor({ row: drawn[next.row].sampleId, step: next.step });
-        setPage(pageOfStep(next.step, layout));   // the phone grid turns to the cursor's page
+        turnPage(pageOfStep(next.step, layout));   // the phone grid turns to the cursor's page (P10: and holds there)
         gridRef.current?.focus({ preventScroll: true });
         return true;
       }
@@ -2257,7 +2346,9 @@ export default function StudioMode({
   /** The finished set that has not reached the Arena yet (SEND AGAIN posts it; it is also kept in sessionStorage). */
   const arenaUnsentRef = useRef<{ taps: HouseTap[]; seconds: number } | null>(null);
   const arenaStore = (): Storage | null => { try { return typeof window === 'undefined' ? null : window.sessionStorage; } catch { return null; } };
-  const postAttempt = (body: Record<string, unknown>) => postArenaAttempt((u, i) => fetch(u, i), body);
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): every post names the room — /api/arena/music-attempt serves music AND dance duels
+  // from one URL, and refuses a room that is not the duel's (400 WRONG_ROOM) before anything is used
+  const postAttempt = (body: Record<string, unknown>) => postArenaAttempt((u, i) => fetch(u, i), { ...body, room: 'music' });
 
   /**
    * The end of an Arena run — a set played and in, or an attempt that was already used: the recap, the room's own sound
@@ -2489,7 +2580,10 @@ export default function StudioMode({
       for (const n of houseBeat.notes) if (n.bar === bar) c[HOUSE_LANES.indexOf(n.lane)][n.step] = true;
       return c;
     }
-    const sounding = drawn.filter((t) => gateOpen(deskHeard, t.sampleId));
+    // MUSIC-SUITE P10: …and only rows holding a sound (performDrawnRows) — a Flip row whose chop failed to load drew notes
+    // the judge never offers (P6's open item). Read in render: while a set plays the room re-renders every step.
+    const eng = engineRef.current;
+    const sounding = performDrawnRows(drawn, (id) => gateOpen(deskHeard, id), (id) => !eng || eng.hasSample(id));
     return performBarCells((step) => sounding.filter((t) => t.pattern[step]).map((t) => t.sampleId));
   })();
   const laneViews: PerformLaneView[] = ([0, 1, 2, 3] as const).map((lane) => ({
@@ -2597,8 +2691,12 @@ export default function StudioMode({
           kept until the Academy closes (it was inside the FLIP tab, and every tab switch disposed it: phonePad.ts). Its
           badge shows on FLIP, and on the other tabs while a phone is connected (hidden, not unmounted, otherwise). */}
       {phoneRoom && (
-        <div data-qa="phone-room" data-phones={phones} style={phoneBadgeShown(view, phones, phonePairAsked && mode === 'perform') ? undefined : { display: 'none' }}>
-          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={phoneInput} onPeers={phonePeers} roomState={phoneState} />
+        // MUSIC-SUITE P10 (2026-09-29): its own row in the flow (phonePad PHONE_BADGE_ROW / _ANCHOR) — the badge floated over
+        // the title (phone) and the Calibrate link (desktop), P5's open item
+        // MUSIC-SUITE P10 FIX: and once shown on this view the row is RESERVED, never collapsed (phonePad phoneBadgeRow):
+        // a phone dropping mid-set no longer jumps PERFORM's lanes 38 px
+        <div data-qa="phone-room" data-phones={phones} data-row={badgeRow} style={phoneBadgeRowStyle(badgeRow)}>
+          <HostLobby config={MODE_CONTROLLERS.music_flip} collapsed onInput={phoneInput} onPeers={phonePeers} roomState={phoneState} anchor={PHONE_BADGE_ANCHOR} />
         </div>
       )}
       {/* …and a phone's REC armed from another tab says so where the player is (the ARM REC button is on FLIP) */}
@@ -2805,14 +2903,15 @@ export default function StudioMode({
                 FLIP ROWS — pads you sent from the FLIP tab ({rows.flip.length}) · every pad gets a row, at every tier
               </div>
             )}
-            layout={layout} page={page} onPage={setPage} playhead={playhead} cursor={cursor} locked={gridLock}
+            layout={layout} page={page} onPage={turnPage} playhead={playhead} cursor={cursor} locked={gridLock}
             onPaint={paintCells} onLocked={() => say(lockLine())} onToggle={(row, step) => toggleCell(row, step)}
-            openNote={openNote} onOpenNote={setOpenNote} focusRef={gridRef}
+            openNote={openNote} onOpenNote={openNoteRow} onPress={pressGrid} focusRef={gridRef}
             onKeyFocus={() => { if (!cursor) keyAct({ kind: 'cursor', dRow: 0, dStep: 0 }); /* P4 FIX PASS: Tab in shows where you are */ }}
             renderNoteRow={(r) => (
               <NoteRow row={{ id: r.id, label: r.label, track: r.track }} songKey={project.key} layout={layout}
                 steps={stepsOnPage(page, layout)} playhead={playhead} locked={!!gridLock}
-                onPick={(step, midi) => pickStepNote(r.id, step, midi)} onLocked={() => say(lockLine())} onClose={() => setOpenNote(null)} />
+                onPick={(step, midi) => pickStepNote(r.id, step, midi)} onStroke={(edits, stroke) => strokeStepNotes(r.id, edits, stroke)}
+                onLocked={() => say(lockLine())} onClose={() => openNoteRow(null)} />
             )} />
           {!gridLock && hiddenHits(tracks, caps) > 0 && (
             <div data-qa="hidden-hits" style={{ fontSize: 11, opacity: 0.75, marginTop: 4 }}>

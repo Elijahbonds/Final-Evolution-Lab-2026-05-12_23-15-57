@@ -234,10 +234,25 @@ export interface StudioProject {
 /** SongPanel's slice of a project. */
 export type SongSlice = Pick<StudioProject, 'sections' | 'chain' | 'takes'>;
 
-const rand36 = (): string => Math.floor(Math.random() * 36 ** 4).toString(36).padStart(4, '0');
-export function newProjectId(now = Date.now()): string { return `prj_${now.toString(36)}${rand36()}`; }
-export function newAudioKey(now = Date.now()): string { return `aud_${now.toString(36)}${rand36()}`; }
-export function newTakeId(now = Date.now()): string { return `t${now.toString(36)}${rand36()}`; }
+/**
+ * The 4 base-36 characters after an id's time. MUSIC-SUITE P10 (2026-09-29): COLLISION-SAFE. They were 4 RANDOM characters
+ * (36⁴ = 1,679,616 values), so ids minted in the same millisecond collided by the birthday rule: StudioProject.test's 200
+ * ids at one `now` failed about 1 % of runs (200² / 2 / 36⁴ ≈ 1.2 %), and a project, take or audio key minted in a burst
+ * (a duplicate, two takes of a best-of-N stopping on one bar) could in principle take another's id — an audio key is
+ * where the store keeps the bytes, so a collision would overwrite a take. Now a per-page COUNTER, started at a random
+ * point so two tabs (or two page loads) in the same millisecond still start apart: within one page no two ids share a
+ * suffix until 36⁴ ids have been minted. The shape is unchanged (<time base36><4 × [0-9a-z]>) — studioStore.audioKeyTime
+ * reads the time back out of exactly that shape.
+ */
+const SUFFIX_SPACE = 36 ** 4;
+let suffixSeq = Math.floor(Math.random() * SUFFIX_SPACE);
+export function idSuffix(): string {
+  suffixSeq = (suffixSeq + 1) % SUFFIX_SPACE;
+  return suffixSeq.toString(36).padStart(4, '0');
+}
+export function newProjectId(now = Date.now()): string { return `prj_${now.toString(36)}${idSuffix()}`; }
+export function newAudioKey(now = Date.now()): string { return `aud_${now.toString(36)}${idSuffix()}`; }
+export function newTakeId(now = Date.now()): string { return `t${now.toString(36)}${idSuffix()}`; }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "Beat · Sep 25 17:40" — a name the player can tell apart in MY PROJECTS until they rename it. Local time. */
@@ -339,7 +354,7 @@ export function saveChopKit(f: ProjectFlip, b: number, name: string, opts: { now
   const kits = f.kits ?? [];
   const n = kitName(name, kits);
   if (!bankHasSound(bank) || !n || kits.length >= MAX_CHOP_KITS) return null;
-  const kit: ChopKit = { id: opts.id ?? `kit_${opts.now.toString(36)}${Math.floor(Math.random() * 36 ** 3).toString(36)}`, name: n, savedAt: opts.now, bank: copyOf(bank) };
+  const kit: ChopKit = { id: opts.id ?? `kit_${opts.now.toString(36)}${idSuffix()}`   /* MUSIC-SUITE P10: the collision-safe suffix (was 3 random chars) */, name: n, savedAt: opts.now, bank: copyOf(bank) };
   return { flip: { ...f, kits: [...kits, kit] }, kit };
 }
 /** Load a kit into bank `b` (a deep copy); the FLIP tab unchanged when there is no such kit. */

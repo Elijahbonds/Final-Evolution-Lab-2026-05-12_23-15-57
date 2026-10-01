@@ -4,8 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
 import { createOnlineChallenge } from '@/lib/mp/service';
-import { isValidMpMode, isMpChallengeOpen, sessionModeFor } from '@/lib/mp/match-core';
-import { stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
+import { isValidMpMode, isMpChallengeOpen, mpChallengeClosedDetail } from '@/lib/mp/match-core';
+import { STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   // a NEW online challenge on a paused mode is refused before anything is written (no match row, no coins, no shards).
   // lib/stakingPause.ts holds the list; a dance challenge posted before the pause still settles through /api/v1/mp/join.
   if (!isMpChallengeOpen(mode)) {
-    return NextResponse.json({ error: STAKING_PAUSED_CODE, detail: stakingPausedDetail(sessionModeFor(mode)) }, { status: STAKING_PAUSED_STATUS });
+    return NextResponse.json({ error: STAKING_PAUSED_CODE, detail: mpChallengeClosedDetail(mode) }, { status: STAKING_PAUSED_STATUS });   // MUSIC-SUITE P9: + the house-set gate's line
   }
 
   const hostName = (session?.user as any)?.name ?? 'Athlete';

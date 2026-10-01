@@ -2,7 +2,7 @@
 // (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14). The captures stay on the owner's disk (~/Downloads/fel-mocap-sources);
 // only the retargeted POSE KEYS are committed.
 //
-//   npx tsx scripts/mocap/gen-opponent-clips.mts [--only name,name]
+//   npx tsx scripts/mocap/gen-opponent-clips.mts [--styles | --dance] [--only name,name]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readBvhStream, readGlbStream, LICENSE, type JointStream, type SourceKind } from './sources.mts';
@@ -18,6 +18,8 @@ interface Entry {
   extend?: { from01: number; peak01: number; release01?: number; Right?: [number, number, number]; Left?: [number, number, number]; polesRight?: [number, number, number]; polesLeft?: [number, number, number] };   // release01: from here the override eases back OUT to the capture by the end
   /** STYLE CLIPS: the vocabulary this clip belongs to, and whether it carries a root track (mocapRetarget.rootTrack). */
   style?: string; rootTrack?: boolean; label?: string;
+  /** DANCE CLIPS (MUSIC-SUITE P9): the dance step id (lib/babylon/dance/moves.ts) this capture dances. */
+  dance?: string;
   /** LOWER STANCES ON MOVES (owner, 2026-09-17) — NOT USABLE YET: measured on the kit rig, the UpLeg/Leg keys of a capture do
    *  not move the feet (the ankle height only followed hipsY, both flexion signs identical), so a crouch here only sinks the
    *  feet. A lower stance needs the leg solve (planted feet / leg IK) in poseClip. Extra flexion in degrees — the thighs come forward by `crouch`, the knees bend by
@@ -40,9 +42,13 @@ const CROUCH_DROP_K = Number(process.env.CROUCH_DROP_K ?? 1);   // LOWER STANCES
 const rootFor = (e: Entry) => (e.source === 'meshy' ? join(process.env.HOME ?? '', 'Downloads/FEL_hero_upload') : ROOT);
 // --styles: the style-clip manifest → authored/mocapStyles.ts (the same retarget, plus the root tracks and the vocabulary)
 const STYLES = process.argv.includes('--styles');
-const OUT = STYLES ? 'lib/babylon/anim/authored/mocapStyles.ts' : 'lib/babylon/anim/authored/mocapOpponents.ts';
+// --dance (MUSIC-SUITE P9, 2026-09-29): the dance-clip manifest → authored/mocapDance.ts — the Cypher's captured breaking and
+// popping steps (owner decision #17). Its OWN manifest and module on purpose: regenerating mocapStyles.ts would re-cut the
+// combat styles' clips under today's retarget, and nothing here may move a clip another mode already plays.
+const DANCE = process.argv.includes('--dance');
+const OUT = DANCE ? 'lib/babylon/anim/authored/mocapDance.ts' : STYLES ? 'lib/babylon/anim/authored/mocapStyles.ts' : 'lib/babylon/anim/authored/mocapOpponents.ts';
 const only = (() => { const i = process.argv.indexOf('--only'); return i > 0 ? new Set(process.argv[i + 1].split(',')) : null; })();
-const manifest = JSON.parse(readFileSync(STYLES ? 'scripts/mocap/style-clips.json' : 'scripts/mocap/opponent-clips.json', 'utf8')) as { clips: Entry[] };
+const manifest = JSON.parse(readFileSync(DANCE ? 'scripts/mocap/dance-clips.json' : STYLES ? 'scripts/mocap/style-clips.json' : 'scripts/mocap/opponent-clips.json', 'utf8')) as { clips: Entry[] };
 
 /** Slide a loop window so its last frame's pose matches its first (hips-relative joints + their velocity). */
 function refineLoop(s: JointStream, from: number, to: number, [minD, maxD]: [number, number]): [number, number] {
@@ -110,6 +116,16 @@ for (const e of manifest.clips) {
   const hands = r.keys.map((k) => Math.max(k.hands!.Left![1], k.hands!.Right![1]));
   const hy = (k: typeof r.keys[number]) => k.bones?.Hips?.[1] ?? 0;   // N4: the hip yaw the first and last keys hand over with
   console.log(`${e.name.padEnd(28)} ${from.toFixed(2)}–${to.toFixed(2)}s @${s.fps.toFixed(0)} → ${r.duration}s ${r.keys.length} keys  scale ${r.scale}  facing ${r.baseYawDeg}°  front ${r.frontSign > 0 ? '+' : '−'}  hands ${Math.min(...hands).toFixed(2)}..${Math.max(...hands).toFixed(2)} m  hip yaw ${hy(r.keys[0])}°→${hy(r.keys[r.keys.length - 1])}°${e.reRoot ? ' (re-rooted)' : ''}${e.pin ? '  PIN' : ''}`);
+  if (DANCE) {
+    out.push(`  {
+    name: '${e.name}', dance: '${e.dance}', duration: ${r.duration}, label: '${e.label ?? e.name}',
+    source: '${e.source}:${e.file.split('/').pop()} ${from.toFixed(2)}–${to.toFixed(2)}s', license: ${JSON.stringify(LICENSE[e.source])},
+    keys: [
+${r.keys.map((k) => `      ${JSON.stringify(k).replace(/"(\w+)":/g, '$1: ')},`).join('\n')}
+    ],${r.root ? `\n    root: [\n${r.root.map((k) => `      ${JSON.stringify(k)},`).join('\n')}\n    ],` : ''}
+  },`);
+    continue;
+  }
   out.push(`  {
     name: '${e.name}', replaces: '${e.replaces}', duration: ${r.duration}, loop: ${!!e.loop},${STYLES ? ` style: '${e.style}', label: '${e.label ?? e.name}',` : ''}
     source: '${e.source}:${e.file.split('/').pop()}${e.anim ? '#' + e.anim : ''} ${from.toFixed(2)}–${to.toFixed(2)}s${e.mirror ? ' mirrored' : ''}', license: ${JSON.stringify(LICENSE[e.source])},
@@ -120,6 +136,30 @@ ${r.keys.map((k) => `      ${JSON.stringify(k).replace(/"(\w+)":/g, '$1: ')},`).
 }
 
 if (only) { console.log('(--only: module not written)'); process.exit(0); }
+if (DANCE) {
+  writeFileSync(OUT, `// mocapDance — the Cypher's captured breaking and popping steps (MUSIC-SUITE P9, 2026-09-29, owner decision #17).
+// GENERATED by scripts/mocap/gen-opponent-clips.mts --dance from scripts/mocap/dance-clips.json — edit those, not this file.
+//
+// Each clip is a REAL-TIME window of a capture retargeted to pose keys INSIDE the pelvis frame plus a ROOT TRACK (the
+// pelvis orientation + hips height: a freeze or a handstand spin turns the whole body over — mocapRetarget.rootTrack).
+// \`dance\` names the dance step it dances (lib/babylon/dance/moves.ts); lib/babylon/anim/danceClips.ts fits it to the
+// beat (CAPTURE_PLAN) and MoveRootLayer plays the root track.
+// Source: CMU Graphics Lab Motion Capture Database — free in commercial products, the data may not be resold. Subjects 85,
+// 90 and 120 read at 120 fps (scripts/mocap/dance-clips.json has how that was measured); the windows are true seconds.
+import type { PoseKey } from '../poseClip';
+import type { RootKey } from '../mocapRetarget';
+
+export interface MocapDanceClip {
+  name: string; dance: string; duration: number; label: string; source: string; license: string; keys: PoseKey[]; root?: RootKey[];
+}
+
+export const MOCAP_DANCE_CLIPS: MocapDanceClip[] = [
+${out.join('\n')}
+];
+`);
+  console.log(`wrote ${OUT} (${out.length} clips)`);
+  process.exit(0);
+}
 if (STYLES) {
   writeFileSync(OUT, `// mocapStyles — the STYLE vocabularies' moves, from real captures (2026-09-15, owner: capoeira / breaking, taekwondo /
 // tricking, parkour). GENERATED by scripts/mocap/gen-opponent-clips.mts --styles from scripts/mocap/style-clips.json.

@@ -16,6 +16,7 @@ import {
   checkStakeScore, checkDunkCard, scoreCeilingFor, canonicalStakeMode, killSwitchOn, dunkAttemptCeiling, aboveCeilingDetail,
   whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, skateLinkMax, chainRunBound, frameRoundedRate,
   carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, type ScoreCeiling,
+  ARENA_STAKE_CEILINGS, stakeCeilingFor, danceChartPerfect, danceChartJudgements,
 } from './arena-score-integrity';
 import { ARENA_MODES } from './arena';
 import { ARENA_SCORE_BASELINES } from './arena-rivals';
@@ -50,6 +51,13 @@ import { EVENTS_PER_NIGHT } from './babylon/core/CarnivalNight';
 import type { GrindLine } from './babylon/core/GroundRide';
 import { SNOW_SLOPE } from './babylon/modes/snowSlope';
 import { timeBonus, TIME_BONUS_MAX } from './babylon/modes/gateCrasher';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
+// MUSIC-SUITE P9 (2026-09-29): the Arena's house song and its judge (an Arena dance set is scored on accuracy)
+import {
+  houseSongFor, houseSongSteps, judgeDanceSet, dancePress, HOUSE_SONG_CHOICES, DANCE_ARENA_SCALE, type HouseSong, type HousePress,
+} from './babylon/dance/houseSong';
+import { isFreeSlot, isPressHold, beatDuration, HOLD_KEPT_POINTS, VARIETY_FLOOR, JUDGE_WINDOWS } from './babylon/core/DanceCore';
+import { FREESTYLE_PAD } from './babylon/dance/chart';
+import { songFor } from './babylon/dance/felSongs';
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const num = (text: string, re: RegExp, what: string): number => {
@@ -250,6 +258,22 @@ function housePerfectRun(seed: string): { score: number; notes: number; bpm: num
   return { score: r.score, notes: r.perfects, bpm: beat.bpm, swing: beat.swing };
 }
 
+// MUSIC-SUITE P9 (2026-09-29): a flawless free-play set of a shipped FEL chart, through the Arena's own replay of the room's
+// judge (judgeDanceSet): every press on its step, every hold held to its end, and the four pad moves in turn on the
+// freestyle slots (a repeated move scales a slot's award DOWN — DanceCore varietyFactor — so turn-taking is the most).
+function houseOf(songId: string): HouseSong { const s = songFor(songId)!; return { v: 1, seed: songId, songId, difficulty: s.difficulty, bpm: s.bpm }; }
+function flawlessPresses(h: HouseSong): HousePress[] {
+  const bd = beatDuration(h.bpm);
+  const pad = Object.values(FREESTYLE_PAD);
+  let k = 0;
+  return houseSongSteps(h).map((s) => dancePress(s.beat * bd, { key: 'A', move: isFreeSlot(s) ? pad[k++ % pad.length] : undefined }));
+}
+function danceFlawlessPoints(h: HouseSong): number { return judgeDanceSet(h, flawlessPresses(h)).points; }
+/** What a STAKED run of a mode scores at its flawless best, where that differs from its free-play run (dance: accuracy). */
+const STAKE_PERFECT_RUNS: Record<string, () => number> = {
+  dance: () => Math.max(...HOUSE_SONG_CHOICES.map((c) => judgeDanceSet(houseOf(c.songId), flawlessPresses(houseOf(c.songId))).score)),
+};
+
 /** A stake check as the Arena route makes it: a music score arrives with the server's rejudge of it (here, itself). */
 const stake = (mode: string, score: unknown) =>
   checkStakeScore({ mode, score, ...(REJUDGED_STAKE_MODES.has(canonicalStakeMode(mode)) && typeof score === 'number' ? { rejudged: score } : {}) });
@@ -350,7 +374,9 @@ const PERFECT_RUNS: Record<string, () => number> = {
     perf.setRoutine(chart);
     perf.start(0);
     for (const s of chart) { const t = s.beat * bd; perf.update(t); perf.hit(t); }
-    return perf.result().score;
+    // MUSIC-SUITE P9 (2026-09-29): the six authored FEL charts are denser than the export's 128 steps — the most is
+    // whichever of them, danced flawlessly through the same judge (danceFlawlessPoints), pays the most
+    return Math.max(perf.result().score, ...HOUSE_SONG_CHOICES.map((c) => danceFlawlessPoints(houseOf(c.songId))));
   },
   training: () => {
     // training-game's loop at 1 ms: the lowest zone the draw allows, released dead centre (PERFECT), four reps an exercise
@@ -402,7 +428,15 @@ describe('the ceiling table', () => {
     const want: Record<string, number> = {
       dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 4800, golf: 1310, baseball: 4422,
       soccer: 5560, tennis: 4, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
-      dance: 79680, training: 9400, music: 378_300,
+      // MUSIC-SUITE P9 (2026-09-29): dance's row is its FREE-PLAY scale, and it now follows the densest authored FEL chart
+      // (danceCeiling; 79,680 was the export's 128 steps — the charts carry up to ~210 judgements). The perfect-run test
+      // below holds it to a flawless set through the real judge. A staked dance set is held to ARENA_STAKE_CEILINGS.dance
+      // (10,000) instead — the P9 describe at the end of this file.
+      // MUSIC-SUITE P9 FIX PASS (2026-09-29): a LITERAL again, on purpose. This read `dance: danceCeiling()`, and the loop
+      // then asserted SCORE_CEILINGS.dance.max === danceCeiling() — which IS SCORE_CEILINGS.dance.max: a check that could no
+      // longer fail (the phase review). This number is the free-play PAY ceiling (the session route reads it: XP = 1.5 ×
+      // score, shards = score / 20), so it must be a tripwire: a chart edit that moves it fails here and gets named.
+      dance: 172_425, training: 9400, music: 378_300,
     };
     for (const [mode, max] of Object.entries(want)) {
       expect(SCORE_CEILINGS[mode].kind, mode).toBe('rules');
@@ -469,7 +503,7 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
       const c = SCORE_CEILINGS[mode];
       expect(run, `${mode}: perfect run ${run} vs ceiling ${c.max}`).toBeLessThanOrEqual(c.max);
       expect(run, mode).toBeGreaterThan(0);
-      expect(stake(mode, Math.round(run)).ok, mode).toBe(true);
+      expect(stake(mode, Math.round(STAKE_PERFECT_RUNS[mode]?.() ?? run)).ok, mode).toBe(true);   // MUSIC-SUITE P9: a staked dance run is its accuracy
     }
   });
 
@@ -526,10 +560,11 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     const over = checkStakeScore({ mode: 'music', score: HOUSE_SET_MAX + 1, rejudged: HOUSE_SET_MAX + 1 });
     if (!over.ok) expect(over.code).toBe('SCORE_ABOVE_CEILING'); else throw new Error('accepted');
     // every other mode ignores `rejudged` — its routes pass none, and nothing about them changed
-    expect([...REJUDGED_STAKE_MODES]).toEqual(['music']);
+    expect([...REJUDGED_STAKE_MODES]).toEqual(['music', 'dance']);   // MUSIC-SUITE P9 (2026-09-29): + dance, on its house song
     expect(checkStakeScore({ mode: 'hoops1v1', score: 11 }).ok).toBe(true);
     expect(checkStakeScore({ mode: 'hoops1v1', score: 11, rejudged: 3 }).ok).toBe(true);
-    expect(checkStakeScore({ mode: 'dance', score: 4000 }).ok).toBe(true);
+    // MUSIC-SUITE P9: dance is rejudged now — a dance score with no rejudge behind it is refused, like music's
+    expect(checkStakeScore({ mode: 'dance', score: 4000 })).toMatchObject({ ok: false, code: 'SCORE_NOT_REJUDGED' });
   });
 
   // Owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays endless". The ceiling
@@ -624,7 +659,7 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
 describe('checkStakeScore', () => {
   it('accepts every ceiling and refuses one more, for every stakeable mode', () => {
     for (const mode of ARENA_MODES) {
-      const max = SCORE_CEILINGS[mode].max;
+      const max = stakeCeilingFor(mode)!.max;   // MUSIC-SUITE P9: the STAKE's ceiling (dance: 10,000); every other mode's row
       expect(stake(mode, max).ok, `${mode} at ${max}`).toBe(true);
       const over = stake(mode, max + 1);
       expect(over.ok, mode).toBe(false);
@@ -781,6 +816,8 @@ describe('the module a server route imports stays server-safe', () => {
       if (!spec.startsWith('.') && !spec.startsWith('@/')) return null;          // a package: checked by name below
       const base = spec.startsWith('@/') ? join(process.cwd(), spec.slice(2)) : join(dirname(from), spec);
       for (const f of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts')]) if (existsSync(f)) return f;
+      // MUSIC-SUITE P9 (2026-09-29): a JSON import is data (the FEL songs' index, the authored charts) — nothing to walk
+      if (base.endsWith('.json') && existsSync(base)) return null;
       throw new Error(`cannot resolve ${spec} from ${from}`);
     };
     const walk = (file: string): void => {
@@ -885,7 +922,15 @@ describe('drift guards — the numbers mirrored out of mode files still match th
   it('dance and training', () => {
     const dance = src('lib/babylon/core/DanceCore.ts');
     expect(dance.split('this.score += points + this.combo * 5').length - 1).toBeGreaterThanOrEqual(1);
-    expect(dance).not.toMatch(/this\.score \+= (?!points \+ this\.combo \* 5)/);
+    // MUSIC-SUITE P9 (2026-09-29): the authored charts' press path adds two award forms, each no more than a PERFECT
+    // press's (300 + combo × 5): a freestyle slot's pressAward (points + combo × 5, scaled by a variety factor ≤ 1) and a
+    // kept hold's tail (HOLD_KEPT_POINTS = PERFECT's 300, + combo × 5). danceCeiling counts a hold's tail as a judgement.
+    expect(dance).not.toMatch(/this\.score \+= (?!points \+ this\.combo \* 5|this\.pressAward\(|HOLD_KEPT_POINTS \+ this\.combo \* 5)/);
+    expect(dance).toContain('const award = points + this.combo * 5;');
+    expect(dance).toContain('return Math.round(award * factor);');
+    expect(dance).toContain('return Math.max(VARIETY_FLOOR, 1 - loss);');
+    expect(VARIETY_FLOOR).toBeLessThanOrEqual(1);
+    expect(HOLD_KEPT_POINTS).toBe(Math.max(...JUDGE_WINDOWS.map((w) => w.points)));
     const tr = src('components/games/training-game.tsx');
     expect(num(tr, /const GAME_LEN = (\d+);/, 'GAME_LEN')).toBe(MIRRORED.trainingSec);
     expect([...tr.matchAll(/speed: ([\d.]+) \}/g)].map((m) => Number(m[1]))).toEqual([...MIRRORED.trainingSpeeds]);
@@ -1071,5 +1116,57 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(c).toContain("[slamRush(), strikeStorm(), trickGauntlet(), hotShot(), coinStorm(), counterStrike()]");
     expect(c).toContain('if (e.btn === \'X\') tricks.start(TRICKS.spin);');
     expect(src('lib/babylon/modes/CourtCarnivalMode.ts')).toContain('const points = Math.round(raw * S.current.pointsPerUnit);');
+  });
+});
+
+// MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("Arena dance (fixed): same house song for both players, accuracy-based
+// score; own songs free play only"): a staked dance set is danced on the duel's house song and scored on accuracy, so its
+// stake has its own ceiling — the house song's maximum, 10,000 on every song — while dance free play keeps its points
+// row. The routes are run in lib/arenaDanceDuel.test.ts.
+describe('P9: the Arena dance ceiling is the house song\'s maximum', () => {
+  it('ARENA_STAKE_CEILINGS.dance = 10,000 = a flawless set on EVERY house song, through the real judge', () => {
+    expect(ARENA_STAKE_CEILINGS.dance).toMatchObject({ max: DANCE_ARENA_SCALE, kind: 'rules' });
+    expect(Object.keys(ARENA_STAKE_CEILINGS)).toEqual(['dance']);
+    for (const c of HOUSE_SONG_CHOICES) expect(judgeDanceSet(houseOf(c.songId), flawlessPresses(houseOf(c.songId))).score, c.songId).toBe(ARENA_STAKE_CEILINGS.dance.max);
+    expect(STAKE_PERFECT_RUNS.dance()).toBe(DANCE_ARENA_SCALE);
+    expect(stakeCeilingFor('dance')).toBe(ARENA_STAKE_CEILINGS.dance);
+    // every other mode's stake ceiling is its SCORE_CEILINGS row, exactly as before
+    for (const mode of ARENA_MODES.filter((m) => m !== 'dance')) expect(stakeCeilingFor(mode), mode).toBe(SCORE_CEILINGS[mode]);
+    expect(stakeCeilingFor('not-a-mode')).toBeNull();
+  });
+
+  it('a staked dance score is checked against 10,000 and the rejudge: 10,000 taken, 10,001 refused ("more than this mode can award")', () => {
+    expect(stake('dance', DANCE_ARENA_SCALE)).toMatchObject({ ok: true, ceiling: ARENA_STAKE_CEILINGS.dance, ceilingApplied: true });
+    const over = stake('dance', DANCE_ARENA_SCALE + 1);
+    if (over.ok) throw new Error('accepted');
+    expect(over.code).toBe('SCORE_ABOVE_CEILING');
+    expect(over.detail).toContain('more than this mode can award: 10000');
+    // the old dance stake — a flawless points run, up to free play's row — is no staked set any more
+    expect(stake('dance', SCORE_CEILINGS.dance.max).ok).toBe(false);
+    expect(stake('dance', 79_680).ok).toBe(false);
+    expect(checkStakeScore({ mode: 'dance', score: 9000, rejudged: 8999 })).toMatchObject({ ok: false, code: 'SCORE_MISMATCH' });
+    // under the kill switch a dance stake is still held (its row does not swap: the Cypher has no fallback game)
+    expect(checkStakeScore({ mode: 'dance', score: DANCE_ARENA_SCALE + 1, rejudged: DANCE_ARENA_SCALE + 1, killSwitch: true }).ok).toBe(false);
+  });
+
+  it('dance FREE PLAY keeps its points row, and it covers every shipped chart danced flawlessly (the sessions route reads it)', () => {
+    expect(SCORE_CEILINGS.dance.max).toBeGreaterThanOrEqual(79_680);   // never below the export's 128-step chart
+    for (const c of HOUSE_SONG_CHOICES) {
+      const h = houseOf(c.songId);
+      const steps = houseSongSteps(h);
+      const pts = danceFlawlessPoints(h);
+      expect(pts, c.songId).toBeLessThanOrEqual(SCORE_CEILINGS.dance.max);
+      // the ceiling's count: one judgement per step and one per press hold's tail, each a PERFECT in one combo
+      expect(pts, c.songId).toBe(danceChartPerfect(danceChartJudgements(steps)));
+      expect(danceChartJudgements(steps)).toBe(steps.length + steps.filter(isPressHold).length);
+    }
+    expect(danceCeiling()).toBe(Math.max(79_680, ...HOUSE_SONG_CHOICES.map((c) => danceFlawlessPoints(houseOf(c.songId)))));
+  });
+
+  it('dance is REJUDGED — the dark engine refuses it (NOT_STAKEABLE_HERE) as it does music', () => {
+    expect(REJUDGED_STAKE_MODES.has('dance')).toBe(true);
+    const comp = src('app/api/competition/create/route.ts');
+    expect(comp).toContain('isRejudgedStakeMode');
+    expect(houseSongFor('any').songId).toBeTruthy();
   });
 });

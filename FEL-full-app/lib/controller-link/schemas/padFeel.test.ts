@@ -129,11 +129,14 @@ describe('haptics: a buzz where the phone has one, the truth where it does not',
 describe('the hints are opt-in: only the Academy\'s two phone pages ask', () => {
   // MUSIC-SUITE P6 (2026-09-25): + music_perform (PERFORM's four lanes buzz; its PAUSE row is compact; no velocity — a lane
   // is hit or not). Every other controller still sets none.
-  it('no mode but music_flip and music_perform sets a hint (every other controller renders as it did)', () => {
+  it('no mode but music_flip, music_perform and dance_pad sets a hint (every other controller renders as it did)', () => {
     for (const [id, c] of Object.entries(MODE_CONTROLLERS)) {
       const h = hintsOf(c.schemas);
       if (id === 'music_flip') expect(h).toEqual({ haptics: true, velocity: true, compact: true });
       else if (id === 'music_perform') expect(h).toEqual({ haptics: true, compact: true });
+      // MUSIC-SUITE P9 (2026-09-29): + dance_pad, the Cypher's NEW phone page (four move buttons that buzz; no velocity,
+      // not compact). A new entry that opts in — every entry that existed renders as it did (the loop below still holds it)
+      else if (id === 'dance_pad') expect(h).toEqual({ haptics: true });
       else expect(hasHints(h), id).toBe(false);
     }
   });

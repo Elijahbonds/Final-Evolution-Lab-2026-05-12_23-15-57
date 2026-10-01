@@ -77,7 +77,10 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   ok(host.includes('hud.energy'), 'the mix bar renders');
 
   const verbs = readFileSync(new URL('../lib/babylon/ui/modeVerbs.ts', import.meta.url), 'utf8');
-  ok(/dance: verbs\(\{ A: \{ label: 'TAP'/.test(verbs), 'touch verb TAP present');
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): CHANGED ASSERTION (named in the report). This pinned the single TAP verb — the
+  // defect itself: one touch button meant every freestyle pick on a phone was Top Rock. The touch rig now carries the
+  // freestyle pad's four moves (A/B/X/Y, each its own button — scripts/verb-key-alignment-tests.ts D1-D3 check the slots).
+  ok(/dance: verbs\(\{\s*A: \{ label: 'TOP ROCK', emit: A\('A'\) \},\s*B: \{ label: 'TWO STEP', emit: A\('B'\) \},\s*X: \{ label: 'ARM WAVE', emit: A\('X'\) \},\s*Y: \{ label: 'SPIN', emit: A\('Y'\) \}/.test(verbs), 'touch carries the four pad moves (A B X Y)');
   const cl = readFileSync(new URL('../lib/controller-link/schemas/registry.ts', import.meta.url), 'utf8');
   ok(/modeId: 'dance'/.test(cl), 'Controller Link has a dance schema');
 }

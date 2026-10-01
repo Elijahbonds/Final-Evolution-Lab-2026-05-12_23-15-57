@@ -380,6 +380,35 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // ── The Cypher's DANCE PAD (MUSIC-SUITE P9, 2026-09-29) ───────────────────────────────────────────────────────────
+  // Owner decision #16: "dance gets a 4-move pad + song pick". The phone the Cypher itself pairs (lib/babylon/dance/ui/
+  // DancePhonePad.tsx, mounted by the dance room) — the `dance` entry above is unchanged, and stays the TV stage's page.
+  // FOUR MOVE BUTTONS: A / B / X / Y, each named for the move it dances in a freestyle bar (lib/babylon/dance/chart.ts
+  // FREESTYLE_PAD) in its family's lane colour (danceTracks.FAMILY_COLOR) — dancePad.test.ts pins both to their sources,
+  // so a renamed move or a recoloured family cannot drift from the phone. They are HOLD buttons (`A:down` / `A:up` —
+  // modeBridge turns them into a real press and a real release), because a chart's freeze hold ends when the press is let
+  // go. The room reads them exactly as a pad's face buttons: all four press on every step, and in a freestyle bar each
+  // picks its move (MUSIC-SUITE P9 FIX PASS: X / Y used to press only in freestyle bars, and a SPIN pressed on a step the
+  // lane called Spin was dropped — dance/freestyle.ts's header). SONG PICK: the d-pad, forwarded as the pick
+  // screen's own d-pad — ◀ ▶ browse the songs, ▲ turns free dance on or off, and A starts. P5's OPT-IN hint: the move
+  // buttons buzz on each hit (`haptics`); no velocity (a dance press is hit or not), no room state. Every other entry
+  // renders byte for byte as before (controller-page.test.tsx; scripts/probes/_music-p6-controller-markup.ts).
+  dance_pad: {
+    modeId: 'dance_pad',
+    title: 'The Cypher · Dance Pad',
+    maxPlayers: 1,
+    askName: false,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', columns: 2, haptics: true, buttons: [
+        { action: 'A', label: 'TOP ROCK', color: '#F4C542', hold: true },
+        { action: 'B', label: 'TWO STEP', color: '#4FD1E8', hold: true },
+        { action: 'X', label: 'ARM WAVE', color: '#C58BFF', hold: true },
+        { action: 'Y', label: 'SPIN', color: '#E8E8E8', hold: true },
+      ] },
+    ],
+  },
+
   // Dunk Duel: pass-and-play contest. The d-pad drives the approach ('move');
   // the chair prop lives on X because the d-pad is spoken for. RUN is a
   // hold (action id `charge` → RT ramp; modeBridge turns a held button

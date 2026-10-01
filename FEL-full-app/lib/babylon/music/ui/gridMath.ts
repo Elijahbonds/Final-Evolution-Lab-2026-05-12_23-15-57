@@ -67,6 +67,41 @@ export function pageOfStep(step: number, layout: GridLayout): number {
   return clampPage(Math.floor(Math.max(0, step) / layout.pageSteps), layout);
 }
 
+/**
+ * MUSIC-SUITE P10 (2026-09-29): THE PHONE GRID FOLLOWS THE PLAYHEAD. P4's open item: on a phone the grid shows one page
+ * of 8 steps, and while the beat played it stayed on whatever page was open — the playhead ran off to steps 9–16 and
+ * back, lit only in the thin overview strip, so a player watching page 1 saw nothing move for half of every bar. Now,
+ * while it plays, the page turns with the playhead — UNLESS the player touched the grid (a cell, a stroke, a note, a
+ * page button or swipe, the key cursor) in the last `holdMs`: the page they are editing is theirs, and following
+ * resumes once they leave it alone. Desktop (all 16 steps on screen) and a stopped transport never move the page.
+ * assumption: 2.5 s — about two page turns at the Academy's 92 BPM (a page of 8 16ths is 1.30 s), long enough to
+ * finish a stroke and look, short enough that the grid is back with the beat by the next bar.
+ */
+export const FOLLOW_HOLD_MS = 2500;
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): `held` — THE PAGE NEVER TURNS UNDER A FINGER OR AN OPEN NOTE ROW. The first cut
+ * counted a "touch" only when an edit was EMITTED (toggleCell / paintCells / pickStepNote / strokeStepNotes) or a page
+ * was turned. But a touch on a cell stays `pending` from pointerdown until it lifts or moves (StepGrid down/move,
+ * NoteRow's P4 FIX PASS rule), and opening a NoteRow or its OCT buttons edit nothing — so the review traced (code
+ * reading, phone at 375 px, 92 BPM): a finger resting on kick step 4 while the playhead crossed step 8 had the page
+ * turned under it, and the next few px of drift made the pending tap a STROKE from step 4 to the cell now under the
+ * finger (step 12) — steps 4–12 lit in one "tap"; and an open bass NoteRow flipped between steps 1–8 and 9–16 every
+ * 1.3 s while the player read it, so a tap aimed at step 3 could land on step 11. The room now passes `held` while a
+ * pointer that went down on the grid is still down, while a NoteRow is open, and while the key cursor is shown
+ * (StudioMode.tsx: gridHeldRef, openNote, cursor): the page holds for as long as any of those lasts, and the
+ * FOLLOW_HOLD_MS hold then starts from its end (the room calls touchGrid on the release / the close).
+ */
+export function followPage(o: {
+  layout: GridLayout; playing: boolean; playhead: number; page: number; lastTouchMs: number; nowMs: number; holdMs?: number;
+  held?: boolean;
+}): number {
+  const page = clampPage(o.page, o.layout);
+  if (!o.layout.compact || !o.playing || !(o.playhead >= 0)) return page;
+  if (o.held === true) return page;
+  if (o.nowMs - o.lastTouchMs < (o.holdMs ?? FOLLOW_HOLD_MS)) return page;
+  return pageOfStep(o.playhead, o.layout);
+}
+
 /** The steps a page draws, in order. */
 export function stepsOnPage(page: number, layout: GridLayout): number[] {
   const p = clampPage(page, layout);

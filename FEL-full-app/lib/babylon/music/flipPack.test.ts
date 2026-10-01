@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { FEL_808_KIT, FEL_SOURCES, FLIP_SHELF_GROUPS, FLIP_TEXTURE_KIT_ID, GATE_MAX_S, PAD_COUNT } from './Flip';
 import {
   FLIP_PACK_RATE, MP3_DECODER_DELAY, decodeFlipPackSource, flipPatternCells, gaplessWindow, isChoppable, isOneShot, itemCuts,
-  joinCuts, kitIdOf, kitPadFiles, lessonAutoLoaded, lessonDismissed, lessonFlip, lessonInOrder, lessonKey, packItemIdOf, padsFromCuts, rememberLessonAutoLoaded,
-  parseFlipPack, rememberLessonDismissed, type FlipPackIndex, type PackDecodeContext,
+  joinCuts, kitIdOf, kitPadFiles, lessonAutoLoaded, lessonDismissed, lessonFlip, lessonInOrder, lessonKey, lessonSchedule, LESSON_LEAD_SEC, packItemIdOf, padsFromCuts, rememberLessonAutoLoaded,
+  parseFlipPack, rememberLessonDismissed, stopDemoHits, DEMO_STOP_DISCONNECT_MS, DEMO_STOP_TAU_SEC, type FlipPackIndex, type PackDecodeContext,
 } from './flipPack';
 import { migrateProject, newProject } from './StudioProject';
 
@@ -308,6 +308,21 @@ describe('the FEL-theme lesson', () => {
     expect(hits[5].at).toBeCloseTo(16 * step, 9);                      // bar 2 starts one bar later
   });
 
+  // MUSIC-SUITE P10 (2026-09-29): the demo on the audio clock — P5's timer demo drifted 14.0 ms (18.7 worst) off the cuts.
+  it('P10: lessonSchedule — one clock read + a lead, each hit at exactly its offset (0 drift by construction), in order', () => {
+    const hits = lessonInOrder(a);
+    const now = 12.345678;
+    const plan = lessonSchedule(hits, now);
+    expect(plan.map((h) => h.pad)).toEqual(hits.map((h) => h.pad));
+    expect(plan[0].when).toBeCloseTo(now + LESSON_LEAD_SEC, 12);
+    const drift = Math.max(...plan.map((h, i) => Math.abs((h.when - plan[0].when) - (hits[i].at - hits[0].at))));
+    expect(drift).toBeLessThan(1e-9);                                    // it was up to 0.0187 s on the timer
+    const flip = lessonSchedule(lessonFlip(a, 2), 0, 0.1);
+    expect(flip[1].when - flip[0].when).toBeCloseTo(lessonFlip(a, 2)[1].at, 12);
+    expect(lessonSchedule(hits, Number.NaN, -1)[0].when).toBe(0);        // junk clock / lead: start at 0, never before now
+    expect(lessonSchedule([{ at: Number.NaN, pad: 1 }, { at: -1, pad: 2 }, { at: 0.5, pad: 3 }], 1, 0)).toEqual([{ pad: 3, when: 1.5 }]);
+  });
+
   it('is remembered per player: closed for one player stays open for another; a storage that throws never blocks', () => {
     const kv = new Map<string, string>();
     const store = { getItem: (k: string) => kv.get(k) ?? null, setItem: (k: string, v: string) => { kv.set(k, v); } };
@@ -335,5 +350,53 @@ describe('the FEL-theme lesson', () => {
     const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
     expect(lessonAutoLoaded(broken, 'u_ana')).toBe(false);
     expect(rememberLessonAutoLoaded(broken, 'u_ana')).toBe(false);
+  });
+});
+
+// MUSIC-SUITE P10 FIX (2026-09-29): ■ STOP on the lesson demo (FlipPad scheduleDemo) — every hit is started ahead of time,
+// so its stop must silence hits that are playing AND hits not started yet. Was inline Web Audio with no test.
+describe('stopDemoHits: the lesson demo\'s ■ STOP plan', () => {
+  function fakeGain() {
+    const calls: string[] = [];
+    let target: { v: number; t: number; tau: number } | null = null;
+    const g = {
+      calls,
+      gain: {
+        cancelScheduledValues: (t: number) => { calls.push(`cancel@${t}`); target = null; },
+        setTargetAtTime: (v: number, t: number, tau: number) => { calls.push(`target(${v})@${t}/${tau}`); target = { v, t, tau }; },
+      },
+      disconnect: () => { calls.push('disconnect'); },
+      /** the level (from 1) at time `at`, per setTargetAtTime's exponential approach */
+      level: (at: number) => (target ? target.v + (1 - target.v) * Math.exp(-Math.max(0, at - target.t) / target.tau) : 1),
+    };
+    return g;
+  }
+  it('every gain (started or not yet) drops its automation and glides to 0 at `now`; the disconnect waits for the fade', () => {
+    const a = fakeGain(), b = fakeGain();
+    const later: { fn: () => void; ms: number }[] = [];
+    stopDemoHits([a, b], 12.5, (fn, ms) => { later.push({ fn, ms }); });
+    for (const g of [a, b]) expect(g.calls).toEqual([`cancel@12.5`, `target(0)@12.5/${DEMO_STOP_TAU_SEC}`]);
+    expect(later).toHaveLength(1);
+    expect(later[0].ms).toBe(DEMO_STOP_DISCONNECT_MS);
+    // silent within 50 ms: e^(−5) ≈ −43 dB, and ≈ −69 dB by the disconnect
+    expect(20 * Math.log10(a.level(12.5 + 0.05))).toBeLessThan(-40);
+    expect(20 * Math.log10(a.level(12.5 + DEMO_STOP_DISCONNECT_MS / 1000))).toBeLessThan(-60);
+    expect(DEMO_STOP_DISCONNECT_MS / 1000).toBeGreaterThan(5 * DEMO_STOP_TAU_SEC);   // the cut comes after the fade, never a click
+    later[0].fn();
+    for (const g of [a, b]) expect(g.calls[g.calls.length - 1]).toBe('disconnect');
+  });
+  it('a closed context (the gain throws) or a node already gone never stops the others', () => {
+    const bad = { gain: { cancelScheduledValues: () => { throw new Error('closed'); }, setTargetAtTime: () => undefined }, disconnect: () => { throw new Error('gone'); } };
+    const ok = fakeGain();
+    const later: (() => void)[] = [];
+    expect(() => stopDemoHits([bad, ok], 1, (fn) => { later.push(fn); })).not.toThrow();
+    expect(ok.calls).toEqual(['cancel@1', `target(0)@1/${DEMO_STOP_TAU_SEC}`]);
+    expect(() => later[0]()).not.toThrow();
+    expect(ok.calls[ok.calls.length - 1]).toBe('disconnect');
+  });
+  it('FlipPad\'s stop hands every started hit\'s gain to it (no inline fade left behind)', () => {
+    const pad = fs.readFileSync(path.resolve(__dirname, 'FlipPad.tsx'), 'utf8');
+    expect(pad).toContain('stopDemoHits(started.map((x) => x.gain), ctx.currentTime);');
+    expect(pad).not.toContain('setTargetAtTime(0, now, 0.01)');
   });
 });

@@ -7,7 +7,10 @@
 // replayed in-game (e.g. as a dunk celebration) by ChoreographyEngine.
 
 import React, { useMemo, useState } from 'react';
-import { DANCE_LIBRARY } from '@/lib/modes/dance/choreography-engine';
+// MUSIC-SUITE P9 (2026-09-29), moves (owner decision #17): the builder offers the Cypher's whole vocabulary — DANCE_LIBRARY's
+// eight (the same rows the legacy choreography-engine copy lists) and the captured breaking / popping moves — so a card can
+// call a moonwalk or a side freeze, and plays in the Cypher exactly as built (lib/babylon/dance/danceCard.ts).
+import { ALL_DANCE_MOVES as DANCE_LIBRARY } from '@/lib/babylon/dance/moves';
 import type { DanceStep } from '@/lib/creator/creative-card-types';
 
 export interface DancePublishPayload {

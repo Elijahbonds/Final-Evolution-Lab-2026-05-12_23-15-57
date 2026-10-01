@@ -6,15 +6,19 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { appendMatchEvent, arenaRefund, ArenaError } from '@/lib/arena';
 import {
-  isMusicDuel, readMusicAttempt, musicAttemptScore, lockMatchRow, isStartReplay, cleanAttemptId, readMusicSeats, houseSeatOf,
-  MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, PRE_HOUSE_BEAT_REASON, HOUSE_START_MARGIN_MS,
+  houseSetModeOf, HOUSE_SET_RULES, readHouseAttempt, houseAttemptScore, lockMatchRow, isStartReplay, cleanAttemptId, readHouseSeats,
+  houseSeatOf, HOUSE_START_MARGIN_MS,
 } from '@/lib/arena-music';
-import {
-  houseBeatFor, houseBeatSummary, houseMinFinishMs, houseCountInMs, houseSetMs, judgeHouseSet, parseHouseTaps, HOUSE_ARENA_RULES,
-} from '@/lib/babylon/music/houseBeat';
+import { dancePressPrint, danceReplayOf, type HousePress } from '@/lib/babylon/dance/houseSong';
 
 /** A refusal that COMMITS what it did first (a legacy duel's refund) and still answers non-2xx, with extra fields. */
 class Answer { constructor(public readonly status: number, public readonly body: Record<string, unknown>) {} }
+
+/** MUSIC-SUITE P9 FIX PASS: an event payload as an object (a JSON column, or a string from a store that keeps one). */
+function payloadOf(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === 'object') return raw as Record<string, unknown>;
+  try { const v = JSON.parse(String(raw ?? '{}')); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+}
 
 /**
  * POST /api/arena/music-attempt — an Arena music duel's ONE attempt (MUSIC-SUITE P6, 2026-09-26; owner decisions #12
@@ -48,6 +52,29 @@ class Answer { constructor(public readonly status: number, public readonly body:
  *     decision #12 says it stops counting). The duel is refunded to both at START (reason 'pre_house_beat'; 409
  *     PRE_HOUSE_BEAT once the refund commits), so nobody plays a set that cannot settle.
  *   · A FINISH REPEATED WITH THE SAME TAPS (a retry whose first reply was lost) answers the recorded score again.
+ *
+ * MUSIC-SUITE P9 (2026-09-29), owner decision #10 — A CYPHER DUEL'S ONE ATTEMPT, THROUGH THIS SAME ROUTE. A dance duel is
+ * one attempt on the duel's house SONG (lib/babylon/dance/houseSong.ts: one of the six FEL songs and its chart, from the
+ * match id), exactly as a music duel is one on its house beat — so this route takes both, and every rule above is the
+ * same code for both: the lock, the one-attempt refusal, the start replay, TOO_LATE, the pre-house legacy void, the
+ * finish checks. What differs is one row of lib/arena-music.ts HOUSE_SET_RULES: the event names (dance_attempt_start /
+ * _finish), the list (`taps` carries the room's presses and releases { tMs, key?, move?, up? }, parseDancePresses), the rejudge (judgeDanceSet,
+ * accuracy 0..10,000), START's summary (`song` where music answers `beat`), the rules line and the legacy code
+ * (409 PRE_HOUSE_SONG). The URL stays /api/arena/music-attempt: the room's client (lib/babylon/music/arenaAttempt.ts
+ * postArenaAttempt — its retries, timeout and verdicts) is shared as it is, not forked. Any other mode is still 400.
+ *
+ * MUSIC-SUITE P9 FIX PASS (2026-09-29):
+ *   · WHICH ROOM IS POSTING. The rules were picked from match.mode alone and the body named no room, so a Cypher opened on a
+ *     MUSIC duel's id (a hand-edited or stale link) posted a start that recorded music_attempt_start and then burnt it (its
+ *     presses fail parseHouseTaps: a final 400, the attempt scores 0) — and a Groove Academy room's taps on a DANCE duel
+ *     were accepted (parseDancePresses reads no `lane`) and judged against a chart. Both rooms now send `room` ('music' |
+ *     'dance'); a room that is not the duel's is 400 WRONG_ROOM with nothing recorded. (A body with no `room` — a room
+ *     from before this pass — is taken as before.)
+ *   · A DANCE SET IS JUDGED ON THE SONG ITS START RECORDED (lib/arena-music.ts verify / the recorded `v`): a chart that is
+ *     not that one refuses (500 with the drift logged) rather than settle a duel on a chart nobody danced.
+ *   · A REPLAYED PRESS LIST IS RECORDED: a dance finish records its songId and its list's fingerprint (houseSong.ts
+ *     dancePressPrint), and one that repeats an earlier finish of the same player on the same song is logged and marked
+ *     `replayOf` — never refused (decision #40: machine-looking lists are logged only and reviewed).
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -59,6 +86,9 @@ export async function POST(req: NextRequest) {
   const phase = body?.phase;
   if (!matchId || matchId.length > 64) return NextResponse.json({ error: 'matchId is required' }, { status: 400 });
   if (phase !== 'start' && phase !== 'finish') return NextResponse.json({ error: "phase must be 'start' or 'finish'" }, { status: 400 });
+  // MUSIC-SUITE P9 FIX PASS: the posting room, when it says (see the header)
+  const room = body?.room;
+  if (room !== undefined && room !== 'music' && room !== 'dance') return NextResponse.json({ error: "room must be 'music' or 'dance'" }, { status: 400 });
 
   try {
     const attemptId = cleanAttemptId(body?.attemptId);
@@ -68,7 +98,15 @@ export async function POST(req: NextRequest) {
       const match = await tx.competitionMatch.findUnique({ where: { id: matchId } });
       if (!match) throw new ArenaError('NOT_FOUND', 'Match not found', 404);
       if (match.currency !== 'LC') throw new ArenaError('WRONG_BOOK', 'Not an Arena match', 400);
-      if (!isMusicDuel(match.mode)) throw new ArenaError('NOT_A_MUSIC_DUEL', 'Only a Groove Academy duel plays a house-beat attempt.', 400);
+      // MUSIC-SUITE P9: a Groove Academy OR a Cypher duel — its house-set rules (lib/arena-music.ts HOUSE_SET_RULES)
+      const setMode = houseSetModeOf(match.mode);
+      if (!setMode) throw new ArenaError('NOT_A_MUSIC_DUEL', 'Only a Groove Academy or Cypher duel plays a house attempt.', 400);
+      if (room !== undefined && room !== setMode) {
+        throw new ArenaError('WRONG_ROOM', setMode === 'dance'
+          ? 'This duel is a Cypher dance duel — open it in the Cypher. Nothing was used.'
+          : 'This duel is a Groove Academy duel — open it in the Academy. Nothing was used.', 400);
+      }
+      const rules = HOUSE_SET_RULES[setMode];
       const isP1 = match.player1Id === userId;
       const isP2 = match.player2Id === userId;
       if (!isP1 && !isP2) throw new ArenaError('NOT_A_PLAYER', 'You are not in this duel.', 403);
@@ -79,16 +117,16 @@ export async function POST(req: NextRequest) {
       if (myScore !== null && myScore !== undefined) throw new ArenaError('ALREADY_SCORED', 'Your score for this duel is already in.', 409);
 
       const player = isP1 ? 'p1' : 'p2';
-      const beat = houseBeatFor(match.id);
-      const attempt = await readMusicAttempt(tx, match.id, userId);
+      const summary = rules.summary(match.id);
+      const attempt = await readHouseAttempt(tx, setMode, match.id, userId);
 
       if (phase === 'start') {
         if (attempt.startedAt) {
           // a retry of the start whose reply was lost: the same start again
           if (isStartReplay(attempt, attemptId, Date.now())) {
-            return { phase, replayed: true, beat: houseBeatSummary(beat), rules: HOUSE_ARENA_RULES };
+            return { phase, replayed: true, [rules.summaryKey]: summary, rules: rules.rules };
           }
-          const v = musicAttemptScore(match.id, attempt);
+          const v = houseAttemptScore(setMode, match.id, attempt);
           throw new Answer(409, {
             error: 'ONE_ATTEMPT', finished: !!attempt.finish, score: v.ok ? v.score : 0,
             detail: attempt.finish
@@ -97,45 +135,60 @@ export async function POST(req: NextRequest) {
           });
         }
         // the deadline must leave room for the whole set (its finish is refused EXPIRED past it)
-        if (match.expiresAt && new Date(match.expiresAt).getTime() - Date.now() < houseCountInMs(beat) + houseSetMs(beat) + HOUSE_START_MARGIN_MS) {
+        if (match.expiresAt && new Date(match.expiresAt).getTime() - Date.now() < rules.countInMs(match.id) + rules.setMs(match.id) + HOUSE_START_MARGIN_MS) {
           throw new ArenaError('TOO_LATE', 'This duel ends before a set could be played to its end — nothing was used.', 409);
         }
-        // the other player's score from before the house beat cannot be settled against: refund both, now
+        // the other player's score from before the house set cannot be settled against: refund both, now
         if (houseSeatOf(match) === null) {
-          const seats = await readMusicSeats(tx, match);
+          const seats = await readHouseSeats(tx, setMode, match);
           if ((isP1 ? seats.p2 : seats.p1).legacy) {
             const feeLc = match.entryFeeCents;
             await arenaRefund(tx, { userId: match.player1Id, matchId: match.id, feeLc });
             await arenaRefund(tx, { userId: match.player2Id, matchId: match.id, feeLc });
             await tx.competitionMatch.update({ where: { id: match.id }, data: { status: 'VOIDED' } });
-            await appendMatchEvent(tx, match.id, 'REFUNDED', null, { reason: PRE_HOUSE_BEAT_REASON, feeLc, legacySide: isP1 ? 'p2' : 'p1' });
-            return { refusal: new Answer(409, {
-              error: 'PRE_HOUSE_BEAT', refunded: true,
-              detail: "Your opponent's score in this duel is from before the house beat, so a set can't be settled against it: both stakes were refunded.",
-            }) };
+            await appendMatchEvent(tx, match.id, 'REFUNDED', null, { reason: rules.legacy.reason, feeLc, legacySide: isP1 ? 'p2' : 'p1' });
+            return { refusal: new Answer(409, { error: rules.legacy.code, refunded: true, detail: rules.legacy.atStart }) };
           }
         }
-        await appendMatchEvent(tx, match.id, MUSIC_ATTEMPT_START, userId, { player, ...houseBeatSummary(beat), ...(attemptId ? { attemptId } : {}) });
-        return { phase, beat: houseBeatSummary(beat), rules: HOUSE_ARENA_RULES };
+        await appendMatchEvent(tx, match.id, rules.start, userId, { player, ...summary, ...(attemptId ? { attemptId } : {}) });
+        return { phase, [rules.summaryKey]: summary, rules: rules.rules };
       }
 
       if (!attempt.startedAt) throw new ArenaError('NOT_STARTED', 'This attempt was never started.', 409);
+      // MUSIC-SUITE P9 FIX PASS: a dance attempt is parsed and judged on the version its start recorded, and only on the
+      // chart that start recorded (verify throws HouseChartDrift — answered 500 below, logged, nothing written)
+      const v = attempt.recorded?.v;
+      rules.verify?.(match.id, attempt);
       if (attempt.finish) {
         // a retry of the same finish (its reply was lost): the recorded score again; anything else is a second finish
-        const again = parseHouseTaps(beat, body?.taps);
+        const again = rules.parse(match.id, body?.taps, v);
         if (again.ok && JSON.stringify(again.taps) === JSON.stringify(attempt.finish.taps)) {
-          return { phase, replayed: true, taps: again.taps.length, score: judgeHouseSet(beat, attempt.finish.taps).score };
+          return { phase, replayed: true, taps: again.taps.length, score: rules.judge(match.id, attempt.finish.taps, v) };
         }
         // (the recorded score rides along: a room whose own list lost the race posts THAT score, which is the one on file)
-        throw new Answer(409, { error: 'ALREADY_FINISHED', detail: 'This attempt is already finished.', score: judgeHouseSet(beat, attempt.finish.taps).score });
+        throw new Answer(409, { error: 'ALREADY_FINISHED', detail: 'This attempt is already finished.', score: rules.judge(match.id, attempt.finish.taps, v) });
       }
-      if (Date.now() - attempt.startedAt.getTime() < houseMinFinishMs(beat)) {
+      if (Date.now() - attempt.startedAt.getTime() < rules.minFinishMs(match.id)) {
         throw new ArenaError('FINISHED_TOO_SOON', 'This set finished sooner than it can be played.', 409);
       }
-      const parsed = parseHouseTaps(beat, body?.taps);
+      const parsed = rules.parse(match.id, body?.taps, v);
       if (!parsed.ok) throw new ArenaError(parsed.code, parsed.detail, 400);
-      await appendMatchEvent(tx, match.id, MUSIC_ATTEMPT_FINISH, userId, { player, v: beat.v, n: parsed.taps.length, taps: parsed.taps });
-      return { phase, taps: parsed.taps.length, score: judgeHouseSet(beat, parsed.taps).score };
+      // MUSIC-SUITE P9 FIX PASS: a dance finish records its song and its list's fingerprint, and a list that repeats one of
+      // this player's earlier finishes on the same song is marked and logged (never refused — see the header)
+      let danceExtra: Record<string, unknown> = {};
+      if (setMode === 'dance') {
+        const songId = String(summary.songId ?? '');
+        const print = dancePressPrint(parsed.taps as HousePress[]);
+        const prior: { matchId: string; payload: unknown }[] = await tx.matchEvent.findMany({
+          where: { userId, eventType: { in: [rules.finish] }, NOT: { matchId: match.id } },
+          orderBy: { createdAt: 'desc' }, take: 200, select: { matchId: true, payload: true },
+        }).catch(() => []);
+        const replayOf = danceReplayOf(songId, print, parsed.taps.length, (prior ?? []).map((r) => ({ ...payloadOf(r.payload), matchId: r.matchId })));
+        if (replayOf) console.warn(`[arena/music-attempt] ${match.id}: this dance set repeats ${userId}'s finish in ${replayOf} press for press (${songId}) — recorded for review`);
+        danceExtra = { songId, print, ...(replayOf ? { replayOf } : {}) };
+      }
+      await appendMatchEvent(tx, match.id, rules.finish, userId, { player, v: v ?? summary.v, n: parsed.taps.length, taps: parsed.taps, ...danceExtra });
+      return { phase, taps: parsed.taps.length, score: rules.judge(match.id, parsed.taps, v) };
     });
     if ('refusal' in outcome && outcome.refusal instanceof Answer) return NextResponse.json(outcome.refusal.body, { status: outcome.refusal.status });
     return NextResponse.json({ ok: true, ...outcome });

@@ -1,0 +1,36 @@
+{
+  "format": "fel-dance-chart/1",
+  "song": "evolution",
+  "bpm": 126,
+  "bars": 56,
+  "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
+  "about": "Difficulty 6. The electro lead and the clap set the accents (1, 1.5, 3); the verse doubles end on the 7 / 7.25 kick pickup, the hooks on sixteenth doubles off the lead (1.5 / 1.75, 5.5 / 5.75); builds climb in quarters; four freeze holds across the two breaks; freestyle every beat, and every eighth in the last hook. MUSIC-SUITE P9 moves: the ROBOT in every B verse, the KICK STEP and the HELICOPTER in the second hook, the SIDE FREEZE on the last break, the MOONWALK to close.",
+  "phrases": {
+    "ein": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" }, { "b": 7 } ] },
+    "ein2": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 1 }, { "b": 2, "m": "spin" }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" }, { "b": 7 } ] },
+    "evA": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 1 }, { "b": 1.5 }, { "b": 3 }, { "b": 4, "m": "toprock" }, { "b": 7, "x2": 0.25 } ] },
+    "evB": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep" }, { "b": 1.5, "x2": 0.5 }, { "b": 3 }, { "b": 4, "m": "robot" }, { "b": 5.5 }, { "b": 7, "m": "spin" } ] },
+    "ebA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1 }, { "b": 2 }, { "b": 3 }, { "b": 4, "m": "toprock" }, { "b": 5 }, { "b": 6 }, { "b": 7, "x2": 0.25 } ] },
+    "ehA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1 }, { "b": 1.5, "x2": 0.25 }, { "b": 3 }, { "b": 4, "m": "wave" }, { "b": 6.5 } ] },
+    "ehB": { "bars": 2, "notes": [ { "b": 0, "m": "kickstep" }, { "b": 1 }, { "b": 1.5, "x2": 0.25 }, { "b": 2.5 }, { "b": 4, "m": "helicopter" }, { "b": 5 }, { "b": 5.5, "x2": 0.25 }, { "b": 7 } ] },
+    "efree": { "bars": 2, "free": { "every": 1 } },
+    "efreeH": { "bars": 2, "free": { "every": 0.5 } },
+    "ebrk1": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 2.5 }, { "b": 3, "m": "wave" }, { "b": 4, "m": "spin" }, { "b": 4.5 }, { "b": 6 } ] },
+    "ebrk2": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 2.5, "mir": 1 }, { "b": 3, "m": "wave", "mir": 1 }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
+    "ebrk3": { "bars": 2, "notes": [ { "b": 0, "m": "sidefreeze", "hold": 3 }, { "b": 4, "m": "babyfreeze", "hold": 2.5, "mir": 1 }, { "b": 7, "m": "spin" } ] },
+    "eout": { "bars": 2, "notes": [ { "b": 0, "m": "moonwalk" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" } ] }
+  },
+  "sections": [
+    { "name": "intro", "bar": 1, "bars": 4, "play": ["ein", "ein2"] },
+    { "name": "verse", "bar": 5, "bars": 8, "play": ["evA", "evB", "evA", "evB"] },
+    { "name": "build", "bar": 13, "bars": 4, "play": ["evB", "ebA"] },
+    { "name": "hook", "bar": 17, "bars": 8, "play": ["ehA", "efree", "ehA", "efree"] },
+    { "name": "break", "bar": 25, "bars": 4, "play": ["ebrk1", "ebrk2"] },
+    { "name": "verse", "bar": 29, "bars": 8, "play": ["evA", "efree", "evB", "evA"] },
+    { "name": "build", "bar": 37, "bars": 4, "play": ["evB", "ebA"] },
+    { "name": "hook", "bar": 41, "bars": 8, "play": ["ehB", "efree", "ehA", "efree"] },
+    { "name": "break", "bar": 49, "bars": 2, "play": ["ebrk3"] },
+    { "name": "hook", "bar": 51, "bars": 4, "play": ["ehB", "efreeH"] },
+    { "name": "outro", "bar": 55, "bars": 2, "play": ["eout"] }
+  ]
+}

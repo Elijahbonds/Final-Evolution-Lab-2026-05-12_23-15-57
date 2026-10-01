@@ -35,6 +35,11 @@ const NOT_IMPORTED: Record<string, string> = {
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
+  // MUSIC-SUITE P9 moves (2026-09-29): the creator's dance builder was the LAST reader of this legacy M28 engine (for its
+  // duplicate DANCE_LIBRARY) and now offers the Cypher's own vocabulary instead (lib/babylon/dance/moves.ts — the same eight
+  // rows plus the captured moves). The engine itself was never instantiated (understand-wf map). It is left in place, not
+  // deleted: removing a file this lane did not write is the owner's call — the phase report names it.
+  'lib/modes/dance/choreography-engine.ts': 'ORPHANED by MUSIC-SUITE P9 (the dance builder reads lib/babylon/dance/moves.ts now); legacy M28 engine awaiting the owner\'s delete',
   // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
   // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
   // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this

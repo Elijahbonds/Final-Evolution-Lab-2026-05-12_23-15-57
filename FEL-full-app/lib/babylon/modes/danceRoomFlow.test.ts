@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { holdAction, countBackFirstBeat, pickTimer, countInTapReaches, type RoomPhase } from './danceRoomFlow';
 import { SongClock } from '../audio/SongClock';
-import { DancePerformance, generateRoutine, beatDuration, MISS_AFTER } from '../core/DanceCore';
+import { DancePerformance, generateRoutine, beatDuration, MISS_AFTER, isPressHold } from '../core/DanceCore';
+import { houseSongFor, houseSongSteps, judgeDanceSet, dancePress, houseSongEndSec, type HousePress, type HouseSong } from '../dance/houseSong';
 import { trackById, PICK_TIMEOUT_SEC } from '../core/danceTracks';
 
 const DANCE = readFileSync(join(process.cwd(), 'lib/babylon/modes/DanceMode.ts'), 'utf8');
@@ -48,7 +49,8 @@ describe('holdAction: when the song holds, and how it comes back', () => {
   });
 
   it('DanceMode takes its decision from holdAction and countBackFirstBeat', () => {
-    expect(DANCE).toContain('const act = holdAction({ ended, hidden, harnessPhase: ctx.phase(), clockPaused: clock.paused, roomPhase: phase });');
+    // (MUSIC-SUITE P9 FIX PASS: + `arena` — an Arena run's song never holds; the describe below)
+    expect(DANCE).toContain('const act = holdAction({ ended, hidden, harnessPhase: ctx.phase(), clockPaused: clock.paused, roomPhase: phase, arena: !!arena });');
     expect(DANCE).toContain('kit?.countIn(clock.audio(countBackFirstBeat(startAt, s, bd)), 4);');
   });
 });
@@ -85,7 +87,8 @@ describe('pickTimer: the pick screen starts a track itself only when nobody is c
 
   it('DanceMode browses and ticks through pickTimer', () => {
     expect(DANCE).toContain("pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;");
-    expect(DANCE).toContain("const pt = pickTimer(pickSec, { type: 'tick', dt }, PICK_TIMEOUT_SEC);");
+    // (MUSIC-SUITE P9 FIX PASS: `held` while the phone pad is being paired — the describe below)
+    expect(DANCE).toContain("const pt = pickTimer(pickSec, { type: 'tick', dt, held: phonePadLink.armed() }, PICK_TIMEOUT_SEC);");
   });
 });
 
@@ -147,7 +150,11 @@ describe('beat 0 can be hit early, in the count-in (review: dropped, then a MISS
     expect(armed).toContain('perf.start(startAt);');
     const flip = DANCE.slice(DANCE.indexOf("phase = 'playing';"), DANCE.indexOf("phase = 'playing';") + 400);
     expect(flip).not.toMatch(/perf\.start\(/);
-    expect(DANCE).toContain('if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) void perf.hit(heardNow);');
+    // MUSIC-SUITE P9 (2026-09-29): every judged press now goes through ONE seam, judgePress (the key names a press hold's
+    // release and a freestyle pick) — the count-in tap still reaches the judge only through countInTapReaches, and the
+    // seam is still a plain perf.hit on the heard time it is given.
+    expect(DANCE).toContain('if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) judgePress(heardNow, edge.down);');
+    expect(DANCE).toContain('void perf.hit(heard, { key, move: padMove(key) });');
   });
 });
 
@@ -163,5 +170,107 @@ describe('the room claims the audio session for itself and gives it back', () =>
   it('DanceMode reads the calibration through the shared reader (an undated pre-P2 offset is ignored)', () => {
     expect(DANCE).toContain('return loadRoomCalibration().offsetMs;');
     expect(DANCE).toContain("if (cal.stale) return 'Recalibrate: /play/calibrate (old reading ignored)';");
+  });
+});
+
+// ── MUSIC-SUITE P9 FIX PASS (2026-09-29) ─────────────────────────────────────────────────────────────────────────────
+describe('P9 FIX PASS: an Arena set runs to its end — there is no pause (owner decision #40, P6\'s Arena rule)', () => {
+  const base = { ended: false, hidden: false, harnessPhase: 'playing', clockPaused: false, roomPhase: 'playing' as RoomPhase, arena: true };
+
+  it('holdAction(arena): the count-in and the song never hold — START, a hidden tab, any harness phase; the ready screen holds as ever', () => {
+    for (const roomPhase of ['countin', 'playing'] as RoomPhase[]) {
+      expect(holdAction({ ...base, roomPhase }), roomPhase).toBe('none');
+      expect(holdAction({ ...base, roomPhase, hidden: true }), roomPhase).toBe('none');
+      for (const p of ['paused', 'countdown', 'ready', 'ended']) expect(holdAction({ ...base, roomPhase, harnessPhase: p }), `${roomPhase} ${p}`).toBe('none');
+      expect(holdAction({ ...base, roomPhase, clockPaused: true, harnessPhase: 'paused' }), roomPhase).toBe('resume');   // never a count back
+    }
+    // the ready screen (nothing scheduled, the attempt not yet used): exactly as free play
+    expect(holdAction({ ...base, roomPhase: 'pick', harnessPhase: 'paused' })).toBe('pause');
+    expect(holdAction({ ...base, roomPhase: 'pick', clockPaused: true })).toBe('resume');
+    // free play keeps its pause and its count back in
+    expect(holdAction({ ...base, arena: false, harnessPhase: 'paused' })).toBe('pause');
+    expect(holdAction({ ...base, arena: false, clockPaused: true })).toBe('resume-count-back');
+    expect(holdAction({ ...base, ended: true, clockPaused: true })).toBe('none');
+  });
+
+  /** A house song on `songId` (the first of a few seeds that picks it). */
+  const houseOn = (songId: string): HouseSong => {
+    for (let i = 0; i < 400; i++) { const h = houseSongFor(`flow-${i}`); if (h.songId === songId) return h; }
+    throw new Error(songId);
+  };
+
+  /**
+   * The room, frame by frame at 120 Hz on the REAL SongClock, with its REAL hold decision, for a dancer who hears every step
+   * `lateSec` late. `trick`: the phase review's exploit — START just after each beat (the step still pending), 3 s of
+   * rest, resume, and press on the replayed beat as the count back in rolls it up to the line again. The list is what the
+   * room records (a press only while the clock accepts — clock.accepting, as onInput reads it — on song time from beat 0).
+   */
+  function room(h: HouseSong, o: { arena: boolean; trick: boolean; lateSec?: number }): { presses: HousePress[]; backwards: boolean } {
+    const bd = beatDuration(h.bpm);
+    const late = o.lateSec ?? 0.15;
+    const startAt = 1;                                                   // song time of beat 0 (the count-in before it)
+    const times = houseSongSteps(h).map((st) => ({ t: startAt + st.beat * bd, hold: isPressHold(st) ? st.pressHoldBeats! * bd : 0 }));
+    const clock = new SongClock();
+    const presses: HousePress[] = [];
+    const endSong = startAt + houseSongEndSec(h);
+    let harness: 'playing' | 'paused' = 'playing', resumeAt = 0, i = 0, pausedFor = -1, lastSong = -Infinity, backwards = false;
+    for (let a = 0; a < 20_000 && i < times.length; a += 1 / 120) {
+      const act = holdAction({ ended: false, hidden: false, harnessPhase: harness, clockPaused: clock.paused, roomPhase: 'playing', arena: o.arena });
+      if (act === 'pause') clock.pause(a);
+      else if (act === 'resume-count-back') clock.resume(a, 4 * bd);
+      else if (act === 'resume') clock.resume(a, 0);
+      const s = clock.song(a);
+      if (s < lastSong - 1e-9) backwards = true;
+      lastSong = s;
+      if (s > endSong) break;
+      if (harness === 'paused') { if (a >= resumeAt) harness = 'playing'; continue; }   // presses are the harness's while it is paused
+      const step = times[i];
+      if (o.trick && pausedFor !== i && s >= step.t + late && s < step.t + MISS_AFTER) {
+        pausedFor = i; harness = 'paused'; resumeAt = a + 3; continue;              // START, 3 s of rest
+      }
+      if (s > step.t + MISS_AFTER) { i++; continue; }                               // gone: the next step
+      // the press: `late` after the beat — or, on the replayed bar, right on it (the count back in showed it coming)
+      const aim = o.trick && pausedFor === i ? step.t : step.t + late;
+      if (s >= aim && clock.accepting(a, MISS_AFTER)) {
+        presses.push(dancePress(s - startAt, { key: 'A' }));
+        presses.push(dancePress((step.hold ? s + step.hold + 0.02 : s + 0.08) - startAt, { key: 'A', up: true }));
+        i++;
+      }
+    }
+    return { presses: presses.sort((x, y) => x.tMs - y.tMs), backwards };
+  }
+
+  it('MEASURED AND CLOSED on CANALS: the late dancer scores the same whether or not they pause; the old room paid the pause 10,000', () => {
+    const h = houseOn('canals');
+    const straight = judgeDanceSet(h, room(h, { arena: true, trick: false }).presses).score;
+    expect(straight).toBeGreaterThan(3_000);
+    expect(straight).toBeLessThan(6_000);                                            // a steady 150 ms lag: GOODs, far from PERFECT
+    // before the fix (free play's hold decision on a staked set): pause after every beat, hit the replayed beat
+    const old = room(h, { arena: false, trick: true });
+    expect(old.backwards).toBe(true);                                                // the song clock rewound on every resume
+    expect(judgeDanceSet(h, old.presses).score).toBe(10_000);                        // the exploit, reproduced
+    // the Arena now: the song never rewinds, and the pause buys nothing — every step it covers passes as a MISS
+    const now = room(h, { arena: true, trick: true });
+    expect(now.backwards).toBe(false);
+    expect(judgeDanceSet(h, now.presses).score).toBeLessThanOrEqual(straight);
+    console.info(`[P9 FIX pause] CANALS, 150 ms late: straight ${straight}; pausing after every beat — old room ${judgeDanceSet(h, old.presses).score}, Arena now ${judgeDanceSet(h, now.presses).score}`);
+    // and a set danced without pausing is judged exactly as before: the arena flag changes nothing while nobody pauses
+    expect(room(h, { arena: true, trick: false }).presses).toEqual(room(h, { arena: false, trick: false }).presses);
+  });
+
+  it('DanceMode passes arena to holdAction, keeps the judge on time under START\'s overlay, and says why nothing stopped', () => {
+    expect(DANCE).toContain('if (act === \'none\') { if (arena) arenaRunsOn(ctx); return; }');
+    const runsOn = DANCE.slice(DANCE.indexOf('function arenaRunsOn('), DANCE.indexOf('function arenaRunsOn(') + 900);
+    expect(runsOn).toContain('ctx.setHud({ round: ARENA_DANCE_NO_PAUSE })');
+    expect(runsOn).toContain('perf.update(heard);');
+    expect(runsOn).toContain('finish(ctx);');
+  });
+});
+
+describe('P9 FIX PASS: the pick screen waits while the phone pad is being paired', () => {
+  it('a held tick never starts the song, and resets the wait; an unheld one counts as before', () => {
+    expect(pickTimer(5.9, { type: 'tick', dt: 1, held: true }, 6)).toEqual({ sec: 0, start: false });
+    expect(pickTimer(5.9, { type: 'tick', dt: 1, held: false }, 6)).toEqual({ sec: 6.9, start: true });
+    expect(pickTimer(5.9, { type: 'tick', dt: 1 }, 6)).toEqual({ sec: 6.9, start: true });
   });
 });

@@ -8,6 +8,8 @@ import { DANCE_LIBRARY, DancePerformance, generateRoutine, beatDuration } from '
 import { kitPattern } from '../audio/KitPulse';
 import { FEL_SONGS, secPerBar } from '../dance/felSongs';
 import { CATEGORY_STEM } from '../audio/StemBand';
+import { chartStepsFor } from '../dance/chart';
+import { FREE_CUE, ACCENT_CUE, DOUBLE_CUE } from './danceTracks';
 
 describe('dance tracks (A+ mission #1)', () => {
   // MUSIC-SUITE P7 (2026-09-29): the three procedurally-random charts are now the six FEL house songs
@@ -102,6 +104,31 @@ describe('dance tracks (A+ mission #1)', () => {
     expect(Object.keys(FAMILY_GLYPH)).toHaveLength(7);
   });
 
+  // MUSIC-SUITE P9 (2026-09-29): the chart's press kinds on the lane — press cues only; a plain press cue is unchanged
+  it('cue lane draws a freestyle slot, an accent, a double\'s second tap and a hold; a plain press cue is as before', () => {
+    const s = (clipId: string, extra: Record<string, unknown> = {}) => ({ clipId, beat: 0, holdBeats: 4, mirrored: true, ...extra });
+    const now = 50;
+    const lane = cueLane([
+      { time: now + 0.2, step: s('dance_toprock_basic', { pressFree: true }) },
+      { time: now + 0.4, step: s('dance_footwork_six', { pressKind: 'accent' }) },
+      { time: now + 0.6, step: s('dance_footwork_six', { pressKind: 'double' }) },
+      { time: now + 0.8, step: s('dance_freeze_baby', { pressHoldBeats: 2 }) },
+      { time: now + 1.0, step: s('dance_wave_arm') },
+    ], now, undefined, 120);
+    expect(lane[0]).toMatchObject({ name: FREE_CUE.name, glyph: FREE_CUE.glyph, color: FREE_CUE.color, pressKind: 'free', mirrored: false, move: 'tap' });
+    expect(lane[1]).toMatchObject({ name: ACCENT_CUE.name, glyph: ACCENT_CUE.glyph, color: FAMILY_COLOR.footwork, pressKind: 'accent' });
+    expect(lane[2]).toMatchObject({ name: DOUBLE_CUE.name, glyph: DOUBLE_CUE.glyph, pressKind: 'double' });
+    expect(lane[3]).toMatchObject({ name: 'HOLD Baby Freeze', glyph: 'FZ', pressHoldSec: 1 });   // 2 beats at 120 BPM
+    expect(lane[4]).toEqual({ in: 1, name: 'Arm Wave', family: 'wave', glyph: 'WV', color: FAMILY_COLOR.wave, mirrored: true, move: 'tap' });
+    // without the bpm a hold is still named, with no length
+    expect(cueLane([{ time: now, step: s('dance_freeze_baby', { pressHoldBeats: 2 }) }], now)[0]).not.toHaveProperty('pressHoldSec');
+    // a body cue never gains a press field
+    const body = cueLane([{ time: now, step: s('x', { move: 'jump', pressFree: true, pressKind: 'accent', pressHoldBeats: 2 }) }], now, undefined, 120)[0];
+    expect(body).not.toHaveProperty('pressKind');
+    expect(body).not.toHaveProperty('pressHoldSec');
+    expect(body.move).toBe('jump');
+  });
+
   it('cue lane reads straight off a running performance (upcoming steps)', () => {
     const t = trackById('cypher');
     const perf = new DancePerformance(t.bpm);
@@ -174,8 +201,13 @@ describe('stepsForSong (the six FEL songs)', () => {
     }
   });
 
-  it('stepsFor(track) answers stepsForSong for every shipped track (no exported track present in node)', () => {
-    for (const t of DANCE_TRACKS) expect(stepsFor(t)).toEqual(stepsForSong(t.song!));
+  // MUSIC-SUITE P9 (2026-09-29): a shipped track now plays its AUTHORED chart (dance/chart.ts); stepsForSong stays
+  // exported and callable (movement play's condition) and is the fallback for a song whose chart fails validation.
+  it('stepsFor(track) answers the authored chart for every shipped track (no exported track present in node)', () => {
+    for (const t of DANCE_TRACKS) {
+      expect(stepsFor(t)).toEqual(chartStepsFor(t.song!));
+      expect(stepsFor(t)).not.toEqual(stepsForSong(t.song!));
+    }
   });
 
   it('earnableStemsAtBar reads the section a bar falls in, minus bed', () => {

@@ -13,7 +13,8 @@
  * rebuilt, judgeHouseSet run on the stored taps (the room's own judge, imported), and the posted score equal to it.
  * An attempt that was started and never finished scores 0 — the reload rule. No start at all: nothing to score.
  *
- * Pure except readMusicAttempt, lockMatchRow and readMusicSeats, which take the caller's transaction client.
+ * Pure except readMusicAttempt / readHouseAttempt, lockMatchRow and readMusicSeats / readHouseSeats, which take the caller's
+ * transaction client.
  *
  * MUSIC-SUITE P6 FIX PASS (2026-09-26) — what the phase review found and measured, and what changed here:
  *   · TWO STARTS RACED PAST THE ONE-ATTEMPT CHECK. The check was a read, then an insert (appendMatchEvent computes seq
@@ -31,12 +32,34 @@
  *   · The rejudge verifies the taps were JUDGED right, not that a hand made them: houseBeatFor(matchId) ships in the
  *     client, so a tap list built from the chart scores HOUSE_SET_MAX. musicTapPlausibility records how machine-exact a
  *     set's timing is in its SCORE_SUBMITTED event for review; nothing is refused on it (other modes have the same limit).
+ *
+ * MUSIC-SUITE P9 (2026-09-29), owner decision #10 ("Arena dance (fixed): same house song for both players, accuracy-based
+ * score; own songs free play only") — THE SAME ATTEMPT FOR A DANCE DUEL, NOT A COPY OF IT. Dance staking was paused in
+ * P1 because the song decided a dance duel; phase 9 gives a Cypher duel the shape music got in phase 6, and this file is
+ * where that shape lives, so it now serves both (HOUSE_SET_RULES): the one-attempt rows, the row lock, the start replay,
+ * the reload-scores-0 rule, the seats the sweep and submit-score count, the pre-house legacy void — one code path, with
+ * what differs per mode in one table:
+ *   · music — the house BEAT (houseBeatFor), taps { lane, tMs }, judgeHouseSet, events music_attempt_start / _finish;
+ *   · dance — the house SONG (lib/babylon/dance/houseSong.ts houseSongFor: one of the six FEL songs and its chart, from
+ *     the match id), presses { tMs, key?, move?, up? }, judgeDanceSet (DanceCore's own judge, scored on accuracy 0..10,000),
+ *     events dance_attempt_start / _finish (their own names, so the audit trail says which room played the set).
+ * Every music export keeps its name and its behaviour (the P6 tests are unchanged); the house-set functions take the
+ * mode where music's took none.
  */
 
 import type { DbClient } from '@/lib/ledger';
 import { canonicalModeKey } from '@/lib/game-data';
 import { appendMatchEvent } from '@/lib/competition';
-import { houseBeatFor, judgeHouseSet, parseHouseTaps, type HouseTap } from '@/lib/babylon/music/houseBeat';
+import {
+  houseBeatFor, judgeHouseSet, parseHouseTaps, houseBeatSummary, houseCountInMs, houseSetMs, houseMinFinishMs, HOUSE_ARENA_RULES,
+  type HouseTap,
+} from '@/lib/babylon/music/houseBeat';
+import {
+  houseSongFor, judgeDanceSet, parseDancePresses, houseSongSummary, houseSongCountInMs, houseSongSetMs, houseSongMinFinishMs,
+  dancePressPlausibility, DANCE_ARENA_RULES, type HousePress,
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): versions carried, charts pinned (houseSong.ts HOUSE_CHART_PRINTS' doc)
+  assertHouseChart, houseChartMatches, HouseChartDrift, HOUSE_SONG_VERSION, type HouseSong,
+} from '@/lib/babylon/dance/houseSong';
 
 export const MUSIC_ATTEMPT_START = 'music_attempt_start';
 export const MUSIC_ATTEMPT_FINISH = 'music_attempt_finish';
@@ -46,15 +69,81 @@ export function isMusicDuel(mode: string | null | undefined): boolean {
   return canonicalModeKey(mode) === 'music';
 }
 
-/** One player's attempt on one duel, as its events say. */
-export interface MusicAttempt {
+/** One player's attempt on one duel, as its events say. `T` is what the finish recorded: music taps, dance presses. */
+export interface HouseAttempt<T = unknown> {
   /** When the start was recorded (the first one, if a race wrote two), or null: never started. */
   startedAt: Date | null;
   /** The finish's tap list (the first finish), or null: not finished. */
-  finish: { taps: HouseTap[]; at: Date } | null;
+  finish: { taps: T[]; at: Date } | null;
   /** MUSIC-SUITE P6 FIX PASS: the room's attemptId on the first start (absent when it sent none). */
   startAttemptId?: string;
+  /**
+   * MUSIC-SUITE P9 FIX PASS (2026-09-29), dance only: what the first start RECORDED of its house song — the house-song
+   * version (`v`) and the chart's fingerprint (`chart`, houseSong.ts houseChartPrint). The rejudge builds the song of THAT
+   * version and refuses a chart that does not print the same (HOUSE_SET_RULES.dance). Absent on a start that recorded
+   * neither (only a hand-made row): judged on the current version, as before.
+   */
+  recorded?: { v?: number; chart?: string };
 }
+/** A Groove Academy attempt: its finish holds house-beat taps. */
+export type MusicAttempt = HouseAttempt<HouseTap>;
+/** MUSIC-SUITE P9: a Cypher attempt: its finish holds house-song presses. */
+export type DanceAttempt = HouseAttempt<HousePress>;
+
+// ── MUSIC-SUITE P9 (2026-09-29): the two house-set modes, and what differs between them ─────────────────────────────
+export const DANCE_ATTEMPT_START = 'dance_attempt_start';
+export const DANCE_ATTEMPT_FINISH = 'dance_attempt_finish';
+
+/** The modes whose Arena duel is ONE recorded attempt on a house set the server rejudges. */
+export type HouseSetMode = 'music' | 'dance';
+/** The house-set mode a duel's mode is (either spelling a row may carry), or null for every other mode. */
+export function houseSetModeOf(mode: string | null | undefined): HouseSetMode | null {
+  const k = canonicalModeKey(mode);
+  return k === 'music' || k === 'dance' ? k : null;
+}
+/** Is this duel played as one recorded attempt on a house set (music or dance)? */
+export function isHouseSetDuel(mode: string | null | undefined): boolean { return houseSetModeOf(mode) !== null; }
+/** MUSIC-SUITE P9: is this duel a Cypher duel? */
+export function isDanceDuel(mode: string | null | undefined): boolean { return canonicalModeKey(mode) === 'dance'; }
+
+type Parsed = { ok: true; taps: unknown[] } | { ok: false; code: string; detail: string };
+/** Everything the attempt route, submit-score, the sweep and the lobby need that differs between music and dance. */
+export interface HouseSetRules {
+  mode: HouseSetMode;
+  /** The event rows an attempt is made of. */
+  start: string;
+  finish: string;
+  /** The finish's list, checked whole (music parseHouseTaps; dance parseDancePresses) — refused lists are never stored.
+   *  MUSIC-SUITE P9 FIX PASS: `v` = the house-song version the attempt's start recorded (dance; music ignores it). */
+  parse(matchId: string, raw: unknown, v?: number): Parsed;
+  /** The rejudge: the score the server makes of a finished list on this duel's house set (on version `v`, dance). */
+  judge(matchId: string, taps: readonly unknown[], v?: number): number;
+  /**
+   * MUSIC-SUITE P9 FIX PASS (2026-09-29): refuse — throw — rather than judge an attempt on a set that is not the one it
+   * was started on (dance: HouseChartDrift when the chart is not the one its version pins, or not the one its start
+   * recorded). Music has no such check (its beat is rebuilt from the match id alone). Absent = nothing to check.
+   */
+  verify?(matchId: string, attempt: HouseAttempt): void;
+  /** What a start event records of the set, and what START answers (the audit trail). */
+  summary(matchId: string): Record<string, unknown>;
+  /** The key START's answer carries the summary under ('beat' for music — unchanged since P6 — 'song' for dance). */
+  summaryKey: 'beat' | 'song';
+  countInMs(matchId: string): number;
+  setMs(matchId: string): number;
+  /** The soonest a finish may land after its start (90 % of the set). */
+  minFinishMs(matchId: string): number;
+  /** The line the room says before its count-in. */
+  rules: string;
+  /** A stored score from before the house set (no attempt behind it): the refusal's code, the REFUNDED reason, the words. */
+  legacy: { code: string; reason: string; atStart: string; atSubmit: string };
+  /** A score with no attempt behind it. */
+  noAttempt: string;
+  /** How machine-exact a finished list's timing is (recorded for review; nothing is refused on it). */
+  plausibility(matchId: string, taps: readonly unknown[], v?: number): { hits: number; spreadMs: number | null; flagged: boolean };
+}
+
+/** Is `raw` a list of the finish rows parse() accepts? A stored row that does not parse reads as an empty list. */
+const tapsOf = (p: Parsed): unknown[] => (p.ok ? p.taps : []);
 
 /** MUSIC-SUITE P6 FIX PASS: the event that marks an Arena set's session as PAID uncapped (once per player per duel). */
 export const MUSIC_SESSION_PAID = 'music_session_paid';
@@ -72,7 +161,7 @@ export function cleanAttemptId(raw: unknown): string | null {
   return typeof raw === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(raw) ? raw : null;
 }
 /** Is this start a retry of the recorded one (same attemptId, not finished, inside HOUSE_START_RETRY_MS)? Pure. */
-export function isStartReplay(attempt: MusicAttempt, attemptId: string | null, nowMs: number): boolean {
+export function isStartReplay(attempt: HouseAttempt, attemptId: string | null, nowMs: number): boolean {
   return !!attempt.startedAt && !attempt.finish && !!attemptId && attempt.startAttemptId === attemptId
     && nowMs - attempt.startedAt.getTime() <= HOUSE_START_RETRY_MS;
 }
@@ -96,42 +185,61 @@ const parsePayload = (raw: unknown): Record<string, unknown> => {
  * The player's attempt on this duel, from its MatchEvent rows. The first start and the first finish count (seq order):
  * two requests racing past the one-attempt check can each write a row, and the first is the one that happened.
  * A finish row whose taps no longer parse (only a hand-edited row could) reads as an empty list — the set scores 0.
+ * MUSIC-SUITE P9: of either house-set mode — its own two event names, its own list parser.
  */
-export async function readMusicAttempt(db: DbClient, matchId: string, userId: string): Promise<MusicAttempt> {
+export async function readHouseAttempt(db: DbClient, mode: HouseSetMode, matchId: string, userId: string): Promise<HouseAttempt> {
+  const rules = HOUSE_SET_RULES[mode];
   const rows: { eventType: string; payload: unknown; createdAt: Date | string }[] = await (db as any).matchEvent.findMany({
-    where: { matchId, userId, eventType: { in: [MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH] } },
+    where: { matchId, userId, eventType: { in: [rules.start, rules.finish] } },
     orderBy: [{ seq: 'asc' }, { createdAt: 'asc' }],
     select: { eventType: true, payload: true, createdAt: true },
   });
-  const start = rows.find((r) => r.eventType === MUSIC_ATTEMPT_START);
-  const fin = rows.find((r) => r.eventType === MUSIC_ATTEMPT_FINISH);
-  let finish: MusicAttempt['finish'] = null;
-  if (fin) {
-    const parsed = parseHouseTaps(houseBeatFor(matchId), parsePayload(fin.payload).taps);
-    finish = { taps: parsed.ok ? parsed.taps : [], at: new Date(fin.createdAt) };
-  }
-  const attemptId = start ? cleanAttemptId(parsePayload(start.payload).attemptId) : null;
-  return { startedAt: start ? new Date(start.createdAt) : null, finish, ...(attemptId ? { startAttemptId: attemptId } : {}) };
+  const start = rows.find((r) => r.eventType === rules.start);
+  const fin = rows.find((r) => r.eventType === rules.finish);
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): a dance start's recorded version and chart (HouseAttempt.recorded) — the finish
+  // is parsed against THAT version's song (its set length bounds the press times), never the current one
+  const sp = start ? parsePayload(start.payload) : {};
+  // (a `v` this build cannot build — a start written by a newer build, then rolled back — is KEPT: danceSongOf refuses it
+  // with HouseChartDrift rather than judge that set on this build's version)
+  const recorded = mode === 'dance' && start
+    ? { ...(typeof sp.v === 'number' && Number.isFinite(sp.v) ? { v: sp.v } : {}), ...(typeof sp.chart === 'string' ? { chart: sp.chart } : {}) }
+    : null;
+  let finish: HouseAttempt['finish'] = null;
+  if (fin) finish = { taps: tapsOf(rules.parse(matchId, parsePayload(fin.payload).taps, recorded?.v)), at: new Date(fin.createdAt) };
+  const attemptId = start ? cleanAttemptId(sp.attemptId) : null;
+  return {
+    startedAt: start ? new Date(start.createdAt) : null, finish, ...(attemptId ? { startAttemptId: attemptId } : {}),
+    ...(recorded && Object.keys(recorded).length ? { recorded } : {}),
+  };
+}
+/** The player's Groove Academy attempt (P6's reader: readHouseAttempt on music). */
+export async function readMusicAttempt(db: DbClient, matchId: string, userId: string): Promise<MusicAttempt> {
+  return readHouseAttempt(db, 'music', matchId, userId) as Promise<MusicAttempt>;
 }
 
 export type MusicScoreVerdict =
   | { ok: true; score: number; forfeit: boolean; taps: number }
   | { ok: false; code: 'NO_ATTEMPT'; status: 409; detail: string };
+/** MUSIC-SUITE P9: the same verdict for either house-set mode. */
+export type HouseScoreVerdict = MusicScoreVerdict;
 
 /**
- * What this attempt scores, on the server: the rejudge of its finished tap list on the duel's house beat, 0 for an
- * attempt started and never finished (decision #29), and no score at all without a start — the room posts its start at
- * the count-in, so a score with none behind it was never played in this duel.
+ * What this attempt scores, on the server: the rejudge of its finished tap list on the duel's house set, 0 for an attempt
+ * started and never finished (decision #29), and no score at all without a start — the room posts its start at the
+ * count-in, so a score with none behind it was never played in this duel. MUSIC-SUITE P9: of either house-set mode.
  */
-export function musicAttemptScore(matchId: string, attempt: MusicAttempt): MusicScoreVerdict {
-  if (!attempt.startedAt) {
-    return {
-      ok: false, code: 'NO_ATTEMPT', status: 409,
-      detail: 'No set was played for this duel: an Arena music score comes from its one recorded attempt. The score was not recorded and nothing was settled.',
-    };
-  }
+export function houseAttemptScore(mode: HouseSetMode, matchId: string, attempt: HouseAttempt): HouseScoreVerdict {
+  const rules = HOUSE_SET_RULES[mode];
+  if (!attempt.startedAt) return { ok: false, code: 'NO_ATTEMPT', status: 409, detail: rules.noAttempt };
   if (!attempt.finish) return { ok: true, score: 0, forfeit: true, taps: 0 };
-  return { ok: true, score: judgeHouseSet(houseBeatFor(matchId), attempt.finish.taps).score, forfeit: false, taps: attempt.finish.taps.length };
+  // MUSIC-SUITE P9 FIX PASS (2026-09-29): a dance set is judged on the version and chart its start recorded, or not at all
+  // (verify throws HouseChartDrift: the route answers an error and the sweep leaves the duel — nothing settles on it)
+  rules.verify?.(matchId, attempt);
+  return { ok: true, score: rules.judge(matchId, attempt.finish.taps, attempt.recorded?.v), forfeit: false, taps: attempt.finish.taps.length };
+}
+/** A Groove Academy attempt's score (P6's: houseAttemptScore on music — judgeHouseSet on the duel's house beat). */
+export function musicAttemptScore(matchId: string, attempt: MusicAttempt): MusicScoreVerdict {
+  return houseAttemptScore('music', matchId, attempt);
 }
 
 /**
@@ -159,14 +267,19 @@ export async function claimMusicSessionPay(db: DbClient, matchId: string, userId
  * The house seat of a Quick Match never plays an attempt; its stored score (drawn at settlement) is taken as it is.
  */
 export interface MusicSeat { score: number | null; legacy: boolean; started: boolean; finished: boolean }
-export function musicSeat(matchId: string, stored: number | null | undefined, attempt: MusicAttempt | null): MusicSeat {
+/** MUSIC-SUITE P9: a seat of either house-set duel (a dance seat's score is its rejudged accuracy, 0..10,000). */
+export type HouseSeat = MusicSeat;
+export function houseSeat(mode: HouseSetMode, matchId: string, stored: number | null | undefined, attempt: HouseAttempt | null): HouseSeat {
   const has = stored !== null && stored !== undefined;
   if (!attempt) return { score: has ? stored! : null, legacy: false, started: false, finished: false };   // the house seat
   const started = !!attempt.startedAt, finished = !!attempt.finish;
   if (has) return started ? { score: stored!, legacy: false, started, finished } : { score: null, legacy: true, started, finished };
   if (!started) return { score: null, legacy: false, started, finished };
-  const v = musicAttemptScore(matchId, attempt);
+  const v = houseAttemptScore(mode, matchId, attempt);
   return { score: v.ok ? v.score : 0, legacy: false, started, finished };
+}
+export function musicSeat(matchId: string, stored: number | null | undefined, attempt: MusicAttempt | null): MusicSeat {
+  return houseSeat('music', matchId, stored, attempt);
 }
 
 /** Which seat of a Quick Match the house sits in: seat 2, always (app/api/arena/quick-match/route.ts seats the player in 1). */
@@ -174,19 +287,29 @@ export function houseSeatOf(m: { matchType?: string | null }): 'p1' | 'p2' | nul
   return m.matchType === 'GHOST_DUEL' ? 'p2' : null;
 }
 
-/** Both seats of a music duel, read from its events (the house seat of a Quick Match is not read: it plays no attempt). */
-export async function readMusicSeats(
-  db: DbClient,
-  m: { id: string; matchType?: string | null; player1Id: string; player2Id: string | null | undefined; player1Score: number | null | undefined; player2Score: number | null | undefined },
-): Promise<{ p1: MusicSeat; p2: MusicSeat }> {
+type SeatRow = { id: string; matchType?: string | null; player1Id: string; player2Id: string | null | undefined; player1Score: number | null | undefined; player2Score: number | null | undefined };
+/**
+ * Both seats of a house-set duel, read from its events (the house seat of a Quick Match is not read: it plays no attempt).
+ * MUSIC-SUITE P9: `mode` is the duel's house-set mode (houseSetModeOf(m.mode)).
+ */
+export async function readHouseSeats(db: DbClient, mode: HouseSetMode, m: SeatRow): Promise<{ p1: HouseSeat; p2: HouseSeat }> {
   const house = houseSeatOf(m);
-  const a1 = house === 'p1' ? null : await readMusicAttempt(db, m.id, m.player1Id);
-  const a2 = house === 'p2' || !m.player2Id ? null : await readMusicAttempt(db, m.id, m.player2Id);
-  return { p1: musicSeat(m.id, m.player1Score, a1), p2: musicSeat(m.id, m.player2Score, a2) };
+  const a1 = house === 'p1' ? null : await readHouseAttempt(db, mode, m.id, m.player1Id);
+  const a2 = house === 'p2' || !m.player2Id ? null : await readHouseAttempt(db, mode, m.id, m.player2Id);
+  return { p1: houseSeat(mode, m.id, m.player1Score, a1), p2: houseSeat(mode, m.id, m.player2Score, a2) };
+}
+/** Both seats of a music duel (P6's reader: readHouseSeats on music). */
+export async function readMusicSeats(db: DbClient, m: SeatRow): Promise<{ p1: MusicSeat; p2: MusicSeat }> {
+  return readHouseSeats(db, 'music', m);
 }
 
 /** The REFUNDED reason for a duel voided because its other score is from before the house beat (decision #12). */
 export const PRE_HOUSE_BEAT_REASON = 'pre_house_beat';
+/**
+ * MUSIC-SUITE P9: the REFUNDED reason for a DANCE duel voided because its other score is from before the house song — a
+ * points score on the player's own pick (up to 79,680), which decision #10's accuracy scale cannot be compared with.
+ */
+export const PRE_HOUSE_SONG_REASON = 'pre_house_song';
 
 // ── the rejudge's limit, recorded (review, minor) ───────────────────────────────────────────────────────────────────
 /** Hits read before a set's timing is judged at all, and the spread under which it is machine-exact. TUNE(elijah). */
@@ -212,4 +335,82 @@ export function musicTapPlausibility(matchId: string, taps: readonly HouseTap[])
   const mean = errs.reduce((a, b) => a + b, 0) / errs.length;
   const spreadMs = Math.sqrt(errs.reduce((a, e) => a + (e - mean) ** 2, 0) / errs.length);
   return { hits: errs.length, spreadMs: Math.round(spreadMs * 100) / 100, flagged: errs.length >= PLAUSIBILITY_MIN_HITS && spreadMs < PLAUSIBILITY_MIN_SPREAD_MS };
+}
+
+/** MUSIC-SUITE P9: the plausibility read of either house-set mode (recorded for review; nothing is refused on it). */
+export function houseTapPlausibility(mode: HouseSetMode, matchId: string, taps: readonly unknown[], v?: number): { hits: number; spreadMs: number | null; flagged: boolean } {
+  return HOUSE_SET_RULES[mode].plausibility(matchId, taps, v);   // MUSIC-SUITE P9 FIX PASS: `v` — the attempt's recorded version (dance)
+}
+
+// ── MUSIC-SUITE P9 (2026-09-29): the table — everything that differs between a music duel and a dance duel ─────────────
+/**
+ * One row per house-set mode. Music's row is exactly what P6 inlined (houseBeatFor / judgeHouseSet / parseHouseTaps and its
+ * words); dance's reads lib/babylon/dance/houseSong.ts. The house set is always rebuilt from the MATCH ID — never from
+ * anything the room sends — so a list is judged on the duel's own song or beat.
+ */
+export const HOUSE_SET_RULES: Readonly<Record<HouseSetMode, HouseSetRules>> = {
+  music: {
+    mode: 'music', start: MUSIC_ATTEMPT_START, finish: MUSIC_ATTEMPT_FINISH,
+    parse: (matchId, raw) => parseHouseTaps(houseBeatFor(matchId), raw),
+    judge: (matchId, taps) => judgeHouseSet(houseBeatFor(matchId), taps as HouseTap[]).score,
+    summary: (matchId) => houseBeatSummary(houseBeatFor(matchId)),
+    summaryKey: 'beat',
+    countInMs: (matchId) => houseCountInMs(houseBeatFor(matchId)),
+    setMs: (matchId) => houseSetMs(houseBeatFor(matchId)),
+    minFinishMs: (matchId) => houseMinFinishMs(houseBeatFor(matchId)),
+    rules: HOUSE_ARENA_RULES,
+    legacy: {
+      code: 'PRE_HOUSE_BEAT', reason: PRE_HOUSE_BEAT_REASON,
+      atStart: "Your opponent's score in this duel is from before the house beat, so a set can't be settled against it: both stakes were refunded.",
+      atSubmit: "Your opponent's score in this duel is from before the house beat, so the two can't be compared: both stakes were refunded.",
+    },
+    noAttempt: 'No set was played for this duel: an Arena music score comes from its one recorded attempt. The score was not recorded and nothing was settled.',
+    plausibility: (matchId, taps) => musicTapPlausibility(matchId, taps as HouseTap[]),
+  },
+  dance: {
+    mode: 'dance', start: DANCE_ATTEMPT_START, finish: DANCE_ATTEMPT_FINISH,
+    // MUSIC-SUITE P9 FIX PASS (2026-09-29): every dance row builds its song through danceSongOf — the attempt's own
+    // house-song version (the current one for a new start), its chart checked against the print that version pins
+    parse: (matchId, raw, v) => {
+      const p = parseDancePresses(danceSongOf(matchId, v), raw);
+      return p.ok ? { ok: true, taps: p.presses } : p;
+    },
+    judge: (matchId, taps, v) => judgeDanceSet(danceSongOf(matchId, v), taps as HousePress[]).score,
+    verify: (matchId, attempt) => {
+      const h = danceSongOf(matchId, attempt.recorded?.v);
+      if (!houseChartMatches(h, attempt.recorded?.chart)) {
+        throw new HouseChartDrift(`duel ${matchId}: its start recorded chart ${attempt.recorded?.chart}, "${h.songId}" v${h.v} builds another — not judged`);
+      }
+    },
+    summary: (matchId) => houseSongSummary(danceSongOf(matchId)),
+    summaryKey: 'song',
+    countInMs: (matchId) => houseSongCountInMs(danceSongOf(matchId)),
+    setMs: (matchId) => houseSongSetMs(danceSongOf(matchId)),
+    minFinishMs: (matchId) => houseSongMinFinishMs(danceSongOf(matchId)),
+    rules: DANCE_ARENA_RULES,
+    legacy: {
+      code: 'PRE_HOUSE_SONG', reason: PRE_HOUSE_SONG_REASON,
+      atStart: "Your opponent's score in this duel is from before the house song, so a set can't be settled against it: both stakes were refunded.",
+      atSubmit: "Your opponent's score in this duel is from before the house song, so the two can't be compared: both stakes were refunded.",
+    },
+    noAttempt: 'No set was danced for this duel: an Arena dance score comes from its one recorded attempt. The score was not recorded and nothing was settled.',
+    plausibility: (matchId, taps, v) => dancePressPlausibility(danceSongOf(matchId, v), taps as HousePress[]),
+  },
+};
+
+/**
+ * MUSIC-SUITE P9 FIX PASS (2026-09-29): a dance duel's house song on version `v` (the current one when absent), its chart
+ * held to the print that version pins (houseSong.ts assertHouseChart — throws HouseChartDrift rather than build a song the
+ * duel was not started on). Hoisted below the table on purpose: every row calls it at request time, never at import.
+ */
+function danceSongOf(matchId: string, v?: number): HouseSong {
+  const h = houseSongFor(matchId, v ?? HOUSE_SONG_VERSION);
+  assertHouseChart(h);
+  return h;
+}
+
+/** The house-set rules of a duel's mode (either spelling), or null for a mode with no house set. */
+export function houseSetRulesFor(mode: string | null | undefined): HouseSetRules | null {
+  const m = houseSetModeOf(mode);
+  return m ? HOUSE_SET_RULES[m] : null;
 }

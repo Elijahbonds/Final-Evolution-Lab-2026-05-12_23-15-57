@@ -1,0 +1,30 @@
+{
+  "format": "fel-dance-chart/1",
+  "song": "cypher",
+  "bpm": 96,
+  "bars": 40,
+  "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
+  "about": "Difficulty 2. Eighths open up: accents on the slap bass's 'and's (1.5, 2.5) and the snare; eighth-note double taps inside the six-step; a long freeze hold into a mirrored one on the break; freestyle every two beats in the second verse and both hooks.",
+  "phrases": {
+    "cin": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 4, "m": "wave" }, { "b": 6, "m": "spin" } ] },
+    "cin2": { "bars": 2, "notes": [ { "b": 0, "m": "toprock", "mir": 1 }, { "b": 2.5 }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" } ] },
+    "cvA": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 1.5 }, { "b": 4, "m": "toprock" }, { "b": 7 } ] },
+    "cvB": { "bars": 2, "notes": [ { "b": 0, "m": "sixstep" }, { "b": 2.5, "x2": 0.5 }, { "b": 7, "m": "spin" } ] },
+    "cvC": { "bars": 2, "notes": [ { "b": 0, "m": "shoulder" }, { "b": 3 }, { "b": 4, "m": "wave" }, { "b": 6, "x2": 0.5 } ] },
+    "chA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1.5 }, { "b": 3 }, { "b": 4, "m": "wave" } ] },
+    "chB": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 1.5 }, { "b": 2, "m": "twostep" }, { "b": 4, "m": "windmill" }, { "b": 5 }, { "b": 6.5 } ] },
+    "free2": { "bars": 2, "free": { "every": 2 } },
+    "brk": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "hold": 3 }, { "b": 4, "m": "babyfreeze", "hold": 2, "mir": 1 }, { "b": 7, "m": "spin" } ] },
+    "out1": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 3 }, { "b": 4, "m": "sixstep" } ] },
+    "out2": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 3 }, { "b": 4, "m": "spin" }, { "b": 6, "m": "babyfreeze", "hold": 1 } ] }
+  },
+  "sections": [
+    { "name": "intro", "bar": 1, "bars": 4, "play": ["cin", "cin2"] },
+    { "name": "verse", "bar": 5, "bars": 8, "play": ["cvA", "cvB", "cvA", "cvB"] },
+    { "name": "hook", "bar": 13, "bars": 8, "play": ["chA", "free2", "chA", "free2"] },
+    { "name": "break", "bar": 21, "bars": 2, "play": ["brk"] },
+    { "name": "verse", "bar": 23, "bars": 6, "play": ["cvA", "cvC", "free2"] },
+    { "name": "hook", "bar": 29, "bars": 8, "play": ["chB", "free2", "chA", "free2"] },
+    { "name": "outro", "bar": 37, "bars": 4, "play": ["out1", "out2"] }
+  ]
+}
