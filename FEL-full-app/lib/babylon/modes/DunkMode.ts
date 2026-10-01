@@ -32,8 +32,10 @@ import { mirrorGroupsInPlace, mirrorSide } from '../anim/groupMirror';   // DUNK
 import { planGather, fitGather, gatherProgress, gatherSpeedAt, gatherDistAt, GATHER_CLIP_SEC, GATHER_BRAKE_FROM } from '../core/DunkGatherRun';   // …and push 1-2 at speed
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
-import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
+import type { BodyView, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import { DUNK_BODY, DunkBodyBinder } from '@/lib/move/dunkBody';
 import { BallSim } from '../core/BallPhysics';
 import { firstNight, nextNight, cardWon, type NightState } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
@@ -461,6 +463,9 @@ export const DunkMode: ModeDefinition = (() => {
   let aHeld = false, hangSec = 0;             // rim-hang tracking
   let runUpPeak = 0;                          // fastest approach speed (m/s) this attempt
   let gatherHeld = false;                     // GATHER (L2) through the run: both feet, by choice (2026-09-19)
+  // P5: the body's run / gather / take-off / slam, delivered as the same presses. Reset with each attempt.
+  const dunkBody = new DunkBodyBinder();
+  let bodySlamClip: number | null = null;
   let launchCarry = 1;                        // the foot's carry through the plant (DunkParkour.launchProfile)
   let launchFoot: 'one' | 'two' = 'two';      // which foot left the floor, for the flight and the card
   let gatherTold = '';                        // the last tell shown, so the HUD is not rewritten every frame
@@ -1077,6 +1082,15 @@ export const DunkMode: ModeDefinition = (() => {
   }
   const def: ModeDefinition = {
     modeId: 'dunk', mood: 'goldenHour', camPreset: 'contest',  // Phase 8: cinematic, not broadcast
+    // P5: the body drives this game. Claims keep the floor from also pressing; onBody speaks the pad the contest already reads.
+    body: DUNK_BODY,
+    onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
+      if (phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic') return false;
+      const act = dunkBody.see(ev);
+      for (const e of act.now) def.onInput(ctx, e);
+      if (act.slamClip !== null) bodySlamClip = act.slamClip;
+      return act.took;
+    },
     // CrowdEnergy owns this venue's voice (the hush before an attempt, the roar on a flush), which is
     // better than a meter-driven bed -- see ModeDefinition.ownsCrowd.
     ownsCrowd: true,
@@ -1198,6 +1212,7 @@ export const DunkMode: ModeDefinition = (() => {
       style = 'power'; prop = DEV_PROP && (PROPS as readonly string[]).includes(DEV_PROP) ? (DEV_PROP as Prop) : 'none'; rimCamCut = false;   // (dev ?prop=: the probe's Dubble Up runs) hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false; gatherHeld = false; gatherTold = '';
+      dunkBody.reset(); bodySlamClip = null;
       vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
         foe = rivalForNight(night);
     stakes = freshStakes();
@@ -1673,6 +1688,11 @@ export const DunkMode: ModeDefinition = (() => {
         const animScale = ctx.scene.animationTimeScale ?? 1;
         const prevClip = clipTime;
         clipTime += dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1);
+        // P5: the body's finish, on the flight clock. The press is the same A the window already grades.
+        if (bodySlamClip !== null && clipTime >= bodySlamClip) {
+          bodySlamClip = null;
+          def.onInput(ctx, { t: 'button', btn: 'A', pressed: true, src: 'body' });
+        }
         if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
           hangSlowMoLatch = true;
           ctx.juice.slowMo(0.4, 400, { gameplay: true });   // HOTFIX (2026-09-24): the flight clock above rides this — reduced motion keeps it whole, so the slam window never moves
@@ -4044,6 +4064,7 @@ export const DunkMode: ModeDefinition = (() => {
     armedAir = null; spin.reset(); replaySpinYaw = 0;
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    dunkBody.reset(); bodySlamClip = null;
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
     runUpPeak = 0; obstacleClipped = false; toppling = false; runwayIds = [];
