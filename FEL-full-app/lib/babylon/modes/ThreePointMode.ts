@@ -342,6 +342,8 @@ const S = {
   /** Per-rival skill 0..1, fixed for the whole contest so form is consistent. */
   skills: [] as number[],
   standingsT: 0,
+  /** The hero answered their posted number this standings window (celebrate/flinch, once). */
+  heroReacted: false,
   /** Rival field indices awaiting a staged reveal, weakest first — the
    *  favourite's number lands last, which is the drama a results board is FOR. */
   revealQueue: [] as number[],
@@ -364,6 +366,7 @@ function resetState(): void {
   S.from.copyFrom(RACK_POS[0]);
   S.round = 'qualifying';
   S.standingsT = 0;
+  S.heroReacted = false;
   S.revealQueue = [];
   S.revealT = 0;
   S.playoff = 0;   // S is module state: a second contest in the session started with the last one's playoffs spent
@@ -392,6 +395,12 @@ function resetRun(): void {
  *  card reads "—" until their number lands). */
 const standings = (): Shooter[] =>
   [...S.field].sort((a, b) => (b.shot ? b.score : -1) - (a.shot ? a.score : -1));
+
+/** Top posted rival score — the number the session should report as opponentScore. */
+export function topRivalScore(board: Shooter[]): number {
+  const rivals = board.filter((f) => !f.isPlayer && f.shot);
+  return rivals.length ? Math.max(...rivals.map((f) => f.score)) : 0;
+}
 
 /** A rack's last ball is the money ball — 2 points instead of 1. */
 const isMoneyBall = (i: number): boolean => i === BALLS_PER_RACK - 1;
@@ -719,7 +728,7 @@ function afterStandings(ctx: ModeContext): void {
     }
     S.phase = 'done';
     ctx.end(step.won ? 'win' : 'complete', step.score, {
-      points: step.score, bestStreak: S.best, place: step.place, round: 2,
+      points: step.score, bestStreak: S.best, place: step.place, round: 2, rivalScore: topRivalScore(board),
     });
     return;
   }
@@ -729,7 +738,7 @@ function afterStandings(ctx: ModeContext): void {
     S.eliminated = true;
     S.phase = 'done';
     ctx.end('complete', myScore, {
-      points: myScore, bestStreak: S.best, place: me + 1, round: 1,
+      points: myScore, bestStreak: S.best, place: me + 1, round: 1, rivalScore: topRivalScore(board),
     });
     return;
   }
@@ -1004,6 +1013,16 @@ export const ThreePointMode: ModeDefinition = {
         return;
       }
       S.standingsT += dt;
+      // HOOPS-10 phase 2 (V:3pt N5 — "the hero stands frozen for 4 s or more"): the standings window answers the
+      // HERO's posted score the way the reveal answers each rival's — a big one celebrates, a poor one flinches
+      // (the same threshold the reveal uses), then the body settles into the watch idle instead of standing
+      // statue-still for the hold. React once, on the first readable frame; the beat settles itself (BeatOwner
+      // plays the base loop on its natural end), so there is nothing to tick here.
+      if (beats && !S.heroReacted) {
+        S.heroReacted = true;
+        beats.beat(S.pts >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { fadeSec: 0.15 });
+        beats.loop(WATCH_IDLE);
+      }
       if (S.standingsT >= STANDINGS_SEC) {
         if (S.finalistsPosting) {
           // the field has posted; the player runs the final at the number

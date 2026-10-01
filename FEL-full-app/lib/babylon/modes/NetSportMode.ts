@@ -917,7 +917,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       }
 
       rally = new RallyState(o.cfg);
-      tennisScore = o.scoring === 'tennis' ? new TennisScore(4) : null;
+      tennisScore = o.scoring === 'tennis' ? new TennisScore(6) : null;   // FIELD-DEPTH W4: first to six games
       volleyScore = o.scoring === 'volley' ? new VolleyScore(25) : null;
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 

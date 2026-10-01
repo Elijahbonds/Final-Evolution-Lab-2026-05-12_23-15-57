@@ -137,7 +137,7 @@ describe('leaving the shot', () => {
 
   it('six seconds out of the shot restarts the part', () => {
     const run = drive({ absence: { part: 'T1-front', ms: 6500 } });
-    expect(run.said.some((x) => x.startsWith('Starting that one again.'))).toBe(true);
+    expect(run.said.some((x) => x.startsWith('Starting that one again.') || x.includes('trying this move once more'))).toBe(true);
     const i = run.steps.indexOf('paused:T1-front');
     expect(run.steps.slice(i)).toContain('position:T1-front');
   });

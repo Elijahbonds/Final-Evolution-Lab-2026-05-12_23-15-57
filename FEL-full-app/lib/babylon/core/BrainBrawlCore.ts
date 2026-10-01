@@ -449,7 +449,7 @@ export function claimedBy(claims: Record<Category, number | null>, player: numbe
   return CATEGORIES.filter((c) => claims[c] === player);
 }
 
-/** Match over: a player holds all five (duel) — or, solo, every category has been played (the composite is the score). */
+/** Match over when a player holds all five. A miss does not close a category; solo ends on five claims, same as a duel. */
 export function matchWinner(claims: Record<Category, number | null>, players: number): number {
   for (let p = 0; p < players; p++) if (claimedBy(claims, p).length === CATEGORIES.length) return p;
   return -1;
@@ -460,3 +460,36 @@ export function boardRows(claims: Record<Category, number | null>, scores: reado
 }
 
 export const SOLO_BEST_KEY = 'fel.brainbrawl.best';
+
+export interface ScriptedClaimRun {
+  claimed: number;
+  rounds: number;
+  done: boolean;
+}
+
+/**
+ * A scripted solo night. `answer` returns the option index, or null to pass.
+ * A correct answer claims; a miss leaves the category on the wheel. Stops at five claims or `maxRounds`.
+ */
+export function scriptedSoloClaims(
+  seed: number,
+  answer: (challenge: Challenge) => number | null,
+  maxRounds = 15,
+): ScriptedClaimRun {
+  const rnd = mulberry32(seed);
+  const claims = freshClaims();
+  const seen = new Set<string>();
+  let rounds = 0;
+  while (rounds < maxRounds && claimedBy(claims, 0).length < CATEGORIES.length) {
+    rounds += 1;
+    const tier = (rounds <= 2 ? 1 : rounds <= 4 ? 2 : 3) as Tier;
+    const { category } = spinWheel(rnd, claims, 0);
+    const challenge = makeChallenge(category, tier, rnd, seen);
+    const pick = answer(challenge);
+    const correct = pick !== null && pick === challenge.answer;
+    const score = challengeScore(correct, challenge.timeLimitSec * 0.5, challenge.timeLimitSec, tier);
+    resolveClaim(claims, category, [score]);
+  }
+  const claimed = claimedBy(claims, 0).length;
+  return { claimed, rounds, done: claimed >= CATEGORIES.length };
+}

@@ -81,7 +81,7 @@ type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
 type Loadout = 'fists' | 'staff';
 const ROUNDS_TO_WIN = 2;
 /** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
-const BASE_RIVAL_DIFFICULTY = 0.6;
+const BASE_RIVAL_DIFFICULTY = 0.68;
 const MOVE_SPEED = 3.3;
 const SLOWMO_SEC = 0.5;
 const SLOWMO_SCALE = 0.3;
@@ -742,6 +742,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
+    brain.setRound(round);
     meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
     deferred.clear(); ledger.reset(); bodyShift = null;   // P7
     applyLoadouts(ctx);

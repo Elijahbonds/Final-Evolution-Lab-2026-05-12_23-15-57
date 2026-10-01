@@ -48,9 +48,11 @@ describe('the announcer', () => {
 });
 
 describe('the celebrations', () => {
-  it('Ruffin\'s Spider-Man splits and Carter\'s "it\'s over" are credited; every one has its clip', () => {
-    expect(CELEBRATIONS.spiderman.by).toBe('Brandon Ruffin');
-    expect(CELEBRATIONS.itsover.by).toBe('Vince Carter');
+  it('every celebration is credited to FLIGHT NIGHT (the in-fiction crew) — no real dunker is named (owner, HOOPS-MOTION round 1)', () => {
+    // Was "Brandon Ruffin" / "Vince Carter". The names were the homage; the credit stays generic so the
+    // poster/HUD never prints a real person in a public build. The clips and labels are unchanged.
+    expect(CELEBRATIONS.spiderman.by).toBe('FLIGHT NIGHT');
+    expect(CELEBRATIONS.itsover.by).toBe('FLIGHT NIGHT');
     for (const c of Object.values(CELEBRATIONS)) expect(c.clip).toMatch(/^dunk_/);   // the dunk family: mirrored to the right hand with the rest
   });
   it('the d-pad throws yours; a thrown one always wins', () => {

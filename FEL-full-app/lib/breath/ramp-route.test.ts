@@ -9,11 +9,13 @@
 // rolls; a set logged through the REAL /api/coach/me/log route closes the breath for that set; and two racing POSTs
 // never leave two uses.
 //
-// MIRROR-COACH P7 FIX (2026-09-29, review), three more held here through the route: a clean re-take no longer erases an
-// earlier lasting "yes" (intake_history); erasing health data (the REAL lib/prq-data-rights.ts eraseHealthData) and
-// opting straight back in (the REAL lib/health/intake.ts submitIntake) no longer resets the weekly count
-// (consent_new); and the exact race interleaving the review described — A stamps first but commits late — now leaves
-// one use, where it used to leave two.
+// MIRROR-COACH P7 FIX (2026-09-29, review), held here through the route: a clean re-take no longer erases an earlier
+// lasting "yes" (intake_history); and the exact race interleaving the review described — A stamps first but commits
+// late — now leaves one use, where it used to leave two.
+// MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT): erasing health data (the REAL lib/prq-data-rights.ts eraseHealthData)
+// keeps the consent ledger. A grant already a full window old stays old enough, and opting straight back in (the REAL
+// lib/health/intake.ts submitIntake) writes no new consent row. BreathLog rows are still deleted, so the rolling count
+// can clear. The owner dropped the post-erase restart of the 7-day hold.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -351,12 +353,14 @@ describe("FEL's weekly limit, counted from the log", () => {
     expect(rows().filter((r) => r.userId === 'client-1')).toHaveLength(3);
   });
 
-  // MIRROR-COACH P7 FIX (2026-09-29, review): the limit reset in seconds — erase health data (every BreathLog row and the
-  // consent ledger go), answer the intake again (which grants consent again), dial up. Run with the REAL erase and the
-  // REAL intake submit over this file's tables.
-  it('erase health data + re-take the intake: refused (consent_new) until a full window has passed, by which time the erased uses are out of it', async () => {
+  // MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT): erase keeps the consent ledger. A grant already a full window
+  // old stays old enough, re-taking the intake writes no new row, and the deleted BreathLog rows clear the rolling
+  // count. The fake has no healthConsent.deleteMany: if eraseHealthData calls one, this throws.
+  it('erase health data + re-take the intake: the kept grant is still old enough, and no consent row is created', async () => {
     const s = h.state.store;
-    // Monday and Tuesday's uses
+    const before = structuredClone(h.state.consents);
+    expect(before).toHaveLength(1);
+    // Monday and Tuesday's uses — the rolling week is full until the log is deleted
     h.state.breath.push(
       { id: 'bl-mon', userId: 'client-1', kind: 'ramp', sessionId: 'past-mon', seconds: null, createdAt: daysAgo(2) },
       { id: 'bl-tue', userId: 'client-1', kind: 'ramp', sessionId: 'past-tue', seconds: null, createdAt: daysAgo(1.2) },
@@ -368,30 +372,26 @@ describe("FEL's weekly limit, counted from the log", () => {
       painCheckIn: { deleteMany: async (a: Row) => { const n = h.state.pain.filter((r) => r.userId === a.where.userId).length; h.state.pain = byUser(h.state.pain, a.where.userId); return { count: n }; } },
       readinessCheckIn: { deleteMany: async (a: Row) => { const n = h.state.readiness.filter((r) => r.userId === a.where.userId).length; h.state.readiness = byUser(h.state.readiness, a.where.userId); return { count: n }; } },
       breathLog: { deleteMany: async (a: Row) => { const n = h.state.breath.filter((r) => r.userId === a.where.userId).length; h.state.breath = byUser(h.state.breath, a.where.userId); return { count: n }; } },
-      healthConsent: { deleteMany: async (a: Row) => { const n = h.state.consents.filter((r) => r.userId === a.where.userId).length; h.state.consents = byUser(h.state.consents, a.where.userId); return { count: n }; } },
     };
-    expect(await eraseHealthData(eraseDb as never, 'client-1')).toMatchObject({ breathLogs: 2, healthConsents: 1, healthIntakes: 1 });
+    expect(await eraseHealthData(eraseDb as never, 'client-1')).toMatchObject({ breathLogs: 2, healthConsents: 0, healthIntakes: 1 });
+    expect(h.state.consents).toEqual(before);
+    const creates: Row[] = [];
     const intakeDb = {
       user: { findUnique: async (a: Row) => s.user.find((u) => u.id === a.where.id) ?? null, update: async () => ({}) },
       guardianConsent: { findMany: async () => [] },
       healthConsent: {
         findFirst: async (a: Row) => h.state.consents.find((c) => c.userId === a.where.userId && c.scope === a.where.scope && !c.revokedAt) ?? null,
-        create: async (a: Row) => { const c = { coachId: null, revokedAt: null, ...a.data }; h.state.consents.push(c); return c; },
+        create: async (a: Row) => { const c = { coachId: null, revokedAt: null, ...a.data }; creates.push(c); h.state.consents.push(c); return c; },
       },
       healthIntake: { create: async (a: Row) => { const r = { id: `hi-re-${s.healthIntake.length}`, clearedAt: null, createdAt: new Date(), ...a.data }; s.healthIntake.push(r); return r; } },
     };
     await submitIntake(intakeDb as never, { userId: 'client-1', consent: true, rawAnswers: { ...CLEAN, [INTAKE_IDS.birthYear]: 1990 } });
-    expect(h.state.consents).toHaveLength(1);
+    expect(creates).toEqual([]);
+    expect(h.state.consents).toEqual(before);
     expect(rows().filter((r) => r.userId === 'client-1')).toHaveLength(0);
-    // the log is empty and the intake is clean — the only thing in the way is how new FEL's consent record is
-    expect((await get(KEY)).json).toMatchObject({ eligible: false, reasons: ['consent_new'] });
-    expect(await post({ sessionExerciseId: KEY })).toMatchObject({ status: 403, json: { reasons: ['consent_new'] } });
-    expect(rows()).toHaveLength(0);
-    // a day short of the window: still no. A full window on: yes — and Monday/Tuesday would have rolled out by now anyway
-    vi.setSystemTime(new Date(NOW.getTime() + (RAMP_LIMIT.firstUseAfterDays - 1) * 86_400_000));
-    expect((await get(KEY)).json.reasons).toEqual(['consent_new']);
-    vi.setSystemTime(new Date(NOW.getTime() + RAMP_LIMIT.firstUseAfterDays * 86_400_000));
-    expect((await get(KEY)).json).toMatchObject({ eligible: true, usesLeft: 2 });
+    const offered = await get(KEY);
+    expect(offered.json.reasons).not.toContain('consent_new');
+    expect(offered.json).toMatchObject({ eligible: true, usesLeft: 2 });
   });
 
   it('withdraw and re-grant (no erase) keeps the old ledger rows, so it waits for nothing', async () => {

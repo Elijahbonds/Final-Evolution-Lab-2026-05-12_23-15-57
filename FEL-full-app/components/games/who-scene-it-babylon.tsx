@@ -8,6 +8,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
 import { PausedLayer, BodyReadyLine } from './paused-layer';
+import { whoSceneItStageBox } from '@/lib/babylon/modes/whoSceneItFrame';
 
 type Hud = Record<string, HudValue>;
 const OPTS: { key: 'optA' | 'optB' | 'optX' | 'optY'; btn: 'A' | 'B' | 'X' | 'Y'; face: string; dpad: string; color: string }[] = [
@@ -56,9 +57,16 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
   const revealing = typeof hud.reveal === 'string' && hud.reveal.length > 0;
+  const [box, setBox] = useState(() => whoSceneItStageBox(1200, 800));
+  useEffect(() => {
+    const measure = () => setBox(whoSceneItStageBox(window.innerWidth, window.innerHeight));
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
 
   return (
-    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden bg-transparent">
+    <div className="relative mx-auto w-full overflow-hidden rounded-xl border border-white/10 bg-black" style={{ width: box.width, height: box.height, maxWidth: '100%' }}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* top bar: pack · question · clock · score */}

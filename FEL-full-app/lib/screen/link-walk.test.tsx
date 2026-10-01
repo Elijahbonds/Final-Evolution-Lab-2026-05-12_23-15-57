@@ -112,7 +112,7 @@ describe('S-11: from the under-18 results, every reachable link stays in the scr
       for (const next of hrefs(await render(href))) if (!seen.has(next)) queue.push(next);
     }
     expect(out).toEqual([]);
-    // what the walk reached: the privacy page, and the QR address (which opens the screen's start, whose links are these two)
-    expect([...seen].sort()).toEqual(['/screen', '/screen/privacy']);
+    // S-15: privacy back is a button (returns to results or history), not a link to /screen
+    expect([...seen].sort()).toEqual(['/screen/privacy']);
   });
 });

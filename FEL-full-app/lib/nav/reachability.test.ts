@@ -35,6 +35,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/train': 'a tab',
   '/profile': 'a tab',
   '/studio': 'HOLD — not shipped, deliberately unlinked',
+  '/settings': 'alias of /account; app/settings/page.tsx redirects there, and the consent screen links /account',
 };
 
 function topLevelRoutes(): string[] {

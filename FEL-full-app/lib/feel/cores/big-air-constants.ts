@@ -42,7 +42,7 @@ export const BIG_AIR_TUNING: AirSessionTuning = {
     sketchy: 0.5, // TUNE(elijah)
     crash: 0, // TUNE(elijah)
   },
-  attemptsPerRound: 3, // TUNE(elijah) — three hits down the hill
+  attemptsPerRound: 5, // FIELD-DEPTH W4: three attempts ended in ~22 s — five gives a real final
   landBeatMs: 900, // TUNE(elijah) — beat between attempts
   cadenceTargetMs: 260, // TUNE(elijah) — push rhythm (optional here)
   cadencePerfectMs: 45, // TUNE(elijah)

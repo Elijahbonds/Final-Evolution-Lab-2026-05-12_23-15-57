@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, signOut } from 'next-auth/react';
+import { AgeStep, AgeTurnAway, ageBlockPresent } from '@/components/age-step';
 import { Dumbbell, Gamepad2 } from 'lucide-react';
 import { ModeCarousel } from '@/components/onboarding/mode-carousel';
 import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
@@ -15,6 +16,7 @@ import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
+import { loginDestination } from '@/lib/auth/safeNext';
 import { toast } from 'sonner';
 
 // M8.6 — landing hook: marquee sports so the pre-auth page actually shows what
@@ -40,6 +42,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [firstGame, setFirstGame] = useState<string>(DEFAULT_FIRST_GAME);
   // The creator whose card or QR brought them, resolved from ?ref by /api/onboarding/host.
   const [host, setHost] = useState<{ name: string; mode: string | null; accent: string | null } | null>(null);
+  // AGE-SCREEN: the year is locked in page memory before any credential field renders. A block replaces the form.
+  const [birthYear, setBirthYear] = useState<number | null>(null);
+  const [turnedAway, setTurnedAway] = useState(false);
 
   useEffect(() => {
     // The last game they picked, so somebody coming back is offered what they chose before rather than the default.
@@ -99,7 +104,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, ...(refCode ? { ref: refCode } : {}) }),
+          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(refCode ? { ref: refCode } : {}) }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -109,6 +114,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         }
       }
       const result = await signIn('credentials', { email, password, redirect: false });
+      // Signing in while the block flag is set shows the turn-away and signs out. The flag carries no age and no id.
+      if (mode === 'login' && ageBlockPresent()) {
+        await signOut({ redirect: false });
+        setTurnedAway(true);
+        setLoading(false);
+        return;
+      }
       if (result?.error) {
         // Only claim the credentials are wrong when they actually are. A
         // backend that cannot reach its database also fails sign-in, and
@@ -123,12 +135,41 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         return;
       }
       // Land them in the thing they said they came for, not on a menu about it.
-      router.replace(destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame })));
+      // S-16: a login ?next= that is a same-origin path wins. Absolute and protocol-relative URLs are ignored.
+      const fallback = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      let nextRaw: string | null = null;
+      if (mode === 'login') {
+        try { nextRaw = new URL(window.location.href).searchParams.get('next'); } catch { /* keep the fallback */ }
+      }
+      const dest = mode === 'login' ? loginDestination(nextRaw, fallback) : fallback;
+      if (mode === 'login') {
+        try {
+          const gate = await fetch('/api/account/birth-year');
+          if (gate.ok) {
+            const j = await gate.json().catch(() => ({}));
+            if (j?.blocked) {
+              await signOut({ redirect: false });
+              setTurnedAway(true);
+              setLoading(false);
+              return;
+            }
+            if (j?.needed) {
+              router.replace(`/age?next=${encodeURIComponent(dest)}`);
+              return;
+            }
+          }
+        } catch { /* a failed GET falls through to the destination */ }
+      }
+      router.replace(dest);
     } catch {
       toast.error('Something went wrong');
       setLoading(false);
     }
   };
+
+  if (turnedAway) return <AgeTurnAway />;
+
+  const credentialsOpen = mode === 'login' || birthYear !== null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050505] px-3 py-6 sm:px-4">
@@ -163,6 +204,12 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
               : 'Pick your arena, then create your athlete profile.'}
           </p>
         </div>
+
+        {mode === 'signup' && (
+          <div className="mb-6">
+            <AgeStep mode="signup" onLocked={setBirthYear} onBlocked={() => setTurnedAway(true)} />
+          </div>
+        )}
 
         {/* WHO SENT THEM. A scanned card already pays its owner; now it also greets the person it recruited and
             decides what they open on. Their colour carries through the whole arrival. */}
@@ -251,7 +298,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           </div>
         )}
 
-        <form onSubmit={submit} className="mx-auto max-w-md space-y-4">
+        {credentialsOpen && <form onSubmit={submit} className="mx-auto max-w-md space-y-4">
           {mode === 'signup' && (
             <input
               type="text"
@@ -303,7 +350,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? 'ENTER THE LAB' : 'BEGIN EVOLUTION'}
           </button>
-        </form>
+        </form>}
         <p className="mt-6 text-center text-sm text-white/50">
           {mode === 'login' ? (
             <>

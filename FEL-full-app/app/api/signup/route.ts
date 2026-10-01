@@ -10,6 +10,8 @@ import { GUEST_COOKIE } from '@/lib/guest';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
 import { sendWelcomeEmail } from '@/lib/marketing/email';
 import { isUnreachable } from '@/lib/db/errors';
+import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { logU13Lock } from '@/lib/privacy/u13LockLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,7 @@ const signupSchema = z.object({
   name: z.string().trim().min(1).max(60).optional().default('Athlete'),
   policyVersion: z.string().max(60).optional(),
   ref: z.string().trim().max(16).optional(),
+  birthYear: z.number({ required_error: AGE_INVALID, invalid_type_error: AGE_INVALID }).int(AGE_INVALID),
 });
 
 function randAttr() {
@@ -45,7 +48,23 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { email, password, name, policyVersion, ref } = parsed.data;
+    const { email, password, name, policyVersion, ref, birthYear } = parsed.data;
+
+    // AGE-SCREEN, before bcrypt or any prisma call. assumption: (FE PM can reverse) a cookie-present retry logs nothing.
+    if (cookies().get(AGE_BLOCK_COOKIE)) {
+      return NextResponse.json({ error: 'age_screen_blocked' }, { status: 403 });
+    }
+    const age = ageScreenOutcome(birthYear);
+    if (age === 'invalid') {
+      return NextResponse.json({ error: AGE_INVALID }, { status: 400 });
+    }
+    if (age === 'blocked') {
+      logU13Lock('/api/signup');
+      return NextResponse.json(
+        { error: 'age_screen_blocked' },
+        { status: 403, headers: { 'Set-Cookie': ageBlockCookieHeader() } },
+      );
+    }
 
     const hashed = await bcrypt.hash(password, 12);
 
@@ -56,6 +75,7 @@ export async function POST(req: Request) {
           email,
           password: hashed,
           name,
+          dobYear: birthYear,
           ...(policyVersion ? { policyVersion, policyAcceptedAt: new Date() } : {}),
         },
       });

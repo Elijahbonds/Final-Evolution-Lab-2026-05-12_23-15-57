@@ -100,8 +100,8 @@ export const RUN_IT_AGAIN = 'Run it again';
 
 /** Under 13, or "rather not say": in place of every link out of the screen (Cyber 3). */
 export const PARENT_TITLE = 'Have a parent open this';
-export const PARENT_BODY = 'The Dunk Program and the free game are for a parent or guardian to open with you. Show them '
-  + 'these results, or take a screenshot to show them later.';
+export const PARENT_BODY = 'Ask a parent or guardian to review these results with you. Show them this screen, or take a '
+  + 'screenshot to share later.';
 
 /** A4-4: only after a real, completed screen where every graded check is green. */
 export const WIN_LINE = 'Clean screen. You\'re ready for Dunking & Plyometrics.';

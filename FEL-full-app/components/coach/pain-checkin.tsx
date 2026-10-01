@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { AlertTriangle, ChevronDown, ChevronUp, Loader2, Lock } from 'lucide-react';
 import { ACUTE_EVENTS, BODY_AREAS, type AcuteEventId, type BodyAreaId, type PainDecision } from '@/lib/health/painRule';
 import { HEALTH_DATA_CONSENT_COPY } from '@/lib/health/intake';
+import { ConsentBulletText } from '@/components/health/consent-bullet';
 
 /** The one error code app/api/health/pain's POST returns for a minor with no accepted guardian consent (owner
  *  decision #6; lib/consent/guardianGate.ts). Every other error stays a generic "could not save". */
@@ -90,7 +91,7 @@ export function HealthConsentLockedNotice({ onGranted }: { onGranted: () => void
       </div>
       <ul className="list-disc space-y-1 pl-6 text-white/60">
         {HEALTH_DATA_CONSENT_COPY.bullets.map((b) => (
-          <li key={b}>{b}</li>
+          <li key={b}><ConsentBulletText text={b} /></li>
         ))}
       </ul>
       <button

@@ -1544,7 +1544,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/elijahbonds/Developer/FEL-swarm/mode-lanes/wt-mirror/FEL-full-app/public/_prisma/client",
+      "value": "public/_prisma/client",
       "fromEnvVar": null
     },
     "config": {
@@ -1562,7 +1562,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/elijahbonds/Developer/FEL-swarm/mode-lanes/wt-mirror/FEL-full-app/public/_prisma/schema.prisma",
+    "sourceFilePath": "public/_prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

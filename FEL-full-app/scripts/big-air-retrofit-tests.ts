@@ -12,7 +12,7 @@
  *   2. Launch impulse scales with carried run speed (weak run -> weak air).
  *   3. Mid-air trick() starts / plants a time-based spin; hold-through-descent stick() upgrades
  *      a clean landing to STUCK (2x points in the tuned grade table).
- *   4. Exactly attemptsPerRound (3) attempts, then phase Done + finished.
+ *   4. Exactly attemptsPerRound (5) attempts, then phase Done + finished.
  *   5. The component's WIN_SCORE (1000) is reachable with strong stuck runs.
  *
  * Deterministic: fixed 60fps clock, scripted inputs. No RNG, no rendering.
@@ -96,14 +96,14 @@ check('trick() spins over time; hold-to-stick upgrades a clean land to STUCK', (
 });
 
 // ---- 4. Exactly attemptsPerRound attempts, then Done ---------------------
-check('round ends after attemptsPerRound (3) attempts, then finished', () => {
+check('round ends after attemptsPerRound (5) attempts, then finished', () => {
   const c = makeBigAirSession();
-  assert.strictEqual(BIG_AIR_TUNING.attemptsPerRound, 3);
+  assert.strictEqual(BIG_AIR_TUNING.attemptsPerRound, 5);
   for (let i = 0; i < BIG_AIR_TUNING.attemptsPerRound; i++) {
     playAttempt(c, 1, false);
     stepUntilLeaves(c, 'Land'); // wait out the land beat -> next Run or Done
   }
-  assert.strictEqual(c.state.attempt, 3, 'exactly three scored attempts');
+  assert.strictEqual(c.state.attempt, 5, 'exactly five scored attempts');
   assert.strictEqual(c.state.phase, 'Done', 'round closed');
   assert.strictEqual(c.state.finished, true, 'finished flag set');
 });

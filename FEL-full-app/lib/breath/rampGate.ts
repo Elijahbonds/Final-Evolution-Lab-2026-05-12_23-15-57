@@ -57,16 +57,14 @@
 // heart-rate-or-balance medicine is sticky too, although it is a "do you take" question — a change of that medicine is
 // exactly what a sharp breath should wait out (decision #15, stop sooner).
 //
-// THE LIMIT CANNOT BE RESET (MIRROR-COACH P7 FIX, 2026-09-29, review). Both erases delete every BreathLog row
-// (lib/prq-data-rights.ts) and the consent ledger with them, and one intake POST grants consent again — so erase,
-// re-take, dial up was a third use in three days. RAMP_LIMIT.firstUseAfterDays closes it without keeping anything an
-// erase promises to delete: the OLDEST 'health_data' grant FEL still holds (revoked or not) must be at least one full
-// window old. After an erase the ledger starts again, so the first Dial-Up waits out a whole window — by which time
-// every erased use would have rolled out of it anyway, so the limit holds exactly. A withdraw-and-re-grant keeps the
-// old rows, so it waits for nothing. assumption: a brand-new athlete waits the same first week; FEL cannot tell a first
-// opt-in from one after an erase without keeping a trace the erase promised to remove, and an optional sharp breath
-// can wait a week (decision #15). The erase also clears the intake history above; that is the erase right, and the
-// same week's wait applies.
+// THE WEEKLY COUNT, AND THE FIRST WEEK (MIRROR-COACH P7 FIX, 2026-09-29, review; MIRROR-COACH-ERASE, owner 07:53 PT).
+// Both erases delete every BreathLog row (lib/prq-data-rights.ts). They KEEP every HealthConsent row. RAMP_LIMIT
+// .firstUseAfterDays is the first-opt-in week: the OLDEST 'health_data' grant FEL holds (revoked or not) must be at
+// least one full window old (consentOldEnough). Erase does not delete that ledger and does not restart this clock —
+// the owner dropped the post-erase wait ("No wait and fix"). A grant already a full window old stays old enough.
+// A withdraw-and-re-grant keeps the old rows, so it waits for nothing. A brand-new athlete, whose oldest grant is
+// new, still waits the first week. BreathLog deletion can clear the rolling use count; the owner accepted that.
+// The erase also clears the intake history above; that is the erase right.
 //
 // NOT SCORED, NOT PAID, NO STREAK (phase rule (e)). A use is logged only to count it against the limit (BreathLog,
 // lib/breath/rampServer.ts), in the export and both erases (lib/prq-data-rights.ts), and read by nothing that scores,
@@ -98,9 +96,9 @@ export const RAMP_KIND: BreathLogKind = 'ramp';
  *     first was abandoned partway (a use is logged when it STARTS);
  *   · minHoursBetween — assumption: never two in one day, even across two sessions. "2 sessions a week" read
  *     conservatively: two separate days;
- *   · firstUseAfterDays — MIRROR-COACH P7 FIX (2026-09-29): the oldest health-data consent FEL holds must be at least
- *     this many days old, so erasing the log (and the ledger with it) and opting straight back in cannot reset the
- *     count. Equal to windowDays on purpose: every erased use has rolled out of the window by the time this passes.
+ *   · firstUseAfterDays — the oldest health-data consent FEL holds must be at least this many days old before the
+ *     Dial-Up Breath is offered (consentOldEnough). A first opt-in waits this week. Erase keeps the ledger, so it
+ *     does not restart this clock (MIRROR-COACH-ERASE, owner 07:53 PT). Equal to windowDays.
  */
 export const RAMP_LIMIT = { perWindow: 2, windowDays: 7, perSession: 1, minHoursBetween: 24, firstUseAfterDays: 7 } as const;
 

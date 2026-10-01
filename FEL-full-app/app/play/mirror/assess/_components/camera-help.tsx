@@ -75,9 +75,9 @@ export function CameraHelp({ why, onRetry, onBack }: { why: string | null; onRet
         <CameraOff aria-hidden className="h-10 w-10 text-[#FFB020]" />
         <h1 id="camera-card-title" className="mt-3 text-[26px] font-black leading-tight">{k.title}</h1>
         <p className="mt-2 text-[16px] leading-snug text-white/85">{k.reason}</p>
-        <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-[15px] leading-relaxed text-white/80">
+        <ul className={`mt-4 space-y-1.5 text-[15px] leading-relaxed text-white/80 ${k.steps.length > 1 ? 'list-disc ps-[1.25rem]' : 'list-none'}`}>
           {k.steps.map((s) => <li key={s}>{s}</li>)}
-        </ol>
+        </ul>
         <p className="mt-3 text-[15px] font-bold text-white">{k.next}</p>
         <button type="button" data-primary data-retry onClick={onRetry} className="mt-6 w-full rounded-full bg-[#00E5FF] px-6 py-3.5 text-[16px] font-black text-black">
           Try again

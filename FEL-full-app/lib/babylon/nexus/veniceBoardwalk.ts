@@ -195,7 +195,10 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     const R = VENICE_BOARDWALK_ROW.at, sx = R[0] + 10.5, sz = R[2] + VENICE_BOARDWALK_ROW.depth[0] - 0.3;
     post('vb_scoreboard_post_l', sx - 1.9, sz - 0.05, 7.0); post('vb_scoreboard_post_r', sx + 1.9, sz - 0.05, 7.0);
     sign('vb_scoreboard', 4.8, 1.3, [sx, 6.3, sz], Math.PI, flightNight);
-  } else sign('vb_scoreboard', 4.8, 1.3, [7.5, 3.0, SCAN_N - 17.4], Math.PI, flightNight);
+  } else {
+    // HOOPS-TO-75 HP-10: the dunk billboard north of the scan read through every half-court baseline into 1v1/3v3/3PT
+    sign('vb_scoreboard', 4.8, 1.3, [ax + grass + walkW / 2 + 1.5, 3.0, SCAN_MID], -Math.PI / 2, flightNight);
+  }
   const flagTex = signTexture(scene, ['FEL'], { bg: '#B03A2E', fg: '#FFF4E0', accent: '#F2B84B', w: 256, h: 640 });
   for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
   // Pass 7 phase 5 — air: six gulls wheel over the northern water on slow ellipses (billboards on a painted chevron).

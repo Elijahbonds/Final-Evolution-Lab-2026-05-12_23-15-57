@@ -28,6 +28,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { PUBLIC_INTAKE_QUESTIONS, RED_FLAG_COPY, isValidBirthYear } from '@/lib/health/intake';
+import { ConsentBulletText } from '@/components/health/consent-bullet';
 import {
   BROWSER_ONLY_LINE, DECLINED_LINE, DECLINE_LABEL, LOCAL_CLEARED, NOTHING_SAVED_LINE, NOT_KEPT_LINE, clearOnce,
   localIntakeOutcome, localIntakeStart, submitIntakeOnce, type LocalIntakeStatus,
@@ -292,7 +293,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
         <h2 className="text-[20px] font-black leading-tight text-white">{status.consent.title}</h2>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-[13.5px] leading-snug text-white/75">
           {status.consent.bullets.map((b) => (
-            <li key={b}>{b}</li>
+            <li key={b}><ConsentBulletText text={b} /></li>
           ))}
         </ul>
         <button type="button" onClick={() => setStage('question')} className={`${primaryBtn} mt-4`}>

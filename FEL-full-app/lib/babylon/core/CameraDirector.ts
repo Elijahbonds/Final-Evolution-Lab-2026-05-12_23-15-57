@@ -140,6 +140,12 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // the horde brawler when SURROUNDED (karate endless H8): pull back and up so
   // the crowd around you is the shot, then drop back over the shoulder
   crowd: { distance: 5.6, height: 3.0, minHeight: 2.0, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.6 },
+  // COMBAT-AI (2026-09-30): karate-only shoulder/crowd presets — pulled back so
+  // attackers stay in frame without touching the shared overShoulder/crowd used
+  // by Dance and other modes. fight-balance-tests: 7.5 m disc + 4.05 m pullback
+  // still clears the shrine mat's 12 m half-extent.
+  fightShoulder: { distance: 4.0, height: 1.75, minHeight: 1.25, pitchFloorDeg: 2, pitchCapDeg: 11, targetHeight: 1.4, lag: 0.28, lookAhead: 2.4, shoulderOffset: 0.65 },
+  fightCrowd: { distance: 6.4, height: 3.2, minHeight: 2.1, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.7 },
   // DUNK CONTEST cinematic — NOT the live-play camera: lower, closer,
   // slower lag so the flight glides like a highlight reel; tighter pitch
   // cap keeps the rim in frame at apex without a hard tilt.
