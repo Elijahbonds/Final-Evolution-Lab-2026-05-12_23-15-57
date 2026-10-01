@@ -126,7 +126,7 @@ import { readFileSync } from 'node:fs';
 // the origin — for a box that is the corner, not the wall, which is exactly the case the old square-vs-radial note
 // worried about.
 const MODE_CAM: Record<CombatModeId, string> = {
-  karate: 'overShoulder',       // KarateEndlessMode camPreset
+  karate: 'fightShoulder',      // KarateEndlessMode camPreset (COMBAT-AI: not shared overShoulder)
   karate_vs: 'fight',           // KarateVSMode camPreset
   mixedcombat: 'fight',         // MixedCombatMode camPreset
   duel: 'duel',                 // DuelMode camPreset
