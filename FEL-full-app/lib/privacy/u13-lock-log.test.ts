@@ -31,7 +31,7 @@ const EMAIL = 'locked-person@fel.test';
 const THIS_YEAR = new Date().getFullYear();
 const IP = '203.0.113.9';
 const UA = 'AgeScreenTest/1.0';
-// Advanced when MIRROR-COACH P8/P9 lands intentional ServedExercise schema (pending SQL + prisma/schema).
+// Advanced for intentional schema landings (MIRROR-COACH ServedExercise; ECONOMY-CAPS runId/agentRun).
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
 const PARENT = 'b6a0ff793acb9baff0d8e5e78f86196502551343';
