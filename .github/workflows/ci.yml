@@ -28,6 +28,28 @@ jobs:
         working-directory: FEL-full-app
     steps:
       - uses: actions/checkout@v4
+      # MERGE TRAIN (owner, 2026-10-01): a PR against lane/finish-release goes red once it is 24h behind the
+      # lane tip, so a stale branch surfaces before review instead of rotting green. Warning-only on the
+      # event where the base SHA is unavailable. Needs history to measure 'behind'.
+      - name: Staleness — a PR 24h behind the lane tip flags red
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin lane/finish-release "$GITHUB_BASE_REF" 2>/dev/null || true
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "::warning::base SHA not fetched; staleness not measured"
+            exit 0
+          fi
+          BEHIND=$(git rev-list --count HEAD..origin/lane/finish-release 2>/dev/null || echo 0)
+          TIP_TS=$(git log -1 --format=%ct origin/lane/finish-release 2>/dev/null || echo 0)
+          BASE_TS=$(git log -1 --format=%ct "$BASE" 2>/dev/null || echo "$TIP_TS")
+          AGE_H=$(( (TIP_TS - BASE_TS) / 3600 ))
+          echo "behind=$BEHIND base_age_hours=$AGE_H"
+          echo "behind=$BEHIND base_age_hours=$AGE_H" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BEHIND" -gt 0 ] && [ "$AGE_H" -ge 24 ]; then
+            echo "::error::This branch is $BEHIND commit(s) behind lane/finish-release and its base is ${AGE_H}h old (≥24h). Merge origin/lane/finish-release (or rebase if never pushed) to pick up the lane before review."
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
