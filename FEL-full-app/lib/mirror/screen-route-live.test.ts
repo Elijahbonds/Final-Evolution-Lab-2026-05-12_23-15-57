@@ -205,7 +205,7 @@ describe('PATCH + the coach\'s draft on the live screen', () => {
     const cam = Object.fromEntries(d.review.camera.map((r: Row) => [`${r.checkId}${r.side ? `:${r.side}` : ''}`, r.status]));
     expect(cam).toMatchObject({ heelLine: 'pass', 'kneeWindow:left': 'flag', hipLevel: 'pass', shoulderLevel: 'pass', headFloat: 'retest' });
     const knee = d.review.camera.find((r: Row) => r.checkId === 'kneeWindow');
-    expect(knee.fix).toMatch(/^Hip external-rotation and glute-medius work/);
+    expect(knee.fix).toMatch(/^Hip external-rotation work and banded side steps/);   // P9 fix: no muscle named (cueLint rule 1)
     expect(knee.block).toMatchObject({ title: 'Ask the hips to lead the hinge' });
     expect(d.review.answers.map((a: Row) => a.said)).toEqual([ANSWERS_WITHHELD, ANSWERS_WITHHELD]);
     expect(d.review.coachChecks).toEqual([]);

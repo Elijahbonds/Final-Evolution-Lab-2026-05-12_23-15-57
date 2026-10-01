@@ -64,12 +64,42 @@ function reads(file: string, needles: RegExp): boolean {
   return needles.test(stripComments(fs.readFileSync(path.join(MODES_DIR, file), 'utf8')));
 }
 
+/** Every `modeId:` a file names, registered or not — for the message below. */
+function allModeIds(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const f of fs.readdirSync(MODES_DIR)) {
+    if (!f.endsWith('.ts') || f.includes('.test.')) continue;
+    const src = stripComments(fs.readFileSync(path.join(MODES_DIR, f), 'utf8'));
+    for (const m of src.matchAll(/modeId:\s*'([^']+)'/g)) out.set(m[1], f);
+  }
+  return out;
+}
+const everyId = allModeIds();
+
+/**
+ * A modeId on the splash that `byId` missed. modesById only registers the id whose NEXT property (comments
+ * stripped) is mood or camPreset — so a real mode goes invisible the moment anything (a flag like
+ * `hideRingInPlay:`, a `body:` line, a comment block wider than the 120-char window) sits between `modeId:`
+ * and that property. That is exactly how velocitykart and aeroaces failed CI in #71 while plainly existing.
+ * The message must name the trap, or the next person fixes the mode and not the ordering.
+ */
+function undeclared(id: string): string {
+  const file = everyId.get(id);
+  if (file) {
+    return `${id}: ${file} declares this modeId, but not as the mode definition the splash reads — ` +
+      `modesById() only sees a modeId whose next property (comments stripped) is mood or camPreset. ` +
+      `Move mood/camPreset to sit directly after modeId (see GC-7's hideRingInPlay fix in #82), ` +
+      `or teach modesById about the new property.`;
+  }
+  return `${id}: no mode file declares this modeId`;
+}
+
 describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
   it('every mode in STYLE_MODES reads the style pick', () => {
     const offenders: string[] = [];
     for (const id of setLiteral(splash, 'STYLE_MODES')) {
       const file = byId.get(id);
-      if (!file) { offenders.push(`${id}: no mode file declares this modeId`); continue; }
+      if (!file) { offenders.push(undeclared(id)); continue; }
       if (!reads(file, /readBlend|hordeStyle|styleAttacks|styleMoveset|readLoadout/)) {
         offenders.push(`${id} (${file}): the splash offers a FIGHTING STYLE picker, nothing reads it`);
       }
@@ -81,7 +111,7 @@ describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
     const offenders: string[] = [];
     for (const id of setLiteral(splash, 'WEAPON_MODES')) {
       const file = byId.get(id);
-      if (!file) { offenders.push(`${id}: no mode file declares this modeId`); continue; }
+      if (!file) { offenders.push(undeclared(id)); continue; }
       if (!reads(file, /readWeapon|readLoadout/)) {
         offenders.push(`${id} (${file}): the splash offers a WEAPON picker, nothing reads it`);
       }
@@ -96,7 +126,7 @@ describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
     const offenders: string[] = [];
     for (const id of setLiteral(splash, 'TIER_MODES')) {
       const file = byId.get(id);
-      if (!file) { offenders.push(`${id}: no mode file declares this modeId`); continue; }
+      if (!file) { offenders.push(undeclared(id)); continue; }
       if (!reads(file, /readProfile|readTier|profileFor/)) {
         offenders.push(`${id} (${file}): the splash offers a DIFFICULTY picker, nothing reads it`);
       }
@@ -109,7 +139,7 @@ describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
     const listed = setLiteral(splash, 'WEATHER_MODES');
     for (const id of listed) {
       const file = byId.get(id);
-      if (!file) { offenders.push(`${id}: no mode file declares this modeId`); continue; }
+      if (!file) { offenders.push(undeclared(id)); continue; }
       if (!reads(file, /readWeather/)) offenders.push(`${id} (${file}): the splash offers a WEATHER chip, nothing reads it`);
     }
     expect(offenders).toEqual([]);
@@ -188,5 +218,14 @@ describe('the picker lists are honest about themselves', () => {
     expect(splash).toMatch(/readySchools\(\)\.map/);
     expect(ARSENAL.length).toBeGreaterThan(1);
     expect(SCHOOLS.length).toBeGreaterThan(1);
+  });
+
+  it('undeclared() names the next-property trap, not just the missing mode (the #71 lesson)', () => {
+    // velocitykart is declared (in VelocityKartMode.ts) and registered today — but if it ever goes
+    // invisible to modesById again (a flag inserted before mood, a widened comment), the failure must say
+    // HOW to fix it, not "no mode declares this". Pin both messages.
+    expect(undeclared('velocitykart')).toContain('VelocityKartMode.ts');
+    expect(undeclared('velocitykart')).toContain('mood or camPreset');
+    expect(undeclared('no-such-mode-xyz')).toBe('no-such-mode-xyz: no mode file declares this modeId');
   });
 });

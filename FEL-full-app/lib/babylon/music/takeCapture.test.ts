@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CAPTURE_CHUNK_FRAMES, PREROLL_SEC, barSec, boothLatency, clampRegion, engineTakeList, firstTransient, gatePcm, gatedBuffer,
-  levels, meterFill, muteRecordingSlot, pickTake, pickedTakeIds, scriptProcessorBlockFrame, takeGroups, takeSilence, takeSlot,
+  levels, meterFill, meterFrame, meterLabel, METER_DECAY, muteRecordingSlot, pickTake, pickedTakeIds, scriptProcessorBlockFrame, takeGroups, takeSilence, takeSlot,
   takeStartBar, takeStartFrame, tapeCut, tapeDropBefore, tapeEnd, toDb, wavFromPcm, watchBarLine, type BarClock, type BoothTake, type TapeChunk,
 } from './takeCapture';
 import { migrateProject, newProject, readTakeRegion, type ProjectTake } from './StudioProject';
@@ -412,6 +412,31 @@ describe('storage and meters', () => {
     expect(levels(new Float32Array([0.5, -0.5]))).toEqual({ peak: 0.5, rms: 0.5 });
     expect(toDb(0)).toBe(-90); expect(toDb(1)).toBe(0); expect(toDb(0.5)).toBeCloseTo(-6.02, 2);
     expect(meterFill(0)).toBe(0); expect(meterFill(1)).toBe(1); expect(meterFill(0.001)).toBeCloseTo(0, 6);
+  });
+  // MUSIC-SUITE P10 (2026-09-29): P4's frame — the bar at 89 % beside "−90 dB" (the number was the newest raw peak while
+  // the bar eased down). The number now reads the bar's own level, every frame.
+  it('P10: the number reads the level the bar shows — a loud hit then silence eases down together, never "89 % / −90 dB"', () => {
+    let fill = 0;
+    const frames: { fill: number; label: string }[] = [];
+    for (const peak of [0.9, 0, 0, 0, 0, 0]) { const m = meterFrame(fill, peak); fill = m.fill; frames.push(m); }
+    expect(frames[0].fill).toBeCloseTo(meterFill(0.9), 9);
+    expect(frames[1].fill).toBeCloseTo(frames[0].fill * METER_DECAY, 9);       // eased, not dropped
+    for (const f of frames) {
+      if (f.fill === 0) { expect(f.label).toBe('−∞ dB'); continue; }
+      const shownDb = Number(f.label.replace('−', '-').replace(' dB', ''));
+      expect(Math.abs(shownDb - (f.fill * 60 - 60))).toBeLessThanOrEqual(0.5);    // the number IS the bar (rounded)
+    }
+    expect(frames[1].label).not.toBe('−90 dB');
+    // the old pair on frame 2: the bar near 89 % and the raw peak's number
+    expect(Math.round(frames[1].fill * 100)).toBeGreaterThan(80);
+    expect(`${toDb(0).toFixed(0)} dB`).toBe('-90 dB');
+  });
+  it('P10: fast up; a bar eased under 1 % is empty (−∞), full scale reads 0 dB; junk in is an empty bar', () => {
+    expect(meterFrame(0.2, 1)).toEqual({ fill: 1, label: '0 dB' });
+    expect(meterFrame(0.0105, 0)).toEqual({ fill: 0, label: '−∞ dB' });          // 0.0105 × 0.9 < 1 %
+    expect(meterFrame(Number.NaN, 0)).toEqual({ fill: 0, label: '−∞ dB' });
+    expect(meterLabel(0.5)).toBe('−30 dB');
+    expect(meterLabel(0)).toBe('−∞ dB');
   });
 });
 

@@ -400,8 +400,8 @@ describe('the ceiling table', () => {
 
   it('sets the rules ceilings at what the rules can award', () => {
     const want: Record<string, number> = {
-      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 4800, golf: 1310, baseball: 4422,
-      soccer: 5560, tennis: 4, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
+      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 8000, golf: 2250, baseball: 6432,
+      soccer: 6660, tennis: 6, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
       dance: 79680, training: 9400, music: 378_300,
     };
     for (const [mode, max] of Object.entries(want)) {

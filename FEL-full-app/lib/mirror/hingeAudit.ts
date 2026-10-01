@@ -283,23 +283,26 @@ export function auditHinge(
 // External-focus, action cues (cue-engine.ts's voice): the action, never a muscle, a cause, or a claim about injury
 // or risk. `escalate` if the same check still reads 'fault' next time; `regress` is the simpler version to fall back
 // to (lib/mirror/pushupAudit.ts's own three-level shape, and patterns.ts's CueRule, which this file registers into).
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const HINGE_CUES: readonly CueRule[] = [
   {
     faultId: 'hingeRatio',
-    cue: 'More hips back — think of closing a door behind you with your hips. Keep the knee soft, not bent.',
-    escalate: 'Still knee-led. Push the hips straight back before the knee is allowed to bend at all.',
-    regress: 'Hands on a wall or a doorframe. Hinge to where you first feel your hamstrings, no lower — the range earns itself.',
+    cue: 'Close a door behind you with your hips — more hips back, and the knee stays soft.',
+    escalate: 'Still squatting it. Send the hips back to the wall behind you before the knee bends at all.',
+    regress: 'Hands on a wall or a doorframe. Hinge back only until the stretch stops you, no lower — the range earns itself.',
   },
   {
     faultId: 'dowelLine',
-    cue: 'Keep one long line from your ears to your hips — chin tucked easy, chest proud.',
-    escalate: 'That line is still breaking. Set your head first, then hinge without losing it.',
+    cue: 'Hinge as if a broomstick lies along your back — it stays touching your head and your hips.',
+    escalate: 'That line is still breaking. Eyes to a spot on the floor a few feet ahead, then hinge without losing the broomstick.',
     regress: 'Pick a spot on the floor a few feet ahead and hold your eyes there the whole rep — the line follows the eyes.',
   },
   {
     faultId: 'shinAngle',
-    cue: 'Keep your shin still — let your hips travel, not your knee.',
-    escalate: 'The knee is still drifting forward. Weight back toward your heels as the hips travel back.',
+    cue: 'Send the hips back toward the wall behind you — the shin stays still, the knee stays put.',
+    escalate: 'Still drifting forward. Sit back toward your heels as the hips travel back to the wall.',
     regress: 'Stand an inch off a wall behind you. If your knee taps it, the shin travelled too far — reset and go slower.',
   },
 ];

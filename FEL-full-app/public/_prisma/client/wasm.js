@@ -177,6 +177,7 @@ exports.Prisma.GameSessionScalarFieldEnum = {
   dodges: 'dodges',
   combos: 'combos',
   maxCombo: 'maxCombo',
+  runId: 'runId',
   createdAt: 'createdAt'
 };
 
@@ -187,6 +188,7 @@ exports.Prisma.SessionRunScalarFieldEnum = {
   status: 'status',
   payoutEligible: 'payoutEligible',
   ineligibleReason: 'ineligibleReason',
+  agentRun: 'agentRun',
   startedAt: 'startedAt',
   expiresAt: 'expiresAt',
   finishedAt: 'finishedAt',
@@ -1053,6 +1055,7 @@ exports.Prisma.ExerciseLogScalarFieldEnum = {
   coachComment: 'coachComment',
   coachCommentAt: 'coachCommentAt',
   completedAt: 'completedAt',
+  servedExerciseId: 'servedExerciseId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

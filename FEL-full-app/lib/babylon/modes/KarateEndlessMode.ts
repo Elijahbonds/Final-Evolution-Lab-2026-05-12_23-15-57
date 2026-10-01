@@ -3,7 +3,7 @@
 // against escalating waves of identical, suited pursuers in a stylized
 // digital arena. Four concrete systems, all new:
 //   1. THIRD-PERSON OVER-THE-SHOULDER CAMERA — CameraDirector's new
-//      'overShoulder' preset (M50), locked behind your facing direction
+//      'fightShoulder' preset (COMBAT-AI), locked behind your facing direction
 //      rather than the nearest-enemy midpoint, the way action games frame
 //      combat instead of a fighting-game side-view.
 //   2. CO-OP-READY ALLY — a second fighter built on PlayerSlot (M48): today
@@ -131,7 +131,8 @@ import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   
  * The camera's bounds come from the ground mesh, so a play area the same size as
  * the mat leaves it nowhere to stand: at the old ±8 on a 16x16 mat the camera was
  * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
- * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the overShoulder rig.
+ * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the fightShoulder rig at
+ * its 3.1m predecessor; at 4.0m the mat's 12m half-extent still clears (11.6m).
  */
 /**
  * The fighter is held inside a DISC of this radius, not a square of this half-
@@ -480,25 +481,35 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     publishHp(ctx, true);
   }
 
-  async function spawnEnemy(ctx: ModeContext, angle: number, i: number): Promise<void> {
+  async function spawnEnemy(ctx: ModeContext, angle: number, i: number, lightFx = false): Promise<void> {
     const sr = spawnRadius(arena);
     const pos = new Vector3(Math.sin(angle) * sr, 0, Math.cos(angle) * sr); arenaClamp(pos, arena, 0.6);
+    const skinTints = ['#a67c5b', '#8d6e52', '#c49a6c', '#7a5c3e', '#b88968'];
+    const kitTint = CFG.enemyTints[(wave * 3 + i) % CFG.enemyTints.length];
+    const spawnName = `horde_w${wave}_e${i}`;
     const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
       position: pos, yawRad: Math.atan2(-pos.x, -pos.z),
-      tint: i % 2 ? '#a67c5b' : '#8d6e52',   // EYE SORES (2026-09-17): the old near-black tint blackened the SKIN — brown heads and leopard tops floated over invisible bodies; a natural tint (a roster seed), the suit is the KIT (tintGarmentSlot below)
-      scale: 0.95 + ((wave * 7 + i * 13) % 12) / 100,
+      tint: skinTints[(wave + i) % skinTints.length],
+      name: spawnName,
+      accessories: true,
+      scale: 0.92 + ((wave * 7 + i * 13) % 17) / 100,
       startClip: STANCE,
+      modeId: 'karate',
+      role: 'opponent',
     });
-    tintGarmentSlot(char, SLOT_KEYS.jersey, i % 2 ? '#2b3550' : '#1f2735'); if ((SLOT_KEYS as Record<string, readonly string[]>).shorts) tintGarmentSlot(char, (SLOT_KEYS as Record<string, readonly string[]>).shorts, '#161b24');   // the agents' dark suit: navy / charcoal kit
+    tintGarmentSlot(char, SLOT_KEYS.jersey, kitTint);
+    if ((SLOT_KEYS as Record<string, readonly string[]>).shorts) tintGarmentSlot(char, (SLOT_KEYS as Record<string, readonly string[]>).shorts, '#161b24');
     neverBindPose(char.animator, STANCE);
     installSafePlay(char.animator, 'agent');
     ctx.groundLock?.track(char.root, char.skeleton);
-    // materialize, don't just appear
+    // materialize, don't just appear — skip heavy VFX on batched spawns (WA-11: the 2 s freeze was N concurrent GLB loads + bursts)
     const targetScale = char.root.scaling.clone();
     char.root.scaling.scaleInPlace(0.001);
-    EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
-    SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
-    tween(0.32, (k) => { char.root.scaling = Vector3.Lerp(new Vector3(0.001, 0.001, 0.001), targetScale, k); });
+    if (!lightFx) {
+      EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
+      SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
+    }
+    tween(lightFx ? 0.18 : 0.32, (k) => { char.root.scaling = Vector3.Lerp(new Vector3(0.001, 0.001, 0.001), targetScale, k); });
     const archetype = (['striker', 'rusher', 'flanker'] as const)[i % 3];
     const preset = STEERING_PRESETS[archetype];
     // ONE owner of this body's clips: the steering reports (idle / move / down), the owner shows it.
@@ -526,9 +537,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const spec = waveSpec(wave, ctx.scene.metadata?.felTier === 'mobile' ? 12 : 20);
     const count = spec.count;
     void spawnRing(wave, count);
-    const proms: Promise<void>[] = [];
-    for (let i = 0; i < count; i++) proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i));
-    await Promise.all(proms);
+    // WA-11: stagger spawns — N concurrent GLB instantiates + VFX in one frame caused a ~2 s hitch.
+    const BATCH = ctx.scene.metadata?.felTier === 'mobile' ? 3 : 4;
+    for (let b = 0; b < count; b += BATCH) {
+      const proms: Promise<void>[] = [];
+      for (let i = b; i < Math.min(b + BATCH, count); i++) {
+        proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i, i > 0));
+      }
+      await Promise.all(proms);
+      if (b + BATCH < count) await new Promise<void>((r) => setTimeout(r, 48));
+    }
     ctx.setHud({ wave, enemies: count, chi, banner: `WAVE ${wave}` });
     setTimeout(() => { if (!shopOpen) ctx.setHud({ banner: '' }); }, 900);
   }
@@ -1536,7 +1554,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'karate', mood: 'dojoWarm', camPreset: 'overShoulder',
+    modeId: 'karate', mood: 'dojoWarm', camPreset: 'fightShoulder',
     // MOVEMENT PLAY P7: the body plays The Hundred only behind its flag (read at mount — the dev probe's ?bodyfight=karate)
     get body() { return bodyFightOn('karate') ? { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES } : undefined; },
     get onBody() { return bodyFightOn('karate') ? onBodyEvent : undefined; },
@@ -1878,7 +1896,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // transition only — setPreset re-derives the venue bounds)
       const surroundedNow = surroundedCount(player.root.position,
         enemies.map((e) => ({ id: 'e', pos: e.mob.char.root.position, hp: e.hp, airborneSec: 0 }))) >= 3;
-      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'crowd' : 'overShoulder'); }
+      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'fightCrowd' : 'fightShoulder'); }
       ctx.camDirector.look(lookX, lookY, dtReal);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
       animate(mySpeed01, Math.min(1, pVel.length() / 2.6));

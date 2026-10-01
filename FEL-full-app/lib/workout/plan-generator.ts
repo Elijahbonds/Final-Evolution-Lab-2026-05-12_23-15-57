@@ -25,6 +25,11 @@
  * anything in the WEEK. Measured: in all 36 of those weeks the power pool's other two exercises (Trap-Bar Jump and
  * Approach Bound) are both already in the week — the rotation puts each power exercise on one of the three days — so
  * the same pool never has an option left, and every swap falls through to NO_FLIGHT_FALLBACK (depthDropSwap).
+ *
+ * MIRROR-COACH P8 (2026-09-29): /workout sells again, and NOTHING it sells comes from here. A new plan is a FEL template
+ * matched to the buyer's answers, behind the protocol gate (lib/workout/relaunch.ts, relaunchServer.ts). This generator
+ * stays for the plans already bought: the revision of a stored plan (plan-revision.ts) and its backfill read its pools
+ * and its swap, and scripts/m17-m21-tests.ts pins its shape. No route calls generatePlan.
  */
 
 import type { Pillar, ScreenResult } from './movement-screen';

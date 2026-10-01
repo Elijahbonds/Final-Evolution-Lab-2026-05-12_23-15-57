@@ -24,7 +24,8 @@ import { Shaker, InputBuffer, impact as feelImpact, timeScale } from './gameFeel
 import { MomentumBus } from './MomentumBus';
 import { crowdLevel, tierSting, tierImpact } from './MomentumFx';
 import {
-  kickImpactFrame, decayImpactFrame, impactGrade, IMPACT_FRAME_IDLE,
+  kickImpactFrame, decayImpactFrame, IMPACT_FRAME_IDLE,
+  speedVignetteLevel, composeFrameGrade, SPEED_VIGNETTE_REDUCED_CAP,
   type ImpactFrameState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
@@ -36,7 +37,7 @@ import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
-import { applyCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
+import { applyCanvasFit, watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
@@ -47,6 +48,7 @@ import { makeAnimProbe } from '../anim/animProbe';   // SHARED-ANIM-BUS: the pro
 import type { PrqGrade } from '../../prq';
 type PrqBand = PrqGrade['key'];
 import { emit as emitCreator } from '@/lib/creator/CreatorRecord';   // the ONE canonical record
+import { devOrAgentHooks } from '@/lib/agentRunHooks';
 import { isWakeInput, WakeLatch, PauseLedger } from './StartWake';   // SHARED-START-UNSTICK: any press/push/pull → playing
 // MOVEMENT PLAY P3 (2026-09-24): the body seam — the mode's profile, the floor that presses it, the session that starts and
 // pauses the game on the body (all built by bodySeamFor), and the one store the UI reads (plan §4.4).
@@ -67,6 +69,13 @@ export interface ModeFeel {
   buffer: InputBuffer;
   /** hit-stop + shake + haptic on impact (strength 0..1). */
   impact(strength: number): void;
+  /**
+   * SPEED-VIGNETTE (racing HUD pass): a speed mode reports its fraction of top speed (0..1) here and the
+   * frame closes in above the window — the perimeter speed vignette the racing brief asked for. Opt-in:
+   * a mode that never calls it gets the venue's resting frame exactly as before. Composed with the impact
+   * pulse by the harness; the mode never touches the pipeline.
+   */
+  speedVignette01(fraction: number): void;
 }
 
 export type ModePhase = 'loading' | 'ready' | 'countdown' | 'playing' | 'paused' | 'ended' | 'error';
@@ -177,6 +186,8 @@ export interface ModeDefinition {
    * flag it would overwrite dunk's crowd every single frame.
    */
   ownsCrowd?: boolean;
+  /** GC-7: hide the harness player ring and glyph during play — off by default so stamina arc stays on other modes. */
+  hideRingInPlay?: boolean;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -321,7 +332,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // MECHANICS PASS (2026-09-15): CAUSE → EFFECT, measured. Under `?agent=1` only, every press the mode receives and
   // every answer a player can perceive (HUD news, a juice beat, an impact, a sound, the hero's clip changing) goes on
   // one timeline, published as `window.__FEL_QA__` for the mechanics probe. See QaTrace.ts. Off in play: `qa` is null.
-  const qa = agentEnabled() ? new QaTrace() : null;
+  const qa = devOrAgentHooks() ? new QaTrace() : null;
   const qaRawHud: Record<string, unknown> = {};
   /** What each captioned HUD key last said, so one banner is announced once and not once a frame. */
   const saidHud: Record<string, string> = {};
@@ -361,6 +372,26 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       /** Every HUD key's latest value, the continuous ones too (a meter, a phase) — what an INTENT driver plays from. */
       rawHud: () => ({ ...qaRawHud }),
       result: () => qaResult,
+      /** RUN-CAPTURE: this session as a saveable artifact (modeId + timeline + result). */
+      transcript: () => qa.transcript(def.modeId, qaResult),
+      /** RUN-CAPTURE save loop: download the transcript as a JSON file, so a headed run's evidence lands in
+       *  a file without console copy-paste. QA-only (the handle exists at all only under ?agent=1). */
+      saveTranscript: (label?: string) => {
+        const t = qa.transcript(def.modeId, qaResult);
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const name = `${def.modeId}${label ? `-${label.replace(/[^\w-]+/g, '-')}` : ''}-${stamp}.json`;
+        const blob = new Blob([JSON.stringify(t, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        console.info(`[FEL-QA] transcript saved: ${name} (${t.events.length} events)`);
+        return name;
+      },
       reset: () => qa.reset(),
       /** The live scene for an INTENT driver (the ball in flight, a pitch on its way): QA sessions only (`?agent=1`). */
       scene: () => (scene.isDisposed ? null : scene),
@@ -388,11 +419,19 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   };
   let frame: ImpactFrameState = IMPACT_FRAME_IDLE;
   let framePainted = false;
+  // SPEED-VIGNETTE: the level the mode reports this frame (0 = off). The harness, not the mode, owns the
+  // pipeline, so the mode reports and the render loop composes — an impact mid-race still wins the frame.
+  let speedVignetteRaw = 0;
   const feel: ModeFeel = {
     shaker, buffer,
     // HOTFIX (2026-09-24): under reduced motion the frame does not pulse (a whole-frame exposure dip is a flash too); the
     // hit-stop, the sound and the pad buzz inside feelImpact are unchanged, and the Shaker holds still on its own.
     impact: (s: number) => { qa?.impact(); feelImpact(shaker, s); if (motionPolicy().flash) frame = kickImpactFrame(frame, s); },
+    // The vignette is a motion cousin: under reduced motion its close is capped, not removed (a driver still
+    // reads "I am at the edge"), and never above the cap even at full speed.
+    speedVignette01: (f: number) => {
+      speedVignetteRaw = Number.isFinite(f) ? Math.max(0, Math.min(1, f)) : 0;
+    },
   };
   // MOMENTUM IS HEARD, NOT DISPLAYED. `momentum:` in setHud only draws in hosts that happen to render it,
   // and there are twenty-one separate host components. The crowd bed and the tier sting need no host at
@@ -479,9 +518,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
   // four live chips, and its reload timed out. Production now publishes the INPUT seam alone: no scene, no hero,
   // nothing that retains a disposed mount. The full handle stays development-only.
-  const probeHandle = process.env.NODE_ENV === 'development' ? devHandle : { modeId: def.modeId, input, anim: animProbe };
+  const probeHandle = devOrAgentHooks() ? devHandle : undefined;
   const devWindow = window as unknown as { __FEL_DEV__?: unknown };
-  devWindow.__FEL_DEV__ = probeHandle;
+  if (probeHandle) devWindow.__FEL_DEV__ = probeHandle;
+  else delete devWindow.__FEL_DEV__;
   setDiagMode(def.modeId);
   // a lost WebGL context is the one failure the player cannot recover from by playing on
   engine.onContextLostObservable.add(() => {
@@ -761,10 +801,12 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     const hit = scene.pickWithRay(new Ray(new Vector3(at.x, at.y + 0.3, at.z), Vector3.Down(), 6), (m) => m.isEnabled() && m.isVisible && m.getTotalVertices() > 0 && !m.isDescendantOf(root) && !/^player_/.test(m.name));   // NOT isPickable: the kart's road is unpickable and sits above the pickable venue ground
     const y = hit?.hit && hit.distance > 0.4 ? -(hit.distance - 0.3) : at.y > 0.15 && at.y < 0.9 ? -at.y : 0;
     ring = mountPlayerRing(scene, root, { color: card?.accent ?? '#22d3ee', icon: readPlayerIcon(), harness: true, radius, y });
+    ring.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
   };
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     ringFollow();
+    ring?.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
     // MOVEMENT PLAY P3 (2026-09-24): the body's clock between camera frames, in every phase — the lost deadline, the
     // stalled-camera watchdog, a release when the game leaves 'playing', and body presses whose release is due when the
     // next frame is late. Before update(), so a pause lands before the mode runs another frame.
@@ -790,20 +832,27 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // The impact pulse runs on REAL dt and in every phase, so a mode that ends mid-pulse still hands the
     // frame back at its resting grade instead of leaving the end card dimmed. `framePainted` means the
     // restore is written exactly once rather than every frame for the rest of the session.
-    if (frame.level > 0 || framePainted) {
+    //
+    // SPEED-VIGNETTE shares the write: the frame moves when the impact pulses OR the mode reports speed.
+    // `speedLevel` is the reported fraction run through the owner-approved window (≥0.85 of top speed), capped
+    // under reduced motion. When neither is active the resting grade is written once (framePainted) and left.
+    const speedLevel = speedVignetteLevel(speedVignetteRaw) * (motionPolicy().flash ? 1 : SPEED_VIGNETTE_REDUCED_CAP);
+    if (frame.level > 0 || framePainted || speedLevel > 0) {
       frame = decayImpactFrame(frame, dt);
-      const g = impactGrade(frame.level, restGrade);
+      const g = composeFrameGrade(restGrade, frame.level, speedLevel);
       lights.pipeline.imageProcessing.vignetteWeight = g.vignette;
       lights.pipeline.imageProcessing.exposure = g.exposure;
       framePainted = frame.level > 0;
     }
     scene.render();
   });
-  const onResize = () => { applyCanvasFit(engine, opts.canvas); };   // M95: re-cap on rotate/resize (applyCanvasFit calls engine.resize)
-  window.addEventListener('resize', onResize);
+  // M95 re-cap on every fold/rotate signal (FOLDABLE-SCREEN): resize, orientationchange, and the
+  // visualViewport resize a cover↔main swap fires first. The mode never sees these — the engine re-fits
+  // in place, nothing unmounts, no state is lost.
+  const unwatchFit = watchCanvasFit(engine, opts.canvas);
 
   return () => {
-    window.removeEventListener('resize', onResize);
+    unwatchFit();
     agentBridge()?.detach();   // M69
     renderWatchdog?.disarm();
     frameGuard?.stop();

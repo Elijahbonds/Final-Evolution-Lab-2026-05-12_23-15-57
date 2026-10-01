@@ -174,25 +174,28 @@ model PlayerProfile {
 }
 
 model GameSession {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   mode          String
   score         Int
-  opponentScore Int      @default(0)
-  won           Boolean  @default(false)
-  xp            Int      @default(0)
-  shards        Int      @default(0)
-  prqDelta      Float    @default(0)
-  credits       Int      @default(0)
-  duration      Int      @default(0)
+  opponentScore Int         @default(0)
+  won           Boolean     @default(false)
+  xp            Int         @default(0)
+  shards        Int         @default(0)
+  prqDelta      Float       @default(0)
+  credits       Int         @default(0)
+  duration      Int         @default(0)
   // Standardized fun-loop tallies (M6 game parity). All defaulted = backward-compatible.
-  hits          Int      @default(0)
-  misses        Int      @default(0)
-  dodges        Int      @default(0)
-  combos        Int      @default(0)
-  maxCombo      Int      @default(0)
-  createdAt     DateTime @default(now())
+  hits          Int         @default(0)
+  misses        Int         @default(0)
+  dodges        Int         @default(0)
+  combos        Int         @default(0)
+  maxCombo      Int         @default(0)
+  // ECONOMY-CAPS C5: the server-issued SessionRun id — one GameSession row per run (NULL allowed on legacy rows).
+  runId         String?     @unique
+  run           SessionRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
 
   @@index([userId, createdAt])
 }
@@ -212,6 +215,7 @@ model SessionRun {
   status           String    @default("open")
   payoutEligible   Boolean
   ineligibleReason String?
+  agentRun         Boolean   @default(false)
   startedAt        DateTime  @default(now())
   expiresAt        DateTime
   finishedAt       DateTime?
@@ -221,7 +225,8 @@ model SessionRun {
   sessionId        String?
   result           Json?
 
-  grants SessionGrant[]
+  grants      SessionGrant[]
+  gameSession GameSession?
 
   @@index([userId, status])
   @@index([expiresAt])
@@ -1753,7 +1758,12 @@ model ExerciseLog {
   coachComment   String? // lane 1 C3: the coach's review of this log
   coachCommentAt DateTime?
 
-  completedAt DateTime?
+  completedAt      DateTime?
+  // MIRROR-COACH P8 FIX (2026-09-30): what the athlete did on a slot the protocol gate swapped for its ladder's easier
+  // step — that step's ProgramExercise id (lib/coach/todayServer.ts servedOnSlots, server-checked). null = done as
+  // written, or a slot the gate never decides. The coach's inbox names it ("Did X in place of Y"), so a logged easier
+  // step is never read as the jump. No relation (the ladder links are bare ids too). Additive, nullable.
+  servedExerciseId String?
 
   setLogs SetLog[] // MIRROR-COACH P2: per-set rows; the fields above stay as the per-exercise summary
 

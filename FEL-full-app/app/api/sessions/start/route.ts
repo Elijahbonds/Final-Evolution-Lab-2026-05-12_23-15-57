@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isCatalogueMode } from '@/lib/session-payout';
-import { decideRunEligibility } from '@/lib/sessions/runEligibility';
+import { decideRunEligibility, isAgentRunRequest } from '@/lib/sessions/runEligibility';
+import { ruleFor } from '@/lib/sessions/modeScoreRules';
 import { startRun } from '@/lib/sessions/sessionRuns';
 
 export const dynamic = 'force-dynamic';
@@ -36,8 +37,13 @@ export async function POST(req: Request) {
 
     // the account as the database has it: role is written by no API route (the server-side test allowlist)
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true } });
-    const eligibility = decideRunEligibility({ url: req.url, headers: req.headers, body, user });
-    const run = await startRun(prisma, { userId, mode, eligibility });
+    const agentRun = isAgentRunRequest({ url: req.url, headers: req.headers });
+    let eligibility = decideRunEligibility({ url: req.url, headers: req.headers, body, user });
+    // SK-4 / HP-9: a mode with no score rule is unpaid from the start — finish would be NO_RULES anyway.
+    if (eligibility.payoutEligible && !ruleFor(mode)) {
+      eligibility = { payoutEligible: false, reason: 'NO_RULES' as const };
+    }
+    const run = await startRun(prisma, { userId, mode, eligibility, agentRun });
     if (!run.payoutEligible) {
       await recordServerEvent({ name: 'session_run_unpaid', userId, props: { mode: run.modeSlug, reason: run.reason ?? '' } });
     }

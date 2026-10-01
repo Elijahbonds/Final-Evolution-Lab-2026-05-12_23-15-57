@@ -20,7 +20,8 @@
 // WHICH BLOCK, and why — FEL's judgement, read off each check's own FIX line against the block's own movements:
 //   shoulderLevel → rib_thoracic · release  "Open the ribcage": the FIX is "breathing work first, then easy rotation
 //                                            drills to both sides", and the block is a mid-back roll, the side-lying
-//                                            open book (rotation to both sides) and 360° breathing.
+//                                            open book (rotation to both sides) and long-exhale rib resets (named
+//                                            "360° breathing" until MIRROR-COACH P9 put it in the Playbook's words).
 //   headFloat     → rib_thoracic · activate "Ask the mid-back to hold": the FIX is thoracic extension; wall slides,
 //                                            the prone Y-raise and a half-kneeling overhead reach are extension work.
 //   hipLevel      → lumbo_pelvic · activate "Ask the pelvis to stay level": the FIX is single-leg hip work; the block is

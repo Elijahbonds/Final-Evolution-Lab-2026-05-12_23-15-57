@@ -15167,6 +15167,7 @@ export namespace Prisma {
     dodges: number | null
     combos: number | null
     maxCombo: number | null
+    runId: string | null
     createdAt: Date | null
   }
 
@@ -15187,6 +15188,7 @@ export namespace Prisma {
     dodges: number | null
     combos: number | null
     maxCombo: number | null
+    runId: string | null
     createdAt: Date | null
   }
 
@@ -15207,6 +15209,7 @@ export namespace Prisma {
     dodges: number
     combos: number
     maxCombo: number
+    runId: number
     createdAt: number
     _all: number
   }
@@ -15259,6 +15262,7 @@ export namespace Prisma {
     dodges?: true
     combos?: true
     maxCombo?: true
+    runId?: true
     createdAt?: true
   }
 
@@ -15279,6 +15283,7 @@ export namespace Prisma {
     dodges?: true
     combos?: true
     maxCombo?: true
+    runId?: true
     createdAt?: true
   }
 
@@ -15299,6 +15304,7 @@ export namespace Prisma {
     dodges?: true
     combos?: true
     maxCombo?: true
+    runId?: true
     createdAt?: true
     _all?: true
   }
@@ -15406,6 +15412,7 @@ export namespace Prisma {
     dodges: number
     combos: number
     maxCombo: number
+    runId: string | null
     createdAt: Date
     _count: GameSessionCountAggregateOutputType | null
     _avg: GameSessionAvgAggregateOutputType | null
@@ -15445,8 +15452,10 @@ export namespace Prisma {
     dodges?: boolean
     combos?: boolean
     maxCombo?: boolean
+    runId?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | GameSession$runArgs<ExtArgs>
   }, ExtArgs["result"]["gameSession"]>
 
   export type GameSessionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -15466,8 +15475,10 @@ export namespace Prisma {
     dodges?: boolean
     combos?: boolean
     maxCombo?: boolean
+    runId?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | GameSession$runArgs<ExtArgs>
   }, ExtArgs["result"]["gameSession"]>
 
   export type GameSessionSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -15487,8 +15498,10 @@ export namespace Prisma {
     dodges?: boolean
     combos?: boolean
     maxCombo?: boolean
+    runId?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | GameSession$runArgs<ExtArgs>
   }, ExtArgs["result"]["gameSession"]>
 
   export type GameSessionSelectScalar = {
@@ -15508,24 +15521,29 @@ export namespace Prisma {
     dodges?: boolean
     combos?: boolean
     maxCombo?: boolean
+    runId?: boolean
     createdAt?: boolean
   }
 
-  export type GameSessionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "mode" | "score" | "opponentScore" | "won" | "xp" | "shards" | "prqDelta" | "credits" | "duration" | "hits" | "misses" | "dodges" | "combos" | "maxCombo" | "createdAt", ExtArgs["result"]["gameSession"]>
+  export type GameSessionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "mode" | "score" | "opponentScore" | "won" | "xp" | "shards" | "prqDelta" | "credits" | "duration" | "hits" | "misses" | "dodges" | "combos" | "maxCombo" | "runId" | "createdAt", ExtArgs["result"]["gameSession"]>
   export type GameSessionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | GameSession$runArgs<ExtArgs>
   }
   export type GameSessionIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | GameSession$runArgs<ExtArgs>
   }
   export type GameSessionIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
+    run?: boolean | GameSession$runArgs<ExtArgs>
   }
 
   export type $GameSessionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "GameSession"
     objects: {
       user: Prisma.$UserPayload<ExtArgs>
+      run: Prisma.$SessionRunPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -15544,6 +15562,7 @@ export namespace Prisma {
       dodges: number
       combos: number
       maxCombo: number
+      runId: string | null
       createdAt: Date
     }, ExtArgs["result"]["gameSession"]>
     composites: {}
@@ -15940,6 +15959,7 @@ export namespace Prisma {
   export interface Prisma__GameSessionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    run<T extends GameSession$runArgs<ExtArgs> = {}>(args?: Subset<T, GameSession$runArgs<ExtArgs>>): Prisma__SessionRunClient<$Result.GetResult<Prisma.$SessionRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15985,6 +16005,7 @@ export namespace Prisma {
     readonly dodges: FieldRef<"GameSession", 'Int'>
     readonly combos: FieldRef<"GameSession", 'Int'>
     readonly maxCombo: FieldRef<"GameSession", 'Int'>
+    readonly runId: FieldRef<"GameSession", 'String'>
     readonly createdAt: FieldRef<"GameSession", 'DateTime'>
   }
     
@@ -16382,6 +16403,25 @@ export namespace Prisma {
   }
 
   /**
+   * GameSession.run
+   */
+  export type GameSession$runArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SessionRun
+     */
+    select?: SessionRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SessionRun
+     */
+    omit?: SessionRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SessionRunInclude<ExtArgs> | null
+    where?: SessionRunWhereInput
+  }
+
+  /**
    * GameSession without action
    */
   export type GameSessionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -16429,6 +16469,7 @@ export namespace Prisma {
     status: string | null
     payoutEligible: boolean | null
     ineligibleReason: string | null
+    agentRun: boolean | null
     startedAt: Date | null
     expiresAt: Date | null
     finishedAt: Date | null
@@ -16445,6 +16486,7 @@ export namespace Prisma {
     status: string | null
     payoutEligible: boolean | null
     ineligibleReason: string | null
+    agentRun: boolean | null
     startedAt: Date | null
     expiresAt: Date | null
     finishedAt: Date | null
@@ -16461,6 +16503,7 @@ export namespace Prisma {
     status: number
     payoutEligible: number
     ineligibleReason: number
+    agentRun: number
     startedAt: number
     expiresAt: number
     finishedAt: number
@@ -16490,6 +16533,7 @@ export namespace Prisma {
     status?: true
     payoutEligible?: true
     ineligibleReason?: true
+    agentRun?: true
     startedAt?: true
     expiresAt?: true
     finishedAt?: true
@@ -16506,6 +16550,7 @@ export namespace Prisma {
     status?: true
     payoutEligible?: true
     ineligibleReason?: true
+    agentRun?: true
     startedAt?: true
     expiresAt?: true
     finishedAt?: true
@@ -16522,6 +16567,7 @@ export namespace Prisma {
     status?: true
     payoutEligible?: true
     ineligibleReason?: true
+    agentRun?: true
     startedAt?: true
     expiresAt?: true
     finishedAt?: true
@@ -16626,6 +16672,7 @@ export namespace Prisma {
     status: string
     payoutEligible: boolean
     ineligibleReason: string | null
+    agentRun: boolean
     startedAt: Date
     expiresAt: Date
     finishedAt: Date | null
@@ -16662,6 +16709,7 @@ export namespace Prisma {
     status?: boolean
     payoutEligible?: boolean
     ineligibleReason?: boolean
+    agentRun?: boolean
     startedAt?: boolean
     expiresAt?: boolean
     finishedAt?: boolean
@@ -16672,6 +16720,7 @@ export namespace Prisma {
     result?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
     grants?: boolean | SessionRun$grantsArgs<ExtArgs>
+    gameSession?: boolean | SessionRun$gameSessionArgs<ExtArgs>
     _count?: boolean | SessionRunCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["sessionRun"]>
 
@@ -16682,6 +16731,7 @@ export namespace Prisma {
     status?: boolean
     payoutEligible?: boolean
     ineligibleReason?: boolean
+    agentRun?: boolean
     startedAt?: boolean
     expiresAt?: boolean
     finishedAt?: boolean
@@ -16700,6 +16750,7 @@ export namespace Prisma {
     status?: boolean
     payoutEligible?: boolean
     ineligibleReason?: boolean
+    agentRun?: boolean
     startedAt?: boolean
     expiresAt?: boolean
     finishedAt?: boolean
@@ -16718,6 +16769,7 @@ export namespace Prisma {
     status?: boolean
     payoutEligible?: boolean
     ineligibleReason?: boolean
+    agentRun?: boolean
     startedAt?: boolean
     expiresAt?: boolean
     finishedAt?: boolean
@@ -16728,10 +16780,11 @@ export namespace Prisma {
     result?: boolean
   }
 
-  export type SessionRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "mode" | "status" | "payoutEligible" | "ineligibleReason" | "startedAt" | "expiresAt" | "finishedAt" | "score" | "durationMs" | "rejectReason" | "sessionId" | "result", ExtArgs["result"]["sessionRun"]>
+  export type SessionRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "mode" | "status" | "payoutEligible" | "ineligibleReason" | "agentRun" | "startedAt" | "expiresAt" | "finishedAt" | "score" | "durationMs" | "rejectReason" | "sessionId" | "result", ExtArgs["result"]["sessionRun"]>
   export type SessionRunInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     grants?: boolean | SessionRun$grantsArgs<ExtArgs>
+    gameSession?: boolean | SessionRun$gameSessionArgs<ExtArgs>
     _count?: boolean | SessionRunCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type SessionRunIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -16746,6 +16799,7 @@ export namespace Prisma {
     objects: {
       user: Prisma.$UserPayload<ExtArgs>
       grants: Prisma.$SessionGrantPayload<ExtArgs>[]
+      gameSession: Prisma.$GameSessionPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -16754,6 +16808,7 @@ export namespace Prisma {
       status: string
       payoutEligible: boolean
       ineligibleReason: string | null
+      agentRun: boolean
       startedAt: Date
       expiresAt: Date
       finishedAt: Date | null
@@ -17158,6 +17213,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     grants<T extends SessionRun$grantsArgs<ExtArgs> = {}>(args?: Subset<T, SessionRun$grantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    gameSession<T extends SessionRun$gameSessionArgs<ExtArgs> = {}>(args?: Subset<T, SessionRun$gameSessionArgs<ExtArgs>>): Prisma__GameSessionClient<$Result.GetResult<Prisma.$GameSessionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -17193,6 +17249,7 @@ export namespace Prisma {
     readonly status: FieldRef<"SessionRun", 'String'>
     readonly payoutEligible: FieldRef<"SessionRun", 'Boolean'>
     readonly ineligibleReason: FieldRef<"SessionRun", 'String'>
+    readonly agentRun: FieldRef<"SessionRun", 'Boolean'>
     readonly startedAt: FieldRef<"SessionRun", 'DateTime'>
     readonly expiresAt: FieldRef<"SessionRun", 'DateTime'>
     readonly finishedAt: FieldRef<"SessionRun", 'DateTime'>
@@ -17618,6 +17675,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SessionGrantScalarFieldEnum | SessionGrantScalarFieldEnum[]
+  }
+
+  /**
+   * SessionRun.gameSession
+   */
+  export type SessionRun$gameSessionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GameSession
+     */
+    select?: GameSessionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GameSession
+     */
+    omit?: GameSessionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameSessionInclude<ExtArgs> | null
+    where?: GameSessionWhereInput
   }
 
   /**
@@ -97713,6 +97789,7 @@ export namespace Prisma {
     coachComment: string | null
     coachCommentAt: Date | null
     completedAt: Date | null
+    servedExerciseId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -97730,6 +97807,7 @@ export namespace Prisma {
     coachComment: string | null
     coachCommentAt: Date | null
     completedAt: Date | null
+    servedExerciseId: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -97747,6 +97825,7 @@ export namespace Prisma {
     coachComment: number
     coachCommentAt: number
     completedAt: number
+    servedExerciseId: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -97776,6 +97855,7 @@ export namespace Prisma {
     coachComment?: true
     coachCommentAt?: true
     completedAt?: true
+    servedExerciseId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -97793,6 +97873,7 @@ export namespace Prisma {
     coachComment?: true
     coachCommentAt?: true
     completedAt?: true
+    servedExerciseId?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -97810,6 +97891,7 @@ export namespace Prisma {
     coachComment?: true
     coachCommentAt?: true
     completedAt?: true
+    servedExerciseId?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -97914,6 +97996,7 @@ export namespace Prisma {
     coachComment: string | null
     coachCommentAt: Date | null
     completedAt: Date | null
+    servedExerciseId: string | null
     createdAt: Date
     updatedAt: Date
     _count: ExerciseLogCountAggregateOutputType | null
@@ -97950,6 +98033,7 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -97971,6 +98055,7 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -97990,6 +98075,7 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
@@ -98009,11 +98095,12 @@ export namespace Prisma {
     coachComment?: boolean
     coachCommentAt?: boolean
     completedAt?: boolean
+    servedExerciseId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type ExerciseLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "clientSessionId" | "sessionExerciseId" | "actualSets" | "actualReps" | "actualLoad" | "rpe" | "clientNote" | "videoUrl" | "coachComment" | "coachCommentAt" | "completedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["exerciseLog"]>
+  export type ExerciseLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "clientSessionId" | "sessionExerciseId" | "actualSets" | "actualReps" | "actualLoad" | "rpe" | "clientNote" | "videoUrl" | "coachComment" | "coachCommentAt" | "completedAt" | "servedExerciseId" | "createdAt" | "updatedAt", ExtArgs["result"]["exerciseLog"]>
   export type ExerciseLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     clientSession?: boolean | ClientSessionDefaultArgs<ExtArgs>
     sessionExercise?: boolean | SessionExerciseDefaultArgs<ExtArgs>
@@ -98049,6 +98136,7 @@ export namespace Prisma {
       coachComment: string | null
       coachCommentAt: Date | null
       completedAt: Date | null
+      servedExerciseId: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["exerciseLog"]>
@@ -98489,6 +98577,7 @@ export namespace Prisma {
     readonly coachComment: FieldRef<"ExerciseLog", 'String'>
     readonly coachCommentAt: FieldRef<"ExerciseLog", 'DateTime'>
     readonly completedAt: FieldRef<"ExerciseLog", 'DateTime'>
+    readonly servedExerciseId: FieldRef<"ExerciseLog", 'String'>
     readonly createdAt: FieldRef<"ExerciseLog", 'DateTime'>
     readonly updatedAt: FieldRef<"ExerciseLog", 'DateTime'>
   }
@@ -118695,6 +118784,7 @@ export namespace Prisma {
     dodges: 'dodges',
     combos: 'combos',
     maxCombo: 'maxCombo',
+    runId: 'runId',
     createdAt: 'createdAt'
   };
 
@@ -118708,6 +118798,7 @@ export namespace Prisma {
     status: 'status',
     payoutEligible: 'payoutEligible',
     ineligibleReason: 'ineligibleReason',
+    agentRun: 'agentRun',
     startedAt: 'startedAt',
     expiresAt: 'expiresAt',
     finishedAt: 'finishedAt',
@@ -119787,6 +119878,7 @@ export namespace Prisma {
     coachComment: 'coachComment',
     coachCommentAt: 'coachCommentAt',
     completedAt: 'completedAt',
+    servedExerciseId: 'servedExerciseId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -120951,8 +121043,10 @@ export namespace Prisma {
     dodges?: IntFilter<"GameSession"> | number
     combos?: IntFilter<"GameSession"> | number
     maxCombo?: IntFilter<"GameSession"> | number
+    runId?: StringNullableFilter<"GameSession"> | string | null
     createdAt?: DateTimeFilter<"GameSession"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    run?: XOR<SessionRunNullableScalarRelationFilter, SessionRunWhereInput> | null
   }
 
   export type GameSessionOrderByWithRelationInput = {
@@ -120972,12 +121066,15 @@ export namespace Prisma {
     dodges?: SortOrder
     combos?: SortOrder
     maxCombo?: SortOrder
+    runId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     user?: UserOrderByWithRelationInput
+    run?: SessionRunOrderByWithRelationInput
   }
 
   export type GameSessionWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    runId?: string
     AND?: GameSessionWhereInput | GameSessionWhereInput[]
     OR?: GameSessionWhereInput[]
     NOT?: GameSessionWhereInput | GameSessionWhereInput[]
@@ -120998,7 +121095,8 @@ export namespace Prisma {
     maxCombo?: IntFilter<"GameSession"> | number
     createdAt?: DateTimeFilter<"GameSession"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
-  }, "id">
+    run?: XOR<SessionRunNullableScalarRelationFilter, SessionRunWhereInput> | null
+  }, "id" | "runId">
 
   export type GameSessionOrderByWithAggregationInput = {
     id?: SortOrder
@@ -121017,6 +121115,7 @@ export namespace Prisma {
     dodges?: SortOrder
     combos?: SortOrder
     maxCombo?: SortOrder
+    runId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     _count?: GameSessionCountOrderByAggregateInput
     _avg?: GameSessionAvgOrderByAggregateInput
@@ -121045,6 +121144,7 @@ export namespace Prisma {
     dodges?: IntWithAggregatesFilter<"GameSession"> | number
     combos?: IntWithAggregatesFilter<"GameSession"> | number
     maxCombo?: IntWithAggregatesFilter<"GameSession"> | number
+    runId?: StringNullableWithAggregatesFilter<"GameSession"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"GameSession"> | Date | string
   }
 
@@ -121058,6 +121158,7 @@ export namespace Prisma {
     status?: StringFilter<"SessionRun"> | string
     payoutEligible?: BoolFilter<"SessionRun"> | boolean
     ineligibleReason?: StringNullableFilter<"SessionRun"> | string | null
+    agentRun?: BoolFilter<"SessionRun"> | boolean
     startedAt?: DateTimeFilter<"SessionRun"> | Date | string
     expiresAt?: DateTimeFilter<"SessionRun"> | Date | string
     finishedAt?: DateTimeNullableFilter<"SessionRun"> | Date | string | null
@@ -121068,6 +121169,7 @@ export namespace Prisma {
     result?: JsonNullableFilter<"SessionRun">
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     grants?: SessionGrantListRelationFilter
+    gameSession?: XOR<GameSessionNullableScalarRelationFilter, GameSessionWhereInput> | null
   }
 
   export type SessionRunOrderByWithRelationInput = {
@@ -121077,6 +121179,7 @@ export namespace Prisma {
     status?: SortOrder
     payoutEligible?: SortOrder
     ineligibleReason?: SortOrderInput | SortOrder
+    agentRun?: SortOrder
     startedAt?: SortOrder
     expiresAt?: SortOrder
     finishedAt?: SortOrderInput | SortOrder
@@ -121087,6 +121190,7 @@ export namespace Prisma {
     result?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
     grants?: SessionGrantOrderByRelationAggregateInput
+    gameSession?: GameSessionOrderByWithRelationInput
   }
 
   export type SessionRunWhereUniqueInput = Prisma.AtLeast<{
@@ -121099,6 +121203,7 @@ export namespace Prisma {
     status?: StringFilter<"SessionRun"> | string
     payoutEligible?: BoolFilter<"SessionRun"> | boolean
     ineligibleReason?: StringNullableFilter<"SessionRun"> | string | null
+    agentRun?: BoolFilter<"SessionRun"> | boolean
     startedAt?: DateTimeFilter<"SessionRun"> | Date | string
     expiresAt?: DateTimeFilter<"SessionRun"> | Date | string
     finishedAt?: DateTimeNullableFilter<"SessionRun"> | Date | string | null
@@ -121109,6 +121214,7 @@ export namespace Prisma {
     result?: JsonNullableFilter<"SessionRun">
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     grants?: SessionGrantListRelationFilter
+    gameSession?: XOR<GameSessionNullableScalarRelationFilter, GameSessionWhereInput> | null
   }, "id">
 
   export type SessionRunOrderByWithAggregationInput = {
@@ -121118,6 +121224,7 @@ export namespace Prisma {
     status?: SortOrder
     payoutEligible?: SortOrder
     ineligibleReason?: SortOrderInput | SortOrder
+    agentRun?: SortOrder
     startedAt?: SortOrder
     expiresAt?: SortOrder
     finishedAt?: SortOrderInput | SortOrder
@@ -121143,6 +121250,7 @@ export namespace Prisma {
     status?: StringWithAggregatesFilter<"SessionRun"> | string
     payoutEligible?: BoolWithAggregatesFilter<"SessionRun"> | boolean
     ineligibleReason?: StringNullableWithAggregatesFilter<"SessionRun"> | string | null
+    agentRun?: BoolWithAggregatesFilter<"SessionRun"> | boolean
     startedAt?: DateTimeWithAggregatesFilter<"SessionRun"> | Date | string
     expiresAt?: DateTimeWithAggregatesFilter<"SessionRun"> | Date | string
     finishedAt?: DateTimeNullableWithAggregatesFilter<"SessionRun"> | Date | string | null
@@ -126641,6 +126749,7 @@ export namespace Prisma {
     coachComment?: StringNullableFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     clientSession?: XOR<ClientSessionScalarRelationFilter, ClientSessionWhereInput>
@@ -126661,6 +126770,7 @@ export namespace Prisma {
     coachComment?: SortOrderInput | SortOrder
     coachCommentAt?: SortOrderInput | SortOrder
     completedAt?: SortOrderInput | SortOrder
+    servedExerciseId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     clientSession?: ClientSessionOrderByWithRelationInput
@@ -126684,6 +126794,7 @@ export namespace Prisma {
     coachComment?: StringNullableFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     clientSession?: XOR<ClientSessionScalarRelationFilter, ClientSessionWhereInput>
@@ -126704,6 +126815,7 @@ export namespace Prisma {
     coachComment?: SortOrderInput | SortOrder
     coachCommentAt?: SortOrderInput | SortOrder
     completedAt?: SortOrderInput | SortOrder
+    servedExerciseId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: ExerciseLogCountOrderByAggregateInput
@@ -126729,6 +126841,7 @@ export namespace Prisma {
     coachComment?: StringNullableWithAggregatesFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableWithAggregatesFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableWithAggregatesFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableWithAggregatesFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"ExerciseLog"> | Date | string
   }
@@ -128663,6 +128776,7 @@ export namespace Prisma {
     maxCombo?: number
     createdAt?: Date | string
     user: UserCreateNestedOneWithoutSessionsInput
+    run?: SessionRunCreateNestedOneWithoutGameSessionInput
   }
 
   export type GameSessionUncheckedCreateInput = {
@@ -128682,6 +128796,7 @@ export namespace Prisma {
     dodges?: number
     combos?: number
     maxCombo?: number
+    runId?: string | null
     createdAt?: Date | string
   }
 
@@ -128703,6 +128818,7 @@ export namespace Prisma {
     maxCombo?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutSessionsNestedInput
+    run?: SessionRunUpdateOneWithoutGameSessionNestedInput
   }
 
   export type GameSessionUncheckedUpdateInput = {
@@ -128722,6 +128838,7 @@ export namespace Prisma {
     dodges?: IntFieldUpdateOperationsInput | number
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
+    runId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -128742,6 +128859,7 @@ export namespace Prisma {
     dodges?: number
     combos?: number
     maxCombo?: number
+    runId?: string | null
     createdAt?: Date | string
   }
 
@@ -128781,6 +128899,7 @@ export namespace Prisma {
     dodges?: IntFieldUpdateOperationsInput | number
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
+    runId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -128790,6 +128909,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -128800,6 +128920,7 @@ export namespace Prisma {
     result?: NullableJsonNullValueInput | InputJsonValue
     user: UserCreateNestedOneWithoutSessionRunsInput
     grants?: SessionGrantCreateNestedManyWithoutRunInput
+    gameSession?: GameSessionCreateNestedOneWithoutRunInput
   }
 
   export type SessionRunUncheckedCreateInput = {
@@ -128809,6 +128930,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -128818,6 +128940,7 @@ export namespace Prisma {
     sessionId?: string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     grants?: SessionGrantUncheckedCreateNestedManyWithoutRunInput
+    gameSession?: GameSessionUncheckedCreateNestedOneWithoutRunInput
   }
 
   export type SessionRunUpdateInput = {
@@ -128826,6 +128949,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -128836,6 +128960,7 @@ export namespace Prisma {
     result?: NullableJsonNullValueInput | InputJsonValue
     user?: UserUpdateOneRequiredWithoutSessionRunsNestedInput
     grants?: SessionGrantUpdateManyWithoutRunNestedInput
+    gameSession?: GameSessionUpdateOneWithoutRunNestedInput
   }
 
   export type SessionRunUncheckedUpdateInput = {
@@ -128845,6 +128970,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -128854,6 +128980,7 @@ export namespace Prisma {
     sessionId?: NullableStringFieldUpdateOperationsInput | string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     grants?: SessionGrantUncheckedUpdateManyWithoutRunNestedInput
+    gameSession?: GameSessionUncheckedUpdateOneWithoutRunNestedInput
   }
 
   export type SessionRunCreateManyInput = {
@@ -128863,6 +128990,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -128879,6 +129007,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -128896,6 +129025,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -134873,6 +135003,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
@@ -134893,6 +135024,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
@@ -134909,6 +135041,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -134929,6 +135062,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
@@ -134947,6 +135081,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -134962,6 +135097,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -134979,6 +135115,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -137367,6 +137504,11 @@ export namespace Prisma {
     not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
+  export type SessionRunNullableScalarRelationFilter = {
+    is?: SessionRunWhereInput | null
+    isNot?: SessionRunWhereInput | null
+  }
+
   export type GameSessionCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -137384,6 +137526,7 @@ export namespace Prisma {
     dodges?: SortOrder
     combos?: SortOrder
     maxCombo?: SortOrder
+    runId?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -137419,6 +137562,7 @@ export namespace Prisma {
     dodges?: SortOrder
     combos?: SortOrder
     maxCombo?: SortOrder
+    runId?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -137439,6 +137583,7 @@ export namespace Prisma {
     dodges?: SortOrder
     combos?: SortOrder
     maxCombo?: SortOrder
+    runId?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -137488,6 +137633,11 @@ export namespace Prisma {
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
+  export type GameSessionNullableScalarRelationFilter = {
+    is?: GameSessionWhereInput | null
+    isNot?: GameSessionWhereInput | null
+  }
+
   export type SessionRunCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -137495,6 +137645,7 @@ export namespace Prisma {
     status?: SortOrder
     payoutEligible?: SortOrder
     ineligibleReason?: SortOrder
+    agentRun?: SortOrder
     startedAt?: SortOrder
     expiresAt?: SortOrder
     finishedAt?: SortOrder
@@ -137517,6 +137668,7 @@ export namespace Prisma {
     status?: SortOrder
     payoutEligible?: SortOrder
     ineligibleReason?: SortOrder
+    agentRun?: SortOrder
     startedAt?: SortOrder
     expiresAt?: SortOrder
     finishedAt?: SortOrder
@@ -137533,6 +137685,7 @@ export namespace Prisma {
     status?: SortOrder
     payoutEligible?: SortOrder
     ineligibleReason?: SortOrder
+    agentRun?: SortOrder
     startedAt?: SortOrder
     expiresAt?: SortOrder
     finishedAt?: SortOrder
@@ -141283,6 +141436,7 @@ export namespace Prisma {
     coachComment?: SortOrder
     coachCommentAt?: SortOrder
     completedAt?: SortOrder
+    servedExerciseId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -141305,6 +141459,7 @@ export namespace Prisma {
     coachComment?: SortOrder
     coachCommentAt?: SortOrder
     completedAt?: SortOrder
+    servedExerciseId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -141322,6 +141477,7 @@ export namespace Prisma {
     coachComment?: SortOrder
     coachCommentAt?: SortOrder
     completedAt?: SortOrder
+    servedExerciseId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -144697,6 +144853,12 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
+  export type SessionRunCreateNestedOneWithoutGameSessionInput = {
+    create?: XOR<SessionRunCreateWithoutGameSessionInput, SessionRunUncheckedCreateWithoutGameSessionInput>
+    connectOrCreate?: SessionRunCreateOrConnectWithoutGameSessionInput
+    connect?: SessionRunWhereUniqueInput
+  }
+
   export type BoolFieldUpdateOperationsInput = {
     set?: boolean
   }
@@ -144707,6 +144869,16 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutSessionsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSessionsInput, UserUpdateWithoutSessionsInput>, UserUncheckedUpdateWithoutSessionsInput>
+  }
+
+  export type SessionRunUpdateOneWithoutGameSessionNestedInput = {
+    create?: XOR<SessionRunCreateWithoutGameSessionInput, SessionRunUncheckedCreateWithoutGameSessionInput>
+    connectOrCreate?: SessionRunCreateOrConnectWithoutGameSessionInput
+    upsert?: SessionRunUpsertWithoutGameSessionInput
+    disconnect?: SessionRunWhereInput | boolean
+    delete?: SessionRunWhereInput | boolean
+    connect?: SessionRunWhereUniqueInput
+    update?: XOR<XOR<SessionRunUpdateToOneWithWhereWithoutGameSessionInput, SessionRunUpdateWithoutGameSessionInput>, SessionRunUncheckedUpdateWithoutGameSessionInput>
   }
 
   export type UserCreateNestedOneWithoutSessionRunsInput = {
@@ -144722,11 +144894,23 @@ export namespace Prisma {
     connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
   }
 
+  export type GameSessionCreateNestedOneWithoutRunInput = {
+    create?: XOR<GameSessionCreateWithoutRunInput, GameSessionUncheckedCreateWithoutRunInput>
+    connectOrCreate?: GameSessionCreateOrConnectWithoutRunInput
+    connect?: GameSessionWhereUniqueInput
+  }
+
   export type SessionGrantUncheckedCreateNestedManyWithoutRunInput = {
     create?: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput> | SessionGrantCreateWithoutRunInput[] | SessionGrantUncheckedCreateWithoutRunInput[]
     connectOrCreate?: SessionGrantCreateOrConnectWithoutRunInput | SessionGrantCreateOrConnectWithoutRunInput[]
     createMany?: SessionGrantCreateManyRunInputEnvelope
     connect?: SessionGrantWhereUniqueInput | SessionGrantWhereUniqueInput[]
+  }
+
+  export type GameSessionUncheckedCreateNestedOneWithoutRunInput = {
+    create?: XOR<GameSessionCreateWithoutRunInput, GameSessionUncheckedCreateWithoutRunInput>
+    connectOrCreate?: GameSessionCreateOrConnectWithoutRunInput
+    connect?: GameSessionWhereUniqueInput
   }
 
   export type UserUpdateOneRequiredWithoutSessionRunsNestedInput = {
@@ -144751,6 +144935,16 @@ export namespace Prisma {
     deleteMany?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
   }
 
+  export type GameSessionUpdateOneWithoutRunNestedInput = {
+    create?: XOR<GameSessionCreateWithoutRunInput, GameSessionUncheckedCreateWithoutRunInput>
+    connectOrCreate?: GameSessionCreateOrConnectWithoutRunInput
+    upsert?: GameSessionUpsertWithoutRunInput
+    disconnect?: GameSessionWhereInput | boolean
+    delete?: GameSessionWhereInput | boolean
+    connect?: GameSessionWhereUniqueInput
+    update?: XOR<XOR<GameSessionUpdateToOneWithWhereWithoutRunInput, GameSessionUpdateWithoutRunInput>, GameSessionUncheckedUpdateWithoutRunInput>
+  }
+
   export type SessionGrantUncheckedUpdateManyWithoutRunNestedInput = {
     create?: XOR<SessionGrantCreateWithoutRunInput, SessionGrantUncheckedCreateWithoutRunInput> | SessionGrantCreateWithoutRunInput[] | SessionGrantUncheckedCreateWithoutRunInput[]
     connectOrCreate?: SessionGrantCreateOrConnectWithoutRunInput | SessionGrantCreateOrConnectWithoutRunInput[]
@@ -144763,6 +144957,16 @@ export namespace Prisma {
     update?: SessionGrantUpdateWithWhereUniqueWithoutRunInput | SessionGrantUpdateWithWhereUniqueWithoutRunInput[]
     updateMany?: SessionGrantUpdateManyWithWhereWithoutRunInput | SessionGrantUpdateManyWithWhereWithoutRunInput[]
     deleteMany?: SessionGrantScalarWhereInput | SessionGrantScalarWhereInput[]
+  }
+
+  export type GameSessionUncheckedUpdateOneWithoutRunNestedInput = {
+    create?: XOR<GameSessionCreateWithoutRunInput, GameSessionUncheckedCreateWithoutRunInput>
+    connectOrCreate?: GameSessionCreateOrConnectWithoutRunInput
+    upsert?: GameSessionUpsertWithoutRunInput
+    disconnect?: GameSessionWhereInput | boolean
+    delete?: GameSessionWhereInput | boolean
+    connect?: GameSessionWhereUniqueInput
+    update?: XOR<XOR<GameSessionUpdateToOneWithWhereWithoutRunInput, GameSessionUpdateWithoutRunInput>, GameSessionUncheckedUpdateWithoutRunInput>
   }
 
   export type UserCreateNestedOneWithoutSessionGrantsInput = {
@@ -148639,6 +148843,7 @@ export namespace Prisma {
     combos?: number
     maxCombo?: number
     createdAt?: Date | string
+    run?: SessionRunCreateNestedOneWithoutGameSessionInput
   }
 
   export type GameSessionUncheckedCreateWithoutUserInput = {
@@ -148657,6 +148862,7 @@ export namespace Prisma {
     dodges?: number
     combos?: number
     maxCombo?: number
+    runId?: string | null
     createdAt?: Date | string
   }
 
@@ -148676,6 +148882,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -148685,6 +148892,7 @@ export namespace Prisma {
     sessionId?: string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     grants?: SessionGrantCreateNestedManyWithoutRunInput
+    gameSession?: GameSessionCreateNestedOneWithoutRunInput
   }
 
   export type SessionRunUncheckedCreateWithoutUserInput = {
@@ -148693,6 +148901,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -148702,6 +148911,7 @@ export namespace Prisma {
     sessionId?: string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     grants?: SessionGrantUncheckedCreateNestedManyWithoutRunInput
+    gameSession?: GameSessionUncheckedCreateNestedOneWithoutRunInput
   }
 
   export type SessionRunCreateOrConnectWithoutUserInput = {
@@ -150788,6 +150998,7 @@ export namespace Prisma {
     dodges?: IntFilter<"GameSession"> | number
     combos?: IntFilter<"GameSession"> | number
     maxCombo?: IntFilter<"GameSession"> | number
+    runId?: StringNullableFilter<"GameSession"> | string | null
     createdAt?: DateTimeFilter<"GameSession"> | Date | string
   }
 
@@ -150817,6 +151028,7 @@ export namespace Prisma {
     status?: StringFilter<"SessionRun"> | string
     payoutEligible?: BoolFilter<"SessionRun"> | boolean
     ineligibleReason?: StringNullableFilter<"SessionRun"> | string | null
+    agentRun?: BoolFilter<"SessionRun"> | boolean
     startedAt?: DateTimeFilter<"SessionRun"> | Date | string
     expiresAt?: DateTimeFilter<"SessionRun"> | Date | string
     finishedAt?: DateTimeNullableFilter<"SessionRun"> | Date | string | null
@@ -153045,6 +153257,49 @@ export namespace Prisma {
     create: XOR<UserCreateWithoutSessionsInput, UserUncheckedCreateWithoutSessionsInput>
   }
 
+  export type SessionRunCreateWithoutGameSessionInput = {
+    id?: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    agentRun?: boolean
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    user: UserCreateNestedOneWithoutSessionRunsInput
+    grants?: SessionGrantCreateNestedManyWithoutRunInput
+  }
+
+  export type SessionRunUncheckedCreateWithoutGameSessionInput = {
+    id?: string
+    userId: string
+    mode: string
+    status?: string
+    payoutEligible: boolean
+    ineligibleReason?: string | null
+    agentRun?: boolean
+    startedAt?: Date | string
+    expiresAt: Date | string
+    finishedAt?: Date | string | null
+    score?: number | null
+    durationMs?: number | null
+    rejectReason?: string | null
+    sessionId?: string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type SessionRunCreateOrConnectWithoutGameSessionInput = {
+    where: SessionRunWhereUniqueInput
+    create: XOR<SessionRunCreateWithoutGameSessionInput, SessionRunUncheckedCreateWithoutGameSessionInput>
+  }
+
   export type UserUpsertWithoutSessionsInput = {
     update: XOR<UserUpdateWithoutSessionsInput, UserUncheckedUpdateWithoutSessionsInput>
     create: XOR<UserCreateWithoutSessionsInput, UserUncheckedCreateWithoutSessionsInput>
@@ -153208,6 +153463,55 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type SessionRunUpsertWithoutGameSessionInput = {
+    update: XOR<SessionRunUpdateWithoutGameSessionInput, SessionRunUncheckedUpdateWithoutGameSessionInput>
+    create: XOR<SessionRunCreateWithoutGameSessionInput, SessionRunUncheckedCreateWithoutGameSessionInput>
+    where?: SessionRunWhereInput
+  }
+
+  export type SessionRunUpdateToOneWithWhereWithoutGameSessionInput = {
+    where?: SessionRunWhereInput
+    data: XOR<SessionRunUpdateWithoutGameSessionInput, SessionRunUncheckedUpdateWithoutGameSessionInput>
+  }
+
+  export type SessionRunUpdateWithoutGameSessionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    user?: UserUpdateOneRequiredWithoutSessionRunsNestedInput
+    grants?: SessionGrantUpdateManyWithoutRunNestedInput
+  }
+
+  export type SessionRunUncheckedUpdateWithoutGameSessionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    payoutEligible?: BoolFieldUpdateOperationsInput | boolean
+    ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    score?: NullableIntFieldUpdateOperationsInput | number | null
+    durationMs?: NullableIntFieldUpdateOperationsInput | number | null
+    rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
+    sessionId?: NullableStringFieldUpdateOperationsInput | string | null
+    result?: NullableJsonNullValueInput | InputJsonValue
+    grants?: SessionGrantUncheckedUpdateManyWithoutRunNestedInput
   }
 
   export type UserCreateWithoutSessionRunsInput = {
@@ -153397,6 +153701,51 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type GameSessionCreateWithoutRunInput = {
+    id?: string
+    mode: string
+    score: number
+    opponentScore?: number
+    won?: boolean
+    xp?: number
+    shards?: number
+    prqDelta?: number
+    credits?: number
+    duration?: number
+    hits?: number
+    misses?: number
+    dodges?: number
+    combos?: number
+    maxCombo?: number
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutSessionsInput
+  }
+
+  export type GameSessionUncheckedCreateWithoutRunInput = {
+    id?: string
+    userId: string
+    mode: string
+    score: number
+    opponentScore?: number
+    won?: boolean
+    xp?: number
+    shards?: number
+    prqDelta?: number
+    credits?: number
+    duration?: number
+    hits?: number
+    misses?: number
+    dodges?: number
+    combos?: number
+    maxCombo?: number
+    createdAt?: Date | string
+  }
+
+  export type GameSessionCreateOrConnectWithoutRunInput = {
+    where: GameSessionWhereUniqueInput
+    create: XOR<GameSessionCreateWithoutRunInput, GameSessionUncheckedCreateWithoutRunInput>
+  }
+
   export type UserUpsertWithoutSessionRunsInput = {
     update: XOR<UserUpdateWithoutSessionRunsInput, UserUncheckedUpdateWithoutSessionRunsInput>
     create: XOR<UserCreateWithoutSessionRunsInput, UserUncheckedCreateWithoutSessionRunsInput>
@@ -153578,6 +153927,57 @@ export namespace Prisma {
     data: XOR<SessionGrantUpdateManyMutationInput, SessionGrantUncheckedUpdateManyWithoutRunInput>
   }
 
+  export type GameSessionUpsertWithoutRunInput = {
+    update: XOR<GameSessionUpdateWithoutRunInput, GameSessionUncheckedUpdateWithoutRunInput>
+    create: XOR<GameSessionCreateWithoutRunInput, GameSessionUncheckedCreateWithoutRunInput>
+    where?: GameSessionWhereInput
+  }
+
+  export type GameSessionUpdateToOneWithWhereWithoutRunInput = {
+    where?: GameSessionWhereInput
+    data: XOR<GameSessionUpdateWithoutRunInput, GameSessionUncheckedUpdateWithoutRunInput>
+  }
+
+  export type GameSessionUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    score?: IntFieldUpdateOperationsInput | number
+    opponentScore?: IntFieldUpdateOperationsInput | number
+    won?: BoolFieldUpdateOperationsInput | boolean
+    xp?: IntFieldUpdateOperationsInput | number
+    shards?: IntFieldUpdateOperationsInput | number
+    prqDelta?: FloatFieldUpdateOperationsInput | number
+    credits?: IntFieldUpdateOperationsInput | number
+    duration?: IntFieldUpdateOperationsInput | number
+    hits?: IntFieldUpdateOperationsInput | number
+    misses?: IntFieldUpdateOperationsInput | number
+    dodges?: IntFieldUpdateOperationsInput | number
+    combos?: IntFieldUpdateOperationsInput | number
+    maxCombo?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutSessionsNestedInput
+  }
+
+  export type GameSessionUncheckedUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    score?: IntFieldUpdateOperationsInput | number
+    opponentScore?: IntFieldUpdateOperationsInput | number
+    won?: BoolFieldUpdateOperationsInput | boolean
+    xp?: IntFieldUpdateOperationsInput | number
+    shards?: IntFieldUpdateOperationsInput | number
+    prqDelta?: FloatFieldUpdateOperationsInput | number
+    credits?: IntFieldUpdateOperationsInput | number
+    duration?: IntFieldUpdateOperationsInput | number
+    hits?: IntFieldUpdateOperationsInput | number
+    misses?: IntFieldUpdateOperationsInput | number
+    dodges?: IntFieldUpdateOperationsInput | number
+    combos?: IntFieldUpdateOperationsInput | number
+    maxCombo?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UserCreateWithoutSessionGrantsInput = {
     id?: string
     email: string
@@ -153743,6 +154143,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -153752,6 +154153,7 @@ export namespace Prisma {
     sessionId?: string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     user: UserCreateNestedOneWithoutSessionRunsInput
+    gameSession?: GameSessionCreateNestedOneWithoutRunInput
   }
 
   export type SessionRunUncheckedCreateWithoutGrantsInput = {
@@ -153761,6 +154163,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -153769,6 +154172,7 @@ export namespace Prisma {
     rejectReason?: string | null
     sessionId?: string | null
     result?: NullableJsonNullValueInput | InputJsonValue
+    gameSession?: GameSessionUncheckedCreateNestedOneWithoutRunInput
   }
 
   export type SessionRunCreateOrConnectWithoutGrantsInput = {
@@ -153958,6 +154362,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -153967,6 +154372,7 @@ export namespace Prisma {
     sessionId?: NullableStringFieldUpdateOperationsInput | string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     user?: UserUpdateOneRequiredWithoutSessionRunsNestedInput
+    gameSession?: GameSessionUpdateOneWithoutRunNestedInput
   }
 
   export type SessionRunUncheckedUpdateWithoutGrantsInput = {
@@ -153976,6 +154382,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -153984,6 +154391,7 @@ export namespace Prisma {
     rejectReason?: NullableStringFieldUpdateOperationsInput | string | null
     sessionId?: NullableStringFieldUpdateOperationsInput | string | null
     result?: NullableJsonNullValueInput | InputJsonValue
+    gameSession?: GameSessionUncheckedUpdateOneWithoutRunNestedInput
   }
 
   export type UserCreateWithoutLedgerInput = {
@@ -171240,6 +171648,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
@@ -171258,6 +171667,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
@@ -171387,6 +171797,7 @@ export namespace Prisma {
     coachComment?: StringNullableFilter<"ExerciseLog"> | string | null
     coachCommentAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"ExerciseLog"> | Date | string | null
+    servedExerciseId?: StringNullableFilter<"ExerciseLog"> | string | null
     createdAt?: DateTimeFilter<"ExerciseLog"> | Date | string
     updatedAt?: DateTimeFilter<"ExerciseLog"> | Date | string
   }
@@ -171464,6 +171875,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     sessionExercise: SessionExerciseCreateNestedOneWithoutExerciseLogsInput
@@ -171482,6 +171894,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     setLogs?: SetLogUncheckedCreateNestedManyWithoutExerciseLogInput
@@ -171828,6 +172241,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     clientSession: ClientSessionCreateNestedOneWithoutExerciseLogsInput
@@ -171847,6 +172261,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -171878,6 +172293,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -171897,6 +172313,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -177446,6 +177863,7 @@ export namespace Prisma {
     dodges?: number
     combos?: number
     maxCombo?: number
+    runId?: string | null
     createdAt?: Date | string
   }
 
@@ -177455,6 +177873,7 @@ export namespace Prisma {
     status?: string
     payoutEligible: boolean
     ineligibleReason?: string | null
+    agentRun?: boolean
     startedAt?: Date | string
     expiresAt: Date | string
     finishedAt?: Date | string | null
@@ -178097,6 +178516,7 @@ export namespace Prisma {
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    run?: SessionRunUpdateOneWithoutGameSessionNestedInput
   }
 
   export type GameSessionUncheckedUpdateWithoutUserInput = {
@@ -178115,6 +178535,7 @@ export namespace Prisma {
     dodges?: IntFieldUpdateOperationsInput | number
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
+    runId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -178134,6 +178555,7 @@ export namespace Prisma {
     dodges?: IntFieldUpdateOperationsInput | number
     combos?: IntFieldUpdateOperationsInput | number
     maxCombo?: IntFieldUpdateOperationsInput | number
+    runId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -178143,6 +178565,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -178152,6 +178575,7 @@ export namespace Prisma {
     sessionId?: NullableStringFieldUpdateOperationsInput | string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     grants?: SessionGrantUpdateManyWithoutRunNestedInput
+    gameSession?: GameSessionUpdateOneWithoutRunNestedInput
   }
 
   export type SessionRunUncheckedUpdateWithoutUserInput = {
@@ -178160,6 +178584,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -178169,6 +178594,7 @@ export namespace Prisma {
     sessionId?: NullableStringFieldUpdateOperationsInput | string | null
     result?: NullableJsonNullValueInput | InputJsonValue
     grants?: SessionGrantUncheckedUpdateManyWithoutRunNestedInput
+    gameSession?: GameSessionUncheckedUpdateOneWithoutRunNestedInput
   }
 
   export type SessionRunUncheckedUpdateManyWithoutUserInput = {
@@ -178177,6 +178603,7 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     payoutEligible?: BoolFieldUpdateOperationsInput | boolean
     ineligibleReason?: NullableStringFieldUpdateOperationsInput | string | null
+    agentRun?: BoolFieldUpdateOperationsInput | boolean
     startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -181512,6 +181939,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -181527,6 +181955,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     clientSession?: ClientSessionUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -181545,6 +181974,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
@@ -181562,6 +181992,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -181578,6 +182009,7 @@ export namespace Prisma {
     coachComment?: string | null
     coachCommentAt?: Date | string | null
     completedAt?: Date | string | null
+    servedExerciseId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -181593,6 +182025,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessionExercise?: SessionExerciseUpdateOneRequiredWithoutExerciseLogsNestedInput
@@ -181611,6 +182044,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     setLogs?: SetLogUncheckedUpdateManyWithoutExerciseLogNestedInput
@@ -181628,6 +182062,7 @@ export namespace Prisma {
     coachComment?: NullableStringFieldUpdateOperationsInput | string | null
     coachCommentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    servedExerciseId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

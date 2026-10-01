@@ -53,6 +53,12 @@ declare global {
  */
 const LOOPBACK_HOST = /^(localhost|[\w-]+(\.[\w-]+)*\.localhost|127(\.\d{1,3}){3}|\[::1\])$/i;
 
+/** The loopback test, exported so the agent-hook gate can re-check the host on the flip path (the module-load
+ *  path already does; a flip to ?agent=1 on the deployed domain must not arm the feed — ECONOMY-CAPS review). */
+export function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOST.test(hostname);
+}
+
 /**
  * The hook is dev and QA only: a deployed page must not accept body frames from a script (body play feeds PRQ and the
  * history, and a page that takes scripted frames would record a jump nobody made). Development builds always have it;

@@ -19,6 +19,7 @@ import { prisma } from '@/lib/db';
 import type { Prisma } from '@/public/_prisma/client';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { postLc } from '@/lib/ledger';
+import { settleRecoveryFor } from '@/lib/prq-recovery';
 import {
   SeasonPassCore,
   TIER_XP,
@@ -120,6 +121,13 @@ async function bookGrant(input: {
   reward: SeasonReward;
   dedupeKey: string;
 }): Promise<boolean> {
+  // MIRROR-COACH P9 fix (2026-09-30, code review): the LC credit below writes PlayerProfile, which moves its updatedAt —
+  // the anchor PRQ recovery's half-life runs from (lib/prq-recovery.ts). Every other PlayerProfile writer settles first
+  // (getOrCreateProfile); this one is also reached from the Stripe webhook and the season claim, which do not, so the
+  // days since the last settle were skipped and recovery stayed HIGH (settled 80, a grant ten days later: the fall to
+  // about 70.7 never happened). Settle first — outside the transaction, so a settle that cannot read can never abort the
+  // grant (it never throws, and it writes only if the row has not moved since it read it).
+  if (input.reward.kind === 'lc' && Number(input.reward.amt ?? 0) > 0) await settleRecoveryFor(prisma, input.userId);
   try {
     await prisma.$transaction(async (tx) => {
       await tx.passGrant.create({

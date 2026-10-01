@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { rampStatus, startRamp } from '@/lib/breath/rampServer';
+import { canWriteHealthData, refuseHealthWrite } from '@/lib/privacy/healthWriteGate';
 
 /**
  * MIRROR-COACH P7 (2026-09-29): app/api/breath/ramp — the adults-only Dial-Up Breath before a session's flagged key set.
@@ -33,6 +34,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  // TEEN-WRITE-BLOCK's rule (lib/privacy/healthWriteGate.ts): a BreathLog use is health data, written only for a verified
+  // 18+ account (the DB's User.dobYear). rampGate already refuses minors; this keeps the write on the one shared gate.
+  if (!(await canWriteHealthData(prisma, userId))) return refuseHealthWrite();
   let body: Record<string, unknown>;
   try {
     body = await req.json();

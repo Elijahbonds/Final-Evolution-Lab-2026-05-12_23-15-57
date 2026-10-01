@@ -80,7 +80,7 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   karateEndless: ['strength', 'agility', 'endurance', 'mental'],
   dunkContest: ['power', 'speed', 'flexibility'],
   tennis: ['agility', 'speed', 'endurance'],
-  brainBrawl: ['mental', 'recovery'],
+  brainBrawl: ['mental'], // MIRROR-COACH P9 (2026-09-30): no longer 'recovery' — trivia is not recovery work (lib/prq-engine.ts, PRQ recovery)
   skateboarding: ['agility', 'flexibility', 'mental'],
   soccer: ['power', 'agility', 'mental'],
   baseball: ['strength', 'power', 'speed'],
@@ -88,12 +88,12 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   surfing: ['flexibility', 'endurance', 'mental'],
   golf: ['mental', 'flexibility', 'power'],
   freerun: ['agility', 'power', 'flexibility'],
-  training: ['strength', 'endurance', 'recovery'],
+  training: ['strength', 'endurance'], // MIRROR-COACH P9 fix (2026-09-30): no longer 'recovery' — the Iron Paradise game is not recovery work (owner decision #12)
   hoops1v1: ['agility', 'power', 'mental'],
   hoops3v3: ['mental', 'agility', 'endurance'],
   threePoint: ['mental', 'flexibility', 'speed'],
   karateVersus: ['strength', 'agility', 'mental'],
-  whoSceneIt: ['mental', 'recovery'],
+  whoSceneIt: ['mental'], // MIRROR-COACH P9 (2026-09-30): no longer 'recovery' — trivia is not recovery work (lib/prq-engine.ts, PRQ recovery)
   bigAir: ['power', 'agility', 'flexibility'],
   tiebreak: ['speed', 'agility', 'mental'],
   sprint: ['speed', 'power', 'endurance'],

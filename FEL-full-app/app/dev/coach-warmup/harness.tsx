@@ -6,11 +6,13 @@ import { WarmupPrep } from '@/components/coach/warmup-prep';
 import { FALLBACK_WARMUP_CONTEXT, type SessionItemLike, type WarmupContext, type WarmupReadiness } from '@/lib/coach/warmup';
 import { ZONE_WORDS } from '@/lib/coach/warmupContent';
 
-const ADULT: WarmupContext = { isYouth: false, painDecision: null, zone: { id: 'foot', words: ZONE_WORDS.foot, checks: ['heelLine'] }, screen: 'flagged', screenAt: '2026-09-28T10:00:00.000Z', hardStopped: false };
+const ADULT: WarmupContext = { isYouth: false, painDecision: null, zone: { id: 'foot', words: ZONE_WORDS.foot, checks: ['heelLine'] }, screen: 'flagged', screenAt: '2026-09-28T10:00:00.000Z', hardStopped: false, jumpGate: { closed: false, why: '', href: null } };
 const CONTEXTS: Record<string, WarmupContext> = {
   adult: ADULT,
   youth: { ...ADULT, isYouth: true, zone: { id: 'rib_thoracic', words: ZONE_WORDS.rib_thoracic, checks: ['shoulderLevel'] } },
   pain: { ...ADULT, painDecision: 'step_down_flag_coach' },
+  // MIRROR-COACH P8 FIX (2026-09-30): an adult whose protocol gate is shut (no landing check yet): no Wake-Up jumps, no jump primer
+  gated: { ...ADULT, jumpGate: { closed: true, why: 'Jumps and drops wait for a landing check: the jump test in the Quick Screen.', href: '/play/mirror/assess' } },
   fallback: FALLBACK_WARMUP_CONTEXT,
 };
 const ex = (id: string, order: number, section: string, pattern: string | null, isKeySet = false, jumpLand = false): SessionItemLike & { id: string } =>

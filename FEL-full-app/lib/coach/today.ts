@@ -95,6 +95,42 @@ export interface TodayExercise extends TreeExercise {
    * while the clock runs instead of a bare countdown. Absent for everything else.
    */
   breath?: PacerSpec;
+  /**
+   * MIRROR-COACH P8 (2026-09-29): THE PROTOCOL GATE SWAPPED THIS ITEM. The coach prescribed a plyometric or a depth drop
+   * the athlete's gate is closed for (lib/coach/protocolGate.ts), so Today serves its ladder's easier step instead — this
+   * exercise's name, exerciseId and coaching are the easier step's; `from` is what was prescribed, and `line` is the one
+   * line saying why. Absent on every item served as written.
+   */
+  protocolGate?: TodayGateNote;
+}
+
+/** Why Today serves an easier step in place of what was prescribed (MIRROR-COACH P8; lib/coach/protocolGate.ts). */
+export interface TodayGateNote {
+  from: { id: string; name: string };
+  /** The one line the card shows (protocolGate.ts swappedLine). */
+  line: string;
+  /** Where the line points (the health answers, the Quick Screen), or null. */
+  href: string | null;
+  /** The reason the line names (protocolGate.ts leadReason). */
+  reason: string;
+}
+
+/**
+ * What a Today card tells the log route it served on a slot (MIRROR-COACH P8 FIX, 2026-09-30): the easier step's id when
+ * the gate swapped the item, else null ("as written"). The route accepts it only when it is that slot's ladder step
+ * (lib/coach/todayServer.ts servedOnSlots), so the coach's inbox can say "Did X in place of Y".
+ */
+export const servedClaim = (e: Pick<TodayExercise, 'exerciseId' | 'protocolGate'>): string | null => (e.protocolGate ? e.exerciseId : null);
+
+/** A prescribed item held back today: gated, with no ungated easier step on its ladder (MIRROR-COACH P8). */
+export interface TodayHeldItem {
+  /** The SessionExercise id. */
+  id: string;
+  name: string;
+  /** The one line (protocolGate.ts heldLine). */
+  line: string;
+  href: string | null;
+  reason: string;
 }
 
 const strings = (v: unknown, max: number): string[] =>

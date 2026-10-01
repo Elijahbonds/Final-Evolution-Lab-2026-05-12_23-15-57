@@ -37,6 +37,24 @@
 //     owner's call and is flagged as one in the P6 report; the switch is the one line above. The time the two phases
 //     free now goes to extra stretch rounds, so a youth plan still runs close to its length.
 //   · PAIN — a step-down or stop decision also drops the primer entirely (not just its impact version), and says so.
+//   · THE JUMP GATE — MIRROR-COACH P8 FIX (2026-09-30, code review; P8 rule (b), owner decisions #6, #10, #15). P8's
+//     protocol gate (lib/coach/protocolGate.ts) holds a coach's plyometrics and depth drops unless the athlete is an
+//     adult with a completed intake (no red flag, no "yes" on a recent injury/surgery or pregnancy answer), health-data
+//     consent, today's pain decision 'continue' and a landing check from the last 4 weeks. This generator never read
+//     it: an adult whose gate was shut — no landing check yet, which is nearly everyone at launch, or an intake "yes" on
+//     pregnancy — read "Jumps and drops stay out for now" on their Prime card while this same screen ran two minutes of
+//     pogos, three launch-jump rounds and FEL's own Squat Jump Primer (and a Prime the gate held left coachPrime false,
+//     so FEL ADDED its impact primer in the jump's place). Now the server hands the gate's verdict in (WarmupContext
+//     .jumpGate: closed, and the gate's own one line — lib/coach/warmupServer.ts), and when it is closed:
+//       - FEL's own impact primer is never picked (pickPrimer(pattern, false)) — rule (b) plainly covers a jump FEL
+//         chose;
+//       - the Wake-Up's two jumping phases are held too, while WARMUP_FOLLOWS_JUMP_GATE is true. OWNER-DECISION CONFLICT,
+//         resolved on the careful side for now: decision #7 extends the owner's Wake-Up (rhythm and launch included)
+//         and #14 says the owner wrote it first; rule (b) (#6, #10) says plyometrics appear only with the gate open,
+//         and #15 says stop sooner. Flagged in the P8 report; the switch is the one line below — false keeps the
+//         Wake-Up's pogos and launch for adults while FEL's primer still follows the gate.
+//     The youth rule is not re-decided here (isYouth and a coach's Prime jumps do that, as before): the verdict carries
+//     only the gate's OTHER reasons, which a coach's assignment never lifts (protocolGate.ts itemReasons).
 //   · The ramp-up breath is not in this phase (phase 7).
 //
 // READINESS (owner decision #12). A 'low' check-in never touches a score: it shortens Prime the Launch to its first
@@ -123,6 +141,27 @@ export const LOW_DAY_LAUNCH_SEC = 20;
 /** Rule (b)'s switch for the Wake-Up's own jumping phases (see the header's assumption). */
 export const WAKE_UP_IMPACT_GATED = true;
 
+/**
+ * MIRROR-COACH P8 FIX (2026-09-30): the Wake-Up's jumping phases follow P8's protocol gate for everyone (see the header's
+ * THE JUMP GATE — an owner-decision conflict, resolved on the careful side). false = the Wake-Up keeps its pogos and
+ * launch whatever the gate says; FEL's own impact primer follows the gate either way.
+ */
+export const WARMUP_FOLLOWS_JUMP_GATE = true;
+
+/** P8's protocol gate as the warm-up takes it (the server's verdict: lib/coach/warmupServer.ts). */
+export interface JumpGate {
+  /** A reason other than the youth rule keeps jumps and drops out today (a coach's assignment cannot lift these). */
+  closed: boolean;
+  /** The gate's one line for the athlete (protocolGate.ts athleteWhy), '' when open. */
+  why: string;
+  /** Where the line points (the health answers, the Quick Screen), or null. */
+  href: string | null;
+}
+/** The line when the server gave no verdict (an older answer): the careful reading, said plainly. */
+export const JUMP_GATE_DEFAULT_WHY = "Jumps and landings wait for FEL's jump checks.";
+/** The warm-up's note when the jump gate holds its jumps back. */
+export const jumpGateNote = (why: string): string => `This warm-up leaves out its jumps and landings. ${why || JUMP_GATE_DEFAULT_WHY}`;
+
 /** A drill phase leaves the floor and lands: any jump or landing target. */
 export const phaseImpact = (p: Pick<DrillPhase, 'targets'>): boolean => p.targets.some((t) => t.move === 'jump' || t.move === 'land');
 
@@ -157,6 +196,9 @@ export interface WarmupInput {
   patternFrom?: PatternSource;
   /** The server context could not be read (FALLBACK_WARMUP_CONTEXT): youth rules, and the plan says why honestly. */
   contextUnavailable?: boolean;
+  /** MIRROR-COACH P8 FIX: P8's protocol gate for this athlete today (WarmupContext.jumpGate). Absent = open (a test's
+   *  input, a harness); the server always sends it, and readWarmupContext reads a missing one as closed. */
+  jumpGate?: JumpGate | null;
 }
 
 // ── output ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -189,12 +231,12 @@ export interface WarmupStep {
   pacer?: DrillPhase['pacer'];
 }
 
-export type HeldReason = 'time' | 'youth_impact' | 'pain' | 'coach_prime' | 'unavailable';
+export type HeldReason = 'time' | 'youth_impact' | 'pain' | 'coach_prime' | 'unavailable' | 'jump_gate';
 
 export interface WarmupNote { id: NoteId; text: string }
 export type NoteId =
   | 'zone' | 'screen_clear' | 'screen_none' | 'untagged' | 'no_key_set' | 'youth_impact' | 'coach_impact' | 'pain'
-  | 'pain_hard' | 'low_day' | 'coach_prime' | 'context_unavailable';
+  | 'pain_hard' | 'low_day' | 'coach_prime' | 'context_unavailable' | 'jump_gate';
 
 export interface WarmupPlan {
   minutes: WarmupMinutes;
@@ -263,6 +305,7 @@ const HELD_WORDS: Record<HeldReason, string> = {
   pain: 'left out after your pain check-in',
   coach_prime: "your coach's Prime section covers it",
   unavailable: 'left out until your details load',
+  jump_gate: "jumps and landings wait for FEL's jump checks",
 };
 /** One line per reason for what the plan left out ("Release the Locks: left out to fit the time"). */
 export function heldBackLines(plan: Pick<WarmupPlan, 'heldBack'>): string[] {
@@ -397,10 +440,12 @@ export function generateWarmup(input: WarmupInput): WarmupPlan {
   const pain = input.painDecision ?? null;
   const painStop = pain !== null && isStopOutcome(pain);
   const youthHold = !!input.isYouth && !input.coachAssignedImpact;
-  const impactOff = youthHold || painStop;
+  // MIRROR-COACH P8 FIX: P8's protocol gate (the header's THE JUMP GATE)
+  const gateClosed = !!input.jumpGate?.closed;
+  const impactOff = youthHold || painStop || (WARMUP_FOLLOWS_JUMP_GATE && gateClosed);
   const low = input.readiness === 'low';
   const unavailable = !!input.contextUnavailable;
-  const gatedWhy: HeldReason = painStop ? 'pain' : unavailable ? 'unavailable' : 'youth_impact';
+  const gatedWhy: HeldReason = painStop ? 'pain' : unavailable ? 'unavailable' : youthHold ? 'youth_impact' : 'jump_gate';
 
   const wake: WarmupStep[] = [];
   const heldBack: WarmupPlan['heldBack'] = [];
@@ -433,8 +478,11 @@ export function generateWarmup(input: WarmupInput): WarmupPlan {
   } else {
     // FEL never chooses an impact primer for an under-18 (rule (b)): a coach's jump work keeps the Wake-Up's own jumping
     // phases, not a jump FEL picked. Only an athlete the youth gate is holding is told the jump waits for their coach.
-    const p = pickPrimer(pattern, !input.isYouth);
+    // MIRROR-COACH P8 FIX: nor for an adult whose jump gate is shut (rule (b) covers a jump FEL picks, whatever the switch)
+    const p = pickPrimer(pattern, !input.isYouth && !gateClosed);
     if (p.skippedImpact && youthHold) heldBack.push({ id: p.skippedImpact.id, name: p.skippedImpact.name, why: unavailable ? 'unavailable' : 'youth_impact' });
+    // (a youth athlete's FEL primer is the calm one whatever the gate says, so only an adult's is held for it)
+    else if (p.skippedImpact && gateClosed && !input.isYouth) heldBack.push({ id: p.skippedImpact.id, name: p.skippedImpact.name, why: 'jump_gate' });
     primer = primerStep(p.primer, p.aim, low);
     primerKind = p.aim;
     primerShort = low;
@@ -500,6 +548,7 @@ export function generateWarmup(input: WarmupInput): WarmupPlan {
   }
   if (painStop) notes.push(isHardStop(pain!) ? { id: 'pain_hard', text: NOTE_COPY.pain_hard } : { id: 'pain', text: NOTE_COPY.pain });
   if (youthHold && !unavailable && heldBack.some((h) => h.why === 'youth_impact')) notes.push({ id: 'youth_impact', text: NOTE_COPY.youth_impact });
+  if (heldBack.some((h) => h.why === 'jump_gate')) notes.push({ id: 'jump_gate', text: jumpGateNote(input.jumpGate?.why ?? '') });
   if (input.isYouth && input.coachAssignedImpact && !painStop && steps.some((s) => s.kind === 'wake_up' && s.impact)) notes.push({ id: 'coach_impact', text: NOTE_COPY.coach_impact });
   if (input.coachPrime) notes.push({ id: 'coach_prime', text: NOTE_COPY.coach_prime });
   if (low) notes.push({ id: 'low_day', text: lowDayNote(launchShort && steps.some((s) => s.shortened), primerShort && steps.some((s) => s.kind === 'primer'), stretchExtra) });
@@ -636,6 +685,9 @@ export interface WarmupContext {
   hardStopped: boolean;
   /** Set only on FALLBACK_WARMUP_CONTEXT: nothing was read, so the plan says so instead of "under 18". */
   unavailable?: true;
+  /** MIRROR-COACH P8 FIX (2026-09-30): P8's protocol gate for this athlete today, its non-youth reasons only (the
+   *  header's THE JUMP GATE). */
+  jumpGate: JumpGate;
 }
 
 /**
@@ -643,7 +695,10 @@ export interface WarmupContext {
  * (no jumps), no area, no pain reading — and the plan says the details did not load (NOTE_COPY.context_unavailable),
  * rather than telling an adult with a birth year on file that they are "under 18, or with no birth year".
  */
-export const FALLBACK_WARMUP_CONTEXT: WarmupContext = { isYouth: true, painDecision: null, zone: null, screen: 'none', screenAt: null, hardStopped: false, unavailable: true };
+export const FALLBACK_WARMUP_CONTEXT: WarmupContext = {
+  isYouth: true, painDecision: null, zone: null, screen: 'none', screenAt: null, hardStopped: false, unavailable: true,
+  jumpGate: { closed: true, why: '', href: null },
+};
 
 // ── running it on Today (the guided run) and the camera hand-off ─────────────────────────────────────────────────────
 
@@ -727,12 +782,19 @@ export function readWarmupContext(json: unknown): WarmupContext {
     : null;
   const screens: readonly ScreenState[] = ['none', 'ungraded', 'clear', 'flagged'];
   const screen = screens.includes(o.screen as ScreenState) ? o.screen as ScreenState : zone ? 'flagged' : 'none';
+  // MIRROR-COACH P8 FIX: the jump gate is open only when the server says so in so many words
+  const g = o.jumpGate && typeof o.jumpGate === 'object' ? o.jumpGate as { closed?: unknown; why?: unknown; href?: unknown } : null;
   return {
     isYouth: o.isYouth !== false,
     painDecision: typeof o.painDecision === 'string' && o.painDecision in PAIN_RANK ? o.painDecision as PainDecision : null,
     zone, screen: zone ? 'flagged' : screen === 'flagged' ? 'none' : screen,
     screenAt: typeof o.screenAt === 'string' ? o.screenAt : null,
     hardStopped: o.hardStopped === true,
+    jumpGate: {
+      closed: g?.closed !== false,
+      why: typeof g?.why === 'string' ? g.why : '',
+      href: typeof g?.href === 'string' && g.href.startsWith('/') ? g.href : null,
+    },
   };
 }
 

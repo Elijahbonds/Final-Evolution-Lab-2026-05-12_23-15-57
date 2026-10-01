@@ -46,7 +46,8 @@ import {
 import type { AgeBand } from '@/lib/screen/age';
 import { clearScreen, keepResult, localForClear, lockAge, readAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
 import { PRE_START, preStep, type PreEvent, type PreState } from '@/lib/screen/flow';
-import { RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
+import { ASSESS_PATH, RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
+import { DEVICE_AUTO_FPS, DEVICE_AUTO_MS } from '@/lib/screen/realtime-cues';
 import { SKELETON_EURO, SKELETON_MIN_VISIBILITY } from '@/lib/screen/ui';
 import { drawSkeleton, SKELETON_COLOURS } from './skeleton';
 import { useVoice } from './use-voice';
@@ -98,6 +99,8 @@ export function AssessApp() {
   const smoothRef = useRef(new PoseFilter(SKELETON_EURO));
   const camRunRef = useRef(0);                                   // the current camera start; a newer one (or a back) cancels it
   const lastJumpRef = useRef<number | null>(null);
+  const deviceOkSince = useRef<number | null>(null);
+  const facingRef = useRef<'user' | 'environment'>('user');
 
   /** Drop this page's listeners; stop the camera too unless `keepFeed` and the QA feed is standing in for it. */
   const cleanup = useCallback((keepFeed = false) => {
@@ -131,6 +134,21 @@ export function AssessApp() {
     cameraFpsRef.current = cam?.frameRate ?? null;
   }, []);
 
+  // Resize / orientation mid-run: keep runner state, resize canvases (SCREEN-REALTIME).
+  useEffect(() => {
+    const onResize = () => {
+      if (phase !== 'device' && phase !== 'running') return;
+      attach();
+      const cam = screenPose().status.camera;
+      if (runnerRef.current && cam?.width && cam.height) {
+        runnerRef.current.calibration.aspect = cam.width / cam.height;
+      }
+    };
+    window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('resize', onResize); window.visualViewport?.removeEventListener('resize', onResize); };
+  }, [phase, attach]);
+
   const startCamera = useCallback(async (model?: 'lite') => {
     // a camera already running is restarted (the lighter model); a QA feed standing in for it is kept (lib/pose/feed.ts)
     cleanup(true);
@@ -154,6 +172,11 @@ export function AssessApp() {
     if (phase === 'device') attach();
   }, [phase, attach]);
 
+  // Skip the camera-info card tap: go straight to the browser prompt (SCREEN-REALTIME speed).
+  useEffect(() => {
+    if (phase === 'cameraInfo') cameraOn();
+  }, [phase]);
+
   const finish = useCallback((v: RunnerView) => {
     cleanup();                                                   // the camera stops the moment the screen ends
     const summary = v.result ? summarize(v.result) : null;
@@ -174,7 +197,7 @@ export function AssessApp() {
     const cam = svc.status.camera;
     const aspect = cam?.width && cam.height ? cam.width / cam.height : 4 / 3;
     previewRef.current?.(); previewRef.current = null;       // the runner draws from here on
-    const runner = new AssessRunner({ aspect, takeoffLeg: null, painAsked: true, cameraFps: () => cameraFpsRef.current });
+    const runner = new AssessRunner({ aspect, takeoffLeg: null, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current });
     runnerRef.current = runner;
     lastSayRef.current = 0;
     setPhase('running');
@@ -188,6 +211,7 @@ export function AssessApp() {
       }
       viewRef.current = v;
       setView(v);
+      runner.autoAdvance(performance.now());
       if (v.step === 'done' || v.step === 'stopped') finish(v);
     }));
   }, [draw, finish, voice]);
@@ -238,7 +262,10 @@ export function AssessApp() {
   const startNew = () => { lastJumpRef.current = null; pre({ type: 'start' }); };
   const answerAge = (a: AgeBand) => pre({ type: 'age', age: a });
   const grownUp = () => pre({ type: 'grownUp' });
-  const answerPainFirst = (hurts: boolean) => pre({ type: 'pain', hurts });
+  const answerPainFirst = (hurts: boolean) => {
+    pre({ type: 'pain', hurts });
+    if (!hurts) setTimeout(() => pre({ type: 'cameraOn' }), 0);
+  };
   const cameraOn = () => pre({ type: 'cameraOn' });
   const resetRun = () => { camRunRef.current++; cleanup(); setView(null); viewRef.current = null; setCaption(''); highFpsRef.current = false; };
   const restart = () => { resetRun(); setKid(null); pre({ type: 'restart' }); };
@@ -260,8 +287,9 @@ export function AssessApp() {
   const aspect = cam?.width && cam.height ? `${cam.width} / ${cam.height}` : '4 / 3';
   const live = phase === 'device' || phase === 'running';
 
-  // the back arrow (S-2): one step back within the screen, and from the start card to /screen; never out of the screen
-  const back: string | (() => void) = phase === 'intro' || phase === 'toResults' ? SCREEN_HOME
+  // S-14: /screen 307-loops back here; use history when we can, else stay on assess.
+  const introBack = () => { if (typeof window !== 'undefined' && window.history.length > 1) window.history.back(); else router.replace(ASSESS_PATH); };
+  const back: string | (() => void) = phase === 'intro' || phase === 'toResults' ? introBack
     : phase === 'running' ? () => setStopAsk(true)
     : phase === 'starting' || phase === 'device' ? cameraBack
     : phase === 'stopped' || phase === 'kidResults' ? restart
@@ -271,11 +299,19 @@ export function AssessApp() {
 
   return (
     <ScreenFrame back={back} right={live ? (
-      <button type="button" onClick={() => voice.setOn(!voice.on)} aria-pressed={voice.on}
-        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-[12px] font-bold text-white/70">
-        {voice.on ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-        Voice {voice.on ? 'on' : 'off'}
-      </button>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => {
+          facingRef.current = facingRef.current === 'user' ? 'environment' : 'user';
+          void screenPose().start({ facingMode: facingRef.current });
+        }} className="rounded-full border border-white/10 px-3 py-1.5 text-[12px] font-bold text-white/70">
+          Flip camera
+        </button>
+        <button type="button" onClick={() => voice.setOn(!voice.on)} aria-pressed={voice.on}
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-[12px] font-bold text-white/70">
+          {voice.on ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          Voice {voice.on ? 'on' : 'off'}
+        </button>
+      </div>
     ) : undefined}>
       {phase === 'intro' ? <StartStep onStart={startNew} /> : null}
       {phase === 'age' ? <AgeStep onAnswer={answerAge} /> : null}
@@ -305,14 +341,15 @@ export function AssessApp() {
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
 
       {live ? (
-        <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: '72vh' }}>
+        <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: 'min(72vh, 100dvh - 12rem)' }}>
           {/* the picture and the skeleton, flipped together so the athlete sees a mirror */}
           <div className="absolute inset-0" style={{ transform: 'scaleX(-1)' }}>
             <canvas ref={pictureRef} aria-hidden className="absolute inset-0 h-full w-full" />
             <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />
           </div>
           {phase === 'device' ? (
-            <DeviceCheck status={status} poseHz={poseHz} tech={tech} onContinue={begin} onLite={() => void startCamera('lite')} />
+            <DeviceCheck status={status} poseHz={poseHz} tech={tech} onContinue={begin} onLite={() => void startCamera('lite')}
+              autoContinue={begin} okSinceRef={deviceOkSince} />
           ) : null}
           {phase === 'running' && view ? (
             <LiveHud view={view} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} />
@@ -349,8 +386,17 @@ function ConfirmCard({ title, body, stay, go, onStay, onGo }: { title: string; b
 }
 
 /** The camera check. `tech`: the numbers, where the QA hooks are allowed; everyone else gets plain words (S-5). */
-function DeviceCheck({ status, poseHz, tech, onContinue, onLite }: { status: PoseStatus | null; poseHz: number; tech: boolean; onContinue: () => void; onLite: () => void }) {
+function DeviceCheck({ status, poseHz, tech, onContinue, onLite, autoContinue, okSinceRef }: {
+  status: PoseStatus | null; poseHz: number; tech: boolean; onContinue: () => void; onLite: () => void;
+  autoContinue?: () => void; okSinceRef?: React.MutableRefObject<number | null>;
+}) {
   const slow = poseHz > 0 && poseHz < MIN_CAMERA_FPS;
+  useEffect(() => {
+    if (!autoContinue || !okSinceRef || poseHz < DEVICE_AUTO_FPS) { if (okSinceRef) okSinceRef.current = null; return; }
+    const now = performance.now();
+    if (okSinceRef.current === null) okSinceRef.current = now;
+    if (now - okSinceRef.current >= DEVICE_AUTO_MS) autoContinue();
+  }, [poseHz, autoContinue, okSinceRef]);
   return (
     <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/75 p-4 backdrop-blur">
       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/50">Camera check</p>

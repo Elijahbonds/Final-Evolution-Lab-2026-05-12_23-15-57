@@ -116,7 +116,7 @@ describe('the map payload says what each node asks, in words', () => {
     const [r1, , , boss] = zone('blacktop').nodes;
     expect(r1).toMatchObject({ goal: 'Score 4 points', mustWin: false });
     expect(boss).toMatchObject({ goal: 'Win the game — first to 11 (or score 10 points)', mustWin: true });
-    expect(zone('tennis').nodes[3]).toMatchObject({ goal: 'Win the match — first to 4 games', mustWin: true });
+    expect(zone('tennis').nodes[3]).toMatchObject({ goal: 'Win the match — first to 6 games', mustWin: true });
     expect(zone('tennis').nodes[1].goal).toBe('Take 2 games');
   });
 });

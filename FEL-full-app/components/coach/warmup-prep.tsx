@@ -60,6 +60,8 @@ export function planFor(exercises: readonly SessionItemLike[], ctx: WarmupContex
     pattern: s.pattern, patternFrom: s.patternFrom, weakestZone: ctx.zone?.id ?? null, minutes, isYouth: ctx.isYouth,
     painDecision: ctx.painDecision, readiness, coachAssignedImpact: s.coachAssignedImpact, coachPrime: s.coachPrime, screen: ctx.screen,
     contextUnavailable: !!ctx.unavailable,
+    // MIRROR-COACH P8 FIX (2026-09-30): P8's protocol gate — a shut gate holds the Wake-Up's jumps and FEL's jump primer
+    jumpGate: ctx.jumpGate,
   });
 }
 

@@ -120,14 +120,14 @@ describe('POST /api/arena/submit-score', () => {
     expect(writes.events[0].payload.card).toBeUndefined();
   });
 
-  it('holds the house rival to the ceiling: a cold-start tennis draw (~21) posts 4, the most a match can end on', async () => {
+  it('holds the house rival to the ceiling: a cold-start tennis draw (~21) posts 6, the most a match can end on', async () => {
     const writes = fakeTx(arenaMatch({ mode: 'tennis', matchType: 'GHOST_DUEL' }));
     const r = await arenaPost({ matchId: 'm1', score: 3 });
     expect(r.status).toBe(200);
     const ghost = writes.events.find((e) => e.eventType === 'GHOST_SCORED')!;
-    expect(ghost.payload.score).toBe(4);
-    expect(Number(ghost.payload.drawnAboveCeiling)).toBeGreaterThan(4);
-    expect(r.json).toMatchObject({ settled: true, p1Score: 3, p2Score: 4 });
+    expect(ghost.payload.score).toBe(6);
+    expect(Number(ghost.payload.drawnAboveCeiling)).toBeGreaterThan(6);
+    expect(r.json).toMatchObject({ settled: true, p1Score: 3, p2Score: 6 });
   });
 
   it('a refused ghost-duel score draws no house score and settles nothing', async () => {

@@ -51,6 +51,8 @@ import { isServerGradedScreen, isUngradedStoredScreen, readStoredScreen, type St
 import { RETEST_HINT, isGraderId, unreadableLine, type GraderId, type UnreadableReason } from '@/lib/mirror/stationGraders';
 import { isScreenNotStation, screenCoverage } from '@/lib/mirror/screenClaims';
 import { PIN_EXERCISE, skillLayer } from './taxonomy';
+// MIRROR-COACH P9 (2026-09-30): a flagged check carries its matching written corrective (PLAN item 9, rule (e)).
+import { screenCorrectiveFor, type ScreenCorrective } from '@/lib/mirror/correctives';
 
 export interface CatalogueExercise {
   id: string;
@@ -94,6 +96,14 @@ export interface Prescription {
   section: typeof CORRECTIVE_SECTION;
   /** What to look for if there is no match — the tags that would match, in words, so an empty slot is actionable. */
   wanted: string[];
+  /**
+   * The matching WRITTEN corrective (MIRROR-COACH P9, 2026-09-30; lib/mirror/correctives.ts SCREEN_CORRECTIVE): the band
+   * drill with its breath and dose, and the release to run first — for an adult client only. Null for a check with none
+   * (the head float, the heel line) and ALWAYS null under youth rules (owner decisions #6, #20). Shown to the coach as
+   * text beside the catalogue match; it is never added to a program as an exercise (rule 1 above: only the coach's own
+   * catalogue goes in).
+   */
+  corrective: ScreenCorrective | null;
 }
 
 /** Correctives go in the session's Prep section: "breath, feet and joints" before the main work (taxonomy.ts). */
@@ -116,7 +126,7 @@ export interface TagWant { pattern?: MovementPattern; skillLayer?: string; joint
 export const WANTED_TAGS: Record<GraderId, readonly TagWant[]> = {
   // "Foot tripod work before anything loaded — short-foot holds, then slow calf raises…"
   heelLine: [{ skillLayer: 'tripod' }, { skillLayer: 'joints', joint: ['ankle', 'calf', 'foot'] }],
-  // "Hip external-rotation and glute-medius work, and slow tempo squats watching the knee…"
+  // "Hip external-rotation work and banded side steps, then slow tempo squats watching the knee…"
   kneeWindow: [{ skillLayer: 'joints', joint: ['hip'] }, { skillLayer: 'strength', pattern: 'squat' }],
   // "Single-leg hip work on the low side…"
   hipLevel: [{ skillLayer: 'strength', pattern: 'lunge' }, { pattern: 'lunge' }],
@@ -199,7 +209,12 @@ export function becauseLine(o: Pick<CheckOutcome, 'checkId' | 'label' | 'side' |
  * not a finding), the pre-P3 borderlines after the flags, one-sided before bilateral, at most `max` — three
  * correctives an athlete does beats nine they skip — and no catalogue row twice.
  */
-export function prescribeFromOutcomes(outcomes: readonly CheckOutcome[], catalogue: readonly CatalogueExercise[], max = 3): Prescription[] {
+export function prescribeFromOutcomes(
+  outcomes: readonly CheckOutcome[], catalogue: readonly CatalogueExercise[], max = 3,
+  // MIRROR-COACH P9: whose draft this is, for the written corrective. Absent → no birth year known → youth rules (none).
+  opts: { youth?: YouthGate } = {},
+): Prescription[] {
+  const youth: YouthGate = opts.youth === undefined ? 'unknownAge' : opts.youth;
   const ranked = outcomes
     .map((o, i) => ({ o, i }))
     .filter(({ o }) => o.status === 'flag')
@@ -232,6 +247,7 @@ export function prescribeFromOutcomes(outcomes: readonly CheckOutcome[], catalog
       workSeconds: dose.workSeconds ?? null,
       section: CORRECTIVE_SECTION,
       wanted: wantedFor(o.checkId),
+      corrective: screenCorrectiveFor(o.checkId, youth, o.side),
     });
   }
   return out;
@@ -264,8 +280,25 @@ export function addBodyFor(p: Prescription, sessionId: string): Record<string, u
   return {
     action: 'add', sessionId, exerciseId: p.exercise.id, section: CORRECTIVE_SECTION,
     sets: p.sets, reps: p.reps, workSeconds: p.workSeconds, load: '', restSeconds: CORRECTIVE_REST_SECONDS, ...tempo,
-    coachNote: p.because,
+    coachNote: coachNoteFor(p),
   };
+}
+
+/**
+ * MIRROR-COACH P9 fix (2026-09-30, code review): THE WRITTEN CORRECTIVE REACHES THE ATHLETE. Rule (e) says the correctives
+ * are reachable "from a coach prescription", and the draft's written corrective was text on the COACH's panel only —
+ * nothing the athlete received from the prescription pointed at it. Now the added Prep row's coach note (what the
+ * athlete reads on Today, "Coach: …") ends with WRITTEN_CORRECTIVE_NOTE and the corrective's page anchor, which Today
+ * renders as a link (components/coach/coach-note.tsx). Still never an exercise row: only the coach's catalogue row is
+ * added. Youth rules hold on both ends — the corrective is null for a youth client, and the correctives page itself
+ * shows a youth athlete why it is off. The finding line stays first (lib/coach/coverage.ts reads SCREEN_NOTE_PREFIX),
+ * trimmed if the pair would pass the 300-character note.
+ */
+export const WRITTEN_CORRECTIVE_NOTE = 'Written corrective:';
+export function coachNoteFor(p: Pick<Prescription, 'because' | 'corrective'>): string {
+  if (!p.corrective) return p.because;
+  const tail = ` ${WRITTEN_CORRECTIVE_NOTE} ${p.corrective.href}`;
+  return `${p.because.slice(0, Math.max(0, COACH_NOTE_CHARS - tail.length))}${tail}`;
 }
 
 /** Every matched corrective of a draft as add bodies, in draft order: what "add the block" sends, one after another. */
@@ -342,8 +375,9 @@ export const ANSWERS_WITHHELD = 'Their answers stay with them until they choose 
 
 /** Youth rules for the client (owner decisions #6, #20; PLAN item 9), said on the coach's side. */
 export const YOUTH_DRAFT_NOTE: Record<Exclude<YouthGate, null>, string> = {
-  minor: 'Under 18: the written corrective blocks are off, and pin-and-stretch rows in your catalogue are not offered.',
-  unknownAge: 'No birth year on file, so youth rules apply: the written corrective blocks are off, and pin-and-stretch rows in your catalogue are not offered.',
+  // MIRROR-COACH P9 (2026-09-30): the band drills and releases the draft now names are off with the blocks
+  minor: 'Under 18: the written corrective blocks are off (the band drills and releases with them), and pin-and-stretch rows in your catalogue are not offered.',
+  unknownAge: 'No birth year on file, so youth rules apply: the written corrective blocks are off (the band drills and releases with them), and pin-and-stretch rows in your catalogue are not offered.',
 };
 
 /** A catalogue row that pins (a pin-and-stretch or a pinned release) — never offered to a youth client (decision #6). */
@@ -508,7 +542,11 @@ export function coachDraft(
   const youth = opts.youth ?? null;
   const outcomes = youth ? withoutBlocks(outcomesOf(stored)) : outcomesOf(stored);
   const offered = youth ? catalogue.filter((e) => !PIN_ROW.test(e.name)) : catalogue;
-  const prescriptions = prescribeFromOutcomes(outcomes, offered);
+  // MIRROR-COACH P9 fix (2026-09-30, code review): the written corrective fails CLOSED here too. `youth` above defaults
+  // to adult (null) — P3's reading for the blocks and the pin rows, unchanged — but the corrective P9 added carries a
+  // release, which is a pin, and prescribeFromOutcomes / prescribePinAndStretch fail closed for exactly the caller that
+  // forgot to say whose draft it is (the dev route did). So an unstated age gets no written corrective.
+  const prescriptions = prescribeFromOutcomes(outcomes, offered, 3, { youth: opts.youth === undefined ? 'unknownAge' : youth });
   const retests = outcomes.filter((o) => o.status === 'retest').length;
   const flags = outcomes.filter((o) => o.status === 'flag').length;
   const complete = stored.summary.ranAll && retests === 0;

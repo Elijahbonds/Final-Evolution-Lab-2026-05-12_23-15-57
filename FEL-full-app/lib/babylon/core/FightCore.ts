@@ -193,8 +193,20 @@ export class RivalFightBrain {
   private stepDir = 1;
   /** Have we already reacted to the wind-up currently on screen? */
   private reactedToStrike = false;
+  /** COMBAT-AI (2026-09-30): punishable strings — consecutive player swings. */
+  private foeStrikeStreak = 0;
+  private foeStrikeGap = 0;
+  private wasFoeStriking = false;
+  /** Seconds left to counter after a successful block read. */
+  private punishSec = 0;
+  /** Round ramp: each round the rival reads a little sooner and presses harder. */
+  private roundBonus = 0;
+  /** Vary the attack mix so rounds do not read as jab spam. */
+  private attackBias = 0;
 
-  constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {}
+  constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {
+    this.attackBias = Math.random();
+  }
 
   /**
    * How hard it is pressing, and what that costs it. Both 1 = it is playing its normal game.
@@ -216,6 +228,11 @@ export class RivalFightBrain {
     if (Number.isFinite(mistake)) this.loose = Math.max(0.5, Math.min(2, mistake));
   }
 
+  /** COMBAT-AI: later rounds read mash strings and counter more reliably. */
+  setRound(round: number): void {
+    this.roundBonus = Math.max(0, Math.min(0.22, (round - 1) * 0.08));
+  }
+
   /** `foeStriking` = the player is mid-swing (readable startup — what the
    *  rival reacts to, exactly like a human watching the wind-up). */
   decide(dt: number, self: Vector3, foe: Vector3, selfState: FighterState, foeStriking: boolean): FightAction {
@@ -226,12 +243,24 @@ export class RivalFightBrain {
     this.circleTimer -= dt;
     this.blockHoldSec = Math.max(0, this.blockHoldSec - dt);
     this.stepHoldSec = Math.max(0, this.stepHoldSec - dt);
+    this.punishSec = Math.max(0, this.punishSec - dt);
     if (this.circleTimer <= 0) { this.circleTimer = 1.4 + Math.random() * 1.6; this.circleDir *= -1; }
 
     const to = foe.subtract(self); to.y = 0;
     const dist = to.length();
     const dir = to.normalize();
     const idealRange = this.attacks.jab.range * 0.9;
+    const effDiff = Math.min(0.92, this.difficulty + this.roundBonus);
+
+    // Track punishable strings: a mash is three swings inside ~1.1 s.
+    if (foeStriking && !this.wasFoeStriking) this.foeStrikeStreak += 1;
+    this.wasFoeStriking = foeStriking;
+    if (foeStriking) this.foeStrikeGap = 0;
+    else {
+      this.foeStrikeGap += dt;
+      if (this.foeStrikeGap > 0.55) this.foeStrikeStreak = 0;
+    }
+    const stringRead = this.foeStrikeStreak >= 2 ? 0.22 : 0;
 
     // REACTIVE GUARD — once per wind-up, not once per frame.
     //
@@ -255,12 +284,13 @@ export class RivalFightBrain {
         // opens a punish) or guard it. Difficulty scales both.
         // NERVE: `loose` is the price of pressing. A rival chasing the fight reads the wind-up less often,
         // so the guard it does not put up is what pays for the pressure it is applying.
-        const read = this.difficulty / this.loose;
-        if (roll < read * 0.35) {
+        const read = Math.min(0.95, effDiff / this.loose + stringRead);
+        if (roll < read * 0.30) {
           this.stepHoldSec = 0.22;
           this.stepDir = Math.random() < 0.5 ? -1 : 1;
-        } else if (roll < read * 0.85) {
-          this.blockHoldSec = 0.45;
+        } else if (roll < read * 0.88) {
+          this.blockHoldSec = this.foeStrikeStreak >= 2 ? 0.55 : 0.45;
+          this.punishSec = 0.42;
         }
       }
     }
@@ -270,17 +300,29 @@ export class RivalFightBrain {
     }
     if (this.blockHoldSec > 0) return { moveX: 0, moveY: 0, attack: null, block: true };
 
-    // attack when in range and off cooldown
-    if (dist <= this.attacks.heavy.range && this.cooldown <= 0) {
-      // NERVE: pressing comes forward sooner. The skill baseline stays `difficulty`; `press` is situation.
-      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, this.difficulty * this.press);
-      const roll = Math.random();
-      const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
-        : roll < 0.45 ? 'jab' : roll < 0.8 ? 'kick' : 'heavy';
+    // Counter window after a read — punish the string with a heavy or kick.
+    if (this.punishSec > 0 && dist <= this.attacks.heavy.range && this.cooldown <= 0) {
+      this.cooldown = (0.85 + Math.random() * 0.7) / Math.max(0.3, effDiff * this.press);
+      this.punishSec = 0;
+      const attack = selfState.chi >= CHI_MAX ? 'heavy'
+        : this.foeStrikeStreak >= 2 || Math.random() < 0.55 ? 'heavy' : 'kick';
       return { moveX: 0, moveY: 0, attack, block: false };
     }
 
-    // spacing: approach when out of range, circle when in range
+    // attack when in range and off cooldown
+    if (dist <= this.attacks.heavy.range && this.cooldown <= 0) {
+      // NERVE: pressing comes forward sooner. The skill baseline stays `difficulty`; `press` is situation.
+      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, effDiff * this.press);
+      const roll = (Math.random() + this.attackBias) % 1;
+      const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
+        : roll < 0.32 ? 'jab' : roll < 0.68 ? 'kick' : 'heavy';
+      return { moveX: 0, moveY: 0, attack, block: false };
+    }
+
+    // spacing: back off from a mashing foe; approach when out of range; circle at ideal range
+    if (this.foeStrikeStreak >= 2 && dist < idealRange + 0.15) {
+      return { moveX: -dir.x * 0.85, moveY: dir.z * 0.85, attack: null, block: false };
+    }
     if (dist > idealRange + 0.3) {
       return { moveX: dir.x, moveY: -dir.z, attack: null, block: false };
     }

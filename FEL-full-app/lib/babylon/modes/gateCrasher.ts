@@ -23,7 +23,7 @@ import { trickSeconds } from '../core/TrickPose';
 import { SNOW_TRICKS, type BoardTrick } from '../core/BoardTricks';
 
 /** The poles stand this far either side of a gate's centre. The world draws them HERE and the verdict reads this. */
-export const GATE_HALF_WIDTH = 1.7;
+export const GATE_HALF_WIDTH = 1.9;
 /** A body whose centre crosses within this of a pole's line brushes it: the pole whips (the verdict is the centre's). */
 export const POLE_BRUSH_M = 0.35;
 /** The share of the gates that makes the run a GATE CRASHER — the win. */

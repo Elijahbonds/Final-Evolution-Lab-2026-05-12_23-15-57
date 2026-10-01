@@ -41,7 +41,14 @@ import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/li
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { RepCounter, type RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
-import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, type CueEvent } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
+import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, fadeReviewLines, type CueEvent, type FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
+// MIRROR-COACH P9 (2026-09-30): the press/row's three faults reach the coach (lib/mirror/pressRowStage.ts), the coach
+// says less as a fault stays fixed (cue-engine.ts, the faded schedule), and the stage can drop the camera picture and
+// keep everything that reads (lib/mirror/skeletonView.ts, components/mirror/skeleton-view.tsx).
+import type { MovementPhase } from '@/lib/babylon/nexus/neuro-mirror/rules/kinematic-engine';
+import { PRESS_ROW_CUE_SHOWN_MS, PRESS_ROW_FAULT_LABEL, initialPressRowCues, stepPressRowCues, type PressRowFault } from '@/lib/mirror/pressRowStage';
+import { readSkeletonOnly, writeSkeletonOnly } from '@/lib/mirror/skeletonView';
+import { CameraImage, SkeletonToggle } from '@/components/mirror/skeleton-view';
 // MIRROR-COACH P1 (2026-09-25): the guided squat's stage clock is a pure step now (lib/mirror/squatStage.ts) — see
 // the onFrame squat branch for why it left the setSquatStage updater.
 import {
@@ -91,6 +98,10 @@ import { ScreenSelfReport } from '@/components/mirror/screen-self-report';
 // coach's draft uses (lib/mirror/screenCorrectives.ts), in plain words, "what the camera saw, not a diagnosis".
 import { ScreenNextSteps } from '@/components/mirror/screen-next-steps';
 import type { YouthGate } from '@/lib/mirror/screenCorrectives';
+// MIRROR-COACH P9 (2026-09-30): the written correctives, mounted — beside the pattern picker, and under a press/row set's
+// summary (lib/mirror/correctives.ts; adults only, youth rules show none).
+import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
+import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -152,7 +163,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const [jumpState, setJumpState] = useState('idle');
   const skeletonRef = useRef<HTMLCanvasElement | null>(null);
   const jumpTrackerRef = useRef(new DunkTracker());
-  const cueEngineRef = useRef(new CueEngine());
+  const cueEngineRef = useRef(new CueEngine({ clearByRep: true }));   // P9 fix: a clean REP clears a fault (cue-engine.ts)
   const [squatStage, setSquatStage] = useState<SquatStage>('breathe');
   // seconds into the breathe stage on the POSE clock (squatStage.ts breathElapsedSec) — what the pacer is drawn at
   const [breathSec, setBreathSec] = useState(0);
@@ -167,6 +178,27 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const [cue, setCue] = useState<CueEvent | null>(null);
   const [cueLog, setCueLog] = useState<CueEvent[]>([]);
   const [voiceOn, setVoiceOn] = useState(true);
+  // MIRROR-COACH P9: the press/row's own coach (one engine per pattern — a squat set says nothing about the elbow, so it
+  // must not step the elbow's faded schedule), its per-frame step, and what the last set's fade says in the review.
+  // Both engines live as long as this page: start() calls reset(), which keeps the faded schedule for the next set.
+  const pressRowCueRef = useRef(new CueEngine({ clearByRep: true }));
+  const pressRowRef = useRef(initialPressRowCues());
+  const [fadeLines, setFadeLines] = useState<string[]>([]);
+  // The skeleton-only view (no camera picture; everything that reads stays). A browser preference, read after mount so
+  // the server render and the first client render agree; never a server write.
+  const [skeletonOnly, setSkeletonOnly] = useState(false);
+  useEffect(() => { setSkeletonOnly(readSkeletonOnly()); }, []);
+  const toggleSkeletonOnly = useCallback(() => {
+    const next = !skeletonOnly;
+    setSkeletonOnly(next);
+    writeSkeletonOnly(next);
+  }, [skeletonOnly]);
+  // MIRROR-COACH P9 fix: the press/row set has no rep cap, so its cue bubble clears itself (pressRowStage.ts)
+  useEffect(() => {
+    if (!cue || pattern !== 'pressRow') return;
+    const id = window.setTimeout(() => setCue(null), PRESS_ROW_CUE_SHOWN_MS);
+    return () => window.clearTimeout(id);
+  }, [cue, pattern]);
   // The guided squat's session state, stepped once per frame by the pure stepSquatSession; the React state above
   // (squatStage, squatReps, squatFindings) is only its mirror for rendering.
   const squatSessionRef = useRef(initialSquatSession());
@@ -343,6 +375,9 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     setReps(null);
     jumpTrackerRef.current.reset();
     cueEngineRef.current.reset();
+    pressRowCueRef.current.reset();
+    pressRowRef.current = initialPressRowCues();
+    setFadeLines([]);
     setSquatStage('breathe');
     setBreathSec(0);
     setSquatReps(0);
@@ -460,7 +495,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             // and only in the WORK set, where the voice cues too (MIRROR-COACH P2 review, 2026-09-26): painted during the
             // breath and the movement check, "KNEES OUT" corrected the athlete during the very measurement the review's
             // "did the correction hold" is judged against, while the voice stayed silent by design (squatStage.ts)
-            paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)), squat.valgusBySide);
+            paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide);
             const step = stepSquatSession(squatSessionRef.current, {
               nowMs: now, phase: squat.phase, present: squat.present, faults: squat.faults, square: squat.square, hipDrop: squat.hipDrop,
             });
@@ -498,6 +533,12 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 speak(evt.text);
               }
             }
+            // MIRROR-COACH P9: the faded schedule is told where a work-set rep ends (with the faults that rep showed —
+            // the same book the review reads) and where the set ends; the review says what the fade did
+            if (was === 'work' && step.repCounted) cueEngineRef.current.endRep(step.state.workReps[step.state.workReps.length - 1] ?? []);
+            if (step.stageChanged && step.state.stage === 'review') {
+              setFadeLines(fadeReviewLines(cueEngineRef.current.endSet(), (f: FaultId) => SQUAT_FAULT_LABEL[f as SquatFault] ?? f));
+            }
           } else if (patternRef.current === 'lunge') {
             // THE LUNGE (MIRROR-COACH P4 lane 1, owner decision #9). No live cue voice or knee overlay here (not asked
             // for — the squat's is a whole coaching-escalation subsystem this phase does not extend); the skeleton
@@ -531,6 +572,21 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             }
           } else {
             paintSkeleton(pose, p);
+            // THE PRESS/ROW'S COACH (MIRROR-COACH P9). Its three faults were read every frame and never reached the voice
+            // (lib/mirror/pressRowStage.ts). Same order as the squat: this frame's cue first, then the rep it closed.
+            if (patternRef.current === 'pressRow') {
+              const pr = stepPressRowCues(pressRowRef.current, { nowMs: pose.timestampMs, present: pose.present, phase: p as MovementPhase, zones, reps: r.reps });
+              pressRowRef.current = pr.state;
+              if (pr.cueFaults) {
+                const evt = pressRowCueRef.current.decide(pose.timestampMs, pr.cueFaults);
+                if (evt) {
+                  setCue(evt);
+                  setCueLog((l) => [...l, evt]);
+                  speak(evt.text);
+                }
+              }
+              if (pr.repFaults) pressRowCueRef.current.endRep(pr.repFaults);
+            }
           }
         },
       });
@@ -572,7 +628,9 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           startedAtMs: s.startedAtMs,
           durationMs: s.durationMs,
           reps: s.reps,
-          avgTempoMs: s.avgTempo ?? null,
+          // MIRROR-COACH P9 fix (2026-09-30): ms per rep (pull + press), the one conversion the correctives use. It posted the
+          // { pullSec, pressSec } object, which the route's num() stores as 0 — every saved session's tempo read 0.
+          avgTempoMs: sessionLikeFromSummary(s).avgTempo,
           avgFrameMs: s.avgFrameMs,
           timeInStableMs: s.timeInStableMs,
           faultCounts: s.faultCounts,
@@ -728,6 +786,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
         void submitScreen(soFar.results, soFar.screen, soFar.grades, { ended: true });
       }
     }
+    // MIRROR-COACH P9: a press/row set ends at End — its fade is settled here and said in the summary
+    if (patternRef.current === 'pressRow' && runtimeRef.current) {
+      setFadeLines(fadeReviewLines(pressRowCueRef.current.endSet(), (f: FaultId) => PRESS_ROW_FAULT_LABEL[f as PressRowFault] ?? f));
+    }
     endZoneSession();
   }, [endZoneSession, submitScreen]);
 
@@ -833,13 +895,16 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             );
           })}
         </div>
+        <CorrectivesPicker youth={youth} />
 
         {/* THE STAGE. The camera is the product here, so it gets the whole width and everything else floats over
             it. Before, it was a 4:3 box in a two-column grid beside a 260px column of bullet lists — the shape of
             a settings page, not of a thing you stand in front of. */}
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-white/10 bg-black
                         shadow-[0_40px_120px_-60px_rgba(0,229,255,0.5)] sm:aspect-[16/10]">
-          <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+          {/* MIRROR-COACH P9: the camera element, hidden in the skeleton-only view (it stays mounted: the pose model reads
+              its frames from it — lib/mirror/skeletonView.ts) */}
+          <CameraImage ref={videoRef} skeletonOnly={skeletonOnly} />
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
           {/* the proof-of-tracking skeleton — drawn from the pose stream */}
           <canvas ref={skeletonRef} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -981,7 +1046,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
 
               {/* THE COACH'S VOICE, one cue at a time, over the picture rather than in a panel below it — you are
                   looking at yourself when the correction lands, not at a sidebar. */}
-              {cue && pattern === 'squat' && squatStage === 'work' && (
+              {cue && ((pattern === 'squat' && squatStage === 'work') || pattern === 'pressRow') && (
                 <div className="pointer-events-none absolute inset-x-4 bottom-24 flex justify-center">
                   <p
                     className="max-w-lg rounded-2xl border px-5 py-3 text-center text-[15px] font-bold backdrop-blur-md"
@@ -1002,14 +1067,17 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 bg-gradient-to-t
                           from-black/80 to-transparent px-4 pb-5 pt-12">
             {!live ? (
-              <button
-                onClick={start}
-                disabled={status === 'requesting' || status === 'loading-model'}
-                className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]
-                           transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
-              >
-                Start session
-              </button>
+              <>
+                <button
+                  onClick={start}
+                  disabled={status === 'requesting' || status === 'loading-model'}
+                  className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]
+                             transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
+                >
+                  Start session
+                </button>
+                <SkeletonToggle skeletonOnly={skeletonOnly} onToggle={toggleSkeletonOnly} />
+              </>
             ) : (
               <>
                 <button
@@ -1030,7 +1098,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                     Skip the retest
                   </button>
                 )}
-                {(pattern === 'squat' || pattern === 'lunge') && (
+                <SkeletonToggle skeletonOnly={skeletonOnly} onToggle={toggleSkeletonOnly} />
+                {(pattern === 'squat' || pattern === 'lunge' || pattern === 'pressRow') && (
                   <button
                     onClick={() => setVoiceOn((v) => !v)}
                     aria-pressed={voiceOn}
@@ -1518,6 +1587,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
               }).line}
             </p>
+            <FadeLines lines={fadeLines} />
           </section>
         )}
 
@@ -1590,10 +1660,22 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 </li>
               ))}
             </ul>
+            {pattern === 'pressRow' && <FadeLines lines={fadeLines} />}
+            {pattern === 'pressRow' && <SessionCorrectives summary={summary} youth={youth} />}
           </section>
         )}
       </div>
     </div>
+  );
+}
+
+/** What the faded schedule did this set (MIRROR-COACH P9, cue-engine.ts fadeReviewLines): nothing when it did nothing. */
+function FadeLines({ lines }: { lines: readonly string[] }) {
+  if (!lines.length) return null;
+  return (
+    <ul data-fade-lines className="mt-3 space-y-1 text-[12.5px] leading-relaxed text-white/55">
+      {lines.map((l) => <li key={l}>{l}</li>)}
+    </ul>
   );
 }
 
