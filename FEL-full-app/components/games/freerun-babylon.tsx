@@ -11,6 +11,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
 
@@ -33,15 +34,14 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      const won = r.outcome === 'win';
       const t = Number(r.stats?.timeSec ?? 0);
-      const result: GameResult = {
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0, won, duration: r.durationSec,
-        // RACING PASS phase 9: the place, the clock and the grade — the grade used to decide the win
-        headline: (() => { const p = Number(r.stats?.place ?? 0), g = ' DCBAS'[Number(r.stats?.grade ?? 0)]?.trim() ?? ''; const ord = p === 1 ? '1ST' : p === 2 ? '2ND' : p === 3 ? '3RD' : `${p}TH`;
-          return r.outcome === 'timeout' ? `OUT OF TIME · ${t}s` : `${p > 0 ? `${ord} · ` : ''}${t}s${g ? ` · GRADE ${g}` : ''}`; })(),
-      };
-      onEnd(result);
+      const p = Number(r.stats?.place ?? 0);
+      const g = ' DCBAS'[Number(r.stats?.grade ?? 0)]?.trim() ?? '';
+      const ord = p === 1 ? '1ST' : p === 2 ? '2ND' : p === 3 ? '3RD' : `${p}TH`;
+      onEnd(gameResultFromSession(r, {
+        won: r.outcome === 'win',
+        headline: r.outcome === 'timeout' ? `OUT OF TIME · ${t}s` : `${p > 0 ? `${ord} · ` : ''}${t}s${g ? ` · GRADE ${g}` : ''}`,
+      }));
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;

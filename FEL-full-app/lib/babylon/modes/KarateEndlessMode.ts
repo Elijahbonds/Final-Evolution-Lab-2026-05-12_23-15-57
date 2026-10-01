@@ -166,6 +166,8 @@ const STRIKES = {
 } as const;
 /** THE-HUNDRED: ground speed (m/s) — was 3 (2.83 measured under the stride filter). The horde is circled, not walked. */
 const MOVE_SPEED = 4.4;
+/** RESULTS-TRUTH / GC-F1: a horde run always posts — three minutes on the clock, then the card. */
+const HUNDRED_SESSION_CAP_SEC = 180;
 /** A held stick cuts a swing's recovery this long after its cancel point (the jab keeps its extension on screen). */
 const MOVE_CANCEL_EXTRA_SEC = 0.1;
 /** The ring the crowd stun throws (unlit, on the floor): peak radius is the move's stun radius. */
@@ -1694,6 +1696,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     update(ctx, dtReal) {
       if (spinApplied) { player.root.rotation.y -= spinApplied; spinApplied = 0; }   // the spin layer: back to the real facing first
       clockSec += dtReal;
+      if (!outFlag && !shopOpen && clockSec >= HUNDRED_SESSION_CAP_SEC) {
+        endSlowMo(ctx);
+        ctx.setHud({ banner: 'TIME!' });
+        return ctx.end('WAVE_CAP', totalKos * 100 + wave * 50 + Math.round(flow.points), { wave, kos: totalKos, bestFlow: flow.best, capped: 1 });
+      }
       ctxRef = ctx;
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       ring?.set(Math.max(0, Math.min(1, vitals.hp / Math.max(1, vitals.maxHp))));   // PLAYER RING: hp as the gauge

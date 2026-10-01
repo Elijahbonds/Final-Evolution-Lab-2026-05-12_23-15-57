@@ -216,8 +216,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     S.done = true;
     if (S.score >= opts.winScore) finishPunch(ctx);
     S.chain.bank(); S.bonus = S.chain.banked;   // phase 4: the run's open pot banks with the run
-    ctx.end(S.score >= opts.winScore ? 'win' : 'complete', S.score, {
-      points: S.score, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt, judgeBest: Math.round(S.judgeBest * 10) / 10,
+    const total = S.score + S.bonus;   // RESULTS-TRUTH WA-5: the HUD total (rotation + banked line) is the one number posted
+    ctx.end(S.score >= opts.winScore ? 'win' : 'complete', total, {
+      points: total, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt, judgeBest: Math.round(S.judgeBest * 10) / 10,
     });
   };
 

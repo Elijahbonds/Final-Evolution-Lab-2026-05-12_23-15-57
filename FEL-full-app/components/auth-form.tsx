@@ -16,6 +16,7 @@ import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
+import { loginDestination } from '@/lib/auth/safeNext';
 import { toast } from 'sonner';
 
 // M8.6 — landing hook: marquee sports so the pre-auth page actually shows what
@@ -134,7 +135,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         return;
       }
       // Land them in the thing they said they came for, not on a menu about it.
-      const dest = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      // S-16: a login ?next= that is a same-origin path wins. Absolute and protocol-relative URLs are ignored.
+      const fallback = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      let nextRaw: string | null = null;
+      if (mode === 'login') {
+        try { nextRaw = new URL(window.location.href).searchParams.get('next'); } catch { /* keep the fallback */ }
+      }
+      const dest = mode === 'login' ? loginDestination(nextRaw, fallback) : fallback;
       if (mode === 'login') {
         try {
           const gate = await fetch('/api/account/birth-year');

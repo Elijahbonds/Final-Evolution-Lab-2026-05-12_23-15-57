@@ -106,14 +106,11 @@ export const STORY_YARDSTICKS: Readonly<Record<string, StoryYardstick>> = {
       + 'wall out of every fielder\'s reach for 107 — three of them (the derby\'s own win) post 321',
   },
   football: {
-    unit: POINTS, verb: 'Score', postsWin: false, winGoal: '', winEvidence: null,
+    unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Score on all three drives',
+    winEvidence: 'RESULTS-TRUTH WA-8: three touchdown drives end DRIVES_DONE and the host posts won:true',
     ceiling: null, reach: 300,
-    // HOTFIX (2026-09-24): a FLOOR, not a ceiling. Evades (+20, ×2 in a breakaway), pounces, trucks, coins (×5),
-    // ramps and rails all add, and a touchdown is 100 + 10 per evade so far — one long drive can post 300 alone.
     basis: 'FootballRushMode: 3 drives, a touchdown pays 100 + 10 per evade so far (×1.5 in a breakaway) — 300 is the '
-      + 'least three touchdowns can post, a floor the rules guarantee, not a measured run (evades, trucks, coins, ramps '
-      + 'and rails all add). The host checks for a TOUCHDOWN outcome the mode never sends, so football never posts a '
-      + 'win (owner item)',
+      + 'least three touchdowns can post. Finishing all three drives posts DRIVES_DONE and won:true (RESULTS-TRUTH WA-8).',
   },
   soccer: {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Win the shootout',

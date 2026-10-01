@@ -11,6 +11,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { BoostGauge } from './boost-hud';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -67,17 +68,12 @@ export function makeAirHost(modeKey: string, title: string) {
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;
-          onEndRef.current({
-            score: r.score,
-            stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-            opponentScore: 0,
+          onEndRef.current(gameResultFromSession(r, {
             won: r.outcome === 'win',
-            duration: r.durationSec,
-            // boards pass phase 10: big air reads its judge; the vault keeps its line
             headline: r.stats?.judgeBest !== undefined
               ? `${r.outcome === 'win' ? 'STOMPED THE FINAL' : 'FINAL OVER'} · JUDGES BEST ${Number(r.stats.judgeBest).toFixed(1)}`
               : r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
-          } satisfies GameResult);
+          }));
         },
       }).then((s) => {
         // If a newer mount already claimed this canvas, do NOT run our teardown —
@@ -106,9 +102,6 @@ export function makeAirHost(modeKey: string, title: string) {
           <div className="pointer-events-none absolute left-4 top-4 z-20 font-mono text-xs text-white">
             <div className="text-2xl font-bold text-[#ffd75e]">{String(hud.score ?? 0)}</div>
             <div className="text-white/60">ATTEMPT {String(hud.attempt ?? '—')} · {String(hud.phase ?? '')}</div>
-            <div className="text-white/60">
-              speed {String(hud.speed ?? 0)} · height {String(hud.height ?? 0)} · spin {String(hud.spin ?? 0)}
-            </div>
             {/* nextFoot is the cadence mechanic's core readout — which stride
                 comes next — and the bezel dropped it (same trap as the 3PT
                 board and football's drive state: published is not rendered).
