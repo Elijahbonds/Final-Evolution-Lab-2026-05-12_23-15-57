@@ -14,7 +14,7 @@ export interface P2 { x: number; z: number }
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export const BREAK = {
-  clockSec: 9, startZ: -8, keeperZ: 10.4, goalZ: 11,
+  clockSec: 11, startZ: -8, keeperZ: 10.4, goalZ: 11,   // FIELD-DEPTH W4: longer breakaway run per kick
   /** The curved glass down each side; a run INTO it at speed goes up it. */
   glassX: 7.6, glassWindow: 0.9, glassMinSpeed: 4.5, wallRunSec: 1.2, wallRunMult: 1.15, wallRunY: 0.5,
   /** The ball rides this far ahead of the feet; a shot needs it inside `strikeReach`. */
