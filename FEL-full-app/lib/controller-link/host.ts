@@ -97,6 +97,15 @@ export class HostSession {
 
   async start(): Promise<string> {
     this.code = await createRoom(this.opts.config.modeId, this.hostId);
+    // MUSIC-SUITE P10 (2026-09-29): DISPOSED WHILE THE ROOM WAS BEING MADE. dispose() stops the poll and the ping — but a
+    // session disposed during this await had neither yet, so it started both AFTER its dispose and nothing ever stopped
+    // them: a mailbox poll every POLL_MS (250 ms) for the life of the page. Measured live on :3121
+    // (scripts/probes/_music-p10-phone-dispose.mts): after leaving the Academy with a phone paired, the page went on
+    // polling `/api/controller-link/signal?code=<a room no phone ever joined>&after=0` ~5 times a second — the session
+    // React's dev double-mount made and threw away mid-createRoom; in production the same race is any lobby unmounted
+    // inside the room POST (leaving PERFORM, closing the badge, a REPLAY remount). A disposed session keeps its code
+    // (the caller's `disposed` guard already ignores it) and starts nothing. hostDispose.test.ts replays it.
+    if (this.disposed) return this.code;
     this.opts.onState?.('signaling');
 
     this.stopPoll = pollSignals(this.code, this.addr, (m) => void this.onSignal(m));
