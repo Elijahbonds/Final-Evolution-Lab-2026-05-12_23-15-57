@@ -314,9 +314,11 @@ export function makeAeroAcesMode(): ModeDefinition {
 
   return {
     modeId: 'aeroaces',
-    hideRingInPlay: true,
     get mood(): ModeDefinition['mood'] { return readCourse('aero').mood; },
     camPreset: 'flyer',
+    // GC-7. After mood/camPreset: pickerReach's modesById() only recognises a modeId whose next property
+    // is mood or camPreset (see VelocityKartMode).
+    hideRingInPlay: true,
 
     async load(ctx: ModeContext): Promise<void> {
       baseFov = null;

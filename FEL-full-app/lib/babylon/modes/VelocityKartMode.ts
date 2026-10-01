@@ -817,11 +817,13 @@ function finish(ctx: ModeContext): void {
 
 return {
   modeId: 'velocitykart',
-  hideRingInPlay: true,
   // A GETTER, read at mount after the course has been picked: a plain value would be evaluated when the mode
   // definition is built, which is before anybody has chosen a map, and every track would be lit for Venice.
   get mood(): ModeDefinition['mood'] { return readCourse('kart').mood; },
   camPreset: 'runner',
+  // GC-7. After mood/camPreset, not before: pickerReach's modesById() only recognises a modeId whose next
+  // property is mood or camPreset, and flag-first here made the mode invisible to that guard.
+  hideRingInPlay: true,
 
   async load(ctx: ModeContext): Promise<void> {
     // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
