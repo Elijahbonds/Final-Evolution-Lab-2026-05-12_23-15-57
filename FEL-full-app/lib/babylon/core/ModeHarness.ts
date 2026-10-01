@@ -177,6 +177,8 @@ export interface ModeDefinition {
    * flag it would overwrite dunk's crowd every single frame.
    */
   ownsCrowd?: boolean;
+  /** GC-7: hide the harness player ring and glyph during play — off by default so stamina arc stays on other modes. */
+  hideRingInPlay?: boolean;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -761,10 +763,12 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     const hit = scene.pickWithRay(new Ray(new Vector3(at.x, at.y + 0.3, at.z), Vector3.Down(), 6), (m) => m.isEnabled() && m.isVisible && m.getTotalVertices() > 0 && !m.isDescendantOf(root) && !/^player_/.test(m.name));   // NOT isPickable: the kart's road is unpickable and sits above the pickable venue ground
     const y = hit?.hit && hit.distance > 0.4 ? -(hit.distance - 0.3) : at.y > 0.15 && at.y < 0.9 ? -at.y : 0;
     ring = mountPlayerRing(scene, root, { color: card?.accent ?? '#22d3ee', icon: readPlayerIcon(), harness: true, radius, y });
+    ring.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
   };
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     ringFollow();
+    ring?.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
     // MOVEMENT PLAY P3 (2026-09-24): the body's clock between camera frames, in every phase — the lost deadline, the
     // stalled-camera watchdog, a release when the game leaves 'playing', and body presses whose release is due when the
     // next frame is late. Before update(), so a pause lands before the mode runs another frame.

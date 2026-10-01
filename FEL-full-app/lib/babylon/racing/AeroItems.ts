@@ -27,7 +27,7 @@ export const ITEM_LABEL: Record<ItemKind, string> = { missile: 'MISSILE', boost:
 
 export const BALLOON_RESPAWN_SEC = 3;
 export const BALLOON_RADIUS = 5.5;   // a toy plane is ~5 m tip to tip: a balloon brushed by a wing is a balloon taken
-export const BANANA_RADIUS = 4;
+export const BANANA_RADIUS = 5.5;
 export const BANANA_CAP = 10;
 export const BANANAS_LOST_ON_HIT = 2;
 export const BOOST_ZIP_SEC = [0, 1.2, 2.0, 3.0];
