@@ -28,6 +28,11 @@ const NOT_IMPORTED: Record<string, string> = {
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.
   'lib/testing/sourceScan.ts': 'test support — imported by the rule tests that scan source, and tests are not counted as consumers',
+  // R5 / HOOPS-10 round 5 (2026-10-01): training had no headless sim while dance, dunkduel and irl/acting all
+  // carry one. The sim is the mode's scoring rules extracted so the integrity ceiling and the win-rate read run
+  // headless; its only caller today is its test (same class as sourceScan above — tests are not consumers).
+  // A headed-rig probe or the integrity model importing it means deleting this line.
+  'lib/babylon/core/trainingSim.ts': 'the training scoring model — run by trainingSim.test.ts and the integrity suite\'s ceiling basis; tests are not counted as consumers',
   // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
   // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
