@@ -809,9 +809,9 @@ function buildSlalomGates(scene: Scene, all: AbstractMesh[], markers: Vector3[],
   strips.thinInstanceSetBuffer('matrix', stripBuf, 16, true); strips.thinInstanceSetBuffer('color', stripCol, 4, false);
 
   // the marker over the next gate: a lit chevron that bobs, the one bright thing on the run
-  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 0.9, diameterBottom: 0, height: 0.8, tessellation: 4 }, scene);
+  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 1.35, diameterBottom: 0, height: 1.2, tessellation: 4 }, scene);
   const markM = new PBRMaterial('gateNextM', scene);
-  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(0.9);
+  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(1.35);
   markM.metallic = 0; markM.roughness = 0.6;
   marker.material = markM; marker.isPickable = false; marker.setEnabled(false);
   all.push(marker);

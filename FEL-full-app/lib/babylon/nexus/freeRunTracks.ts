@@ -26,22 +26,22 @@ export interface FreeRunTrack {
 export const FREERUN_TRACKS: readonly FreeRunTrack[] = [
   {
     id: 'neon-rooftop', name: 'Neon Rooftop Run', sub: 'BILLBOARD WALL-RUNS · ELEVATOR-SHAFT REBOUNDS · POWER-LINE RAILS', tint: '#22d3ee',
-    sections: ['alley', 'shaft', 'straight', 'gaps', 'shaft', 'chokepoint', 'straight'],
+    sections: ['alley', 'shaft', 'straight', 'gaps', 'shaft', 'chokepoint', 'straight', 'gaps', 'shaft', 'chokepoint', 'stacks'],
     world: { mood: 'nightGame', backdrop: 'venice', colors: { ground: '#2a2440', vault: '#f472b6', wall: '#22d3ee', ledge: '#a78bfa', roof: '#a78bfa', rail: '#22d3ee', hazard: '#fbbf24', spring: '#34d399', gate: '#f87171', anchor: '#fde68a', slope: '#3b3552' } },
   },
   {
     id: 'hydro-dam', name: 'Overgrown Hydro-Dam', sub: 'THE SPILLWAY SURF · THE PIPE RAILS · THE TURBINE CHOKEPOINT', tint: '#34d399',
-    sections: ['alley', 'spillway', 'gaps', 'straight', 'chokepoint', 'spillway', 'gaps'],
+    sections: ['alley', 'spillway', 'gaps', 'straight', 'chokepoint', 'spillway', 'gaps', 'canyon', 'stacks', 'chokepoint', 'spillway'],
     world: { mood: 'overcast', backdrop: 'alpine', colors: { ground: '#5a6a5e', vault: '#8a7a4a', wall: '#6b7a6e', ledge: '#3fb8b0', roof: '#3fb8b0', rail: '#9aa3ad', hazard: '#c98a4b', spring: '#7dd3fc', gate: '#f87171', anchor: '#fde68a', slope: '#4f6b66' } },
   },
   {
     id: 'freight-terminal', name: 'Freight Terminal Grid', sub: 'CONTAINER STACKS · DRAFTING LANES · GATES UNDER THE CRANES', tint: '#f59e0b',
-    sections: ['straight', 'stacks', 'alley', 'straight', 'stacks', 'gaps', 'chokepoint'],
+    sections: ['straight', 'stacks', 'alley', 'straight', 'stacks', 'gaps', 'chokepoint', 'straight', 'stacks', 'gaps', 'canyon'],
     world: { mood: 'daylight', backdrop: 'ocean', colors: { ground: '#6b6f78', vault: '#c2410c', wall: '#7c2d12', ledge: '#f59e0b', roof: '#f59e0b', rail: '#e5e7eb', hazard: '#b45309', spring: '#34d399', gate: '#f87171', anchor: '#fde68a', slope: '#565a63' } },
   },
   {
     id: 'sunken-temple', name: 'Sunken Temple Highway', sub: 'THE WAVE-RIDER RUN · THE WALL-BOUND CANYON · THE AQUEDUCT GATE', tint: '#fbbf24',
-    sections: ['canyon', 'gaps', 'alley', 'canyon', 'spillway', 'stacks', 'straight'],
+    sections: ['canyon', 'gaps', 'alley', 'canyon', 'spillway', 'stacks', 'straight', 'gaps', 'canyon', 'stacks', 'chokepoint'],
     world: { mood: 'goldenHour', backdrop: 'ocean', colors: { ground: '#b8a888', vault: '#8a7a5a', wall: '#a08a6a', ledge: '#d9c39a', roof: '#d9c39a', rail: '#7a6a4a', hazard: '#9a8a6a', spring: '#7dd3fc', gate: '#f87171', anchor: '#fde68a', slope: '#a89878' } },
   },
 ];

@@ -13,6 +13,8 @@ const h = vi.hoisted(() => ({
   db: {
     users: [] as Row[], intakes: [] as Row[], scans: [] as Row[], consents: [] as Row[], pain: [] as Row[],
     calls: [] as { model: string; op: string; args: Row }[],
+    /** MIRROR-COACH P8 FIX: the stored Quick Screens cannot be read (the protocol gate's landing read fails). */
+    quickScreensOffline: false,
   },
 }));
 
@@ -28,10 +30,18 @@ function fakeDb() {
   const newest = (a: Row, b: Row) => +new Date(b.createdAt) - +new Date(a.createdAt);
   return {
     user: { findUnique: async (args: Row) => { log('user', 'findUnique', args); const u = d.users.find((x) => x.id === args.where.id); return u ? { dobYear: u.dobYear } : null; } },
-    healthIntake: { findFirst: async (args: Row) => { log('healthIntake', 'findFirst', args); return d.intakes.filter((x) => x.userId === args.where.userId).sort(newest)[0] ?? null; } },
+    healthIntake: {
+      findFirst: async (args: Row) => { log('healthIntake', 'findFirst', args); return d.intakes.filter((x) => x.userId === args.where.userId).sort(newest)[0] ?? null; },
+      // MIRROR-COACH P8 FIX: the protocol gate's intake-history read (protocolGateServer.ts loadProtocolFacts)
+      findMany: async (args: Row) => {
+        log('healthIntake', 'findMany', args);
+        return d.intakes.filter((x) => x.userId === args.where.userId && x.createdAt >= args.where.createdAt.gte).sort(newest).map((x) => ({ createdAt: x.createdAt, redFlags: x.redFlags }));
+      },
+    },
     workoutScan: {
       findMany: async (args: Row) => {
         log('workoutScan', 'findMany', args);
+        if (d.quickScreensOffline && args.where.kind === 'mirror_assessment') throw new Error('workoutScan is offline');
         return d.scans.filter((x) => x.userId === args.where.userId && x.kind === args.where.kind).sort(newest).slice(0, args.take).map((x) => ({ metrics: x.metrics, createdAt: x.createdAt }));
       },
     },
@@ -55,6 +65,10 @@ import { scoreScreen } from '@/lib/mirror/screen';
 import { storedScreen } from '@/lib/mirror/screenStore';
 import { regradeFromSummary } from '@/lib/mirror/stationGraders';
 import { readFileSync } from 'node:fs';
+import { GATE_UNREAD_LINE, PROTOCOL_WHY } from './protocolGate';
+import { INTAKE_IDS, INTAKE_VERSION } from '../health/intake';
+import { bandOf } from '../assess/thresholds';
+import { readWarmupContext } from './warmup';
 
 // ── screens, made the way the route makes them (mirrorToProgram.test.ts's recipe) ───────────────────────────────────
 const PASS = {
@@ -93,7 +107,7 @@ async function get(as: string | null = 'athlete-1'): Promise<{ status: number; j
 
 beforeEach(() => {
   h.db.users = [{ id: 'athlete-1', dobYear: ADULT }, { id: 'athlete-2', dobYear: ADULT }];
-  h.db.intakes = []; h.db.scans = []; h.db.consents = []; h.db.pain = []; h.db.calls = [];
+  h.db.intakes = []; h.db.scans = []; h.db.consents = []; h.db.pain = []; h.db.calls = []; h.db.quickScreensOffline = false;
 });
 
 describe('GET /api/coach/me/warmup', () => {
@@ -106,7 +120,11 @@ describe('GET /api/coach/me/warmup', () => {
   it('an adult with nothing on file: no area, no pain reading, not youth, not stopped', async () => {
     const r = await get();
     expect(r.status).toBe(200);
-    expect(r.json).toEqual({ isYouth: false, painDecision: null, zone: null, screen: 'none', screenAt: null, hardStopped: false });
+    // MIRROR-COACH P8 FIX: + the protocol gate's verdict — shut, with its one line (no health answers on file)
+    expect(r.json).toEqual({
+      isYouth: false, painDecision: null, zone: null, screen: 'none', screenAt: null, hardStopped: false,
+      jumpGate: { closed: true, why: PROTOCOL_WHY.no_health_consent, href: '/play/mirror' },
+    });
   });
 
   it('youth from the birth year — and a blank birth year is youth (decision #20)', async () => {
@@ -218,5 +236,73 @@ describe('end to end: the context → the plan', () => {
     expect(plan.steps.find((s) => s.kind === 'rock_hold')!.id).toBe('ankle-rock');
     expect(plan.steps.some((s) => s.impact)).toBe(false);
     expect(plan.steps.find((s) => s.kind === 'primer')!.id).toBe('fast-squat-primer');
+  });
+});
+
+
+// ── MIRROR-COACH P8 FIX (2026-09-30, code review): the warm-up follows P8's protocol gate ────────────────────────────
+describe("THE JUMP GATE: an adult whose gate is shut gets no Wake-Up jumps and no jump primer (rule (b))", () => {
+  const cleanAnswers = (over: Row = {}) => ({
+    [INTAKE_IDS.currentPain]: false, [INTAKE_IDS.recentInjuryOrSurgery]: false, [INTAKE_IDS.dizzinessFaintingChestPain]: false,
+    [INTAKE_IDS.heartOrBpCondition]: false, [INTAKE_IDS.pregnancyOrPostpartum]: false, [INTAKE_IDS.heartRateOrBalanceMedicine]: false,
+    [INTAKE_IDS.clinicianToldToAvoid]: false, ...over,
+  });
+  const FLEX = bandOf('t5.landingFlex'), VALGUS = bandOf('t5.landingValgus');
+  /** Every check passing for athlete-1: consent, a clean current intake, a passed landing check 3 days old. */
+  const allClear = (answers: Row = {}) => {
+    h.db.consents.push({ userId: 'athlete-1', scope: 'health_data', coachId: null, grantedAt: ago(24 * 30), revokedAt: null });
+    h.db.intakes.push({ userId: 'athlete-1', version: INTAKE_VERSION, createdAt: ago(24 * 10), answers: cleanAnswers(answers), redFlags: [], clearedAt: null });
+    h.db.scans.push({
+      userId: 'athlete-1', kind: 'mirror_assessment', createdAt: ago(72),
+      metrics: { assessmentId: 'a1', tests: [{ id: 'T5', status: 'scored', confidence: 0.9, sides: { both: { repsValid: 3, repsTotal: 3, complete: true, metrics: { landingFlex: FLEX.good, landingValgusLeft: VALGUS.good, landingValgusRight: VALGUS.good }, faults: [] } } }] },
+    });
+  };
+  const planOf = (ctx: WarmupContext) => generateWarmup({ pattern: 'squat', weakestZone: null, minutes: 14, isYouth: ctx.isYouth, painDecision: ctx.painDecision, readiness: null, jumpGate: ctx.jumpGate });
+
+  it('every check passing: open — the Wake-Up keeps its jumps and FEL picks the jump primer', async () => {
+    allClear();
+    const ctx = (await get()).json;
+    expect(ctx.jumpGate).toEqual({ closed: false, why: '', href: null });
+    const plan = planOf(ctx);
+    expect(plan.steps.filter((s) => s.impact).map((s) => s.id)).toEqual(['build-the-rhythm', 'prime-the-launch', 'squat-jump-primer']);
+  });
+
+  it("THE CASE: an intake 'yes' on a recent injury or surgery, a landing check on file — shut, and the warm-up agrees with Prime", async () => {
+    allClear({ [INTAKE_IDS.recentInjuryOrSurgery]: true });
+    const ctx = (await get()).json;
+    expect(ctx.jumpGate).toEqual({ closed: true, why: PROTOCOL_WHY.intake_answer, href: null });
+    const plan = planOf(ctx);
+    expect(plan.steps.some((s) => s.impact)).toBe(false);
+    expect(plan.steps.find((s) => s.kind === 'primer')!.impact).toBe(false);
+    expect(plan.heldBack.filter((x) => x.why === 'jump_gate').map((x) => x.id)).toEqual(['build-the-rhythm', 'prime-the-launch', 'squat-jump-primer']);
+    expect(plan.notes.find((n) => n.id === 'jump_gate')!.text).toContain(PROTOCOL_WHY.intake_answer);
+  });
+
+  it('an adult who never took the jump test (nearly everyone at launch): shut, with the landing line', async () => {
+    allClear();
+    h.db.scans = [];
+    expect((await get()).json.jumpGate).toEqual({ closed: true, why: PROTOCOL_WHY.landing_never, href: '/play/mirror/assess' });
+  });
+
+  it("a minor's youth rule is not in the verdict (a coach's Prime jumps can still lift it) — only the other reasons are", async () => {
+    allClear();
+    h.db.users[0].dobYear = MINOR;
+    const ctx = (await get()).json;
+    expect(ctx.isYouth).toBe(true);
+    expect(ctx.jumpGate.closed).toBe(false);
+  });
+
+  it('a failed read of the gate closes it with the unread line — the rest of the context still loads', async () => {
+    allClear();
+    h.db.quickScreensOffline = true;
+    const r = await get();
+    expect(r.status).toBe(200);
+    expect(r.json.jumpGate).toEqual({ closed: true, why: GATE_UNREAD_LINE, href: null });
+  });
+
+  it('an answer without a verdict (an older server) reads as shut', () => {
+    expect(readWarmupContext({ isYouth: false }).jumpGate.closed).toBe(true);
+    expect(readWarmupContext({ isYouth: false, jumpGate: { closed: false, why: '', href: null } }).jumpGate.closed).toBe(false);
+    expect(readWarmupContext({ isYouth: false, jumpGate: { closed: false, href: 'https://evil.test' } }).jumpGate.href).toBeNull();
   });
 });

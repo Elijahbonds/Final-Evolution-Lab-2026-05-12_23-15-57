@@ -433,6 +433,43 @@ export function lessonFlip(item: Pick<FlipPackItem, 'bpm' | 'swing' | 'lesson'>,
   return out;
 }
 
+/**
+ * MUSIC-SUITE P10 (2026-09-29): the lesson demo on the AUDIO CLOCK — every hit's start time, read off ONE clock read
+ * (`now`, the context's currentTime when the demo is pressed) plus a short lead so the first hit is not already late.
+ * P5's demo fired each hit from its own setTimeout and drifted up to 14.0 ms (18.7 ms worst) off the theme's cuts; hits
+ * started at these times are sample-exact (FlipPad scheduleDemo). Hits keep their order and their spacing exactly.
+ */
+export const LESSON_LEAD_SEC = 0.06;
+export function lessonSchedule(hits: readonly LessonHit[], now: number, lead = LESSON_LEAD_SEC): { pad: number; when: number }[] {
+  const t0 = (Number.isFinite(now) ? now : 0) + Math.max(0, lead);
+  return hits.filter((h) => Number.isFinite(h.at) && h.at >= 0).map((h) => ({ pad: h.pad, when: t0 + h.at }));
+}
+
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): ■ STOP ON THE LESSON DEMO, pure. scheduleDemo (FlipPad.tsx) starts every hit of the
+ * demo ahead of time, so STOP cannot simply clear timers: hits already started and hits scheduled for later are both live
+ * sources. Its stop was Web Audio written inline and untested (the review: "if ■ STOP breaks, a 2-bar demo plays on after
+ * STOP"). The plan, now here and tested with a fake AudioParam: at `now`, every hit's own gain drops its automation and
+ * glides to 0 with a DEMO_STOP_TAU_SEC time constant (no hard node.stop — FlipPad.p5.test pins that a pad has no stop
+ * gate; its gate is baked into the chop), and DEMO_STOP_DISCONNECT_MS later — well after the fade — each gain leaves
+ * the strip, so a hit not started yet starts into nothing. After 50 ms the level is e^(−5) ≈ −43 dB; at the disconnect
+ * (80 ms) e^(−8) ≈ −69 dB, then nothing.
+ */
+export const DEMO_STOP_TAU_SEC = 0.01;
+export const DEMO_STOP_DISCONNECT_MS = 80;
+export interface DemoGainLike {
+  gain: { cancelScheduledValues(t: number): unknown; setTargetAtTime(v: number, t: number, tau: number): unknown };
+  disconnect(): void;
+}
+export function stopDemoHits(
+  gains: readonly DemoGainLike[], now: number, later: (fn: () => void, ms: number) => unknown = (fn, ms) => setTimeout(fn, ms),
+): void {
+  for (const g of gains) {
+    try { g.gain.cancelScheduledValues(now); g.gain.setTargetAtTime(0, now, DEMO_STOP_TAU_SEC); } catch { /* a closed context */ }
+  }
+  later(() => { for (const g of gains) { try { g.disconnect(); } catch { /* already gone */ } } }, DEMO_STOP_DISCONNECT_MS);
+}
+
 /** The re-flip as the card writes it: pad numbers counted from 1, '·' for a rest. */
 export function flipPatternCells(lesson: Pick<FlipLesson, 'flipPattern'>): string[] {
   return lesson.flipPattern.map((p) => (p === null ? '·' : String(p + 1)));

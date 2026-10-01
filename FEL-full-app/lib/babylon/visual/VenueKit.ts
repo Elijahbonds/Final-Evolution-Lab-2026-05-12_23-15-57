@@ -396,7 +396,7 @@ export const VenueKit = {
     }
   },
 
-  buildSlope(scene: Scene, liftCable?: GrindLine): void {
+  buildSlope(scene: Scene, liftCable?: GrindLine, opts?: { walls?: boolean }): void {
     // Pass 5 phase 7: big air's piste was near-white (#eef4fa) with faint groom lines under the alpine sky and read as a
     // flat white sheet. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
     // The piste's own extent, so nothing placed on it can drift past its edge (see the gate flags below).
@@ -409,7 +409,7 @@ export const VenueKit = {
         ctx.beginPath(); ctx.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 24, 3 + Math.random() * 5, 0, 0, Math.PI * 2); ctx.fill();
       }
     });
-    venueBox(scene, 64, 404, 12, [paintTrees(true)]);
+    if (opts?.walls !== false) venueBox(scene, 64, 404, 12, [paintTrees(true)]);
     // GATE FLAGS, ON THE SNOW. This ran to z −360 on a piste that ends at −200, so the last three pairs hung
     // in the air 160 m past the ground (found by scripts/probes/_ground-audit.mts: six gates over nothing).
     // Bound to the piste's own length now, with a margin, so the two cannot drift apart again.
@@ -521,6 +521,15 @@ export const VenueKit = {
       rough.isPickable = false;
       return;
     }
-    venueBox(scene, bw, bl, 7, [paintBleachers(CROWD), paintTrees(false)]);
+    // WA-17: pitch used paintTrees on the walls — stretched dark-green cones that smeared in the stadium camera.
+    const walls = preset === 'pitch'
+      ? [paintBleachers(CROWD), paintBleachers(CROWD), paintBleachers(CROWD), paintBleachers(CROWD)]
+      : [paintBleachers(CROWD), paintTrees(false)];
+    venueBox(scene, bw, bl, 7, walls);
+  },
+
+  /** Big-air slope: same groomed piste as buildSlope but no venueBox tree walls (WA-7 stretched prisms). */
+  buildBigAirSlope(scene: Scene): void {
+    VenueKit.buildSlope(scene, undefined, { walls: false });
   },
 };

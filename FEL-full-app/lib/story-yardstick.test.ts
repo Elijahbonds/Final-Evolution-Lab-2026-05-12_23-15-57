@@ -69,9 +69,9 @@ describe('each yardstick is what its mode actually posts', () => {
     expect(STORY_YARDSTICKS.volleyball.postsWin).toBe(true);
   });
 
-  it('Match Point: first to 4 games posts the games you took — run on RallyCore', () => {
-    has('lib/babylon/modes/NetSportMode.ts', "tennisScore = o.scoring === 'tennis' ? new TennisScore(4) : null;");
-    const t = new TennisScore(4);
+  it('Match Point: first to 6 games posts the games you took — run on RallyCore', () => {
+    has('lib/babylon/modes/NetSportMode.ts', "tennisScore = o.scoring === 'tennis' ? new TennisScore(6) : null;");
+    const t = new TennisScore(6);
     let r: string = 'point';
     while (r !== 'match') r = t.award(0);
     expect(t.games[0]).toBe(STORY_YARDSTICKS.tennis.reach);
@@ -107,7 +107,7 @@ describe('each yardstick is what its mode actually posts', () => {
     expect(STORY_YARDSTICKS.snowboarding.reach).toBe(Math.ceil(gates * share) * 100);
   });
 
-  it('The Loop: a par card posts 420 (par 3-4-3, the last hole ×1.5) and par or better wins', () => {
+  it('The Loop: a par card posts 660 (par 3-4-4-3-5, the last hole ×1.5) and par or better wins', () => {
     const m = 'lib/babylon/modes/precisionModes.ts';
     const par = src(m).match(/export const GOLF_PAR = \[([\d, ]+)\] as const;/);
     expect(par).not.toBeNull();
@@ -141,7 +141,7 @@ describe('each yardstick is what its mode actually posts', () => {
     expect(STORY_YARDSTICKS.baseball).toMatchObject({ reach: 3 * homer, postsWin: true });
   });
 
-  it('Breakaway: three drives, a touchdown pays 100 or more — and finishing all three posts a win', () => {
+  it('Breakaway: five drives, a touchdown pays 100 or more — and finishing all five posts a win', () => {
     const m = 'lib/babylon/modes/FootballRushMode.ts';
     const drives = pin(m, /const DRIVES = (\d+);/);
     has(m, 'score += Math.round((100 + evades * 10) * mult);');
@@ -258,7 +258,7 @@ describe('what the node card says', () => {
     expect(storyGoalLabel('tennis', n('tennis.r2'))).toBe('Take 2 games');
     expect(storyGoalLabel('hoops1v1', n('blacktop.boss'))).toBe('Win the game — first to 11 (or score 10 points)');
     expect(storyGoalLabel('volleyball', n('sandPit.boss'))).toBe('Win the set (or score 22 points)');
-    expect(storyGoalLabel('tennis', n('tennis.boss'))).toBe('Win the match — first to 4 games');
+    expect(storyGoalLabel('tennis', n('tennis.boss'))).toBe('Win the match — first to 6 games');
     expect(storyGoalLabel('karateEndless', n('dojo.boss'))).toBe('Score 1,120 points');
   });
 

@@ -1055,6 +1055,7 @@ exports.Prisma.ExerciseLogScalarFieldEnum = {
   coachComment: 'coachComment',
   coachCommentAt: 'coachCommentAt',
   completedAt: 'completedAt',
+  servedExerciseId: 'servedExerciseId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

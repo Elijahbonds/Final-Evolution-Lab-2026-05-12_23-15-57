@@ -171,7 +171,11 @@ export interface SquatStep {
   stageChanged: boolean;
   /** The check's findings grew on this frame. */
   findingsChanged: boolean;
-  /** The faults to hand the cue engine on this frame (work set only, and only when something faulted), else null. */
+  /**
+   * The faults to hand the cue engine on this frame: work set only, with a body in frame — [] on a clean frame (MIRROR-COACH
+   * P9 fix: it was null unless something faulted, so the coach never saw the athlete fix a fault and "There it is. Own
+   * it." could only land on another fault's frame) — else null.
+   */
   cueFaults: SquatFault[] | null;
   /** Say SQUARE_UP_LINE on this frame: the stage that just ended was read off square the whole way (once a session). */
   squareUp: boolean;
@@ -253,7 +257,7 @@ export function stepSquatSession(prev: Readonly<SquatSessionState>, input: Squat
       const grown = [...findings, ...frameFaults.filter((f) => !findings.includes(f))];
       if (grown.length !== findings.length) { findings = [...new Set(grown)]; findingsChanged = true; }
     }
-    if (stage === 'work' && input.faults.length) cueFaults = [...input.faults];
+    if (stage === 'work' && input.present) cueFaults = [...input.faults];
     // the work set remembers what each rep did, so the review can say whether a cued fault was still there at the end
     const fresh = stage === 'work' && input.present ? frameFaults.filter((f, i, all) => !repFaults.includes(f) && all.indexOf(f) === i) : [];
     if (fresh.length) repFaults = [...repFaults, ...fresh];
@@ -298,8 +302,12 @@ export function stepSquatSession(prev: Readonly<SquatSessionState>, input: Squat
  * overlay painted "KNEES OUT" during the breath and the movement check too, correcting the athlete during the very
  * measurement the review's "did the correction hold" is judged against.
  */
-export function paintableFaults<F extends string>(stage: SquatStage, cueable: readonly F[]): F[] {
-  return stage === 'work' ? [...cueable] : [];
+export function paintableFaults<F extends string>(stage: SquatStage, cueable: readonly F[], shownThisRep?: (f: F) => boolean): F[] {
+  // MIRROR-COACH P9 fix (2026-09-30, code review): the fade quieted only the voice, and the painter still flagged a
+  // fault on every rep whatever its schedule (a fault faded to 'summaryOnly' was painted red on every frame). The fade's
+  // reason — feedback that never thins out is what the athlete leans on — is the same for the picture, so the painter
+  // takes the voice's rule (the harness passes CueEngine.isVoiceable): painted on the reps the coach may speak on.
+  return stage === 'work' ? cueable.filter((f) => !shownThisRep || shownThisRep(f)) : [];
 }
 
 // ── the knee record ────────────────────────────────────────────────────────────────────────────────────────────────

@@ -383,6 +383,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
   return {
     modeId: 'snowboard', camPreset: 'descent',
+    hideRingInPlay: true,
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab and the spin this mode reads itself
     body: { lines: rideLines('snowboard') },
     // The LIGHT is the venue's. A getter, because the harness reads this at mount — after the splash has written the

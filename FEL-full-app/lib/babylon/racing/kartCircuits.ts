@@ -358,7 +358,7 @@ export function buildKartCircuit(spec: KartSpec): KartCircuit {
   const surfaceAt = (x: number, z: number): number => {
     const at = locate(line, x, z);
     const off = Math.abs(at.lateral) - spec.halfWidth;
-    return off <= 0 ? at.point.y : at.point.y - Math.min(6, off * 0.35);
+    return off <= 0 ? at.point.y : at.point.y - Math.min(8, off * 0.52);
   };
 
   const course: Course = {

@@ -65,11 +65,18 @@
 //     (`settleBlocked`); the other way round needs nothing extra, since a settle starts a rest and that closes the offer.
 //   · A timed breath item (the off day's 4-6 Recovery Breath) passes its pacer to its timer (`breath`), so its Work run
 //     draws the one pacer's ring instead of a bare countdown (lib/breath/presets.ts workBreathFor).
+//
+// MIRROR-COACH P8 (2026-09-29): THE PROTOCOL GATE's lines (lib/coach/protocolGate.ts; decided server-side in
+// lib/coach/todayServer.ts). A plyometric or depth drop the athlete's gate is closed for arrives as its ladder's easier
+// step, and its card says so in one line with why (<GateSwapLine>, components/coach/protocol-gate-line.tsx); one with no
+// ungated easier step arrives in `session.held` and is listed, one line each, above the first section (<GateHeldList>).
+// Neither is a rule of this file: it draws what the server sent.
 // `api` points the view at other endpoints (the dev harness app/dev/coach-today runs the same server code in memory).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
+import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 import { SetTimer } from '@/components/coach/set-timer';
 import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
@@ -81,9 +88,11 @@ import { needsAutoCooldown, showsGeneratedWarmup, todayWarmupKind } from '@/lib/
 import { OFF_DAY_LINE, type WeekEntry } from '@/lib/coach/offDay';
 import type { WarmupReadiness } from '@/lib/coach/warmup';
 import { SET_LOG_ERROR_COPY, convertDrafts, draftIsEmpty, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
-import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
+import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, servedClaim, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
+// MIRROR-COACH P9 fix (2026-09-30): a screen prescription's note links the Mirror's written corrective (rule (e))
+import { CoachNote } from '@/components/coach/coach-note';
 
 export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null }
 export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API };
@@ -153,7 +162,9 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const submit = async (complete: boolean) => {
     if (!data?.today || !data.program) return;
     setBusy(true); setErrors({});
-    const logs = data.today.session.exercises.map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl }));
+    // MIRROR-COACH P8 FIX (2026-09-30): what this card served on each slot — the gate's easier step, or null for "as
+    // written" — so the coach's inbox never reads a logged easier step as the jump (the server checks the claim)
+    const logs = data.today.session.exercises.map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl, servedExerciseId: servedClaim(e) }));
     const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ programId: data.program.id, sessionId: data.today.session.id, logs, complete }) });
     setBusy(false);
     if (!r.ok) {
@@ -241,7 +252,9 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
         </div>
         {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
       </div>
-      {today.session.exercises.length === 0 && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
+      {today.session.exercises.length === 0 && !today.session.held?.length && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
+      {/* MIRROR-COACH P8: items the protocol gate holds back today (no ungated easier step on their ladder) */}
+      {today.session.held && <GateHeldList items={today.session.held} />}
       {today.session.exercises.length > 0 && showsGeneratedWarmup(today.session.kind) && <WarmupPrep exercises={today.session.exercises} contextUrl={api.warmup ?? null} readiness={readiness} />}
       {layout.map((sec) => (
         <section key={sec.section} className="space-y-2" data-section={sec.section} aria-label={sec.label}>
@@ -356,6 +369,8 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
         {tags && <div className="text-[11px] text-white/35">{tags}</div>}
         {e.isKeySet && <div className="text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</div>}
       </div>
+      {/* MIRROR-COACH P8: the protocol gate served this easier step in place of what was prescribed, and says why */}
+      {e.protocolGate && <GateSwapLine note={e.protocolGate} />}
       {/* MIRROR-COACH P7: the Dial-Up Breath, before set-up and the first set — rendered only when the server says so */}
       {rampEndpoint && <RampBreath sessionExerciseId={e.id} endpoint={rampEndpoint} started={keySetUnderWay(draft.sets, timerUsed)} onDone={toTheSet} onRunningChange={setRampBusy} />}
 
@@ -366,7 +381,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
           {c.setup.map((s) => <div key={s.id} className="text-sm text-white/85">· {s.text}</div>)}
         </div>
       )}
-      {e.coachNote && <div className="text-xs text-[#00E5FF]/80">Coach: {e.coachNote}</div>}
+      {e.coachNote && <CoachNote note={e.coachNote} />}
       {c.cues.length > 0 && (
         <div className="space-y-0.5" data-cues>
           <div className="text-[11px] uppercase tracking-wider text-white/40">Cues</div>

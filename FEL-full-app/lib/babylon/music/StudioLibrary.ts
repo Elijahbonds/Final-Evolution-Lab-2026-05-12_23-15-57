@@ -684,8 +684,9 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
     },
 
     /**
-     * COMPAT — the pre-P3 synchronous publish, kept for the P1 baseline sim (scripts/music/baseline-sim.ts:715), which
-     * counts publishes until one throws. The room uses `publishWithAudio`. The row is written synchronously (it throws
+     * COMPAT — the pre-P3 synchronous publish. It was kept for the P1 baseline sim, which counted publishes until one
+     * threw; MUSIC-SUITE P10 (2026-09-29) moved the sim onto the room's `publishWithAudio`, so only the tests that pin the
+     * pre-P3 record shape (StudioLibrary.test, uploadPrivacy.test) still call this. The room uses `publishWithAudio`. The row is written synchronously (it throws
      * on failure, as before); the data URL plays from memory while its audio is copied into the store in the
      * background, and a failed copy is reported through `problems()`.
      */

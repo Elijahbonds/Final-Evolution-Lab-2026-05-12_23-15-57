@@ -1142,8 +1142,8 @@ describe('OWNER DECISION (2026-09-28): a mode with no rules row is recorded unpa
       expect(r.status, String(score)).toBe(422);
       expect(r.body, String(score)).toMatchObject({ reason: 'SCORE_INVALID', detail });
     }
-    const capped = await post({ mode: 'tennis', score: 5, won: true, duration: 60 });   // tennis: 4 games at most (the rules)
-    expect(capped.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 4 });
+    const capped = await post({ mode: 'tennis', score: 7, won: true, duration: 60 });   // tennis: 6 games at most (the rules)
+    expect(capped.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 6 });
     expectNothingPaid();
   });
 

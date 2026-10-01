@@ -342,6 +342,8 @@ const S = {
   /** Per-rival skill 0..1, fixed for the whole contest so form is consistent. */
   skills: [] as number[],
   standingsT: 0,
+  /** The hero answered their posted number this standings window (celebrate/flinch, once). */
+  heroReacted: false,
   /** Rival field indices awaiting a staged reveal, weakest first — the
    *  favourite's number lands last, which is the drama a results board is FOR. */
   revealQueue: [] as number[],
@@ -364,6 +366,7 @@ function resetState(): void {
   S.from.copyFrom(RACK_POS[0]);
   S.round = 'qualifying';
   S.standingsT = 0;
+  S.heroReacted = false;
   S.revealQueue = [];
   S.revealT = 0;
   S.playoff = 0;   // S is module state: a second contest in the session started with the last one's playoffs spent
@@ -1010,6 +1013,16 @@ export const ThreePointMode: ModeDefinition = {
         return;
       }
       S.standingsT += dt;
+      // HOOPS-10 phase 2 (V:3pt N5 — "the hero stands frozen for 4 s or more"): the standings window answers the
+      // HERO's posted score the way the reveal answers each rival's — a big one celebrates, a poor one flinches
+      // (the same threshold the reveal uses), then the body settles into the watch idle instead of standing
+      // statue-still for the hold. React once, on the first readable frame; the beat settles itself (BeatOwner
+      // plays the base loop on its natural end), so there is nothing to tick here.
+      if (beats && !S.heroReacted) {
+        S.heroReacted = true;
+        beats.beat(S.pts >= 16 ? SPORT_CLIP.scoreCelebrate : 'bball_contact_react', { fadeSec: 0.15 });
+        beats.loop(WATCH_IDLE);
+      }
       if (S.standingsT >= STANDINGS_SEC) {
         if (S.finalistsPosting) {
           // the field has posted; the player runs the final at the number

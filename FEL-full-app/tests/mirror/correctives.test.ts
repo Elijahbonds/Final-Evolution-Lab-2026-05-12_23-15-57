@@ -1,4 +1,10 @@
 // Correctives: RNT + breath, and SMR pin-and-stretch (2026-09-12).
+//
+// MIRROR-COACH P9 (2026-09-30): re-pointed, nothing deleted. The release lost its two middle pins (rib_thoracic: fingertips
+// under the ribs; lumbo_pelvic: a ball inside the front of the hip — PLAN item 9), so the four SMR cases that drifted only
+// in those zones now drift in zones that still have a release; each keeps its assertion. The youth gate fails closed now
+// (only an explicit  — a known adult — gets a release), so every adult call below passes ; a one-argument
+// call returning nothing is its own case at the end.
 // A coaching tool that prescribes work nobody needs is a tool athletes stop trusting, so the
 // "clean session earns nothing" cases matter as much as the prescriptions.
 import { describe, it, expect } from 'vitest';
@@ -80,13 +86,14 @@ describe('RNT feeds the fault', () => {
 describe('SMR runs centre-out, because load transfers through the middle', () => {
   it('orders the sequence from the centre of mass outward, not by severity', () => {
     const s = session({
-      // upper_traps is the WORST, but it is furthest from the centre
-      faultCounts: { upper_traps: 40, rib_thoracic: 12 },
-      timeInStableMs: { upper_traps: 0.1 * 4 * MIN, rib_thoracic: 0.3 * 4 * MIN },
+      // upper_traps is the WORST, but it is furthest from the centre (P9: re-pointed from rib_thoracic, whose pin is gone —
+      // the elbow-path zone now carries the nearer release, the side of the ribcage under the arm)
+      faultCounts: { upper_traps: 40, posterior_chain: 12 },
+      timeInStableMs: { upper_traps: 0.1 * 4 * MIN, posterior_chain: 0.3 * 4 * MIN },
     });
-    const plan = prescribePinAndStretch(s);
+    const plan = prescribePinAndStretch(s, false);
     expect(plan.length).toBe(2);
-    expect(plan[0].zone).toBe('rib_thoracic');      // diaphragm first
+    expect(plan[0].zone).toBe('lat_rhomboid');      // the nearer of the two to the centre goes first
     expect(plan[0].comOrder).toBeLessThan(plan[1].comOrder);
   });
 
@@ -96,7 +103,7 @@ describe('SMR runs centre-out, because load transfers through the middle', () =>
   });
 
   it('is pin AND stretch — the half people skip is present', () => {
-    const plan = prescribePinAndStretch(session({ faultCounts: { posterior_chain: 20 }, timeInStableMs: {} }));
+    const plan = prescribePinAndStretch(session({ faultCounts: { posterior_chain: 20 }, timeInStableMs: {} }), false);
     expect(plan[0].pin.length).toBeGreaterThan(10);
     expect(plan[0].stretch).toMatch(/slowly|glide|floss|range|rotate|bend/i);
   });
@@ -104,24 +111,40 @@ describe('SMR runs centre-out, because load transfers through the middle', () =>
   it('warns off nerve and bone on every protocol', () => {
     const plan = prescribePinAndStretch(session({
       faultCounts: { upper_traps: 20, lat_rhomboid: 20, posterior_chain: 20 }, timeInStableMs: {},
-    }));
+    }), false);
+    expect(plan.length).toBeGreaterThan(0);
     for (const p of plan) expect(p.avoid).toMatch(/nerve|tingl|numb/i);
   });
 
   it('tells the athlete WHY this area, from their own numbers', () => {
-    const plan = prescribePinAndStretch(session({ faultCounts: { lumbo_pelvic: 20 }, timeInStableMs: { lumbo_pelvic: 0.25 * 4 * MIN } }));
+    // P9: re-pointed from lumbo_pelvic (its pin is gone) to upper_traps
+    const plan = prescribePinAndStretch(session({ faultCounts: { upper_traps: 20 }, timeInStableMs: { upper_traps: 0.25 * 4 * MIN } }), false);
     expect(plan[0].because).toMatch(/%/);
     expect(plan[0].because).toMatch(/×\/min|\/min/);
   });
 
   it('ends on the retest, because without it this is just stretching', () => {
-    const plan = prescribePinAndStretch(session({ faultCounts: { rib_thoracic: 20 }, timeInStableMs: {} }));
+    // P9: re-pointed from rib_thoracic (its pin is gone) to upper_traps
+    const plan = prescribePinAndStretch(session({ faultCounts: { upper_traps: 20 }, timeInStableMs: {} }), false);
+    expect(plan.length).toBe(1);
     expect(retestPrompt(plan)).toMatch(/Mirror/);
     expect(retestPrompt([])).toMatch(/Nothing to release/);
   });
 
   it('changes one thing at a time when the score does not move', () => {
-    const plan = prescribePinAndStretch(session({ faultCounts: { rib_thoracic: 20 }, timeInStableMs: {} }));
+    const plan = prescribePinAndStretch(session({ faultCounts: { upper_traps: 20 }, timeInStableMs: {} }), false);
     expect(retestPrompt(plan)).toMatch(/one thing, not three/);
+  });
+
+  it('P9: a drift only in the two middle zones earns no release — their pins were removed', () => {
+    const middle = session({ faultCounts: { rib_thoracic: 30, lumbo_pelvic: 30 }, timeInStableMs: {} });
+    expect(prescribePinAndStretch(middle, false)).toEqual([]);
+  });
+
+  it('P9: the gate fails closed — a call that does not say "adult" gets nothing', () => {
+    const s = session({ faultCounts: { upper_traps: 20 }, timeInStableMs: {} });
+    expect(prescribePinAndStretch(s, false).length).toBe(1);
+    expect((prescribePinAndStretch as (x: MirrorSessionLike) => unknown[])(s)).toEqual([]);
+    expect(prescribePinAndStretch(s, true)).toEqual([]);
   });
 });

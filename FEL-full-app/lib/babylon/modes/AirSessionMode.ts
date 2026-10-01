@@ -479,6 +479,17 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       boostFx?.update(dt, boost, bev);
       if (bev.started) say('BOOST!', 0.5);
       ctx.camDirector.look(S.lookX, S.lookY, dt);
+      // WA-7: runner preset looked straight down in the air; board + setAir gives a three-quarter read.
+      if (st.phase === 'Air') {
+        ctx.camDirector.setPreset('board');
+        ctx.camDirector.setAir(Math.min(1, Math.max(0.35, st.pos.y / 7)));
+      } else if (st.phase === 'Land') {
+        ctx.camDirector.setPreset('board');
+        ctx.camDirector.setAir(0.25);
+      } else {
+        ctx.camDirector.setPreset('runner');
+        ctx.camDirector.setAir(0);
+      }
       ctx.camDirector.update(athlete.root.position, new Vector3(0, 0, -st.speed), launchPad.position);
       baseFov ??= ctx.camera.fov;
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), st.phase === 'Run' ? st.speed : 0, BIG_AIR_TUNING.maxRunSpeed, dt);
@@ -511,7 +522,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 export const BigAirMode: ModeDefinition = makeAirSessionMode({
     modeId: 'bigair',
     mood: 'alpine',
-    buildVenue: (scene) => VenueKit.buildSlope(scene),
+    buildVenue: (scene) => VenueKit.buildBigAirSlope(scene),   // WA-7: no venueBox tree walls
     propSet: 'bigair-run',   // P9: pines down the −z run (the 'slope' set stood behind the athlete)
     makeSession: (onLanding) => makeBigAirSession(undefined, { onLanding }),
     attempts: BIG_AIR_TUNING.attemptsPerRound ?? 3,

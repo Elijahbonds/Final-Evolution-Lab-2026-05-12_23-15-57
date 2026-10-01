@@ -410,6 +410,43 @@ export function gestureEnd(g: WaveGesture, v: WaveView, x: number, cancelled: bo
   return { end: null, tap: sampleAtPx(v, g.downX) };
 }
 
+/**
+ * MUSIC-SUITE P10 (2026-09-29): THE WAVEFORM IN WORDS, for a screen reader. P5's open item: the chop editor is a canvas
+ * — the arrow keys moved a cut, but a screen reader got only the canvas's label, never where any slice sat or what a
+ * nudge did. Waveform.tsx now describes the canvas with these two lines (aria-describedby) and announces `selected`
+ * politely whenever it changes (a nudge, a drag's end, a tap on another slice). Pure, so the words are tested.
+ *   selected: "Pad 5 selected: 1.234 s to 1.567 s, 333 ms." / "No pad selected — tap a slice or a pad to select it."
+ *   all:      "16 slices on 2.40 s of sound. Pad 1: 0.000 to 0.150 s. Pad 2: …" (pad order) / "No sound loaded."
+ */
+export function waveformSpeech(regions: readonly Region[], selected: number | null, rate: number, length: number): { selected: string; all: string } {
+  const r = rate > 0 && Number.isFinite(rate) ? rate : 44100;
+  const sec = (x: number): string => (x / r).toFixed(3);
+  const sorted = [...regions].sort((a, b) => a.pad - b.pad);
+  const sel = sorted.find((x) => x.pad === selected) ?? null;
+  const selectedLine = !length
+    ? 'No sound loaded.'
+    : sel
+      ? `Pad ${sel.pad + 1} selected: ${sec(sel.start)} s to ${sec(sel.end)} s, ${Math.round(((sel.end - sel.start) / r) * 1000)} ms.`
+      : 'No pad selected — tap a slice or a pad to select it.';
+  const all = !length
+    ? 'No sound loaded.'
+    : `${sorted.length} slice${sorted.length === 1 ? '' : 's'} on ${(length / r).toFixed(2)} s of sound.${sorted.map((x) => ` Pad ${x.pad + 1}: ${sec(x.start)} to ${sec(x.end)} s.`).join('')}`;
+  return { selected: selectedLine, all };
+}
+
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): WHAT THE POLITE LIVE REGION SAYS — the selected pad's line, but HELD while a marker
+ * is being dragged. Waveform.tsx put `aria-live="polite"` on waveformSpeech's `selected`, which is recomputed from
+ * `regions`; during a drag every pointermove calls onEdge(…, 'move') and FlipPad rebuilds `regions` (editPads), so the
+ * "… s to … s, N ms" text changed on every frame and VoiceOver / TalkBack queued dozens of announcements for one drag
+ * (on touch only the selected pad can be dragged, so every touch drag did it). The doc above promised an announcement at
+ * a drag's END. `held` is the line as it was when the drag began; the room shows it until the drag ends, then the
+ * current line — one announcement per drag, as for a nudge or a tap on another slice.
+ */
+export function waveformLiveLine(held: string, current: string, dragging: boolean): string {
+  return dragging ? held : current;
+}
+
 /** Min / max of `mono[from, to)` per column — what the waveform draws. */
 export function peaks(mono: Float32Array, columns: number, from = 0, to = mono.length): { min: Float32Array; max: Float32Array } {
   const n = Math.max(1, Math.floor(columns));

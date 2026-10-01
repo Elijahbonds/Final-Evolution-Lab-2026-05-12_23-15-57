@@ -28,6 +28,10 @@ import { spend, WalletError } from '@/lib/wallet/wallet-service';
  *                           writes — "revised once".
  *   GET ?check=purchase   → spend() (lib/wallet/wallet-service.ts) for both /workout SKUs against a database stand-in
  *                           that answers the idempotency read and throws on anything else: NOT_ON_SALE, no write.
+ *                           MIRROR-COACH P8 FIX (2026-09-30): P8 put both SKUs back on sale (owner decision #24), so
+ *                           spend() now passes NOT_ON_SALE and reaches the charge, which the stand-in refuses ("spend
+ *                           touched prisma.$transaction"): still no write. Each answer carries `since` saying so — the
+ *                           P1-era proof (outbox p1/) recorded NOT_ON_SALE, and that record is history now.
  *
  * lib/mirror/screen-route.test.ts and lib/workout/plan-route.test.ts run the real route files with the same stand-ins.
  */
@@ -119,7 +123,7 @@ export async function GET(req: NextRequest) {
       let answer: string;
       try { await spend(db, { playerId: 'dev-fixture-buyer', idempotencyKey: `dev-p1-${sku}`, skuId: sku, quantity: 1 }); answer = 'CHARGED'; }
       catch (e) { answer = e instanceof WalletError ? `WalletError ${e.code}` : `threw: ${(e as Error).message}`; }
-      out[sku] = { skuOnSale: skuOnSale(sku), spend: answer, prismaTouched: touched };
+      out[sku] = { skuOnSale: skuOnSale(sku), spend: answer, prismaTouched: touched, since: 'MIRROR-COACH P8: on sale again at the same price; the stand-in refuses the charge, nothing is written' };
     }
     return NextResponse.json(out);
   }
