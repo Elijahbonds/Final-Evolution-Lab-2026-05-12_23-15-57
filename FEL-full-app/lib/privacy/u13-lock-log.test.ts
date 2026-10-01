@@ -31,7 +31,10 @@ const EMAIL = 'locked-person@fel.test';
 const THIS_YEAR = new Date().getFullYear();
 const IP = '203.0.113.9';
 const UA = 'AgeScreenTest/1.0';
-const PARENT = 'c07f6cf7cccefa215935ec94ad1ff0c97b2d230c';
+// Advanced when MIRROR-COACH P8/P9 lands intentional ServedExercise schema (pending SQL + prisma/schema).
+// AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
+// intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
+const PARENT = 'f9eea1501439810ca2ee50cb1a83c3ea6298101c';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
