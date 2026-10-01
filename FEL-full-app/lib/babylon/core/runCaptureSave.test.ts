@@ -25,7 +25,8 @@ describe('RUN-CAPTURE save loop (qa.saveTranscript)', () => {
   });
 
   it('saveTranscript lives on the QA-only handle (never in a production run)', () => {
-    // the handle is published inside the `if (qa)` block, which exists only when agentEnabled() (?agent=1)
-    expect(harness).toMatch(/agentEnabled\(\) \? new QaTrace\(\) : null/);
+    // the handle is published inside the `if (qa)` block — ECONOMY-CAPS gates QaTrace on
+    // devOrAgentHooks() (dev always; prod only behind the server agent-run marker), not bare agentEnabled().
+    expect(harness).toMatch(/devOrAgentHooks\(\) \? new QaTrace\(\) : null/);
   });
 });
