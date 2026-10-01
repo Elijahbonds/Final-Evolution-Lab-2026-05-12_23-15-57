@@ -361,6 +361,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       /** Every HUD key's latest value, the continuous ones too (a meter, a phase) — what an INTENT driver plays from. */
       rawHud: () => ({ ...qaRawHud }),
       result: () => qaResult,
+      /** RUN-CAPTURE: this session as a saveable artifact (modeId + timeline + result). */
+      transcript: () => qa.transcript(def.modeId, qaResult),
       reset: () => qa.reset(),
       /** The live scene for an INTENT driver (the ball in flight, a pitch on its way): QA sessions only (`?agent=1`). */
       scene: () => (scene.isDisposed ? null : scene),
