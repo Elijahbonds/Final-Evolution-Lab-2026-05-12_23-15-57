@@ -36,7 +36,7 @@ import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
-import { applyCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
+import { applyCanvasFit, watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
@@ -799,11 +799,13 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     }
     scene.render();
   });
-  const onResize = () => { applyCanvasFit(engine, opts.canvas); };   // M95: re-cap on rotate/resize (applyCanvasFit calls engine.resize)
-  window.addEventListener('resize', onResize);
+  // M95 re-cap on every fold/rotate signal (FOLDABLE-SCREEN): resize, orientationchange, and the
+  // visualViewport resize a cover↔main swap fires first. The mode never sees these — the engine re-fits
+  // in place, nothing unmounts, no state is lost.
+  const unwatchFit = watchCanvasFit(engine, opts.canvas);
 
   return () => {
-    window.removeEventListener('resize', onResize);
+    unwatchFit();
     agentBridge()?.detach();   // M69
     renderWatchdog?.disarm();
     frameGuard?.stop();
