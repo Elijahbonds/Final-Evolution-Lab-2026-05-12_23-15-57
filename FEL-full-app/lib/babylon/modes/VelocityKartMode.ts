@@ -1321,6 +1321,9 @@ return {
     // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
     baseFov ??= ctx.camera.fov;
     ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), state.speed, kartSpec.vMax, dt);
+    // SPEED-VIGNETTE (racing HUD pass): report the fraction of top speed; the harness closes the frame above
+    // the owner-approved window (≥0.85), composed with the impact pulse. Opt-in, harness-owned.
+    ctx.feel.speedVignette01(state.speed / kartSpec.vMax);
     pushHud(ctx);
   },
 
