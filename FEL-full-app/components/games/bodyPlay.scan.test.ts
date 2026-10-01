@@ -84,8 +84,9 @@ describe('the camera starts only through the READY choice (Z-P4-6)', () => {
     const files = sourceFiles(ROOT, ['components', 'app', 'lib'], fs, path).filter((f) => !/\.test\.tsx?$/.test(f));
     const starters = files.filter((f) => /sharedPoseSource\(\)\s*\.start\(|\bsource\.start\(/.test(read(f))).sort();
     expect(starters).toEqual([path.join('lib', 'input', 'poseSource.ts'), path.join('lib', 'move', 'bodyPlay.ts')].sort());
-    // poseSource's own is the probe hook (behind the feed's gate)
-    expect(read('lib/input/poseSource.ts')).toMatch(/feedHookAllowed\([\s\S]*start: \(opts\?: PoseSourceStartOptions\) => sharedPoseSource\(\)\.start\(opts\)/);
+    // poseSource's own is the probe hook (behind the agent-run gate in production)
+    expect(read('lib/input/poseSource.ts')).toMatch(/registerProdHookSync\(installBodyHook, removeBodyHook\)/);
+    expect(read('lib/input/poseSource.ts')).toMatch(/start: \(opts\?: PoseSourceStartOptions\) => sharedPoseSource\(\)\.start\(opts\)/);
   });
 });
 

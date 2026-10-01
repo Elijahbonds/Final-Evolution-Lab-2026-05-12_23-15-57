@@ -126,6 +126,9 @@ export function sessionShards(score: number, won: boolean): number {
  */
 export const ENDLESS_SESSION_CEILING = { xp: 14_150, shards: 473 } as const;
 
+/** ECONOMY-CAPS C1: per-run XP/shard ceiling for every paying session (see lib/economy-caps.ts). */
+export const PER_RUN_SESSION_CAP = { xp: 14_150, shards: 100 } as const;
+
 /** The ceiling's basis is a flawless training MINUTE: an endless session pays at most that minute's pay per minute. */
 export const ENDLESS_CEILING_BASIS_SEC = 60;
 

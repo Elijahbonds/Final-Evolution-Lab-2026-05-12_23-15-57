@@ -47,7 +47,7 @@ import { emitToLive } from '@/lib/babylon/core/InputBus';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { feedHookAllowed } from '@/lib/pose/feed';
-import { agentEnabled } from '@/lib/babylon/core/AgentBridge';
+import { agentRunHooksAllowed, registerProdHookSync } from '@/lib/agentRunHooks';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
 
 /** The brightness is sampled at most this often (ms), only while the check runs. */
@@ -436,7 +436,8 @@ export interface SpaceHook {
 declare global {
   interface Window { __FEL_SPACE__?: SpaceHook }
 }
-if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
+function installSpaceHook(): void {
+  if (typeof window === 'undefined') return;
   window.__FEL_SPACE__ = {
     view: () => bodyPlay.view(),
     session: () => sessionStore.view(),
@@ -446,4 +447,16 @@ if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agent
     end: (k) => bodyPlay.end(k),
     shortcut: () => bodyPlay.button(),
   };
+}
+function removeSpaceHook(): void {
+  if (typeof window === 'undefined') return;
+  delete window.__FEL_SPACE__;
+}
+if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    if (feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installSpaceHook();
+  } else {
+    registerProdHookSync(installSpaceHook, removeSpaceHook);
+    if (agentRunHooksAllowed() && feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installSpaceHook();
+  }
 }

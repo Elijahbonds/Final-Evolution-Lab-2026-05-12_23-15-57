@@ -192,6 +192,9 @@ model GameSession {
   dodges        Int      @default(0)
   combos        Int      @default(0)
   maxCombo      Int      @default(0)
+  // ECONOMY-CAPS C5: the server-issued SessionRun id — one GameSession row per run (NULL allowed on legacy rows).
+  runId         String?  @unique
+  run           SessionRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -212,6 +215,7 @@ model SessionRun {
   status           String    @default("open")
   payoutEligible   Boolean
   ineligibleReason String?
+  agentRun         Boolean   @default(false)
   startedAt        DateTime  @default(now())
   expiresAt        DateTime
   finishedAt       DateTime?
@@ -222,6 +226,7 @@ model SessionRun {
   result           Json?
 
   grants           SessionGrant[]
+  gameSession      GameSession?
 
   @@index([userId, status])
   @@index([expiresAt])

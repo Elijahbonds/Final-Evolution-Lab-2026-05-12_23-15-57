@@ -105,7 +105,8 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(ledger.find((g: Json) => g.grantType === 'wallet_coins').amount).toBe(r.body.coins);
     expect(ledger.find((g: Json) => g.grantType === 'season_xp').amount).toBe(r.body.season.gained);
     const walletRows = await walletRowsFor(run.runId);
-    expect(walletRows.map((w: Json) => w.idempotencyKey).sort()).toEqual([`run:${run.runId}:coins`, `run:${run.runId}:lc`, `run:${run.runId}:won`]);
+    expect(walletRows.map((w: Json) => w.idempotencyKey).sort()).toEqual([`run:${run.runId}:coins`, `run:${run.runId}:won`]);
+    expect(await prisma.walletLedgerEntry.findFirst({ where: { idempotencyKey: `session-lc:${run.runId}` } })).toBeTruthy();
 
     // the same Postgres transaction wrote every one of them: the ledger, the wallet rows, the balances, the session and the run
     const tx = await xmin('SessionRun', run.runId);
@@ -153,7 +154,7 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(after.xp - before.xp).toBe(paid.xp);
     expect(after.coins - before.coins).toBe(paid.coins);
     expect(await prisma.gameSession.count({ where: { userId: users.twin } })).toBe(1);
-    expect((await walletRowsFor(run.runId)).length).toBe(3);
+    expect((await walletRowsFor(run.runId)).length).toBe(2);
   });
 
   it('check 1 / QA "impossible score is rejected": SCORE_INVALID, the run closed, no ledger row, no balance change', async () => {
@@ -219,13 +220,26 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(await prisma.passProgress.count({ where: { userId: users.agent } })).toBe(0);
   });
 
-  it('check 6: a test-allowlist account (User.role, or FEL_TEST_ACCOUNTS) gets paid: false', async () => {
+  it('check 6: a test-allowlist account (User.role in prod, or FEL_TEST_ACCOUNTS) gets paid: false', async () => {
     as('tester');
-    const run = await start('brainBrawl');
-    expect(run).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
-    await playedFor(run.runId, 43);
-    expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ paid: false, reason: 'TEST_ACCOUNT' });
-    expect(await ledgerFor(run.runId)).toEqual([]);
+    if (process.env.NODE_ENV === 'production') {
+      const run = await start('brainBrawl');
+      expect(run).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
+      await playedFor(run.runId, 43);
+      expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ paid: false, reason: 'TEST_ACCOUNT' });
+      expect(await ledgerFor(run.runId)).toEqual([]);
+    } else {
+      process.env.FEL_TEST_ACCOUNTS = `${TAG}-tester@example.test`;
+      try {
+        const run = await start('brainBrawl');
+        expect(run).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
+        await playedFor(run.runId, 43);
+        expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ paid: false, reason: 'TEST_ACCOUNT' });
+        expect(await ledgerFor(run.runId)).toEqual([]);
+      } finally {
+        delete process.env.FEL_TEST_ACCOUNTS;
+      }
+    }
     as('listed');
     process.env.FEL_TEST_ACCOUNTS = `${TAG}-listed@example.test`;
     try {
