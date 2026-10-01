@@ -4,6 +4,8 @@
  * or under next dev (NODE_ENV !== 'production').
  */
 
+import { isLoopbackHost } from '@/lib/pose/feed';
+
 let allowed = false;
 type HookSync = () => void;
 const syncOn: HookSync[] = [];
@@ -20,6 +22,12 @@ export function setAgentRunHooksAllowed(v: boolean): void {
   const prev = allowed;
   allowed = v;
   if (process.env.NODE_ENV === 'production' && prev !== v) {
+    // SECURITY (ECONOMY-CAPS review, hook gate): the flip-on path must clear the same bar as the module-load
+    // path. The installers carry no hostname check of their own, so without this an `?agent=1` run on the
+    // DEPLOYED domain would arm __FEL_POSE_FEED__ / __FEL_BODY__ / __FEL_SPACE__ — the scripted-frame handles
+    // feed.ts scopes as "never on the deployed site". Prod honours the marker only on loopback, exactly as
+    // feedHookAllowed does at load. syncOff always runs (tearing down is never gated).
+    if (v && !isLoopbackHost(typeof window !== 'undefined' ? window.location.hostname : '')) return;
     for (const fn of v ? syncOn : syncOff) fn();
   }
 }

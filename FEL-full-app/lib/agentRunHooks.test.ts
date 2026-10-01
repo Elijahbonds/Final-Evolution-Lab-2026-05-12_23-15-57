@@ -29,8 +29,9 @@ describe('agentRunHooks (ECONOMY-CAPS CYBER k)', () => {
     expect(agentRunHooksAllowed()).toBe(true);
   });
 
-  it('production: registerProdHookSync runs on/off when the gate flips', async () => {
+  it('production: registerProdHookSync runs on/off when the gate flips (on a loopback host)', async () => {
     vi.stubEnv('NODE_ENV', 'production');
+    vi.stubGlobal('window', { location: { hostname: 'localhost' } });
     const { setAgentRunHooksAllowed, registerProdHookSync } = await import('./agentRunHooks');
     const on = vi.fn();
     const off = vi.fn();
@@ -39,5 +40,17 @@ describe('agentRunHooks (ECONOMY-CAPS CYBER k)', () => {
     expect(on).toHaveBeenCalledTimes(1);
     setAgentRunHooksAllowed(false);
     expect(off).toHaveBeenCalledTimes(1);
+  });
+
+  it('production: ?agent=1 on the DEPLOYED domain does not arm the hooks (the hostname re-check)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubGlobal('window', { location: { hostname: 'final-evolution-lab.web.app' } });
+    const { setAgentRunHooksAllowed, registerProdHookSync, agentRunHooksAllowed } = await import('./agentRunHooks');
+    const on = vi.fn();
+    registerProdHookSync(on, vi.fn());
+    // the marker flips, the installers stay shut off-domain (the feed handles never publish)
+    setAgentRunHooksAllowed(true);
+    expect(on).not.toHaveBeenCalled();
+    expect(agentRunHooksAllowed()).toBe(true);   // the gate flag still flips; only the install is held
   });
 });

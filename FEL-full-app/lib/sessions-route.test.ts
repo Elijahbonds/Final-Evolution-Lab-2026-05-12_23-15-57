@@ -117,6 +117,12 @@ vi.mock('@/lib/db', () => {
       },
       create: async ({ data }: { data: Record<string, unknown> }) => { h.writes.push(`event:${String(data.eventType)}`); h.matchEvents.push({ ...(data as never), createdAt: new Date() }); return data; },
     },
+    // ECONOMY-CAPS security fix: the daily-cap check locks the user's PlayerProfile row first (SELECT … FOR UPDATE).
+    // The mock answers it and records the lock order so a test can assert the lock precedes the sum.
+    $queryRawUnsafe: async (sql: string, ...args: unknown[]) => {
+      if (/FOR UPDATE/.test(sql)) { h.writes.push('profile:lock'); return [{ '?column?': 1 }]; }
+      throw new Error(`unexpected raw SQL in test: ${sql} (${args.length} args)`);
+    },
   };
   return {
     prisma: {
@@ -922,7 +928,7 @@ describe('ECONOMY-SESSIONS-HARDEN FIX 2: one run id keys every grant, and the le
     expect(h.grants.find((g) => g.grantType === 'wallet_coins')).toMatchObject({ amount: 40 });
     expect(h.grants.find((g) => g.grantType === 'wallet_shards')).toMatchObject({ amount: 2 });
     // claim, then the ledger, then balances; season and mastery inside the transaction; the answer stored last
-    expect(h.writes).toEqual(['run:paid', 'grants', 'profile', 'session', 'lc', 'wallet:MODE_SESSION_COMPLETED', 'wallet:MODE_SESSION_WON', 'season:tx', 'mastery:tx', 'run:result']);
+    expect(h.writes).toEqual(['run:paid', 'profile:lock', 'grants', 'profile', 'session', 'lc', 'wallet:MODE_SESSION_COMPLETED', 'wallet:MODE_SESSION_WON', 'season:tx', 'mastery:tx', 'run:result']);
     // every wallet movement is keyed by the run
     expect(h.lc[0]).toMatchObject({ idempotencyKey: `session-lc:${id}` });
     expect(h.wallet.map((w) => w.idempotencyKey)).toEqual([`run:${id}:coins`, `run:${id}:won`]);
@@ -1043,7 +1049,8 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     const { house, body } = arenaSet('m1');
     const r = await post(body);
     expect(r.body).toMatchObject({ paid: true, capped: true, xp: 14_150 });
-    expect(h.writes.slice(0, 4)).toEqual(['run:paid', 'duel:lock', `event:${MUSIC_SESSION_PAID}`, 'grants']);
+    // the daily-cap row lock (ECONOMY-CAPS review fix) runs after the duel's claim and before the ledger is filed
+    expect(h.writes.slice(0, 5)).toEqual(['run:paid', 'duel:lock', `event:${MUSIC_SESSION_PAID}`, 'profile:lock', 'grants']);
     expect(h.grants.find((g) => g.grantType === 'xp')).toMatchObject({ amount: 14_150, metadata: { arenaSet: true, arenaMatchId: 'm1', rejudged: house } });
     expect(h.runs[r.runId!]).toMatchObject({ status: 'paid', score: house, sessionId: 's1' });
   });

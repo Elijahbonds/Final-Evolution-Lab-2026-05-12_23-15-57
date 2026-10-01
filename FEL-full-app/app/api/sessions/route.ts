@@ -28,7 +28,7 @@ import {
   storePaidResult, storedResult, type StoredResult,
 } from '@/lib/sessions/sessionRuns';
 import { applyEconomyCaps, dailyCapMessage } from '@/lib/economy-caps';
-import { sumEarnedToday } from '@/lib/economy-caps-db';
+import { sumEarnedToday, lockPlayerForDailyCap } from '@/lib/economy-caps-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -381,6 +381,11 @@ export async function POST(req: Request) {
         let { payout, xp, shards, credits, attrData } = plan;
         let economyCapNote: string | null = null;
         try {
+          // SECURITY (ECONOMY-CAPS review, daily-cap TOCTOU): lock the user's PlayerProfile row before summing
+          // today's earnings, so two concurrent finishes of the same user on different runs cannot both read the
+          // same stale sum and each collect the full remaining headroom. The second finish's sum now waits on the
+          // first's commit. The lock is released with the transaction.
+          await lockPlayerForDailyCap(tx, userId);
           const earnedToday = await sumEarnedToday(tx, userId, now);
           const caps = applyEconomyCaps({ xp, shards }, earnedToday);
           xp = caps.xp;
