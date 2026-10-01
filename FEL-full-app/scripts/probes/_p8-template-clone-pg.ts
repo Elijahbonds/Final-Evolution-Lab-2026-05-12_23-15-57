@@ -10,7 +10,7 @@
 //   createdb -h 127.0.0.1 fel_p8_tpl_X
 //   prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > s.sql
 //   prisma db execute --url postgresql://…/fel_p8_tpl_X --file s.sql
-// Run: P8_PG_URL=postgresql://elijahbonds@127.0.0.1:5432/fel_p8_tpl_X DATABASE_URL=$P8_PG_URL node tsx scripts/probes/_p8-template-clone-pg.ts [out.json]
+// Run: P8_PG_URL=postgresql://localhost:5432/fel_p8_tpl_X DATABASE_URL=$P8_PG_URL node tsx scripts/probes/_p8-template-clone-pg.ts [out.json]
 import { writeFileSync } from 'node:fs';
 import { PrismaClient } from '@/public/_prisma/client';
 import { builderAction, loadProgram, type BuilderDb } from '@/lib/coach/builderServer';
