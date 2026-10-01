@@ -147,13 +147,15 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     console.info('[CARN-JUICE] champion punch');
   }
 
-  /** The hub is MOUNTED for hub phases and DISPOSED while an event runs — not hidden. A mounted venue finishes loading
-   *  its map asynchronously and snaps the camera to itself when it lands; with the hub merely hidden, that late snap
-   *  arrived after the first event had set its own camera and left the frame on the sky (measured on /play/carnival).
-   *  Who Scene It mounts and disposes a venue per question the same way. */
+  /** The hub stays mounted for the night. Disposing it and building court_carnival again on every event was the
+   *  swap hitch: the venue, its map and its lights came back from scratch between stops. keepGameplayCamera hands
+   *  the shot back at the one mount; hiding the root takes the hub off screen while an event paints its own floor.
+   *  Assumption: the old sky-frame came from the venue camera at mount time, which keepGameplayCamera already
+   *  restores. Venue map load does not assign scene.activeCamera. */
   function showHub(ctx: ModeContext, S: St, on: boolean): void {
     if (on) {
       if (!S.hub) { S.hub = mountVenue(ctx, HUB_VENUE, { keepGameplayCamera: true, look: readPlaceLook('carnival') }); S.hub?.hidePlaceholders(); }   // PLACE: the splash's pick
+      S.hub?.built.root.setEnabled(true);
       // A FOLLOW camera around a still anchor, not a fixed shot: fixed mode places the camera but the frame guard
       // measured it aimed away ("hero BEHIND camera") and the frame sat on the sky. Follow aims every frame. The anchor
       // is the court's centre; the objective is the midpoint of the two actor spots, so the two-shot looks past the
@@ -165,7 +167,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       ctx.camDirector.setPreset('court');
       ctx.camDirector.snapTo(S.anchor.position, mid);
     } else {
-      S.hub?.dispose(); S.hub = null;
+      S.hub?.built.root.setEnabled(false);
     }
     S.host?.root.setEnabled(on);
     S.guest?.root.setEnabled(on);

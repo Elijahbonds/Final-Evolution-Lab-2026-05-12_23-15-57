@@ -75,11 +75,13 @@ import {
 type Phase = 'pick' | 'spin' | 'expose' | 'answer' | 'result' | 'done';
 const MAX_ROUNDS = 15;
 /** The spin, then the LANDING beat: the wheel stopped, the category named — before the card goes up. */
-const SPIN_S = 2.2, LAND_S = 0.7;
+// Feel: the wheel and the verdict used to hold 2.2 + 0.7 and 3.2 s (skip at 0.9). A night of five claims
+// dragged. 1.5 + 0.45 and 2.1 s (skip at 0.55) keeps the landing readable and moves on.
+const SPIN_S = 1.5, LAND_S = 0.45;
 /** Everyone is in: the slap lands and reads before the reveal. */
 const LOCK_BEAT_S = 0.4;
 /** The result holds this long on its own; a face press moves on after RESULT_SKIP_S (the verdict has had its beat). */
-const RESULT_S = 3.2, RESULT_SKIP_S = 0.9;
+const RESULT_S = 2.1, RESULT_SKIP_S = 0.55;
 /** A speech bubble's life on screen, and a score pop's. */
 const BUBBLE_S = 1.9, POP_S = 1.8;
 /** What the podium bodies and the host stand on: the riser's top cap (BrainBrawlStage: riser + 2 mm) and the stage deck. */
@@ -154,6 +156,8 @@ interface St {
   challenge: Challenge | null; clock: number; exposeT: number; answers: (number | null)[]; answerTimes: number[];
   lockT: number; resultT: number; resultAge: number; hurried: boolean; thought: boolean[];
   best: number;
+  /** Correct answers in a row. Presentation only — posted points stay challengeScore, so the arena ceiling holds. */
+  streak: number;
   /** One per seat, spawned when the seat is in play (P2 only for a duel): a HIDDEN body that is still animating trips
    *  SkinningGuard's stall check (no bone moves in its first 45 frames) and is forced onto CPU skinning. */
   cast: (Contestants | null)[];
@@ -355,7 +359,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       optX: c && showOpts ? c.options[2] : '', optY: c && showOpts ? c.options[3] : '',
       clock: S.phase === 'answer' ? Math.max(0, Math.ceil(S.clock)) : null,
       clockFrac: S.phase === 'answer' && c ? Math.max(0, Math.min(1, S.clock / c.timeLimitSec)) : null,
-      score: S.scores[0], p2score: S.scores[1] ?? 0,
+      score: S.scores[0], p2score: S.scores[1] ?? 0, streak: S.streak,
       answeredP1: S.answers[0] !== null && S.phase === 'answer', answeredP2: S.answers[1] !== null && S.players > 1 && S.phase === 'answer',
       // what each seat picked: shown on the card for the player's OWN lock-in (solo) and at the reveal (both)
       pickP1: S.answers[0] ?? -1, pickP2: S.players > 1 ? (S.answers[1] ?? -1) : -1,
@@ -398,13 +402,12 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   function spin(ctx: ModeContext, S: St): void {
     S.round++;
     S.tier = (S.round <= 2 ? 1 : S.round <= 4 ? 2 : 3) as Tier;
-    // solo: the wheel walks the five categories once (played = claimed for the spin's purposes)
-    const pseudo = { ...S.claims } as Record<Category, number | null>;
-    if (S.players === 1) for (const c of S.played) pseudo[c] = 0;
+    // A miss stays open. The wheel skips only categories already claimed, so a solo night can reach all five.
     const spinner = S.players > 1 ? (S.round - 1) % 2 : 0;
+    const unclaimed = CATEGORIES.filter((c) => S.claims[c] === null).length;
     // N5: what the wheel can land on, read BEFORE the spin — the spinner's wish names only one of these
-    const wish = spinLines(wheelPool(pseudo, spinner), S.rnd);
-    const { category, fullTurns } = spinWheel(S.rnd, pseudo, spinner);
+    const wish = spinLines(wheelPool(S.claims, spinner), S.rnd);
+    const { category, fullTurns } = spinWheel(S.rnd, S.claims, spinner);
     S.category = category; S.landed = false; S.spinT = 0;
     S.spinFrom = S.wheel ? S.wheel.rotation.z : 0;
     S.spinTo = wheelLanding(S.spinFrom, category, fullTurns);   // an ABSOLUTE stop: the named wedge under the pin
@@ -416,7 +419,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     hud(ctx, S, { banner: S.players > 1 ? `${names(S)[spinner]} SPINS` : 'SPIN', hint: '', board: null, boardTitle: '', reveal: -1, verdictP1: '', verdictP2: '', pop1: '', pop2: '' });
     // the host opens the match, then calls every spin; the spinner wishes it on
     if (S.round === 1) host(S, S.matches > 1 ? 'again' : S.players > 1 ? 'intro.duel' : 'intro.solo', 'present');
-    else host(S, S.players === 1 && S.played.size === CATEGORIES.length - 1 ? 'spin.last' : 'spin', 'present');
+    else host(S, S.players === 1 && unclaimed === 1 ? 'spin.last' : 'spin', 'present');
     later(S, 350, () => { if (S.phase === 'spin') speak(S, spinner, 'spin', true, wish); });
   }
 
@@ -477,6 +480,8 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     const before = S.claims[c.category];   // who held it going in — the banner says HOLDS / TAKES / STAYS WITH from this
     const claimant = resolveClaim(S.claims, c.category, roundScores);
     S.played.add(c.category);
+    // Assumption: a streak changes the banner, the chip and the cheer pitch. It does not multiply roundScores.
+    if (S.players === 1) S.streak = vs[0] === 'correct' ? S.streak + 1 : 0;
     const fast = (i: number) => vs[i] === 'correct' && S.answerTimes[i] / c.timeLimitSec >= 0.7;
     // the verdicts land together, on the bodies, the lecterns, the bubbles and the card
     vs.forEach((v, i) => {
@@ -488,7 +493,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     });
     screens(S);
     const anyRight = vs.includes('correct');
-    if (anyRight) SoundKit.play('score', { volume: 0.6, pitch: 1.1 });
+    if (anyRight) SoundKit.play('score', { volume: 0.6, pitch: 1 + Math.min(0.4, Math.max(0, S.streak - 1) * 0.08) });
     else if (vs.every((v) => v === 'timeout')) SoundKit.play('clang', { volume: 0.5, pitch: 0.6 });
     else SoundKit.play('miss', { volume: 0.55, pitch: 0.9 });
     if (claimant >= 0 && before !== claimant) {   // a new claim or a steal gets the confetti; a defended hold does not
@@ -508,17 +513,17 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     else host(S, 'claim');
     S.phase = 'result'; S.resultT = RESULT_S; S.resultAge = 0;
     hud(ctx, S, {
-      banner: claimLine(before, c.category, claimant, names(S)),
+      banner: `${claimLine(before, c.category, claimant, names(S))}${S.players === 1 && S.streak > 1 ? ` · STREAK ×${S.streak}` : ''}`,
       hint: `${roundScores.map((v, i) => `${names(S)[i]} ${vs[i] === 'correct' ? `+${v}` : vs[i] === 'wrong' ? 'wrong' : 'out of time'}`).join(' · ')} · A next`,
       reveal: c.answer, verdictP1: vs[0], verdictP2: vs[1] ?? '', gainP1: roundScores[0], gainP2: roundScores[1] ?? 0,
-      board: boardRows(S.claims, S.scores, names(S)), boardTitle: S.players > 1 ? 'FIRST TO FIVE' : `${S.played.size} / 5 PLAYED`,
+      board: boardRows(S.claims, S.scores, names(S)), boardTitle: S.players > 1 ? 'FIRST TO FIVE' : `${claimedBy(S.claims, 0).length}/5 CLAIMED${S.streak > 1 ? ` · STREAK ×${S.streak}` : ''}`,
     });
   }
 
   function afterResult(ctx: ModeContext, S: St): void {
     if (S.phase !== 'result') return;
     const winner = matchWinner(S.claims, S.players);
-    const soloDone = S.players === 1 && S.played.size >= CATEGORIES.length;
+    const soloDone = S.players === 1 && claimedBy(S.claims, 0).length >= CATEGORIES.length;
     if (winner >= 0 || soloDone || S.round >= MAX_ROUNDS) { finish(ctx, S, winner); return; }
     spin(ctx, S);
   }
@@ -564,7 +569,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   restartMatch = (S: St): void => {
     for (const t of S.timers) clearTimeout(t);
     S.timers = [];
-    S.claims = freshClaims(); S.played = new Set(); S.round = 0; S.tier = 1; S.challenge = null; S.category = null;
+    S.claims = freshClaims(); S.played = new Set(); S.streak = 0; S.round = 0; S.tier = 1; S.challenge = null; S.category = null;
     S.matches++;
     // N9: the last match's talk goes with it — the bubbles, the pops and the host's caption — so round one of the rematch
     // opens clean (its opener is an 'again' line, none of which names a round). The no-repeat memory (lastSaid) STAYS: 'again'
@@ -596,7 +601,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
         venue: null, stage: null, crowd: [], anchor: null, wheel: null, cast: [null, null], spawning: [false, false], host: null,
         spinT: 0, spinFrom: 0, spinTo: 0, landed: false, category: null, lastRoll: 0, tickAt: 0,
         challenge: null, clock: 0, exposeT: 0, answers: [null], answerTimes: [0], lockT: -1, resultT: 0, resultAge: 0, hurried: false, thought: [false, false],
-        best: loadBest(), spots: [], hostAt: { at: HOST_AT.clone(), yaw: 0 }, feet: [null, null, null], timers: [],
+        best: loadBest(), streak: 0, spots: [], hostAt: { at: HOST_AT.clone(), yaw: 0 }, feet: [null, null, null], timers: [],
         say: [{ text: '', t: 0, n: 0 }, { text: '', t: 0, n: 0 }], hostN: 0, lastSaid: new Map(), pops: [{ t: 0, n: 0 }, { t: 0, n: 0 }], anchorsAt: 0, anchorKey: '',
       };
       states.set(ctx.scene, S); live.add(S);

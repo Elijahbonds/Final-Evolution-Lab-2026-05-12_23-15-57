@@ -12,7 +12,7 @@
 // animator's fade handler (the stranded-fade freeze the combat pass measured). Bodies on a loop + beats use BeatOwner;
 // the trick gauntlet rides BoardAnimTree with the TrickMachine in external mode, exactly like the skate mode.
 
-import { MeshBuilder, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -58,6 +58,63 @@ export interface CarnivalEvent {
 
 const cfg = { heroUrl: SHARED_CFG.heroUrl };
 
+/** Meshes an event's venue kit added. Torn down with the event so the next stop does not inherit a floor, a hoop or a wall. */
+function meshIds(scene: Scene): Set<number> {
+  return new Set(scene.meshes.map((m) => m.uniqueId));
+}
+function bornSince(scene: Scene, before: Set<number>): AbstractMesh[] {
+  return scene.meshes.filter((m) => !before.has(m.uniqueId));
+}
+function dropStage(meshes: readonly AbstractMesh[]): void {
+  for (const m of meshes) if (!m.isDisposed()) m.dispose(false, true);
+}
+
+/**
+ * Counter Strike's dojo floor is smaller than its walls, so the clear colour shows as a saw-tooth along the edge,
+ * and the pale shoji reads as a blank board. A dark apron fills the gap; a painted banner stands in front of the
+ * far wall. Any backboard still enabled from a previous stop gets its own material — the shared one is left alone.
+ */
+function dressCounterStrike(scene: Scene): void {
+  const apron = MeshBuilder.CreateGround('carn_apron', { width: 28, height: 28 }, scene);
+  apron.position.y = -0.02;
+  const apronMat = new PBRMaterial('carn_apron_m', scene);
+  apronMat.albedoColor = Color3.FromHexString('#3a2418');
+  apronMat.emissiveColor = Color3.FromHexString('#3a2418').scale(0.08);
+  apronMat.roughness = 0.82;
+  apron.material = apronMat;
+  apron.isPickable = false;
+
+  const frame = MeshBuilder.CreatePlane('carn_banner', { width: 6.2, height: 1.6 }, scene);
+  frame.position.set(0, 2.6, -9.58);
+  const frameMat = new PBRMaterial('carn_banner_m', scene);
+  frameMat.albedoColor = Color3.FromHexString('#3a2418');
+  frameMat.emissiveColor = Color3.FromHexString('#3a2418').scale(0.05);
+  frameMat.roughness = 0.7;
+  frame.material = frameMat;
+  frame.isPickable = false;
+
+  const panel = MeshBuilder.CreatePlane('carn_banner_panel', { width: 5.4, height: 1.05 }, scene);
+  panel.position.set(0, 2.6, -9.5);
+  const panelMat = new PBRMaterial('carn_banner_panel_m', scene);
+  panelMat.albedoColor = Color3.FromHexString('#c45c26');
+  panelMat.emissiveColor = Color3.FromHexString('#e8a060').scale(0.25);
+  panelMat.roughness = 0.55;
+  panel.material = panelMat;
+  panel.isPickable = false;
+
+  const owned = new Set([apron.uniqueId, frame.uniqueId, panel.uniqueId]);
+  for (const m of scene.meshes) {
+    if (owned.has(m.uniqueId) || !m.isEnabled()) continue;
+    const n = m.name.toLowerCase();
+    if (n !== 'backboard' && !n.includes('backboard')) continue;
+    const paint = new PBRMaterial(`carn_board_${m.uniqueId}`, scene);
+    paint.albedoColor = Color3.FromHexString('#c45c26');
+    paint.emissiveColor = Color3.FromHexString('#c45c26').scale(0.12);
+    paint.roughness = 0.55;
+    m.material = paint;
+  }
+}
+
 // MOMENTUM (finish-release, 2026-09-24): the carnival reported nothing to the bus, so its crowd bed never swelled. Each
 // event reports its success beat at the weight a like beat carries in the full modes; a failure reports nothing.
 /** a mashed bag hit: every press lands here, so a third of a landed strike in the fight modes (9) */
@@ -68,6 +125,7 @@ const MOMENTUM_TRICK = 6;
 // ── SLAM RUSH — as many dunks as you can charge-and-release in the clock ──
 export function slamRush(): CarnivalEvent {
   let player: SpawnedCharacter, ball: AbstractMesh, body: BeatOwner;
+  let stage: AbstractMesh[] = [];
   let charging = false, charge = 0, makes = 0, cooldown = 0;
   let gathered = false;   // this charge's gather has been thrown (it is held, not looped — see gather())
   const rim = new Vector3(0, 3.05, -0.6);
@@ -84,7 +142,9 @@ export function slamRush(): CarnivalEvent {
     id: 'slam_rush', title: 'SLAM RUSH', durationSec: 20, pointsPerUnit: 12, rivalRange: [4, 9],
     verbs: { buttons: [], says: 'HOLD CHARGE — RELEASE AT THE TOP' },
     async build(ctx) {
+      const before = meshIds(ctx.scene);
       VenueKit.buildCourt(ctx.scene, 'venice');
+      stage = bornSince(ctx.scene, before);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: SPORT_CLIP.idle });
       neverBindPose(player.animator, SPORT_CLIP.idle); installSafePlay(player.animator, 'carnival-slam');
       // HOOPS MOTION phase 3: the dunker is right-handed on screen like every hoops body — the dunk and hoops families mirrored onto
@@ -132,20 +192,23 @@ export function slamRush(): CarnivalEvent {
       }
     },
     tick(_ctx, dt) { cooldown = Math.max(0, cooldown - dt); if (charging) gather(); return makes; },
-    teardown() { player?.dispose(); ball?.dispose(); },
+    teardown() { player?.dispose(); ball?.dispose(); dropStage(stage); },
   };
 }
 
 // ── STRIKE STORM — land as many strikes as you can on a training bag ──────
 export function strikeStorm(): CarnivalEvent {
   let player: SpawnedCharacter, bag: SpawnedCharacter, body: BeatOwner, bagBody: BeatOwner;
+  let stage: AbstractMesh[] = [];
   let hits = 0, striking = false;
 
   return {
     id: 'strike_storm', title: 'STRIKE STORM', durationSec: 15, pointsPerUnit: 8, rivalRange: [10, 22],
     verbs: { buttons: ['A', 'B', 'Y'], says: 'MASH GO · TRICK · POWER' },
     async build(ctx) {
+      const before = meshIds(ctx.scene);
       VenueKit.buildDojo(ctx.scene);
+      stage = bornSince(ctx.scene, before);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 1.4), startClip: SPORT_CLIP.karateStance });
       neverBindPose(player.animator, SPORT_CLIP.karateStance); installSafePlay(player.animator, 'carnival-strike');
       ctx.groundLock?.track(player.root, player.skeleton);
@@ -173,7 +236,7 @@ export function strikeStorm(): CarnivalEvent {
       }
     },
     tick() { return hits; },
-    teardown() { player?.dispose(); bag?.dispose(); },
+    teardown() { player?.dispose(); bag?.dispose(); dropStage(stage); },
   };
 }
 
@@ -258,6 +321,7 @@ export function trickGauntlet(): CarnivalEvent {
 // ── HOT SHOT — quick-fire shots on goal, reusing aimSwingCore as-is ───────
 export function hotShot(): CarnivalEvent {
   let player: SpawnedCharacter, ball: AbstractMesh, reticle: Reticle, meter: PowerMeter, flight: Flight, body: BeatOwner;
+  let stage: AbstractMesh[] = [];
   let goal: AbstractMesh[] = [];
   let goals = 0, phase: 'aim' | 'power' | 'flight' = 'aim', stickX = 0, stickY = 0;
   const goalCenter = new Vector3(0, 1.2, 11);
@@ -266,8 +330,10 @@ export function hotShot(): CarnivalEvent {
     id: 'hot_shot', title: 'HOT SHOT', durationSec: 15, pointsPerUnit: 15, rivalRange: [3, 7],
     verbs: { buttons: ['A'], says: 'GO — POWER, THEN SHOOT' },
     async build(ctx) {
+      const before = meshIds(ctx.scene);
       VenueKit.buildField(ctx.scene, 'pitch');
       goal = buildGoal(ctx.scene);
+      stage = bornSince(ctx.scene, before);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.penaltyIdle });
       neverBindPose(player.animator, SPORT_CLIP.penaltyIdle); installSafePlay(player.animator, 'carnival-hotshot');
       body = new BeatOwner(player.animator); body.loop(SPORT_CLIP.penaltyIdle);
@@ -307,13 +373,14 @@ export function hotShot(): CarnivalEvent {
       }
       return goals;
     },
-    teardown() { player?.dispose(); ball?.dispose(); reticle?.dispose(); goal.forEach((g) => g.dispose()); },
+    teardown() { player?.dispose(); ball?.dispose(); reticle?.dispose(); goal.forEach((g) => g.dispose()); dropStage(stage); },
   };
 }
 
 // ── COIN STORM — clear the pattern, a fresh one drops, keep sprinting ─────
 export function coinStorm(): CarnivalEvent {
   let player: SpawnedCharacter, body: BeatOwner;
+  let stage: AbstractMesh[] = [];
   let coins: CoinField | null = null;
   let collected = 0, wave = 0, moving = false;
   let stickX = 0, stickY = 0;
@@ -342,8 +409,10 @@ export function coinStorm(): CarnivalEvent {
       // sit at y 0, so the boundary z-fought — the rc20 late frame is a sawtooth of grass and asphalt chewing along the
       // court's edge. The court is the thing that arrived second, so it is the thing that steps up; a centimetre is
       // daylight to the depth buffer and nothing to a runner.
+      const before = meshIds(ctx.scene);
       const groundsBefore = new Set(ctx.scene.meshes.filter((m) => m.name === 'venue_ground'));
       VenueKit.buildCourt(ctx.scene, 'street');
+      stage = bornSince(ctx.scene, before);
       for (const g of ctx.scene.meshes) if (g.name === 'venue_ground' && !groundsBefore.has(g)) g.position.y += 0.012;
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.idle });
       neverBindPose(player.animator, SPORT_CLIP.idle); installSafePlay(player.animator, 'carnival-coins');
@@ -382,13 +451,14 @@ export function coinStorm(): CarnivalEvent {
       ctx.camDirector.update(player.root.position, vel, null);
       return collected;
     },
-    teardown() { player?.dispose(); coins?.dispose(); coins = null; },
+    teardown() { player?.dispose(); coins?.dispose(); coins = null; dropStage(stage); },
   };
 }
 
 // ── COUNTER STRIKE — pure parry timing: read the wind-up, GUARD the window ─
 export function counterStrike(): CarnivalEvent {
   let player: SpawnedCharacter, rival: SpawnedCharacter, body: BeatOwner, rivalBody: BeatOwner;
+  let stage: AbstractMesh[] = [];
   let parries = 0;
   let state: 'idle' | 'telegraph' | 'cooldown' = 'idle';
   let stateSec = 0, parried = false;
@@ -399,7 +469,10 @@ export function counterStrike(): CarnivalEvent {
     id: 'counter_strike', title: 'COUNTER STRIKE', durationSec: 15, pointsPerUnit: 14, rivalRange: [4, 8],
     verbs: { buttons: ['A'], says: 'GO — ON THE WIND-UP' },
     async build(ctx) {
+      const before = meshIds(ctx.scene);
       VenueKit.buildDojo(ctx.scene);
+      dressCounterStrike(ctx.scene);
+      stage = bornSince(ctx.scene, before);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 1.2), startClip: SPORT_CLIP.karateStance });
       neverBindPose(player.animator, SPORT_CLIP.karateStance); installSafePlay(player.animator, 'carnival-counter');
       ctx.groundLock?.track(player.root, player.skeleton);
@@ -458,7 +531,7 @@ export function counterStrike(): CarnivalEvent {
       }
       return parries;
     },
-    teardown() { player?.dispose(); rival?.dispose(); },
+    teardown() { player?.dispose(); rival?.dispose(); dropStage(stage); },
   };
 }
 

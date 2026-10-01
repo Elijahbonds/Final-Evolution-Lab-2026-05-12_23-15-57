@@ -12,6 +12,7 @@ import { TransformNode, Vector3 } from '@babylonjs/core';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { makeVenueShelf } from './whoSceneItVenues';
 import { WHO_SCENE_IT, type QuizPack, type QuizQuestion } from '../core/QuizCore';
 import { BuzzMatch, buildRounds, MAX_PLAYERS, type Resolution } from '../core/SceneBuzz';
 import { WHO_SCENE_IT_PACK } from '../content/quizPacks';
@@ -26,12 +27,15 @@ const QUESTIONS_PER_CATEGORY = 2;
 const FACE: Array<'A' | 'B' | 'X' | 'Y'> = ['A', 'B', 'X', 'Y'];
 /** P2's answers on the d-pad, in card order A B C D. */
 const DPAD: Array<'up' | 'right' | 'down' | 'left'> = ['up', 'right', 'down', 'left'];
-const SWEEP = { radius: 13, height: 5.5, speed: 0.12 };   // a slow orbit, ~50 s per lap; a question sees a quarter turn
+// The orbit used to run at radius 13, which crosses the venue walls (who_scene_it at z −10, gymnastics at z −12).
+// 8.5 keeps the camera on the play side of both. Feel number: camera distance, 13 → 8.5.
+export const WHO_SCENE_SWEEP = { radius: 8.5, height: 5.5, speed: 0.12 };
 
 type Phase = 'pick' | 'play' | 'board' | 'done';
 
 export function makeWhoSceneItMode(): ModeDefinition {
   let venue: VenueHandle | null = null;
+  let shelf = makeVenueShelf<{ root: { setEnabled(on: boolean): void }; dispose(): void; handle: VenueHandle }>(() => null);
   let anchor: TransformNode | null = null;   // a quiz has no hero; the frame guard still wants a subject — an anchor at the floor's centre
   let pack: QuizPack = WHO_SCENE_IT_PACK;
   let match: BuzzMatch | null = null;
@@ -89,9 +93,10 @@ export function makeWhoSceneItMode(): ModeDefinition {
   }
 
   function mountFor(ctx: ModeContext, q: QuizQuestion | null): void {
-    venue?.dispose?.(); venue = null;
     const key = q?.sceneVenueId ?? 'who_scene_it';
-    venue = mountVenue(ctx, key, { keepGameplayCamera: true }) ?? mountVenue(ctx, 'who_scene_it', { keepGameplayCamera: true });
+    const shown = shelf.show(key) ?? shelf.show('who_scene_it');
+    venue = shown?.handle ?? null;
+    venue?.hidePlaceholders();
     sweepT = Math.random() * Math.PI * 2;
     if (!anchor || anchor.isDisposed()) { anchor = new TransformNode('wsi_anchor', ctx.scene); anchor.position.set(0, 1.2, 0); }
     ctx.heroRef.current = anchor; ctx.objectiveRef.current = null;
@@ -205,7 +210,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
 
   function finish(ctx: ModeContext): void {
     if (phase === 'done') return; phase = 'done';
-    venue?.dispose?.(); venue = null;
+    venue = null;
     const m = match;
     const total = m?.totalQuestions ?? 0;
     const p1 = m?.players[0]; const p2 = m?.players[1];
@@ -230,6 +235,14 @@ export function makeWhoSceneItMode(): ModeDefinition {
     async load(ctx: ModeContext): Promise<void> {
       phase = 'pick'; pickT = 0; match = null; revealT = 0; boardT = 0;
       pack = await pickPack(); packTitle = pack.title;
+      shelf = makeVenueShelf((id) => {
+        const handle = mountVenue(ctx, id, { keepGameplayCamera: true });
+        if (!handle) return null;
+        return { root: handle.built.root, dispose: () => handle.dispose(), handle };
+      });
+      const ids = new Set<string>(['who_scene_it']);
+      for (const q of pack.questions) if (q.sceneVenueId) ids.add(q.sceneVenueId);
+      shelf.preload([...ids]);
       const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('players') : null;
       players = Math.max(1, Math.min(MAX_PLAYERS, Number(q ?? 1) || 1));
       clock = WHO_SCENE_IT.timeLimit;
@@ -263,8 +276,8 @@ export function makeWhoSceneItMode(): ModeDefinition {
     update(ctx: ModeContext, dt: number): void {
       if (phase === 'done') return;
       // the camera sweeps the mounted venue — a slow orbit at eye-plus height, always looking at the floor's centre
-      sweepT += dt * SWEEP.speed;
-      ctx.camera.position.set(Math.sin(sweepT) * SWEEP.radius, SWEEP.height, Math.cos(sweepT) * SWEEP.radius);
+      sweepT += dt * WHO_SCENE_SWEEP.speed;
+      ctx.camera.position.set(Math.sin(sweepT) * WHO_SCENE_SWEEP.radius, WHO_SCENE_SWEEP.height, Math.cos(sweepT) * WHO_SCENE_SWEEP.radius);
       ctx.camera.setTarget(new Vector3(0, 1.2, 0));
       if (phase === 'pick') { pickT += dt; if (pickT >= PICK_TIMEOUT_S) begin(ctx); return; }
       if (phase === 'board') { boardT -= dt; if (boardT <= 0) startQuestion(ctx); return; }
@@ -274,7 +287,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
       if (Math.floor((clock + dt) * 2) !== Math.floor(clock * 2)) hud(ctx);   // twice a second is plenty for a clock
     },
 
-    dispose(): void { venue?.dispose?.(); venue = null; anchor?.dispose(); anchor = null; match = null; cast?.dispose(); cast = null; },
+    dispose(): void { shelf.dispose(); venue = null; anchor?.dispose(); anchor = null; match = null; cast?.dispose(); cast = null; },
   };
 }
 
