@@ -60,6 +60,8 @@ class SoundKitImpl {
   // sfxBus sits exactly where voiceBus and musicBus already did (its own gain node, between the sound and master),
   // so play()'s cases changed only their connect() target, never their own envelope math.
   private sfxBus: GainNode | null = null;
+  /** A copy of the mix for a local recording. Speakers stay connected. Nothing is uploaded. */
+  private recordDest: MediaStreamAudioDestinationNode | null = null;
   /** The three player-set levels (0..1 each), read once at construction (lib/audio/volumes.ts's own on-device
    *  persistence — the same guarded-localStorage shape readVoicePref/writeVoicePref below already use) and kept
    *  live from there on: setVolume() below is the only thing that ever changes it after this. */
@@ -397,6 +399,20 @@ class SoundKitImpl {
     if (!this.crowdGain) return;
     const k = Math.max(0, Math.min(1, level01));
     this.crowdGain.gain.value = this.crowdBaseGain * (0.35 + k * 2.2);
+  }
+
+  /**
+   * The game mix, as a stream a local recording can add. The speakers are unchanged: this is a second
+   * wire off the limiter. Null when this browser has no audio context. Never sent anywhere.
+   */
+  captureMix(): MediaStream | null {
+    const ctx = this.ensure();
+    if (!ctx || !this.out || typeof ctx.createMediaStreamDestination !== 'function') return null;
+    if (!this.recordDest) {
+      this.recordDest = ctx.createMediaStreamDestination();
+      this.out.connect(this.recordDest);
+    }
+    return this.recordDest.stream;
   }
 
   stopAmbient(): void {
