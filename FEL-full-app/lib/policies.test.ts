@@ -14,6 +14,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-29b-draft': 'da6275bf1062a1d8',  // + §5 names the daily readiness check-in (mirror-coach, phase 6)
   '2026-09-29c-draft': '7c6a27b255d6eda1',  // + §5 names the Dial-Up Breath use log and its week after an erase (mirror-coach, phase 7)
   '2026-09-30-draft': 'abc709bb13372227',  // + §5 keeps consent records; an erase does not restart the breath's first week (mirror-coach-erase)
+  '2026-10-01-draft': '18b88eec085ba82b',  // §6: body-tracking files from our own servers only (no jsDelivr / Google fallback)
 };
 
 describe('the policy version', () => {

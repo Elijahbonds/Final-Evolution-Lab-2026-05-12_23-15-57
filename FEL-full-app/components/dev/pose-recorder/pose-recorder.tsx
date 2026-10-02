@@ -6,7 +6,7 @@
 // What it keeps is LANDMARK NUMBERS ONLY. The camera picture is drawn in this page and nowhere else: never saved,
 // never sent. Takes live in this tab's memory until the owner downloads them as one .json file, which the browser
 // saves on the Mac. There is no fetch and no POST here. The only network use is the pose model's one-time download
-// (from our own /pose copy, like every camera feature in the app; the MediaPipe CDN only if ours is missing).
+// from our own /pose copy, the same as every camera feature in the app.
 //
 // The owner stands about 3 m from the screen, so everything they need mid-take (the prompt, the 3-2-1, GO) is drawn
 // big on the video, with a beep on each count, and "Record all remaining" runs the takes back to back.
@@ -373,8 +373,8 @@ export default function PoseRecorder() {
         <b className="text-[#00FF9D]">NUMBERS ONLY. NOTHING IS UPLOADED.</b> The camera picture is shown on this page and
         nowhere else. It is never saved and never sent. What is kept is the 33 body points per frame (positions and
         visibility), in this tab&apos;s memory, until you download them as one .json file to this Mac. This page sends
-        nothing to any server. The only network use is the pose model&apos;s one-time download (MediaPipe, from jsDelivr
-        and Google&apos;s model storage). Closing the tab throws the takes away.
+        nothing to any server. The only network use is the pose model&apos;s one-time download from this site (/pose).
+        Closing the tab throws the takes away.
       </section>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">

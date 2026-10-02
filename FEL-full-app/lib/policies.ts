@@ -20,6 +20,9 @@
 // consumer-health-data laws (e.g. Washington's My Health My Data Act) by extending the same rights to everyone
 // everywhere rather than only where a given law requires it. 2026-09-25-draft is live and signups recorded it for
 // the old three-sentence §5.
+// BODY-PLAY-WORKS (2026-10-01): bumped again, §6 only — the body-tracking files come from our own servers only.
+// The sentence that said a missing copy falls back to jsDelivr and Google was left over from before that fallback
+// was removed. Face scan's model is unchanged. 2026-09-30-draft is the text without this sentence.
 // MIRROR-COACH P6 (2026-09-29): bumped again, §5 only — it now names the optional daily check-in (sleep, soreness,
 // energy, mood; lib/health/readiness.ts) in what is collected, where it lives, who can see it and what an erase
 // deletes, because it is stored under the same health-data consent and §5 listed only the intake and pain
@@ -33,7 +36,7 @@
 // MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT, "No wait and fix"): bumped again, §5 only — an erase keeps the
 // consent records as proof of agreement and withdrawal, and it does not start the Dial-Up Breath's first-week wait
 // over. A first opt-in still waits that week. 2026-09-29c-draft never shipped either; a new string is still the rule.
-export const CURRENT_POLICY_VERSION = '2026-09-30-draft';
+export const CURRENT_POLICY_VERSION = '2026-10-01-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -140,7 +143,7 @@ When you play, only numbers worked out from the camera (for example jump height,
 
 Before body play, a space check makes sure the camera can see all of you and the floor. It also checks how bright the picture is. Both happen on your device, and nothing from them is sent or saved. Your choice to play a game with your body is remembered on this device only. The small self-view of you is shown only on your screen.
 
-The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers. Face scan's model file comes from Google's servers (storage.googleapis.com), and if our copy of the body-tracking files is ever missing they come from jsDelivr and Google instead. These downloads never include your picture.
+The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers only. Face scan's model file comes from Google's servers (storage.googleapis.com). These downloads never include your picture.
 
 ## 7. Third Parties
 
