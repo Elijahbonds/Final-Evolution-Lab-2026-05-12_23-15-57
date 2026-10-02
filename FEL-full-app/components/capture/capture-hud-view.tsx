@@ -32,10 +32,12 @@ export interface CaptureHudViewProps {
   dunkFilm: boolean;
   canShareTake: boolean;
   canShareReplay: boolean;
+  busy: boolean;
   onRecord: () => void;
   onReplay: () => void;
   onAspect: (aspect: Aspect) => void;
   onShare: (which: 'take' | 'replay') => void;
+  onDiscard: () => void;
   onStream: () => void;
   onHide: () => void;
   onShow: () => void;
@@ -52,8 +54,15 @@ export function CaptureHudView(props: CaptureHudViewProps) {
   }
   const recording = props.phase === 'recording';
   const buffering = props.phase === 'buffering';
+  const hasClip = props.canShareTake || props.canShareReplay;
+  const disabledShareStyle = props.busy ? { ...btn, opacity: 0.55, cursor: 'wait' } : btn;
   return (
     <div data-testid="capture-hud" style={bar}>
+      {props.phase === 'error' ? (
+        <button type="button" data-testid="capture-reset" onClick={props.onDiscard} style={recOn}>
+          Reset recorder
+        </button>
+      ) : null}
       <button type="button" data-testid="capture-record" onClick={props.onRecord} style={recording ? recOn : btn}>
         {recording ? 'Stop' : 'Record'}
       </button>
@@ -66,9 +75,26 @@ export function CaptureHudView(props: CaptureHudViewProps) {
       <button type="button" data-testid="capture-aspect-169" onClick={() => props.onAspect('16:9')} style={props.aspect === '16:9' ? on : btn}>
         16:9
       </button>
-      <button type="button" data-testid="capture-share" onClick={() => props.onShare(props.canShareTake ? 'take' : 'replay')} disabled={!props.canShareTake && !props.canShareReplay} style={btn}>
-        Share
-      </button>
+      {props.canShareTake ? (
+        <button type="button" data-testid="capture-share-take" onClick={() => props.onShare('take')} disabled={props.busy} style={disabledShareStyle}>
+          Share take
+        </button>
+      ) : null}
+      {props.canShareReplay ? (
+        <button type="button" data-testid="capture-share-replay" onClick={() => props.onShare('replay')} disabled={props.busy} style={disabledShareStyle}>
+          Share 30s
+        </button>
+      ) : null}
+      {!hasClip ? (
+        <button type="button" data-testid="capture-share" onClick={() => props.onShare('take')} disabled style={btn}>
+          Share
+        </button>
+      ) : null}
+      {hasClip || props.phase === 'error' ? (
+        <button type="button" data-testid="capture-discard" onClick={props.onDiscard} style={btn}>
+          Discard
+        </button>
+      ) : null}
       <button type="button" data-testid="capture-stream" aria-pressed={props.streamOn} onClick={props.onStream} style={props.streamOn ? on : btn}>
         {props.streamOn ? 'Stream on' : 'Stream'}
       </button>

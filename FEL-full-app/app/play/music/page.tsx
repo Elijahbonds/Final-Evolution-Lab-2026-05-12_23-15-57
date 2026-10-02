@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
@@ -12,5 +13,9 @@ export default async function MusicPage() {
   // device never shows one player's kits to another while GET /api/music/unlock (the truth) is on its way. The id is the
   // session's own (lib/auth.ts puts token.sub there); only this player's cache key is built from it, on this device.
   const playerId = (session.user as { id?: unknown } | undefined)?.id;
-  return <MusicLoader playerId={typeof playerId === 'string' && playerId ? playerId : null} />;
+  return (
+    <Suspense fallback={<div className="grid min-h-[60vh] place-items-center bg-[#050505] text-sm text-white/60">Loading music room...</div>}>
+      <MusicLoader playerId={typeof playerId === 'string' && playerId ? playerId : null} />
+    </Suspense>
+  );
 }
