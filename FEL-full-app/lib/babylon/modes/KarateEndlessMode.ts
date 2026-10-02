@@ -132,7 +132,7 @@ import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   
  * the mat leaves it nowhere to stand: at the old ±8 on a 16x16 mat the camera was
  * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
  * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the fightShoulder rig at
- * its 3.1m predecessor; at 4.0m the mat's 12m half-extent still clears (11.6m).
+ * its 3.1m predecessor; at 4.0 m × HUNDRED_CAM_PULL the mat's 12 m half-extent still clears.
  */
 /**
  * The fighter is held inside a DISC of this radius, not a square of this half-
