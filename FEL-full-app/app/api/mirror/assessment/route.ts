@@ -9,6 +9,7 @@ import { PRQ_CAMERA_SOURCE, prqGrade } from '@/lib/prq';
 import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 import { ASSESSMENT_KIND, MAX_RECORD_BYTES, mediaIn, prqWritesFor, validateRecord, type AssessmentRecord } from '@/lib/assess/prqWrite';
 import { mqs as mqsOf, type TestResult } from '@/lib/assess/scoring';
+import { buildAssessmentProgram } from '@/lib/assess/program';
 
 /**
  * Mirror Assess: a finished Quick Screen, as numbers (lib/assess, spec §9).
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
   const prior = recent.find((r: { metrics: unknown }) => (r.metrics as Stored | null)?.assessmentId === rec.assessmentId);
   if (prior) {
     const m = prior.metrics as Stored;
-    return NextResponse.json({ saved: true, idempotent: true, scanId: prior.id, assessmentId: rec.assessmentId, prqBefore: m.prqBefore ?? null, prqAfter: m.prqAfter ?? null, writes: m.prqWrites ?? [] });
+    return NextResponse.json({ saved: true, idempotent: true, scanId: prior.id, assessmentId: rec.assessmentId, prqBefore: m.prqBefore ?? null, prqAfter: m.prqAfter ?? null, writes: m.prqWrites ?? [], program: m.program ?? null });
   }
 
   const now = new Date();
@@ -97,8 +98,7 @@ export async function POST(req: NextRequest) {
     asymmetryFlags: m?.asymmetryFlags ?? 0,
     prqWrites: writes.map((w) => ({ axis: w.axis, value: w.value, reason: w.reason, entryId: null as string | null })),
     prqBefore: summary(before), prqAfter: null as ReturnType<typeof summary> | null,
-    // the programming engine (spec §7) is not built: the results page says "Your plan: coming soon"
-    program: null,
+    program: buildAssessmentProgram(rec),
   };
   const scan = await prisma.workoutScan.create({ data: { userId: uid, kind: ASSESSMENT_KIND, metrics: stored as unknown as object }, select: { id: true } });
 
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
     prqBefore: stored.prqBefore, prqAfter: stored.prqAfter,
     writes: stored.prqWrites.map((w) => ({ ...w, before: axesBefore[w.axis] ?? null, after: w.value })),
     mqs: m ? { value: m.value, band: m.band, label: m.label } : null,
+    program: stored.program,
   });
 }
 
