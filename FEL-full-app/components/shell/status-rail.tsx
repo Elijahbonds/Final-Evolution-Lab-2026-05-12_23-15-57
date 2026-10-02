@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
-import { BarChart3, LogOut, Zap } from 'lucide-react';
+import { BarChart3, BookOpen, LogOut, Zap } from 'lucide-react';
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DualWalletChip } from '@/components/dual-wallet-chip';
 import { TabBar, chromeHiddenFor } from '@/components/shell/tab-bar';
@@ -85,13 +85,22 @@ export function StatusRail() {
                 <DualWalletChip />
               </Link>
               {data.isAdmin && (
-                <Link
-                  href="/admin/metrics"
-                  aria-label="Growth metrics"
-                  className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                </Link>
+                <>
+                  <Link
+                    href="/admin/metrics"
+                    aria-label="Growth metrics"
+                    className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/coach/admin"
+                    aria-label="Exercise knowledge-base admin"
+                    className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                  </Link>
+                </>
               )}
             </>
           ) : (
