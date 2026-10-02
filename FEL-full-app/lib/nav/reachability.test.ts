@@ -33,6 +33,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/admin': 'shown in the rail to an admin only',
   '/game-surface.css': 'not a route',
   '/play': 'a tab',
+  '/play/map-preview': 'signed-in 3D map preview harness, opened directly for map/perf QA rather than product navigation',
   '/train': 'a tab',
   '/profile': 'a tab',
   '/studio': 'HOLD — not shipped, deliberately unlinked',
@@ -75,7 +76,7 @@ function routeReachedBy(route: string, href: string): boolean {
     const routePart = routeParts[i];
     const hrefPart = hrefParts[i];
     if (routePart.startsWith('[') && routePart.endsWith(']')) continue;
-    if (hrefPart.startsWith('[') && hrefPart.endsWith(']')) continue;
+    if (hrefPart.startsWith('[') && hrefPart.endsWith(']')) return false;
     if (routePart !== hrefPart) return false;
   }
   return true;
@@ -136,6 +137,10 @@ describe('nothing in the app is orphaned', () => {
     // HOTFIX (2026-09-24): the walk above sees top-level routes only, and /creator is linked -- so /creator/athlete
     // shipped with nothing pointing at it while this file stayed green. Its door is on Profile.
     expect(hrefs.has('/creator/athlete')).toBe(true);
+  });
+
+  it('does not advertise the held Nexus Studio route', () => {
+    expect(hrefs.has('/studio')).toBe(false);
   });
 
   it('the not-navigable list has not gone stale', () => {

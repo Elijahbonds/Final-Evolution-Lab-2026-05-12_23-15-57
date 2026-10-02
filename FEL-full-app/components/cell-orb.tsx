@@ -12,8 +12,7 @@
 
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Link from 'next/link';
-import { X, Send, Loader2, Sparkles, Maximize2 } from 'lucide-react';
+import { X, Send, Loader2, Sparkles } from 'lucide-react';
 
 interface Msg { id: string; role: 'user' | 'cell'; content: string }
 
@@ -61,7 +60,7 @@ export function CellOrb() {
         }
       }
     } catch {
-      setMessages((prev) => prev.map((m) => (m.id === aid && !m.content ? { ...m, content: 'CELL is offline right now. Try the full Studio.' } : m)));
+      setMessages((prev) => prev.map((m) => (m.id === aid && !m.content ? { ...m, content: 'CELL is offline right now. Try again from the Story hub.' } : m)));
     } finally { setBusy(false); }
   };
 
@@ -92,7 +91,6 @@ export function CellOrb() {
                 <span className="rounded bg-[#A855F7]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#C79BFF]">Nexus</span>
               </div>
               <div className="flex items-center gap-1">
-                <Link href="/studio" className="rounded p-1 text-white/50 hover:text-white" aria-label="Open full Studio"><Maximize2 className="h-4 w-4" /></Link>
                 <button onClick={() => setOpen(false)} className="rounded p-1 text-white/50 hover:text-white" aria-label="Close"><X className="h-4 w-4" /></button>
               </div>
             </div>
