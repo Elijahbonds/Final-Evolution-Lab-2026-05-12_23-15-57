@@ -8,8 +8,10 @@ import type { Wardrobe } from '@/lib/babylon/core/kit';
 // (playerIdentity.applyIdentity), not a parallel preview-only mapping — a
 // color that looks right here cannot look different in a mode.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FaceConfig, JerseyConfig } from '@/lib/closet/wearable-catalog';
+import { poseLoops } from '@/lib/creator/editor/previewPose';
+import { PreviewControls } from '@/components/creator/editor/preview-controls';
 
 export interface AvatarPreviewProps {
   face: FaceConfig;
@@ -22,17 +24,26 @@ export interface AvatarPreviewProps {
 export default function AvatarPreview({ face, palette, jersey, wardrobe }: AvatarPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
+  const playRef = useRef<(clip: string | null) => void>(() => {});
+  const spinRef = useRef(true);
+  const [spinning, setSpinning] = useState(true);
 
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | null = null;
     (async () => {
       const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color4, Color3 } = await import('@babylonjs/core');
+      const { applyCanvasFit, fitCanvas } = await import('@/lib/babylon/core/canvasFit');
+      const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
       const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
       const { applyIdentity } = await import('@/lib/babylon/core/playerIdentity');
       if (disposed || !canvasRef.current) return;
 
-      const engine = new Engine(canvasRef.current, true, { alpha: true });
+      const box = canvasRef.current;
+      const fit0 = fitCanvas({ cssWidth: box.clientWidth || 260, cssHeight: box.clientHeight || 260, dpr: window.devicePixelRatio || 1 });
+      const tier = detectQualityTier(box, fit0);
+      const engine = new Engine(box, tier === 'desktop', { alpha: true, adaptToDeviceRatio: false });
+      applyCanvasFit(engine, box);
       const scene = new Scene(engine);
       scene.clearColor = new Color4(0.03, 0.03, 0.05, 1);
       const cam = new ArcRotateCamera('closetCam', -Math.PI / 2, 1.25, 3.1, new Vector3(0, 0.95, 0), scene);
@@ -75,12 +86,18 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe }: Avata
       };
       applyRef.current({ face, palette, jersey, wardrobe });
 
-      // slow turntable so the back (jersey plate) is reachable
+      playRef.current = (clip: string | null) => {
+        if (!clip) return;
+        spawned.animator.play(clip, { loop: poseLoops(clip), restart: true });
+      };
+      const onResize = () => { if (canvasRef.current) applyCanvasFit(engine, canvasRef.current); };
+      window.addEventListener('resize', onResize);
       scene.registerBeforeRender(() => {
-        spawned.root.rotation.y += engine.getDeltaTime() * 0.0004;
+        if (spinRef.current) spawned.root.rotation.y += engine.getDeltaTime() * 0.0004;
       });
       engine.runRenderLoop(() => scene.render());
       cleanup = () => {
+        window.removeEventListener('resize', onResize);
         engine.stopRenderLoop();
         spawned.dispose();
         scene.dispose();
@@ -97,11 +114,14 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe }: Avata
   }, [face, palette, jersey, wardrobe]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="mx-auto block w-full rounded-xl border border-white/10"
-      style={{ height: 260, touchAction: 'none' }}
-      aria-label="3D avatar preview"
-    />
+    <div>
+      <canvas
+        ref={canvasRef}
+        className="mx-auto block w-full rounded-xl border border-white/10"
+        style={{ height: 260, touchAction: 'none' }}
+        aria-label="3D avatar preview"
+      />
+      <PreviewControls spinning={spinning} onToggleSpin={() => { spinRef.current = !spinRef.current; setSpinning(spinRef.current); }} onPose={(clip) => playRef.current(clip)} />
+    </div>
   );
 }

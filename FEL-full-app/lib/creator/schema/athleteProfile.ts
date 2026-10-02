@@ -27,7 +27,7 @@
 
 import type { PrqAxisId } from './types';
 
-export const ATHLETE_PROFILE_VERSION = '1.0.0';
+export const ATHLETE_PROFILE_VERSION = '1.1.0';
 
 export interface AthleteProfile {
   schema_version: string;
@@ -43,6 +43,8 @@ export interface AthleteProfile {
   tendencies: Record<string, number>;
   hot_zones: Record<string, string>;
   mechanics: Record<string, unknown>;
+  /** Animation package labels. Added in 1.1.0; an older file migrates forward with this empty. */
+  animations: Record<string, string | null>;
   traits: Record<string, number>;
   budgets: Record<string, number>;
   /** The measured axes this build's ceilings were resolved against, when the athlete had any. */
@@ -54,7 +56,7 @@ export interface AthleteProfile {
 
 const KNOWN_KEYS = new Set([
   'schema_version', 'profile_id', 'created_at', 'updated_at', 'vitals', 'appearance', 'body', 'ink',
-  'gear', 'attributes', 'tendencies', 'hot_zones', 'mechanics', 'traits', 'budgets', 'prq', 'unknown',
+  'gear', 'attributes', 'tendencies', 'hot_zones', 'mechanics', 'animations', 'traits', 'budgets', 'prq', 'unknown',
   'checksum',
 ]);
 
@@ -85,7 +87,7 @@ export function emptyAthleteProfile(id: string, now = new Date(0).toISOString())
   const base: Omit<AthleteProfile, 'checksum'> = {
     schema_version: ATHLETE_PROFILE_VERSION, profile_id: id, created_at: now, updated_at: now,
     vitals: {}, appearance: {}, body: {}, ink: [], gear: {},
-    attributes: {}, tendencies: {}, hot_zones: {}, mechanics: {}, traits: {}, budgets: {}, prq: null,
+    attributes: {}, tendencies: {}, hot_zones: {}, mechanics: {}, animations: {}, traits: {}, budgets: {}, prq: null,
   };
   return { ...base, checksum: checksumOf(base) };
 }
@@ -155,7 +157,9 @@ export function importProfile(raw: string | unknown): ImportResult {
     gear: obj(r.gear),
     attributes: num(r.attributes), tendencies: num(r.tendencies),
     hot_zones: Object.fromEntries(Object.entries(obj(r.hot_zones)).filter(([, v]) => typeof v === 'string')) as Record<string, string>,
-    mechanics: obj(r.mechanics), traits: num(r.traits), budgets: num(r.budgets),
+    mechanics: obj(r.mechanics),
+    animations: Object.fromEntries(Object.entries(obj(r.animations)).filter(([, v]) => typeof v === 'string' || v === null)) as Record<string, string | null>,
+    traits: num(r.traits), budgets: num(r.budgets),
     prq: r.prq && typeof r.prq === 'object' ? (num(r.prq) as Partial<Record<PrqAxisId, number>>) : null,
     ...(Object.keys(unknown).length ? { unknown } : {}),
   };
