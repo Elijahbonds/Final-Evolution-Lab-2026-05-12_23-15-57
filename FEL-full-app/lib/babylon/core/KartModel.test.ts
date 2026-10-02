@@ -8,6 +8,7 @@ import { Vector3 } from '@babylonjs/core';
 import {
   KART_STARTER, KART_NEUTRAL, DRIFT_SLIP, MAX_SLIP,
   spawnKart, stepKart, travelOf, kartNose, driftQuality, kartHitWall,
+  steerAuthority, weightTransferGrip,
   type KartInput, type KartState,
 } from './KartModel';
 
@@ -210,6 +211,83 @@ describe('RULE 3 — the racing line is worth finding', () => {
       return Math.abs(s.slip);
     };
     expect(mk(false)).toBeGreaterThan(mk(true));
+  });
+});
+
+describe('10-PHASE PASS, phase 1 — steering feel (2026-10-02)', () => {
+  it('steering authority: nothing at a standstill, fullish in the midrange, calm at the top end', () => {
+    expect(steerAuthority(0, K)).toBe(0);
+    expect(steerAuthority(K.vMax / 3, K)).toBeGreaterThan(0.8);       // the cornering band
+    expect(steerAuthority(K.vMax, K)).toBeCloseTo(K.steerHighSpeed, 6);
+  });
+
+  it('the turn radius WIDENS with speed — flat-out full lock is a long arc, not a flick', () => {
+    const r = (v: number) => v / (K.steerRate * steerAuthority(v, K));
+    expect(r(K.vMax)).toBeGreaterThan(r(8) * 2);
+  });
+
+  it('…and the same holds through the integrator, scrub and all: less yaw per second at the top end', () => {
+    const yawRateAt = (speed: number): number => {
+      const s = spawnKart(new Vector3(0, 0, 0), 0);
+      s.speed = speed;
+      let turned = 0;
+      for (let i = 0; i < 15; i++) {                                  // a quarter second, before scrub bites
+        const before = s.heading;
+        stepKart(s, input({ steer: 1 }), 1 / 60, true, K);
+        turned += s.heading - before;
+      }
+      return turned / 0.25;
+    };
+    expect(yawRateAt(K.vMax)).toBeLessThan(yawRateAt(8));
+  });
+
+  it('the wheel EASES to the stick — a flick is not an instant full-lock snap', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    s.speed = 15;
+    stepKart(s, input({ steer: 1 }), 1 / 60, true, K);
+    const firstFrame = s.heading;
+    const steadyPerFrame = (K.steerRate * steerAuthority(15, K)) / 60;
+    expect(firstFrame).toBeLessThan(steadyPerFrame * 0.25);
+    // …and it gets there: inside a second the applied steer IS the stick
+    for (let i = 0; i < 60; i++) stepKart(s, input({ steer: 1 }), 1 / 60, true, K);
+    expect(s.steerAt).toBeGreaterThan(0.99);
+  });
+
+  it('a dithering input never JERKS the nose — the yaw rate cannot jump, whatever the stick does', () => {
+    // Fast RANDOM dither (seeded, ±full lock at 60 Hz — crueler than any wheel). Jitter is the yaw RATE
+    // jumping frame to frame, so that is what this pins: the biggest single-frame change in the per-frame
+    // heading delta. Unsmoothed, a sign flip jumps it by twice the full-lock frame delta; the rate limit
+    // bounds the jump to steerSlew/60 of it.
+    let seed = 7;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    s.speed = 15;
+    let prevDelta = 0, maxJump = 0;
+    for (let i = 0; i < 120; i++) {
+      const before = s.heading;
+      stepKart(s, input({ steer: rnd() > 0.5 ? 1 : -1 }), 1 / 60, true, K);
+      const delta = s.heading - before;
+      maxJump = Math.max(maxJump, Math.abs(delta - prevDelta));
+      prevDelta = delta;
+    }
+    const fullFrame = (K.steerRate * steerAuthority(15, K)) / 60;
+    expect(maxJump).toBeLessThan(fullFrame * 0.2);
+  });
+
+  it('weight transfer is real: brake loads the front, throttle unloads the rear', () => {
+    expect(weightTransferGrip(K.grip, K, 1, 0)).toBeGreaterThan(K.grip);   // trail-braking BITES
+    expect(weightTransferGrip(K.grip, K, 0, 1)).toBeLessThan(K.grip);      // power-on loosens
+    expect(weightTransferGrip(K.grip, K, 0, 0)).toBeCloseTo(K.grip, 9);
+  });
+
+  it('power-on oversteer: the same corner on the gas slides more than coasting', () => {
+    const mk = (throttle: number) => {
+      const s = spawnKart(new Vector3(0, 0, 0), 0);
+      s.speed = 18;
+      drive(s, input({ steer: 0.55, throttle }), 0.8);
+      return Math.abs(s.slip);
+    };
+    expect(mk(1)).toBeGreaterThan(mk(0));
   });
 });
 

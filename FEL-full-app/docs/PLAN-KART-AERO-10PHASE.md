@@ -36,19 +36,24 @@ frame-time check on a mid-phone profile (`TIER=mobile THROTTLE=4`, `scripts/capt
 **Goal:** steering that answers at every speed without snapping; weight you can feel move.
 
 **What changes** (`core/KartModel.ts`, `modes/VelocityKartMode.ts`):
-- Applied steer eases toward the stick (`steerSlew`, 1/s) inside the model — a stick flick can no longer
-  snap the heading, and input dither stops reading as jitter.
+- Applied steer moves toward the stick under a RATE LIMIT (`steerSlew`, full-lock/sec) inside the model —
+  a stick flick can no longer snap the heading, and input dither stops reading as jitter. (First cut was an
+  exponential ease; measured against the body-play gate it cost 50 ms of the 33 ms headroom on the 700 ms
+  turn-onset allowance, where a rate limit costs nothing — small deflections arrive at once, full flicks
+  take ~1/slew. Measured: worst segment 666.7 ms before and after.)
 - Speed-sensitive steering becomes an explicit, tunable curve (`steerAuthority(v01)`): full authority
   arrives by ~⅓ vMax and falls to a tunable fraction at vMax, so flat-out steering is calm.
-- Weight transfer: braking adds front bite (small grip bonus), throttle lift-off mid-turn adds a touch of
-  rotation, and the kart body rolls/pitches with the lateral/longitudinal load (visual, on the rig).
-- Slip ease-in rate becomes a spec number alongside `slipRecover`.
+- Weight transfer: braking adds front bite (small grip bonus), throttle unloads the rear (power-on
+  oversteer), and the kart body rolls/pitches with the lateral/longitudinal load (visual, on the rig).
+- Slip ease-in rate becomes a spec number (`slipIn`) alongside `slipRecover`.
 
 **Pass check (vitest):** turn radius at vMax > radius at 0.5·vMax; zero-speed steer still turns nothing
 (existing pin); a full-stick step never moves the heading more than the eased rate allows in one frame;
 drifted lap still beats a tidy lap (existing pin); brake still stops the kart (existing pin).
 
-- [ ] done
+- [x] done — `steerSlew` 7 lock/s, `steerHighSpeed` 0.55 (was effectively 0.65), `steerLowSpeed` 3,
+  `slipIn` 6.5 (unchanged value, now tunable), `brakeGrip` 0.25, `throttleLoose` 0.12, `rollGain` 0.0062,
+  `pitchGain` 0.0021. rideBody G9 kart gate green with the signed-off margin (666.7 ms ≤ 700 ms).
 
 ## Phase 2 — Aero handling feel
 

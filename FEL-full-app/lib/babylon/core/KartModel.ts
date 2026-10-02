@@ -55,6 +55,42 @@ export interface KartSpec {
   scrub: number;
   /** How much of the scrub a proper slide avoids, 0..1. */
   driftScrubRelief: number;
+  /**
+   * HOW FAST THE WHEEL FOLLOWS THE STICK, in full-lock per second — a RATE LIMIT, not a lag (10-phase
+   * pass, 2026-10-02). The applied steer moves toward the input at at most this rate instead of snapping
+   * to it: a thumb flick used to rotate the nose at full steerRate in a single frame, which read as a
+   * SNAP at speed and as jitter when the input dithered (a body-play wheel reads at 15–30 Hz with noise).
+   * A rate limit, unlike an exponential ease, reaches a SMALL deflection quickly — a 15° wheel still
+   * turns the kart inside the body-play gate's 700 ms — while a full 0→lock flick takes ~1/this to
+   * arrive, which is where the snap protection actually lives. 7/s is lock-to-lock in ~0.29 s: quick
+   * hands, not a servo.
+   */
+  steerSlew: number;
+  /** v01 multiple that decides how quickly full steering authority arrives (full at 1/this of vMax). */
+  steerLowSpeed: number;
+  /**
+   * The fraction of steering authority kept AT vMax. Below 1 the top end is calm on purpose: flat-out
+   * full-lock should ease the line wide, not flick the kart sideways.
+   */
+  steerHighSpeed: number;
+  /** How fast a slide grows toward its target while the corner is being asked for, 1/s. */
+  slipIn: number;
+  /**
+   * WEIGHT TRANSFER (10-phase pass): braking loads the front tyres — grip rises by this fraction at full
+   * brake, which is what makes trail-braking into a corner a real technique rather than a way to arrive
+   * slower.
+   */
+  brakeGrip: number;
+  /**
+   * …and throttle unloads the rear: grip falls by this fraction at full gas. Power-on oversteer is where
+   * the drift LIVES; without it the slide only ever comes from the handbrake.
+   */
+  throttleLoose: number;
+  /** VISUAL weight transfer: body roll per m/s² of lateral load, radians. The driver leans IN; the kart
+   *  rolls OUT, the way a rigid chassis does. */
+  rollGain: number;
+  /** VISUAL: body pitch per m/s² of longitudinal accel, radians (brake dives the nose, gas squats it). */
+  pitchGain: number;
 }
 
 /** The starter kart: grippy enough to be forgiving, loose enough that drifting is obviously faster. */
@@ -64,6 +100,14 @@ export const KART_STARTER: KartSpec = {
   driftCharge: 0.55, boostSpeed: 11, boostSec: 1.5,
   offTrack: 0.45,
   scrub: 0.85, driftScrubRelief: 0.8,
+  steerSlew: 7,
+  steerLowSpeed: 3,
+  steerHighSpeed: 0.55,
+  slipIn: 6.5,
+  brakeGrip: 0.25,
+  throttleLoose: 0.12,
+  rollGain: 0.0062,
+  pitchGain: 0.0021,
 };
 
 export interface KartState {
@@ -80,6 +124,8 @@ export interface KartState {
   boosting: number;
   /** True while the kart is sliding enough to count as a drift. */
   drifting: boolean;
+  /** Applied steer after the slew ease — what the front wheels are actually doing, −1..1. */
+  steerAt: number;
 }
 
 export interface KartInput {
@@ -107,7 +153,7 @@ export const DRIFT_SLIP = 0.18;
 export const MAX_SLIP = 0.95;
 
 export function spawnKart(at: Vector3, heading = 0): KartState {
-  return { pos: at.clone(), heading, speed: 0, slip: 0, boost: 0, boosting: 0, drifting: false };
+  return { pos: at.clone(), heading, speed: 0, slip: 0, boost: 0, boosting: 0, drifting: false, steerAt: 0 };
 }
 
 /** The direction the kart is TRAVELLING — the nose rotated by the slip angle. */
@@ -127,8 +173,28 @@ export function kartNose(s: KartState): Vector3 {
  * Mutates and returns, like BallSim and the flight model: one kart steps every frame and a fresh object per
  * frame is pure garbage.
  */
+/**
+ * Steering authority at a speed: ramps in from a standstill (a stationary kart cannot turn — the tests pin
+ * this), reaches full at vMax/steerLowSpeed, then breathes out toward steerHighSpeed at vMax so flat-out
+ * full-lock eases the line wide instead of flicking the kart sideways.
+ */
+export function steerAuthority(speed: number, spec: KartSpec = KART_STARTER): number {
+  const v01 = Math.max(0, Math.min(1, speed / spec.vMax));
+  return Math.min(1, v01 * spec.steerLowSpeed) * (1 - v01 * (1 - spec.steerHighSpeed));
+}
+
+/**
+ * Grip after weight transfer: braking loads the front tyres (grip rises — trail-braking into a corner is a
+ * real technique), throttle unloads the rear (grip falls — power-on oversteer is where the drift lives).
+ */
+export function weightTransferGrip(grip: number, spec: KartSpec, brake01: number, throttle01: number): number {
+  return grip * (1 + spec.brakeGrip * brake01) * (1 - spec.throttleLoose * throttle01);
+}
+
 export function stepKart(s: KartState, input: KartInput, dt: number, onTrack: boolean, spec: KartSpec = KART_STARTER): KartState {
-  const grip = spec.grip * (onTrack ? 1 : spec.offTrack);
+  const throttle01 = Math.max(0, Math.min(1, input.throttle));
+  const brake01 = Math.max(0, Math.min(1, input.brake));
+  const grip = weightTransferGrip(spec.grip * (onTrack ? 1 : spec.offTrack), spec, brake01, throttle01);
   const boostK = Math.max(s.boosting > 0 ? 1 : 0, Math.max(0, Math.min(1, input.boostK ?? 0)));
   const vMax = spec.vMax * (onTrack ? 1 : spec.offTrack) + spec.boostSpeed * boostK;
 
@@ -140,16 +206,21 @@ export function stepKart(s: KartState, input: KartInput, dt: number, onTrack: bo
   s.boosting = Math.max(0, s.boosting - dt);
 
   // SPEED.
-  const push = spec.accel * Math.max(0, Math.min(1, input.throttle)) * (1 + 0.6 * boostK);
-  const stop = spec.brake * Math.max(0, Math.min(1, input.brake));
+  const push = spec.accel * throttle01 * (1 + 0.6 * boostK);
+  const stop = spec.brake * brake01;
   const roll = spec.drag * s.speed * s.speed;
   s.speed = Math.max(0, Math.min(vMax, s.speed + (push - stop - roll) * dt));
 
   // STEERING. A kart turns hardest at moderate speed: at a standstill the wheels do nothing, and at the top
   // end it washes out. The curve peaks around a third of vMax, which is where a corner actually gets taken.
-  const v01 = Math.max(0, Math.min(1, s.speed / spec.vMax));
-  const steerAuth = Math.min(1, v01 * 3) * (1 - v01 * 0.35);
-  const steer = Math.max(-1, Math.min(1, input.steer));
+  const steerAuth = steerAuthority(s.speed, spec);
+  // The wheel FOLLOWS the stick at a rate limit (spec.steerSlew) instead of snapping to it — a thumb flick
+  // used to rotate the nose at full steerRate in one frame, which read as a snap at speed and as jitter on
+  // a noisy input. The clamp lands exactly on the target, so a centred stick centres the wheel exactly.
+  const steerIn = Math.max(-1, Math.min(1, input.steer));
+  const maxStep = spec.steerSlew * dt;
+  s.steerAt += Math.max(-maxStep, Math.min(maxStep, steerIn - s.steerAt));
+  const steer = s.steerAt;
   s.heading = wrap(s.heading + steer * spec.steerRate * steerAuth * dt);
 
   // GRIP vs SLIP — the heart of it. The lateral acceleration a corner demands grows with speed and how hard
@@ -166,7 +237,7 @@ export function stepKart(s: KartState, input: KartInput, dt: number, onTrack: bo
   const wanted = (excess / Math.max(1, grip)) * 0.9 + (input.drift && s.speed > spec.vMax * 0.25 ? 0.45 : 0);
   const target = Math.max(-MAX_SLIP, Math.min(MAX_SLIP, -Math.sign(steer || 1) * Math.min(MAX_SLIP, wanted)));
   // slide INTO the target while the corner is being asked for, and straighten out when it is not
-  const toward = Math.abs(target) > Math.abs(s.slip) ? 6.5 : spec.slipRecover;
+  const toward = Math.abs(target) > Math.abs(s.slip) ? spec.slipIn : spec.slipRecover;
   s.slip += (target - s.slip) * Math.min(1, toward * dt);
   if (Math.abs(s.slip) < 0.01) s.slip = 0;
 

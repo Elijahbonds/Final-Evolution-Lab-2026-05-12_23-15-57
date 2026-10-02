@@ -32,7 +32,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
-  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, kartHitWall,
+  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, kartHitWall, steerAuthority,
   type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
@@ -127,6 +127,11 @@ const PLAYER_ID = 0;
 const KART_PICKUP_SCALE = 0.42;
 /** The player's own distance along the racing line — what the standings are computed against. */
 let playerDist = 0;
+// VISUAL WEIGHT TRANSFER (10-phase pass, 2026-10-02): the chassis rolls out of the corner and dives/squats
+// with the pedal. Eased here, from the model's own numbers, so the body can never disagree with the tyres.
+let bodyRoll = 0;
+let bodyPitch = 0;
+let lastSpeed = 0;
 
 // THE GHOST (2026-09-19 depth pass). The mode had a clock and medals and no memory: once the gold was gone there was
 // nothing left on the course to chase. The recorder runs every frame, the best lap per course is kept on the device,
@@ -890,6 +895,7 @@ return {
     { const k = kart; void dressVehicle(ctx.scene, k, 'kart', kartId, { hide: k.getChildMeshes(), y: KART_GROUND_Y }); }
 
     state = spawnKart(course.start.at, course.start.heading);
+    bodyRoll = 0; bodyPitch = 0; lastSpeed = 0;
     if (circuit) state.pos.y = circuit.surfaceAt(state.pos.x, state.pos.z);
     prevPos.copyFrom(state.pos);
     kart.position.copyFrom(state.pos);
@@ -1248,7 +1254,17 @@ return {
     if (line) tickField(ctx, dt);   // RACE CONTACT + ITEMS: the rivals steer, bump, spin, pick up and fire
     // the BODY points where the nose does while the kart travels at the slip angle — that difference is the
     // drift, and showing it is the whole read
-    kart.rotation.y = state.heading + (S.spinT > 0 ? S.spinT * 11 : 0);   // a shell or a punt spins the body; the travel carries on
+    // WEIGHT TRANSFER ON THE CHASSIS (10-phase pass): roll OUT of the corner with the lateral load, dive
+    // under braking, squat under gas. The driver still leans IN below — the two together are the read.
+    // Capped small: this is a rigid kart, not a boat.
+    const dV = dt > 0 ? (state.speed - lastSpeed) / dt : 0;
+    lastSpeed = state.speed;
+    const lat = state.steerAt * kartSpec.steerRate * steerAuthority(state.speed, kartSpec) * state.speed;
+    const rollWant = Math.max(-0.09, Math.min(0.09, lat * kartSpec.rollGain));
+    const pitchWant = Math.max(-0.05, Math.min(0.06, -dV * kartSpec.pitchGain));
+    bodyRoll += (rollWant - bodyRoll) * Math.min(1, 9 * dt);
+    bodyPitch += (pitchWant - bodyPitch) * Math.min(1, 7 * dt);
+    kart.rotation.set(bodyPitch, state.heading + (S.spinT > 0 ? S.spinT * 11 : 0), bodyRoll);   // a shell or a punt spins the body; the travel carries on
     // the driver leans into the corner — shoulders following the turn, not a board rider's whole-body bank:
     // a seated body is belted in and cannot lean like that (8° at full lock against the boards' 22°)
     if (driver) {
