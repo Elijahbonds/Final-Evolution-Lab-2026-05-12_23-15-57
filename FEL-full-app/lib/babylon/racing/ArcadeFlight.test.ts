@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import {
-  ARCADE_TRAINER as T, spawnArcade, stepArcade, startStunt, dodging, spinOut, topFor, wallTurn, arcadeFrom,
+  ARCADE_TRAINER as T, spawnArcade, stepArcade, startStunt, dodging, spinOut, topFor, wallTurn, arcadeFrom, forwardOf,
   LOOP_SEC, ROLL_SEC, ROLL_SHIFT, type ArcadeInput,
 } from './ArcadeFlight';
 import { PLANES } from './garage';
@@ -87,6 +87,49 @@ describe('stunts', () => {
     fly(s, I({ gas: 1, steer: 1 }), 0.5);
     expect(s.heading).toBeCloseTo(h);
     expect(s.speed).toBeLessThan(before);
+  });
+});
+
+describe('10-PHASE PASS, phase 2 — the turn has a body (2026-10-02)', () => {
+  it('the yaw rate rolls in — a full-stick flick is not an instant full-rate pivot', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);
+    stepArcade(s, I({ steer: 1 }), 1 / 60, T, flat, 200);
+    const steadyPerFrame = T.turnRate / 60;
+    expect(Math.abs(s.heading)).toBeLessThan(steadyPerFrame * 0.25);
+    // …and it gets there: full rate inside a quarter second
+    fly(s, I({ steer: 1 }), 1);
+    expect(Math.abs(s.yawAt)).toBeGreaterThan(T.turnRate * 0.95);
+  });
+
+  it('the bank shows the turn BEING MADE: a brake-turn at half stick banks harder than a cruise turn', () => {
+    const a = spawnArcade(new Vector3(0, 40, 0), 0), b = spawnArcade(new Vector3(0, 40, 0), 0);
+    fly(a, I({ steer: 0.5, gas: 1 }), 1.5);
+    fly(b, I({ steer: 0.5, brake: 1 }), 1.5);
+    expect(Math.abs(b.roll)).toBeGreaterThan(Math.abs(a.roll) * 1.3);
+    // …and even the brake-turn cannot bank past the cap
+    const c = spawnArcade(new Vector3(0, 40, 0), 0);
+    fly(c, I({ steer: 1, brake: 1 }), 2);
+    expect(Math.abs(c.roll)).toBeLessThanOrEqual(T.maxBank + 1e-6);
+  });
+
+  it('a hard turn holds a touch of back-pressure, and it leaves with the turn', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);
+    fly(s, I({ steer: 1 }), 2);
+    expect(s.pitch).toBeGreaterThan(0.03);           // coordinated-turn nose-up
+    expect(s.pitch).toBeLessThan(0.15);              // a touch, not a climb
+    fly(s, I(), 1.5);
+    expect(Math.abs(s.pitch)).toBeLessThan(0.05);    // hands off: level, exactly as before
+  });
+
+  it('the nose stays along the velocity — steering and climbing hard, outside stunts', () => {
+    const s = spawnArcade(new Vector3(0, 50, 0), 0);
+    for (let i = 0; i < 180; i++) {
+      const prev = s.pos.clone();
+      stepArcade(s, I({ steer: 0.6, climb: 0.4, gas: 1 }), 1 / 60, T, flat, 400);
+      const moved = s.pos.subtract(prev);
+      const dot = Vector3.Dot(moved.normalize(), forwardOf(s));
+      expect(dot).toBeGreaterThan(0.9999);
+    }
   });
 });
 

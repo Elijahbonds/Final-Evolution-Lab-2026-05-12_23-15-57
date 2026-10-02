@@ -61,9 +61,13 @@ drifted lap still beats a tidy lap (existing pin); brake still stops the kart (e
 hands-off auto-level, boost punch.
 
 **What changes** (`racing/ArcadeFlight.ts`):
-- Yaw rate eases toward the stick's demand (`yawEase`) — no more instant full-rate snap at full deflection.
-- Bank follows the *actual* yaw rate (brake-turns bank harder), capped at `maxBank`.
-- A small coordinated-turn pitch in a hard bank; pitch ease stays tunable.
+- Yaw rate is RATE-LIMITED toward the stick's demand (`yawSlew`, (rad/s)/s) — no more instant full-rate
+  snap at full deflection. (First cut was an exponential ease; measured against the body-play gate even
+  8/s left 17 ms of the 900 ms allowance, where the rate limit keeps the signed-off 783.3 ms exactly.)
+- Bank follows the *actual* yaw rate (brake-turns bank harder at the same stick), capped at `maxBank`;
+  the bank ease rate is a tune number (`bankEase`, was hardcoded 6/s).
+- A small coordinated-turn pitch in a hard bank (`turnPitch`, vanishes with the turn); pitch ease stays
+  tunable.
 - Auto-level stays (pinned). **No stall — that is a signed-off design decision** (ArcadeFlight header:
   "NO STALL … a kart that can climb"); the "stall or boost" ask is answered by the boost (+40%, shared
   BoostKit), whose ramp is already felt. Flagged, not changed.
@@ -72,7 +76,9 @@ hands-off auto-level, boost punch.
 banks harder than a normal turn; hands-off levels roll and pitch (existing pin); outside stunts the
 displacement direction matches `forwardOf` (nose along velocity — complements PR #100's mesh pin).
 
-- [ ] done
+- [x] done — `yawSlew` 8 (rad/s)/s (full rate in ~0.19 s), `bankEase` 6 (unchanged value, now tunable),
+  `turnPitch` 0.06 rad. rideBody G9 plane gate green with the signed-off margin (783.3 ms ≤ 900 ms);
+  bank/pitch peak monotonicity intact.
 
 ## Phase 3 — Speed and the sense of speed
 
