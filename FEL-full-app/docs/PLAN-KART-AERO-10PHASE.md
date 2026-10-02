@@ -131,7 +131,15 @@ only the given fields.
 head-on impact keeps little; respawn places the kart on the line, pointed along it; aero `wallTurn` still
 turns the plane back (existing pin).
 
-- [ ] done
+- [x] done — `KartModel.wallSlide(s, nx, nz, keep = 0.75)`: the into-wall component of the travel dies,
+  75% of the tangential survives, the nose eases along the wall (slip × 0.35); a kart already leaving the
+  wall is untouched. The ±400 m world wall uses it (was `kartHitWall`'s blunt 75% stop — flagged: wall
+  hits are cheaper now on purpose; a glancing hit at 45° keeps 53% of speed vs 25% before, a head-on
+  still stops the kart). `KartModel.kartRespawn(s, point, tangent)` + stuck detection in the mode
+  (throttle held, wheels down, speed < 0.8 m/s for 2 s, no spin/burnout/air): back on the line at the
+  distance already earned, speed 0, boost bank kept, camera CUTS (snapTo) rather than whip-panning.
+  Aero: `wallScrub` 0.35 is a tune number now (unchanged value), passed by the mode; the turn-back is
+  free, only the scrape costs. 6 new vitest pins.
 
 ## Phase 5 — AI rivals drive and fly the same handling model
 

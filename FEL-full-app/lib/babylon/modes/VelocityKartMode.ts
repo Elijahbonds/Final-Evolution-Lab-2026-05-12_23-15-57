@@ -32,7 +32,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
-  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, kartHitWall, steerAuthority,
+  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, wallSlide, kartRespawn, steerAuthority,
   type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
@@ -186,6 +186,8 @@ const S = {
   start: newStart() as StartState, burnT: 0,
   /** Seconds the nose has pointed back down the line (racing pass phase 5: WRONG WAY, as the plane already had). */
   wrongT: 0,
+  /** Seconds the kart has been beached — throttle held, wheels down, barely moving (10-phase pass, phase 4). */
+  stuckT: 0,
 };
 let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
@@ -842,7 +844,7 @@ return {
     S.boostHeld = false; boost = new BoostKit();
     S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0, minis: 0 };
     S.draft = noDraft(); S.draftSaid = false; S.mini = noMini();
-    S.start = newStart(); S.burnT = 0; S.wrongT = 0;
+    S.start = newStart(); S.burnT = 0; S.wrongT = 0; S.stuckT = 0;
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
@@ -1124,6 +1126,24 @@ return {
       if (S.spinT <= 0 && state.speed > 3 && Math.sin(state.heading) * at.tangent.x + Math.cos(state.heading) * at.tangent.z < -0.35) S.wrongT += dt; else S.wrongT = 0;
       if (S.wrongT > 1.2 && S.bannerT <= 0) { say('WRONG WAY', 0.8); SoundKit.play('miss', { volume: 0.35 }); }
 
+      // STUCK → RESPAWN (10-phase pass, phase 4): throttle held, wheels down, barely moving for two seconds —
+      // beached on the scenery past the verge or nose-first into the world wall. Back onto the line at the
+      // distance already earned, from a standstill: the cost is the time already lost, never the race. A spin
+      // or a start-line burnout sorts itself out, so neither counts as stuck.
+      const beached = S.start.go && !S.done && !S.air.airborne && S.spinT <= 0 && S.burnT <= 0
+        && S.input.throttle > 0.5 && state.speed < 0.8;
+      S.stuckT = beached ? S.stuckT + dt : 0;
+      if (S.stuckT > 2) {
+        S.stuckT = 0;
+        kartRespawn(state, at.point, at.tangent);
+        at = locate(circuit.line, state.pos.x, state.pos.z);   // the teleport invalidates everything below
+        ctx.camDirector.snapTo(state.pos, null);   // a teleport, not a drive: cut, don't whip pan
+        say('BACK ON TRACK', 1.0);
+        SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 });
+        ctx.juice.flash('#ffffff', 40);
+        console.info('[RACE] respawn — kart beached, back on the line');
+      }
+
       // ── THE OUTSIDE OF THE COURSE ───────────────────────────────────────────────────────────────────────
       // Measured by steering off with the throttle pinned: the kart reached 76 m from the line, still making
       // race distance at the on-road rate, with nothing to stop it. Past the verge the ground pulls it back —
@@ -1308,11 +1328,15 @@ return {
     if (bev.denied) ctx.juice.callout('BOOST EMPTY — DRIFT (X) TO FILL IT', '#94a3b8', 900);
 
     // the edge of the world: a wall you hit rather than an invisible stop. ±400 (was 260: the stadium oval runs to z 382 and the boardwalk pier
-    // runs out to z 332, so the wall stood ACROSS the road there; the world ground is sized off the same number)
+    // runs out to z 332, so the wall stood ACROSS the road there; the world ground is sized off the same number).
+    // 10-phase pass (phase 4): the wall SLIDES now — a glancing hit scrubs the into-wall speed and runs along the
+    // barrier instead of the blunt 75% stop that pinned the kart nose-first until the driver backed out.
     if (Math.abs(state.pos.x) > WORLD_WALL || Math.abs(state.pos.z) > WORLD_WALL) {
+      const nx = state.pos.x > WORLD_WALL ? -1 : state.pos.x < -WORLD_WALL ? 1 : 0;
+      const nz = state.pos.z > WORLD_WALL ? -1 : state.pos.z < -WORLD_WALL ? 1 : 0;
       state.pos.x = Math.max(-WORLD_WALL, Math.min(WORLD_WALL, state.pos.x));
       state.pos.z = Math.max(-WORLD_WALL, Math.min(WORLD_WALL, state.pos.z));
-      const lost = kartHitWall(state);
+      const lost = wallSlide(state, nx, nz);
       if (lost > 3) {
         SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
         ctx.juice.shake(0.1, 140);

@@ -70,6 +70,13 @@ export interface ArcadeTune {
   bananaSpeed: number;
   /** Bananas that count. */
   bananaCap: number;
+  /**
+   * The course edge's price (10-phase pass, phase 4): the fraction of the INTO-wall speed a wallTurn
+   * scrubs. The turn-back itself is free — this is only what the scrape costs. 0.35 has been the value
+   * since the edge was authored; it is a tune number now so a plane can be made more or less forgiving
+   * without editing the model.
+   */
+  wallScrub: number;
 }
 
 /** DKR scale: laps of ~1 km flown in 30–40 s, low through canyons and under arches. */
@@ -77,7 +84,7 @@ export const ARCADE_TRAINER: ArcadeTune = {
   top: 32, coast: 22, minSpeed: 14, accel: 11, accelLaunch: 0.3, brakeDecel: 16,
   turnRate: 1.55, brakeTurn: 1.65, yawSlew: 8, maxPitch: 0.55, pitchEase: 4.5, maxBank: 0.85,
   bankEase: 6, turnPitch: 0.06,
-  bananaSpeed: 0.55, bananaCap: 10,
+  bananaSpeed: 0.55, bananaCap: 10, wallScrub: 0.35,
 };
 
 /**
@@ -315,7 +322,7 @@ function clampAltitude(s: ArcadeState, floorAt: (x: number, z: number) => number
  * THE COURSE EDGE is a wall that turns the plane back (the same lesson as the board fence — WALLS + SPEED, 2026-09-15:
  * a clamp that leaves the vehicle aimed at the wall pins it there). `nx, nz` points back into the course.
  */
-export function wallTurn(s: ArcadeState, nx: number, nz: number): boolean {
+export function wallTurn(s: ArcadeState, nx: number, nz: number, scrub = 0.35): boolean {
   const l = Math.hypot(nx, nz); if (!(l > 0)) return false;
   nx /= l; nz /= l;
   const fx = Math.sin(s.heading), fz = Math.cos(s.heading);
@@ -323,6 +330,6 @@ export function wallTurn(s: ArcadeState, nx: number, nz: number): boolean {
   if (into <= 0.02) return false;
   const dx = fx + into * nx + 0.35 * nx, dz = fz + into * nz + 0.35 * nz;
   s.heading = Math.atan2(dx, dz);
-  s.speed = Math.max(0, s.speed * (1 - 0.35 * into));
+  s.speed = Math.max(0, s.speed * (1 - scrub * into));
   return true;
 }

@@ -280,3 +280,47 @@ export function kartHitWall(s: KartState, keep = 0.25): number {
   s.slip = 0;
   return lost;
 }
+
+/**
+ * SLIDE ALONG A WALL, don't stick to it (10-phase pass, phase 4, 2026-10-02). `(nx, nz)` is the wall's
+ * normal pointing back INTO the world. The into-wall component of the travel dies and `keep` of the
+ * tangential survives, so a glancing hit scrubs some speed and runs along the wall instead of the blunt
+ * stop kartHitWall was — a wall you can lean on, the way a kart racer's barriers work. The nose eases
+ * along the wall (most of the slide is knocked out of it). A kart already moving away from the wall is
+ * untouched. Returns the speed lost.
+ */
+export function wallSlide(s: KartState, nx: number, nz: number, keep = 0.75): number {
+  const l = Math.hypot(nx, nz);
+  if (!(l > 0) || s.speed <= 0) return 0;
+  nx /= l; nz /= l;
+  const t = travelOf(s);
+  const vx = t.x * s.speed, vz = t.z * s.speed;
+  const into = vx * nx + vz * nz;                    // < 0: travelling INTO the wall
+  if (into >= 0) return 0;
+  const tx = (vx - into * nx) * keep, tz = (vz - into * nz) * keep;
+  const newSpeed = Math.hypot(tx, tz);
+  const lost = s.speed - newSpeed;
+  s.speed = newSpeed;
+  if (newSpeed < 0.5) {
+    // head-on: the kart stops; the nose stays where it was (the driver — or the respawn net — sorts the rest)
+    s.slip = 0;
+  } else {
+    // the travel now runs ALONG the wall; ease the nose to it by knocking most of the slide out
+    s.slip *= 0.35;
+    s.heading = wrap(Math.atan2(tx, tz) - s.slip);
+  }
+  return lost;
+}
+
+/**
+ * Put a beached kart back on the racing line (10-phase pass, phase 4): ON the line at the distance it
+ * had earned, pointed along it, from a standstill. The cost of getting stuck is the time already lost —
+ * never a race-ending reset, and the boost bank survives it.
+ */
+export function kartRespawn(s: KartState, point: Vector3, tangent: Vector3): void {
+  s.pos.copyFrom(point);
+  s.heading = Math.atan2(tangent.x, tangent.z);
+  s.speed = 0;
+  s.slip = 0;
+  s.steerAt = 0;
+}

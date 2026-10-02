@@ -8,9 +8,10 @@ import { Vector3 } from '@babylonjs/core';
 import {
   KART_STARTER, KART_NEUTRAL, DRIFT_SLIP, MAX_SLIP,
   spawnKart, stepKart, travelOf, kartNose, driftQuality, kartHitWall,
-  steerAuthority, weightTransferGrip,
+  steerAuthority, weightTransferGrip, wallSlide, kartRespawn,
   type KartInput, type KartState,
 } from './KartModel';
+import { sampleLine, locate } from '../racing/racingLine';
 
 const K = KART_STARTER;
 const input = (over: Partial<KartInput> = {}): KartInput => ({ ...KART_NEUTRAL, ...over });
@@ -341,5 +342,63 @@ describe('nothing produces a NaN, and a wall hurts', () => {
     expect(lost).toBeGreaterThan(0);
     expect(s.speed).toBeLessThan(before * 0.5);
     expect(s.slip).toBe(0);
+  });
+});
+
+describe('10-PHASE PASS, phase 4 — walls slide, and a beached kart gets back (2026-10-02)', () => {
+  it('a 45° impact keeps at least half the speed and travels ALONG the wall', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), Math.PI / 4);   // travelling (+x, +z) into the x = 400 wall
+    s.speed = 20;
+    const lost = wallSlide(s, -1, 0);
+    expect(lost).toBeGreaterThan(0);
+    expect(s.speed).toBeGreaterThanOrEqual(20 * 0.5);
+    const t = travelOf(s);
+    expect(Math.abs(t.x)).toBeLessThan(0.05);                   // no longer travelling into the wall
+    expect(t.z).toBeGreaterThan(0.99);                          // …running along it
+  });
+
+  it('a head-on impact keeps little, and the nose stays put for the driver to sort out', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), Math.PI / 2);   // straight at the wall
+    s.speed = 20;
+    wallSlide(s, -1, 0);
+    expect(s.speed).toBeLessThan(20 * 0.2);
+    expect(s.heading).toBeCloseTo(Math.PI / 2, 5);              // no snap: still nose-first
+  });
+
+  it('a kart already moving away from the wall is untouched', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), -Math.PI / 2);  // travelling −x, away from the x = 400 wall
+    s.speed = 20;
+    expect(wallSlide(s, -1, 0)).toBe(0);
+    expect(s.speed).toBe(20);
+  });
+
+  it('a glancing hit while drifting knocks the slide out — the nose eases along the wall', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), Math.PI / 4);
+    s.speed = 22;
+    s.slip = 0.4;                                               // arriving sideways
+    wallSlide(s, -1, 0);
+    const nose = kartNose(s), t = travelOf(s);
+    expect(nose.x * t.x + nose.z * t.z).toBeGreaterThan(0.98);  // nose and travel together, along the wall
+    expect(Math.abs(s.slip)).toBeLessThan(0.2);
+  });
+
+  it('a respawn puts the kart ON the line, pointed along it, from a standstill — and it drives on', () => {
+    const line = sampleLine([[0, 0, 0], [60, 0, 0], [60, 0, 60], [0, 0, 60]], { loop: true });
+    const s = spawnKart(new Vector3(28, 0, 9), 2.1);            // beached beside the first leg, facing wrong
+    s.speed = 0.3; s.slip = 0.5; s.steerAt = 0.7; s.boost = 0.6;
+    const at = locate(line, s.pos.x, s.pos.z);
+    kartRespawn(s, at.point, at.tangent);
+    const after = locate(line, s.pos.x, s.pos.z);
+    expect(Math.abs(after.lateral)).toBeLessThan(0.01);         // ON the line
+    expect(Math.sin(s.heading) * at.tangent.x + Math.cos(s.heading) * at.tangent.z).toBeGreaterThan(0.999);
+    expect(s.speed).toBe(0);
+    expect(s.slip).toBe(0);
+    expect(s.steerAt).toBe(0);
+    expect(s.boost).toBe(0.6);                                  // the bank survives — the cost was the time
+    expect(Math.abs(after.dist - at.dist)).toBeLessThan(0.5);   // the distance already earned is kept
+    drive(s, input({ throttle: 1 }), 2);
+    const gone = locate(line, s.pos.x, s.pos.z);
+    expect(Math.abs(gone.lateral)).toBeLessThan(1.5);           // driving on down the line, not off it
+    expect(gone.dist).toBeGreaterThan(after.dist + 5);
   });
 });

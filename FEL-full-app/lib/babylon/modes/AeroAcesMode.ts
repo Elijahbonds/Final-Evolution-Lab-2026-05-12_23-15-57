@@ -516,7 +516,7 @@ export function makeAeroAcesMode(): ModeDefinition {
         const side = Math.sign(at.lateral);
         const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
         flight.pos.subtractInPlace(right.scale(at.lateral - side * circuit.corridor));
-        if (wallTurn(flight, -right.x * side, -right.z * side) && S.scrapeCool <= 0) {
+        if (wallTurn(flight, -right.x * side, -right.z * side, tune.wallScrub) && S.scrapeCool <= 0) {
           S.scrapeCool = 1.2;
           SoundKit.play('thud', { pitch: 0.9, volume: 0.35 });
           ctx.juice.shake(0.08, 120);

@@ -55,6 +55,19 @@ describe('arcade flight: nothing a player does crashes the plane', () => {
     expect(wallTurn(s, -1, 0)).toBe(true);
     expect(Math.sin(s.heading)).toBeLessThan(0.3);
   });
+
+  it('10-PHASE PASS phase 4: the edge’s price is the tune’s wallScrub — the turn-back itself is free', () => {
+    const into = () => spawnArcade(new Vector3(0, 40, 0), Math.PI / 2 - 0.3);
+    const gentle = into(); gentle.speed = 30;
+    const firm = into(); firm.speed = 30;
+    wallTurn(gentle, -1, 0, 0.1);
+    wallTurn(firm, -1, 0, 0.6);
+    expect(gentle.speed).toBeGreaterThan(firm.speed);            // a bigger scrub costs more speed
+    expect(firm.speed).toBeGreaterThan(0);                       // …but never parks the plane
+    expect(Math.sin(firm.heading)).toBeLessThan(0.3);            // and both still turn back along the course
+    expect(Math.sin(gentle.heading)).toBeLessThan(0.3);
+    expect(T.wallScrub).toBe(0.35);                              // the signed-off value, now a tune number
+  });
 });
 
 describe('stunts', () => {
