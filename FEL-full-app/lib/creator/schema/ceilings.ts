@@ -67,5 +67,5 @@ export function ceilingNote(row: Pick<RatedRow, 'prqAxis' | 'max'>, axes?: Parti
   if (!row.prqAxis) return '';
   const measured = axes?.[row.prqAxis];
   if (!Number.isFinite(measured as number)) return '';
-  return `CEILING ${ceilingFor(row, axes)} · raise it by training ${row.prqAxis}`;
+  return `CEILING ${ceilingFor(row, axes)} · train to raise ${row.prqAxis}`;
 }

@@ -18,7 +18,7 @@ const SRC = readFileSync(join(process.cwd(), 'components/creator/editor/creator-
 
 describe('the generic editor screen', () => {
   it('branches on no section name anywhere', () => {
-    const sections = ['attributes', 'tendencies', 'hotZones', 'mechanics', 'traits', 'vitals', 'appearance', 'body', 'ink', 'gear', 'accessories'];
+    const sections = ['attributes', 'tendencies', 'hotZones', 'mechanics', 'animations', 'traits', 'vitals', 'appearance', 'body', 'ink', 'gear', 'accessories'];
     for (const s of sections) {
       // the section may be MENTIONED (a comment, a type import) but never compared against
       expect(SRC).not.toMatch(new RegExp(`===\\s*['"\`]${s}['"\`]`));
@@ -53,6 +53,8 @@ describe('the generic editor screen', () => {
   it('puts each validation issue on its row rather than in a list at the top', () => {
     expect(SRC).toContain('issueFor');
     expect(SRC).toContain('rowIssues');
+    expect(SRC).toContain('ceilingNote');
+    expect(SRC).toContain('type="range"');
   });
 });
 

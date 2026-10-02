@@ -69,6 +69,8 @@ export interface BuildPayload {
   traits: Record<string, number>;
   hotZones: Record<string, string>;
   mechanics: Record<string, string | null>;
+  /** Animation package labels. Same JSON row as the rest of the build — no new column. */
+  animations: Record<string, string | null>;
   /** Frame scales as percent, the archetype and the stance. */
   frame: Record<string, RowValue>;
   /** The four palette overrides, by row id. */
@@ -98,6 +100,7 @@ export function toBuild(values: Values): BuildPayload {
     traits: numbers(values.traits),
     hotZones: strings(values.hotZones),
     mechanics: nullableStrings(values.mechanics),
+    animations: nullableStrings(values.animations),
     frame,
     palette,
   };
@@ -116,6 +119,7 @@ export function fromStorage(build: Partial<BuildPayload> | null | undefined, loo
     traits: { ...(build?.traits ?? {}) },
     hotZones: { ...(build?.hotZones ?? {}) },
     mechanics: { ...(build?.mechanics ?? {}) },
+    animations: { ...(build?.animations ?? {}) },
     vitals: {},
     body: {},
     appearance: {},
@@ -173,6 +177,7 @@ export function validateForSave(values: Values, prq: CreatorBuild['prq']): { ok:
     traits: numbers(values.traits),
     hotZones: strings(values.hotZones),
     mechanics: nullableStrings(values.mechanics),
+    animations: nullableStrings(values.animations),
     look: Object.fromEntries(Object.keys(LOOK_SECTIONS).map((k) => [k, (values[k] ?? {}) as Record<string, string | number | null>])),
     prq,
   };
