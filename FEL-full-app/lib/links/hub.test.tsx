@@ -33,7 +33,6 @@ const EXPECTED: { id: string; label: string; url: string; rel: string | null }[]
   { id: 'play', label: 'Play FEL', url: '/try', rel: null },
   { id: 'blueprint', label: "The Neuro-Mechanic's Blueprint on Kindle", url: 'https://www.amazon.com/dp/B0H5J1M18H', rel: 'noopener' },
   { id: 'millions', label: 'MILLIONS', url: 'https://millions.co/elijah-bonds-basketball', rel: 'noopener' },
-  { id: 'fanarch', label: 'Fanarch', url: 'https://fanarch.com/collections/elijah-bonds', rel: 'noopener' },
   { id: 'pjf', label: 'PJF Performance Band', url: 'https://pjf-performance-shop.myshopify.com/?sca_ref=9885072.t2P8qJogGNMRly', rel: 'sponsored noopener' },
   { id: 'tbb', label: 'Total Body Board', url: 'https://www.totalbodyboard.com/', rel: 'sponsored noopener' },
   { id: 'contact', label: 'Contact', url: 'mailto:FinalEvolution.us@gmail.com', rel: 'noopener' },
@@ -67,6 +66,7 @@ describe('the rendered page', () => {
   it('renders those links in order and no others', () => {
     const got = anchors(html());
     expect(got.map((a) => [a.label, a.href, a.rel])).toEqual(EXPECTED.map((item) => [item.label, item.url, item.rel]));
+    expect(html()).not.toMatch(/fanarch/i);
   });
 
   it('opens http(s) links in a new tab; internal and mailto stay here', () => {
@@ -138,7 +138,7 @@ describe('the page stays light', () => {
     for (const f of [...files, join(ROOT, 'lib/links/hub.ts'), join(ROOT, 'app/books/route.ts')]) {
       const src = readFileSync(f, 'utf8');
       expect(src, f).not.toMatch(/getServerSession|next-auth|prisma|lib\/db|babylon|three|gtag|facebook|pixel|googletagmanager|hotjar|segment\.com/);
-      expect(src, f).not.toMatch(/https?:\/\/(?!www\.amazon\.com|millions\.co|fanarch\.com|pjf-performance-shop\.myshopify\.com|www\.totalbodyboard\.com)/);
+      expect(src, f).not.toMatch(/https?:\/\/(?!www\.amazon\.com|millions\.co|pjf-performance-shop\.myshopify\.com|www\.totalbodyboard\.com)/);
     }
   });
 });

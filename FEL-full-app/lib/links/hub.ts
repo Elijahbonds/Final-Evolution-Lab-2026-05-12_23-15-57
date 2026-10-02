@@ -40,7 +40,6 @@ export const HUB_ITEMS: readonly HubItem[] = [
     section: 'books',
   },
   { id: 'millions', label: 'MILLIONS', url: 'https://millions.co/elijah-bonds-basketball', kind: 'external', section: 'merch' },
-  { id: 'fanarch', label: 'Fanarch', url: 'https://fanarch.com/collections/elijah-bonds', kind: 'external', section: 'merch' },
   {
     id: 'pjf',
     label: 'PJF Performance Band',
