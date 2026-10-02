@@ -41,16 +41,15 @@ const APPROVED: [number, string, string][] = [
   [3, 'Blueprint Kindle', 'https://www.amazon.com/dp/B0H5J1M18H'],
   [4, 'All Books', 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B'],
   [5, 'MILLIONS', 'https://millions.co/elijah-bonds-basketball'],
-  [6, 'Fan Arch', 'https://fanarch.com/collections/elijah-bonds'],
-  [7, 'PJF', 'https://pjf-performance-shop.myshopify.com/?sca_ref=9885072.t2P8qJogGNMRly'],
-  [8, 'Total Body Board', 'https://www.totalbodyboard.com'],
-  [9, 'Elijah Bonds', 'https://www.instagram.com/elijahbonds'],
-  [9, 'Final Evolution', 'https://www.instagram.com/finalevolutionllc'],
-  [10, 'YouTube', 'https://www.youtube.com/channel/UCP_ziu1PO1DGWfpmIP3kEng'],
-  [11, 'LinkedIn', 'https://www.linkedin.com/in/elijah-bonds-771aa1228'],
+  [6, 'PJF', 'https://pjf-performance-shop.myshopify.com/?sca_ref=9885072.t2P8qJogGNMRly'],
+  [7, 'Total Body Board', 'https://www.totalbodyboard.com'],
+  [8, 'Elijah Bonds', 'https://www.instagram.com/elijahbonds'],
+  [8, 'Final Evolution', 'https://www.instagram.com/finalevolutionllc'],
+  [9, 'YouTube', 'https://www.youtube.com/channel/UCP_ziu1PO1DGWfpmIP3kEng'],
+  [10, 'LinkedIn', 'https://www.linkedin.com/in/elijah-bonds-771aa1228'],
 ];
 
-describe('the approved buttons (12 links; slot 9 is two)', () => {
+describe('the approved buttons (11 links; slot 8 is two)', () => {
   it('the data: exact slots, labels and hrefs, in order', () => {
     expect(ELIJAH_LINKS.map((b) => [b.slot, b.label, b.href])).toEqual(APPROVED);
   });
@@ -58,7 +57,7 @@ describe('the approved buttons (12 links; slot 9 is two)', () => {
   it('the rendered page: the same links in the same order, and no other link', () => {
     const got = items(html());
     expect(got.map((l) => [l.slot, l.label, l.href])).toEqual(APPROVED);
-    expect([...html().matchAll(/<a /g)]).toHaveLength(12);
+    expect([...html().matchAll(/<a /g)]).toHaveLength(11);
     expect(html()).toContain('href="https://pjf-performance-shop.myshopify.com/?sca_ref=9885072.t2P8qJogGNMRly"');
   });
 
@@ -76,10 +75,10 @@ describe('the approved buttons (12 links; slot 9 is two)', () => {
     }
   });
 
-  it('Total Body Board prints its code, EBondJmp; slot 9 is "Elijah Bonds" then "Final Evolution" under an Instagram caption', () => {
+  it('Total Body Board prints its code, EBondJmp; slot 8 is "Elijah Bonds" then "Final Evolution" under an Instagram caption', () => {
     const l = items(html());
-    expect(l[7].linkText).toContain('code EBondJmp');
-    expect([l[8].label, l[9].label]).toEqual(['Elijah Bonds', 'Final Evolution']);
+    expect(l[6].linkText).toContain('code EBondJmp');
+    expect([l[7].label, l[8].label]).toEqual(['Elijah Bonds', 'Final Evolution']);
     expect(html()).toMatch(/data-group="Instagram"[^>]*>Instagram</);
   });
 });
@@ -92,7 +91,7 @@ describe('the paid-link line (owner rule 2026-09-29), not an "affiliate" tag', (
   it('sits right after the PJF link and the Total Body Board link, in the same list item, and beside no other link', () => {
     for (const l of items(html())) {
       const note = /^\s*<p data-paid-link-note="(\d+)"([^>]*)>([^<]*)<\/p>/.exec(l.after);
-      if (l.slot === 7 || l.slot === 8) {
+      if (l.slot === 6 || l.slot === 7) {
         expect(note, l.label).not.toBeNull();
         expect(note![1]).toBe(String(l.slot));
         expect(note![3]).toBe(PAID_LINK_NOTE);

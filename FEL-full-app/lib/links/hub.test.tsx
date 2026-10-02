@@ -66,7 +66,6 @@ describe('the rendered page', () => {
   it('renders those links in order and no others', () => {
     const got = anchors(html());
     expect(got.map((a) => [a.label, a.href, a.rel])).toEqual(EXPECTED.map((item) => [item.label, item.url, item.rel]));
-    expect(html()).not.toMatch(/fanarch/i);
   });
 
   it('opens http(s) links in a new tab; internal and mailto stay here', () => {
