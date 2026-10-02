@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultFace, type FaceConfig } from '../closet/wearable-catalog';
 import { VITAL_DEFAULT } from './schema/vitals';
-import { decideLookHold, holdFace, holdFrame, payloadHasImage, privacyRecord } from './lookPrivacy';
+import { athleteSaveRequest, closetSaveRequest, decideLookHold, holdFace, holdFrame, payloadHasImage, privacyRecord } from './lookPrivacy';
 
 const built = (): FaceConfig => ({
   ...defaultFace(),
@@ -20,7 +20,7 @@ const built = (): FaceConfig => ({
 describe('under 18 the look does not upload', () => {
   it('writes the catalog default face and the standard frame even when both flags are checked', () => {
     const hold = decideLookHold(false, true, true);
-    expect(hold).toEqual({ adult: false, uploadFace: false, uploadNumbers: false, modelTraining: false });
+    expect(hold).toEqual({ adult: false, uploadFace: false, uploadLook: false, uploadNumbers: false, modelTraining: false });
     const face = holdFace(built(), hold);
     expect(face).toEqual(defaultFace());
     expect(face.sliders).toBeUndefined();
@@ -28,6 +28,49 @@ describe('under 18 the look does not upload', () => {
       heightScale: VITAL_DEFAULT, buildScale: VITAL_DEFAULT, archetype: 'Guard',
     });
     expect(privacyRecord(hold).modelTraining).toBe(false);
+  });
+
+  it('a minor save request carries no look or equipped data at all', () => {
+    const body = athleteSaveRequest({
+      adult: false,
+      plate: 'ACE',
+      saveLookNumbers: true,
+      modelTraining: true,
+      values: {
+        appearance: { hairStyle: 'Locs', faceLong: 80 },
+        vitals: { jerseyNumber: 23, heightScale: 104, buildScale: 108 },
+        gear: { shoes: 'Evolution Hi-Tops', paletteJersey: '#FF00AA' },
+        accessories: { accessory: 'Shard Chain' },
+        animations: { animJsBase: 'Set Shot' },
+        attributes: { midRange: 70 },
+        body: { stance: 'compact' },
+      },
+    });
+    const json = JSON.stringify(body);
+    expect(json).not.toMatch(/Locs|ACE|Evolution|Set Shot|faceLong|Shard Chain|FF00AA|jerseyNumber|heightScale|buildScale/);
+    expect(body.plate).toBe('');
+    expect(body.values.appearance).toBeUndefined();
+    expect(body.values.animations).toBeUndefined();
+    expect(body.values.accessories).toBeUndefined();
+    expect(body.values.gear).toBeUndefined();
+    expect(body.values.vitals).toBeUndefined();
+    expect(body.values.attributes).toEqual({ midRange: 70 });
+    expect(body.values.body).toEqual({ stance: 'compact' });
+    expect(body.saveLookNumbers).toBe(false);
+    expect(body.modelTraining).toBe(false);
+
+    const closet = closetSaveRequest({
+      adult: false,
+      face: built(),
+      equipped: { shoes: 'shoes_evo', tops: 'top_bonds' },
+      jersey: { number: 23, name: 'ACE' },
+      skinCardId: 'card-1',
+      saveLookNumbers: true,
+      modelTraining: true,
+    });
+    const closetJson = JSON.stringify(closet);
+    expect(closetJson).not.toMatch(/Locs|ACE|shoes_evo|top_bonds|card-1|face|equipped|jersey/);
+    expect(closet).toEqual({ saveLookNumbers: false, modelTraining: false });
   });
 });
 

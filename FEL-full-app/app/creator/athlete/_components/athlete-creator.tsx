@@ -15,8 +15,8 @@ import CreatorEditor from '@/components/creator/editor/creator-editor';
 import { bindPreview, bindFace } from '@/lib/creator/editor/previewBinding';
 import { clipForChoice } from '@/lib/creator/schema/animations';
 import { LookConsent } from '@/components/creator/look-consent';
-import { appearanceFromFace, readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredConsent } from '@/lib/creator/localLook';
-import { decideLookHold } from '@/lib/creator/lookPrivacy';
+import { creatorDeviceLook, overlayDeviceLook, readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredConsent } from '@/lib/creator/localLook';
+import { athleteSaveRequest, decideLookHold } from '@/lib/creator/lookPrivacy';
 
 // The preview pulls Babylon in; it must not be in the page's first bundle, and it cannot render on the
 // server at all.
@@ -92,15 +92,11 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
         setConsent(savedConsent);
         const hold = decideLookHold(serverAdult, savedConsent.saveLookNumbers, savedConsent.modelTraining);
         const local = readLocalLook();
-        const next = body.values as Values;
-        if (local && !hold.uploadFace && local.face) next.appearance = appearanceFromFace(local.face);
-        if (local && !hold.uploadNumbers) {
-          if (local.face?.sliders) next.appearance = { ...(next.appearance ?? {}), ...appearanceFromFace({ ...(bindFace(next.appearance)), sliders: local.face.sliders }) };
-          if (typeof local.heightScale === 'number') next.vitals = { ...(next.vitals ?? {}), heightScale: local.heightScale };
-          if (typeof local.buildScale === 'number') next.vitals = { ...(next.vitals ?? {}), buildScale: local.buildScale };
-        }
-        setValues(next);
-        if (typeof body.plate === 'string') setPlate(body.plate);
+        const filled = overlayDeviceLook(body.values as Values, typeof body.plate === 'string' ? body.plate : '', local, hold);
+        const nextValues: Values = {};
+        for (const [section, rows] of Object.entries(filled.values)) if (rows) nextValues[section] = rows;
+        setValues(nextValues);
+        setPlate(filled.plate);
         ready.current = true;
       } catch { /* offline: the editor still works, it just starts empty */ }
     })();
@@ -110,21 +106,18 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
   // Under 18 the server never keeps the face. Write it here so a refresh before Finalize still has it.
   useEffect(() => {
     if (!ready.current) return;
-    const face = bindFace(values.appearance);
-    writeLocalLook({
-      ...(readLocalLook() ?? {}),
-      face,
-      heightScale: numOf(values.vitals?.heightScale),
-      buildScale: numOf(values.vitals?.buildScale),
-    });
-  }, [values.appearance, values.vitals]);
+    writeLocalLook(creatorDeviceLook(values, plate, readLocalLook(), bindFace(values.appearance)));
+  }, [values, plate]);
 
   const doSave = useCallback(async () => {
     setSaving(true); setSaveNote(''); setServerIssues([]);
     try {
       const r = await fetch('/api/v1/creator/athlete', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ values, plate, saveLookNumbers: consent.saveLookNumbers, modelTraining: consent.modelTraining }),
+        body: JSON.stringify(athleteSaveRequest({
+          adult: isAdult, values, plate,
+          saveLookNumbers: consent.saveLookNumbers, modelTraining: consent.modelTraining,
+        })),
       });
       const body = await r.json().catch(() => ({}));
       if (r.status === 422) {
@@ -148,9 +141,8 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
     } finally {
       setSaving(false);
     }
-    const face = bindFace(values.appearance);
-    writeLocalLook({ ...(readLocalLook() ?? {}), face, heightScale: numOf(values.vitals?.heightScale), buildScale: numOf(values.vitals?.buildScale) });
-  }, [values, plate, consent]);
+    writeLocalLook(creatorDeviceLook(values, plate, readLocalLook(), bindFace(values.appearance)));
+  }, [values, plate, consent, isAdult]);
 
   const onChange = useCallback((section: string, rowId: string, next: RowValue) => {
     setValues((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [rowId]: next } }));
@@ -317,8 +309,6 @@ const pick = (m: Record<string, unknown>, ids: string[]): Record<string, RowValu
   }
   return out;
 };
-
-const numOf = (v: RowValue | undefined): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 
 const numeric = (m?: Record<string, RowValue>): Record<string, number> => {
   const out: Record<string, number> = {};

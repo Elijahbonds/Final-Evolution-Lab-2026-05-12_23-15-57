@@ -9,7 +9,7 @@ import { newIdempotencyKey } from '@/lib/wallet/client';
 import { FaceScanCapture } from '@/components/facescan/face-scan-capture';
 import { LookConsent } from '@/components/creator/look-consent';
 import { readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredConsent } from '@/lib/creator/localLook';
-import { decideLookHold } from '@/lib/creator/lookPrivacy';
+import { closetSaveRequest, decideLookHold } from '@/lib/creator/lookPrivacy';
 import { invalidateIdentity } from '@/lib/babylon/core/characterPipeline';
 import { canEquip as canEquipItem } from '@/lib/closet/ownership';
 import {
@@ -120,15 +120,16 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         if (res.ok) {
           let nextFace: FaceConfig = { ...defaultFace(), ...(j.look?.face ?? {}) };
           // The server copy is whatever the hold allowed. The device copy wins for the rest.
-          if (local?.face && !hold.uploadFace) nextFace = { ...local.face };
+          if (!hold.uploadLook && local?.face) nextFace = { ...local.face };
           else if (local?.face?.sliders && !hold.uploadNumbers) nextFace = { ...nextFace, sliders: { ...local.face.sliders } };
           setFace(nextFace);
-          setEquipped({ ...defaultEquipped(), ...(j.look?.equipped ?? {}) });
+          const serverEquipped = { ...defaultEquipped(), ...(j.look?.equipped ?? {}) };
+          setEquipped(!hold.uploadLook && local?.equipped ? { ...defaultEquipped(), ...local.equipped } : serverEquipped);
           setOwned(new Set<string>(j.owned ?? []));
           setSkins(j.skins ?? []);
           setSkinCardId(j.look?.skinCardId ?? null);
-          setJersey(sanitizeJersey(j.look?.jersey ?? defaultJersey()));
-        } else if (local?.face && !hold.uploadFace) {
+          setJersey(!hold.uploadLook && local?.jersey ? sanitizeJersey(local.jersey) : sanitizeJersey(j.look?.jersey ?? defaultJersey()));
+        } else if (local?.face && !hold.uploadLook) {
           setFace({ ...local.face });
         }
       } catch { /* ignore */ }
@@ -139,8 +140,8 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   // The look the server is not allowed to keep still has to survive a refresh.
   useEffect(() => {
     if (!hydrated.current || loading) return;
-    writeLocalLook({ ...(readLocalLook() ?? {}), face });
-  }, [face, loading]);
+    writeLocalLook({ ...(readLocalLook() ?? {}), face, equipped, jersey });
+  }, [face, equipped, jersey, loading]);
 
   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
   // Draft palette — the same mapping resolveIdentity() applies at spawn time,
@@ -179,19 +180,19 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     try {
       const res = await fetch('/api/v1/closet', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          face, equipped, skinCardId, jersey,
+        body: JSON.stringify(closetSaveRequest({
+          adult, face, equipped, skinCardId, jersey,
           saveLookNumbers: consent.saveLookNumbers, modelTraining: consent.modelTraining,
-        }),
+        })),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'save failed');
       writeConsent(consent);
-      writeLocalLook({ ...(readLocalLook() ?? {}), face });
+      writeLocalLook({ ...(readLocalLook() ?? {}), face, equipped, jersey });
       invalidateIdentity(); // next spawn picks up the new look everywhere
       toast.success(adult
         ? 'Look saved — this is how you appear across the Lab.'
-        : 'Saved on this device. Your face was not uploaded.');
+        : 'Saved on this device. Your look was not uploaded.');
     } catch (e: any) { toast.error(e?.message || 'Save failed'); }
     finally { setSaving(false); }
   };

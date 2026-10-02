@@ -6,8 +6,9 @@
 //
 // The storage helpers no-op when there is no window, so a test can run the merge without a browser.
 
-import type { FaceConfig } from '../closet/wearable-catalog';
+import { sanitizeJersey, type FaceConfig, type JerseyConfig } from '../closet/wearable-catalog';
 import { APPEARANCE } from './schema/appearance';
+import type { RowValue } from './editor/rowState';
 
 export const LOCAL_LOOK_KEY = 'fel.myplayer.look.v1';
 export const LOCAL_CONSENT_KEY = 'fel.myplayer.consent.v1';
@@ -16,7 +17,18 @@ export interface StoredLook {
   face?: FaceConfig;
   heightScale?: number;
   buildScale?: number;
+  /** Closet item ids. Purchase inventory is not stored here. */
+  equipped?: Record<string, string | null>;
+  jersey?: JerseyConfig;
+  animations?: Record<string, string | null>;
+  /** Creator display values for the worn slots, so the editor can refill without reversing ids. */
+  gear?: Record<string, RowValue>;
+  accessories?: Record<string, RowValue>;
+  appearance?: Record<string, string | number>;
+  plate?: string;
 }
+
+const WORN_GEAR = ['headwear', 'tops', 'shorts', 'shoes'] as const;
 
 export interface StoredConsent {
   saveLookNumbers: boolean;
@@ -65,6 +77,80 @@ export function mergeLocalLook(
     if (typeof local.buildScale === 'number') buildScale = local.buildScale;
   }
   return { face, heightScale, buildScale };
+}
+
+/** What the creator writes beside the server save, including the parts a minor is not allowed to upload. */
+export function creatorDeviceLook(
+  values: Record<string, Record<string, RowValue> | undefined>,
+  plate: string,
+  prev: StoredLook | null,
+  face?: FaceConfig,
+): StoredLook {
+  const gear: Record<string, RowValue> = {};
+  for (const id of WORN_GEAR) {
+    const v = values.gear?.[id];
+    if (v !== undefined) gear[id] = v;
+  }
+  const animations: Record<string, string | null> = {};
+  for (const [k, v] of Object.entries(values.animations ?? {})) {
+    animations[k] = v === null || typeof v === 'string' ? v : null;
+  }
+  const height = values.vitals?.heightScale;
+  const build = values.vitals?.buildScale;
+  const number = values.vitals?.jerseyNumber;
+  return {
+    ...(prev ?? {}),
+    ...(face ? { face } : {}),
+    appearance: values.appearance
+      ? Object.fromEntries(Object.entries(values.appearance).filter(([, v]) => typeof v === 'string' || typeof v === 'number')) as Record<string, string | number>
+      : prev?.appearance,
+    heightScale: typeof height === 'number' ? height : prev?.heightScale,
+    buildScale: typeof build === 'number' ? build : prev?.buildScale,
+    gear: { ...(prev?.gear ?? {}), ...gear },
+    accessories: { ...(prev?.accessories ?? {}), ...(values.accessories ?? {}) },
+    animations: { ...(prev?.animations ?? {}), ...animations },
+    jersey: sanitizeJersey({ number: typeof number === 'number' ? number : prev?.jersey?.number ?? 0, name: plate || prev?.jersey?.name || '' }),
+    plate,
+  };
+}
+
+type Values = Record<string, Record<string, RowValue> | undefined>;
+
+/**
+ * Refill the editor from the device for everything the server was not allowed to keep.
+ * A minor's face, worn items, plate, animations, and height/build all come from here.
+ */
+export function overlayDeviceLook(
+  values: Values,
+  plate: string,
+  local: StoredLook | null,
+  hold: { uploadLook: boolean; uploadFace: boolean; uploadNumbers: boolean },
+): { values: Values; plate: string } {
+  if (!local) return { values, plate };
+  const next: Values = { ...values };
+  if (!hold.uploadLook) {
+    if (local.appearance) next.appearance = { ...local.appearance };
+    else if (local.face) next.appearance = appearanceFromFace(local.face);
+    if (local.animations) next.animations = { ...(next.animations ?? {}), ...local.animations };
+    if (local.gear) next.gear = { ...(next.gear ?? {}), ...local.gear };
+    if (local.accessories) next.accessories = { ...(next.accessories ?? {}), ...local.accessories };
+    next.vitals = { ...(next.vitals ?? {}) };
+    if (typeof local.heightScale === 'number') next.vitals.heightScale = local.heightScale;
+    if (typeof local.buildScale === 'number') next.vitals.buildScale = local.buildScale;
+    if (local.jersey) next.vitals.jerseyNumber = local.jersey.number;
+    return { values: next, plate: local.plate ?? local.jersey?.name ?? plate };
+  }
+  if (!hold.uploadFace && local.face) next.appearance = appearanceFromFace(local.face);
+  if (!hold.uploadNumbers) {
+    if (local.face?.sliders) {
+      const base = next.appearance ?? {};
+      next.appearance = { ...base, ...appearanceFromFace({ ...(local.face), sliders: local.face.sliders }) };
+    }
+    next.vitals = { ...(next.vitals ?? {}) };
+    if (typeof local.heightScale === 'number') next.vitals.heightScale = local.heightScale;
+    if (typeof local.buildScale === 'number') next.vitals.buildScale = local.buildScale;
+  }
+  return { values: next, plate };
 }
 
 export function readLocalLook(): StoredLook | null {

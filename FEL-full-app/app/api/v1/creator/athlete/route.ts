@@ -35,7 +35,7 @@ import { isMissingTable, isUnreachable } from '@/lib/db/errors';
 import { axesFor } from '@/lib/creator/athleteAxes-server';
 import { SCAN_SAVE_REFUSED, canSaveScanNumbers, readDobYear } from '@/lib/privacy/scanSaveGate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
-import { decideLookHold, holdFace, holdFrame, payloadHasImage, privacyRecord } from '@/lib/creator/lookPrivacy';
+import { decideLookHold, holdAnimations, holdEquipped, holdFace, holdFrame, holdJersey, payloadHasImage, privacyRecord } from '@/lib/creator/lookPrivacy';
 
 /**
  * `AthleteBuild` is new and the migration is the owner's to run, so the one error a fresh checkout will
@@ -132,10 +132,16 @@ export async function POST(req: NextRequest) {
   look.face = holdFace(look.face, hold);
   const built = toBuild(values);
   built.frame = holdFrame(built.frame, hold);
+  built.animations = holdAnimations(built.animations, hold);
+  // Jersey colours live in the build, not on AvatarLook. A minor's row keeps the catalog defaults.
+  if (!hold.uploadLook) built.palette = toBuild({}).palette;
   const stored = { ...built, privacy: privacyRecord(hold) };
   const owned = new Set((await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId));
-  const refused = refusedItems(look.equipped, owned);
-  const equipped = filterEquipped(look.equipped, owned);
+  // Inventory stays. What is WORN does not upload for anyone who is not a verified adult.
+  const refused = hold.uploadLook ? refusedItems(look.equipped, owned) : [];
+  look.equipped = holdEquipped(hold.uploadLook ? filterEquipped(look.equipped, owned) : look.equipped, hold);
+  look.jersey = holdJersey(look.jersey, hold);
+  const equipped = look.equipped;
 
   // TEEN-WRITE-BLOCK (FE PM 23:05 PT): only the PRQ snapshot is a movement save (verified 18+ AND opted in); the look and the Fine Tune build save for every signed-in user.
   const prqAllowed = await canSaveScanNumbers(prisma, userId);
