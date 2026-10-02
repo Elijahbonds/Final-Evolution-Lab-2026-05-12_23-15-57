@@ -291,6 +291,34 @@ describe('10-PHASE PASS, phase 1 — steering feel (2026-10-02)', () => {
   });
 });
 
+describe('10-PHASE PASS, phase 3 — the launch curve (2026-10-02)', () => {
+  it('reaches 95% of top speed inside the target time, flat out', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    let t = 0;
+    while (t < 10 && s.speed < K.vMax * 0.95) { stepKart(s, input({ throttle: 1 }), 1 / 60, true, K); t += 1 / 60; }
+    expect(t).toBeLessThan(4);
+  });
+
+  it('the launch is harder than the old flat shove — and the top end is EXACTLY what it was', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    drive(s, input({ throttle: 1 }), 0.5);
+    expect(s.speed).toBeGreaterThan(7.5);          // the flat 13 m/s² gave ~6.4 here
+    const top = drive(spawnKart(new Vector3(0, 0, 0), 0), input({ throttle: 1 }), 12);
+    expect(top.speed).toBe(K.vMax);                // terminal unchanged — the medal times are safe
+  });
+
+  it('the climb is monotone and never overshoots', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    let prev = 0;
+    for (let i = 0; i < 12 * 60; i++) {
+      stepKart(s, input({ throttle: 1 }), 1 / 60, true, K);
+      expect(s.speed).toBeGreaterThanOrEqual(prev - 1e-9);
+      expect(s.speed).toBeLessThanOrEqual(K.vMax + 1e-9);
+      prev = s.speed;
+    }
+  });
+});
+
 describe('nothing produces a NaN, and a wall hurts', () => {
   it('thirty seconds of random input stays finite', () => {
     let seed = 11;

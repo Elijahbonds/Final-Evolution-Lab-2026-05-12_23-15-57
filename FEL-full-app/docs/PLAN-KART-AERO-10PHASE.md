@@ -100,7 +100,18 @@ read from that config.
 monotone and never overshoots vMax; `speedFovTarget` honours a custom gain/floor; `tuneFollow` overlays
 only the given fields.
 
-- [ ] done
+- [x] done — `racing/kartTune.ts` (`KART_TUNE`) and `racing/aeroTune.ts` (`AERO_TUNE`) own {spec/tune
+  reference, fov {gain, floor01, tau}, cam {distance, height, lag, lookAhead}}; the cam blocks carry the
+  signed-off runner/flyer preset values (7.5/3.2/0.08/3.0 and 13.5/4.6/0.09/9.0 — unchanged, now owned
+  per mode). Launch curve: `accelLaunch` 0.4 kart / 0.3 aero — the shove is `1 + accelLaunch·(1 − v/vMax)`
+  while accelerating, so the launch is harder and the terminal speed is byte-identical (medal times
+  untouched). `SpeedFov` takes an optional tune (defaults = the signed-off constants). `CameraDirector.
+  tuneFollow` overlays only the named fields on the active preset (composes with the broadcast blend).
+  Measured: kart 0 → 95% vMax in 2.03 s (old flat curve: 2.47 s), v(0.5 s) 8.5 vs 6.4 m/s, terminal
+  speed byte-identical at 12 s (26.000 both); aero coast → 95% top in 0.73 s (was 0.77 s — the shove
+  shows most after a brake or wall scrub, not from the coast spawn). G9 kart gate re-measured with the
+  launch live: worst onset still 666.7 ms vs the 700 ms allowance. 13 new vitest pins
+  (speedFeel.test.ts + curve describes in the KartModel / ArcadeFlight suites).
 
 ## Phase 4 — Collision and recovery
 

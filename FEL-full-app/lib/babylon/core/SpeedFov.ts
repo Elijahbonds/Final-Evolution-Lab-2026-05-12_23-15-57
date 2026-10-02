@@ -39,20 +39,36 @@ export const SPEED_FOV_TAU = 0.22;
 export const SPEED_FOV_EPSILON = 0.0005;
 
 /**
+ * A mode's own copy of the kick's shape (10-phase pass, 2026-10-02): the racing modes tune their lens in
+ * their own config (racing/kartTune, racing/aeroTune) instead of sharing the module constants. Every
+ * field defaults to the signed-off constant, so a caller that passes nothing behaves exactly as before.
+ */
+export interface SpeedFovTune {
+  /** Widest the lens goes, as a multiple of the resting fov. Default SPEED_FOV_GAIN. */
+  gain?: number;
+  /** Fraction of top speed below which there is no kick. Default SPEED_FOV_FLOOR01. */
+  floor01?: number;
+  /** The lens's time constant, seconds. Default SPEED_FOV_TAU. */
+  tau?: number;
+}
+
+/**
  * How open the lens wants to be right now.
  *
  * `speed` and `topSpeed` are both in m/s and both the mode's own. Returns a multiplier on the resting fov,
  * never an angle — the mode owns its resting angle, and a module that returned radians would quietly
  * overwrite a camera preset somebody tuned.
  */
-export function speedFovTarget(speed: number, topSpeed: number): number {
+export function speedFovTarget(speed: number, topSpeed: number, tune: SpeedFovTune = {}): number {
   if (!(topSpeed > 0) || !Number.isFinite(speed)) return 1;
+  const gain = tune.gain ?? SPEED_FOV_GAIN;
+  const floor01 = tune.floor01 ?? SPEED_FOV_FLOOR01;
   const s01 = Math.max(0, Math.min(1, speed / topSpeed));
-  if (s01 <= SPEED_FOV_FLOOR01) return 1;
+  if (s01 <= floor01) return 1;
   // re-normalised across the part of the range that actually kicks, so the effect starts from zero at the
   // floor rather than stepping straight to a visible width the moment the floor is crossed.
-  const k = (s01 - SPEED_FOV_FLOOR01) / (1 - SPEED_FOV_FLOOR01);
-  return 1 + (SPEED_FOV_GAIN - 1) * k;
+  const k = (s01 - floor01) / (1 - floor01);
+  return 1 + (gain - 1) * k;
 }
 
 /**
@@ -60,11 +76,11 @@ export function speedFovTarget(speed: number, topSpeed: number): number {
  *
  * `baseFov` is the mode's resting angle in radians — the one its camera preset was tuned at.
  */
-export function stepSpeedFov(currentFov: number, baseFov: number, speed: number, topSpeed: number, dt: number): number {
-  const want = baseFov * speedFovTarget(speed, topSpeed);
+export function stepSpeedFov(currentFov: number, baseFov: number, speed: number, topSpeed: number, dt: number, tune: SpeedFovTune = {}): number {
+  const want = baseFov * speedFovTarget(speed, topSpeed, tune);
   if (!(dt > 0)) return currentFov;
   // THE WHOLE POINT: a time constant, not a per-frame fraction. Identical settling at 30 fps and 144.
-  const a = 1 - Math.exp(-dt / SPEED_FOV_TAU);
+  const a = 1 - Math.exp(-dt / (tune.tau ?? SPEED_FOV_TAU));
   const next = currentFov + (want - currentFov) * a;
   return Math.abs(want - next) < SPEED_FOV_EPSILON ? want : next;
 }

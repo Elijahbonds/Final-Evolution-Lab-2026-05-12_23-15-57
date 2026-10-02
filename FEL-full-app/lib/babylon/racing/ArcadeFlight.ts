@@ -31,6 +31,12 @@ export interface ArcadeTune {
   minSpeed: number;
   /** m/s² toward the target speed. */
   accel: number;
+  /**
+   * LAUNCH SHOVE (10-phase pass, 2026-10-02): while accelerating, the rate is
+   * `accel × (1 + accelLaunch × (1 − speed/top))` — eager off the mark, exactly the old flat rate at the
+   * top end, so the top speed and the time it takes to SETTLE there are unchanged. Braking is unaffected.
+   */
+  accelLaunch: number;
   /** m/s² while braking. */
   brakeDecel: number;
   /** Yaw rate at full stick, rad/s. */
@@ -68,7 +74,7 @@ export interface ArcadeTune {
 
 /** DKR scale: laps of ~1 km flown in 30–40 s, low through canyons and under arches. */
 export const ARCADE_TRAINER: ArcadeTune = {
-  top: 32, coast: 22, minSpeed: 14, accel: 11, brakeDecel: 16,
+  top: 32, coast: 22, minSpeed: 14, accel: 11, accelLaunch: 0.3, brakeDecel: 16,
   turnRate: 1.55, brakeTurn: 1.65, yawSlew: 8, maxPitch: 0.55, pitchEase: 4.5, maxBank: 0.85,
   bankEase: 6, turnPitch: 0.06,
   bananaSpeed: 0.55, bananaCap: 10,
@@ -194,7 +200,10 @@ export function stepArcade(
   let want = input.gas > 0.1 ? tune.coast + (top - tune.coast) * Math.min(1, input.gas) : tune.coast;
   if (input.boostK > 0.05) want = Math.max(want, top);
   if (input.brake > 0.1) want = tune.minSpeed;
-  const rate = input.brake > 0.1 && s.speed > want ? tune.brakeDecel : tune.accel;
+  // the launch shove: eager off the mark, exactly the flat rate at the top end (see tune.accelLaunch);
+  // it only ever pushes FORWARD — settling down to the coast speed is the old rate, unchanged
+  const launch = s.speed < want ? 1 + tune.accelLaunch * (1 - Math.max(0, Math.min(1, s.speed / top))) : 1;
+  const rate = input.brake > 0.1 && s.speed > want ? tune.brakeDecel : tune.accel * launch;
   if (s.speed < want) s.speed = Math.min(want, s.speed + rate * dt);
   else s.speed = Math.max(want, s.speed - rate * dt * (s.speed > top ? 1.5 : 1));
   s.speed = Math.max(tune.minSpeed, s.speed);

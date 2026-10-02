@@ -66,6 +66,7 @@ import {
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
+import { KART_TUNE } from '../racing/kartTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 
 /** A kart is small; a full-size body swamps it. */
@@ -1002,6 +1003,7 @@ return {
       minX: -402, maxX: 402, minZ: -402, maxZ: 402, minY: -0.1,
       groundAt: circ ? (x, z) => Math.max(circ.surfaceAt(x, z), groundHeight ? groundHeight(x, z) : -0.03) : undefined,
     });
+    ctx.camDirector.tuneFollow(KART_TUNE.cam);   // the mode's own chase numbers (10-phase pass, phase 3)
     ctx.camDirector.snapTo(state.pos, null);
     tintMarks();
     say(`${course.name} — ${course.sub}`, 2.2);
@@ -1348,7 +1350,7 @@ return {
     // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
     // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
     baseFov ??= ctx.camera.fov;
-    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), state.speed, kartSpec.vMax, dt);
+    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), state.speed, kartSpec.vMax, dt, KART_TUNE.fov);
     // SPEED-VIGNETTE (racing HUD pass): report the fraction of top speed; the harness closes the frame above
     // the owner-approved window (≥0.85), composed with the impact pulse. Opt-in, harness-owned.
     ctx.feel.speedVignette01(state.speed / kartSpec.vMax);

@@ -91,6 +91,13 @@ export interface KartSpec {
   rollGain: number;
   /** VISUAL: body pitch per m/s² of longitudinal accel, radians (brake dives the nose, gas squats it). */
   pitchGain: number;
+  /**
+   * LAUNCH SHOVE (10-phase pass, 2026-10-02): the acceleration curve's shape. The push is
+   * `accel × (1 + accelLaunch × (1 − v/vMax))` — hardest off the line, easing to exactly the old flat
+   * shove at vMax, so the terminal speed (and every medal time tuned to it) is byte-identical and only
+   * the launch is punchier. A kart SHOULD feel eager at walking speed; the top end is the drag's business.
+   */
+  accelLaunch: number;
 }
 
 /** The starter kart: grippy enough to be forgiving, loose enough that drifting is obviously faster. */
@@ -108,6 +115,7 @@ export const KART_STARTER: KartSpec = {
   throttleLoose: 0.12,
   rollGain: 0.0062,
   pitchGain: 0.0021,
+  accelLaunch: 0.4,
 };
 
 export interface KartState {
@@ -205,8 +213,10 @@ export function stepKart(s: KartState, input: KartInput, dt: number, onTrack: bo
   }
   s.boosting = Math.max(0, s.boosting - dt);
 
-  // SPEED.
-  const push = spec.accel * throttle01 * (1 + 0.6 * boostK);
+  // SPEED. The launch shove (spec.accelLaunch) makes the curve hard off the line and exactly the old flat
+  // push at vMax — the terminal speed is unchanged, only the launch is punchier.
+  const launch = 1 + spec.accelLaunch * (1 - Math.max(0, Math.min(1, s.speed / spec.vMax)));
+  const push = spec.accel * throttle01 * launch * (1 + 0.6 * boostK);
   const stop = spec.brake * brake01;
   const roll = spec.drag * s.speed * s.speed;
   s.speed = Math.max(0, Math.min(vMax, s.speed + (push - stop - roll) * dt));

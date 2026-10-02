@@ -44,6 +44,7 @@ import {
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
+import { AERO_TUNE } from '../racing/aeroTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy plane bodies over the toy primitives
 import { refuse } from '../core/Refusal';
 import { stepDraft, noDraft, DRAFT, type DraftState } from '../racing/Slipstream';   // racing pass phase 7
@@ -364,6 +365,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = null;
+      ctx.camDirector.tuneFollow(AERO_TUNE.cam);   // the mode's own chase numbers (10-phase pass, phase 3)
       ctx.camDirector.snapTo(flight.pos, null);
       say(`${circuit.course.name} — ${circuit.course.sub}`, 2.4);
 
@@ -726,7 +728,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       ctx.camDirector.look(S.lookX, S.lookY, dt);
       ctx.camDirector.update(flight.pos, fwd.scale(flight.speed), null);
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt, AERO_TUNE.fov);
       // SPEED-VIGNETTE (racing HUD pass): same opt-in as the kart — report the fraction, the harness frames it.
       ctx.feel.speedVignette01(flight.speed / (tune.top * 1.4));
       pushHud(ctx);

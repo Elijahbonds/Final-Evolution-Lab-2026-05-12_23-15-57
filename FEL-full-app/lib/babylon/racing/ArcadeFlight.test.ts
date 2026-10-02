@@ -133,6 +133,23 @@ describe('10-PHASE PASS, phase 2 — the turn has a body (2026-10-02)', () => {
   });
 });
 
+describe('10-PHASE PASS, phase 3 — the launch curve (2026-10-02)', () => {
+  it('the gas reaches 95% of the top inside the target time, and never past it', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);   // starts at the coast speed
+    let t = 0;
+    while (t < 4 && s.speed < T.top * 0.95) { stepArcade(s, I({ gas: 1 }), 1 / 60, T, flat, 200); t += 1 / 60; }
+    expect(t).toBeLessThan(1.2);
+    fly(s, I({ gas: 1 }), 3);
+    expect(s.speed).toBeLessThanOrEqual(T.top + 1e-6);
+  });
+
+  it('the launch is harder than the old flat rate — from the very first frame', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);
+    stepArcade(s, I({ gas: 1 }), 1 / 60, T, flat, 200);
+    expect(s.speed - T.coast).toBeGreaterThan((T.accel / 60) * 1.05);   // the flat rate's first frame was accel/60
+  });
+});
+
 describe('the garage planes keep their characters', () => {
   it('the darter is faster and the kestrel turns harder than the trainer', () => {
     const tune = (id: string) => arcadeFrom(PLANES.find((p) => p.id === id)!.spec);
