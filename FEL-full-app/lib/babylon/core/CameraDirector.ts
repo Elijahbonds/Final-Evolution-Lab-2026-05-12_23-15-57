@@ -84,6 +84,12 @@ export interface FollowConfig {
 /** The air cam's full offset (setAir(1)): metres further back, up, and round to the side for a three-quarter view. */
 export const AIR_CAM = { back: 2.2, up: 1.3, side: 2.4 };
 
+/**
+ * The Hundred's gameplay camera, as a fraction farther than the shoulder (4.0 m) and crowd (6.4 m)
+ * distances it shipped with. Owner 2026-10-01: zoom out a little, about 15–20%. One constant, both shots.
+ */
+export const HUNDRED_CAM_PULL = 1.18;
+
 export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // SCORECARD VISUALS (2026-09-15): golf played on 'court', which is a fitTwo preset — with the PIN as the second subject
   // (up to 90 m away) the separation pull-back put the camera 12.5 m off a 1.8 m golfer, and the frame review could
@@ -142,10 +148,12 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   crowd: { distance: 5.6, height: 3.0, minHeight: 2.0, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.6 },
   // COMBAT-AI (2026-09-30): karate-only shoulder/crowd presets — pulled back so
   // attackers stay in frame without touching the shared overShoulder/crowd used
-  // by Dance and other modes. fight-balance-tests: 7.5 m disc + 4.05 m pullback
-  // still clears the shrine mat's 12 m half-extent.
-  fightShoulder: { distance: 4.0, height: 1.75, minHeight: 1.25, pitchFloorDeg: 2, pitchCapDeg: 11, targetHeight: 1.4, lag: 0.28, lookAhead: 2.4, shoulderOffset: 0.65 },
-  fightCrowd: { distance: 6.4, height: 3.2, minHeight: 2.1, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.7 },
+  // by Dance and other modes. fight-balance-tests: the 7.5 m disc plus this
+  // pullback still clears the shrine mat's 12 m half-extent.
+  // THE HUNDRED (owner 2026-10-01): one zoom-out on both shots. 1.18 is 18% farther
+  // than the 4.0 m shoulder and 6.4 m crowd distances those presets were signed off at.
+  fightShoulder: { distance: 4.0 * HUNDRED_CAM_PULL, height: 1.75, minHeight: 1.25, pitchFloorDeg: 2, pitchCapDeg: 11, targetHeight: 1.4, lag: 0.28, lookAhead: 2.4, shoulderOffset: 0.65 },
+  fightCrowd: { distance: 6.4 * HUNDRED_CAM_PULL, height: 3.2, minHeight: 2.1, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.7 },
   // DUNK CONTEST cinematic — NOT the live-play camera: lower, closer,
   // slower lag so the flight glides like a highlight reel; tighter pitch
   // cap keeps the rim in frame at apex without a hard tilt.
