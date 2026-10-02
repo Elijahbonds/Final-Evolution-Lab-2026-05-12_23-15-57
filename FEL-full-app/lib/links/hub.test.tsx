@@ -14,6 +14,7 @@ vi.mock('next/navigation', async (orig) => ({
 
 import Page, { metadata } from '@/app/links/page';
 import { GET as booksGet } from '@/app/books/route';
+import { copyPlainText } from '@/app/links/copy-code';
 import { config, isPublicRoute, middleware, PUBLIC_ROUTE_ALLOWLIST } from '../../middleware';
 import {
   AFFILIATE_DISCLOSURE,
@@ -90,6 +91,51 @@ describe('the rendered page', () => {
     const h = text(html());
     expect(h).not.toMatch(/\b(street|avenue|boulevard|blvd|phone|located|venice|california)\b/i);
     expect(html()).not.toMatch(/tel:|sms:|geo:/);
+  });
+});
+
+describe('copy code behavior', () => {
+  it('reports success when the async clipboard accepts the code', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const ok = await copyPlainText(
+      'EBondJmp',
+      undefined,
+      { clipboard: { writeText } } as unknown as Navigator,
+    );
+
+    expect(ok).toBe(true);
+    expect(writeText).toHaveBeenCalledWith('EBondJmp');
+  });
+
+  it('reports blocked when both clipboard paths fail', async () => {
+    const remove = vi.fn();
+    const select = vi.fn();
+    const area = {
+      value: '',
+      setAttribute: vi.fn(),
+      style: {} as CSSStyleDeclaration,
+      select,
+      remove,
+    } as unknown as HTMLTextAreaElement;
+    const appendChild = vi.fn();
+    const execCommand = vi.fn(() => false);
+    const doc = {
+      body: { appendChild },
+      createElement: vi.fn(() => area),
+      execCommand,
+    } as unknown as Document;
+
+    const ok = await copyPlainText(
+      'EBondJmp',
+      doc,
+      { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('blocked')) } } as unknown as Navigator,
+    );
+
+    expect(ok).toBe(false);
+    expect(appendChild).toHaveBeenCalledWith(area);
+    expect(select).toHaveBeenCalled();
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(remove).toHaveBeenCalled();
   });
 });
 
