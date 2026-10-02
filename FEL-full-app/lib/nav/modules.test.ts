@@ -33,6 +33,9 @@ const NOT_IMPORTED: Record<string, string> = {
   // headless; its only caller today is its test (same class as sourceScan above — tests are not consumers).
   // A headed-rig probe or the integrity model importing it means deleting this line.
   'lib/babylon/core/trainingSim.ts': 'the training scoring model — run by trainingSim.test.ts and the integrity suite\'s ceiling basis; tests are not counted as consumers',
+  // BODY-PLAY-WORKS (2026-10-01): the public-repo rule for a committed pose recording. The walk lives in
+  // recordingsGuard.test.ts; tests are not counted as consumers, same as sourceScan above.
+  'lib/pose/recordingsGuard.ts': 'repo guard — recordingsGuard.test.ts rejects a committed video, image, or child take; tests are not counted as consumers',
   // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
   // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
