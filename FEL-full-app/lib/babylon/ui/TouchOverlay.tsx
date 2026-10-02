@@ -48,7 +48,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
   if (!props.visible || props.bus.gamepadActive) return null;
 
   return (
-    <div className={landscape
+    <div data-touch-deck className={landscape
       ? 'pointer-events-none absolute inset-0 z-30'
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
       <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col items-center gap-2" style={SAFE_LEFT}>
