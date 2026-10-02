@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 // /dev/mode/dunkduel still runs it.
 export default async function DunkDuelPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fplay%2Fdunkduel');
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <ProveIt />

@@ -9,12 +9,30 @@ import {
 const APP = join(__dirname, '../../app');
 
 describe('the free game is /try, the guest dunk contest', () => {
-  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to /login', () => {
+  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to login and back', () => {
     expect(DEFAULT_FREE_GAME_ROUTE).toBe('/try');
     const tryPage = readFileSync(join(APP, 'try/page.tsx'), 'utf8');
     expect(tryPage).toMatch(/return <GuestDunkShell/);
     expect(tryPage).not.toMatch(/redirect\(\s*['"`]\/login/);
-    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(/if \(!session\) redirect\('\/login'\)/);
+    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8'))
+      .toMatch(/if \(!session\) redirect\('\/login\?next=%2Fplay%2Fbrain-brawl'\)/);
+  });
+
+  it('every signed-in play route preserves its destination through login', () => {
+    const misses: string[] = [];
+    const walk = (dir: string) => {
+      for (const f of readdirSync(dir)) {
+        const p = join(dir, f);
+        if (statSync(p).isDirectory()) { walk(p); continue; }
+        if (f !== 'page.tsx') continue;
+        const src = readFileSync(p, 'utf8');
+        if (!/redirect\(\s*['"`]\/login/.test(src)) continue;
+        if (src.includes('?next=')) continue;
+        misses.push(`/${relative(APP, dir).replace(/\/?$/, '')}`);
+      }
+    };
+    walk(join(APP, 'play'));
+    expect(misses, 'play routes that drop the intended mode after login').toEqual([]);
   });
 
   // CHANGED (SCREEN-FIX-2, S-10): was 13 and older; 13–17 lose the /try link (no page reads this now: the results'
