@@ -31,4 +31,13 @@ describe('Babylon hosts own their boot effect for the mount', () => {
 
     expect(src).not.toMatch(/\},\s*\[onEnd\]\);/);
   });
+
+  it.each(babylonHosts)('%s surfaces boot failures as retryable errors', (file) => {
+    const src = read(file);
+
+    expect(src).toContain("from './boot-error'");
+    expect(src).toMatch(
+      /\.catch\(\(e\) => surfaceBootError\(e, \{[\s\S]*?setPhase,\s*setLoadError[\s\S]*?\}\)\);/,
+    );
+  });
 });
