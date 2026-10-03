@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
+import { Gem, Shirt, Store, CalendarDays, PersonStanding, Settings } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { readWallet } from '@/lib/wallet/wallet-service';
@@ -53,6 +53,7 @@ export default async function ProfilePage() {
     { href: '/closet', icon: Shirt, accent: '#00E5FF', label: 'Closet' },
     { href: '/store', icon: Store, accent: '#FF7A2F', label: 'Store' },
     { href: '/wallet', icon: Gem, accent: '#A855F7', label: 'Wallet' },
+    { href: '/account', icon: Settings, accent: '#00E5FF', label: 'Account' },
     { href: '/sessions', icon: CalendarDays, accent: '#00FF9D', label: 'Sessions' },
   ];
 

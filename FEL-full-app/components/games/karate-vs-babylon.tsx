@@ -18,6 +18,8 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'VICTORY' : 'DEFEATED',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     // StrictMode runs effect -> cleanup -> effect. Starting immediately means the
     // PHANTOM mount also builds a Babylon engine its cleanup cannot cancel, and
@@ -74,7 +76,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-        .catch((e) => console.error('[FEL-KARATE-VS] boot failed', e));
+        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
     }, 0);
 
     return () => {
@@ -83,7 +85,8 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the Babylon stage is mount-owned; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);

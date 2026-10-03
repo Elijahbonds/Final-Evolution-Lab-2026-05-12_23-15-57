@@ -1,6 +1,23 @@
 // S-16: login ?next= is a same-origin path, or it is ignored.
 import { describe, expect, it } from 'vitest';
-import { loginDestination, safeLoginNext } from './safeNext';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { loginDestination, loginPath, safeLoginNext } from './safeNext';
+
+const root = join(__dirname, '../..');
+
+function pageFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      out.push(...pageFiles(full));
+    } else if (entry === 'page.tsx') {
+      out.push(full);
+    }
+  }
+  return out;
+}
 
 describe('safeLoginNext', () => {
   it('?next=/play/mirror lands there', () => {
@@ -11,6 +28,7 @@ describe('safeLoginNext', () => {
   it('keeps a same-origin query and hash', () => {
     expect(safeLoginNext('/play/mirror?step=1')).toBe('/play/mirror?step=1');
     expect(safeLoginNext('/account#data')).toBe('/account#data');
+    expect(loginPath('/account#data')).toBe('/login?next=%2Faccount%23data');
   });
 
   it('?next=https://evil.example and //evil.example are ignored', () => {
@@ -41,5 +59,15 @@ describe('safeLoginNext', () => {
     expect(safeLoginNext(['/play/mirror'])).toBeNull();
     expect(safeLoginNext('/' + 'a'.repeat(600))).toBeNull();
     expect(loginDestination(undefined, '/play/dunk')).toBe('/play/dunk');
+    expect(loginPath('https://evil.example')).toBe('/login');
+  });
+
+  it('game routes owned by the play shell keep their deep link through login', () => {
+    const offenders = pageFiles(join(root, 'app/play'))
+      .map((file) => relative(root, file))
+      .filter((file) => file !== 'app/play/calibrate/page.tsx' && !file.startsWith('app/play/mirror/'))
+      .filter((file) => /redirect\((['"])\/login\1\)/.test(readFileSync(join(root, file), 'utf8')));
+
+    expect(offenders).toEqual([]);
   });
 });

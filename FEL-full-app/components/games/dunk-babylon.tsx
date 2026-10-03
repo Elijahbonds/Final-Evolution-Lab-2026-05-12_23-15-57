@@ -131,7 +131,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-DUNK] boot failed', e));
+        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
     }, 0);
 
     return () => {
