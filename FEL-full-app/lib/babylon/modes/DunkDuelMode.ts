@@ -38,8 +38,10 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { FirstPress, PRESS_GRACE } from '../core/timingPress';
 import { TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
 import { refuse } from '../core/Refusal';   // HOTFIX (2026-09-24): a slam thrown too early is answered
-import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
+import type { BodyView, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import { DUNK_BODY, DunkBodyBinder } from '@/lib/move/dunkBody';
 import { BallSim } from '../core/BallPhysics';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
@@ -136,6 +138,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
   // HOTFIX (2026-09-24, BASELINE.md:244): and the FIRST press decides, as in the contest (DunkMode's SlamLatch, core/slamPress). Every A in the
   // flight used to be judged until one hit, so a re-press after a too-early one still scored (the owner's dunk hit on its third A).
   const slamPress = new FirstPress();
+  // P5: the same body binding as the contest. The duel reads the same RT / A / B.
+  const dunkBody = new DunkBodyBinder();
+  let bodySlamClip: number | null = null;
   // HOTFIX (2026-09-24): …and the take-off's own A is not that first press. On the keyboard the take-off is the Space release,
   // which InputBus sends as R 0 and then an A: the R 0 launched, the A became the flight's first press, was held, and missed at
   // the window, and the real J in the window came back spent — every keyboard dunk clanked. A Space still held at the line
@@ -239,6 +244,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function enterHandoff(ctx: ModeContext): void {
     setPhase('handoff');
     style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    dunkBody.reset(); bodySlamClip = null;
     runUpPeak = 0; launchSpeed01 = 0; holdRunSpeed = 0; obstacleClipped = false; toppling = false; obstacleOver = false; obstacleCleared = false;
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     setProp(ctx, 'none');
@@ -590,8 +596,16 @@ export const DunkDuelMode: ModeDefinition = (() => {
     }
   }
 
-  return {
+  const def: ModeDefinition = {
     modeId: 'dunkduel', mood: 'goldenHour', camPreset: 'court',
+    body: DUNK_BODY,
+    onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
+      if (phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic') return false;
+      const act = dunkBody.see(ev);
+      for (const e of act.now) def.onInput(ctx, e);
+      if (act.slamClip !== null) bodySlamClip = act.slamClip;
+      return act.took;
+    },
 
     async load(ctx: ModeContext) {
       // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
@@ -757,6 +771,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
         const animScale = ctx.scene.animationTimeScale ?? 1;
         const prevClip = clipTime;
         clipTime += dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1);
+        if (bodySlamClip !== null && clipTime >= bodySlamClip) {
+          bodySlamClip = null;
+          def.onInput(ctx, { t: 'button', btn: 'A', pressed: true, src: 'body' });
+        }
         if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
           hangSlowMoLatch = true;
           ctx.juice.slowMo(0.4, 400, { gameplay: true });   // HOTFIX (2026-09-24): clipTime rides it (the slam window) — reduced motion keeps it whole
@@ -873,6 +891,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       SoundKit.stopAmbient();
     },
   };
+  return def;
 })();
 
 // HUD CONTRACT (bare values): activePlayer ('P1'/'P2'), p1Score/p2Score,
