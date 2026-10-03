@@ -13,7 +13,7 @@
 // A mode author writes neither: they add a registry entry and consume the input
 // they already consume.
 
-import type { InputBus, FelInput } from '../babylon/core/InputBus';
+import type { InputBus, FelButton, FelInput } from '../babylon/core/InputBus';
 import type { ControlEvent } from './types';
 import type { Dir } from './schemas/dpad';
 
@@ -22,9 +22,10 @@ import type { Dir } from './schemas/dpad';
  * phone is indistinguishable from a gamepad as far as any mode is concerned.
  *
  * Convention:
- *   'A' | 'B' | 'X' | 'Y'      -> button press (and `:down`/`:up` for holds)
+ *   FEL button names             -> button press (and `:down`/`:up` for holds)
  *   'dpad' with {dir,pressed}  -> dpad event
  *   'charge' with number 0..1  -> right trigger value (the shot-meter path)
+ *   'brake' with number 0..1   -> left trigger value (the racing brake path)
  *   anything else              -> passed through as a button of that name,
  *                                 which modes can pattern-match on.
  */
@@ -76,9 +77,9 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
       return;
     }
 
-    if (ev.a === 'charge') {
+    if (ev.a === 'charge' || ev.a === 'brake') {
       const v = typeof ev.p === 'number' ? Math.min(1, Math.max(0, ev.p)) : 0;
-      emit({ t: 'trigger', side: 'R', value: v });
+      emit({ t: 'trigger', side: ev.a === 'charge' ? 'R' : 'L', value: v });
       return;
     }
 
@@ -92,14 +93,15 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
       // maps every unknown action to 'A' — so on a phone with motion denied,
       // holding CHARGE fired SLAM instead. That is the silent-degradation shape
       // this project keeps getting bitten by: no error, just the wrong verb.
-      if (name === 'charge') {
+      if (name === 'charge' || name === 'brake') {
         stopCharge();
-        if (edge === 'up') { emit({ t: 'trigger', side: 'R', value: 0 }); return; }
+        const side = name === 'charge' ? 'R' : 'L';
+        if (edge === 'up') { emit({ t: 'trigger', side, value: 0 }); return; }
         const t0 = Date.now();
-        emit({ t: 'trigger', side: 'R', value: 0.01 });
+        emit({ t: 'trigger', side, value: 0.01 });
         chargeTimer = setInterval(() => {
           const v = Math.min(1, (Date.now() - t0) / CHARGE_RAMP_MS);
-          emit({ t: 'trigger', side: 'R', value: v });
+          emit({ t: 'trigger', side, value: v });
           if (v >= 1) stopCharge();
         }, 50);
         return;
@@ -117,9 +119,13 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
 }
 
 /** Map a mode-vocabulary action onto the A/B/X/Y face buttons. */
-function normalizeBtn(action: string): 'A' | 'B' | 'X' | 'Y' {
+function normalizeBtn(action: string): FelButton {
   const upper = action.toUpperCase();
-  if (upper === 'A' || upper === 'B' || upper === 'X' || upper === 'Y') return upper;
+  if (
+    upper === 'A' || upper === 'B' || upper === 'X' || upper === 'Y' ||
+    upper === 'L1' || upper === 'R1' || upper === 'SELECT' || upper === 'START' ||
+    upper === 'LS' || upper === 'RS'
+  ) return upper;
   // 'shoot' is the primary verb in every mode that has one — put it on A, which
   // is what LocalInputSource and the touch overlay already treat as primary.
   return 'A';
