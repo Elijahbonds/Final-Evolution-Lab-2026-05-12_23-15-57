@@ -28,6 +28,8 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
       const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
       const place = Number(r.stats?.place ?? 0), field = Number(r.stats?.field ?? 0), medal = ['none', 'bronze', 'silver', 'gold'][Number(r.stats?.medal ?? 0)] ?? 'none';
       const ord = place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`;
-      onEnd(gameResultFromSession(r, {
+      onEndRef.current(gameResultFromSession(r, {
         won: r.outcome === 'win',
         headline: r.outcome === 'dnf' ? `DNF · ${ord} OF ${field}`
           : place > 0 ? `${ord} OF ${field} · ${t.toFixed(1)}s${medal !== 'none' ? ` · ${medal.toUpperCase()}` : ''}` : `RACE COMPLETE · ${t.toFixed(1)}s`,
@@ -72,7 +74,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);

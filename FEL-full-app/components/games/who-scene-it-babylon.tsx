@@ -23,6 +23,8 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         headline: won ? 'SCENE MASTER' : 'ROUND OVER',
         tallies: { hits: r.stats?.correct ?? 0, misses: Math.max(0, (r.stats?.total ?? 0) - (r.stats?.correct ?? 0)), dodges: 0, combos: r.stats?.bestStreak ?? 0 },
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;
@@ -52,7 +54,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -172,7 +174,20 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
           pause screen at all: a pad's START froze the quiz with no word, and nothing said both hands up bring it back. */}
       {phase === 'paused' && <PausedLayer onResume={tapStart} />}
       {phase === 'countdown' && countdown != null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="fel-heading text-7xl font-black text-white drop-shadow">{countdown}</span></div>}
-      {phase === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-6 text-center font-mono text-sm text-[var(--fel-red)]">{loadError}</div>}
+      {phase === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6 text-center">
+          <div className="fel-panel max-w-md rounded-2xl border-[var(--fel-red)]/50 px-6 py-5">
+            <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
+            <button
+              type="button"
+              onClick={tapStart}
+              className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
+            >
+              RETRY
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

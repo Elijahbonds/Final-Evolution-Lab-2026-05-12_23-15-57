@@ -21,6 +21,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'GAME WON' : drew ? 'DEAD EVEN' : 'GAME OVER',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     // StrictMode runs effect -> cleanup -> effect. Starting the harness
@@ -88,7 +90,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
