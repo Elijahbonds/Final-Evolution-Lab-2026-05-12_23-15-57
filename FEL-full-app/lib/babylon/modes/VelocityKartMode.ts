@@ -32,7 +32,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
-  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, kartHitWall,
+  KART_STARTER, MAX_SLIP, spawnKart, stepKart, travelOf, driftQuality, wallSlide, kartRespawn, steerAuthority,
   type KartInput, type KartState, type KartSpec,
 } from '../core/KartModel';
 import {
@@ -48,7 +48,8 @@ import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepM
 import { AeroPickups } from '../racing/aeroPickups';
 import {
   buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
-  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, buildForest, buildEdgeLights } from '../racing/kartDressing';
+  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, kartSettingFor, buildForest, buildEdgeLights } from '../racing/kartDressing';
+import { buildCloudDeck, type CloudDeckHandle } from '../visual/CloudDeck';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS } from '../visual/venuePropSets';
 import { refuse } from '../core/Refusal';
@@ -62,10 +63,12 @@ import { buildTrackside, type TracksideHandle } from '../racing/trackside';   //
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine, raceLineFromPoints, lapProgress,
+  buildRaceLine, makeField, stepRival, rivalPace, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine, raceLineFromPoints, lapProgress,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
+import { KART_TUNE } from '../racing/kartTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
+import { spawnKartDrive, stepKartDrive, type KartDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field drives the same model
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 
 /** A kart is small; a full-size body swamps it. */
@@ -105,6 +108,9 @@ let roadTex: DynamicTexture | null = null;
 let line: RaceLine | null = null;
 let rivals: Rival[] = [];
 let rivalKarts: TransformNode[] = [];
+/** THE FIELD DRIVES (10-phase pass, phase 5): each rival's own KartState, stepped through the player's
+ *  model by a pure-pursuit driver. Empty only where a course has no circuit to drive (the pacer fallback). */
+let rivalDrive: KartDrive[] = [];
 // RACE CONTACT + ITEMS (2026-09-18). A rival's home lane (its personality steers off it), its spin, the per-pair bump
 // cooldown, the near-miss latch, and its item kit — the same kit the Aero Aces field carries.
 let rivalHome: number[] = [];
@@ -127,6 +133,11 @@ const PLAYER_ID = 0;
 const KART_PICKUP_SCALE = 0.42;
 /** The player's own distance along the racing line — what the standings are computed against. */
 let playerDist = 0;
+// VISUAL WEIGHT TRANSFER (10-phase pass, 2026-10-02): the chassis rolls out of the corner and dives/squats
+// with the pedal. Eased here, from the model's own numbers, so the body can never disagree with the tyres.
+let bodyRoll = 0;
+let bodyPitch = 0;
+let lastSpeed = 0;
 
 // THE GHOST (2026-09-19 depth pass). The mode had a clock and medals and no memory: once the gold was gone there was
 // nothing left on the course to chase. The recorder runs every frame, the best lap per course is kept on the device,
@@ -180,6 +191,8 @@ const S = {
   start: newStart() as StartState, burnT: 0,
   /** Seconds the nose has pointed back down the line (racing pass phase 5: WRONG WAY, as the plane already had). */
   wrongT: 0,
+  /** Seconds the kart has been beached — throttle held, wheels down, barely moving (10-phase pass, phase 4). */
+  stuckT: 0,
 };
 let boost = new BoostKit();
 let boostFx: BoostFx | null = null;
@@ -187,6 +200,7 @@ let boostPads: BoostPads | null = null;
 let ramps: Mesh[] = [];
 let kerbRoot: TransformNode | null = null;
 let detailRoot: TransformNode | null = null; let scenery: VenuePropsHandle | null = null; let sceneryGone = false;   // DETAIL PASS
+let clouds: CloudDeckHandle | null = null;   // 10-phase pass, phase 6: the sky over the course
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -634,8 +648,19 @@ function tickField(ctx: ModeContext, dt: number): void {
     k.shieldT = Math.max(0, k.shieldT - dt); k.zipT = Math.max(0, k.zipT - dt);
     // INTENT: the lane the personality wants (a blocker crosses in front of you, a bumper leans on you, a clean one steps round a slower car)
     if (rivalStun[i] <= 0) r.lane = steerLane({ lane: r.lane, dist: r.dist, speed: r.speed, personality: personalityFor(i), home: rivalHome[i] }, player, others.filter((_, j) => j !== i), halfW, lapLen, dt);
-    stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
-    if (rivalStun[i] > 0) { rivalStun[i] = Math.max(0, rivalStun[i] - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+    const drv = rivalDrive[i];
+    if (circuit && drv) {
+      // THE FIELD DRIVES (10-phase pass, phase 5): the pace brain (rivalPace — the same maths stepRival
+      // always ran) sets the TARGET; the pursuit driver steers the player's own stepKart to it, and the
+      // distance is measured back off the road. A stunned rival LIMPS (a fifth of its pace) instead of
+      // the pacer's dist-damping, which a driven kart cannot fake.
+      const want = rivalPace(r, line, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
+      if (rivalStun[i] > 0) rivalStun[i] = Math.max(0, rivalStun[i] - dt);
+      stepKartDrive(drv, r, circuit.line, rivalStun[i] > 0 ? want * 0.2 : want, dt, kartSpec, circuit.halfWidth);
+    } else {
+      stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
+      if (rivalStun[i] > 0) { rivalStun[i] = Math.max(0, rivalStun[i] - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+    }
     // a rival crossing an item row picks up an item, and uses it when it makes sense
     const inLap = ((r.dist % lapLen) + lapLen) % lapLen;
     const lap = Math.floor(r.dist / lapLen);
@@ -662,8 +687,19 @@ function tickField(ctx: ModeContext, dt: number): void {
         k.item = null;
       }
     }
-    const at = rivalPlacement(r, line);
-    if (rk) { rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0); pickups?.shield(i + 1, rk, k.shieldT > 0); }
+    if (rk) {
+      if (circuit && drv) {
+        // the pose comes from the STATE: the nose is the model's heading, so a rival's drift is real
+        const st = drv.state;
+        rk.position.set(st.pos.x, circuit.surfaceAt(st.pos.x, st.pos.z) + KART_RIDE_Y, st.pos.z);
+        rk.rotation.y = st.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0);
+      } else {
+        const at = rivalPlacement(r, line);
+        rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z);
+        rk.rotation.y = at.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0);
+      }
+      pickups?.shield(i + 1, rk, k.shieldT > 0);
+    }
   }
   // CONTACT: a side bump shoves both; closing fast (or with the boost lit) punts the car in front
   const rposes = rivals.map((r) => ({ dist: r.dist, lateral: r.lane, speed: r.speed }));
@@ -671,10 +707,15 @@ function tickField(ctx: ModeContext, dt: number): void {
     const right = new Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
     for (const ev of resolveContact({ ...player, boosting: boost.k > 0.35 || S.zipT > 0 }, rposes, lapLen, rivalCool, dt, rivalTouch)) {
       const r = rivals[ev.i];
+      const rdrv = rivalDrive[ev.i];
       state.pos.addInPlace(right.scale(ev.playerShove)); r.lane += ev.rivalShove;
+      // a bump is physical for a DRIVEN rival too: shove the kart itself (the lane intent moves with it, so it
+      // does not steer back into the hit), and the speed cost lands on the model, not a number it overwrites
+      if (rdrv) { rdrv.state.pos.addInPlace(right.scale(ev.rivalShove)); }
+      const cutRival = (keep: number) => { r.speed *= keep; if (rdrv) rdrv.state.speed *= keep; };
       if (ev.kind === 'punt') { state.speed *= ev.playerKeep; hitRival(ctx, ev.i, 'PUNTED', true); S.events.punts++; ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), 'PUNT!', '#fbbf24'); }
-      else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) { say('SHIELD HELD', 0.5); } else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
-      else { state.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, state.pos.add(right.scale(-ev.playerShove)), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
+      else if (ev.kind === 'punted') { cutRival(ev.rivalKeep); if (S.shieldT > 0) { say('SHIELD HELD', 0.5); } else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
+      else { state.speed *= ev.playerKeep; cutRival(ev.rivalKeep); S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, state.pos.add(right.scale(-ev.playerShove)), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
     }
     for (const i of nearMisses(player, rposes, lapLen, rivalAlongside)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
     // SLIPSTREAM (racing pass phase 7, racing/Slipstream): tuck in behind a rival, in its lane, and the wake charges; hold it
@@ -836,7 +877,7 @@ return {
     S.boostHeld = false; boost = new BoostKit();
     S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0, minis: 0 };
     S.draft = noDraft(); S.draftSaid = false; S.mini = noMini();
-    S.start = newStart(); S.burnT = 0; S.wrongT = 0;
+    S.start = newStart(); S.burnT = 0; S.wrongT = 0; S.stuckT = 0;
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
 
@@ -856,6 +897,12 @@ return {
     // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
     trackside?.dispose();
     trackside = buildTrackside(ctx.scene, course);
+    // THE SKY OVER THE COURSE (phase 6): low-poly puffs in the mood's tint, riding the camera like the dome does
+    clouds?.dispose();
+    clouds = buildCloudDeck(ctx.scene, {
+      span: 1100, yLo: 95, yHi: 170, count: 24, drift: 1.8,
+      tint: course.mood === 'nightGame' ? '#39415e' : course.mood === 'goldenHour' ? '#ffe3c2' : course.mood === 'overcast' ? '#dde5ee' : '#f6faff',
+    });
     ramps = buildRamps(ctx);
     if (circuit) {
       placedObstacles = placeObstacles(circuit);
@@ -869,7 +916,8 @@ return {
       // read their road by edge lights (the orbit station was a black frame to the render watchdog without them)
       if (course.venue === 'slope') buildForest(ctx.scene, circuit, worldHeightFn(course), course.mood === 'alpine' ? '#2f5a3e' : '#3b6a4a').parent = detailRoot;
       if (course.mood === 'nightGame') buildEdgeLights(ctx.scene, circuit).parent = detailRoot;
-      const key = `kart-${circuit.course.id}`; VENUE_PROP_SETS[key] = kartSceneryFor(circuit);
+      // phase 6: the event (racing kit) PLUS the place it stands in (the venue family's own nature/city band)
+      const key = `kart-${circuit.course.id}`; VENUE_PROP_SETS[key] = [...kartSceneryFor(circuit), ...kartSettingFor(circuit)];
       sceneryGone = false; scenery?.dispose(); scenery = null;
       void mountVenueProps(ctx.scene, key, detailRoot, { snapToGround: true }).then((h) => { if (sceneryGone) h?.dispose(); else scenery = h; });
     }
@@ -890,6 +938,7 @@ return {
     { const k = kart; void dressVehicle(ctx.scene, k, 'kart', kartId, { hide: k.getChildMeshes(), y: KART_GROUND_Y }); }
 
     state = spawnKart(course.start.at, course.start.heading);
+    bodyRoll = 0; bodyPitch = 0; lastSpeed = 0;
     if (circuit) state.pos.y = circuit.surfaceAt(state.pos.x, state.pos.z);
     prevPos.copyFrom(state.pos);
     kart.position.copyFrom(state.pos);
@@ -937,6 +986,9 @@ return {
     // where the kart's fixed 0.5 used to, legend at the ceiling.
     rivals = makeField(shape.count, kartSpec.vMax, Math.min(1, tier.edge + KART_FIELD_EDGE));
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
+    // the field's own karts, on the grid it was dealt (10-phase pass, phase 5)
+    const driveLine = circuit?.line ?? null;
+    rivalDrive = driveLine ? rivals.map((r) => spawnKartDrive(driveLine, r)) : [];
     for (const rk of rivalKarts) void dressVehicle(ctx.scene, rk, 'kart', 'rival', { hide: rk.getChildMeshes(), y: KART_GROUND_Y });   // phase 5: the field wears the fifth body
     playerDist = 0;
     // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
@@ -996,6 +1048,7 @@ return {
       minX: -402, maxX: 402, minZ: -402, maxZ: 402, minY: -0.1,
       groundAt: circ ? (x, z) => Math.max(circ.surfaceAt(x, z), groundHeight ? groundHeight(x, z) : -0.03) : undefined,
     });
+    ctx.camDirector.tuneFollow(KART_TUNE.cam);   // the mode's own chase numbers (10-phase pass, phase 3)
     ctx.camDirector.snapTo(state.pos, null);
     tintMarks();
     say(`${course.name} — ${course.sub}`, 2.2);
@@ -1059,6 +1112,7 @@ return {
 
   update(ctx: ModeContext, dt: number): void {
     crowd?.update(dt);   // they idle and bob whether or not the race is running
+    clouds?.update(dt, ctx.scene.activeCamera);
     if (!state || !kart || S.done) return;
 
     // ── THE START (racing pass phase 4, racing/RaceStart) ─────────────────────────────────────────────────────────
@@ -1115,6 +1169,24 @@ return {
       // had this and the kart did not (a spin-out's own turn is exempt)
       if (S.spinT <= 0 && state.speed > 3 && Math.sin(state.heading) * at.tangent.x + Math.cos(state.heading) * at.tangent.z < -0.35) S.wrongT += dt; else S.wrongT = 0;
       if (S.wrongT > 1.2 && S.bannerT <= 0) { say('WRONG WAY', 0.8); SoundKit.play('miss', { volume: 0.35 }); }
+
+      // STUCK → RESPAWN (10-phase pass, phase 4): throttle held, wheels down, barely moving for two seconds —
+      // beached on the scenery past the verge or nose-first into the world wall. Back onto the line at the
+      // distance already earned, from a standstill: the cost is the time already lost, never the race. A spin
+      // or a start-line burnout sorts itself out, so neither counts as stuck.
+      const beached = S.start.go && !S.done && !S.air.airborne && S.spinT <= 0 && S.burnT <= 0
+        && S.input.throttle > 0.5 && state.speed < 0.8;
+      S.stuckT = beached ? S.stuckT + dt : 0;
+      if (S.stuckT > 2) {
+        S.stuckT = 0;
+        kartRespawn(state, at.point, at.tangent);
+        at = locate(circuit.line, state.pos.x, state.pos.z);   // the teleport invalidates everything below
+        ctx.camDirector.snapTo(state.pos, null);   // a teleport, not a drive: cut, don't whip pan
+        say('BACK ON TRACK', 1.0);
+        SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 });
+        ctx.juice.flash('#ffffff', 40);
+        console.info('[RACE] respawn — kart beached, back on the line');
+      }
 
       // ── THE OUTSIDE OF THE COURSE ───────────────────────────────────────────────────────────────────────
       // Measured by steering off with the throttle pinned: the kart reached 76 m from the line, still making
@@ -1248,7 +1320,17 @@ return {
     if (line) tickField(ctx, dt);   // RACE CONTACT + ITEMS: the rivals steer, bump, spin, pick up and fire
     // the BODY points where the nose does while the kart travels at the slip angle — that difference is the
     // drift, and showing it is the whole read
-    kart.rotation.y = state.heading + (S.spinT > 0 ? S.spinT * 11 : 0);   // a shell or a punt spins the body; the travel carries on
+    // WEIGHT TRANSFER ON THE CHASSIS (10-phase pass): roll OUT of the corner with the lateral load, dive
+    // under braking, squat under gas. The driver still leans IN below — the two together are the read.
+    // Capped small: this is a rigid kart, not a boat.
+    const dV = dt > 0 ? (state.speed - lastSpeed) / dt : 0;
+    lastSpeed = state.speed;
+    const lat = state.steerAt * kartSpec.steerRate * steerAuthority(state.speed, kartSpec) * state.speed;
+    const rollWant = Math.max(-0.09, Math.min(0.09, lat * kartSpec.rollGain));
+    const pitchWant = Math.max(-0.05, Math.min(0.06, -dV * kartSpec.pitchGain));
+    bodyRoll += (rollWant - bodyRoll) * Math.min(1, 9 * dt);
+    bodyPitch += (pitchWant - bodyPitch) * Math.min(1, 7 * dt);
+    kart.rotation.set(bodyPitch, state.heading + (S.spinT > 0 ? S.spinT * 11 : 0), bodyRoll);   // a shell or a punt spins the body; the travel carries on
     // the driver leans into the corner — shoulders following the turn, not a board rider's whole-body bank:
     // a seated body is belted in and cannot lean like that (8° at full lock against the boards' 22°)
     if (driver) {
@@ -1290,11 +1372,15 @@ return {
     if (bev.denied) ctx.juice.callout('BOOST EMPTY — DRIFT (X) TO FILL IT', '#94a3b8', 900);
 
     // the edge of the world: a wall you hit rather than an invisible stop. ±400 (was 260: the stadium oval runs to z 382 and the boardwalk pier
-    // runs out to z 332, so the wall stood ACROSS the road there; the world ground is sized off the same number)
+    // runs out to z 332, so the wall stood ACROSS the road there; the world ground is sized off the same number).
+    // 10-phase pass (phase 4): the wall SLIDES now — a glancing hit scrubs the into-wall speed and runs along the
+    // barrier instead of the blunt 75% stop that pinned the kart nose-first until the driver backed out.
     if (Math.abs(state.pos.x) > WORLD_WALL || Math.abs(state.pos.z) > WORLD_WALL) {
+      const nx = state.pos.x > WORLD_WALL ? -1 : state.pos.x < -WORLD_WALL ? 1 : 0;
+      const nz = state.pos.z > WORLD_WALL ? -1 : state.pos.z < -WORLD_WALL ? 1 : 0;
       state.pos.x = Math.max(-WORLD_WALL, Math.min(WORLD_WALL, state.pos.x));
       state.pos.z = Math.max(-WORLD_WALL, Math.min(WORLD_WALL, state.pos.z));
-      const lost = kartHitWall(state);
+      const lost = wallSlide(state, nx, nz);
       if (lost > 3) {
         SoundKit.play('impact', { pitch: 0.8, volume: 0.5 });
         ctx.juice.shake(0.1, 140);
@@ -1332,7 +1418,7 @@ return {
     // against THIS mode's ceiling so flat-out feels the same in every discipline. Frame-independent:
     // see SpeedFov (a per-frame lerp settles 2.4x faster at 144 fps than at 60).
     baseFov ??= ctx.camera.fov;
-    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), state.speed, kartSpec.vMax, dt);
+    ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), state.speed, kartSpec.vMax, dt, KART_TUNE.fov);
     // SPEED-VIGNETTE (racing HUD pass): report the fraction of top speed; the harness closes the frame above
     // the owner-approved window (≥0.85), composed with the impact pulse. Opt-in, harness-owned.
     ctx.feel.speedVignette01(state.speed / kartSpec.vMax);
@@ -1351,11 +1437,11 @@ return {
     seated?.stop(); seated?.dispose(); seated = null;
     driver?.dispose(); driver = null;
     steerWheel = null;
-    venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null;
+    venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null; clouds?.dispose(); clouds = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];
-    rivalKarts = []; rivals = []; line = null;
+    rivalKarts = []; rivals = []; rivalDrive = []; line = null;
     ramps.forEach((m) => m.dispose());
     ramps = [];
     kerbRoot?.dispose(); sceneryGone = true; scenery?.dispose(); scenery = null; detailRoot?.dispose(); detailRoot = null; kerbRoot = null;

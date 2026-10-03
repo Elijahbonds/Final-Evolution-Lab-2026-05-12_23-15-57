@@ -40,10 +40,13 @@ import type { FelInput } from '../core/InputBus';
 import { readCourse, startRace, stepRace, toNextGate, type RaceProgress } from '../core/RaceCourse';
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
-  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine, lapProgress,
+  makeField, stepRival, rivalPace, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine, lapProgress,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
+import { AERO_TUNE } from '../racing/aeroTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
+import { spawnAeroDrive, stepAeroDrive, type AeroDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field flies the same model
+import type { RacingLine } from '../racing/racingLine';
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy plane bodies over the toy primitives
 import { refuse } from '../core/Refusal';
 import { stepDraft, noDraft, DRAFT, type DraftState } from '../racing/Slipstream';   // racing pass phase 7
@@ -104,6 +107,11 @@ export function makeAeroAcesMode(): ModeDefinition {
   let rivals: Rival[] = [];
   let rivalKits: RivalKit[] = [];
   let rivalPlanes: ToyPlane[] = [];
+  /** THE FIELD FLIES (10-phase pass, phase 5): each rival's own ArcadeState, stepped through the player's
+   *  model by a pure-pursuit pilot. `driveLine` is the circuit's line as a racingLine (same arrays — the
+   *  aero CircuitLine is always a loop, so the adapter is exact). */
+  let rivalDrive: AeroDrive[] = [];
+  let driveLine: RacingLine | null = null;
   let balloons: Balloon[] = [];
   let bananas: Banana[] = [];
   let missiles: Missile[] = [];
@@ -191,6 +199,9 @@ export function makeAeroAcesMode(): ModeDefinition {
     // planes are wide: spread the lanes, and put the grid behind the player in two staggered rows
     rivals.forEach((r, i) => { r.lane *= 3.2; r.dist = -10 - i * 7; });
     rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, touch: false, alongside: false }));
+    // the field's own planes, on the grid it was dealt (10-phase pass, phase 5)
+    driveLine = { pts: circuit.line.pts, cum: circuit.line.cum, length: circuit.line.length, loop: true };
+    rivalDrive = rivals.map((r) => spawnAeroDrive(driveLine!, r, tune));
     S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, slingshots: 0 };
     S.draft = noDraft(); S.draftSaid = false;
     rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
@@ -364,6 +375,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = null;
+      ctx.camDirector.tuneFollow(AERO_TUNE.cam);   // the mode's own chase numbers (10-phase pass, phase 3)
       ctx.camDirector.snapTo(flight.pos, null);
       say(`${circuit.course.name} — ${circuit.course.sub}`, 2.4);
 
@@ -514,7 +526,7 @@ export function makeAeroAcesMode(): ModeDefinition {
         const side = Math.sign(at.lateral);
         const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
         flight.pos.subtractInPlace(right.scale(at.lateral - side * circuit.corridor));
-        if (wallTurn(flight, -right.x * side, -right.z * side) && S.scrapeCool <= 0) {
+        if (wallTurn(flight, -right.x * side, -right.z * side, tune.wallScrub) && S.scrapeCool <= 0) {
           S.scrapeCool = 1.2;
           SoundKit.play('thud', { pitch: 0.9, volume: 0.35 });
           ctx.juice.shake(0.08, 120);
@@ -588,8 +600,19 @@ export function makeAeroAcesMode(): ModeDefinition {
         // cornerBite 0.1 (racing pass phase 6, was 0.3): an arcade plane turns at close to full speed, so a field that
         // lifted 30 % for every bend lost the twisty circuits by itself — measured, a driver flying the line with NO items,
         // stunts or boost won NEON SKYLINE by 332 m while RED ROCK was a real race. The corners are the pilot's, not a tax.
-        stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
-        if (k.stunT > 0) { k.stunT = Math.max(0, k.stunT - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+        const drv = rivalDrive[i];
+        if (drv && driveLine) {
+          // THE FIELD FLIES (10-phase pass, phase 5): rivalPace (the same maths stepRival ran) sets the TARGET;
+          // the pursuit pilot flies the player's own stepArcade to it — the weave is a lane target now, so the
+          // bank into it is the model's own. A stunned rival LIMPS at a fifth of its pace.
+          const want = rivalPace(r, line!, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
+          if (k.stunT > 0) k.stunT = Math.max(0, k.stunT - dt);
+          const weave = Math.sin(race.time * 0.5 + r.phase) * 3;
+          stepAeroDrive(drv, r, driveLine, k.stunT > 0 ? want * 0.2 : want, dt, tune, circuit.corridor, circuit.floorAt, circuit.ceilingAt, weave);
+        } else {
+          stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
+          if (k.stunT > 0) { k.stunT = Math.max(0, k.stunT - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+        }
         // a rival flying a balloon row picks up an item
         const inLap = ((r.dist % lapLen) + lapLen) % lapLen;
         const lap = Math.floor(r.dist / lapLen);
@@ -619,16 +642,24 @@ export function makeAeroAcesMode(): ModeDefinition {
         }
         // place and pose the rival's plane: its lane weaves, it banks into the line's turns, it tumbles when hit
         if (rp) {
-          const place = rivalPlacement(r, line!);
-          const weave = Math.sin(race.time * 0.5 + r.phase) * 3;
-          const side = new Vector3(Math.cos(place.heading), 0, -Math.sin(place.heading));
-          rp.root.position.copyFrom(place.pos.add(side.scale(weave)));
-          rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(rp.root.position.x, rp.root.position.z) + 3);
-          let turn = place.heading - k.lastHeading; turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-          k.lastHeading = place.heading;
-          k.roll += ((dt > 0 ? Math.max(-0.8, Math.min(0.8, (turn / dt) * 0.5)) : 0) - k.roll) * Math.min(1, 5 * dt);
           const tumble = k.stunT > 0 ? race.time * 14 : 0;
-          rp.root.rotation.set(0, place.heading, -k.roll + tumble);
+          if (drv && driveLine) {
+            // the pose is the STATE's: the bank into a turn is the model's own roll, not a heading delta
+            const st = drv.state;
+            rp.root.position.copyFrom(st.pos);
+            rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(st.pos.x, st.pos.z) + 3);
+            rp.root.rotation.set(-st.pitch, st.heading, -st.roll + tumble);
+          } else {
+            const place = rivalPlacement(r, line!);
+            const weave = Math.sin(race.time * 0.5 + r.phase) * 3;
+            const side = new Vector3(Math.cos(place.heading), 0, -Math.sin(place.heading));
+            rp.root.position.copyFrom(place.pos.add(side.scale(weave)));
+            rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(rp.root.position.x, rp.root.position.z) + 3);
+            let turn = place.heading - k.lastHeading; turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+            k.lastHeading = place.heading;
+            k.roll += ((dt > 0 ? Math.max(-0.8, Math.min(0.8, (turn / dt) * 0.5)) : 0) - k.roll) * Math.min(1, 5 * dt);
+            rp.root.rotation.set(0, place.heading, -k.roll + tumble);
+          }
           rp.prop.rotation.z += 40 * dt;
           pickups?.shield(i + 1, rp.root, k.shieldT > 0);
         }
@@ -642,10 +673,13 @@ export function makeAeroAcesMode(): ModeDefinition {
         const cools = rivalKits.map((k) => k.cool), touches = rivalKits.map((k) => k.touch);
         for (const ev of resolveContact(me, rposes, lapLen, cools, dt, touches)) {
           const r = rivals[ev.i];
+          const rdrv = rivalDrive[ev.i];
           flight.pos.addInPlace(right.scale(ev.playerShove * 2)); r.lane += ev.rivalShove * 2;
+          // the speed cost lands on the rival's MODEL (r.speed is measured off it next frame)
+          const cutRival = (keep: number) => { r.speed *= keep; if (rdrv) rdrv.state.speed *= keep; };
           if (ev.kind === 'punt') { flight.speed *= ev.playerKeep; hitRival(ctx, ev.i, true); S.events.punts++; say(`PUNTED ${r.name}`, 0.9); }
-          else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) say('SHIELD HELD', 0.5); else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
-          else { flight.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
+          else if (ev.kind === 'punted') { cutRival(ev.rivalKeep); if (S.shieldT > 0) say('SHIELD HELD', 0.5); else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
+          else { flight.speed *= ev.playerKeep; cutRival(ev.rivalKeep); S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
         }
         rivalKits.forEach((k, i) => { k.cool = cools[i]; k.touch = touches[i]; });
         const was = rivalKits.map((k) => k.alongside);
@@ -726,7 +760,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       ctx.camDirector.look(S.lookX, S.lookY, dt);
       ctx.camDirector.update(flight.pos, fwd.scale(flight.speed), null);
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt, AERO_TUNE.fov);
       // SPEED-VIGNETTE (racing HUD pass): same opt-in as the kart — report the fraction, the harness frames it.
       ctx.feel.speedVignette01(flight.speed / (tune.top * 1.4));
       pushHud(ctx);
@@ -739,7 +773,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       pilot?.dispose(); pilot = null;
       player?.dispose(); player = null;
       for (const rp of rivalPlanes) rp.dispose();
-      rivalPlanes = []; rivals = []; rivalKits = []; line = null;
+      rivalPlanes = []; rivals = []; rivalKits = []; rivalDrive = []; driveLine = null; line = null;
       pickups?.dispose(); pickups = null;
       world?.dispose(); world = null;
       balloons = []; bananas = []; missiles = []; mines = [];
