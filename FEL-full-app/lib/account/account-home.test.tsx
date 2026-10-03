@@ -27,6 +27,12 @@ describe('/account and /settings both resolve', () => {
     expect(ACCOUNT_SETTINGS_PATH).toBe('/account');
     expect(page).not.toContain('notFound(');
   });
+
+  it('the profile tab links account settings directly', () => {
+    const profile = read('app/profile/page.tsx');
+    expect(profile).toContain("href: '/account'");
+    expect(profile).toContain("label: 'Account'");
+  });
 });
 
 describe('the consent screen links account settings without changing the promise', () => {

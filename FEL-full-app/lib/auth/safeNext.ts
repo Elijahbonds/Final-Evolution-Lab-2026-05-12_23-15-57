@@ -35,3 +35,9 @@ export function safeLoginNext(raw: unknown): string | null {
 export function loginDestination(nextRaw: unknown, fallback: string): string {
   return safeLoginNext(nextRaw) ?? fallback;
 }
+
+/** A login URL that returns to a same-origin app path after sign-in. */
+export function loginPath(nextPath: string): string {
+  const safe = safeLoginNext(nextPath);
+  return safe ? `/login?next=${encodeURIComponent(safe)}` : '/login';
+}
