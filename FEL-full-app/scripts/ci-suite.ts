@@ -51,7 +51,7 @@ const SCRIPTS = path.join(ROOT, 'scripts');
  * runner gates them instead. `assertDbListFresh()` below re-derives this set
  * from the source on every run, so the list cannot rot as suites are added.
  */
-const DB_SUITES = new Set([
+export const DB_SUITES = new Set([
   'arena-tests.ts',
   'creative-card-tests.ts',
   'economy-tests.ts',
