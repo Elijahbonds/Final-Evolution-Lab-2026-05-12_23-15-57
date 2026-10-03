@@ -23,6 +23,8 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         headline: won ? 'SCENE MASTER' : 'ROUND OVER',
         tallies: { hits: r.stats?.correct ?? 0, misses: Math.max(0, (r.stats?.total ?? 0) - (r.stats?.correct ?? 0)), dodges: 0, combos: r.stats?.bestStreak ?? 0 },
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;
@@ -52,7 +54,8 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);

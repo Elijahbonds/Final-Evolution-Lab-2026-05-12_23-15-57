@@ -22,6 +22,8 @@ export default function FootballBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
       if (endedRef.current) return;
       endedRef.current = true;
       const won = footballSessionWon(r.outcome);
-      onEnd(gameResultFromSession(r, { won, headline: footballHeadline(r, won) }));
+      onEndRef.current(gameResultFromSession(r, { won, headline: footballHeadline(r, won) }));
     };
 
     runMode(MODES.football, {
@@ -64,7 +66,8 @@ export default function FootballBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
