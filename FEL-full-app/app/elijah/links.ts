@@ -11,7 +11,7 @@ export interface LinkButton {
   href: string;
   /** Opens in a new tab with rel="noopener noreferrer". */
   external: boolean;
-  /** The approved list's slot (slot 9 is two buttons). */
+  /** The approved list's slot (slot 8 is two buttons). */
   slot: number;
   /** A discount code printed on the button beside its label (Total Body Board). */
   code?: string;
@@ -30,13 +30,12 @@ export const ELIJAH_LINKS: readonly LinkButton[] = [
   { slot: 3, label: 'Blueprint Kindle', href: 'https://www.amazon.com/dp/B0H5J1M18H', external: true },
   { slot: 4, label: 'All Books', href: 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B', external: true },
   { slot: 5, label: 'MILLIONS', href: 'https://millions.co/elijah-bonds-basketball', external: true },
-  { slot: 6, label: 'Fan Arch', href: 'https://fanarch.com/collections/elijah-bonds', external: true },
-  { slot: 7, label: 'PJF', href: 'https://pjf-performance-shop.myshopify.com/?sca_ref=9885072.t2P8qJogGNMRly', external: true, paid: true },
-  { slot: 8, label: 'Total Body Board', href: 'https://www.totalbodyboard.com', external: true, code: 'EBondJmp', paid: true },
-  { slot: 9, label: 'Elijah Bonds', href: 'https://www.instagram.com/elijahbonds', external: true, group: 'Instagram' },
-  { slot: 9, label: 'Final Evolution', href: 'https://www.instagram.com/finalevolutionllc', external: true, group: 'Instagram' },
-  { slot: 10, label: 'YouTube', href: 'https://www.youtube.com/channel/UCP_ziu1PO1DGWfpmIP3kEng', external: true },
-  { slot: 11, label: 'LinkedIn', href: 'https://www.linkedin.com/in/elijah-bonds-771aa1228', external: true },
+  { slot: 6, label: 'PJF', href: 'https://pjf-performance-shop.myshopify.com/?sca_ref=9885072.t2P8qJogGNMRly', external: true, paid: true },
+  { slot: 7, label: 'Total Body Board', href: 'https://www.totalbodyboard.com', external: true, code: 'EBondJmp', paid: true },
+  { slot: 8, label: 'Elijah Bonds', href: 'https://www.instagram.com/elijahbonds', external: true, group: 'Instagram' },
+  { slot: 8, label: 'Final Evolution', href: 'https://www.instagram.com/finalevolutionllc', external: true, group: 'Instagram' },
+  { slot: 9, label: 'YouTube', href: 'https://www.youtube.com/channel/UCP_ziu1PO1DGWfpmIP3kEng', external: true },
+  { slot: 10, label: 'LinkedIn', href: 'https://www.linkedin.com/in/elijah-bonds-771aa1228', external: true },
 ];
 
 export const LINKS_TITLE = 'Elijah Bonds';
