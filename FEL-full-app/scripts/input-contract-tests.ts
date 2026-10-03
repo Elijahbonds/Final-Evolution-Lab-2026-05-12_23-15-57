@@ -33,6 +33,47 @@ const PLAY = path.join(ROOT, 'app', 'play');
 let passed = 0;
 function check(name: string, fn: () => void) { fn(); passed++; console.log('  \u2713 ' + name); }
 const read = (p: string) => fs.readFileSync(p, 'utf8');
+const relPlay = (p: string) => path.relative(PLAY, p);
+const relRoot = (p: string) => path.relative(ROOT, p);
+
+const SHELL_EXEMPT_ROUTES: Record<string, string> = {
+  calibrate: 'timing calibration utility; it does not record a play session',
+  'map-preview': 'auth-gated map preview, not a playable mode',
+  mirror: 'Train-owned pose screen; mirror-coach owns its camera/session contract',
+};
+
+const LOADER_BYPASS_ROUTES: Record<string, string> = {
+  // Prove It is the real-life camera contest. The Babylon loader stays available for /dev/mode/dunkduel, while
+  // /play/dunkduel deliberately mounts the on-device pose tracker and pays only the played floor server-side.
+  dunkduel: 'IRL Prove It route mounts its camera tracker instead of the legacy Babylon loader',
+};
+
+function routeUsesLoader(route: string): boolean {
+  const routeDir = path.join(PLAY, route);
+  const candidates = [path.join(routeDir, 'page.tsx')];
+  const componentsDir = path.join(routeDir, '_components');
+  if (fs.existsSync(componentsDir)) {
+    for (const name of fs.readdirSync(componentsDir)) {
+      if (name.endsWith('.tsx') && name !== 'loader.tsx') candidates.push(path.join(componentsDir, name));
+    }
+  }
+  return candidates.some((file) => {
+    if (!fs.existsSync(file)) return false;
+    return /from ['"]\.\/(?:_components\/)?loader['"]/.test(read(file));
+  });
+}
+
+function routeSource(route: string): string {
+  const routeDir = path.join(PLAY, route);
+  const files = [path.join(routeDir, 'page.tsx')];
+  const componentsDir = path.join(routeDir, '_components');
+  if (fs.existsSync(componentsDir)) {
+    for (const name of fs.readdirSync(componentsDir)) {
+      if (name.endsWith('.tsx') && name !== 'loader.tsx') files.push(path.join(componentsDir, name));
+    }
+  }
+  return files.filter((file) => fs.existsSync(file)).map(read).join('\n');
+}
 
 // ---- 1. every /play/<mode> loader mounts GameShell ----------------------
 const loaders = fs
@@ -46,7 +87,72 @@ check(`found play-mode loaders (${loaders.length})`, () => {
 
 check('every play-mode loader mounts <GameShell> (no mode opts out)', () => {
   const missing = loaders.filter((p) => !/GameShell/.test(read(p)));
-  assert.strictEqual(missing.length, 0, `loaders without GameShell: ${missing.map((p) => path.relative(PLAY, p)).join(', ')}`);
+  assert.strictEqual(missing.length, 0, `loaders without GameShell: ${missing.map(relPlay).join(', ')}`);
+});
+
+check('loaders whose game owns <TouchOverlay> mark GameShell ownControls', () => {
+  const missing: string[] = [];
+  for (const loader of loaders) {
+    const source = read(loader);
+    const gameImports = [...source.matchAll(/import\(['"]@\/components\/games\/([^'"]+)['"]\)/g)];
+    const ownsTouch = gameImports.some((match) => {
+      const gameFile = path.join(ROOT, 'components', 'games', `${match[1]}.tsx`);
+      return fs.existsSync(gameFile) && /<TouchOverlay\b/.test(read(gameFile));
+    });
+    if (ownsTouch && !/\bownControls(?:\b|=)/.test(source)) missing.push(relPlay(loader));
+  }
+  assert.strictEqual(
+    missing.length,
+    0,
+    `loaders with host-owned TouchOverlay but no ownControls: ${missing.join(', ')}`,
+  );
+});
+
+const routeDirs = fs
+  .readdirSync(PLAY, { withFileTypes: true })
+  .filter((d) => d.isDirectory() && fs.existsSync(path.join(PLAY, d.name, 'page.tsx')))
+  .map((d) => d.name)
+  .sort();
+
+check('every top-level play route has a GameShell loader or an explicit reviewed exemption', () => {
+  const withoutLoader = routeDirs.filter((route) => {
+    if (route in SHELL_EXEMPT_ROUTES) return false;
+    return !fs.existsSync(path.join(PLAY, route, '_components', 'loader.tsx'));
+  });
+  assert.strictEqual(
+    withoutLoader.length,
+    0,
+    `routes without loader or exemption: ${withoutLoader.join(', ')}`,
+  );
+  for (const [route, reason] of Object.entries(SHELL_EXEMPT_ROUTES)) {
+    assert.ok(routeDirs.includes(route), `loader exemption is stale; route gone: ${route}`);
+    assert.ok(reason.length > 20, `loader exemption needs a real reason: ${route}`);
+  }
+});
+
+check('every route with a loader actually imports it, unless the bypass is explicit', () => {
+  const bypassed = loaders
+    .map((loader) => path.basename(path.dirname(path.dirname(loader))))
+    .filter((route) => {
+      if (route in LOADER_BYPASS_ROUTES) return false;
+      return !routeUsesLoader(route);
+    });
+  assert.strictEqual(
+    bypassed.length,
+    0,
+    `routes with dead loaders or direct mounts: ${bypassed.join(', ')}`,
+  );
+  for (const [route, reason] of Object.entries(LOADER_BYPASS_ROUTES)) {
+    const page = path.join(PLAY, route, 'page.tsx');
+    assert.ok(fs.existsSync(page), `loader bypass is stale; route gone: ${route}`);
+    assert.ok(reason.length > 20, `loader bypass needs a real reason: ${route}`);
+    const source = routeSource(route);
+    assert.ok(/setReady\(['"]/.test(source), `loader bypass must publish #fel-ready: ${route}`);
+    assert.ok(/\/api\/sessions\/start/.test(source), `loader bypass must start a server run: ${route}`);
+    assert.ok(/fetch\(['"]\/api\/sessions['"]/.test(source), `loader bypass must finish a session: ${route}`);
+    assert.ok(/\bplayed:\s*true\b/.test(source), `loader bypass must send explicit play evidence: ${route}`);
+    assert.ok(source.length > read(page).length, `loader bypass source scan missed route components: ${relRoot(page)}`);
+  }
 });
 
 // ---- 2. GameShell mounts BOTH gamepad poller and touch controller -------

@@ -20,6 +20,8 @@ export default function KarateBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       const kos = Number(r.stats?.kos ?? 0);
       const wave = Number(r.stats?.wave ?? 0);
       const capped = r.outcome === 'WAVE_CAP';
-      onEnd(gameResultFromSession(r, {
+      onEndRef.current(gameResultFromSession(r, {
         won: false,
         headline: capped ? `TIME! · WAVE ${wave} · ${kos} KO` : `WAVE ${wave} REACHED · ${kos} KO`,
       }));
@@ -79,7 +81,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-        .catch((e) => console.error('[FEL-KARATE] boot failed', e));
+        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
       });
     }, 0);
 
@@ -89,7 +91,8 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the Babylon stage is mount-owned; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);

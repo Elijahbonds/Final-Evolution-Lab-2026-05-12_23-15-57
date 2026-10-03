@@ -16,6 +16,18 @@ describe('which tab owns a path', () => {
     expect(tabForPath('/wallet')?.id).toBe('profile');
   });
 
+  it('lights each tab on its door routes', () => {
+    for (const path of ['/venues', '/host', '/arena', '/multiplayer', '/ladder', '/story']) {
+      expect(tabForPath(path)?.id, path).toBe('play');
+    }
+    for (const path of ['/workout', '/camp', '/education', '/live', '/coach']) {
+      expect(tabForPath(path)?.id, path).toBe('train');
+    }
+    for (const path of ['/account', '/cards', '/market', '/create', '/guidance', '/signature', '/support']) {
+      expect(tabForPath(path)?.id, path).toBe('profile');
+    }
+  });
+
   it('follows a path into its depths', () => {
     expect(tabForPath('/coach/join/abc123')?.id).toBe('train');
     expect(tabForPath('/card/elijah')?.id).toBe('profile');

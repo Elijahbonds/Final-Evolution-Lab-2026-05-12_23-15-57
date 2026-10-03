@@ -39,6 +39,8 @@ export default function ProveIt() {
   const trackerRef = useRef(new DunkTracker());
   const rafRef = useRef(0);
   const liveRef = useRef(false);
+  const sessionRunRef = useRef<Promise<string | null> | null>(null);
+  const postedFinalRef = useRef<string | null>(null);
 
   const [stage, setStage] = useState<Stage>('consent');
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,30 @@ export default function ProveIt() {
       if (typeof j?.prq === 'number') setPrq(Math.round(j.prq));
     }).catch(() => {});
   }, []);
+
+  const startSessionRun = useCallback((fresh = false): Promise<string | null> => {
+    if (fresh) sessionRunRef.current = null;
+    if (!sessionRunRef.current) {
+      sessionRunRef.current = fetch('/api/sessions/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'dunkduel' }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          const runId = typeof j?.runId === 'string' ? j.runId : null;
+          if (!runId) sessionRunRef.current = null;
+          return runId;
+        })
+        .catch(() => {
+          sessionRunRef.current = null;
+          return null;
+        });
+    }
+    return sessionRunRef.current;
+  }, []);
+
+  useEffect(() => { void startSessionRun(); }, [startSessionRun]);
 
   // THE READY MARKER (SCORECARD, 2026-09-15). Every Babylon mode publishes #fel-ready, and the scorecard capture waits
   // on it; this page is React and published nothing, so 150 seconds of waiting produced "not ready ()" and PROVE IT
@@ -185,6 +211,60 @@ export default function ProveIt() {
 
   const totals = [0, 1].map((i) => attempts[i].reduce((s, a) => s + a.total, 0));
   const winner = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
+
+  useEffect(() => {
+    if (stage !== 'final') return;
+    const finalKey = `${attempts[0].length}:${attempts[1].length}:${totals[0]}:${totals[1]}`;
+    if (postedFinalRef.current === finalKey) return;
+    postedFinalRef.current = finalKey;
+
+    const form = {
+      v: 1,
+      mode: 'dunkduel',
+      attemptCount: attempts[0].length + attempts[1].length,
+      attempts: attempts.flatMap((playerAttempts, playerIndex) =>
+        playerAttempts.map((attempt) => ({
+          kind: 'jump',
+          label: attempt.metrics.family,
+          player: playerIndex === 0 ? 1 : 2,
+          made: true,
+          takeoff: attempt.metrics.takeoff === 'one-foot' ? 'one' : 'two',
+          reads: {
+            heightCm: attempt.metrics.verticalCm,
+            flightMs: attempt.metrics.flightTimeMs,
+            landingStability: attempt.metrics.landingStability,
+          },
+        })),
+      ),
+    };
+
+    void startSessionRun()
+      .then((runId) => runId ?? startSessionRun(true))
+      .then((runId) => fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'dunkduel',
+          runId,
+          score: Math.max(0, Math.round(totals[0])),
+          opponentScore: Math.max(0, Math.round(totals[1])),
+          won: winner === 0,
+          duration: 0,
+          form,
+          played: true,
+        }),
+      }))
+      .catch(() => {});
+  }, [attempts, stage, startSessionRun, totals, winner]);
+
+  const runItBack = useCallback(() => {
+    postedFinalRef.current = null;
+    void startSessionRun(true);
+    setAttempts([[], []]);
+    setPlayer(0);
+    setCurrent(null);
+    setStage('arm');
+  }, [startSessionRun]);
 
   return (
     <div className="mx-auto max-w-[880px] px-4 py-6 font-mono text-white">
@@ -320,7 +400,7 @@ export default function ProveIt() {
             </div>
             <div className="text-sm text-white/60">{totals[0]} — {totals[1]}</div>
             <button
-              onClick={() => { setAttempts([[], []]); setPlayer(0); setCurrent(null); setStage('arm'); }}
+              onClick={runItBack}
               className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black"
               style={{ background: CYAN }}
             >

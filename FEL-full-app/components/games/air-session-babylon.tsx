@@ -55,36 +55,40 @@ export function makeAirHost(modeKey: string, title: string) {
       let stop: (() => void) | null = null;
       let disposed = false;
 
-      runMode(MODES[modeKey], {
-        canvas,
-        input: bus,
-        onPhase: (p, d) => {
-          if (disposed) return;
-          setPhase(p);
-          setCountdown(typeof d === 'number' ? d : null);
-          if (p === 'error') setLoadError(typeof d === 'string' ? d : 'load failed');
-        },
-        onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
-        resultSink: async (r: SessionResult) => {
-          if (endedRef.current) return;
-          endedRef.current = true;
-          onEndRef.current(gameResultFromSession(r, {
-            won: r.outcome === 'win',
-            headline: r.stats?.judgeBest !== undefined
-              ? `${r.outcome === 'win' ? 'STOMPED THE FINAL' : 'FINAL OVER'} · JUDGES BEST ${Number(r.stats.judgeBest).toFixed(1)}`
-              : r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
-          }));
-        },
-      }).then((s) => {
-        // If a newer mount already claimed this canvas, do NOT run our teardown —
-        // it would dispose the engine holding the shared WebGL context.
-        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
-        stop = s;
-      })
-        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      const startTimer = setTimeout(() => {
+        if (disposed) return;
+        runMode(MODES[modeKey], {
+          canvas,
+          input: bus,
+          onPhase: (p, d) => {
+            if (disposed) return;
+            setPhase(p);
+            setCountdown(typeof d === 'number' ? d : null);
+            if (p === 'error') setLoadError(typeof d === 'string' ? d : 'load failed');
+          },
+          onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+          resultSink: async (r: SessionResult) => {
+            if (endedRef.current) return;
+            endedRef.current = true;
+            onEndRef.current(gameResultFromSession(r, {
+              won: r.outcome === 'win',
+              headline: r.stats?.judgeBest !== undefined
+                ? `${r.outcome === 'win' ? 'STOMPED THE FINAL' : 'FINAL OVER'} · JUDGES BEST ${Number(r.stats.judgeBest).toFixed(1)}`
+                : r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
+            }));
+          },
+        }).then((s) => {
+          // If a newer mount already claimed this canvas, do NOT run our teardown —
+          // it would dispose the engine holding the shared WebGL context.
+          if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+          stop = s;
+        })
+          .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      }, 0);
 
       return () => {
         disposed = true;
+        clearTimeout(startTimer);
         if (canvasOwner.get(canvas) === token) stop?.();
       };
     }, []);   // mount once — see onEndRef above
