@@ -11,9 +11,10 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { SoundKit } from '../audio/SoundKit';
+import { readPlaceLook } from '../nexus/placeLooks';
 import {
   commitSwing, freshBlitz, mulberry32, postedScore, skipGap, tickBlitz, TARGET,
-  type BlitzFeel, type BlitzState, type Side, NORMAL_FEEL,
+  type BlitzFeel, type BlitzState, type Side, NORMAL_FEEL, aiNetsIt, gradeReactBase,
 } from '../core/TiebreakBlitz';
 
 export interface TiebreakModeOpts {
@@ -118,7 +119,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     camPreset: 'court',
 
     async load(ctx: ModeContext): Promise<void> {
-      venue = mountVenue(ctx, 'tennis', { keepGameplayCamera: true });
+      venue = mountVenue(ctx, 'tennis', { keepGameplayCamera: true, look: readPlaceLook('tiebreak') });
       venue?.hidePlaceholders();
       player = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
         position: new Vector3(0, 0, NEAR_Z), yawRad: Math.PI, startClip: SPORT_CLIP.idle,
@@ -204,3 +205,29 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     },
   };
 }
+
+// Registry/dev default. The live route still calls makeTiebreakMode with the
+// signed-in player's PRQ grade; this keeps /dev/mode/tiebreak and drift guards
+// on the same central roster without freezing the product route to one grade.
+// The wrapper makes a fresh match state for every harness load.
+let registryLiveTiebreak: ModeDefinition | null = null;
+
+export const TiebreakMode: ModeDefinition = {
+  modeId: 'tiebreak',
+  mood: 'goldenHour',
+  camPreset: 'court',
+  load(ctx) {
+    registryLiveTiebreak = makeTiebreakMode({ reactBase: gradeReactBase('READY'), aiNets: aiNetsIt });
+    return registryLiveTiebreak.load(ctx);
+  },
+  onInput(ctx, e) {
+    registryLiveTiebreak?.onInput?.(ctx, e);
+  },
+  update(ctx, dt) {
+    registryLiveTiebreak?.update(ctx, dt);
+  },
+  dispose() {
+    registryLiveTiebreak?.dispose?.();
+    registryLiveTiebreak = null;
+  },
+};
