@@ -157,12 +157,14 @@ export interface FieldSpec {
 }
 
 /**
- * Advance one rival.
+ * THE PACE BRAIN (10-phase pass, phase 5): the speed a rival would hold here — the target a RivalDriver
+ * steers the real model toward, and the number stepRival eases a pure pacer to. Same maths either way:
+ * own pace, the corner's cost, the road's physics cap, the wobble, the bounded band.
  *
  * `playerDist` is what the band reads. Pass the player's own distance along the line so the field knows
  * whether it is ahead or behind; the band is symmetric and bounded, so a rival can be caught and can catch.
  */
-export function stepRival(r: Rival, line: RaceLine, dt: number, playerDist: number, spec: FieldSpec, t: number): void {
+export function rivalPace(r: Rival, line: RaceLine, playerDist: number, spec: FieldSpec, t: number): number {
   const bite = spec.cornerBite ?? 0.55;
   // the pace this rival would hold on a straight
   const base = spec.topSpeed * (0.62 + r.skill * 0.42);
@@ -177,7 +179,16 @@ export function stepRival(r: Rival, line: RaceLine, dt: number, playerDist: numb
   // the band: bounded, symmetric, weak enough to out-drive
   const gap = playerDist - r.dist;
   const band = Math.max(-BAND_LIMIT, Math.min(BAND_LIMIT, (gap / 140) * RUBBER_BAND));
-  const target = cornered * wobble * (1 + band);
+  return cornered * wobble * (1 + band);
+}
+
+/**
+ * Advance one rival as a pure pacer. Modes whose rivals run the real handling model (RivalDriver) call
+ * `rivalPace` for the target instead and measure the distance back off the line; this stays for any mode
+ * without a circuit to drive on, and its pins hold either way.
+ */
+export function stepRival(r: Rival, line: RaceLine, dt: number, playerDist: number, spec: FieldSpec, t: number): void {
+  const target = rivalPace(r, line, playerDist, spec, t);
   // ease toward the target rather than snapping, so a rival looks like it is driving
   r.speed += (target - r.speed) * Math.min(1, 2.2 * dt);
   r.dist += r.speed * dt;

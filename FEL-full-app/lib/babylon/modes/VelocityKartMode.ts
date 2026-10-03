@@ -62,11 +62,12 @@ import { buildTrackside, type TracksideHandle } from '../racing/trackside';   //
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import { taperedPlank, taperedSection, roadWheel } from '../racing/shapes';
 import {
-  buildRaceLine, makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine, raceLineFromPoints, lapProgress,
+  buildRaceLine, makeField, stepRival, rivalPace, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, fieldFor, aroundCall, gapLine, raceLineFromPoints, lapProgress,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readKart } from '../racing/garage';
 import { KART_TUNE } from '../racing/kartTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
+import { spawnKartDrive, stepKartDrive, type KartDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field drives the same model
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 
 /** A kart is small; a full-size body swamps it. */
@@ -106,6 +107,9 @@ let roadTex: DynamicTexture | null = null;
 let line: RaceLine | null = null;
 let rivals: Rival[] = [];
 let rivalKarts: TransformNode[] = [];
+/** THE FIELD DRIVES (10-phase pass, phase 5): each rival's own KartState, stepped through the player's
+ *  model by a pure-pursuit driver. Empty only where a course has no circuit to drive (the pacer fallback). */
+let rivalDrive: KartDrive[] = [];
 // RACE CONTACT + ITEMS (2026-09-18). A rival's home lane (its personality steers off it), its spin, the per-pair bump
 // cooldown, the near-miss latch, and its item kit — the same kit the Aero Aces field carries.
 let rivalHome: number[] = [];
@@ -642,8 +646,19 @@ function tickField(ctx: ModeContext, dt: number): void {
     k.shieldT = Math.max(0, k.shieldT - dt); k.zipT = Math.max(0, k.zipT - dt);
     // INTENT: the lane the personality wants (a blocker crosses in front of you, a bumper leans on you, a clean one steps round a slower car)
     if (rivalStun[i] <= 0) r.lane = steerLane({ lane: r.lane, dist: r.dist, speed: r.speed, personality: personalityFor(i), home: rivalHome[i] }, player, others.filter((_, j) => j !== i), halfW, lapLen, dt);
-    stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
-    if (rivalStun[i] > 0) { rivalStun[i] = Math.max(0, rivalStun[i] - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+    const drv = rivalDrive[i];
+    if (circuit && drv) {
+      // THE FIELD DRIVES (10-phase pass, phase 5): the pace brain (rivalPace — the same maths stepRival
+      // always ran) sets the TARGET; the pursuit driver steers the player's own stepKart to it, and the
+      // distance is measured back off the road. A stunned rival LIMPS (a fifth of its pace) instead of
+      // the pacer's dist-damping, which a driven kart cannot fake.
+      const want = rivalPace(r, line, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
+      if (rivalStun[i] > 0) rivalStun[i] = Math.max(0, rivalStun[i] - dt);
+      stepKartDrive(drv, r, circuit.line, rivalStun[i] > 0 ? want * 0.2 : want, dt, kartSpec, circuit.halfWidth);
+    } else {
+      stepRival(r, line, dt, playerDist, { topSpeed: kartSpec.vMax * (k.zipT > 0 ? 1.3 : 1), holdAt: holdAtRoad }, race.time);
+      if (rivalStun[i] > 0) { rivalStun[i] = Math.max(0, rivalStun[i] - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+    }
     // a rival crossing an item row picks up an item, and uses it when it makes sense
     const inLap = ((r.dist % lapLen) + lapLen) % lapLen;
     const lap = Math.floor(r.dist / lapLen);
@@ -670,8 +685,19 @@ function tickField(ctx: ModeContext, dt: number): void {
         k.item = null;
       }
     }
-    const at = rivalPlacement(r, line);
-    if (rk) { rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z); rk.rotation.y = at.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0); pickups?.shield(i + 1, rk, k.shieldT > 0); }
+    if (rk) {
+      if (circuit && drv) {
+        // the pose comes from the STATE: the nose is the model's heading, so a rival's drift is real
+        const st = drv.state;
+        rk.position.set(st.pos.x, circuit.surfaceAt(st.pos.x, st.pos.z) + KART_RIDE_Y, st.pos.z);
+        rk.rotation.y = st.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0);
+      } else {
+        const at = rivalPlacement(r, line);
+        rk.position.set(at.pos.x, at.pos.y + KART_RIDE_Y, at.pos.z);
+        rk.rotation.y = at.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0);
+      }
+      pickups?.shield(i + 1, rk, k.shieldT > 0);
+    }
   }
   // CONTACT: a side bump shoves both; closing fast (or with the boost lit) punts the car in front
   const rposes = rivals.map((r) => ({ dist: r.dist, lateral: r.lane, speed: r.speed }));
@@ -679,10 +705,15 @@ function tickField(ctx: ModeContext, dt: number): void {
     const right = new Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
     for (const ev of resolveContact({ ...player, boosting: boost.k > 0.35 || S.zipT > 0 }, rposes, lapLen, rivalCool, dt, rivalTouch)) {
       const r = rivals[ev.i];
+      const rdrv = rivalDrive[ev.i];
       state.pos.addInPlace(right.scale(ev.playerShove)); r.lane += ev.rivalShove;
+      // a bump is physical for a DRIVEN rival too: shove the kart itself (the lane intent moves with it, so it
+      // does not steer back into the hit), and the speed cost lands on the model, not a number it overwrites
+      if (rdrv) { rdrv.state.pos.addInPlace(right.scale(ev.rivalShove)); }
+      const cutRival = (keep: number) => { r.speed *= keep; if (rdrv) rdrv.state.speed *= keep; };
       if (ev.kind === 'punt') { state.speed *= ev.playerKeep; hitRival(ctx, ev.i, 'PUNTED', true); S.events.punts++; ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), 'PUNT!', '#fbbf24'); }
-      else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) { say('SHIELD HELD', 0.5); } else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
-      else { state.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, state.pos.add(right.scale(-ev.playerShove)), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
+      else if (ev.kind === 'punted') { cutRival(ev.rivalKeep); if (S.shieldT > 0) { say('SHIELD HELD', 0.5); } else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
+      else { state.speed *= ev.playerKeep; cutRival(ev.rivalKeep); S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, state.pos.add(right.scale(-ev.playerShove)), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
     }
     for (const i of nearMisses(player, rposes, lapLen, rivalAlongside)) { S.events.nearMisses++; boost.earn('nearMiss'); ctx.juice.callout('CLOSE PASS', '#86efac', 420); SoundKit.play('swish', { pitch: 1.4, volume: 0.35 }); console.info(`[RACE] near miss ${rivals[i].name}`); }
     // SLIPSTREAM (racing pass phase 7, racing/Slipstream): tuck in behind a rival, in its lane, and the wake charges; hold it
@@ -946,6 +977,9 @@ return {
     // where the kart's fixed 0.5 used to, legend at the ceiling.
     rivals = makeField(shape.count, kartSpec.vMax, Math.min(1, tier.edge + KART_FIELD_EDGE));
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
+    // the field's own karts, on the grid it was dealt (10-phase pass, phase 5)
+    const driveLine = circuit?.line ?? null;
+    rivalDrive = driveLine ? rivals.map((r) => spawnKartDrive(driveLine, r)) : [];
     for (const rk of rivalKarts) void dressVehicle(ctx.scene, rk, 'kart', 'rival', { hide: rk.getChildMeshes(), y: KART_GROUND_Y });   // phase 5: the field wears the fifth body
     playerDist = 0;
     // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
@@ -1397,7 +1431,7 @@ return {
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];
-    rivalKarts = []; rivals = []; line = null;
+    rivalKarts = []; rivals = []; rivalDrive = []; line = null;
     ramps.forEach((m) => m.dispose());
     ramps = [];
     kerbRoot?.dispose(); sceneryGone = true; scenery?.dispose(); scenery = null; detailRoot?.dispose(); detailRoot = null; kerbRoot = null;

@@ -162,7 +162,23 @@ gets — instead of advancing along the line as pure pacers.
 stays inside the corridor ~always, never NaNs; an aero rival holds the line's altitude band; a beached
 rival is recovered onto the line. Headless probe: a race still finishes with a live field spread.
 
-- [ ] done
+- [x] done — new `racing/RivalDriver.ts`: `spawnKartDrive`/`stepKartDrive` and `spawnAeroDrive`/
+  `stepAeroDrive` run the field through the player's own `stepKart`/`stepArcade`. Pure pursuit: steer at a
+  look-ahead point (kart `clamp(speed*0.55, 8, 30)` m, aero `clamp(speed*0.6, 12, 40)` m) offset by the
+  rival's lane, gained `err*2.2` to the stick; throttle servo `clamp01(slow*0.4+0.4)`, brake
+  `clamp01((v-want-0.8)*0.3)`; the drift DECISION is the player's (`|steer|>0.7` at speed) so the slide
+  emerges from the model. Aero climb servo `(aim.y-pos.y)*0.18`. `r.dist` is measured back off the line
+  (wrap-safe `measureAdvance`, ±half-lap rule), so standings/contact/items/finish read what they always
+  read. The recovery NET (not a rail): beached (`want>5 && speed<1`) or wide (`|lateral|>halfWidth+8` kart,
+  `corridor+10` aero, or 25 m off the line's height) for 2 s → put back at the distance EARNED, never
+  forward. `RaceField.rivalPace` extracted from `stepRival` (behaviour-identical — the pacer's tests pin
+  it) so the pace brain sets the driver's target; `stepRival` stays as the fallback path. FLAGGED
+  behaviour changes: a stunned rival now LIMPS at a fifth of its pace instead of the pacer's dist-damping;
+  aero rivals spawn at `coast` speed like the player (was 0.25×top); the pacer's slow weave is now a real
+  flown lane target (banked into and out of). 6 new vitest pins (lap window vs the pacer, corridor
+  ~always, drift emerges on a tight circle, beached/thrown recovery never teleports forward, aero altitude
+  band ±8 m, wrap seam). Test-authoring lesson recorded: `sampleLine` authored order is [x, z, y] — a
+  square authored [x, y, z] is VERTICAL and the kart drove its ground projection into circles.
 
 ## Phase 6 — Track and sky environment richness
 
