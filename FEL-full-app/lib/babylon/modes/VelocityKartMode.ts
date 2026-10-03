@@ -73,6 +73,7 @@ import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: 
 import { fitVehicleLight, vehicleEnvFor, VEHICLE_ENV_BASE, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, DustEmitter } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { ExhaustPuffs, bobAmp, bobFreq, frontWheelAngle, rivalSteer, wheelAngle, wrapPi } from '../racing/vehicleMotion';   // 10-phase pass, phase 9
+import { kartHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -218,6 +219,8 @@ let rivalWheelDist: number[] = [];
 let rivalLastHeading: number[] = [];  // the legacy path has no steerAt; the turn rate stands in
 let rivalSteerSm: number[] = [];
 let bobT = 0;
+/** GC-13 / phase 10: whose words the HUD says, and when the ring's puck needs re-asserting. */
+const hudSwitch = new RideHudSwitch();
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -838,8 +841,8 @@ function pushHud(ctx: ModeContext): void {
     delta: bestGhost ? deltaLabel(ghostDelta) : '',
     chasing: bestGhost ? `PB ${(bestGhost.timeMs / 1000).toFixed(1)}s` : '',
     cup: cupLine,
-    hint: S.start.go ? 'RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item'
-      : 'THROTTLE DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" IT BOGS',
+    // GC-13 / phase 10: the words are whoever is riding (rideHud) — a body's on the body, the pad's unchanged
+    ...kartHudWords(hudSwitch.isBody, S.start.go),
   } satisfies Record<string, HudValue>);
 }
 
@@ -918,6 +921,7 @@ return {
   async load(ctx: ModeContext): Promise<void> {
     // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
     baseFov = null;
+    hudSwitch.reset();   // GC-13: a remount starts on the pad's words until a body plays
     S.done = false; S.banner = ''; S.bannerT = 0; S.bestDrift = 0; S.offRoadSec = 0; S.graceLeft = null;
     S.input = { steer: 0, throttle: 0, brake: 0, drift: false, fire: false, boostK: 0 };
     S.boostHeld = false; boost = new BoostKit();
@@ -1171,6 +1175,12 @@ return {
     crowd?.update(dt);   // they idle and bob whether or not the race is running
     clouds?.update(dt, ctx.scene.activeCamera);
     if (!state || !kart || S.done) return;
+    // GC-13 / phase 10: the HUD's words and the ring's gamepad puck follow whoever is riding — a body gets
+    // a body's words and no puck (the exact call rideHud.test.ts pins); the puck is re-asserted once a
+    // second while a body rides, because the harness can mount the ring after the switch
+    const sw = hudSwitch.next(!!(ctx.body?.() ?? null));
+    if (sw !== null) { ctx.setHud({ ...kartHudWords(!!(ctx.body?.() ?? null), S.start.go) }); setRingGlyph(ctx.scene.meshes, !sw); }
+    else if (hudSwitch.isBody && hudSwitch.glyphDue(dt)) setRingGlyph(ctx.scene.meshes, false);
 
     // ── THE START (racing pass phase 4, racing/RaceStart) ─────────────────────────────────────────────────────────
     // The field launched on frame one while the course name was still on screen. Now nobody moves until GO, the clock

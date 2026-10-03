@@ -287,7 +287,15 @@ flat, and flagged.
 **Pass check:** `rideHud.test.ts` stays green plus new aero-words coverage; mobile-tier screenshots show
 the HUD legible; the body-play probe paths (same input channels) untouched.
 
-- [ ] done
+- [x] done — `RideHudSwitch` is routed into VelocityKartMode with the exact pinned call
+  (`kartHudWords(!!(ctx.body?.() ?? null), S.start.go)`), the ring's puck hides while a body rides and is
+  re-asserted once a second; the pad's hint literals left the mode (rideHud owns them, test-pinned).
+  `aeroHudWords(body, started)` added (spread arms = GAS, bank = STEER, raise/lower = CLIMB and DIVE;
+  boost/fire/stunts labelled pad / touch) and AeroAcesMode wired the same way. Both modes' pushHud takes
+  its words from the switch, so the GO beat flips the start hint for the right rider. rideHud.test.ts:
+  +4 tests (aero body/pad words, both modes' source scans) — the kart's pre-pinned wiring test now passes
+  on the regex, not the literals. Mobile-tier shots: docs/shots/pr138/p10-hud-* (touch deck, place, gap,
+  speed, item all legible at phone size). Perf flat: kart 59fps/294 draws, aero 60/160. ci-suite 189 green.
 
 ---
 

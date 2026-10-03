@@ -67,6 +67,7 @@ import {
 import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/aeroCircuits';
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
 import { buildToyPlane, blurProp, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
+import { aeroHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
 import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, WingtipTrails } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { AeroPickups } from '../racing/aeroPickups';
@@ -126,6 +127,8 @@ export function makeAeroAcesMode(): ModeDefinition {
   let tier = profileFor(DEFAULT_TIER);
   const prevPos = new Vector3();
 
+  /** GC-13 / phase 10: whose words the HUD says, and when the ring's puck needs re-asserting. */
+  const hudSwitch = new RideHudSwitch();
   const S = {
     input: { steer: 0, climb: 0, gas: 0, brake: 0, boostK: 0, bananas: 0 } as ArcadeInput,
     held: null as HeldItem | null,
@@ -192,9 +195,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       banner: S.banner,
       draft: Math.round(S.draft.charge * 100),   // SLIPSTREAM (phase 7): the wake's charge, 0–100
       start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
-      hint: S.start.go ? 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost'
-        : 'GAS DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" THE ENGINE BOGS',
       ...boost.hud(),
+      // GC-13 / phase 10: the words are whoever is flying (rideHud) — a body's on the body, the pad's unchanged
+      ...aeroHudWords(hudSwitch.isBody, S.start.go),
     };
     ctx.setHud(hud);
   }
@@ -338,6 +341,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
     async load(ctx: ModeContext): Promise<void> {
       baseFov = null;
+      hudSwitch.reset();   // GC-13: a remount starts on the pad's words until a body plays
       Object.assign(S, {
         input: { steer: 0, climb: 0, gas: 0, brake: 0, boostK: 0, bananas: 0 }, held: null, bananas: 0, shieldT: 0, zipT: 0,
         boostHeld: false, banner: '', bannerT: 0, done: false, lastPlace: 0, wrongT: 0, scrapeCool: 0, graceLeft: null,
@@ -448,6 +452,12 @@ export function makeAeroAcesMode(): ModeDefinition {
 
     update(ctx: ModeContext, dt: number): void {
       if (!flight || !player || !line || S.done) return;
+      // GC-13 / phase 10: the HUD's words and the ring's gamepad puck follow whoever is flying (the kart's
+      // wiring, the same pattern SkateRunMode set) — the puck is re-asserted once a second while a body
+      // plays, because the harness can mount the ring after the switch
+      const sw = hudSwitch.next(!!(ctx.body?.() ?? null));
+      if (sw !== null) { ctx.setHud({ ...aeroHudWords(!!(ctx.body?.() ?? null), S.start.go) }); setRingGlyph(ctx.scene.meshes, !sw); }
+      else if (hudSwitch.isBody && hudSwitch.glyphDue(dt)) setRingGlyph(ctx.scene.meshes, false);
 
       // ── THE START (racing pass phase 4, racing/RaceStart): the field holds on the grid until GO; the gas's timing
       // against the beats is worth a rocket (a zip) or a burnout (lost thrust). The planes hang on their grid spots.
