@@ -59,27 +59,32 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
       onEndRef.current(result);
     };
 
-    runMode(MODES.dunkduel, {
-      canvas,
-      location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-      },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-      resultSink,
-    })
-      .then((s) => {
-        // A newer mount owns the canvas: do NOT run our teardown.
-        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
-        stop = s;
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.dunkduel, {
+        canvas,
+        location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+        input: bus,
+        onPhase: (p, cd) => {
+          if (disposed) return;
+          setPhase(p);
+          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        },
+        onHud: (u) => { if (!disposed) setHud((prev) => ({ ...prev, ...u })); },
+        resultSink,
       })
-      .catch((e) => console.error('[FEL-DUNKDUEL] boot failed', e));
+        .then((s) => {
+          // A newer mount owns the canvas: do NOT run our teardown.
+          if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+          stop = s;
+        })
+        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
