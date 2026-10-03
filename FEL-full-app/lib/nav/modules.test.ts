@@ -94,7 +94,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',
   'lib/env.ts',
-  'lib/mode-menu.ts',
   'lib/offline-cache.ts',
   'lib/profile/dashboard.ts',
   'lib/story/progression-gates.ts',
