@@ -14,7 +14,9 @@ describe('the free game is /try, the guest dunk contest', () => {
     const tryPage = readFileSync(join(APP, 'try/page.tsx'), 'utf8');
     expect(tryPage).toMatch(/return <GuestDunkShell/);
     expect(tryPage).not.toMatch(/redirect\(\s*['"`]\/login/);
-    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(/if \(!session\) redirect\('\/login'\)/);
+    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(
+      /if \(!session\) redirect\(loginRedirect\('\/play\/brain-brawl'/,
+    );
   });
 
   // CHANGED (SCREEN-FIX-2, S-10): was 13 and older; 13–17 lose the /try link (no page reads this now: the results'
@@ -62,7 +64,7 @@ describe('the free game is /try, the guest dunk contest', () => {
         if (statSync(p).isDirectory()) { if (f !== 'api') walk(p); continue; }
         if (!/^(page|layout)\.tsx?$/.test(f)) continue;
         const src = readFileSync(p, 'utf8');
-        if (!/redirect\(\s*['"`]\/login/.test(src)) continue;
+        if (!/redirect\(\s*(?:['"`]\/login|loginRedirect\()/.test(src)) continue;
         // the route: route groups dropped; a dynamic segment ends it (everything under the prefix is walled)
         const segs = relative(APP, dir).split('/').filter((x) => x && !/^\(.*\)$/.test(x));
         const cut = segs.findIndex((x) => x.startsWith('['));

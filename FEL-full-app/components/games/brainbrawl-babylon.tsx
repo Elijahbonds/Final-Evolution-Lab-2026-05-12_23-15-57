@@ -30,6 +30,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { GameProps, GameResult } from './game-shell';
 import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { BootSplash } from './boot-splash';
+import { failBabylonBoot } from './boot-failure';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { replayBrainBrawl } from '@/lib/babylon/modes/BrainBrawlMode';
@@ -194,7 +195,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         resultSink,
         // GO AGAIN in place: the finish reports its card and the stage stays up for REPLAY (replayBrainBrawl)
         continuous: true, cardSink: resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-BRAINBRAWL] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => { if (!disposed) failBabylonBoot('[FEL-BRAINBRAWL]', e, setPhase, setLoadError); });
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
   }, []);

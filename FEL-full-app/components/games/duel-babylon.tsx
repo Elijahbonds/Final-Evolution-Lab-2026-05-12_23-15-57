@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { failBabylonBoot } from './boot-failure';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -64,7 +65,7 @@ export default function DuelBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-DUEL] boot failed', e));
+      .catch((e) => { if (!disposed) failBabylonBoot('[FEL-DUEL]', e, setPhase, setLoadError); });
 
     return () => {
       disposed = true;

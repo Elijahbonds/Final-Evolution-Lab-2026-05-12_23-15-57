@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { failBabylonBoot } from './boot-failure';
 import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -115,7 +116,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
           if (disposed) { s(); return; }
           stop = s;
         })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => { if (!disposed) failBabylonBoot(`[${tag}]`, e, setPhase, setLoadError); });
       }, 0);
 
       return () => {
