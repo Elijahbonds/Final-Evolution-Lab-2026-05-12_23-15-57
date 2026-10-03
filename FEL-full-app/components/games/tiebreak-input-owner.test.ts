@@ -9,3 +9,10 @@ describe('Tiebreak input ownership', () => {
   });
 });
 
+describe('Brain Brawl input ownership', () => {
+  it('declares that its Babylon host owns controls', () => {
+    const loader = fs.readFileSync(path.resolve(__dirname, '../../app/play/brain-brawl/_components/loader.tsx'), 'utf8');
+    expect(loader).toMatch(/<GameShell\b[^>]*mode="brainBrawl"[^>]*ownControls\b/);
+  });
+});
+

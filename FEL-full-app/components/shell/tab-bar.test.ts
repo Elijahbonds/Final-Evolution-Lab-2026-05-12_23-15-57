@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DOORS } from '@/lib/nav/doors';
 import { TABS, chromeHiddenFor, tabForPath } from './tab-bar';
 
 /**
@@ -41,6 +42,12 @@ describe('which tab owns a path', () => {
         expect(seen.has(p), `${p} claimed by ${seen.get(p)} and ${t.id}`).toBe(false);
         seen.set(p, t.id);
       }
+    }
+  });
+
+  it('every door keeps its tab lit when opened', () => {
+    for (const door of DOORS) {
+      expect(tabForPath(door.href)?.id, door.href).toBe(door.tab);
     }
   });
 

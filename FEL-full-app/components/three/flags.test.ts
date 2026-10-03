@@ -14,6 +14,7 @@ describe('renderer flags', () => {
     expect(isBabylon('dunkContest')).toBe(true);
     expect(isBabylon('velocityKart')).toBe(true);
     expect(isBabylon('aeroAces')).toBe(true);
+    expect(isBabylon('tiebreak')).toBe(true);
     expect(isBabylon('not_a_mode')).toBe(false);
     expect(isBabylon('')).toBe(false);
     expect(isBabylon('dunk')).toBe(false);          // the registry's key is NOT this table's key

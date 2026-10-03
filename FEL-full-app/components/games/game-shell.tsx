@@ -235,13 +235,20 @@ function GameShellInner({
     let live = true;
     setUnreachable(false);
     fetch('/api/profile')
-      .then((r) => (r?.ok ? r.json() : null))
+      .then(async (r) => {
+        if (r?.ok) return r.json();
+        if (r?.status === 401) return { unauthorized: true };
+        return { unreachable: true };
+      })
       .then((j) => {
         if (!live) return;
         if (j?.grade) {
           setProfile({ prq: j?.prq ?? 50, grade: j.grade });
+        } else if (j?.unauthorized) {
+          const next = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '/play';
+          router.replace(`/login?next=${encodeURIComponent(next)}`);
         } else {
-          router.replace('/login');
+          setUnreachable(true);
         }
       })
       .catch(() => { if (live) setUnreachable(true); });
@@ -920,7 +927,7 @@ function GameShellInner({
         </AnimatePresence>
       </div>
 
-      {profile && scheme && !result && !ownControls && !streamOn && <VirtualController scheme={scheme} />}
+      {profile && scheme && !result && !babylonOwnsInput && !streamOn && <VirtualController scheme={scheme} />}
     </div>
   );
 }
