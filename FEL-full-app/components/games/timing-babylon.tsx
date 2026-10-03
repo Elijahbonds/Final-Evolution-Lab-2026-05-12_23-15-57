@@ -27,6 +27,7 @@ import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 // drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
 // renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
 import { MicCaption } from './mic-caption';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -65,6 +66,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;

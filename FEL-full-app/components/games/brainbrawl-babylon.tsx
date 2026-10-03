@@ -37,6 +37,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { useReplayInPlace } from './replay-in-place';
 import { CATEGORIES, CATEGORY_COLOR, type Category } from '@/lib/babylon/core/BrainBrawlCore';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 type Hud = Record<string, HudValue>;
 const OPTS = [
@@ -169,6 +170,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
   const [hostLive, setHostLive] = useState(false);
+  useBabylonPlaytestBridge('brainbrawl', () => ({ phase, countdown, loadError, hud, hostLive }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;

@@ -5,7 +5,7 @@
  * Runs ALL invariant/regression tests. A failing test exits non-zero,
  * blocking the build/deploy pipeline. Promoted from M7-QA1.
  *
- * Run:  yarn tsx scripts/standing-suite.ts
+ * Run:  npx tsx scripts/standing-suite.ts
  *
  * Coverage:
  *   - M7-QA1 scene invariants (m7d-tests.ts) — T-pose, locomotion, idle, one-shot
@@ -16,8 +16,9 @@
  *     variable-gravity / arc-drive / sensory-bus measured-target harness
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { suiteCommand } from './ci-suite';
 
 const ROOT = path.resolve(__dirname, '..');
 const suites = [
@@ -92,10 +93,12 @@ for (const suite of suites) {
   console.log(`SUITE: ${suite.name}`);
   console.log('='.repeat(60));
   try {
-    execSync(`yarn tsx ${suite.script}`, {
+    const [command, args] = suiteCommand(path.basename(suite.script));
+    execFileSync(command, args, {
       cwd: ROOT,
       stdio: 'inherit',
       env: { ...process.env, NODE_ENV: 'test' },
+      maxBuffer: 32 * 1024 * 1024,
     });
     results.push({ name: suite.name, ok: true });
   } catch (err: any) {

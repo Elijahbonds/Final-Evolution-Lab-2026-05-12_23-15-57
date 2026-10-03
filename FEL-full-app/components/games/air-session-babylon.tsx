@@ -12,6 +12,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { BoostGauge } from './boost-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -44,6 +45,7 @@ export function makeAirHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;

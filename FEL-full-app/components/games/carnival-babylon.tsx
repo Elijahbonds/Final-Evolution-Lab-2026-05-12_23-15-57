@@ -16,6 +16,7 @@ import { PadChips } from '@/lib/babylon/ui/PadChips';   // CONTROLLER-UNIVERSAL-
 import { hnode } from './hud-format';
 import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): the MC's words and the voice switch
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 /** The between-events scoreboard rows the mode publishes (HudScoreCard shape). */
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
   Array.isArray(v) && v.every((r) => !!r && typeof r === 'object' && 'line' in (r as object));
@@ -40,6 +41,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('carnival', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;

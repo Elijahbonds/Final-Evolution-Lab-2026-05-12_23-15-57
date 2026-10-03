@@ -17,6 +17,7 @@ import { hnode } from './hud-format';
 import { getActiveSkin } from '@/lib/modes/art/active-skin';
 import { applyArtCardToSurface } from '@/lib/modes/art/apply-art-card';
 import { boardGameResult, boardHeadline, boardSportWon } from '@/lib/sessions/gameResultFromSession';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 type Hud = Record<string, HudValue>;
 
@@ -62,6 +63,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;

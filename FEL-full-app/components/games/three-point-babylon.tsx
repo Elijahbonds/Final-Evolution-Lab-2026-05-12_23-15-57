@@ -25,6 +25,7 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnum } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24)
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -58,6 +59,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   // next frame's hud would wipe the caption
   const [micLine, setMicLine] = useState<{ text: HudValue; who: HudValue }>({ text: '', who: '' });
   const [busReady, setBusReady] = useState(false);
+  useBabylonPlaytestBridge('threepoint', () => ({ phase, countdown, loadError, hud, micLine }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;
