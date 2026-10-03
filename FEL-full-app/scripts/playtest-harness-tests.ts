@@ -90,6 +90,8 @@ async function main() {
     'dunk-game-3d.tsx': 'dunk',
     'one-v-one-3d.tsx': 'onevone',
     'basketball-3d.tsx': 'basketball',
+    'baseball-3d.tsx': 'baseball',
+    'golf-3d.tsx': 'golf',
     'karate-3d.tsx': 'karate',
     'karate-versus-3d.tsx': 'karateVs',
     'soccer-3d.tsx': 'soccer',
