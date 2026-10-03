@@ -3,9 +3,42 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { SHELF_LEDE, SHELF_MODE_COUNT, FAMILIES, OFF_SHELF, familyById, familyOf, shelvedModes } from './families';
 import { MODE_INFO } from '@/lib/game-data';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
 
 const KNOWN = new Set(Object.keys(MODE_INFO as Record<string, unknown>));
 const ROOT = process.cwd();
+
+const BABYLON_MODE_INFO_KEYS: Record<string, string> = {
+  dunk: 'dunkContest',
+  karate: 'karateEndless',
+  football: 'football',
+  skateboard: 'skateboarding',
+  snowboard_slalom: 'snowboarding',
+  surf: 'surfing',
+  tennis: 'tennis',
+  tiebreak: 'tiebreak',
+  derby: 'baseball',
+  penalty: 'soccer',
+  golf: 'golf',
+  onevone: 'hoops1v1',
+  threevthree: 'hoops3v3',
+  carnival: 'carnival',
+  karate_vs: 'karateVersus',
+  mixedcombat: 'mixedcombat',
+  dunkduel: 'dunkduel',
+  sprint: 'sprint',
+  showdown: 'showdown',
+  duel: 'duel',
+  volleyball: 'volleyball',
+  dance: 'dance',
+  who_scene_it: 'whoSceneIt',
+  freerun: 'freerun',
+  threepoint: 'threePoint',
+  bigair: 'bigAir',
+  aeroaces: 'aeroAces',
+  velocitykart: 'velocityKart',
+  brainbrawl: 'brainBrawl',
+};
 
 function pageForHref(href: string): string {
   const path = href.replace(/[?#].*$/, '');
@@ -62,6 +95,22 @@ describe('the mode shelf', () => {
       .filter(([, info]) => !existsSync(pageForHref(info.href)))
       .map(([mode, info]) => `${mode} -> ${info.href}`);
     expect(dark).toEqual([]);
+  });
+
+  it('every enabled Babylon mode has a catalogue door on the play shelf', () => {
+    const shelved = new Set(shelvedModes());
+    const missingMapping = [...ENABLED_BABYLON_MODES]
+      .filter((registryKey) => !(registryKey in BABYLON_MODE_INFO_KEYS));
+    expect(missingMapping, 'enabled Babylon modes missing MODE_INFO mapping').toEqual([]);
+
+    const staleMapping = Object.keys(BABYLON_MODE_INFO_KEYS)
+      .filter((registryKey) => !ENABLED_BABYLON_MODES.has(registryKey));
+    expect(staleMapping, 'MODE_INFO mappings for no-longer-enabled Babylon modes').toEqual([]);
+
+    const hidden = Object.entries(BABYLON_MODE_INFO_KEYS)
+      .filter(([, modeInfoKey]) => !KNOWN.has(modeInfoKey) || !shelved.has(modeInfoKey))
+      .map(([registryKey, modeInfoKey]) => `${registryKey} -> ${modeInfoKey}`);
+    expect(hidden, 'enabled Babylon modes absent from the player shelf').toEqual([]);
   });
 
   it('looks up both ways', () => {
