@@ -41,7 +41,7 @@ export default async function TrainingPage() {
           When a coach sends you an invite link, accepting it puts their programming here. Until then, the modes are
           open and everything you play still counts toward your card.
         </p>
-        <Link href="/modes" className="mt-7 inline-flex rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-[#050505]">
+        <Link href="/play" className="mt-7 inline-flex rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-[#050505]">
           Go and train
         </Link>
       </div>

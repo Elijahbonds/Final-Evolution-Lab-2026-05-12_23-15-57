@@ -353,8 +353,8 @@ export function CalibrateClient({ returnTo = null }: { returnTo?: string | null 
             <>No offset saved on this device yet.</>
           )}
         </span>
-        <Link href={returnTo ?? '/modes'} className="shrink-0 text-[#00E5FF] hover:underline">
-          {returnTo ? 'Back to the room' : 'Back to modes'}
+        <Link href={returnTo ?? '/play'} className="shrink-0 text-[#00E5FF] hover:underline">
+          {returnTo ? 'Back to the room' : 'Back to Play'}
         </Link>
       </div>
     </div>

@@ -17,7 +17,7 @@ export const DOORS: Door[] = [
   { href: '/ladder', label: 'Ladder', tab: 'play' },
   { href: '/story', label: 'Story', tab: 'play' },
   { href: '/host', label: 'Big screen', tab: 'play' },
-  { href: '/modes', label: 'All modes', tab: 'play' },
+  { href: '/play', label: 'All modes', tab: 'play' },
 
   // TRAIN — the coaching business, the credentials, the classes, the gym.
   { href: '/workout', label: 'Workouts', tab: 'train' },

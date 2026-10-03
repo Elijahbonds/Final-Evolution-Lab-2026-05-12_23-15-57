@@ -115,9 +115,9 @@ export function EducationView() {
             <div className="mt-4 space-y-2">
               {nexusQueue.map((item) => {
                 // HOTFIX (2026-09-24): the sequencer's key is read as the catalogue spells it now. An item still saying
-                // 'musicAcademy', 'velocitykart' or 'aeroaces' fell back to /modes instead of opening its game.
+                // 'musicAcademy', 'velocitykart' or 'aeroaces' fell back to the shelf instead of opening its game.
                 const modeInfo = MODE_INFO[canonicalModeKey(item.mode)];
-                const href = modeInfo?.href ?? '/modes';
+                const href = modeInfo?.href ?? '/play';
                 return (
                   <div key={item.id} className="fel-card rounded-lg hover:border-[#A855F7]/30 transition-colors">
                     <div className="flex items-center gap-3 px-4 py-3">

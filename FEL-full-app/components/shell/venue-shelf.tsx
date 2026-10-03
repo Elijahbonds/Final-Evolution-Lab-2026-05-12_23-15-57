@@ -23,6 +23,11 @@ const ROUTE_TO_MODE: Record<string, string> = {
   karate: 'karateEndless', dunk: 'dunkContest', tennis: 'tennis', 'brain-brawl': 'brainBrawl',
   skateboard: 'skateboarding', snowboard: 'snowboarding', surf: 'surfing', golf: 'golf',
   soccer: 'soccer', baseball: 'baseball', football: 'football', freerun: 'freerun', training: 'training',
+  'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival',
+  threepoint: 'threePoint', 'big-air': 'bigAir', tiebreak: 'tiebreak', volleyball: 'volleyball',
+  mixedcombat: 'mixedcombat', dunkduel: 'dunkduel', dance: 'dance', music: 'music', acting: 'acting',
+  irl: 'irl', sprint: 'sprint', showdown: 'showdown', duel: 'duel', 'velocity-kart': 'velocityKart',
+  'aero-aces': 'aeroAces',
 };
 
 function venueModeKey(href?: string): string | null {
@@ -62,8 +67,11 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {VENUES.map((venue, i) => {
-          const key = venueModeKey(venue.href);
+          const links = venue.modeLinks ?? (venue.href ? venue.modes.map((label) => ({ label, href: venue.href! })) : []);
+          const primaryHref = venue.href ?? links[0]?.href;
+          const key = venueModeKey(primaryHref);
           const tier = key ? mastery[key]?.tierIndex ?? 0 : 0;
+          const hasModePicker = venue.playable && (venue.modeLinks?.length ?? 0) > 1;
           const card = (
             <div
               className={`group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02]
@@ -111,11 +119,26 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
                 </div>
                 {tier ? <MasteryBadge tierIndex={tier} className="ml-auto shrink-0" /> : null}
               </div>
+              {hasModePicker && (
+                <div className="flex flex-wrap gap-2 px-4 pb-4">
+                  {links.map((link) => (
+                    <Link
+                      key={`${venue.key}:${link.href}`}
+                      href={link.href}
+                      className="rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 font-mono text-[10px]
+                                 font-bold uppercase tracking-[0.12em] text-white/65 transition-colors
+                                 hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           );
           return (
             <li key={venue.key} className="fel-rise" style={{ '--fel-rise-delay': `${Math.min(i, 8) * 45}ms` } as React.CSSProperties}>
-              {venue.playable && venue.href ? <Link href={venue.href}>{card}</Link> : card}
+              {venue.playable && primaryHref && !hasModePicker ? <Link href={primaryHref}>{card}</Link> : card}
             </li>
           );
         })}

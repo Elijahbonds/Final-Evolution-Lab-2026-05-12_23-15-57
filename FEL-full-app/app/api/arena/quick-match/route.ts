@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       status: result.match.status,
       feeLc,
       rival: { name: result.rival.name, tagline: result.rival.tagline, house: true },
-      href: MODE_INFO[mode]?.href ?? '/modes',
+      href: MODE_INFO[mode]?.href ?? '/play',
     });
   } catch (err: any) {
     if (err instanceof ArenaError) {

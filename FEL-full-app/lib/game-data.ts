@@ -5,13 +5,37 @@ export interface Venue {
   name: string;
   image: string;
   modes: string[];
+  modeLinks?: { label: string; href: string }[];
   playable: boolean;
   href?: string;
 }
 
 export const VENUES: Venue[] = [
-  { key: 'dojo', name: 'Shimogamo Dojo', image: '/venues/dojo-card.jpg', modes: ['The Hundred', 'Storm Duel'], playable: true, href: '/play/karate' },
-  { key: 'venicebeach', name: 'Venice Beach Court', image: '/venues/venicebeach.jpg', modes: ['Flight Night', 'Ones', 'Threes'], playable: true, href: '/play/dunk' },
+  {
+    key: 'dojo',
+    name: 'Shimogamo Dojo',
+    image: '/venues/dojo-card.jpg',
+    modes: ['The Hundred', 'Storm Duel'],
+    modeLinks: [
+      { label: 'The Hundred', href: '/play/karate' },
+      { label: 'Storm Duel', href: '/play/karate-vs' },
+    ],
+    playable: true,
+    href: '/play/karate',
+  },
+  {
+    key: 'venicebeach',
+    name: 'Venice Beach Court',
+    image: '/venues/venicebeach.jpg',
+    modes: ['Flight Night', 'Ones', 'Threes'],
+    modeLinks: [
+      { label: 'Flight Night', href: '/play/dunk' },
+      { label: 'Ones', href: '/play/onevone' },
+      { label: 'Threes', href: '/play/threevthree' },
+    ],
+    playable: true,
+    href: '/play/dunk',
+  },
   { key: 'tenniscourt', name: 'Venice Tennis Court', image: '/venues/tenniscourt.jpg', modes: ['Match Point'], playable: true, href: '/play/tennis' },
   { key: 'skatepark', name: 'Venice Skatepark', image: '/venues/skatepark.jpg', modes: ['Venice Lines'], playable: true, href: '/play/skateboard' },
   { key: 'mountainslope', name: 'Mountain Slope', image: '/venues/mountainslope.jpg', modes: ['Gate Crasher'], playable: true, href: '/play/snowboard' },
@@ -194,17 +218,11 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   whoSceneIt: { name: 'Who Scene It', venue: 'NeuroArena', href: '/play/who-scene-it' },
   bigAir: { name: 'Stomp', venue: 'Mountain Slope', href: '/play/big-air' },
   tiebreak: { name: 'Tiebreak Blitz', venue: 'Venice Tennis Court', href: '/play/tiebreak' },
-  // sprint: RETIRED from the v1 roster (owner decision, 2026-09-01 — no locked
-  // benchmark and nobody chose one; see PHASE2_BENCHMARK_LOCKS.md TIER B). The
-  // route redirects to /play; the mode file stays in the tree for a future
-  // revival with a real benchmark.
+  // sprint was revived after the early roster cut and now has a live route.
   storyMode: { name: 'The Nexus Initiative', venue: 'The Nexus', href: '/story' },
   football: { name: 'Breakaway', venue: 'The Gridiron', href: '/play/football' },
   mixedcombat: { name: "Ring's Edge", venue: 'The Octagon', href: '/play/mixedcombat' },
-  // duel + showdown: RETIRED from the v1 roster (owner, 2026-09-01 — combat is
-  // Karate VS / Karate Endless / Mixed Combat only; karate-vs is the Storm
-  // mode). Routes redirect to /play; mode files stay registered for a future
-  // revival. See PHASE2_BENCHMARK_LOCKS.md post-lock retirements.
+  // duel + showdown were revived after the early roster cut and now have live routes.
   dunkduel: { name: 'Prove It', venue: 'Venice Beach Court', href: '/play/dunkduel' },
   volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
