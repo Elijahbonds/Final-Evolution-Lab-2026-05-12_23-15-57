@@ -108,7 +108,7 @@ say('## How it was measured',
   '- **P1** is `lib/pose/baseline.ts` exactly as BASELINE.md ran it: `poseControl` on a 60 Hz rAF loop, 12 good ticks of calibration on a 0.5 s stand.',
   '- **P3** is `lib/pose/seamReplay.ts`: `BodyReader` → `ChannelReader` → `BodySession` + the mode\'s `BodyFloor` → `BodyArbiter` → the mode. A packet is handled when its frame arrives (the app clock), render ticks run at 60 Hz, and the game is `playing` from the first frame (the START hold is measured in the gate). Each take is held 1.2 s still before it (`grade.standFrame` + `holdStill`), the stand the reader calibrates on.',
   '- **Times.** "App" is when the mode receives the event, minus the ground-truth instant (the camera and inference latency included, ~66 ms on the fixtures). "Capture" uses the capture time of the frame that produced it.',
-  '- **Profiles.** 9 of the 28 modes bind the body in P3 (plan §2.2); the rest are session-only: the body starts and pauses them and presses nothing.');
+  '- **Profiles.** 9 of the 29 modes bind the body in P3 (plan §2.2); the rest are session-only: the body starts and pauses them and presses nothing.');
 
 // ── §0 the mapper on its own ──
 say('## 0. The mapper on its own', '### The jump as a take-off detector',
@@ -155,7 +155,7 @@ for (const n of names) {
   restRows.push([n, rest1 ? `(${f2(Math.abs(rest1.x))}, ${f2(rest1.y)})` : '–', pct(B.stickYStats(r1).shareAtLevel), standSticks ? `${standSticks} events` : 'none', pct(back),
     ys.length ? `${f2(Math.min(...ys))} … ${f2(Math.max(...ys))}` : '0']);
 }
-say(table(['fixture', 'P1 rest stick', 'P1 share at y ≥ 0.99', 'P3 stick events in the stand (all 28 profiles)', 'P3 share at y ≥ 0.99', 'P3 Free Run y range'], restRows));
+say(table(['fixture', 'P1 rest stick', 'P1 share at y ≥ 0.99', 'P3 stick events in the stand (all 29 profiles)', 'P3 share at y ≥ 0.99', 'P3 Free Run y range'], restRows));
 key.push(`- **The resting stick:** P1 (0, +1) on 12 of 12 takes; P3 sends ${p3AnyRest ? p3AnyRest : 'no'} stick event${p3AnyRest === 1 ? '' : 's'} at rest in any profile, and never holds y back: only Free Run's run in place pushes y, and only forward.`);
 
 say('### Calibration',
