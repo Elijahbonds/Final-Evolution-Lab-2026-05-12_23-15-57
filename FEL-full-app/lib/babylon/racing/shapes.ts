@@ -75,5 +75,14 @@ export function roadWheel(
   const r = MeshBuilder.CreateCylinder(`${name}_rim`, { diameter: diameter * 0.58, height: width * 1.04, tessellation: 12 }, scene);
   r.material = rim;
   r.parent = t;
+  // SPOKES (10-phase pass, phase 9): a smooth rim spins invisibly — the eye needs a mark on the face to
+  // read the wheel turning at all. Three thin bars across the outboard face, so the spin survives a glance.
+  for (let s = 0; s < 3; s++) {
+    const sp = MeshBuilder.CreateBox(`${name}_spoke_${s}`, { width: diameter * 0.44, height: 0.02, depth: diameter * 0.1 }, scene);
+    sp.material = rim;
+    sp.rotation.y = (s * Math.PI) / 3;
+    sp.position.y = width * 0.53;   // the cylinder's axis is local Y pre-tilt: just proud of the rim face
+    sp.parent = t;
+  }
   return t;
 }

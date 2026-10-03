@@ -22,7 +22,10 @@ export async function GET() {
   }
   const owned = await prisma.ownedWearable.findMany({ where: { userId } });
   const cards = await prisma.creatorCard.findMany({ where: { ownerId: userId }, select: { id: true, displayName: true, accent: true, rarity: true, mode: true } });   // PLAYER RING (2026-09-17): `mode` = the card's signature mode → the indicator's glyph
-  return NextResponse.json({ look, owned: owned.map((o) => o.itemId), skins: cards });
+  // lookLocal on the READ too (PR #138): the row a minor saves holds only the catalog defaults, so a client
+  // that shows the player their own model (the race modes) must know to take the look from the device.
+  const adult = verifiedAdult(await readDobYear(prisma, userId, 'look_hold'));
+  return NextResponse.json({ look, owned: owned.map((o) => o.itemId), skins: cards, lookLocal: !adult });
 }
 
 /** POST /api/v1/closet — save face + equipped + optional creator-card skin. */

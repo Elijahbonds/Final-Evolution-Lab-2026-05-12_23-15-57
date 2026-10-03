@@ -8,8 +8,10 @@ import { Vector3 } from '@babylonjs/core';
 import {
   KART_STARTER, KART_NEUTRAL, DRIFT_SLIP, MAX_SLIP,
   spawnKart, stepKart, travelOf, kartNose, driftQuality, kartHitWall,
+  steerAuthority, weightTransferGrip, wallSlide, kartRespawn,
   type KartInput, type KartState,
 } from './KartModel';
+import { sampleLine, locate } from '../racing/racingLine';
 
 const K = KART_STARTER;
 const input = (over: Partial<KartInput> = {}): KartInput => ({ ...KART_NEUTRAL, ...over });
@@ -213,6 +215,111 @@ describe('RULE 3 — the racing line is worth finding', () => {
   });
 });
 
+describe('10-PHASE PASS, phase 1 — steering feel (2026-10-02)', () => {
+  it('steering authority: nothing at a standstill, fullish in the midrange, calm at the top end', () => {
+    expect(steerAuthority(0, K)).toBe(0);
+    expect(steerAuthority(K.vMax / 3, K)).toBeGreaterThan(0.8);       // the cornering band
+    expect(steerAuthority(K.vMax, K)).toBeCloseTo(K.steerHighSpeed, 6);
+  });
+
+  it('the turn radius WIDENS with speed — flat-out full lock is a long arc, not a flick', () => {
+    const r = (v: number) => v / (K.steerRate * steerAuthority(v, K));
+    expect(r(K.vMax)).toBeGreaterThan(r(8) * 2);
+  });
+
+  it('…and the same holds through the integrator, scrub and all: less yaw per second at the top end', () => {
+    const yawRateAt = (speed: number): number => {
+      const s = spawnKart(new Vector3(0, 0, 0), 0);
+      s.speed = speed;
+      let turned = 0;
+      for (let i = 0; i < 15; i++) {                                  // a quarter second, before scrub bites
+        const before = s.heading;
+        stepKart(s, input({ steer: 1 }), 1 / 60, true, K);
+        turned += s.heading - before;
+      }
+      return turned / 0.25;
+    };
+    expect(yawRateAt(K.vMax)).toBeLessThan(yawRateAt(8));
+  });
+
+  it('the wheel EASES to the stick — a flick is not an instant full-lock snap', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    s.speed = 15;
+    stepKart(s, input({ steer: 1 }), 1 / 60, true, K);
+    const firstFrame = s.heading;
+    const steadyPerFrame = (K.steerRate * steerAuthority(15, K)) / 60;
+    expect(firstFrame).toBeLessThan(steadyPerFrame * 0.25);
+    // …and it gets there: inside a second the applied steer IS the stick
+    for (let i = 0; i < 60; i++) stepKart(s, input({ steer: 1 }), 1 / 60, true, K);
+    expect(s.steerAt).toBeGreaterThan(0.99);
+  });
+
+  it('a dithering input never JERKS the nose — the yaw rate cannot jump, whatever the stick does', () => {
+    // Fast RANDOM dither (seeded, ±full lock at 60 Hz — crueler than any wheel). Jitter is the yaw RATE
+    // jumping frame to frame, so that is what this pins: the biggest single-frame change in the per-frame
+    // heading delta. Unsmoothed, a sign flip jumps it by twice the full-lock frame delta; the rate limit
+    // bounds the jump to steerSlew/60 of it.
+    let seed = 7;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    s.speed = 15;
+    let prevDelta = 0, maxJump = 0;
+    for (let i = 0; i < 120; i++) {
+      const before = s.heading;
+      stepKart(s, input({ steer: rnd() > 0.5 ? 1 : -1 }), 1 / 60, true, K);
+      const delta = s.heading - before;
+      maxJump = Math.max(maxJump, Math.abs(delta - prevDelta));
+      prevDelta = delta;
+    }
+    const fullFrame = (K.steerRate * steerAuthority(15, K)) / 60;
+    expect(maxJump).toBeLessThan(fullFrame * 0.2);
+  });
+
+  it('weight transfer is real: brake loads the front, throttle unloads the rear', () => {
+    expect(weightTransferGrip(K.grip, K, 1, 0)).toBeGreaterThan(K.grip);   // trail-braking BITES
+    expect(weightTransferGrip(K.grip, K, 0, 1)).toBeLessThan(K.grip);      // power-on loosens
+    expect(weightTransferGrip(K.grip, K, 0, 0)).toBeCloseTo(K.grip, 9);
+  });
+
+  it('power-on oversteer: the same corner on the gas slides more than coasting', () => {
+    const mk = (throttle: number) => {
+      const s = spawnKart(new Vector3(0, 0, 0), 0);
+      s.speed = 18;
+      drive(s, input({ steer: 0.55, throttle }), 0.8);
+      return Math.abs(s.slip);
+    };
+    expect(mk(1)).toBeGreaterThan(mk(0));
+  });
+});
+
+describe('10-PHASE PASS, phase 3 — the launch curve (2026-10-02)', () => {
+  it('reaches 95% of top speed inside the target time, flat out', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    let t = 0;
+    while (t < 10 && s.speed < K.vMax * 0.95) { stepKart(s, input({ throttle: 1 }), 1 / 60, true, K); t += 1 / 60; }
+    expect(t).toBeLessThan(4);
+  });
+
+  it('the launch is harder than the old flat shove — and the top end is EXACTLY what it was', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    drive(s, input({ throttle: 1 }), 0.5);
+    expect(s.speed).toBeGreaterThan(7.5);          // the flat 13 m/s² gave ~6.4 here
+    const top = drive(spawnKart(new Vector3(0, 0, 0), 0), input({ throttle: 1 }), 12);
+    expect(top.speed).toBe(K.vMax);                // terminal unchanged — the medal times are safe
+  });
+
+  it('the climb is monotone and never overshoots', () => {
+    const s = spawnKart(new Vector3(0, 0, 0), 0);
+    let prev = 0;
+    for (let i = 0; i < 12 * 60; i++) {
+      stepKart(s, input({ throttle: 1 }), 1 / 60, true, K);
+      expect(s.speed).toBeGreaterThanOrEqual(prev - 1e-9);
+      expect(s.speed).toBeLessThanOrEqual(K.vMax + 1e-9);
+      prev = s.speed;
+    }
+  });
+});
+
 describe('nothing produces a NaN, and a wall hurts', () => {
   it('thirty seconds of random input stays finite', () => {
     let seed = 11;
@@ -235,5 +342,63 @@ describe('nothing produces a NaN, and a wall hurts', () => {
     expect(lost).toBeGreaterThan(0);
     expect(s.speed).toBeLessThan(before * 0.5);
     expect(s.slip).toBe(0);
+  });
+});
+
+describe('10-PHASE PASS, phase 4 — walls slide, and a beached kart gets back (2026-10-02)', () => {
+  it('a 45° impact keeps at least half the speed and travels ALONG the wall', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), Math.PI / 4);   // travelling (+x, +z) into the x = 400 wall
+    s.speed = 20;
+    const lost = wallSlide(s, -1, 0);
+    expect(lost).toBeGreaterThan(0);
+    expect(s.speed).toBeGreaterThanOrEqual(20 * 0.5);
+    const t = travelOf(s);
+    expect(Math.abs(t.x)).toBeLessThan(0.05);                   // no longer travelling into the wall
+    expect(t.z).toBeGreaterThan(0.99);                          // …running along it
+  });
+
+  it('a head-on impact keeps little, and the nose stays put for the driver to sort out', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), Math.PI / 2);   // straight at the wall
+    s.speed = 20;
+    wallSlide(s, -1, 0);
+    expect(s.speed).toBeLessThan(20 * 0.2);
+    expect(s.heading).toBeCloseTo(Math.PI / 2, 5);              // no snap: still nose-first
+  });
+
+  it('a kart already moving away from the wall is untouched', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), -Math.PI / 2);  // travelling −x, away from the x = 400 wall
+    s.speed = 20;
+    expect(wallSlide(s, -1, 0)).toBe(0);
+    expect(s.speed).toBe(20);
+  });
+
+  it('a glancing hit while drifting knocks the slide out — the nose eases along the wall', () => {
+    const s = spawnKart(new Vector3(399, 0, 0), Math.PI / 4);
+    s.speed = 22;
+    s.slip = 0.4;                                               // arriving sideways
+    wallSlide(s, -1, 0);
+    const nose = kartNose(s), t = travelOf(s);
+    expect(nose.x * t.x + nose.z * t.z).toBeGreaterThan(0.98);  // nose and travel together, along the wall
+    expect(Math.abs(s.slip)).toBeLessThan(0.2);
+  });
+
+  it('a respawn puts the kart ON the line, pointed along it, from a standstill — and it drives on', () => {
+    const line = sampleLine([[0, 0, 0], [60, 0, 0], [60, 0, 60], [0, 0, 60]], { loop: true });
+    const s = spawnKart(new Vector3(28, 0, 9), 2.1);            // beached beside the first leg, facing wrong
+    s.speed = 0.3; s.slip = 0.5; s.steerAt = 0.7; s.boost = 0.6;
+    const at = locate(line, s.pos.x, s.pos.z);
+    kartRespawn(s, at.point, at.tangent);
+    const after = locate(line, s.pos.x, s.pos.z);
+    expect(Math.abs(after.lateral)).toBeLessThan(0.01);         // ON the line
+    expect(Math.sin(s.heading) * at.tangent.x + Math.cos(s.heading) * at.tangent.z).toBeGreaterThan(0.999);
+    expect(s.speed).toBe(0);
+    expect(s.slip).toBe(0);
+    expect(s.steerAt).toBe(0);
+    expect(s.boost).toBe(0.6);                                  // the bank survives — the cost was the time
+    expect(Math.abs(after.dist - at.dist)).toBeLessThan(0.5);   // the distance already earned is kept
+    drive(s, input({ throttle: 1 }), 2);
+    const gone = locate(line, s.pos.x, s.pos.z);
+    expect(Math.abs(gone.lateral)).toBeLessThan(1.5);           // driving on down the line, not off it
+    expect(gone.dist).toBeGreaterThan(after.dist + 5);
   });
 });

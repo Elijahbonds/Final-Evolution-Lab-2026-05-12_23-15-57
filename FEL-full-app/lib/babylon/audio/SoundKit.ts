@@ -19,7 +19,7 @@
 //   clang   — a chain net, or metal taking a hit
 //   squeak  — rubber on a hard floor: the sound a hard cut actually makes
 type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
-  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak';
+  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust';
 
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the three player-set bus levels (lib/audio/volumes.ts owns the pure
 // arithmetic and the on-device persistence; this file is the only place that arithmetic reaches a real GainNode).
@@ -262,6 +262,32 @@ class SoundKitImpl {
         this.env(g, ctx, 0.02, 0.24, 0.35 * vol);
         src.connect(bp).connect(g).connect(this.sfxBus);
         src.start(); src.stop(ctx.currentTime + 0.3);
+        break;
+      }
+      // AN ENGINE SPOOLING UP (10-phase pass, phase 8 — the kart's boost exhaust note). A boost ignition was a
+      // `whoosh` of moving air and nothing from the machine; the machine is the kart. A low sawtooth RISES (the
+      // revs coming on, not a release falling off) with a brown-noise chug under it through a lowpass — the
+      // two-stroke bark read at phone volume, short enough to layer under the whoosh without smearing it.
+      case 'exhaust': {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(68 * pitch, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(180 * pitch, ctx.currentTime + 0.22);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 900;
+        const g = ctx.createGain();
+        this.env(g, ctx, 0.008, 0.3, 0.5 * vol);
+        osc.connect(lp).connect(g).connect(this.sfxBus);
+        osc.start(); osc.stop(ctx.currentTime + 0.34);
+
+        const chug = ctx.createBufferSource();
+        chug.buffer = this.noiseBuffer(ctx, 0.16, 'brown');
+        const cl = ctx.createBiquadFilter();
+        cl.type = 'lowpass'; cl.frequency.value = 320;
+        const cg = ctx.createGain();
+        this.env(cg, ctx, 0.004, 0.18, 0.4 * vol);
+        chug.connect(cl).connect(cg).connect(this.sfxBus);
+        chug.start(); chug.stop(ctx.currentTime + 0.2);
         break;
       }
       case 'impact': {

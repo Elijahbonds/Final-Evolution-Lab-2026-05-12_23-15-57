@@ -417,25 +417,37 @@ export class CameraDirector {
    */
   public broadcast = 0;
 
-  /** The active preset, blended toward the broadcast framing by `broadcast`. */
+  /** The active preset, blended toward the broadcast framing by `broadcast`, with the mode's tuneFollow overlay on top. */
   private effCfg(): FollowConfig {
     const b = Math.max(0, Math.min(1, this.broadcast));
-    if (b <= 0) return this.cfg;
-    const c = this.cfg;
-    return {
-      ...c,
-      distance: c.distance + 4.0 * b,
-      height: c.height + 6.0 * b,
-      minHeight: c.minHeight + 4.0 * b,
-      lookAhead: c.lookAhead + 6.0 * b,
-      pitchCapDeg: c.pitchCapDeg + 10 * b,
+    const blended = b <= 0 ? this.cfg : {
+      ...this.cfg,
+      distance: this.cfg.distance + 4.0 * b,
+      height: this.cfg.height + 6.0 * b,
+      minHeight: this.cfg.minHeight + 4.0 * b,
+      lookAhead: this.cfg.lookAhead + 6.0 * b,
+      pitchCapDeg: this.cfg.pitchCapDeg + 10 * b,
     };
+    return this.tune ? { ...blended, ...this.tune } : blended;
   }
 
   setPreset(preset: keyof typeof FOLLOW_PRESETS): void {
     this.cfg = FOLLOW_PRESETS[preset] ?? this.cfg;
     this.mode = 'follow';
     this.invalidateBounds();          // a preset change usually means a new venue
+  }
+
+  /**
+   * PER-MODE FOLLOW TUNING (10-phase pass, 2026-10-02): an overlay on the active preset so a mode can own
+   * its chase camera in its own config (racing/kartTune, racing/aeroTune) instead of editing a preset
+   * shared with every other mode. Only the fields given are overlaid — the rest stay the preset's — and
+   * it composes with the broadcast blend (the blend applies to the preset, the overlay on top). Pass
+   * `null` to drop the overlay. Survives setPreset, so re-apply after a preset change if the new preset
+   * should NOT carry it.
+   */
+  private tune: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null = null;
+  tuneFollow(t: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null): void {
+    this.tune = t ? { ...t } : null;
   }
 
   /** Explicit venue bounds — overrides auto-derivation. */
