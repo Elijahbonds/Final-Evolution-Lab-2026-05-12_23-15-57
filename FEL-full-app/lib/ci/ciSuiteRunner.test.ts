@@ -49,5 +49,6 @@ describe('ci-suite runner', () => {
     );
     expect(out).toContain('suite(s) discovered');
     expect(out).toContain('smokeTest.ts');
+    expect(out).toContain('mode-list-check.ts');
   });
 });

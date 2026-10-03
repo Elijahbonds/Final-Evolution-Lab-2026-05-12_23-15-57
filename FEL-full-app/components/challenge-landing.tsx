@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Trophy, Swords, Flame } from 'lucide-react';
+import { challengePlayHref } from '@/lib/social/challenge-routes';
 
 const MODE_LABEL: Record<string, string> = {
   dunkContest: 'Flight Night',
@@ -40,9 +41,11 @@ export function ChallengeLanding({
     fetch(`/api/challenge/${code}/open`, { method: 'POST' }).catch(() => {});
   }, [code]);
 
-  // dunkContest is guest-playable end-to-end; other modes route to signup.
+  // dunkContest is guest-playable end-to-end; signed-in athletes go straight
+  // to the real play route so GameShell can settle the same `?c=` attempt.
   const guestPlayable = modeKey === 'dunkContest';
-  const ctaHref = guestPlayable ? `/try?c=${code}` : `/signup?c=${code}`;
+  const authedHref = challengePlayHref(modeKey, code);
+  const ctaHref = isAuthed && authedHref ? authedHref : guestPlayable ? `/try?c=${code}` : `/signup?c=${code}`;
   const ctaLabel = guestPlayable ? 'ACCEPT — PLAY NOW' : isAuthed ? 'ACCEPT CHALLENGE' : 'SIGN UP TO ACCEPT';
 
   return (

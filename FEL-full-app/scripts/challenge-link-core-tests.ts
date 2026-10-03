@@ -16,6 +16,7 @@
 
 import assert from 'node:assert';
 import { ChallengeLinkCore, type ChallengePayload } from '../lib/social/challenge-link-core';
+import { challengePlayHref } from '../lib/social/challenge-routes';
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -89,6 +90,14 @@ check('identical mint input -> identical path', () => {
   const a = ChallengeLinkCore.mint(input);
   const b = ChallengeLinkCore.mint(input);
   assert.strictEqual(a.path, b.path, 'deterministic encoding');
+});
+
+// 8. signed-in challenge routing
+check('signed-in challenge routing preserves code on the matching play route', () => {
+  assert.strictEqual(challengePlayHref('dunkContest', 'abc 123'), '/play/dunk?c=abc%20123');
+  assert.strictEqual(challengePlayHref('brainBrawl', 'BB-7'), '/play/brain-brawl?c=BB-7');
+  assert.strictEqual(challengePlayHref('hoops1v1', 'ONES'), '/play/onevone?c=ONES');
+  assert.strictEqual(challengePlayHref('unknown-mode', 'x'), null);
 });
 
 console.log(`\n\u2705 challenge-link-core: ${passed} checks passed`);
