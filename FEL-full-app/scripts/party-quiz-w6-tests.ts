@@ -99,6 +99,7 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   const host = src('components/games/who-scene-it-babylon.tsx');
   ok(!host.includes('h-[calc(100dvh-3.25rem)]'), 'who-scene-it host: canvas is not the old viewport height');
   ok(host.includes('whoSceneItStageBox'), 'who-scene-it host: uses the frame box');
+  ok(host.includes("phase === 'error'") && host.includes('RETRY') && host.includes('onClick={tapStart}'), 'who-scene-it host: error overlay gives touch/mouse players a retry');
   const mode = src('lib/babylon/modes/WhoSceneItMode.ts');
   ok(mode.includes('shelf.preload'), 'who-scene-it: preloads venues');
   ok(mode.includes('shelf.show'), 'who-scene-it: shows a cached venue');
