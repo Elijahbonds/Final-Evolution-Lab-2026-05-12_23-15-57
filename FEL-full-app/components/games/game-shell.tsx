@@ -14,6 +14,7 @@ import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from 
 import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
+import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
@@ -147,6 +148,8 @@ function GameShellInner({
     | null
   >(null);
   const [gameKey, setGameKey] = useState(0);
+  /** Stream mode: a 16:9 stage with the chrome hidden, for OBS or a phone's own screen broadcast. */
+  const [streamOn, setStreamOn] = useState(false);
   // FEATURES-UX-SHOP (2026-09-08): browsing is not playing. A mode left idle ends on its own clock and used to post a
   // score-0 session that paid XP, a profile shard, streak credits and the 40-coin "Session completed" floor. The shell
   // now counts the presses it saw while the run was live (keys — the pad bridge and the touch deck both emit them —
@@ -564,7 +567,7 @@ function GameShellInner({
     <div className={fullBleed ? 'flex h-[100dvh] flex-col overflow-hidden bg-[#050505]' : 'flex min-h-screen flex-col bg-[#050505]'}>
       {/* Sideways on a phone, the header is a fifth of the screen spent on a back link. It goes; the way out
           lives on the stage instead, where a thumb already is. */}
-      <header className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed ? 'hidden' : ''}`}>
+      <header data-game-chrome className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed || streamOn ? 'hidden' : ''}`}>
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
           <Link
             href="/"
@@ -604,14 +607,16 @@ function GameShellInner({
 
       <div
         ref={stageRef}
+        data-fel-stream={streamOn ? '1' : undefined}
         className={fullBleed
           ? 'relative w-full flex-1 overflow-hidden'
           : 'relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4'}
       >
+        <GameCaptureHud mode={mode} stageRef={stageRef} streamOn={streamOn} onStreamMode={setStreamOn} />
         {/* The two controls the header was carrying, as thumb-sized glass over the corner of the stage. Only
             while full-bleed — with the header up they would be a second copy of it. */}
-        {fullBleed && (
-          <div className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+        {fullBleed && !streamOn && (
+          <div data-game-chrome className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <Link
               href="/play"
               aria-label="Leave the game"
@@ -915,7 +920,7 @@ function GameShellInner({
         </AnimatePresence>
       </div>
 
-      {profile && scheme && !result && !ownControls && <VirtualController scheme={scheme} />}
+      {profile && scheme && !result && !ownControls && !streamOn && <VirtualController scheme={scheme} />}
     </div>
   );
 }

@@ -31,7 +31,6 @@ describe('SCREEN-HARDEN middleware matcher', () => {
   }
   for (const p of [
     '/',
-    '/elijah',
     '/try',
     '/play/dunk',
     '/play/mirror',
@@ -49,6 +48,13 @@ describe('SCREEN-HARDEN middleware headers', () => {
     expect(res.headers.get('Permissions-Policy')).toBe(PP);
     expect(res.headers.get('Permissions-Policy')).toContain('camera=(self)');
     expect(res.headers.get('Permissions-Policy')).toContain('microphone=()');
+  });
+
+  it('matches /elijah only to let the public redirect through, with no screen camera policy', () => {
+    expect(matcherHits('/elijah')).toBe(true);
+    const res = call('/elijah');
+    expect(res.headers.get('Permissions-Policy')).toBeNull();
+    expect(res.headers.get('location') ?? '').not.toMatch(/\/login/);
   });
 
   it('CSP-Report-Only has wasm-unsafe-eval, a nonce, no unsafe-eval, no report endpoint', () => {

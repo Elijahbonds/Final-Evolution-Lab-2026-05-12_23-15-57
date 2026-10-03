@@ -37,6 +37,7 @@ import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import type { ModePhase } from '@/lib/babylon';
 import { BodyReadyLine, HandsUpLine, HandsUpRing, type BodyLine } from './paused-layer';
 import { stanceLine } from '@/lib/move/rideStance';   // MOVEMENT PLAY P8: the board games' stance line
+import { GrownUpStep } from '@/app/play/mirror/assess/_components/gate-steps';
 
 // ── the words ──
 export const PLAY_WITH_BODY = 'PLAY WITH YOUR BODY';
@@ -148,6 +149,18 @@ function CameraLine({ view }: { view: BodyPlayView }) {
   return <p className="text-center text-2xl font-black text-white">{cameraWords(view)}</p>;
 }
 
+/**
+ * The Mirror's grown-up step, before the camera. Same component, same words, same disabled Continue.
+ * A tap here is not the game's start, and it does not request the camera until Continue.
+ */
+function BodyGrownUp({ className = '' }: { className?: string }) {
+  return (
+    <div data-fel-body-grown-up="" onPointerDown={(e) => e.stopPropagation()} className={`w-full max-w-md text-left ${className}`}>
+      <GrownUpStep onContinue={() => { void bodyPlay.confirmGrownUp(); }} />
+    </div>
+  );
+}
+
 /** The ring for a stage's hold (framing, the reach, the stand). */
 function HoldRing({ progress }: { progress: number }) {
   const r = 11, c = 2 * Math.PI * r, p = Math.min(1, Math.max(0, progress));
@@ -253,6 +266,7 @@ export function BodyPlayReady({ tint, onStart }: { tint: string; onStart: () => 
   useEffect(() => { setRemembered(key ? bodyPlay.remembered(key) : false); }, [key, view.stage]);
   if (offer === null) return null;
   if (offer === 'coming') return <p className="text-[11px] tracking-wide text-white/45">{COMING_COPY}</p>;
+  if (view.grownUp === 'ask') return <BodyGrownUp />;
   const on = view.stage === 'starting' || view.stage === 'checking' || view.stage === 'set';
   if (on && view.collapsed) {
     return (
@@ -306,6 +320,13 @@ export function BodyPlayLayer({ phase, onStart }: { phase: ModePhase; onStart: (
   const [corner, setCorner] = useState<Corner>(CORNERS[0]);
   useEffect(() => holdSharedPoseSource(), []);
   useEffect(() => { setCorner(readCorner()); }, []);
+  if (view.grownUp === 'ask' && phase !== 'ready') {
+    return (
+      <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-[#05060a] px-4 py-6">
+        <BodyGrownUp />
+      </div>
+    );
+  }
   const live = view.camera.state === 'calibrating' || view.camera.state === 'live';
   if (!live || phase === 'ready' || phase === 'loading' || phase === 'error') return null;
   if (phase === 'paused' && view.checking) {

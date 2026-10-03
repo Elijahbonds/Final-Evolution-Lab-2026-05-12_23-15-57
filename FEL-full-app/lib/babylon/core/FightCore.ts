@@ -285,10 +285,24 @@ export class RivalFightBrain {
         // NERVE: `loose` is the price of pressing. A rival chasing the fight reads the wind-up less often,
         // so the guard it does not put up is what pays for the pressure it is applying.
         const read = Math.min(0.95, effDiff / this.loose + stringRead);
-        if (roll < read * 0.30) {
+        // STEP_SHARE of the roll sidesteps; READ_SHARE is the whole answer
+        // (step or guard). The 0.92 / 0.95 caps bound the in-match ramp so a
+        // later round cannot become a wall. They must not also clip a skill
+        // dial that already covers every roll: before the caps, difficulty 2
+        // made `read * 0.85` land past 1, and fight-balance C1 still requires
+        // that a maxed dial always answers the wind-up. In-match bases
+        // (0.68, 0.72) stay under this line, so their step and guard rates
+        // do not move. `loose` still opens a miss — a chasing rival pays for
+        // pressing by reading less, even on a high dial.
+        const STEP_SHARE = 0.30;
+        const READ_SHARE = 0.88;
+        const dialCovers = (this.difficulty / this.loose) * READ_SHARE >= 1;
+        const stepAt = dialCovers ? STEP_SHARE / READ_SHARE : read * STEP_SHARE;
+        const readAt = dialCovers ? 1 : read * READ_SHARE;
+        if (roll < stepAt) {
           this.stepHoldSec = 0.22;
           this.stepDir = Math.random() < 0.5 ? -1 : 1;
-        } else if (roll < read * 0.88) {
+        } else if (roll < readAt) {
           this.blockHoldSec = this.foeStrikeStreak >= 2 ? 0.55 : 0.45;
           this.punishSec = 0.42;
         }
