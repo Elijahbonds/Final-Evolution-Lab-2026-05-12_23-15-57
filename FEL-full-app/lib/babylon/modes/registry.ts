@@ -30,6 +30,7 @@ import { FreeRunMode } from './FreeRunMode';    // A+ mission #10: free-running 
 import { SprintMode } from './SprintMode';
 import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
 import { BrainBrawlMode } from './BrainBrawlMode';   // A+ mission #11 — the trivia deck as a party mode
+import { TiebreakMode } from './TiebreakMode';        // Party Quiz W6 — sudden-death tennis timing
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -44,6 +45,7 @@ export const MODES: Record<string, ModeDefinition> = {
   // Rollout wave 3 — precision family (M40 full rebuilds on aimSwingCore).
   // Route flag keys map to these registry keys: baseball→derby, soccer→penalty.
   tennis: TennisMode,
+  tiebreak: TiebreakMode,
   derby: DerbyMode,
   penalty: PenaltyMode,
   golf: GolfMode,
@@ -96,7 +98,7 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   // rollout wave 2 — board family
   'skateboard', 'snowboard_slalom', 'surf',
   // rollout wave 3 — timing family (registry keys)
-  'tennis', 'derby', 'penalty', 'golf',
+  'tennis', 'tiebreak', 'derby', 'penalty', 'golf',
   // rollout wave 4 — basketball simulator family (M48)
   'onevone', 'threevthree',
   // rollout wave 5 — Court Carnival hub (M49)

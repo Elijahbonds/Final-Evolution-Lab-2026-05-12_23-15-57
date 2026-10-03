@@ -12,7 +12,7 @@ import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { SoundKit } from '../audio/SoundKit';
 import {
-  commitSwing, freshBlitz, mulberry32, postedScore, skipGap, tickBlitz, TARGET,
+  aiNetsIt, commitSwing, freshBlitz, gradeReactBase, mulberry32, postedScore, skipGap, tickBlitz, TARGET,
   type BlitzFeel, type BlitzState, type Side, NORMAL_FEEL,
 } from '../core/TiebreakBlitz';
 
@@ -204,3 +204,9 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     },
   };
 }
+
+/** Default registry/dev-runner definition; the player host still builds a fresh grade-aware definition per session. */
+export const TiebreakMode = makeTiebreakMode({
+  reactBase: gradeReactBase('READY'),
+  aiNets: aiNetsIt,
+});

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 /** /kitchens/fuel — FEL Kitchens' Fuel floor: today's MealRx from Your Build (read-only) + the grocery list (v0). */
 export default async function KitchensFuelPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fkitchens%2Ffuel');
   return (
     <div className="min-h-screen bg-[#050505] pb-24 text-white">
       <FuelView />
