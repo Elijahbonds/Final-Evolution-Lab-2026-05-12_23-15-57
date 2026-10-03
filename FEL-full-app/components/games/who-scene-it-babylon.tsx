@@ -8,6 +8,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
 import { PausedLayer, BodyReadyLine } from './paused-layer';
+import { failBabylonBoot } from './boot-failure';
 import { whoSceneItStageBox } from '@/lib/babylon/modes/whoSceneItFrame';
 
 type Hud = Record<string, HudValue>;
@@ -49,7 +50,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => { if (!disposed) failBabylonBoot('[FEL-WSI]', e, setPhase, setLoadError); });
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
   }, [onEnd]);

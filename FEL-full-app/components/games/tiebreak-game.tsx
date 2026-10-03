@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { useStartWake } from '@/components/games/use-start-wake';
 import { BootSplash } from '@/components/games/boot-splash';
+import { failBabylonBoot } from '@/components/games/boot-failure';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { gradeReactBase } from '@/lib/babylon/core/TiebreakBlitz';
 import { makeTiebreakMode } from '@/lib/babylon/modes/TiebreakMode';
@@ -81,7 +82,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
     }).then((s) => {
       if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
       stop = s;
-    }).catch((e) => console.error('[FEL-TIEBREAK] boot failed', e));
+    }).catch((e) => { if (!disposed) failBabylonBoot('[FEL-TIEBREAK]', e, setPhase, setLoadError); });
 
     return () => {
       disposed = true;

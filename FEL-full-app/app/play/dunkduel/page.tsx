@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginRedirect, type LoginRedirectSearchParams } from '@/lib/auth/safeNext';
 import ProveIt from './_components/prove-it';
 
 export const dynamic = 'force-dynamic';
@@ -12,9 +13,9 @@ export const dynamic = 'force-dynamic';
 // uploaded. The Babylon pass-and-play duel (DunkDuelMode) was the
 // transitional occupant of this route and stays in the registry —
 // /dev/mode/dunkduel still runs it.
-export default async function DunkDuelPage() {
+export default async function DunkDuelPage({ searchParams }: { searchParams?: LoginRedirectSearchParams }) {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(loginRedirect('/play/dunkduel', searchParams));
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <ProveIt />

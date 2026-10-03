@@ -1,6 +1,6 @@
 // S-16: login ?next= is a same-origin path, or it is ignored.
 import { describe, expect, it } from 'vitest';
-import { loginDestination, safeLoginNext } from './safeNext';
+import { loginDestination, loginRedirect, safeLoginNext } from './safeNext';
 
 describe('safeLoginNext', () => {
   it('?next=/play/mirror lands there', () => {
@@ -11,6 +11,15 @@ describe('safeLoginNext', () => {
   it('keeps a same-origin query and hash', () => {
     expect(safeLoginNext('/play/mirror?step=1')).toBe('/play/mirror?step=1');
     expect(safeLoginNext('/account#data')).toBe('/account#data');
+  });
+
+  it('builds a login redirect that keeps play-page query state', () => {
+    expect(loginRedirect('/play/dunk', { c: 'challenge-1', arena: 'venice' })).toBe(
+      '/login?next=%2Fplay%2Fdunk%3Fc%3Dchallenge-1%26arena%3Dvenice',
+    );
+    expect(loginRedirect('/play/tennis', { c: ['one', 'two'], empty: undefined })).toBe(
+      '/login?next=%2Fplay%2Ftennis%3Fc%3Done%26c%3Dtwo',
+    );
   });
 
   it('?next=https://evil.example and //evil.example are ignored', () => {

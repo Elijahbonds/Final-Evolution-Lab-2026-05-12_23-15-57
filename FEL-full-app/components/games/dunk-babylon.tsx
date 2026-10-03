@@ -10,6 +10,7 @@ import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { failBabylonBoot } from './boot-failure';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -131,7 +132,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-DUNK] boot failed', e));
+        .catch((e) => { if (!disposed) failBabylonBoot('[FEL-DUNK]', e, setPhase, setLoadError); });
     }, 0);
 
     return () => {

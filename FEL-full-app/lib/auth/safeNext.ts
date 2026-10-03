@@ -35,3 +35,25 @@ export function safeLoginNext(raw: unknown): string | null {
 export function loginDestination(nextRaw: unknown, fallback: string): string {
   return safeLoginNext(nextRaw) ?? fallback;
 }
+
+export type LoginRedirectSearchParams = Record<string, string | string[] | undefined> | URLSearchParams;
+
+function serializeSearchParams(searchParams: LoginRedirectSearchParams | undefined): string {
+  if (!searchParams) return '';
+  if (searchParams instanceof URLSearchParams) return searchParams.toString();
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value === undefined) continue;
+    const values = Array.isArray(value) ? value : [value];
+    for (const item of values) params.append(key, item);
+  }
+  return params.toString();
+}
+
+/** Build /login?next=... for protected pages while preserving a safe relative return path. */
+export function loginRedirect(path: string, searchParams?: LoginRedirectSearchParams): string {
+  const query = serializeSearchParams(searchParams);
+  const candidate = query ? `${path}${path.includes('?') ? '&' : '?'}${query}` : path;
+  const next = safeLoginNext(candidate) ?? '/play';
+  return `/login?next=${encodeURIComponent(next)}`;
+}

@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { failBabylonBoot } from './boot-failure';
 import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -66,7 +67,7 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
       }).then((s) => { if (disposed) { s(); return; } stop = s; })
-        .catch((e) => console.error('[FEL-AERO] boot failed', e));
+        .catch((e) => { if (!disposed) failBabylonBoot('[FEL-AERO]', e, setPhase, setLoadError); });
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };

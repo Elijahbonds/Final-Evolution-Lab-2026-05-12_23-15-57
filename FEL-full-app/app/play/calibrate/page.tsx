@@ -9,8 +9,7 @@ export const dynamic = 'force-dynamic';
 // MUSIC-SUITE P2 (2026-09-25): the rooms link here with ?return=<path> (the dance pick screen, the Academy header), and
 // the screen offers "Back to the room" once the offset is saved. Only a same-origin path is honoured (safeReturnPath);
 // anything else is dropped and the screen falls back to "Back to modes". A signed-out player is sent to sign in with
-// the way back in ?next= (as app/guidance/page.tsx does) — though the sign-in form does not read `next` yet
-// (components/auth-form.tsx:126 lands on the first game), so today it is a way back for the day it does.
+// the way back in ?next= so the sign-in form returns them here with the room return path intact.
 export default async function CalibratePage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const raw = searchParams?.return;
   const returnTo = safeReturnPath(Array.isArray(raw) ? raw[0] : raw);
