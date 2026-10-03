@@ -363,6 +363,78 @@ export function buildForest(scene: Scene, circuit: KartCircuit, heightAt: ((x: n
   return root;
 }
 
+// ── THE SETTING BAND (10-phase pass, phase 6, 2026-10-03) ─────────────────────────────────────────────────────────
+//
+// kartSceneryFor dresses the course as an EVENT (stands, flags, barriers — the racing kit). What stands PAST the
+// event is the place: palms down the boardwalk and the quay, real pines shouldering out of the forest band on the
+// mountain, the city's own furniture under the rooftops, a tree silhouette wall round the stadium. Same VenueProps
+// pipeline (one thin-instance draw per model × tint), same rule as every band here: NOTHING ON THE TARMAC — the
+// locate guard rejects anything within halfWidth + 5 of ANY part of the line, so a course that curls back on
+// itself (the rooftop does, at three heights) never grows a tree through the deck.
+
+interface SettingPick { kit: string; model: string; tint?: string }
+interface SettingFamily { picks: SettingPick[]; step: number; near: number; far: number; lo: number; hi: number }
+
+const CONIFER_DARK = '#2f5a3e';   // the forest's own alpine green, so the GLB pines read as its front rank
+const NIGHT_TREE = '#2c4a3e';     // a tree under stadium lights is a silhouette, not a shrub
+
+const SETTING: Record<string, SettingFamily> = {
+  park: {
+    picks: [{ kit: 'nature', model: 'tree_palmTall' }, { kit: 'nature', model: 'tree_palmBend' }, { kit: 'nature', model: 'tree_palm' }, { kit: 'nature', model: 'plant_bushLarge' }, { kit: 'nature', model: 'grass_large' }],
+    step: 21, near: 9, far: 38, lo: 3.2, hi: 5.4,
+  },
+  harbor: {
+    picks: [{ kit: 'nature', model: 'tree_palmTall' }, { kit: 'nature', model: 'tree_palm' }, { kit: 'nature', model: 'rock_largeA' }, { kit: 'nature', model: 'rock_largeB' }, { kit: 'nature', model: 'plant_bushLarge' }],
+    step: 23, near: 9, far: 36, lo: 3.0, hi: 5.2,
+  },
+  slope: {
+    // the primitive forest owns ≥ halfWidth + 14; these are its front rank, between the chevron boards and it
+    picks: [{ kit: 'nature', model: 'tree_pineTallA', tint: CONIFER_DARK }, { kit: 'nature', model: 'tree_pineTallB', tint: CONIFER_DARK }, { kit: 'nature', model: 'tree_pineRoundA', tint: CONIFER_DARK }, { kit: 'nature', model: 'rock_tallA' }, { kit: 'nature', model: 'rock_largeD' }],
+    step: 24, near: 8, far: 13, lo: 3.4, hi: 5.6,
+  },
+  pitch: {
+    picks: [{ kit: 'nature', model: 'tree_tall', tint: NIGHT_TREE }, { kit: 'nature', model: 'tree_default', tint: NIGHT_TREE }, { kit: 'nature', model: 'tree_detailed', tint: NIGHT_TREE }, { kit: 'racing', model: 'lightPostLarge' }],
+    step: 26, near: 12, far: 44, lo: 4.0, hi: 6.2,
+  },
+  street: {
+    // the rooftop circuit: the city under and beside the decks — fences, planters, a lamp where one fits
+    picks: [{ kit: 'city-suburban', model: 'fence-low' }, { kit: 'city-suburban', model: 'planter' }, { kit: 'city-suburban', model: 'fence-1x3' }, { kit: 'racing', model: 'lightPostModern' }],
+    step: 18, near: 6, far: 15, lo: 2.0, hi: 2.6,
+  },
+  orbit: {
+    // a station grows no trees — dock lamps and the odd flag, tight to the platforms
+    picks: [{ kit: 'racing', model: 'lightPostModern' }, { kit: 'racing', model: 'flagCheckers' }],
+    step: 34, near: 6, far: 13, lo: 2.4, hi: 3.0,
+  },
+};
+
+/**
+ * The place the event stands in, as VenueProps placements down both verges. Deterministic per course; every
+ * placement is checked against the WHOLE line, not just the metre it was measured from.
+ */
+export function kartSettingFor(circuit: KartCircuit): PropPlacement[] {
+  const fam = SETTING[circuit.course.venue];
+  if (!fam) return [];
+  const out: PropPlacement[] = [];
+  let s = (13 + circuit.course.id.length * 7) >>> 0;
+  const rnd = (): number => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const L = circuit.line.length;
+  for (let d = 0; d < L; d += fam.step) {
+    const at = pointAlong(circuit.line, d + rnd() * fam.step * 0.5);
+    const side = rnd() < 0.5 ? -1 : 1;
+    const off = fam.near + rnd() * (fam.far - fam.near);
+    const p = at.pos.add(at.right.scale(side * (circuit.halfWidth + off)));
+    if (Math.abs(locate(circuit.line, p.x, p.z).lateral) < circuit.halfWidth + 5) continue;
+    const pick = fam.picks[Math.floor(rnd() * fam.picks.length)]!;
+    out.push({
+      kit: pick.kit, model: pick.model, at: [p.x, 0, p.z],
+      yaw: rnd() * Math.PI * 2, scale: fam.lo + rnd() * (fam.hi - fam.lo),
+      ...(pick.tint ? { tint: pick.tint } : {}),
+    });
+  }
+  return out;
+}
+
 /** Where the night courses' edge lights go: [x, y, z, yaw] every `step` metres down both sides of the road. */
 export function edgeLightsFor(circuit: KartCircuit, step = 9): [number, number, number, number][] {
   const out: [number, number, number, number][] = [];

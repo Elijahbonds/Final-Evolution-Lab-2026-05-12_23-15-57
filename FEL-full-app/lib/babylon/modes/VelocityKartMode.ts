@@ -48,7 +48,8 @@ import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepM
 import { AeroPickups } from '../racing/aeroPickups';
 import {
   buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
-  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, buildForest, buildEdgeLights } from '../racing/kartDressing';
+  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, kartSettingFor, buildForest, buildEdgeLights } from '../racing/kartDressing';
+import { buildCloudDeck, type CloudDeckHandle } from '../visual/CloudDeck';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS } from '../visual/venuePropSets';
 import { refuse } from '../core/Refusal';
@@ -199,6 +200,7 @@ let boostPads: BoostPads | null = null;
 let ramps: Mesh[] = [];
 let kerbRoot: TransformNode | null = null;
 let detailRoot: TransformNode | null = null; let scenery: VenuePropsHandle | null = null; let sceneryGone = false;   // DETAIL PASS
+let clouds: CloudDeckHandle | null = null;   // 10-phase pass, phase 6: the sky over the course
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -895,6 +897,12 @@ return {
     // worst frames in the project). Trackside dresses the PATH instead, at whatever scale the course is.
     trackside?.dispose();
     trackside = buildTrackside(ctx.scene, course);
+    // THE SKY OVER THE COURSE (phase 6): low-poly puffs in the mood's tint, riding the camera like the dome does
+    clouds?.dispose();
+    clouds = buildCloudDeck(ctx.scene, {
+      span: 1100, yLo: 95, yHi: 170, count: 24, drift: 1.8,
+      tint: course.mood === 'nightGame' ? '#39415e' : course.mood === 'goldenHour' ? '#ffe3c2' : course.mood === 'overcast' ? '#dde5ee' : '#f6faff',
+    });
     ramps = buildRamps(ctx);
     if (circuit) {
       placedObstacles = placeObstacles(circuit);
@@ -908,7 +916,8 @@ return {
       // read their road by edge lights (the orbit station was a black frame to the render watchdog without them)
       if (course.venue === 'slope') buildForest(ctx.scene, circuit, worldHeightFn(course), course.mood === 'alpine' ? '#2f5a3e' : '#3b6a4a').parent = detailRoot;
       if (course.mood === 'nightGame') buildEdgeLights(ctx.scene, circuit).parent = detailRoot;
-      const key = `kart-${circuit.course.id}`; VENUE_PROP_SETS[key] = kartSceneryFor(circuit);
+      // phase 6: the event (racing kit) PLUS the place it stands in (the venue family's own nature/city band)
+      const key = `kart-${circuit.course.id}`; VENUE_PROP_SETS[key] = [...kartSceneryFor(circuit), ...kartSettingFor(circuit)];
       sceneryGone = false; scenery?.dispose(); scenery = null;
       void mountVenueProps(ctx.scene, key, detailRoot, { snapToGround: true }).then((h) => { if (sceneryGone) h?.dispose(); else scenery = h; });
     }
@@ -1103,6 +1112,7 @@ return {
 
   update(ctx: ModeContext, dt: number): void {
     crowd?.update(dt);   // they idle and bob whether or not the race is running
+    clouds?.update(dt, ctx.scene.activeCamera);
     if (!state || !kart || S.done) return;
 
     // ── THE START (racing pass phase 4, racing/RaceStart) ─────────────────────────────────────────────────────────
@@ -1427,7 +1437,7 @@ return {
     seated?.stop(); seated?.dispose(); seated = null;
     driver?.dispose(); driver = null;
     steerWheel = null;
-    venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null;
+    venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null; clouds?.dispose(); clouds = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];

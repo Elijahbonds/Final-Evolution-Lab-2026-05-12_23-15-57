@@ -194,7 +194,20 @@ rival is recovered onto the line. Headless probe: a race still finishes with a l
 **Pass check:** before/after screenshots both modes; the perf line (fps / avg ms / draws / meshes) on the
 mid-phone profile does not regress versus the Phase-6 baseline; ci-suite perf budgets stay green.
 
-- [ ] done
+- [x] done — kart: new `kartSettingFor` (kartDressing.ts) grows the PLACE past the event dressing, per venue
+  family and deterministic per course: palms/bushes/grass at the boardwalk (park) and the quay (harbor), a
+  GLB-pine front rank between the chevron boards and the primitive forest on the mountain (slope), a dark
+  tree-silhouette wall + light masts round the stadium (pitch), city fences/planters/lamps under the rooftop
+  decks (street), dock lamps and flags only on the station (orbit — a station grows no trees). Every
+  placement guarded off the WHOLE line (locate ≥ halfWidth + 5), so the rooftop's three-height loop never
+  grows a tree through the deck. Aero: island beaches get their undergrowth (grass/bushes at the palms'
+  feet, never in the water). BOTH modes get a sky: new `visual/CloudDeck.ts` — two merged-lobe low-poly
+  puffs, thin-instanced (two draws however many clouds), unlit in the mood/theme's tint, riding the camera
+  like the dome and drifting ~2 m/s. assumption: the repo holds no cloud sprite/texture (checked
+  public/**), so the deck is geometry in the same flat-shaded language — no new assets, nothing downloaded.
+  Thin-instancing absorbed the props: kart draws 330 → 333, aero 142 → 134 (meshes +6/+7: the new masters)
+  on the SwiftShader mid-phone proxy. 8 new vitest pins (band exists per course and names only on-disk GLBs,
+  off-tarmac against the whole line, deterministic, venue character; deck determinism/band/spread/lobes).
 
 ## Phase 7 — Materials and lighting
 
