@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import { is3D, isBabylon } from './flags';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
+
+const BABYLON_FLAG_KEYS: Record<string, string> = {
+  dunk: 'dunkContest',
+  karate: 'karateEndless',
+  football: 'football',
+  skateboard: 'skateboard',
+  snowboard_slalom: 'snowboard_slalom',
+  surf: 'surf',
+  tennis: 'tennis',
+  tiebreak: 'tiebreak',
+  derby: 'baseball',
+  penalty: 'soccer',
+  golf: 'golf',
+  onevone: 'hoops1v1',
+  threevthree: 'hoops3v3',
+  carnival: 'carnival',
+  karate_vs: 'karateVersus',
+  mixedcombat: 'mixedcombat',
+  dunkduel: 'dunkduel',
+  sprint: 'sprint',
+  showdown: 'showdown',
+  duel: 'duel',
+  volleyball: 'volleyball',
+  dance: 'dance',
+  who_scene_it: 'whoSceneIt',
+  freerun: 'freerun',
+  threepoint: 'threePoint',
+  bigair: 'bigAir',
+  aeroaces: 'aeroAces',
+  velocitykart: 'velocityKart',
+  brainbrawl: 'brainBrawl',
+};
 
 /**
  * WHICH RENDERER A MODE GETS. Twenty files import these two predicates, and getting one wrong does not throw — it
@@ -17,6 +50,21 @@ describe('renderer flags', () => {
     expect(isBabylon('not_a_mode')).toBe(false);
     expect(isBabylon('')).toBe(false);
     expect(isBabylon('dunk')).toBe(false);          // the registry's key is NOT this table's key
+  });
+
+  it('has a Babylon flag for every enabled registry mode', () => {
+    const missingMapping = [...ENABLED_BABYLON_MODES]
+      .filter((registryKey) => !(registryKey in BABYLON_FLAG_KEYS));
+    expect(missingMapping, 'enabled Babylon modes missing flag-key mapping').toEqual([]);
+
+    const staleMapping = Object.keys(BABYLON_FLAG_KEYS)
+      .filter((registryKey) => !ENABLED_BABYLON_MODES.has(registryKey));
+    expect(staleMapping, 'flag mappings for no-longer-enabled Babylon modes').toEqual([]);
+
+    const disabled = Object.entries(BABYLON_FLAG_KEYS)
+      .filter(([, flagKey]) => !isBabylon(flagKey))
+      .map(([registryKey, flagKey]) => `${registryKey} -> ${flagKey}`);
+    expect(disabled, 'enabled Babylon modes whose renderer flag is off').toEqual([]);
   });
 
   it('never answers yes on a prototype-chain key — the classic lookup-table hole', () => {
