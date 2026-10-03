@@ -9,12 +9,14 @@ import {
 const APP = join(__dirname, '../../app');
 
 describe('the free game is /try, the guest dunk contest', () => {
-  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to /login', () => {
+  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to /login with a return path', () => {
     expect(DEFAULT_FREE_GAME_ROUTE).toBe('/try');
     const tryPage = readFileSync(join(APP, 'try/page.tsx'), 'utf8');
     expect(tryPage).toMatch(/return <GuestDunkShell/);
     expect(tryPage).not.toMatch(/redirect\(\s*['"`]\/login/);
-    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(/if \(!session\) redirect\('\/login'\)/);
+    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(
+      /if \(!session\) redirect\('\/login\?next=%2Fplay%2Fbrain-brawl'\)/,
+    );
   });
 
   // CHANGED (SCREEN-FIX-2, S-10): was 13 and older; 13–17 lose the /try link (no page reads this now: the results'
@@ -38,6 +40,7 @@ describe('the free game is /try, the guest dunk contest', () => {
   it('a signed-in-only env route is rejected → /try', () => {
     for (const bad of [
       '/play/brain-brawl', '/play/brain-brawl?src=screen', '/login', '/login?next=%2Fplay', '/signup', '/account', '/account/settings',
+      '/create', '/create?from=cell',
       '/play', '/play/dunk', '/profile', '/api/guest', '/dev/brainbrawl', '/PLAY/brain-brawl', '/try/../play/brain-brawl',
       '/pl%61y/brain-brawl', '/wallet/', '/studio/x',
     ]) {

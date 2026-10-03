@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Certify } from './camp-view';
 
 // HOTFIX (2026-09-24): the Certify tab reads its paper, and each module's attempt gate, from GET
@@ -73,5 +75,21 @@ describe('Certify, first paint', () => {
 
   it('shows no questions until a module is opened', () => {
     expect(render()).not.toContain('A prompt?');
+  });
+});
+
+describe('Camp plan selection wiring', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, 'camp-view.tsx'), 'utf8');
+
+  it('normalizes stale plan selections before posting plan-scoped actions', () => {
+    expect(source).toContain('visiblePlanId(plans, planId)');
+    expect(source).toContain('goalPlanId: visibleId');
+    expect(source).toContain('await load(visibleId)');
+    expect(source).toContain('const plan = plans.find((p) => p.id === visibleId) ?? null');
+  });
+
+  it('binds plan dropdowns to the visible id, not a removed prior id', () => {
+    const selectBindings = source.match(/<select value=\{visibleId\}/g) ?? [];
+    expect(selectBindings.length).toBeGreaterThanOrEqual(3);
   });
 });

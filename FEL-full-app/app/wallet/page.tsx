@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function WalletPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fwallet');
   // FEATURES-UX-SHOP: "Get Shards" led to a store that said COMING SOON — the button now carries the purchases truth itself.
   const shardCopy = shardSaleCopy(purchasesEnabledFromEnv());
   return (

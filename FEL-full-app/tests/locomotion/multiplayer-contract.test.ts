@@ -29,9 +29,7 @@ describe('multiplayer covers the game that actually ships', () => {
 
   it('no challenge exists for a mode you cannot play', () => {
     const enabledMp = new Set([...ENABLED_BABYLON_MODES].map(mpKeyFor));
-    // tiebreak is a live route that is not a Babylon mode, so it is a legitimate extra
-    const allowed = new Set([...enabledMp, 'tiebreak']);
-    const orphan = MP_MODES.map((m) => m.key).filter((k) => !allowed.has(k));
+    const orphan = MP_MODES.map((m) => m.key).filter((k) => !enabledMp.has(k));
     expect(orphan, `challengeable but not playable: ${JSON.stringify(orphan)}`).toEqual([]);
   });
 

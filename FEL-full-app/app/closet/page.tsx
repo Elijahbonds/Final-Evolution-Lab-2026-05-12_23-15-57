@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ClosetPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fcloset');
   const userId = (session.user as { id?: string } | undefined)?.id;
   const adult = userId ? verifiedAdult(await readDobYear(prisma, userId, 'look_hold_page')) : false;
   return (

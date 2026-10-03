@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function BigAirPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fplay%2Fbig-air');
   return <BigAirLoader />;
 }
