@@ -126,3 +126,45 @@ describe('the doors', () => {
     for (const t of TABS) expect(DOORS.filter((d) => d.tab === t.id).length, t.id).toBeGreaterThan(2);
   });
 });
+
+function pageFilesUnder(routeRoot: string): string[] {
+  const base = join(ROOT, 'app', routeRoot);
+  const out: string[] = [];
+  const scan = (dir: string) => {
+    for (const e of readdirSync(dir)) {
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) { scan(p); continue; }
+      if (e === 'page.tsx') out.push(p);
+    }
+  };
+  scan(base);
+  return out.sort();
+}
+
+function routeForPageFile(file: string): string {
+  const appRoot = join(ROOT, 'app');
+  const rel = file.slice(appRoot.length + 1).replace(/\/page\.tsx$/, '');
+  return '/' + rel;
+}
+
+describe('protected play and story pages return players after login', () => {
+  it('has no bare /login redirects on game/story entry pages', () => {
+    const offenders: string[] = [];
+    for (const file of [...pageFilesUnder('play'), ...pageFilesUnder('story')]) {
+      const src = readFileSync(file, 'utf8');
+      if (/redirect\((['"])\/login\1\)/.test(src)) offenders.push(routeForPageFile(file));
+    }
+    expect(offenders, 'these routes strand a signed-out player on login instead of returning to the attempted page')
+      .toEqual([]);
+  });
+
+  it('literal login return targets match the page that issued them', () => {
+    for (const file of [...pageFilesUnder('play'), ...pageFilesUnder('story')]) {
+      const src = readFileSync(file, 'utf8');
+      const route = routeForPageFile(file);
+      for (const m of src.matchAll(/redirect\((['"])\/login\?next=([^'"]+)\1\)/g)) {
+        expect(decodeURIComponent(m[2]), route).toBe(route);
+      }
+    }
+  });
+});

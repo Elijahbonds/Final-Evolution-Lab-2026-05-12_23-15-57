@@ -45,6 +45,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
             <button
               onClick={() => setOpen(isOpen ? null : f.id)}
               aria-expanded={isOpen}
+              aria-label={`${f.label} family, ${modes.length} modes`}
               className="group flex w-full items-center gap-3.5 rounded-2xl border px-4 py-3 text-left transition-all duration-300"
               style={{
                 borderColor: isOpen ? `${f.accent}55` : 'rgba(255,255,255,0.08)',

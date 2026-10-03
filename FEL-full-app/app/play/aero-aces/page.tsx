@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AeroAcesPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fplay%2Faero-aces');
   // Release wall stays data-driven: adding/removing the WALLED entry in
   // modes/shipStatus.ts is the only switch this player-facing route needs.
   if (isWalled('aeroaces')) {

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 /** /camp — the Camp Blueprint: certify, intake, sessions, templates. */
 export default async function CampPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fcamp');
   return (
     <div className="min-h-screen bg-[#050505] pb-24">
       <CampView />

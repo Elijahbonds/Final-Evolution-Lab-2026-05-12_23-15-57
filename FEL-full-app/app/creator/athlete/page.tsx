@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AthleteCreatorPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fcreator%2Fathlete');
   // PRQ axes are resolved server-side and passed down. Null is a perfectly good answer -- somebody with no
   // body scan gets no ceilings at all, which is the rule the whole attribute layer is built on.
   // HOTFIX (2026-09-24): this passed a hard-coded null, so the editor capped nothing while Finalize capped against

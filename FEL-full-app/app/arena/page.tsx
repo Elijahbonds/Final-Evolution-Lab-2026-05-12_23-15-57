@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function ArenaPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Farena');
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <main className="mx-auto max-w-[960px] px-4 py-8">
