@@ -72,6 +72,7 @@ import { spawnKartDrive, stepKartDrive, type KartDrive } from '../racing/RivalDr
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 import { fitVehicleLight, vehicleEnvFor, VEHICLE_ENV_BASE, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, DustEmitter } from '../racing/speedFx';   // 10-phase pass, phase 8
+import { ExhaustPuffs, bobAmp, bobFreq, frontWheelAngle, rivalSteer, wheelAngle, wrapPi } from '../racing/vehicleMotion';   // 10-phase pass, phase 9
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -206,6 +207,17 @@ let clouds: CloudDeckHandle | null = null;   // 10-phase pass, phase 6: the sky 
 let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
 let speedLines: SpeedLines | null = null;   // 10-phase pass, phase 8: streaks past ~80% of top speed
 let dustFx: DustEmitter | null = null;      // 10-phase pass, phase 8: the rear wheels' continuous dust
+// 10-phase pass, phase 9: the machines move like machines — the wheels (spin + steer + planted bob), the
+// exhaust puffs, and the accumulators that drive them
+interface WheelRef { mesh: Mesh; front: boolean; radius: number; baseY: number }
+let kartWheels: WheelRef[] = [];
+let rivalWheelSets: WheelRef[][] = [];
+let exhaustFx: ExhaustPuffs | null = null;
+let wheelDist = 0;                    // the player's odometer — the spin is distance / radius
+let rivalWheelDist: number[] = [];
+let rivalLastHeading: number[] = [];  // the legacy path has no steerAt; the turn rate stands in
+let rivalSteerSm: number[] = [];
+let bobT = 0;
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -366,7 +378,9 @@ function buildKart(ctx: ModeContext): TransformNode {
   steerWheel = wheel;
 
   // tyres: fronts narrow, rears fat, all four ON the road — and each with a RIM, because a bare cylinder
-  // reads as a disc and a disc at speed reads as nothing at all
+  // reads as a disc and a disc at speed reads as nothing at all. Phase 9 keeps a handle on each: they spin
+  // at road speed, the fronts yaw with the applied steer, and their y counters the body's suspension bob.
+  kartWheels = [];
   for (const [i, [x, z, dia, wide]] of ([
     [-0.60, 0.74, 0.56, 0.20], [0.60, 0.74, 0.56, 0.20],
     [-0.66, -0.74, 0.64, 0.30], [0.66, -0.74, 0.64, 0.30],
@@ -374,6 +388,7 @@ function buildKart(ctx: ModeContext): TransformNode {
     const w = roadWheel(ctx.scene, `kart_wheel_${i}`, dia, wide, dark, chrome);
     w.position.set(x, KART_GROUND_Y + dia / 2, z);
     w.parent = rig;
+    kartWheels.push({ mesh: w, front: z > 0, radius: dia / 2, baseY: KART_GROUND_Y + dia / 2 });
   }
   return rig;
 }
@@ -392,6 +407,9 @@ function buildRivalKart(ctx: ModeContext, name: string, tint: string): Transform
   paint.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.paint, course.mood);
   const dark = VenueKit.paint(ctx.scene, `rival_tyre_${name}`, '#15181f', 0.05, 0.92);
   dark.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.dark, course.mood);
+  // phase 9: rims too — the wheels spin now, and a bare drum would spin invisibly
+  const rimM = VenueKit.paint(ctx.scene, `rival_rim_${name}`, '#8b93a1', 0.06, 0.3);
+  rimM.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.chrome, course.mood); rimM.metallic = 0.7;
   const box = (n: string, w: number, h: number, d: number, at: [number, number, number], m = paint): void => {
     const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
     b.position.set(at[0], at[1], at[2]);
@@ -403,16 +421,18 @@ function buildRivalKart(ctx: ModeContext, name: string, tint: string): Transform
   box('rv_pod_r', 0.2, 0.34, 1.15, [0.62, KART_GROUND_Y + 0.30, -0.18]);
   box('rv_nose', 0.8, 0.18, 0.66, [0, KART_GROUND_Y + 0.20, 0.92]);
   box('rv_seat', 0.6, 0.52, 0.12, [0, KART_HIPS.y + 0.22, KART_HIPS.z - 0.32]);
+  // the same wheels as the player's (phase 9): they spin at the rival's road speed and the fronts steer
+  const set: WheelRef[] = [];
   for (const [i, [x, z, dia, wide]] of ([
     [-0.60, 0.74, 0.56, 0.20], [0.60, 0.74, 0.56, 0.20],
     [-0.66, -0.74, 0.64, 0.30], [0.66, -0.74, 0.64, 0.30],
   ] as const).entries()) {
-    const w = MeshBuilder.CreateCylinder(`rv_wheel_${i}_${name}`, { diameter: dia, height: wide, tessellation: 10 }, ctx.scene);
-    w.rotation.z = Math.PI / 2;
+    const w = roadWheel(ctx.scene, `rv_wheel_${i}_${name}`, dia, wide, dark, rimM);
     w.position.set(x, KART_GROUND_Y + dia / 2, z);
-    w.material = dark;
     w.parent = rig;
+    set.push({ mesh: w, front: z > 0, radius: dia / 2, baseY: KART_GROUND_Y + dia / 2 });
   }
+  rivalWheelSets.push(set);
   return rig;
 }
 
@@ -707,6 +727,24 @@ function tickField(ctx: ModeContext, dt: number): void {
         rk.rotation.y = at.heading + (rivalStun[i] > 0 ? rivalStun[i] * 11 : 0);
       }
       pickups?.shield(i + 1, rk, k.shieldT > 0);
+      // phase 9: the rivals' wheels do what the player's do — spin at their own road speed, fronts
+      // steering. A driven rival's steer comes off its KartState; the legacy path reads its turn rate.
+      const ws = rivalWheelSets[i];
+      if (ws) {
+        rivalWheelDist[i] += (drv ? drv.state.speed : r.speed) * dt;
+        let steer = 0;
+        if (drv) steer = drv.state.steerAt;
+        else {
+          const turn = dt > 0 ? wrapPi(rk.rotation.y - rivalLastHeading[i]) / dt : 0;
+          rivalSteerSm[i] += (rivalSteer(turn) - rivalSteerSm[i]) * Math.min(1, 6 * dt);
+          steer = rivalSteerSm[i];
+        }
+        rivalLastHeading[i] = rk.rotation.y;
+        for (const w of ws) {
+          w.mesh.rotation.x = wheelAngle(rivalWheelDist[i], w.radius);
+          if (w.front) w.mesh.rotation.y = frontWheelAngle(steer);
+        }
+      }
     }
   }
   // CONTACT: a side bump shoves both; closing fast (or with the boost lit) punts the car in front
@@ -994,6 +1032,7 @@ return {
     // tier's own edge let a clean driver at top speed pull 200 m clear in 50 s on STADIUM OVAL. One notch up: rookie runs
     // where the kart's fixed 0.5 used to, legend at the ceiling.
     rivals = makeField(shape.count, kartSpec.vMax, Math.min(1, tier.edge + KART_FIELD_EDGE));
+    rivalWheelSets = []; rivalWheelDist = rivals.map(() => 0); rivalLastHeading = rivals.map(() => 0); rivalSteerSm = rivals.map(() => 0);
     rivalKarts = rivals.map((r) => buildRivalKart(ctx, r.name, r.tint));
     // the field's own karts, on the grid it was dealt (10-phase pass, phase 5)
     const driveLine = circuit?.line ?? null;
@@ -1006,6 +1045,8 @@ return {
     // phase 8: speed you can see — streaks riding the camera, and the rear wheels' dust as one emitter
     speedLines?.dispose(); speedLines = new SpeedLines(ctx.scene, ctx.camera);
     dustFx?.dispose(); dustFx = new DustEmitter(ctx.scene, kart, 'kart');
+    // phase 9: the exhaust putters at the pipe tip, its rate following the throttle
+    exhaustFx?.dispose(); exhaustFx = new ExhaustPuffs(ctx.scene, kart, 'kart', new Vector3(0.62, KART_GROUND_Y + 0.5, -1.35));
     playerDist = 0;
     // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
     ghostRec = new GhostRecorder();
@@ -1302,7 +1343,12 @@ return {
     // THE KART RIDES THE ROAD'S HEIGHT (2026-09-18). This was pinned to the flat ride height "because the track is
     // flat" — the rooftops, the mountain loops and the station platforms are not, so the kart drove at y 0 under a road
     // 56 m up with the chase camera under the terrain. state.pos.y is the road (or the air over it) every frame.
-    kart.position.set(state.pos.x, state.pos.y + KART_RIDE_Y, state.pos.z);
+    // phase 9: the body bobs on its suspension — a hum on tarmac, a bounce on the rough — while the
+    // wheels stay planted (their y counters the bob below)
+    const speed01 = Math.min(1, state.speed / Math.max(1, kartSpec.vMax));
+    bobT += dt * bobFreq(speed01);
+    const bob = Math.sin(bobT * Math.PI * 2) * bobAmp(speed01, !on);
+    kart.position.set(state.pos.x, state.pos.y + KART_RIDE_Y + bob, state.pos.z);
 
     // THE FIELD MOVES. playerDist is PROGRESS ALONG THE ROAD (racing pass phase 6), laps plus where the kart projects
     // onto the circuit line — the axis the rivals now run. It was distance TRAVELLED, which counted every weave and
@@ -1348,6 +1394,16 @@ return {
     bodyRoll += (rollWant - bodyRoll) * Math.min(1, 9 * dt);
     bodyPitch += (pitchWant - bodyPitch) * Math.min(1, 7 * dt);
     kart.rotation.set(bodyPitch, state.heading + (S.spinT > 0 ? S.spinT * 11 : 0), bodyRoll);   // a shell or a punt spins the body; the travel carries on
+    // phase 9: the wheels. Spin is the odometer over each tyre's own radius (the fat rears turn slower);
+    // the fronts yaw with the APPLIED steer — what the tyres are doing, not what the thumbs asked; and
+    // the wheel y counters the body's bob so the tyres stay on the road. On a wheel mesh Babylon composes
+    // Y·X·Z over the tyre's fixed z-tilt, so x is the roll and y the steer.
+    wheelDist += state.speed * dt;
+    for (const w of kartWheels) {
+      w.mesh.rotation.x = wheelAngle(wheelDist, w.radius);
+      if (w.front) w.mesh.rotation.y = frontWheelAngle(state.steerAt);
+      w.mesh.position.y = w.baseY - bob;
+    }
     // the driver leans into the corner — shoulders following the turn, not a board rider's whole-body bank:
     // a seated body is belted in and cannot lean like that (8° at full lock against the boards' 22°)
     if (driver) {
@@ -1387,6 +1443,7 @@ return {
     // and the burn gets the engine's exhaust note under the whoosh
     speedLines?.update(S.done ? 0 : state.speed / Math.max(1, kartSpec.vMax));
     dustFx?.update(!on ? 'offRoad' : state.drifting ? 'drift' : 'off');
+    exhaustFx?.update(S.done ? 0 : S.input.throttle);   // phase 9: the pipe putters with the throttle
     if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); SoundKit.play('exhaust', { volume: 0.8 }); }
     if (bev.full) say('BOOST READY', 0.8);
     // RACING PASS phase 3: an empty press already ticks and flags the HUD pill; it now also SAYS what fills the tank
@@ -1461,6 +1518,9 @@ return {
     venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null; clouds?.dispose(); clouds = null;
     vehicleLight?.dispose(); vehicleLight = null;
     speedLines?.dispose(); speedLines = null; dustFx?.dispose(); dustFx = null;
+    exhaustFx?.dispose(); exhaustFx = null;
+    kartWheels = []; rivalWheelSets = []; rivalWheelDist = []; rivalLastHeading = []; rivalSteerSm = [];
+    wheelDist = 0; bobT = 0;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];

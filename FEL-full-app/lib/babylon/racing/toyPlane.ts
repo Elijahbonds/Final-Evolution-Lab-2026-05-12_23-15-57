@@ -17,12 +17,17 @@ import { Color3, Mesh, MeshBuilder, TransformNode, Vector3 } from '@babylonjs/co
 import type { PBRMaterial, Scene } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { vehicleEnvFor, PLANE_ENV_BASE } from './vehicleLight';   // 10-phase pass, phase 7
+import { propBlurK, PROP_BLUR } from './vehicleMotion';           // 10-phase pass, phase 9
 import type { VenueMood } from '../scene/moods';
 
 export interface ToyPlane {
   root: TransformNode;
   /** Turned by the mode, fast. */
   prop: TransformNode;
+  /** The blur disc that takes over from the blades at high rpm (phase 9). */
+  propDisc: Mesh;
+  /** The two blades — faded toward the disc as the rpm climbs (phase 9). */
+  propBlades: Mesh[];
   /** The wingtip anchors (left, right) the phase-8 trails stream from — model-space, so they ride the scale. */
   wingtips: [TransformNode, TransformNode];
   /** Where the pilot's hips go (local to root). */
@@ -76,10 +81,19 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
   const prop = new TransformNode(`toy_prop_${name}`, scene); prop.parent = model; prop.position.z = 2.45;
   const spinner = add(MeshBuilder.CreateSphere(`toy_spinner_${name}`, { diameterX: 0.6, diameterY: 0.6, diameterZ: 0.95, segments: 12 }, scene), cream, prop);
   spinner.position.z = 0.15;
+  const propBlades: Mesh[] = [];
   for (const s of [0, 1]) {
     const blade = add(MeshBuilder.CreateCapsule(`toy_blade_${name}_${s}`, { height: 2.6, radius: 0.16, tessellation: 10, subdivisions: 2 }, scene), dark, prop);
     blade.rotation.z = s * Math.PI; blade.position.y = 0; blade.scaling.set(1, 1, 0.35);
+    propBlades.push(blade);
   }
+  // the blur disc (phase 9): past the tune's blur gate the blades smear into this — a translucent disc
+  // fading in as the blades fade out, the way a fast prop actually photographs. Its own material (the
+  // blades share `dark` with the struts, and the chase camera watches the disc's back).
+  const blurM = paint(scene, `toy_blurmat_${name}`, '#4a505c', 0.02, 0.7, env);
+  blurM.backFaceCulling = false;
+  const propDisc = add(MeshBuilder.CreateDisc(`toy_blur_${name}`, { radius: 1.32, tessellation: 28 }, scene), blurM, prop);
+  propDisc.visibility = 0;
 
   // ── one thick straight wing with round tips, a stripe of trim ──
   const wing = add(MeshBuilder.CreateCapsule(`toy_wing_${name}`, { height: 8.6, radius: 0.55, tessellation: 14, subdivisions: 4 }, scene), trim);
@@ -144,10 +158,18 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
   }
 
   return {
-    root, prop, wingtips, seat, scarfAnchor, body,
+    root, prop, propDisc, propBlades, wingtips, seat, scarfAnchor, body,
     parts,
     dispose() { for (const p of parts) p.dispose(); model.dispose(); root.dispose(); },
   };
+}
+
+/** Phase 9: the prop's blur for an rpm — the disc fades in as the blades fade out (per-mesh visibility:
+ *  the blades share their material with the struts, so a material alpha would fade half the plane). */
+export function blurProp(plane: ToyPlane, rpm: number, from: number, to: number): void {
+  const k = propBlurK(rpm, from, to);
+  plane.propDisc.visibility = k * PROP_BLUR.discAlpha;
+  for (const b of plane.propBlades) b.visibility = 1 - k * PROP_BLUR.bladeFade;
 }
 
 /** The pilot's scarf: a ribbon that streams back off the neck and ripples with speed. */

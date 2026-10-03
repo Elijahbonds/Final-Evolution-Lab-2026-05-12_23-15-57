@@ -62,8 +62,9 @@ function streakTexture(scene: Scene) {
   return tex;
 }
 
-/** A soft 16×16 dot, once per scene (EffectsKit's dot is private to it; same recipe). */
-function moteTexture(scene: Scene) {
+/** A soft 16×16 dot, once per scene (EffectsKit's dot is private to it; same recipe). Exported for the
+ *  phase-9 exhaust puffs, which share the sprite. */
+export function moteTexture(scene: Scene) {
   const existing = scene.getTextureByName('fx_mote');
   if (existing) return existing;
   const tex = new DynamicTexture('fx_mote', { width: 16, height: 16 }, scene, false);

@@ -260,7 +260,16 @@ flat, and flagged.
 
 **Pass check:** before/after screenshots (wheel/prop motion across frames); perf line flat; ci-suite green.
 
-- [ ] done
+- [x] done — `lib/babylon/racing/vehicleMotion.ts`: all four kart wheels (player AND rivals) spin off an
+  odometer over each tyre's own radius, fronts yaw with the applied `state.steerAt` (rivals: their drive
+  state, or the measured turn rate on the legacy path); `roadWheel` gained three rim spokes so the spin is
+  visible at all (rivals upgraded from bare drums to the same wheels); the body bobs on the suspension
+  (`bobAmp`/`bobFreq`) while the wheels' y counters it and stays planted; `ExhaustPuffs` streams from the
+  pipe tip with the throttle. Aero: the prop rates moved into `AERO_TUNE.prop` (same signed-off numbers)
+  and the blades smear into a translucent blur disc past the gate (`blurProp`, per-mesh visibility — the
+  blades share a material with the struts). Perf mobile tier: kart 58fps/295 draws/38 meshes, aero
+  60fps/159 draws (p8: 59/294 and 60/159) — flat. tsc 0; vitest 825/825 (+14 vehicleMotion tests);
+  ci-suite 189 green. Shots: docs/shots/pr138/p9-after.
 
 ## Phase 10 — HUD readability
 

@@ -21,4 +21,10 @@ export const AERO_TUNE = {
    * own values, owned here now so an aero-camera change stops being a shared-preset change.
    */
   cam: { distance: 13.5, height: 4.6, lag: 0.09, lookAhead: 9.0 },
+  /**
+   * The prop's spin rates, rad/s (10-phase pass, phase 9). These are the values the mode already ran —
+   * moved here, not re-tuned: the grid's rev, the airborne idle/gas/boost terms, the field's constant hum,
+   * and the gate where the blades smear into the blur disc (full gas is 48, a lit boost 68, rivals 40).
+   */
+  prop: { gridIdle: 6, gridGas: 40, idle: 18, gas: 30, boost: 20, rival: 40, blurFrom: 34, blurTo: 58 },
 } as const;

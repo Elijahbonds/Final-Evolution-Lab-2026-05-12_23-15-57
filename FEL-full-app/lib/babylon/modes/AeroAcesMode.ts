@@ -66,7 +66,7 @@ import {
 } from '../racing/AeroItems';
 import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/aeroCircuits';
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
-import { buildToyPlane, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
+import { buildToyPlane, blurProp, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
 import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, WingtipTrails } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { AeroPickups } from '../racing/aeroPickups';
@@ -458,7 +458,9 @@ export function makeAeroAcesMode(): ModeDefinition {
         if (!st.wentGo) {
           player.root.position.copyFrom(flight.pos);
           player.root.rotation.set(-flight.pitch, flight.heading, -flight.roll);
-          player.prop.rotation.z += (6 + 40 * S.input.gas) * dt;   // the engine revs on the grid
+          const gridRpm = AERO_TUNE.prop.gridIdle + AERO_TUNE.prop.gridGas * S.input.gas;   // the engine revs on the grid
+          player.prop.rotation.z += gridRpm * dt;
+          blurProp(player, gridRpm, AERO_TUNE.prop.blurFrom, AERO_TUNE.prop.blurTo);
           rivals.forEach((r, i) => {
             const rp = rivalPlanes[i]; if (!rp) return;
             const place = rivalPlacement(r, line!);
@@ -567,7 +569,10 @@ export function makeAeroAcesMode(): ModeDefinition {
       // ── the plane and the pilot ──
       player.root.position.copyFrom(flight.pos);
       player.root.rotation.set(-flight.pitch, flight.heading, -flight.roll);
-      player.prop.rotation.z += (18 + 30 * S.input.gas + 20 * S.input.boostK) * dt;
+      // phase 9: the prop rate lives in AERO_TUNE, and past the blur gate the blades smear into the disc
+      const propRpm = AERO_TUNE.prop.idle + AERO_TUNE.prop.gas * S.input.gas + AERO_TUNE.prop.boost * S.input.boostK;
+      player.prop.rotation.z += propRpm * dt;
+      blurProp(player, propRpm, AERO_TUNE.prop.blurFrom, AERO_TUNE.prop.blurTo);
       scarf?.update(dt, Math.min(1, flight.speed / tune.top));
       pickups?.shield(PLAYER_ID, player.root, S.shieldT > 0);
 
@@ -672,7 +677,8 @@ export function makeAeroAcesMode(): ModeDefinition {
             k.roll += ((dt > 0 ? Math.max(-0.8, Math.min(0.8, (turn / dt) * 0.5)) : 0) - k.roll) * Math.min(1, 5 * dt);
             rp.root.rotation.set(0, place.heading, -k.roll + tumble);
           }
-          rp.prop.rotation.z += 40 * dt;
+          rp.prop.rotation.z += AERO_TUNE.prop.rival * dt;
+          blurProp(rp, AERO_TUNE.prop.rival, AERO_TUNE.prop.blurFrom, AERO_TUNE.prop.blurTo);
           pickups?.shield(i + 1, rp.root, k.shieldT > 0);
         }
       });
