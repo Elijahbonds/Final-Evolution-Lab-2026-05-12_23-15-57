@@ -8,7 +8,7 @@ export type GameModeKey =
   | 'dunkContest' | 'hoops1v1' | 'streetball' | 'threePoint'
   | 'karate' | 'tennis' | 'skateboard' | 'soccer' | 'baseball'
   | 'golf' | 'freerun' | 'training' | 'carnival'
-  | 'mixedcombat' | 'dunkduel' | 'sprint' | 'showdown' | 'duel' | 'brainBrawl';
+  | 'mixedcombat' | 'dunkduel' | 'sprint' | 'showdown' | 'duel' | 'brainBrawl' | 'tiebreak';
 
 // Modes rendered with the real-time 3D engine. Everything else stays 2D.
 const THREE_D_MODES: Partial<Record<string, boolean>> = {
@@ -48,6 +48,7 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // golf) on the shared makeTimingSportMode core with swept-hit contact. The
   // route flag keys map to registry modes: baseball→derby, soccer→penalty.
   tennis: true,
+  tiebreak: true,
   golf: true,
   baseball: true,
   soccer: true,
@@ -74,7 +75,7 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   karateVersus: true,
   mixedcombat: true,
   dunkduel: true,
-  // These four mount Babylon unconditionally from their own loaders (all pass `ownControls`), so the flag was simply
+  // These modes mount Babylon unconditionally from their own loaders (all pass `ownControls`), so the flag was simply
   // untrue for them — and anything that asks "is this a Babylon mode?" (the shell's input owner, above) read the wrong
   // answer. Ported from elijahbonds-fel-upgrade-pass, 2026-09-12.
   volleyball: true,

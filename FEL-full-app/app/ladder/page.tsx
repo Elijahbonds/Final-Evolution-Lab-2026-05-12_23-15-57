@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 /** /ladder — the mastery ladder: this week's standing, recent seasons, your PRQ grade (pass 5 phase 4). */
 export default async function LadderPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fladder');
   return (
     <div className="min-h-screen bg-[#050505] pb-24 text-white">
       <LadderView />

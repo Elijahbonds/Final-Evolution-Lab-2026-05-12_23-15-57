@@ -38,11 +38,13 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
   const router = useRouter();
   const [data, setData] = useState<CampaignStatus | null>(initialData ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) return;
     let cancelled = false;
+    setError(null);
     fetch('/api/story', { cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Story load failed (${res.status})`);
@@ -59,7 +61,7 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
     return () => {
       cancelled = true;
     };
-  }, [initialData]);
+  }, [initialData, loadAttempt]);
 
   const selectedZone = useMemo(
     () => data?.zones.find((z) => z.id === selectedZoneId) ?? null,
@@ -84,8 +86,24 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
 
   if (error) {
     return (
-      <div className={cn('flex h-full items-center justify-center', className)}>
+      <div className={cn('flex h-full flex-col items-center justify-center gap-3 text-center', className)}>
         <p className="text-sm text-red-400">{error}</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLoadAttempt((n) => n + 1)}
+            className="rounded-md border border-cyan-400/60 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-200 transition-colors hover:bg-cyan-400/10"
+          >
+            Retry story
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/play')}
+            className="rounded-md border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-white/70 transition-colors hover:border-white/35 hover:text-white"
+          >
+            Back to Play
+          </button>
+        </div>
       </div>
     );
   }

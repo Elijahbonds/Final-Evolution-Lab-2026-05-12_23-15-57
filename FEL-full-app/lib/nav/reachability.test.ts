@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DOORS } from './doors';
 import { TABS } from '../../components/shell/tab-bar';
 import { FAMILIES, OFF_SHELF } from './families';
+import { MODE_INFO } from '@/lib/game-data';
 
 /**
  * The orphan test.
@@ -78,8 +79,16 @@ function everyLinkTarget(): Set<string> {
   // Links the shell builds from data rather than writing literally.
   for (const t of TABS) hrefs.add(t.href);
   for (const d of DOORS) hrefs.add(d.href);
-  for (const f of FAMILIES) for (const m of f.modes) hrefs.add('/play/' + m);
-  for (const k of Object.keys(OFF_SHELF)) hrefs.add('/play/' + k);
+  for (const f of FAMILIES) {
+    for (const m of f.modes) {
+      const href = MODE_INFO[m]?.href;
+      if (href?.startsWith('/')) hrefs.add(href);
+    }
+  }
+  for (const k of Object.keys(OFF_SHELF)) {
+    const href = MODE_INFO[k]?.href;
+    if (href?.startsWith('/')) hrefs.add(href);
+  }
   return hrefs;
 }
 
@@ -123,5 +132,47 @@ describe('the doors', () => {
 
   it('gives every tab some depth', () => {
     for (const t of TABS) expect(DOORS.filter((d) => d.tab === t.id).length, t.id).toBeGreaterThan(2);
+  });
+});
+
+function pageFilesUnder(routeRoot: string): string[] {
+  const base = join(ROOT, 'app', routeRoot);
+  const out: string[] = [];
+  const scan = (dir: string) => {
+    for (const e of readdirSync(dir)) {
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) { scan(p); continue; }
+      if (e === 'page.tsx') out.push(p);
+    }
+  };
+  scan(base);
+  return out.sort();
+}
+
+function routeForPageFile(file: string): string {
+  const appRoot = join(ROOT, 'app');
+  const rel = file.slice(appRoot.length + 1).replace(/\/page\.tsx$/, '');
+  return '/' + rel;
+}
+
+describe('protected play and story pages return players after login', () => {
+  it('has no bare /login redirects on game/story entry pages', () => {
+    const offenders: string[] = [];
+    for (const file of [...pageFilesUnder('play'), ...pageFilesUnder('story')]) {
+      const src = readFileSync(file, 'utf8');
+      if (/redirect\((['"])\/login\1\)/.test(src)) offenders.push(routeForPageFile(file));
+    }
+    expect(offenders, 'these routes strand a signed-out player on login instead of returning to the attempted page')
+      .toEqual([]);
+  });
+
+  it('literal login return targets match the page that issued them', () => {
+    for (const file of [...pageFilesUnder('play'), ...pageFilesUnder('story')]) {
+      const src = readFileSync(file, 'utf8');
+      const route = routeForPageFile(file);
+      for (const m of src.matchAll(/redirect\((['"])\/login\?next=([^'"]+)\1\)/g)) {
+        expect(decodeURIComponent(m[2]), route).toBe(route);
+      }
+    }
   });
 });

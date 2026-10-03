@@ -113,6 +113,12 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     X: { label: 'DROP', emit: A('X') },
     Y: { label: 'LOB', emit: A('Y') },
   }),
+  // Tiebreak is a read-the-side timing mode. The d-pad is the primary input, and the mode also accepts X/B as
+  // left/right swing aliases so a touch player gets the two real verbs instead of MODE_VERBS.default's ACTION.
+  tiebreak: verbs({
+    X: { label: 'LEFT', emit: A('X') },
+    B: { label: 'RIGHT', emit: A('B') },
+  }),
   // PARKOUR DERBY (2026-09-18): B is the BAT-FLIP VAULT, the wind-up trick that fills flow for a KINETIC swing. It
   // shipped with no touch slot, so on a tablet or the on-screen pad the derby's whole trick economy was unreachable —
   // a player could swing, and could never earn the swing that scores.
@@ -281,7 +287,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
 // a control that does nothing. Unlisted = 'LOOK'.
 const R_STICK: Record<string, string | null> = {
   skateboard: 'FLICK',                                   // the trick input — never stolen for the camera
-  tennis: null, volleyball: null,                        // the rally camera is a cut behind the baseline
+  tennis: null, tiebreak: null, volleyball: null,         // the rally camera is a cut behind the baseline
   golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give
   carnival: null,                                        // the hub's bursts cut between fixed and follow shots
   dance: null, who_scene_it: null,                       // no follow camera

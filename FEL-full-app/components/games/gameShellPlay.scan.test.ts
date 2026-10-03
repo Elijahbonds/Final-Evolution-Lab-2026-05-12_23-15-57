@@ -150,3 +150,26 @@ describe('an answer that lands after REPLAY writes nothing to the next run\'s ca
     expect(between(h, 'if (j?.ok) {', "fetch('/api/story/complete'")).toMatch(/if \(mine\(\) && j\?\.paid === true\) \{[\s\S]*setRecapCoins\(\{ coins, capped \}\)/);
   });
 });
+
+describe('the profile failure state is a stop, not a spinner plus a stop', () => {
+  it('only a 401 profile response sends a player to login with a return path', () => {
+    const profileFetch = between(shell, "fetch('/api/profile')", 'return () => {');
+    expect(profileFetch).toContain('if (r?.status === 401) return { unauthorized: true };');
+    expect(profileFetch).toContain('return { unreachable: true };');
+    expect(profileFetch).toContain('router.replace(`/login?next=${encodeURIComponent(next)}`);');
+    expect(profileFetch).not.toContain("router.replace('/login');");
+  });
+
+  it('when /api/profile is unreachable, the retry panel replaces the loader instead of rendering underneath it', () => {
+    const profileBlock = between(shell, '{!profile && unreachable && (', '<AnimatePresence>');
+    expect(profileBlock).toContain("Can&apos;t reach the server. Check your connection, then try again.");
+    expect(profileBlock).toContain(') : !unreachable ? (');
+    expect(profileBlock).toContain('<Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />');
+    expect(profileBlock).toContain(') : null}');
+  });
+
+  it('the virtual touch pad follows the same Babylon ownership predicate as the physical bridge', () => {
+    expect(shell).toContain('const babylonOwnsInput = isBabylon(mode) || !!ownControls;');
+    expect(shell).toContain('{profile && scheme && !result && !babylonOwnsInput && !streamOn && <VirtualController scheme={scheme} />}');
+  });
+});

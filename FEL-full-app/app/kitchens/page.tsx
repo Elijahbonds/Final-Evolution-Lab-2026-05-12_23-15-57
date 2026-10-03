@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function KitchensPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fkitchens');
   return <KitchenLoader />;
 }
