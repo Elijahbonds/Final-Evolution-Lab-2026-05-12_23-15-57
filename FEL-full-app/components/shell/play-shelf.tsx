@@ -43,6 +43,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
         return (
           <section key={f.id} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 40}ms` }}>
             <button
+              type="button"
               onClick={() => setOpen(isOpen ? null : f.id)}
               aria-expanded={isOpen}
               aria-label={`${f.label} family, ${modes.length} modes`}

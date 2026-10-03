@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { SHELF_LEDE, SHELF_MODE_COUNT, FAMILIES, OFF_SHELF, familyById, familyOf, shelvedModes } from './families';
 import { MODE_INFO } from '@/lib/game-data';
 
 const KNOWN = new Set(Object.keys(MODE_INFO as Record<string, unknown>));
+const ROOT = process.cwd();
+
+function pageForHref(href: string): string {
+  const path = href.replace(/[?#].*$/, '');
+  return path === '/' ? join(ROOT, 'app/page.tsx') : join(ROOT, 'app', path.slice(1), 'page.tsx');
+}
 
 describe('the mode shelf', () => {
   it('every shelved mode is a mode that exists', () => {
@@ -46,6 +54,14 @@ describe('the mode shelf', () => {
       expect(KNOWN.has(mode), `${mode} is off the shelf but does not exist`).toBe(true);
       expect(why.length, mode).toBeGreaterThan(20);
     }
+  });
+
+  it('every internal catalogue href resolves to a page — shelf links cannot go dark', () => {
+    const dark = Object.entries(MODE_INFO)
+      .filter(([, info]) => info.href.startsWith('/'))
+      .filter(([, info]) => !existsSync(pageForHref(info.href)))
+      .map(([mode, info]) => `${mode} -> ${info.href}`);
+    expect(dark).toEqual([]);
   });
 
   it('looks up both ways', () => {
