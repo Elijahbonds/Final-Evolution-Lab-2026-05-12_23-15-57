@@ -195,17 +195,11 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   whoSceneIt: { name: 'Who Scene It', venue: 'NeuroArena', href: '/play/who-scene-it' },
   bigAir: { name: 'Stomp', venue: 'Mountain Slope', href: '/play/big-air' },
   tiebreak: { name: 'Tiebreak Blitz', venue: 'Venice Tennis Court', href: '/play/tiebreak' },
-  // sprint: RETIRED from the v1 roster (owner decision, 2026-09-01 — no locked
-  // benchmark and nobody chose one; see PHASE2_BENCHMARK_LOCKS.md TIER B). The
-  // route redirects to /play; the mode file stays in the tree for a future
-  // revival with a real benchmark.
+  // sprint / duel / showdown were retired from the v1 roster on 2026-09-01, then revived when the owner asked
+  // to include and improve them. They are enabled Babylon routes now; keep the catalogue rows live.
   storyMode: { name: 'The Nexus Initiative', venue: 'The Nexus', href: '/story' },
   football: { name: 'Breakaway', venue: 'The Gridiron', href: '/play/football' },
   mixedcombat: { name: "Ring's Edge", venue: 'The Octagon', href: '/play/mixedcombat' },
-  // duel + showdown: RETIRED from the v1 roster (owner, 2026-09-01 — combat is
-  // Karate VS / Karate Endless / Mixed Combat only; karate-vs is the Storm
-  // mode). Routes redirect to /play; mode files stay registered for a future
-  // revival. See PHASE2_BENCHMARK_LOCKS.md post-lock retirements.
   dunkduel: { name: 'Prove It', venue: 'Venice Beach Court', href: '/play/dunkduel' },
   volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
