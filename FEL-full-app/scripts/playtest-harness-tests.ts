@@ -85,8 +85,8 @@ async function main() {
     assert.strictEqual(api.active(), null);
   });
 
-  // ---- Part B: every wired 3D mode registers + unregisters --------------
-  const wired: Record<string, string> = {
+  // ---- Part B: every playable host registers + unregisters --------------
+  const legacyWired: Record<string, string> = {
     'dunk-game-3d.tsx': 'dunk',
     'one-v-one-3d.tsx': 'onevone',
     'basketball-3d.tsx': 'basketball',
@@ -98,12 +98,53 @@ async function main() {
     'three-point-3d.tsx': 'threePoint',
     'three-v-three-3d.tsx': 'threeVThree',
   };
-  check(`every wired 3D mode registers + unregisters (${Object.keys(wired).length})`, () => {
-    for (const [file, id] of Object.entries(wired)) {
+  check(`every legacy 3D mode registers + unregisters (${Object.keys(legacyWired).length})`, () => {
+    for (const [file, id] of Object.entries(legacyWired)) {
       const src = fs.readFileSync(path.join(ROOT, 'components', 'games', file), 'utf8');
       assert.ok(src.includes(`registerFelMode('${id}'`), `${file} must registerFelMode('${id}')`);
       assert.ok(src.includes(`unregisterFelMode('${id}')`), `${file} must unregisterFelMode('${id}')`);
       assert.ok(/getState:/.test(src) && /sendInput:/.test(src), `${file} bridge needs getState + sendInput`);
+    }
+  });
+
+  const babylonWired: Record<string, string> = {
+    'aero-aces-babylon.tsx': 'aeroaces',
+    'air-session-babylon.tsx': 'modeKey',
+    'basketball-babylon.tsx': 'onevone',
+    'board-babylon.tsx': 'modeKey',
+    'brainbrawl-babylon.tsx': 'brainbrawl',
+    'carnival-babylon.tsx': 'carnival',
+    'duel-babylon.tsx': 'duel',
+    'dunk-babylon.tsx': 'dunk',
+    'dunkduel-babylon.tsx': 'dunkduel',
+    'football-babylon.tsx': 'football',
+    'freerun-babylon.tsx': 'freerun',
+    'karate-babylon.tsx': 'karate',
+    'karate-vs-babylon.tsx': 'karate_vs',
+    'mixedcombat-babylon.tsx': 'mixedcombat',
+    'showdown-babylon.tsx': 'showdown',
+    'sprint-babylon.tsx': 'modeKey',
+    'three-point-babylon.tsx': 'threepoint',
+    'three-v-three-babylon.tsx': 'threevthree',
+    'timing-babylon.tsx': 'modeKey',
+    'velocity-kart-babylon.tsx': 'velocitykart',
+    'who-scene-it-babylon.tsx': 'who_scene_it',
+  };
+  check(`every Babylon host registers with the playtest bridge (${Object.keys(babylonWired).length})`, () => {
+    const gamesDir = path.join(ROOT, 'components', 'games');
+    const actual = fs.readdirSync(gamesDir).filter((f) => f.endsWith('-babylon.tsx')).sort();
+    assert.deepStrictEqual(actual, Object.keys(babylonWired).sort(), 'babylon host manifest must list every *-babylon.tsx file');
+
+    const bridgeSrc = fs.readFileSync(path.join(gamesDir, 'use-babylon-playtest-bridge.ts'), 'utf8');
+    assert.ok(bridgeSrc.includes('registerFelMode(modeId'), 'Babylon playtest bridge must register modes');
+    assert.ok(bridgeSrc.includes('unregisterFelMode(modeId'), 'Babylon playtest bridge must unregister modes');
+    assert.ok(bridgeSrc.includes('emitPlaytestInput'), 'Babylon playtest bridge must route sendInput to InputBus');
+
+    for (const [file, id] of Object.entries(babylonWired)) {
+      const src = fs.readFileSync(path.join(gamesDir, file), 'utf8');
+      const expected = id === 'modeKey' ? 'useBabylonPlaytestBridge(modeKey' : `useBabylonPlaytestBridge('${id}'`;
+      assert.ok(src.includes("use-babylon-playtest-bridge"), `${file} must import the Babylon playtest bridge`);
+      assert.ok(src.includes(expected), `${file} must call ${expected}`);
     }
   });
 

@@ -12,6 +12,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 type Hud = Record<string, HudValue>;
 
@@ -28,6 +29,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('dunkduel', () => ({ phase, countdown, loadError, hud }), busRef.current);
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
 

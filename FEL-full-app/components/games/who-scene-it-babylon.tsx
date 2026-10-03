@@ -9,6 +9,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
 import { PausedLayer, BodyReadyLine } from './paused-layer';
 import { whoSceneItStageBox } from '@/lib/babylon/modes/whoSceneItFrame';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 type Hud = Record<string, HudValue>;
 const OPTS: { key: 'optA' | 'optB' | 'optX' | 'optY'; btn: 'A' | 'B' | 'X' | 'Y'; face: string; dpad: string; color: string }[] = [
@@ -27,6 +28,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('who_scene_it', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;

@@ -21,6 +21,7 @@ import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
 import { MicCaption, MicToggle } from './mic-caption';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 
 type Hud = Record<string, HudValue>;
 
@@ -56,6 +57,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const [hud, setHud] = useState<Hud>({});
   // CONTROLLER-UNIVERSAL-MULTI: the chips and the phone link need the bus in RENDER, and busRef alone never re-renders
   const [bus, setBus] = useState<InputBus | null>(null);
+  useBabylonPlaytestBridge('dunk', () => ({ phase, countdown, loadError, hud }), bus ?? busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;
