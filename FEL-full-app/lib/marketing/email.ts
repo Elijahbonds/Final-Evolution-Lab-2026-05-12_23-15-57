@@ -68,7 +68,7 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
     <h2 style="margin:0 0 10px;font-size:22px">Welcome${name ? `, ${name}` : ''} 🔥</h2>
     <p style="color:#c7cbd1;line-height:1.6">You just stepped into the lab. Train across every mode, earn <b style="color:#FFD700">coins</b> and prestige <b style="color:#C79BFF">shards</b>, and climb the ranks.</p>
     <p style="color:#c7cbd1;line-height:1.6">Jump in and play your first session to start earning.</p>
-    <a href="${url}/modes" style="display:inline-block;margin-top:8px;background:#00E5FF;color:#001014;font-weight:700;padding:11px 20px;border-radius:10px;text-decoration:none">Enter the Lab</a>`;
+    <a href="${url}/play" style="display:inline-block;margin-top:8px;background:#00E5FF;color:#001014;font-weight:700;padding:11px 20px;border-radius:10px;text-decoration:none">Enter the Lab</a>`;
   return send({ notificationId: process.env.NOTIF_ID_WELCOME_EMAIL, subject: 'Welcome to Final Evolution Lab', body: shell(inner), recipient: to });
 }
 
@@ -83,7 +83,7 @@ export async function sendReengageEmail(to: string, name: string | null | undefi
   const url = process.env.NEXTAUTH_URL || '';
   const inner = `<h2 style="margin:0 0 10px;font-size:22px">Your lab is waiting${name ? `, ${name}` : ''}</h2>
     <p style="color:#c7cbd1;line-height:1.6">You've banked <b style="color:#FFD700">${coins.toLocaleString('en-US')} coins</b> and <b style="color:#C79BFF">${shards.toLocaleString('en-US')} shards</b>. Come back for a run and keep the streak alive.</p>
-    <a href="${url}/modes" style="display:inline-block;margin-top:8px;background:#00FF9D;color:#00140c;font-weight:700;padding:11px 20px;border-radius:10px;text-decoration:none">Play Now</a>`;
+    <a href="${url}/play" style="display:inline-block;margin-top:8px;background:#00FF9D;color:#00140c;font-weight:700;padding:11px 20px;border-radius:10px;text-decoration:none">Play Now</a>`;
   return send({ notificationId: process.env.NOTIF_ID_COME_BACK_PLAY, subject: 'Your Final Evolution Lab rewards are waiting', body: shell(inner), recipient: to });
 }
 

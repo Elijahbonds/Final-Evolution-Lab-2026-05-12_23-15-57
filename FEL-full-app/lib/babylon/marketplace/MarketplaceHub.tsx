@@ -24,16 +24,16 @@ const KINDS: { id: ListingKind; label: string }[] = [
 
 // HOTFIX (2026-09-24): with no shards seam the Marketplace is a PREVIEW that takes nothing (see `preview` below). Every
 // shard figure on it has to agree with the banner, so the receipt and the ✦ Cell tool prices come from here.
-/** The note after a BUY: a real receipt with a seam, and the plain truth in the preview. */
+/** The note after a BUY: a real receipt with a seam, and the fail-closed truth in the preview. */
 export function buyNote(preview: boolean, sellerNetShards: number): string {
   return preview
-    ? 'Yours in this preview. No Shards were spent and the seller was not paid.'
+    ? 'Preview only. No Shards were spent and ownership did not transfer.'
     : `Yours! Seller nets ${sellerNetShards}◈`;
 }
 
-/** The price tag on a ✦ Cell tool button: its shard cost with a seam, "free in preview" without one. */
+/** The price tag on a ✦ Cell tool button: its shard cost with a seam, locked without one. */
 export function cellToolPrice(preview: boolean, costShards: number): string {
-  return preview ? 'free in preview' : `${costShards}◈`;
+  return preview ? 'locked in preview' : `${costShards}◈`;
 }
 
 export default function MarketplaceHub({
@@ -67,15 +67,19 @@ export default function MarketplaceHub({
   void rev;
 
   const say = (m: string) => { setNote(m); setTimeout(() => setNote(''), 2600); };
-  // HOTFIX (2026-09-24): nothing passes spendShards (app/market mounts <MarketplaceHub /> with no props), so every BUY
-  // and every ✦ Cell tool is free, and listings and purchases live only in this browser's localStorage. It takes
-  // nothing real, but it read as a real shop ("Yours! Seller nets 135◈"). The owner's economy-honesty call: label it a
-  // preview, on the page, in the receipt and on the Cell tool buttons, until the seam and the server sync exist.
+  // Without a seam the market is a catalogue preview only. Dynamic listing prices live in localStorage today, so they
+  // cannot safely be charged through the generic SKU spend route; fail closed until a server-owned market buy route exists.
   const preview = !spendShards;
+  const needWallet = (action: string): boolean => {
+    if (!preview) return true;
+    console.info(`[FEL-MARKET] SHARDS SEAM not wired — refusing "${action}" until market wallet sync exists`);
+    say(`${action} needs wallet sync before it can spend Shards.`);
+    return false;
+  };
   const trySpend = async (cost: number, reason: string): Promise<boolean> => {
     if (spendShards) return spendShards(cost, reason);
-    console.info(`[FEL-MARKET] SHARDS SEAM not wired — allowing "${reason}" (${cost}) for free`);
-    return true;
+    console.info(`[FEL-MARKET] SHARDS SEAM not wired — refusing "${reason}" (${cost})`);
+    return false;
   };
 
   const pickFile = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -119,6 +123,7 @@ export default function MarketplaceHub({
   };
 
   const buy = async (l: MarketListing): Promise<void> => {
+    if (!needWallet('Buying')) return;
     const receipt = await Marketplace.buy(l.id, trySpend, l.sellerHasPass ? { active: true, currentPeriodEnd: null, cancelAtPeriodEnd: false } : null);
     if (!receipt) { say('Purchase failed'); return; }
     setRev((r) => r + 1);
@@ -127,6 +132,7 @@ export default function MarketplaceHub({
 
   const startOutline = async (): Promise<void> => {
     if (!topic.trim()) { say('Give Cell a topic'); return; }
+    if (!needWallet('Cell outlines')) return;
     const ok = await trySpend(OUTLINE_COST_SHARDS, 'book outline');
     if (!ok) { say('Not enough Shards'); return; }
     setOutline(draftOutline(topic));
@@ -136,6 +142,7 @@ export default function MarketplaceHub({
 
   const scaffoldChapter = async (): Promise<void> => {
     if (!outline) return;
+    if (!needWallet('Cell scaffolds')) return;
     const ok = await trySpend(CHAPTER_DRAFT_COST_SHARDS, `chapter ${chapterIdx + 1} scaffold`);
     if (!ok) { say('Not enough Shards'); return; }
     const text = draftChapterScaffold(outline, chapterIdx);
@@ -170,7 +177,7 @@ export default function MarketplaceHub({
       <div style={{ fontSize: 12, opacity: 0.75 }}>books · audiobooks · art · music — creator to creator, priced in Shards</div>
       {preview && (
         <div style={S.preview}>
-          PREVIEW — no Shards are spent here yet. BUY and the ✦ Cell tools are free, sellers are not paid, and listings and purchases stay in this browser.
+          PREVIEW — listings stay in this browser. BUY and the ✦ Cell tools are locked until wallet sync is live, so no Shards move and ownership does not transfer.
         </div>
       )}
 
@@ -198,7 +205,7 @@ export default function MarketplaceHub({
                 <div style={{ fontSize: 11, opacity: 0.75 }}>{l.sellerName} · {l.kind} · {l.sales} sold</div>
                 <div style={{ fontSize: 12 }}>{l.blurb}</div>
               </div>
-              <div style={{ fontWeight: 800, color: '#e8b84a' }}>{l.priceShards}◈{preview ? ' list price, free in preview' : ''}</div>
+              <div style={{ fontWeight: 800, color: '#e8b84a' }}>{l.priceShards}◈{preview ? ' list price, locked in preview' : ''}</div>
               {Marketplace.owned(l.id) || l.sellerId === profile.id ? (
                 <>
                   {l.kind === 'book' && <button style={S.btn} onClick={() => setReading(reading?.id === l.id ? null : l)}>READ</button>}
@@ -308,7 +315,7 @@ export default function MarketplaceHub({
               <div key={p.listingId + p.at} style={S.card}>
                 <div style={{ minWidth: 150 }}>
                   <div style={{ fontWeight: 700 }}>{l.title}</div>
-                  <div style={{ fontSize: 11, opacity: 0.75 }}>{l.kind} · {preview ? `${p.paidShards}◈ list price, not charged (preview)` : `bought for ${p.paidShards}◈`}</div>
+                  <div style={{ fontSize: 11, opacity: 0.75 }}>{l.kind} · {preview ? `${p.paidShards}◈ legacy preview receipt, not charged` : `bought for ${p.paidShards}◈`}</div>
                 </div>
                 {l.kind === 'book' && <button style={S.btn} onClick={() => setReading(reading?.id === l.id ? null : l)}>READ</button>}
                 {l.kind === 'audiobook' && l.payload.audioDataUrl && <audio controls src={l.payload.audioDataUrl} style={{ height: 32 }} />}

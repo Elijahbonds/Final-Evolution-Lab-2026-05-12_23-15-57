@@ -22,7 +22,6 @@ import {
   Snowflake,
   Zap,
 } from 'lucide-react';
-import { CARNIVAL_EXTERNAL_POOL } from './carnival-run';
 import { MODE_INFO, canonicalModeKey } from './game-data';
 
 export interface ModeMenuMeta {
@@ -77,7 +76,6 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
 
 export const SUPPORT_SURFACES = new Set<string>(['marketplace', 'kitchens']);
 export const HIDDEN_FROM_MODE_MENU = new Set<string>([
-  ...CARNIVAL_EXTERNAL_POOL,
   ...SUPPORT_SURFACES,
 ]);
 

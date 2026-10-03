@@ -13,9 +13,8 @@ import { OUTLINE_COST_SHARDS, CHAPTER_DRAFT_COST_SHARDS } from './AuthorStudio';
 import { button, drive, settle } from '@/tests/helpers/driveRender';
 import { loggedStrings, stateLog } from '@/tests/helpers/stateLog';
 
-// The Marketplace is mounted with no shards seam, so every BUY and Cell tool is free and everything lives in this
-// browser's localStorage. It takes nothing real, but it read as a real shop. Owner decision 2026-09-24: label it a
-// preview, and make every shard figure on the page agree with that label.
+// The Marketplace is mounted with no shards seam, so dynamic listing prices are not server-owned yet. Preview mode must
+// fail closed: browse/list locally, but do not transfer ownership or run Cell tools as a free spend surrogate.
 const loader = readFileSync(new URL('../../../app/market/_components/loader.tsx', import.meta.url), 'utf8');
 
 function memoryStorage(): Storage {
@@ -44,34 +43,33 @@ describe('Marketplace, labelled a preview', () => {
   });
 
   it('says PREVIEW on the page when no shards seam is wired, and not when one is', () => {
-    expect(renderToStaticMarkup(createElement(MarketplaceHub))).toMatch(/PREVIEW — no Shards are spent here yet/);
+    expect(renderToStaticMarkup(createElement(MarketplaceHub))).toMatch(/PREVIEW — listings stay in this browser/);
     expect(renderToStaticMarkup(createElement(MarketplaceHub, { spendShards: async () => true }))).not.toMatch(/PREVIEW/);
   });
 
-  it('the AUTHOR DESK Cell button says free in preview, with no shard cost on it', () => {
+  it('the AUTHOR DESK Cell button is locked in preview, with no shard cost on it', () => {
     const { html } = drive(() => MarketplaceHub({}), [(t) => button(t, /^AUTHOR DESK$/).props.onClick()]);
-    expect(html).toContain('✦ CELL: 20-CHAPTER OUTLINE (free in preview)');
+    expect(html).toContain('✦ CELL: 20-CHAPTER OUTLINE (locked in preview)');
     expect(html).not.toContain(`(${OUTLINE_COST_SHARDS}◈)`);
   });
 
   it('with a seam wired the same button shows its shard cost', () => {
     const { html } = drive(() => MarketplaceHub({ spendShards: async () => true }), [(t) => button(t, /^AUTHOR DESK$/).props.onClick()]);
     expect(html).toContain(`✦ CELL: 20-CHAPTER OUTLINE (${OUTLINE_COST_SHARDS}◈)`);
-    expect(html).not.toMatch(/free in preview/);
+    expect(html).not.toMatch(/locked in preview/);
   });
 
-  it('a preview BUY on the real hub charges nothing, and MY SHELF says the price was not charged', async () => {
+  it('a preview BUY on the real hub transfers nothing, and MY SHELF stays empty', async () => {
     localStorage.setItem('fel_market_listings_v1', JSON.stringify([LISTING]));
     const shop = drive(() => MarketplaceHub({}), [(t) => button(t, /^ART$/).props.onClick()]);
-    expect(shop.html).toContain('150◈ list price, free in preview');
+    expect(shop.html).toContain('150◈ list price, locked in preview');
     button(shop.tree, /^BUY$/).props.onClick();
     await settle();
-    expect(Marketplace.owned('lst_1')).toBe(true); // the preview hands it over locally, as the banner says
-    // the receipt the hub set after the await is the preview one, never a payment to the seller
-    expect(loggedStrings()).toContain(buyNote(true, 135));
+    expect(Marketplace.owned('lst_1')).toBe(false);
+    expect(loggedStrings()).toContain('Buying needs wallet sync before it can spend Shards.');
     expect(loggedStrings().filter((s) => /Seller nets|◈/.test(s))).toEqual([]);
     const shelf = drive(() => MarketplaceHub({}), [(t) => button(t, /^MY SHELF$/).props.onClick()]);
-    expect(shelf.html).toContain('150◈ list price, not charged (preview)');
+    expect(shelf.html).toContain('nothing yet — the SHOP floor awaits');
     expect(shelf.html).not.toMatch(/bought for/);
   });
 
@@ -88,15 +86,15 @@ describe('Marketplace, labelled a preview', () => {
 });
 
 describe('the preview copy helpers', () => {
-  it('the BUY receipt never claims a payment in preview, and names the seller net with a seam', () => {
-    expect(buyNote(true, 135)).toBe('Yours in this preview. No Shards were spent and the seller was not paid.');
+  it('the BUY receipt never claims a payment or ownership in preview, and names the seller net with a seam', () => {
+    expect(buyNote(true, 135)).toBe('Preview only. No Shards were spent and ownership did not transfer.');
     expect(buyNote(true, 135)).not.toMatch(/◈/);
     expect(buyNote(false, 135)).toBe('Yours! Seller nets 135◈');
   });
 
-  it('a Cell tool price is free in preview and its cost with a seam, for both tools', () => {
+  it('a Cell tool price is locked in preview and its cost with a seam, for both tools', () => {
     for (const cost of [OUTLINE_COST_SHARDS, CHAPTER_DRAFT_COST_SHARDS]) {
-      expect(cellToolPrice(true, cost)).toBe('free in preview');
+      expect(cellToolPrice(true, cost)).toBe('locked in preview');
       expect(cellToolPrice(false, cost)).toBe(`${cost}◈`);
     }
   });
