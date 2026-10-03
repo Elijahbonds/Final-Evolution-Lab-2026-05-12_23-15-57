@@ -36,6 +36,8 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,7 +56,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      onEnd(gameResultFromSession(r, {
+      onEndRef.current(gameResultFromSession(r, {
         won: r.outcome === 'CHAMPION',
         opponentScore: opponentScoreFromStats(r.stats),
         headline: r.outcome === 'CHAMPION' ? 'CARNIVAL CHAMPION' : 'RUNNER-UP',
@@ -85,7 +87,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);

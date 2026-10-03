@@ -18,6 +18,8 @@ export default function DuelBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function DuelBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'DUEL WON' : 'DUEL LOST',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     runMode(MODES.duel, {
@@ -71,7 +73,7 @@ export default function DuelBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
