@@ -93,7 +93,8 @@ describe('1d POST /api/mirror/assessment', () => {
     const r = await post(record());
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ saved: true, idempotent: false, assessmentId: 'assessment-0001' });
-    expect(Object.keys(r.json).sort()).toEqual(['assessmentId', 'idempotent', 'mqs', 'prqAfter', 'prqBefore', 'saved', 'scanId', 'writes']);
+    expect(Object.keys(r.json).sort()).toEqual(['assessmentId', 'idempotent', 'mqs', 'program', 'prqAfter', 'prqBefore', 'saved', 'scanId', 'writes']);
+    expect(r.json.program).toMatchObject({ lane: 'correctives', topFlag: 'ohs.kneeCave', priorities: ['ohs.kneeCave', 'ktw.shinAngle'] });
     expect(writesOf(db)).toEqual(['workoutScan.create', 'prqEntry.create', 'prqEntry.create', 'workoutScan.update']);
     const fresh = db.tables.prqEntry.filter((e) => e.id !== 'e-old');
     expect(fresh.map((e) => e.attribute).sort()).toEqual(['flexibility', 'power']);

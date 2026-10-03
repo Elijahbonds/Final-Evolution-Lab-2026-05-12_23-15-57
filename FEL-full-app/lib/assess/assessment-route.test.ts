@@ -146,6 +146,7 @@ describe('POST /api/mirror/assessment', () => {
     const { status, json } = await post(record());
     expect(status).toBe(200);
     expect(json.saved).toBe(true);
+    expect(json.program).toMatchObject({ v: 1, lane: 'correctives', topFlag: 'ohs.kneeCave', priorities: ['ohs.kneeCave', 'ktw.shinAngle'] });
     expect(scans()).toHaveLength(1);
     const scan = scans()[0];
     expect(entries().map((e) => e.attribute).sort()).toEqual(['flexibility', 'power']);
@@ -193,7 +194,14 @@ describe('POST /api/mirror/assessment', () => {
   it('stores the spec §9 shape, numbers only', async () => {
     await post(record());
     const s = scans()[0].metrics;
-    expect(s).toMatchObject({ version: 1, protocolVersion: 'jump-screen-1.0', thresholdsVersion: 'jump-screen-0.2-proposed', mode: 'quick', takeoffLeg: 'left', program: null });
+    expect(s).toMatchObject({ version: 1, protocolVersion: 'jump-screen-1.0', thresholdsVersion: 'jump-screen-0.2-proposed', mode: 'quick', takeoffLeg: 'left' });
+    expect(s.program).toMatchObject({
+      v: 1, thresholdsVersion: 'jump-screen-0.2-proposed', complete: true, clean: false,
+      lane: 'correctives', topFlag: 'ohs.kneeCave', priorities: ['ohs.kneeCave', 'ktw.shinAngle'],
+    });
+    expect(s.program.checks).toHaveLength(14);
+    expect(s.program.checks.find((c: Row) => c.id === 'ohs.kneeCave')).toEqual({ id: 'ohs.kneeCave', band: 'red' });
+    expect(s.program.checks.find((c: Row) => c.id === 'ktw.shinAngle')).toEqual({ id: 'ktw.shinAngle', band: 'yellow' });
     expect(s.device).toEqual(device);
     expect(s.tests.map((t: Row) => t.id)).toEqual(['T1', 'T2', 'T3', 'T5']);
     expect(s.prqWrites.every((w: Row) => typeof w.entryId === 'string')).toBe(true);
@@ -207,6 +215,7 @@ describe('POST /api/mirror/assessment', () => {
     await post(record({ id: 'retry-00001' }));
     const again = await post(record({ id: 'retry-00001' }));
     expect(again.json).toMatchObject({ saved: true, idempotent: true });
+    expect(again.json.program).toMatchObject({ lane: 'correctives', topFlag: 'ohs.kneeCave' });
     expect(scans()).toHaveLength(1);
     expect(entries()).toHaveLength(2);
     await post(record({ id: 'another-0002' }));
