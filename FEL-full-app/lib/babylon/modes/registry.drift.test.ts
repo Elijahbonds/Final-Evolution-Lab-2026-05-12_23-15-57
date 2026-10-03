@@ -101,7 +101,8 @@ describe('nothing calls runMode with a mode that is not registered', () => {
 describe('EVERY ENABLED MODE HAS A DOOR', () => {
   // Aero Aces and Velocity Kart were ENABLED, registered, and reachable only from /dev/mode — no player
   // route at all, and an MP challenge that could never settle because no host posted their session. This is
-  // the check that would have caught it the day they were added.
+  // the check that would have caught it the day they were added. Tiebreak is factory-hosted because the route
+  // injects the player's grade into the mode definition instead of using the registry's default dev definition.
   //
   // A mode is mounted one of THREE ways and all three count: a literal `MODES.<key>` in a host, a factory
   // host handed `modeKey: '<key>'`, or a factory called with the id positionally — makeAirHost('bigair',
@@ -126,7 +127,8 @@ describe('EVERY ENABLED MODE HAS A DOOR', () => {
       const literal = new RegExp(`MODES\\.${id}\\b`).test(all);
       const viaFactory = new RegExp(`modeKey:\\s*['"]${id}['"]`).test(all)
         || new RegExp(`modeKey=["']${id}["']`).test(all)
-        || new RegExp(`make\\w*Host\\(\\s*['"]${id}['"]`).test(all);
+        || new RegExp(`make\\w*Host\\(\\s*['"]${id}['"]`).test(all)
+        || (id === 'tiebreak' && /makeTiebreakMode\(/.test(all));
       return !literal && !viaFactory;
     });
     expect(undoored).toEqual([]);

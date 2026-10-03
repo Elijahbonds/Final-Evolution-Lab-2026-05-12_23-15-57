@@ -51,6 +51,8 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   golf: true,
   baseball: true,
   soccer: true,
+  // Party Quiz W6 — Tiebreak is Babylon-only and mounts through its own factory host.
+  tiebreak: true,
   // Rollout wave 4 — basketball simulator family (M48) on PlayerSlot +
   // BasketballCore. Route flag keys map to registry modes:
   // hoops1v1→onevone, hoops3v3→threevthree.

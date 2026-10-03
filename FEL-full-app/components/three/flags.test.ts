@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import { is3D, isBabylon } from './flags';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
+
+const ROUTE_FLAG_KEY_BY_REGISTRY_KEY: Readonly<Record<string, string>> = {
+  dunk: 'dunkContest',
+  karate: 'karateEndless',
+  football: 'football',
+  skateboard: 'skateboard',
+  snowboard_slalom: 'snowboard_slalom',
+  surf: 'surf',
+  tennis: 'tennis',
+  tiebreak: 'tiebreak',
+  derby: 'baseball',
+  penalty: 'soccer',
+  golf: 'golf',
+  onevone: 'hoops1v1',
+  threevthree: 'hoops3v3',
+  carnival: 'carnival',
+  karate_vs: 'karateVersus',
+  mixedcombat: 'mixedcombat',
+  dunkduel: 'dunkduel',
+  sprint: 'sprint',
+  showdown: 'showdown',
+  duel: 'duel',
+  volleyball: 'volleyball',
+  dance: 'dance',
+  who_scene_it: 'whoSceneIt',
+  freerun: 'freerun',
+  threepoint: 'threePoint',
+  bigair: 'bigAir',
+  aeroaces: 'aeroAces',
+  velocitykart: 'velocityKart',
+  brainbrawl: 'brainBrawl',
+};
 
 /**
  * WHICH RENDERER A MODE GETS. Twenty files import these two predicates, and getting one wrong does not throw — it
@@ -17,6 +50,21 @@ describe('renderer flags', () => {
     expect(isBabylon('not_a_mode')).toBe(false);
     expect(isBabylon('')).toBe(false);
     expect(isBabylon('dunk')).toBe(false);          // the registry's key is NOT this table's key
+  });
+
+  it('every enabled Babylon registry mode has a live route flag key', () => {
+    const enabled = [...ENABLED_BABYLON_MODES];
+    const unmapped = enabled.filter((registryKey) => !(registryKey in ROUTE_FLAG_KEY_BY_REGISTRY_KEY));
+    expect(unmapped, `enabled mode has no route flag key: ${JSON.stringify(unmapped)}`).toEqual([]);
+
+    const disabledRouteFlags = enabled
+      .map((registryKey) => [registryKey, ROUTE_FLAG_KEY_BY_REGISTRY_KEY[registryKey]] as const)
+      .filter(([, routeFlagKey]) => !isBabylon(routeFlagKey))
+      .map(([registryKey, routeFlagKey]) => `${registryKey} -> ${routeFlagKey}`);
+    expect(disabledRouteFlags, `enabled mode is not answered by isBabylon(): ${JSON.stringify(disabledRouteFlags)}`).toEqual([]);
+
+    const staleMappings = Object.keys(ROUTE_FLAG_KEY_BY_REGISTRY_KEY).filter((registryKey) => !ENABLED_BABYLON_MODES.has(registryKey));
+    expect(staleMappings, `route flag map names a disabled/missing mode: ${JSON.stringify(staleMappings)}`).toEqual([]);
   });
 
   it('never answers yes on a prototype-chain key — the classic lookup-table hole', () => {
