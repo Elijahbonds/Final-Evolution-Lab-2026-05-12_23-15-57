@@ -10,6 +10,7 @@ import { makeRoomCode } from '../lib/controller-link/codes';
 import { getSignalStore } from '../lib/controller-link/signalStore';
 import { TiltCharge } from '../lib/controller-link/schemas/motion';
 import { toInputBus } from '../lib/controller-link/modeBridge';
+import { LocalInputSource } from '../lib/babylon/core/PlayerSlot';
 import type { FelInput } from '../lib/babylon/core/InputBus';
 import type { InputBus } from '../lib/babylon/core/InputBus';
 
@@ -123,6 +124,51 @@ async function main(): Promise<void> {
   await new Promise((r) => setTimeout(r, 200));
   ok(seen.length === 1, 'E12 the ramp stops on release — no leaked timer');
 
+  seen.length = 0;
+  feed({ a: 'brake', p: 0.75, t: 0 });
+  ok(seen.length === 1 && seen[0].t === 'trigger' && seen[0].side === 'L' && seen[0].value === 0.75,
+    'E13 brake maps to the left trigger');
+
+  seen.length = 0;
+  feed({ a: 'charge:down', t: 0 });
+  await new Promise((r) => setTimeout(r, 160));
+  const rightBeforeBrake = (seen.filter((i) => i.t === 'trigger' && i.side === 'R') as Extract<FelInput, { t: 'trigger' }>[])
+    .at(-1)?.value ?? 0;
+  feed({ a: 'brake:down', t: 0 });
+  await new Promise((r) => setTimeout(r, 160));
+  feed({ a: 'brake:up', t: 0 });
+  const rightAfterBrake = (seen.filter((i) => i.t === 'trigger' && i.side === 'R') as Extract<FelInput, { t: 'trigger' }>[])
+    .at(-1)?.value ?? 0;
+  ok(rightAfterBrake > rightBeforeBrake,
+    `E14 gas keeps ramping while brake is held (${rightBeforeBrake.toFixed(2)} → ${rightAfterBrake.toFixed(2)})`);
+  feed({ a: 'charge:up', t: 0 });
+
+  // ── F. phone bridge → basketball LocalInputSource ────────────────────────
+  // Basketball uses the owner's 2K map. The shared 'charge' action is RT there,
+  // which means turbo — not the shot meter. The phone schema must therefore send
+  // held X for SHOOT, and this integration guard proves the exact seam the modes
+  // read rather than only checking a registry string.
+  const hoop = new LocalInputSource();
+  const hoopFeed = toInputBus({ emit: (i: FelInput) => hoop.feed(i) } as InputBus);
+  hoopFeed({ a: 'X:down', t: 0 });
+  let intent = hoop.poll();
+  ok(intent.actionHeld === 1 && !intent.turbo,
+    'F1 basketball held X starts the shot meter without turning on turbo');
+  hoopFeed({ a: 'X:up', t: 0 });
+  intent = hoop.poll();
+  ok(intent.action && intent.actionHeld === 0,
+    'F2 basketball releasing X creates the shot edge');
+  hoopFeed({ a: 'charge', p: 1, t: 0 });
+  intent = hoop.poll();
+  ok(intent.turbo === true && intent.actionHeld === 0 && !intent.action,
+    'F3 basketball charge/RT is turbo only, never SHOOT');
+  hoopFeed({ a: 'A', t: 0 });
+  intent = hoop.poll();
+  ok(intent.pass === true, 'F4 basketball A maps to pass');
+  hoopFeed({ a: 'Y', t: 0 });
+  intent = hoop.poll();
+  ok(intent.jump === true, 'F5 basketball Y maps to block/jump');
+
   // MOVEMENT. Modes read movement from a LEFT STICK event and nothing else, so
   // a d-pad event moves nobody. A mode that needs walking would have delivered
   // every verb except the ability to walk — silently, like everything else in
@@ -130,21 +176,21 @@ async function main(): Promise<void> {
   seen.length = 0;
   feed({ a: 'move', p: { dir: 'right', pressed: true }, t: 0 });
   ok(seen.length === 1 && seen[0].t === 'stick' && seen[0].side === 'L' && seen[0].x === 1,
-    'E13 a move d-pad press becomes a LEFT STICK event, not a dpad event');
+    'E15 a move d-pad press becomes a LEFT STICK event, not a dpad event');
   feed({ a: 'move', p: { dir: 'up', pressed: true }, t: 0 });
   const diag = seen[seen.length - 1];
   ok(diag.t === 'stick' && diag.x === 1 && diag.y === 1,
-    'E14 two held directions combine into a diagonal rather than replacing each other');
+    'E16 two held directions combine into a diagonal rather than replacing each other');
   feed({ a: 'move', p: { dir: 'right', pressed: false }, t: 0 });
   const rel = seen[seen.length - 1];
-  ok(rel.t === 'stick' && rel.x === 0 && rel.y === 1, 'E15 releasing one direction keeps the other');
+  ok(rel.t === 'stick' && rel.x === 0 && rel.y === 1, 'E17 releasing one direction keeps the other');
 
   // Dunk's d-pad means PROP and mid-air TRICK, not movement. It must stay a dpad
   // event or picking a prop would walk the dunker instead.
   seen.length = 0;
   feed({ a: 'dpad', p: { dir: 'down', pressed: true }, t: 0 });
   ok(seen.length === 1 && seen[0].t === 'dpad',
-    'E16 a plain dpad action stays a dpad event — Dunk selects props with it');
+    'E18 a plain dpad action stays a dpad event — Dunk selects props with it');
 
   // ── report ───────────────────────────────────────────────────────────────
   if (fail.length) {
