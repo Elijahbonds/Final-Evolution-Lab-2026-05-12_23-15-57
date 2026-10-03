@@ -45,6 +45,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   // the running order lives in a ref AND state: the input callback reads it every frame (ref) while the
   // banner renders from it (state)
@@ -83,7 +85,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       const pts = Number(r.stats?.points ?? r.score ?? 0);
       const rivalPts = Number(r.stats?.rivalScore ?? 0);
       const won = r.outcome === 'win';
-      onEnd({
+      onEndRef.current({
         score: pts,
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: rivalPts,
@@ -122,7 +124,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       },
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      .catch((e) => { if (disposed) return; console.error('[FEL-THREEPOINT] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); };

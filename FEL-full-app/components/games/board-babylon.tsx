@@ -58,6 +58,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+    const onEndRef = useRef(onEnd);
+    onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
         // boards pass phase 10: the card reads the MODE's line. It used to say `0 COINS · x1 CHAIN` for every board (snow has no
         // coins; `combo` was never a stat) and `won: false` for every run — the modes end 'win' / 'complete' now.
         const won = boardSportWon(r.outcome);
-        onEnd(boardGameResult(r, { modeKey, headline: boardHeadline(modeKey, r, won) }));
+        onEndRef.current(boardGameResult(r, { modeKey, headline: boardHeadline(modeKey, r, won) }));
       };
 
       const def = MODES[modeKey];
@@ -115,7 +117,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
           if (disposed) { s(); return; }
           stop = s;
         })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => { if (disposed) return; console.error(`[${tag}] boot failed`, e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
       }, 0);
 
       return () => {
@@ -124,7 +126,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
         stop?.();
         busRef.current = null;
       };
-    }, [onEnd]);
+    }, []);   // mount once — see onEndRef above
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);

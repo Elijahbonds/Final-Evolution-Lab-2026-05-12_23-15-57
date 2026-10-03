@@ -79,7 +79,7 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
         if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-COMBAT] boot failed', e));
+      .catch((e) => { if (disposed) return; console.error('[FEL-COMBAT] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
 
     return () => {
       disposed = true;

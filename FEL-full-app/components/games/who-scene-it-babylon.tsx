@@ -23,6 +23,8 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         headline: won ? 'SCENE MASTER' : 'ROUND OVER',
         tallies: { hits: r.stats?.correct ?? 0, misses: Math.max(0, (r.stats?.total ?? 0) - (r.stats?.correct ?? 0)), dodges: 0, combos: r.stats?.bestStreak ?? 0 },
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;
@@ -49,10 +51,10 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => { if (disposed) return; console.error('[FEL-WSI] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);

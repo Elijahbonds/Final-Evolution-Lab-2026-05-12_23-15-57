@@ -104,6 +104,11 @@ describe('nothing in the app is orphaned', () => {
     expect(hrefs.has('/creator/athlete')).toBe(true);
   });
 
+  it('the account data home is linked from Profile, not only from consent copy', () => {
+    const profileSrc = readFileSync(join(ROOT, 'app', 'profile', 'page.tsx'), 'utf8');
+    expect(profileSrc).toContain("href: '/account'");
+  });
+
   it('the not-navigable list has not gone stale', () => {
     // A route that was excused and then deleted leaves a lie behind in the list.
     const gone = Object.keys(NOT_NAVIGABLE).filter((r) => r.startsWith('/') && !r.includes('.') && !routes.includes(r));

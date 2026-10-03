@@ -20,6 +20,8 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'SHOWDOWN WON' : 'SHOWDOWN LOST',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     runMode(MODES.showdown, {
@@ -67,14 +69,14 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-COMBAT] boot failed', e));
+      .catch((e) => { if (disposed) return; console.error('[FEL-COMBAT] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
 
     return () => {
       disposed = true;
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
