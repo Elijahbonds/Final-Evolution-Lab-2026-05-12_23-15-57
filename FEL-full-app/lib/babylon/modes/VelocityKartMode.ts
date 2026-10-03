@@ -71,6 +71,7 @@ import { KART_TUNE } from '../racing/kartTune';   // 10-phase pass, phase 3: the
 import { spawnKartDrive, stepKartDrive, type KartDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field drives the same model
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 import { fitVehicleLight, vehicleEnvFor, VEHICLE_ENV_BASE, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
+import { SpeedLines, DustEmitter } from '../racing/speedFx';   // 10-phase pass, phase 8
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -203,6 +204,8 @@ let kerbRoot: TransformNode | null = null;
 let detailRoot: TransformNode | null = null; let scenery: VenuePropsHandle | null = null; let sceneryGone = false;   // DETAIL PASS
 let clouds: CloudDeckHandle | null = null;   // 10-phase pass, phase 6: the sky over the course
 let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
+let speedLines: SpeedLines | null = null;   // 10-phase pass, phase 8: streaks past ~80% of top speed
+let dustFx: DustEmitter | null = null;      // 10-phase pass, phase 8: the rear wheels' continuous dust
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -1000,6 +1003,9 @@ return {
     // through the primitives before), and a flat mood gets a weak fill sun that lights only the karts.
     vehicleLight?.dispose();
     vehicleLight = fitVehicleLight(ctx.scene, course.mood, [kart, ...rivalKarts], 'kart');
+    // phase 8: speed you can see — streaks riding the camera, and the rear wheels' dust as one emitter
+    speedLines?.dispose(); speedLines = new SpeedLines(ctx.scene, ctx.camera);
+    dustFx?.dispose(); dustFx = new DustEmitter(ctx.scene, kart, 'kart');
     playerDist = 0;
     // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
     ghostRec = new GhostRecorder();
@@ -1154,7 +1160,8 @@ return {
       // SCORECARD FEEL (2026-09-15): OFF THE ROAD was a number on the HUD and nothing else — the grass is a penalty you
       // should feel and hear, and it is most of what a driver who leaves the line experiences
       offRoadTick -= dt;
-      if (offRoadTick <= 0) { offRoadTick = 0.45; ctx.feel.impact(0.12); SoundKit.play('rattle', { pitch: 0.8, volume: 0.22 }); EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust'); }
+      // phase 8: the dust itself is the continuous rear-wheel emitter (driven below); the tick keeps the feel and the rattle
+      if (offRoadTick <= 0) { offRoadTick = 0.45; ctx.feel.impact(0.12); SoundKit.play('rattle', { pitch: 0.8, volume: 0.22 }); }
       if (!offRoadSaid) { offRoadSaid = true; ctx.juice.callout('OFF THE ROAD', '#fca5a5', 600); }
     } else { offRoadTick = 0; offRoadSaid = false; ctx.objectiveRef.current = null; }
     const bev = boost.update(dt, S.boostHeld, true);
@@ -1356,7 +1363,7 @@ return {
     if (state.drifting) {
       S.bestDrift = Math.max(S.bestDrift, driftQuality(state));
       boost.earnOver('drift', dt, driftQuality(state));   // a CLEAN slide fills the shared meter (the kart's own bank is retired)
-      if (Math.random() < 0.25) EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust');
+      // phase 8: the slide's dust streams from the rear-wheel emitter now — no more per-frame burst dice
       // SCORECARD FEEL (2026-09-15): a slide that HOOKS UP is the kart's best moment and it was silent past the dust —
       // it calls itself while it holds (the race measured 1.5 juice beats a minute)
       driftCallT -= dt;
@@ -1376,7 +1383,11 @@ return {
     }
     if (boostPads && boostPads.update(dt, state.pos, boost) > 0) { say('BOOST PAD', 0.5); ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.4, 0)), 'BOOST PAD', '#38bdf8'); }
     boostFx?.update(dt, boost, bev);
-    if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
+    // phase 8: speed you can see — streaks past ~80% of top, the rear-wheel dust by drive state,
+    // and the burn gets the engine's exhaust note under the whoosh
+    speedLines?.update(S.done ? 0 : state.speed / Math.max(1, kartSpec.vMax));
+    dustFx?.update(!on ? 'offRoad' : state.drifting ? 'drift' : 'off');
+    if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); SoundKit.play('exhaust', { volume: 0.8 }); }
     if (bev.full) say('BOOST READY', 0.8);
     // RACING PASS phase 3: an empty press already ticks and flags the HUD pill; it now also SAYS what fills the tank
     if (bev.denied) ctx.juice.callout('BOOST EMPTY — DRIFT (X) TO FILL IT', '#94a3b8', 900);
@@ -1449,6 +1460,7 @@ return {
     steerWheel = null;
     venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null; clouds?.dispose(); clouds = null;
     vehicleLight?.dispose(); vehicleLight = null;
+    speedLines?.dispose(); speedLines = null; dustFx?.dispose(); dustFx = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];

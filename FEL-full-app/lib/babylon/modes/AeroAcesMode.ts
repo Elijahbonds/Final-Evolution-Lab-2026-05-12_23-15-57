@@ -68,6 +68,7 @@ import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/a
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
 import { buildToyPlane, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
 import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
+import { SpeedLines, WingtipTrails } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { AeroPickups } from '../racing/aeroPickups';
 import { steerLane, resolveContact, nearMisses, personalityFor } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, wing-to-wing bumps and punts
 
@@ -103,6 +104,8 @@ export function makeAeroAcesMode(): ModeDefinition {
   let pickups: AeroPickups | null = null;
   let boostFx: BoostFx | null = null;
   let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
+  let speedLines: SpeedLines | null = null;       // 10-phase pass, phase 8: streaks past ~80% of top speed
+  let wingtipFx: WingtipTrails | null = null;     // 10-phase pass, phase 8: the air coming off the wingtips
   let flight: ArcadeState | null = null;
   let race: RaceProgress = startRace();
   let line: RaceLine | null = null;
@@ -370,6 +373,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       // phase 7: one vehicle light over every plane on the grid (receiveShadows on all, fill where the mood is flat)
       vehicleLight?.dispose();
       vehicleLight = fitVehicleLight(ctx.scene, circuit.course.mood, [player.root, ...rivalPlanes.map((p) => p.root)], 'plane');
+      // phase 8: speed you can see — streaks riding the camera, ribbons off the player's wingtips
+      speedLines?.dispose(); speedLines = new SpeedLines(ctx.scene, ctx.camera);
+      wingtipFx?.dispose(); wingtipFx = new WingtipTrails(ctx.scene, player.wingtips);
 
       flight = spawnArcade(circuit.course.start.at, circuit.course.start.heading, tune);
       prevPos.copyFrom(flight.pos);
@@ -729,6 +735,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       S.lastPlace = place;
 
       boostFx?.update(dt, boost, bev);
+      // phase 8: streaks past ~80% of top, and the wingtip ribbons in a hard bank or near the top
+      speedLines?.update(S.done ? 0 : flight.speed / Math.max(1, tune.top));
+      wingtipFx?.update(flight.roll, flight.speed / Math.max(1, tune.top));
       if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
       if (bev.full) say('BOOST READY', 0.8);
       // RACING PASS phase 3: an empty press says what fills the tank (it already ticked and lit the HUD pill)
@@ -775,6 +784,7 @@ export function makeAeroAcesMode(): ModeDefinition {
     dispose(): void {
       boostFx?.dispose(); boostFx = null;
       vehicleLight?.dispose(); vehicleLight = null;
+      speedLines?.dispose(); speedLines = null; wingtipFx?.dispose(); wingtipFx = null;
       scarf?.dispose(); scarf = null;
       seated?.dispose(); seated = null;
       pilot?.dispose(); pilot = null;

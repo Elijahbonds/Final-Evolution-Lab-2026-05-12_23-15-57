@@ -23,6 +23,8 @@ export interface ToyPlane {
   root: TransformNode;
   /** Turned by the mode, fast. */
   prop: TransformNode;
+  /** The wingtip anchors (left, right) the phase-8 trails stream from — model-space, so they ride the scale. */
+  wingtips: [TransformNode, TransformNode];
   /** Where the pilot's hips go (local to root). */
   seat: TransformNode;
   /** The scarf's anchor at the pilot's neck (local to root). */
@@ -116,6 +118,14 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
     disc.rotation.z = Math.PI / 2; disc.position.set(side * 1.02, 0.1, -0.7);
   }
 
+  // the wingtip anchors: the wing is an 8.6-long capsule across X at (0, -0.35, 0.35) — the tips are where
+  // the air comes off in a bank. Model-space (they hang off `model`), so the mode never does scale maths.
+  const wingtips = [-1, 1].map((side) => {
+    const tip = new TransformNode(`toy_wingtip_${name}_${side}`, scene);
+    tip.parent = model; tip.position.set(side * 4.25, -0.3, 0.35);
+    return tip;
+  }) as [TransformNode, TransformNode];
+
   const seat = new TransformNode(`toy_seat_${name}`, scene); seat.parent = root; seat.position.set(0, TOY_SEAT.y * TOY_SCALE, TOY_SEAT.z * TOY_SCALE);
   const scarfAnchor = new TransformNode(`toy_scarf_${name}`, scene); scarfAnchor.parent = root; scarfAnchor.position.set(0, TOY_SEAT.y * TOY_SCALE + 0.5, (TOY_SEAT.z - 0.15) * TOY_SCALE);   // the pilot's neck: hips + ~0.5 m at the mode's pilot scale
 
@@ -134,7 +144,7 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
   }
 
   return {
-    root, prop, seat, scarfAnchor, body,
+    root, prop, wingtips, seat, scarfAnchor, body,
     parts,
     dispose() { for (const p of parts) p.dispose(); model.dispose(); root.dispose(); },
   };

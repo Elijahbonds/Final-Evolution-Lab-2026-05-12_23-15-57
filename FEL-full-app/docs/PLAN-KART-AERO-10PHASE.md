@@ -241,7 +241,13 @@ flat, and flagged.
 
 **Pass check:** before/after screenshots; perf line flat on the mid-phone profile; ci-suite green.
 
-- [ ] done
+- [x] done — `lib/babylon/racing/speedFx.ts`: SpeedLines (camera-parented stretched-billboard
+  streaks, on at 80% top speed, speed-driven), DustEmitter (one continuous rear-axle system replacing
+  the drift/off-road random bursts), WingtipTrails (TrailMesh on new `toyPlane.wingtips` anchors,
+  gated on roll and speed). SoundKit gains an `exhaust` boost note (sawtooth + brown-noise chug).
+  Perf mobile tier: kart 59fps/294 draws/38 meshes and aero 60fps/159 draws (p7: 60/296 and 60/159) —
+  flat. tsc 0; vitest 811/811 (racing+modes+audio, +10 new speedFx tests); ci-suite 189 green.
+  Shots: docs/shots/pr138/p8-after (speed streaks visible in aero mid shot).
 
 ## Phase 9 — Vehicle detail and wheel/prop animation
 
