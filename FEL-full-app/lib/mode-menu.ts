@@ -76,8 +76,9 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
 };
 
 export const SUPPORT_SURFACES = new Set<string>(['marketplace', 'kitchens']);
+export const STANDALONE_CARNIVAL_STOPS = new Set<string>(['sprint']);
 export const HIDDEN_FROM_MODE_MENU = new Set<string>([
-  ...CARNIVAL_EXTERNAL_POOL,
+  ...CARNIVAL_EXTERNAL_POOL.filter((key) => !STANDALONE_CARNIVAL_STOPS.has(key)),
   ...SUPPORT_SURFACES,
 ]);
 

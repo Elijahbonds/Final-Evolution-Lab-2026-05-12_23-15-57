@@ -11,10 +11,9 @@
 //      black frame the RenderWatchdog could not rescue (dead WebGL
 //      context). The canvasOwner token guard is ported from
 //      air-session-babylon, which never goes black.
-//   C. 'sprint' was retired from the v1 roster (owner decision, recorded
-//      in PHASE2_BENCHMARK_LOCKS.md) but still sat in the night-lineup
-//      pool — dealing tonight's lineup a route that redirects away
-//      mid-night.
+//   C. Every external stop in tonight's lineup is a live, directly reachable
+//      route. Sprint was revived with a locked benchmark and belongs in the
+//      pool again; stale retirement comments must not strand it.
 //   D. Trap "published is not rendered": every field the mode sets on the
 //      HUD must be drawn by the host bezel.
 //
@@ -22,7 +21,9 @@
 //
 // Run: npx tsx scripts/carnival-depth-tests.ts
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 let checks = 0;
 const fail: string[] = [];
@@ -31,6 +32,8 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
 const mode = readFileSync(new URL('../lib/babylon/modes/CourtCarnivalMode.ts', import.meta.url), 'utf8');
 const host = readFileSync(new URL('../components/games/carnival-babylon.tsx', import.meta.url), 'utf8');
 const run = readFileSync(new URL('../lib/carnival-run.ts', import.meta.url), 'utf8');
+const gameData = readFileSync(new URL('../lib/game-data.ts', import.meta.url), 'utf8');
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 // ── A. the rival is a person at the party ─────────────────────────────────
 {
@@ -58,10 +61,24 @@ const run = readFileSync(new URL('../lib/carnival-run.ts', import.meta.url), 'ut
   ok(cleanupGuard.test(host), 'cleanup only stops the engine it still owns');
 }
 
-// ── C. no retired stops in tonight's lineup ───────────────────────────────
+// ── C. tonight's lineup points only at live stop routes ────────────────────
 {
   const pool = run.slice(run.indexOf('CARNIVAL_EXTERNAL_POOL'), run.indexOf('] as const'));
-  ok(!/^\s*'sprint',?\s*$/m.test(pool), "retired 'sprint' is not dealt into the lineup pool");
+  const stops = [...pool.matchAll(/^\s*'([^']+)',?\s*$/gm)].map((m) => m[1]);
+  ok(stops.includes('sprint'), "revived 'sprint' is dealt into the lineup pool");
+  for (const stop of stops) {
+    const row = new RegExp(`^  ${stop}: \\{[^\\n]*href: '([^']+)'`, 'm').exec(gameData);
+    ok(Boolean(row), `MODE_INFO has a link for '${stop}'`);
+    const href = row?.[1] ?? '';
+    if (href.startsWith('/play/')) {
+      const pageFile = join(root, 'app', href.replace(/^\/+/, ''), 'page.tsx');
+      ok(existsSync(pageFile), `${stop} route exists at ${href}`);
+      if (existsSync(pageFile)) {
+        const page = readFileSync(pageFile, 'utf8');
+        ok(!page.includes("redirect('/play')"), `${stop} route does not redirect away from the run`);
+      }
+    }
+  }
 }
 
 // ── D. published is rendered (trap #4 watch) ──────────────────────────────
