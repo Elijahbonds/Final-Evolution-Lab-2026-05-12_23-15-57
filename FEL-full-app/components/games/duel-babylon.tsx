@@ -66,7 +66,7 @@ export default function DuelBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-DUEL] boot failed', e));
+      .catch((e) => { if (disposed) return; console.error('[FEL-DUEL] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
 
     return () => {
       disposed = true;

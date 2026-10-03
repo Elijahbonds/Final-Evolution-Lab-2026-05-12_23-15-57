@@ -70,7 +70,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
       }).then((s) => { if (disposed) { s(); return; } stop = s; })
-        .catch((e) => console.error('[FEL-KART] boot failed', e));
+        .catch((e) => { if (disposed) return; console.error('[FEL-KART] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };

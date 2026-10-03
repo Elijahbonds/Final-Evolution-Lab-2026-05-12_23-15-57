@@ -69,7 +69,7 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-COMBAT] boot failed', e));
+      .catch((e) => { if (disposed) return; console.error('[FEL-COMBAT] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
 
     return () => {
       disposed = true;

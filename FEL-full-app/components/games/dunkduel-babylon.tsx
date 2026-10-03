@@ -76,7 +76,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
         if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-DUNKDUEL] boot failed', e));
+      .catch((e) => { if (disposed) return; console.error('[FEL-DUNKDUEL] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
 
     return () => {
       disposed = true;

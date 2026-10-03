@@ -124,7 +124,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       },
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      .catch((e) => { if (disposed) return; console.error('[FEL-THREEPOINT] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); };

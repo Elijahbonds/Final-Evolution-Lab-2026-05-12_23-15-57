@@ -37,4 +37,29 @@ describe('Babylon hosts mount once and keep callbacks fresh', () => {
 
     expect(failures).toEqual([]);
   });
+
+  it('every runMode host surfaces pre-harness boot failures to the retry UI', () => {
+    const hosts = babylonHosts();
+    const failures: string[] = [];
+
+    for (const host of hosts) {
+      const catches = [...read(host).matchAll(/\.catch\(\(e\)\s*=>\s*(?:\{([\s\S]*?)\}|([^;]+));/g)];
+      if (catches.length === 0) {
+        failures.push(`${host}: missing runMode catch`);
+        continue;
+      }
+
+      for (const catchMatch of catches) {
+        const body = catchMatch[1] ?? catchMatch[2] ?? '';
+        if (!body.includes("setPhase('error')")) {
+          failures.push(`${host}: boot catch does not set phase=error`);
+        }
+        if (!/setLoadError\(\s*String\(e\?\.message \?\? e\)\s*\)/.test(body)) {
+          failures.push(`${host}: boot catch does not expose the thrown message`);
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
 });

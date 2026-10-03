@@ -121,7 +121,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
             if (disposed) { s(); return; }
             stop = s;
           })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => { if (disposed) return; console.error(`[${tag}] boot failed`, e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
       }, 0);
 
       return () => {

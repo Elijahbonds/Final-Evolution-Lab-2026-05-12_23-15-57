@@ -59,7 +59,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-FOOTBALL] boot failed', e));
+      .catch((e) => { if (disposed) return; console.error('[FEL-FOOTBALL] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
 
     return () => {
       disposed = true;

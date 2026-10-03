@@ -51,7 +51,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => { if (disposed) return; console.error('[FEL-WSI] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
   }, []);   // mount once — see onEndRef above

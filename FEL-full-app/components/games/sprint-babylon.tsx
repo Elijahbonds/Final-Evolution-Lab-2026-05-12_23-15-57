@@ -91,7 +91,7 @@ export function makeSprintHost(modeKey: string, title: string) {
         if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
-        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+        .catch((e) => { if (disposed) return; console.error('[FEL-SPRINT] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
       }, 0);
 
       return () => {

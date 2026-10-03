@@ -81,7 +81,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-HOOPS3] boot failed', e));
+        .catch((e) => { if (disposed) return; console.error('[FEL-HOOPS3] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
 
     return () => {

@@ -81,7 +81,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-        .catch((e) => console.error('[FEL-KARATE] boot failed', e));
+        .catch((e) => { if (disposed) return; console.error('[FEL-KARATE] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
       });
     }, 0);
 

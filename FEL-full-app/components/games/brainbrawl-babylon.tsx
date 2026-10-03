@@ -194,7 +194,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         resultSink,
         // GO AGAIN in place: the finish reports its card and the stage stays up for REPLAY (replayBrainBrawl)
         continuous: true, cardSink: resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-BRAINBRAWL] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => { if (disposed) return; console.error('[FEL-BRAINBRAWL] boot failed', e); setPhase('error'); setLoadError(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
   }, []);
