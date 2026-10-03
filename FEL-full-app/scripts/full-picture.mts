@@ -40,10 +40,30 @@ const camKeys = new Set(Object.keys(camFraming.modes));
 const bridge = read('lib/controller-link/schemas/registry.ts');
 const gauntlet = read('scripts/gauntlet.sh');
 const gauntletPlay = read('scripts/gauntlet-play.sh');
+const modesInFirstForLoop = (src: string): Set<string> => {
+  const body = src.match(/for m in ([^;]+); do/)?.[1] ?? '';
+  return new Set(body.trim().split(/\s+/).filter(Boolean));
+};
+const devGauntletModes = modesInFirstForLoop(gauntlet);
+const playGauntletModes = modesInFirstForLoop(gauntletPlay);
 const gameData = read('lib/game-data.ts');
 const locks = new Set(readdirSync('docs/concept-lock').map((f) => f.replace(/\.md$/, '')));
 const testScripts = readdirSync('scripts').filter((f) => /-tests\.ts$/.test(f));
-const routeMap: Record<string, string> = { karate_vs: 'karate-vs', penalty: 'soccer', derby: 'baseball', snowboard_slalom: 'snowboard', bigair: 'big-air', dunkduel: 'dunkduel' };
+const routeMap: Record<string, string> = {
+  aeroaces: 'aero-aces',
+  brainbrawl: 'brain-brawl',
+  karate_vs: 'karate-vs',
+  penalty: 'soccer',
+  derby: 'baseball',
+  snowboard_slalom: 'snowboard',
+  bigair: 'big-air',
+  velocitykart: 'velocity-kart',
+  who_scene_it: 'who-scene-it',
+  dunkduel: 'dunkduel',
+};
+// /play/dunkduel is the IRL camera Prove It flow; the Babylon DunkDuelMode is
+// deliberately registry/dev-mode only.
+const PLAY_SWEEP_EXEMPT = new Set(['dunkduel']);
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 const camName: Record<string, string> = { karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 
@@ -66,8 +86,8 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
     navFirst: /\.constrain\(/.test(src),
     clamps: (src.match(/Math\.max\(-?[A-Z_0-9.]+, *Math\.min\(/g) ?? []).length + (src.match(/^const (COURT|FIELD|ARENA|BOUNDS|HALF)[A-Z_]* *=/gm) ?? []).length,
     bridge: bridge.includes(`'${key}'`),
-    gauntlet: new RegExp(`\\b${key}\\b`).test(gauntlet.split('for m in')[1] ?? ''),
-    play: gauntletPlay.includes(key),
+    gauntlet: devGauntletModes.has(key),
+    play: playGauntletModes.has(key),
     lock: locks.has(lockName[key] ?? key),
     tests: testScripts.filter((t) => t.includes(key.split('_')[0])).length,
     lines: src ? src.split('\n').length : 0,
@@ -86,6 +106,7 @@ for (const r of rows.filter((x) => x.enabled)) {
   if (!r.bridge) gaps.push(`${r.key}: not on the phone bridge`);
   if (!r.menu) gaps.push(`${r.key}: no Modes-screen entry for ${r.route}`);
   if (!r.gauntlet) gaps.push(`${r.key}: not in the dev-mode gauntlet`);
+  if (!r.play && !PLAY_SWEEP_EXEMPT.has(r.key)) gaps.push(`${r.key}: not in the /play gauntlet`);
   if (!r.lock) gaps.push(`${r.key}: no concept lock`);
   if (r.cores.length === 0) gaps.push(`${r.key}: no shared movement core (mode-local movement)`);
 }

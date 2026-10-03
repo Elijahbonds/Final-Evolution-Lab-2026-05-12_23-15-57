@@ -31,7 +31,6 @@
     { "id": "derby",            "route": "/play/baseball",      "label": "Moonshot Derby", "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
     { "id": "duel",             "route": "/play/duel",          "label": "Duel",           "venue": "Shimogamo Dojo",       "actions": ["move", "guard", "strike", "idle"] },
     { "id": "dunk",             "route": "/play/dunk",          "label": "Dunk Contest",   "venue": "Venice Beach Court",   "actions": ["move", "sprint", "dunk", "shoot", "idle"] },
-    { "id": "dunkduel",         "route": "/play/dunkduel",      "label": "Prove It",       "venue": "Venice Beach Court",   "actions": ["move", "sprint", "dunk", "shoot", "idle"] },
     { "id": "football",         "route": "/play/football",      "label": "Breakaway",      "venue": "The Gridiron",         "actions": ["move", "sprint", "turbo", "idle"] },
     { "id": "freerun",          "route": "/play/freerun",       "label": "Free Run",       "venue": "The Yard",             "actions": ["move", "sprint", "idle"] },
     { "id": "golf",             "route": "/play/golf",          "label": "The Loop",       "venue": "Coastal Links",        "actions": ["move", "shoot", "idle"] },

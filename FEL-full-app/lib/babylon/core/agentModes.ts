@@ -20,7 +20,6 @@ export const AGENT_MODES: AgentModeDescriptor[] = [
   { id: 'derby',             route: '/play/baseball',      label: 'Moonshot Derby', actions: ['move', 'shoot', 'idle'] },
   { id: 'duel',              route: '/play/duel',          label: 'Duel',           actions: ['move', 'guard', 'strike', 'idle'] },
   { id: 'dunk',              route: '/play/dunk',          label: 'Dunk Contest',   actions: ['move', 'sprint', 'dunk', 'shoot', 'idle'] },
-  { id: 'dunkduel',          route: '/play/dunkduel',      label: 'Prove It',       actions: ['move', 'sprint', 'dunk', 'shoot', 'idle'] },
   { id: 'football',          route: '/play/football',      label: 'Breakaway',      actions: ['move', 'sprint', 'turbo', 'idle'] },
   { id: 'freerun',           route: '/play/freerun',       label: 'Free Run',       actions: ['move', 'sprint', 'idle'] },
   { id: 'golf',              route: '/play/golf',          label: 'The Loop',       actions: ['move', 'shoot', 'idle'] },
