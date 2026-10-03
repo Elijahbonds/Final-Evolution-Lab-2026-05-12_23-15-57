@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import {
   CrashScreen, GENERIC_CRASH_COPY, GlobalErrorBoundary, PLAY_CRASH_COPY, reportCrash,
 } from './global-error-boundary';
+import SegmentError from '@/app/error';
 import GlobalError from '@/app/global-error';
+import NotFound from '@/app/not-found';
 import PlayLayout from '@/app/play/layout';
 import { POST } from '@/app/api/telemetry/crash/route';
 
@@ -82,6 +84,24 @@ describe('which copy the crash screen shows', () => {
     expect(renderToStaticMarkup(boundary.render() as ReactElement)).toContain(GENERIC_CRASH_COPY);
     expect(renderToStaticMarkup(createElement(CrashScreen, { onRetry: () => {} }))).toContain(GENERIC_CRASH_COPY);
     expect(GENERIC_CRASH_COPY).not.toMatch(/session|progress|currency|safe/i);
+  });
+
+  it('the root segment error page uses the branded generic recovery screen', () => {
+    vi.stubGlobal('location', { pathname: '/shop' });
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('{}')));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const reset = vi.fn();
+    const tree = SegmentError({ error: crash(), reset }) as ReactElement<{ onRetry: () => void; copy?: string }>;
+    expect(tree.type).toBe(CrashScreen);
+    expect(tree.props.copy).toBe(GENERIC_CRASH_COPY);
+    tree.props.onRetry();
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(effects).toHaveLength(1);
+    effects[0]();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)))
+      .toMatchObject({ caughtBy: 'boundary', path: '/shop' });
   });
 });
 
@@ -168,6 +188,17 @@ describe('the buttons', () => {
     screen.props.onRetry();
     expect(reload).toHaveBeenCalledTimes(1);
     expect(reset).not.toHaveBeenCalled();
+  });
+});
+
+describe('not found recovery', () => {
+  it('renders a branded hub link instead of a framework-default dead end', () => {
+    const m = renderToStaticMarkup(createElement(NotFound));
+    expect(m).toContain('Final Evolution');
+    expect(m).toContain('We lost that route');
+    expect(m).toContain('href="/"');
+    expect(m).toContain('BACK TO HUB');
+    expect(m).not.toMatch(/login|404 - This page could not be found/i);
   });
 });
 

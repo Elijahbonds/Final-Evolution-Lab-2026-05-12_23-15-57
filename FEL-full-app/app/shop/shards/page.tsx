@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ShardShopPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fshop%2Fshards');
   return (
     <div className="min-h-screen bg-[#050505] pb-24">
       <Suspense fallback={null}>

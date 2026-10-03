@@ -14,7 +14,7 @@ import { arenasFor, COMBAT_MODE_IDS, type CombatModeId } from '../combat/arenas'
 import { looksFor } from './placeLooks';
 
 /** Registry key → the splash / pick id, where they differ. */
-const SPLASH_ID: Record<string, string> = { snowboard_slalom: 'snow', skateboard: 'skate', surf: 'surf', bigair: 'snow', aeroaces: 'aero', velocitykart: 'kart', brainbrawl: 'brainbrawl' };
+const SPLASH_ID: Record<string, string> = { snowboard_slalom: 'snow', skateboard: 'skate', surf: 'surf', bigair: 'snow', aeroaces: 'aero', velocitykart: 'kart', brainbrawl: 'brainbrawl', tiebreak: 'tennis' };
 const BOARD = new Set(['skate', 'snow', 'surf']);
 const RACE = new Set(['aero', 'kart']);
 /** Worlds built by hand (no venue spec) — they read a place look's `world` block instead. Kept so the ledger names them. */

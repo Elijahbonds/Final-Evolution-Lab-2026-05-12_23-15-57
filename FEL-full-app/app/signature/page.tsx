@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SignaturePage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fsignature');
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <main className="mx-auto max-w-[900px] px-4 py-8">
