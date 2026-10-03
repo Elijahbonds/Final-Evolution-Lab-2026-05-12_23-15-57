@@ -162,6 +162,7 @@ const ROWS: readonly BodyProfile[] = [
   // ── no plan phase yet (L)
   none('football', 'football', 'later', 'L', false),
   none('tennis', 'tennis', 'later', 'L', false),
+  none('tiebreak', 'tiebreak', 'later', 'L', false),
   none('golf', 'golf', 'later', 'L', false),
   none('derby', 'baseball', 'later', 'L', false),
   none('penalty', 'soccer', 'later', 'L', false),
