@@ -4,6 +4,7 @@
 // buttons on any pad (the mode reads A/B/X/Y). Results flow back through GameShell's onEnd like every other mode.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
@@ -51,7 +52,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-WSI] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
