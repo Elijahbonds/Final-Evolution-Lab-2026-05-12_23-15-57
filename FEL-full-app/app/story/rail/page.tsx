@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function RailPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user) redirect('/login');
+  if (!session?.user) redirect('/login?next=%2Fstory%2Frail');
   return <RailLoader />;
 }

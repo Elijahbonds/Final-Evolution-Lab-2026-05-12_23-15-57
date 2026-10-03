@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function BaseballPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fplay%2Fbaseball');
   return <BaseballLoader />;
 }
