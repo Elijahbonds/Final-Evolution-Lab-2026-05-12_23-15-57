@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
 const ROOT = process.cwd();
 
 const registry = readFileSync(join(ROOT, 'lib/babylon/modes/registry.ts'), 'utf8');
 const matrix = readFileSync(join(ROOT, 'scripts/full-picture.mts'), 'utf8');
 const gameData = readFileSync(join(ROOT, 'lib/game-data.ts'), 'utf8');
-const controllerRegistry = readFileSync(join(ROOT, 'lib/controller-link/schemas/registry.ts'), 'utf8');
 const devGauntlet = readFileSync(join(ROOT, 'scripts/gauntlet.sh'), 'utf8');
 const playGauntlet = readFileSync(join(ROOT, 'scripts/gauntlet-play.sh'), 'utf8');
 
@@ -32,6 +32,30 @@ const playGauntletExempt = new Set([
   // DunkDuelMode remains registry/dev-mode coverage only.
   'dunkduel',
 ]);
+const devGauntletModes = modesInForLoops(devGauntlet);
+const playGauntletModes = modesInForLoops(playGauntlet);
+
+function modesInForLoops(script: string): Set<string> {
+  const modes = new Set<string>();
+  for (const match of script.matchAll(/for\s+\w+\s+in\s+([^;]+);/g)) {
+    for (const token of match[1].trim().split(/\s+/)) {
+      if (/^[a-z0-9_]+$/.test(token)) modes.add(token);
+    }
+  }
+  return modes;
+}
+
+function hasDpadAction(mode: string, action: string): boolean {
+  return (MODE_CONTROLLERS[mode]?.schemas ?? []).some((schema) => (
+    schema.kind === 'dpad' && schema.dpad.action === action
+  ));
+}
+
+function hasHeldButton(mode: string, action: string): boolean {
+  return (MODE_CONTROLLERS[mode]?.schemas ?? []).some((schema) => (
+    schema.kind === 'button' && schema.buttons.some((button) => button.action === action && button.hold === true)
+  ));
+}
 
 for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
@@ -47,9 +71,9 @@ for (const key of enabledModes) {
   const slug = route.slice('/play/'.length);
   if (!existsSync(join(ROOT, 'app/play', slug, 'page.tsx'))) missingRoutes.push(`${key} -> ${route}`);
   if (!gameData.includes(`href: '${route}'`)) missingMenuLinks.push(`${key} -> ${route}`);
-  if (!controllerRegistry.includes(`modeId: '${key}'`)) missingControllerSchemas.push(key);
-  if (!new RegExp(`\\b${key}\\b`).test(devGauntlet.split('for m in')[1] ?? '')) missingDevGauntlet.push(key);
-  if (!playGauntletExempt.has(key) && !new RegExp(`\\b${key}\\b`).test(playGauntlet.split('for m in')[1] ?? '')) missingPlayGauntlet.push(key);
+  if (!(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
+  if (!devGauntletModes.has(key)) missingDevGauntlet.push(key);
+  if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);
 }
 
 assert.deepEqual(missingRoutes, [], 'full-picture must resolve enabled modes to real /play routes');
@@ -57,5 +81,9 @@ assert.deepEqual(missingMenuLinks, [], 'full-picture menu column must match MODE
 assert.deepEqual(missingControllerSchemas, [], 'enabled modes must have Controller Link schemas');
 assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode gauntlet');
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
+assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
+assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
+assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
+assert.ok(hasHeldButton('mixedcombat', 'X'), 'mixedcombat phone guard must be holdable, not a tap');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);

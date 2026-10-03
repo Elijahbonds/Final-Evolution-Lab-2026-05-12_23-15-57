@@ -160,18 +160,20 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   },
 
   // ── Air-session family ────────────────────────────────────────────────────
-  // The run-up IS a d-pad cadence, so these need the dpad schema as well as the
-  // two air verbs. Same shape for both because they are one shared core.
+  // FreeRun steers from the left stick during the run phase, then still lets the
+  // face buttons start/pick tricks. Sprint and slide are trigger holds in-mode,
+  // so phone fallbacks must be holds too.
   freerun: {
     modeId: 'freerun',
     title: 'Free Run',
     maxPlayers: 1,
     askName: true,
     schemas: [
-      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'dpad', dpad: { action: 'move' } },
       { kind: 'button', buttons: [
+        { action: 'charge', label: 'SPRINT', hold: true },
         { action: 'A', label: 'JUMP' },
-        { action: 'B', label: 'SLIDE' },
+        { action: 'brake', label: 'SLIDE', hold: true },
         { action: 'X', label: 'FLIP' },
         { action: 'Y', label: 'TWIST' },
       ] },
@@ -532,7 +534,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'STRIKE' },
         { action: 'B', label: 'KICK' },
-        { action: 'X', label: 'GUARD' },
+        { action: 'X', label: 'GUARD', hold: true },
         { action: 'Y', label: 'HEAVY' },
       ] },
     ],

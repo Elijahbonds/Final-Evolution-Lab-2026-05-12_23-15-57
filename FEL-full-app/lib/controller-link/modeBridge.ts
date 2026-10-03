@@ -37,12 +37,16 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
   // does it (space depth over 1.1s); on the motion path the phone does it from
   // tilt. A held button has neither, so the bridge ramps it here — otherwise
   // the fallback is a single instant value and charge stops being analog.
-  let chargeTimer: ReturnType<typeof setInterval> | null = null;
+  const triggerTimers: Partial<Record<'L' | 'R', ReturnType<typeof setInterval>>> = {};
   // Held d-pad directions for the 'move' action, so up+right is a diagonal
   // rather than whichever arrow arrived last.
   const heldDirs = new Set<Dir>();
-  const stopCharge = (): void => {
-    if (chargeTimer) { clearInterval(chargeTimer); chargeTimer = null; }
+  const stopTriggerRamp = (side: 'L' | 'R'): void => {
+    const timer = triggerTimers[side];
+    if (timer) {
+      clearInterval(timer);
+      delete triggerTimers[side];
+    }
   };
 
   return (ev: ControlEvent) => {
@@ -94,15 +98,15 @@ export function toInputBus(bus: InputBus): (ev: ControlEvent) => void {
       // holding CHARGE fired SLAM instead. That is the silent-degradation shape
       // this project keeps getting bitten by: no error, just the wrong verb.
       if (name === 'charge' || name === 'brake') {
-        stopCharge();
         const side = name === 'charge' ? 'R' : 'L';
+        stopTriggerRamp(side);
         if (edge === 'up') { emit({ t: 'trigger', side, value: 0 }); return; }
         const t0 = Date.now();
         emit({ t: 'trigger', side, value: 0.01 });
-        chargeTimer = setInterval(() => {
+        triggerTimers[side] = setInterval(() => {
           const v = Math.min(1, (Date.now() - t0) / CHARGE_RAMP_MS);
           emit({ t: 'trigger', side, value: v });
-          if (v >= 1) stopCharge();
+          if (v >= 1) stopTriggerRamp(side);
         }, 50);
         return;
       }

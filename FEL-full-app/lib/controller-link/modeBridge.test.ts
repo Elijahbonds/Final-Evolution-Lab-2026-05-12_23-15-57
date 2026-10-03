@@ -51,4 +51,31 @@ describe('Controller Link mode bridge', () => {
       vi.useRealTimers();
     }
   });
+
+  it('keeps gas and brake hold ramps independent', () => {
+    vi.useFakeTimers();
+    try {
+      const { bridge, events } = collectBridge();
+
+      bridge({ a: 'charge:down', t: 1 });
+      vi.advanceTimersByTime(250);
+      const rightBeforeBrake = events
+        .filter((e): e is Extract<FelInput, { t: 'trigger' }> => e.t === 'trigger' && e.side === 'R')
+        .at(-1)?.value ?? 0;
+
+      bridge({ a: 'brake:down', t: 2 });
+      vi.advanceTimersByTime(250);
+      bridge({ a: 'brake:up', t: 3 });
+
+      const rightAfterBrake = events
+        .filter((e): e is Extract<FelInput, { t: 'trigger' }> => e.t === 'trigger' && e.side === 'R')
+        .at(-1)?.value ?? 0;
+      expect(rightAfterBrake).toBeGreaterThan(rightBeforeBrake);
+
+      bridge({ a: 'charge:up', t: 4 });
+      expect(events.at(-1)).toEqual({ t: 'trigger', side: 'R', value: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
