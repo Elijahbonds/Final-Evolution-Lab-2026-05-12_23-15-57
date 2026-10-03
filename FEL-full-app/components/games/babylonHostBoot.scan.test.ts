@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const HOST_DIR = path.join(ROOT, 'components/games');
 const babylonHosts = fs.readdirSync(HOST_DIR)
   .filter((name) => name.endsWith('-babylon.tsx'))
+  .concat('tiebreak-game.tsx')
   .sort();
 
 const read = (file: string): string =>
@@ -35,7 +36,7 @@ describe('Babylon hosts own their boot effect for the mount', () => {
   it.each(babylonHosts)('%s surfaces boot failures as retryable errors', (file) => {
     const src = read(file);
 
-    expect(src).toContain("from './boot-error'");
+    expect(src).toMatch(/from ['"](?:\.|@\/components\/games)\/boot-error['"]/);
     expect(src).toMatch(
       /\.catch\(\(e\) => surfaceBootError\(e, \{[\s\S]*?setPhase,\s*setLoadError[\s\S]*?\}\)\);/,
     );
