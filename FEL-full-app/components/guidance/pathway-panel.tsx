@@ -25,17 +25,33 @@ function accentFor(d: string): string {
 export function PathwayPanel() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
+    setFailed(false);
     fetch('/api/guidance')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
       .then((j) => { if (live) setData(j); })
       .catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, []);
+  }, [attempt]);
 
-  if (failed) return null;
+  if (failed) {
+    return (
+      <div className="rounded-2xl border border-[#FF3366]/30 bg-[#FF3366]/10 p-5 text-center">
+        <p className="font-mono text-sm font-bold text-[#FF9DB3]">Guidance is unavailable right now.</p>
+        <p className="mt-1 text-sm text-white/55">Your pathway suggestions are safe; refresh this panel when the server is reachable.</p>
+        <button
+          type="button"
+          onClick={() => setAttempt((n) => n + 1)}
+          className="mt-4 rounded-lg border border-[#FF9DB3]/50 px-4 py-2 font-mono text-xs text-[#FF9DB3] transition-colors hover:bg-[#FF9DB3]/10"
+        >
+          TRY AGAIN
+        </button>
+      </div>
+    );
+  }
   if (!data) return <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />;
 
   return (

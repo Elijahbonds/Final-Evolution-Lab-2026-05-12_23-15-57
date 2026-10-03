@@ -15,18 +15,23 @@ import type React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Lock, Play } from 'lucide-react';
-import { VENUES } from '@/lib/game-data';
+import { MODE_INFO, VENUES } from '@/lib/game-data';
 import { MasteryBadge } from '@/components/mastery-badge';
 
-/** A venue's /play/<route> slug is not the camelCase key its sessions post under; this is that map. */
-const ROUTE_TO_MODE: Record<string, string> = {
-  karate: 'karateEndless', dunk: 'dunkContest', tennis: 'tennis', 'brain-brawl': 'brainBrawl',
-  skateboard: 'skateboarding', snowboard: 'snowboarding', surf: 'surfing', golf: 'golf',
-  soccer: 'soccer', baseball: 'baseball', football: 'football', freerun: 'freerun', training: 'training',
-};
+function playSlug(href?: string): string | null {
+  return (href ?? '').split('/play/')[1]?.split(/[?#]/)[0] ?? null;
+}
 
-function venueModeKey(href?: string): string | null {
-  const slug = (href ?? '').split('/play/')[1]?.split(/[?#]/)[0];
+/** A venue's /play/<route> slug is not always the camelCase key its sessions post under; MODE_INFO is canonical. */
+const ROUTE_TO_MODE: Record<string, string> = Object.fromEntries(
+  Object.entries(MODE_INFO).flatMap(([key, info]) => {
+    const slug = playSlug(info.href);
+    return slug ? [[slug, key]] : [];
+  }),
+);
+
+export function venueModeKey(href?: string): string | null {
+  const slug = playSlug(href);
   return slug ? ROUTE_TO_MODE[slug] ?? slug : null;
 }
 

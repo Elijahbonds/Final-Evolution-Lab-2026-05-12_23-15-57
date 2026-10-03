@@ -126,7 +126,10 @@ describe('EVERY ENABLED MODE HAS A DOOR', () => {
       const literal = new RegExp(`MODES\\.${id}\\b`).test(all);
       const viaFactory = new RegExp(`modeKey:\\s*['"]${id}['"]`).test(all)
         || new RegExp(`modeKey=["']${id}["']`).test(all)
-        || new RegExp(`make\\w*Host\\(\\s*['"]${id}['"]`).test(all);
+        || new RegExp(`make\\w*Host\\(\\s*['"]${id}['"]`).test(all)
+        // Tiebreak keeps a grade-specific factory on the live route; the
+        // registry carries a READY default only for dev/probe coverage.
+        || (id === 'tiebreak' && /makeTiebreakMode\(/.test(all));
       return !literal && !viaFactory;
     });
     expect(undoored).toEqual([]);

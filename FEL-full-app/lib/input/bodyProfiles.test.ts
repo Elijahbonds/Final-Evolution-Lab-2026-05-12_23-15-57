@@ -1,5 +1,5 @@
 // MOVEMENT PLAY P3 (2026-09-24): the body profiles — one row per mode, what the body may press there, and the card's
-// words for it. What is pinned: the 28 rows and their verbs against the touch deck's own labels (a card that says POP
+// words for it. What is pinned: one row per enabled mode and their verbs against the touch deck's own labels (a card that says POP
 // over a button the deck calls PUMP is a lie), the NEVER-table (the baseline's misfires, each made impossible by the
 // data), and how a mode's own claims and profile override the row. The registry side (every ENABLED key has its row,
 // the four modeId aliases) is registry.drift.test.ts; what the floor does with a row is bodyFloor / bodyGate.
@@ -9,10 +9,12 @@ import {
   sessionOnly, type BodyBinding, type BodyProfile, COMING_COPY, UNAVAILABLE_COPY,
 } from './bodyProfiles';
 import { MODE_VERBS } from '@/lib/babylon/ui/modeVerbs';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
 import { RIDE_ROWS_ON } from './rideProfiles';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 
 const ROWS = Object.values(BODY_PROFILES);
+const ENABLED_MODE_COUNT = ENABLED_BABYLON_MODES.size;
 /** MOVEMENT PLAY P8: the table as it binds with the ride switch on (the kart and the plane as the probe grades them). */
 const ROWS_ON = ROWS.map((p) => RIDE_ROWS_ON.find((r) => r.modeId === p.modeId) ?? p);
 const byKey = (key: string): BodyProfile => ROWS.find((p) => p.key === key)!;
@@ -32,9 +34,9 @@ function slotLabel(key: string, to: string): string | null {
 }
 
 describe('the table', () => {
-  it('has 28 rows, one per mode, keyed by modeId, eleven of them binding the body (P8: the kart and the plane)', () => {
-    expect(ROWS).toHaveLength(28);
-    expect(new Set(ROWS.map((p) => p.key)).size).toBe(28);
+  it('has one row per enabled mode, keyed by modeId, eleven of them binding the body (P8: the kart and the plane)', () => {
+    expect(ROWS).toHaveLength(ENABLED_MODE_COUNT);
+    expect(new Set(ROWS.map((p) => p.key)).size).toBe(ENABLED_MODE_COUNT);
     for (const [modeId, p] of Object.entries(BODY_PROFILES)) expect(p.modeId).toBe(modeId);
     expect(ROWS.filter((p) => p.bindings.length).map((p) => p.key).sort()).toEqual(
       ['aeroaces', 'bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf', 'velocitykart'],
@@ -115,7 +117,7 @@ describe('THE NEVER-TABLE — the baseline\'s misfires, impossible by the data',
   });
   it('nothing at all in the quizzes, the rhythm game and the modes with no plan phase', () => {
     const where = ROWS.filter((p) => ['quiz', 'rhythm', 'later'].includes(p.family));
-    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'volleyball', 'who_scene_it']);
+    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'tiebreak', 'volleyball', 'who_scene_it']);
     for (const p of where) expect(p.bindings, p.key).toEqual([]);
     expect(byKey('who_scene_it').later).toBeNull();
     expect(byKey('brainbrawl').later).toBeNull();
