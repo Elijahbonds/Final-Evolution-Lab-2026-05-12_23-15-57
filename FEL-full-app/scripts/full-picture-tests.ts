@@ -57,6 +57,14 @@ function hasHeldButton(mode: string, action: string): boolean {
   ));
 }
 
+function hasButton(mode: string, action: string, label?: string): boolean {
+  return (MODE_CONTROLLERS[mode]?.schemas ?? []).some((schema) => (
+    schema.kind === 'button' && schema.buttons.some((button) => (
+      button.action === action && (label === undefined || button.label === label)
+    ))
+  ));
+}
+
 for (const [key, slug] of Object.entries(expectedSlugs)) {
   assert.equal(routeMap.get(key), slug, `full-picture routeMap must carry ${key} -> ${slug}`);
 }
@@ -85,5 +93,17 @@ assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
 assert.ok(hasHeldButton('mixedcombat', 'X'), 'mixedcombat phone guard must be holdable, not a tap');
+assert.ok(hasHeldButton('karate', 'X'), 'karate phone block must be a held X guard, not a dash tap');
+assert.ok(hasHeldButton('karate_vs', 'X'), 'karate_vs phone block must be a held X guard, not a dash tap');
+assert.ok(hasHeldButton('onevone', 'X') && hasButton('onevone', 'X', 'SHOOT'),
+  'onevone phone SHOOT must use held X, matching the 2K shot-meter map');
+assert.ok(!hasButton('onevone', 'charge'),
+  'onevone phone SHOOT must not use charge/RT, which basketball reads as turbo');
+assert.ok(hasHeldButton('threevthree', 'X') && hasButton('threevthree', 'X', 'SHOOT'),
+  'threevthree phone SHOOT must use held X, matching the 2K shot-meter map');
+assert.ok(hasButton('threevthree', 'A', 'PASS') && hasButton('threevthree', 'Y', 'BLOCK'),
+  'threevthree phone PASS/BLOCK must match the local 2K face-button map');
+assert.ok(!hasButton('threevthree', 'charge'),
+  'threevthree phone SHOOT must not use charge/RT, which basketball reads as turbo');
 
 console.log(`full-picture-tests: ${enabledModes.length} enabled mode routes, menus, phone schemas, and gauntlets resolve`);
