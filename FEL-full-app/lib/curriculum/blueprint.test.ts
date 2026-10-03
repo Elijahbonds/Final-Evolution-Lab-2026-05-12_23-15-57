@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { allLessons, lessonByRef, requiredModules } from './blueprint';
 import { TRACKS } from '../game-data';
+
+const PLAY = join(__dirname, '..', '..', 'app', 'play');
 
 describe('the Blueprint curriculum', () => {
   it('has a body for every lesson in the mode tracks', () => {
@@ -14,6 +18,12 @@ describe('the Blueprint curriculum', () => {
       expect(l.keyPoints.length, l.ref).toBeGreaterThan(0);
       expect(l.drill.modeKey, l.ref).toMatch(/^[a-z_]+$/);
     }
+  });
+  it('every lesson drill links to a shipped play route', () => {
+    const missing = allLessons()
+      .filter((l) => !existsSync(join(PLAY, l.drill.modeKey, 'page.tsx')))
+      .map((l) => `${l.ref} -> /play/${l.drill.modeKey}`);
+    expect(missing, 'Camp drill buttons must not send players to 404s').toEqual([]);
   });
   // HOTFIX (2026-09-24): the question/answer/grading checks that lived here moved with the answer key to
   // lib/curriculum/assessments.test.ts. This module ships to the browser, so what it must prove now is the

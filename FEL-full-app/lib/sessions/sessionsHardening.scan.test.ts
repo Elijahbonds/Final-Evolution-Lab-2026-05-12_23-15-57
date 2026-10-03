@@ -74,6 +74,7 @@ describe('FIX 2 step 7: the run rate limits are STAGED, not wired', () => {
 
 describe('ADDENDUM: the end card shows only what the server granted, and no daily line', () => {
   const shell = stripComments(readFileSync(join(ROOT, 'components/games/game-shell.tsx'), 'utf8'));
+  const proveIt = stripComments(readFileSync(join(ROOT, 'app/play/dunkduel/_components/prove-it.tsx'), 'utf8'));
   it('there is no daily line on the card, and no earn the card could add one from', () => {
     expect(shell).not.toMatch(/daily|DAILY_FIRST_SESSION|first.session/i);
     expect(shell).not.toMatch(/reportEarn/);
@@ -92,5 +93,13 @@ describe('ADDENDUM: the end card shows only what the server granted, and no dail
     expect(unpaidReason('SCORE_INVALID', 'no_rules')).toBe('NO_RULES');
     expect(unpaidReason('SCORE_INVALID', 'above_max_score')).toBe('SCORE_INVALID');
     expect(unpaidReason(undefined)).toBe('UNPAID');
+  });
+
+  it('Prove It bypasses GameShell but still starts and finishes a server session run', () => {
+    expect(proveIt).toMatch(/fetch\('\/api\/sessions\/start'/);
+    expect(proveIt).toMatch(/fetch\('\/api\/sessions'/);
+    expect(proveIt).toMatch(/mode:\s*SESSION_MODE/);
+    expect(proveIt).toMatch(/runId/);
+    expect(proveIt).toMatch(/played:\s*attempts\[0\]\.length > 0/);
   });
 });

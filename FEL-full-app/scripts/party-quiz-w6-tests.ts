@@ -68,6 +68,11 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   ok(host.includes('score: myPts,'), 'tiebreak host: posts the game score (WA-22)');
   ok(host.includes('Math.random() < 0.16 + rally * 0.05'), 'tiebreak host: AI net rate');
   ok(/useStartWake\(!started/.test(host), 'tiebreak host: start card');
+  const loader = src('app/play/tiebreak/_components/loader.tsx');
+  ok(loader.includes('ownControls'), 'tiebreak loader: shell does not draw a second control deck');
+  const registry = src('lib/babylon/modes/registry.ts');
+  ok(registry.includes('tiebreak: TiebreakMode'), 'tiebreak: registered in the Babylon roster');
+  ok(registry.includes("'tiebreak'"), 'tiebreak: enabled in the Babylon roster');
   const mode = src('lib/babylon/modes/TiebreakMode.ts');
   ok(mode.includes("mountVenue(ctx, 'tennis'"), 'tiebreak: mounts the tennis venue');
   ok(mode.includes('MeshBuilder.CreateSphere'), 'tiebreak: the ball is a mesh');

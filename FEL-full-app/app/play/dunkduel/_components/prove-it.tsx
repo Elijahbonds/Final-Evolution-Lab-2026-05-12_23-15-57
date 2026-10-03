@@ -16,6 +16,7 @@ import { Camera, CameraOff, RotateCcw, Users, Trophy } from 'lucide-react';
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
+import { FORM_SUMMARY_VERSION } from '@/lib/move/formSummary';
 
 const BG = '#050505';
 const CYAN = '#00E5FF';
@@ -25,12 +26,33 @@ const PINK = '#FF2D95';
 const RED = '#FF3366';
 
 const DUNKS_EACH = 2;
+const SESSION_MODE = 'dunkduel';
 
 type Stage =
   | 'consent' | 'camera-off' | 'loading-model' | 'prop-phone'
   | 'arm' | 'watching' | 'judged' | 'handoff' | 'final';
 
 interface Attempt { metrics: DunkMetrics; scores: JudgeScore[]; total: number }
+type SessionStatus = 'idle' | 'saving' | 'saved' | 'unpaid' | 'failed';
+
+function formForSession(attempts: [Attempt[], Attempt[]]) {
+  return {
+    v: FORM_SUMMARY_VERSION,
+    mode: SESSION_MODE,
+    attemptCount: attempts[0].length + attempts[1].length,
+    attempts: attempts.flatMap((list, playerIndex) => list.map((a) => ({
+      kind: 'jump',
+      label: a.metrics.family,
+      player: playerIndex === 0 ? 1 : 2,
+      made: true,
+      takeoff: a.metrics.takeoff === 'one-foot' ? 'one' : 'two',
+      reads: {
+        heightCm: a.metrics.verticalCm,
+        flightMs: a.metrics.flightTimeMs,
+      },
+    }))),
+  };
+}
 
 export default function ProveIt() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -39,6 +61,8 @@ export default function ProveIt() {
   const trackerRef = useRef(new DunkTracker());
   const rafRef = useRef(0);
   const liveRef = useRef(false);
+  const runRef = useRef<Promise<string | null> | null>(null);
+  const finalPostedRef = useRef(false);
 
   const [stage, setStage] = useState<Stage>('consent');
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +73,7 @@ export default function ProveIt() {
   const [trackerState, setTrackerState] = useState('idle');
   // an attempt the tracker refused (the dunks route would too): said on the pill instead of vanishing
   const [refused, setRefused] = useState<DunkRefusal | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<{ state: SessionStatus; line: string }>({ state: 'idle', line: '' });
 
   useEffect(() => {
     fetch('/api/profile').then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -83,6 +108,20 @@ export default function ProveIt() {
     adapterRef.current = null;
   }, []);
   useEffect(() => () => stopAll(), [stopAll]);
+
+  const startServerRun = useCallback((): Promise<string | null> => {
+    if (!runRef.current) {
+      runRef.current = fetch('/api/sessions/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: SESSION_MODE }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => (typeof j?.runId === 'string' ? j.runId as string : null))
+        .catch(() => null);
+    }
+    return runRef.current;
+  }, []);
 
   const startCamera = useCallback(async () => {
     // TRY AGAIN after a refusal: the last attempt's model (and any camera it opened) go first, or each retry leaked one.
@@ -161,13 +200,14 @@ export default function ProveIt() {
   }, [player, prq]);
 
   const armAttempt = useCallback(() => {
+    void startServerRun();
     trackerRef.current.reset();
     setCurrent(null);
     setRefused(null);
     setStage('watching');
     liveRef.current = true;
     runLoop();
-  }, [runLoop]);
+  }, [runLoop, startServerRun]);
 
   const nextUp = useCallback(() => {
     const mine = attempts[player].length;
@@ -185,6 +225,46 @@ export default function ProveIt() {
 
   const totals = [0, 1].map((i) => attempts[i].reduce((s, a) => s + a.total, 0));
   const winner = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
+
+  useEffect(() => {
+    if (stage !== 'final' || finalPostedRef.current) return;
+    finalPostedRef.current = true;
+    setSessionStatus({ state: 'saving', line: 'Saving Prove It session...' });
+    void (async () => {
+      const runId = await startServerRun();
+      if (!runId) {
+        setSessionStatus({ state: 'failed', line: 'Session could not be saved. Your device-only contest result stays on this screen.' });
+        return;
+      }
+      try {
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: SESSION_MODE,
+            runId,
+            score: Math.max(0, Math.floor(totals[0])),
+            opponentScore: Math.max(0, Math.floor(totals[1])),
+            won: winner === 0,
+            played: attempts[0].length > 0,
+            form: formForSession(attempts),
+          }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body?.ok === false) {
+          setSessionStatus({ state: 'failed', line: `Session not saved: ${String(body?.reason ?? body?.error ?? res.status)}` });
+          return;
+        }
+        if (body?.paid === false) {
+          setSessionStatus({ state: 'unpaid', line: `Session recorded · ${String(body?.reason ?? 'unpaid')}` });
+          return;
+        }
+        setSessionStatus({ state: 'saved', line: `Session saved · +${Number(body?.xp ?? 0)} XP · +${Number(body?.shards ?? 0)} shards` });
+      } catch {
+        setSessionStatus({ state: 'failed', line: 'Session could not be saved. Your device-only contest result stays on this screen.' });
+      }
+    })();
+  }, [attempts, stage, startServerRun, totals, winner]);
 
   return (
     <div className="mx-auto max-w-[880px] px-4 py-6 font-mono text-white">
@@ -319,8 +399,21 @@ export default function ProveIt() {
               {winner === null ? 'DEAD HEAT' : `PLAYER ${winner + 1} PROVED IT`}
             </div>
             <div className="text-sm text-white/60">{totals[0]} — {totals[1]}</div>
+            {sessionStatus.state !== 'idle' && (
+              <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-white/60">
+                {sessionStatus.line}
+              </div>
+            )}
             <button
-              onClick={() => { setAttempts([[], []]); setPlayer(0); setCurrent(null); setStage('arm'); }}
+              onClick={() => {
+                setAttempts([[], []]);
+                setPlayer(0);
+                setCurrent(null);
+                runRef.current = null;
+                finalPostedRef.current = false;
+                setSessionStatus({ state: 'idle', line: '' });
+                setStage('arm');
+              }}
               className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black"
               style={{ background: CYAN }}
             >
