@@ -24,6 +24,12 @@ describe('mode menu contract', () => {
     }
   });
 
+  it('keeps revived standalone Carnival stops in the game-mode grid', () => {
+    const visible = new Set(visibleModeEntries().map(([key]) => key));
+    expect(visible.has('sprint'), 'Sprint is a revived standalone route as well as a Carnival stop').toBe(true);
+    expect(HIDDEN_FROM_MODE_MENU.has('sprint')).toBe(false);
+  });
+
   it('does not fall back for any visible mode', () => {
     for (const [key, info] of visibleModeEntries()) {
       const meta = modeMenuMetaFor(key);
