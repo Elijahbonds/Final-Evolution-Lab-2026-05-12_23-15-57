@@ -194,17 +194,15 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   whoSceneIt: { name: 'Who Scene It', venue: 'NeuroArena', href: '/play/who-scene-it' },
   bigAir: { name: 'Stomp', venue: 'Mountain Slope', href: '/play/big-air' },
   tiebreak: { name: 'Tiebreak Blitz', venue: 'Venice Tennis Court', href: '/play/tiebreak' },
-  // sprint: RETIRED from the v1 roster (owner decision, 2026-09-01 — no locked
-  // benchmark and nobody chose one; see PHASE2_BENCHMARK_LOCKS.md TIER B). The
-  // route redirects to /play; the mode file stays in the tree for a future
-  // revival with a real benchmark.
+  // REVIVED (owner, 2026-09-13): sprint has a locked benchmark and is live on
+  // the Play shelf again. Keep this row aligned with ENABLED_BABYLON_MODES and
+  // the /play/sprint route; venue/mastery surfaces read it as the session key.
   storyMode: { name: 'The Nexus Initiative', venue: 'The Nexus', href: '/story' },
   football: { name: 'Breakaway', venue: 'The Gridiron', href: '/play/football' },
   mixedcombat: { name: "Ring's Edge", venue: 'The Octagon', href: '/play/mixedcombat' },
-  // duel + showdown: RETIRED from the v1 roster (owner, 2026-09-01 — combat is
-  // Karate VS / Karate Endless / Mixed Combat only; karate-vs is the Storm
-  // mode). Routes redirect to /play; mode files stay registered for a future
-  // revival. See PHASE2_BENCHMARK_LOCKS.md post-lock retirements.
+  // REVIVED (owner, 2026-09-13): duel + showdown have locked benchmarks and
+  // live routes again. Keep these rows aligned with ENABLED_BABYLON_MODES so
+  // catalogue links, mastery and challenge surfaces do not silently drift.
   dunkduel: { name: 'Prove It', venue: 'Venice Beach Court', href: '/play/dunkduel' },
   volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
