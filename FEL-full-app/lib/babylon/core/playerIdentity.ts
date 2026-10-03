@@ -57,6 +57,10 @@ export interface PlayerIdentity {
   /** PLAYER RING (owner, 2026-09-17: "the icon correlates to the user's creator card"): the EQUIPPED creator card —
    *  the start screen's card slot / the Closet skin (AvatarLook.skinCardId) — with its accent and signature mode. null = BASE. */
   card?: EquippedCard | null;   // optional: the preview / dev literals do not carry one
+  /** TRUE for an under-18 or unknown-age player (the closet row holds only catalog defaults): the real look
+   *  is on the device and nowhere else (LOOK PRIVACY, PR #98; the race's local overlay, PR #138). Optional:
+   *  dev literals do not carry one. */
+  lookLocal?: boolean;
 }
 export interface EquippedCard { id: string; name: string; accent: string; mode: string }
 
@@ -107,7 +111,7 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
 
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
   const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card };
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true };
   return cached;
 }
 /** The identity resolved so far this session (null before the first spawn asked) — a synchronous read for the ring / icon. */
@@ -137,6 +141,13 @@ function devBodyOverride(): PlayerIdentity | null {
 
 /** Call on Closet save / new scan so the next spawn picks up changes. */
 export function invalidateIdentity(): void { cached = null; }
+
+/**
+ * Seat a resolved identity as the session's one (racing/raceLook: the local-look overlay for a minor,
+ * computed from what the device holds, so CharacterLibrary's own resolveIdentity picks it up). Nothing
+ * here fetches or uploads — it only sets what the next spawn will wear.
+ */
+export function primeIdentity(id: PlayerIdentity): void { cached = id; }
 
 // ── Application layers ──────────────────────────────────────────────────
 

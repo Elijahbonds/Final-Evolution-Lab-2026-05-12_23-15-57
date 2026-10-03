@@ -68,6 +68,7 @@ import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/a
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
 import { buildToyPlane, blurProp, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
 import { aeroHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
+import { resolveRaceIdentity } from '../racing/raceLook';   // PR #138: a minor's look is the device's, and never uploaded
 import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, WingtipTrails } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { AeroPickups } from '../racing/aeroPickups';
@@ -362,6 +363,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       { const pl = player; void dressVehicle(ctx.scene, pl.root, 'plane', readPlane().id, { hide: pl.parts }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); }); }   // phase 5: the garage pick's body
       // THE PILOT IN THE OPEN COCKPIT: the hero, seated, chest up out of the rim. Parented to the seat, so the plane
       // carries the body through every roll and loop with no second copy of the attitude maths.
+      // PR #138: a minor's (or unknown-age) pilot wears the look the PHONE holds — resolved and seated here,
+      // read-only over the wire, before the spawn asks for the session identity
+      await resolveRaceIdentity();
       pilot = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 0), yawRad: 0, startClip: 'idle_stand' });
       pilot.animator.park();
       pilot.root.parent = player.seat;

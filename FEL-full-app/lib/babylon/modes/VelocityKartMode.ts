@@ -74,6 +74,7 @@ import { fitVehicleLight, vehicleEnvFor, VEHICLE_ENV_BASE, type VehicleLightHand
 import { SpeedLines, DustEmitter } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { ExhaustPuffs, bobAmp, bobFreq, frontWheelAngle, rivalSteer, wheelAngle, wrapPi } from '../racing/vehicleMotion';   // 10-phase pass, phase 9
 import { kartHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
+import { resolveRaceIdentity } from '../racing/raceLook';   // PR #138: a minor's look is the device's, and never uploaded
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -1004,6 +1005,9 @@ return {
     // that could drift by a frame. Posed with an authored seated stance (anim/authored/seated.ts) because
     // no sitting clip exists — keyed as BONE EULERS through the bind frame, which is the channel that means
     // the same thing at any yaw.
+    // PR #138: a minor's (or unknown-age) hero wears the look the PHONE holds — resolved and seated here,
+    // read-only over the wire, before the spawn asks for the session identity
+    await resolveRaceIdentity();
     driver = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
       position: new Vector3(0, 0, 0), yawRad: 0, startClip: 'idle_stand',
     });
