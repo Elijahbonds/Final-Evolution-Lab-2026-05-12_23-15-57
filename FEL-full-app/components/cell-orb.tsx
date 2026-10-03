@@ -92,7 +92,7 @@ export function CellOrb() {
                 <span className="rounded bg-[#A855F7]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#C79BFF]">Nexus</span>
               </div>
               <div className="flex items-center gap-1">
-                <Link href="/studio" className="rounded p-1 text-white/50 hover:text-white" aria-label="Open full Studio"><Maximize2 className="h-4 w-4" /></Link>
+                <Link href="/create" className="rounded p-1 text-white/50 hover:text-white" aria-label="Open Creative Studio"><Maximize2 className="h-4 w-4" /></Link>
                 <button onClick={() => setOpen(false)} className="rounded p-1 text-white/50 hover:text-white" aria-label="Close"><X className="h-4 w-4" /></button>
               </div>
             </div>
