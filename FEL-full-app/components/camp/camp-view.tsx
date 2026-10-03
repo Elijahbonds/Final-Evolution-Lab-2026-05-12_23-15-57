@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles, BookOpen } from 'lucide-react';
 import Link from 'next/link';
+import { drillPlayHref } from '@/lib/curriculum/drillRoutes';
 // HOTFIX (2026-09-24): blueprint.ts is lesson content only now. The certification questions and their
 // answer key are server-only (lib/curriculum/assessments.ts); this page gets each paper from GET
 // /api/v1/camp/assess with no answers, and the server grades. lib/curriculum/answerKeyBoundary.test.ts
@@ -312,7 +313,7 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
             <p className="font-semibold text-white/90">{lesson.title}</p>
             <ul className="mt-1 list-disc pl-4 text-white/60">{lesson.keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
             <p className="mt-2 text-white/70"><span className="text-cyan-300">Drill:</span> {lesson.drill.text}</p>
-            <Link href={`/play/${lesson.drill.modeKey}`} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300"><Play className="h-3.5 w-3.5" /> Play the drill · {lesson.drill.modeKey}</Link>
+            <Link href={drillPlayHref(lesson.drill.modeKey)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300"><Play className="h-3.5 w-3.5" /> Play the drill · {lesson.drill.modeKey}</Link>
             <p className="mt-1 text-[11px] text-white/40">The game attaches itself to this plan when you record the session.</p>
           </div>
         )}
