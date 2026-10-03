@@ -15,6 +15,8 @@ describe('which tab owns a path', () => {
     expect(tabForPath('/kitchens')?.id).toBe('train');
     expect(tabForPath('/profile')?.id).toBe('profile');
     expect(tabForPath('/wallet')?.id).toBe('profile');
+    expect(tabForPath('/account')?.id).toBe('profile');
+    expect(tabForPath('/settings')?.id).toBe('profile');
   });
 
   it('follows a path into its depths', () => {
