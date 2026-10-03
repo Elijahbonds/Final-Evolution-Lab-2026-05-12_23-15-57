@@ -1,5 +1,5 @@
 // MOVEMENT PLAY P3 (2026-09-24): the body profiles — one row per mode, what the body may press there, and the card's
-// words for it. What is pinned: the 28 rows and their verbs against the touch deck's own labels (a card that says POP
+// words for it. What is pinned: the 29 rows and their verbs against the touch deck's own labels (a card that says POP
 // over a button the deck calls PUMP is a lie), the NEVER-table (the baseline's misfires, each made impossible by the
 // data), and how a mode's own claims and profile override the row. The registry side (every ENABLED key has its row,
 // the four modeId aliases) is registry.drift.test.ts; what the floor does with a row is bodyFloor / bodyGate.
@@ -32,9 +32,9 @@ function slotLabel(key: string, to: string): string | null {
 }
 
 describe('the table', () => {
-  it('has 28 rows, one per mode, keyed by modeId, eleven of them binding the body (P8: the kart and the plane)', () => {
-    expect(ROWS).toHaveLength(28);
-    expect(new Set(ROWS.map((p) => p.key)).size).toBe(28);
+  it('has 29 rows, one per mode, keyed by modeId, eleven of them binding the body (P8: the kart and the plane)', () => {
+    expect(ROWS).toHaveLength(29);
+    expect(new Set(ROWS.map((p) => p.key)).size).toBe(29);
     for (const [modeId, p] of Object.entries(BODY_PROFILES)) expect(p.modeId).toBe(modeId);
     expect(ROWS.filter((p) => p.bindings.length).map((p) => p.key).sort()).toEqual(
       ['aeroaces', 'bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf', 'velocitykart'],
@@ -115,7 +115,7 @@ describe('THE NEVER-TABLE — the baseline\'s misfires, impossible by the data',
   });
   it('nothing at all in the quizzes, the rhythm game and the modes with no plan phase', () => {
     const where = ROWS.filter((p) => ['quiz', 'rhythm', 'later'].includes(p.family));
-    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'volleyball', 'who_scene_it']);
+    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'tiebreak', 'volleyball', 'who_scene_it']);
     for (const p of where) expect(p.bindings, p.key).toEqual([]);
     expect(byKey('who_scene_it').later).toBeNull();
     expect(byKey('brainbrawl').later).toBeNull();
