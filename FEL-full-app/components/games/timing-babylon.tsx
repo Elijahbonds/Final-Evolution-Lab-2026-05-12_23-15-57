@@ -61,6 +61,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
           : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
-        onEnd({ ...base, headline, maxCombo: timingMaxCombo(st) });
+        onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };
 
       const def = MODES[modeKey];
@@ -119,7 +121,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
             if (disposed) { s(); return; }
             stop = s;
           })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
       }, 0);
 
       return () => {
@@ -128,7 +130,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
         stop?.();
         busRef.current = null;
       };
-    }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the Babylon stage is mount-owned; callbacks are read through refs.
+  }, []);
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);
