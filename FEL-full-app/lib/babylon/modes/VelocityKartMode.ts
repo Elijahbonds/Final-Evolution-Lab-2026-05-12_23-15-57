@@ -70,6 +70,7 @@ import { readKart } from '../racing/garage';
 import { KART_TUNE } from '../racing/kartTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
 import { spawnKartDrive, stepKartDrive, type KartDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field drives the same model
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
+import { fitVehicleLight, vehicleEnvFor, VEHICLE_ENV_BASE, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -201,6 +202,7 @@ let ramps: Mesh[] = [];
 let kerbRoot: TransformNode | null = null;
 let detailRoot: TransformNode | null = null; let scenery: VenuePropsHandle | null = null; let sceneryGone = false;   // DETAIL PASS
 let clouds: CloudDeckHandle | null = null;   // 10-phase pass, phase 6: the sky over the course
+let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
 let obstacleRoot: TransformNode | null = null;
 let placedObstacles: PlacedObstacle[] = [];
 
@@ -271,11 +273,12 @@ function buildKart(ctx: ModeContext): TransformNode {
   // #f25f5c is a salmon and it PHOTOGRAPHED as one even on PBR with the IBL down — under this much light a
   // mid-tone red lands pink. A deeper base pigment is what actually reads as a red kart on screen.
   const paint = VenueKit.paint(ctx.scene, 'kart_paint', '#b8302c', 0.08, 0.32);
-  paint.environmentIntensity = 0.4; paint.specularIntensity = 0.8; paint.metallic = 0.2;
+  // phase 7: the env intensities are the signed-off bases scaled by the mood (vehicleLight), not bare numbers
+  paint.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.paint, course.mood); paint.specularIntensity = 0.8; paint.metallic = 0.2;
   const dark = VenueKit.paint(ctx.scene, 'kart_tyre', '#15181f', 0.05, 0.88);
-  dark.environmentIntensity = 0.3;
+  dark.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.dark, course.mood);
   const chrome = VenueKit.paint(ctx.scene, 'kart_chrome', '#b9c0cc', 0.06, 0.22);
-  chrome.environmentIntensity = 0.5; chrome.metallic = 0.85;
+  chrome.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.chrome, course.mood); chrome.metallic = 0.85;
 
   const box = (name: string, w: number, h: number, d: number, at: [number, number, number], mat = paint): Mesh => {
     const m = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, ctx.scene);
@@ -383,9 +386,9 @@ function buildKart(ctx: ModeContext): TransformNode {
 function buildRivalKart(ctx: ModeContext, name: string, tint: string): TransformNode {
   const rig = new TransformNode(`rival_${name}`, ctx.scene);
   const paint = VenueKit.paint(ctx.scene, `rival_paint_${name}`, tint, 0.1, 0.45);
-  paint.environmentIntensity = 0.4;
+  paint.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.paint, course.mood);
   const dark = VenueKit.paint(ctx.scene, `rival_tyre_${name}`, '#15181f', 0.05, 0.92);
-  dark.environmentIntensity = 0.3;
+  dark.environmentIntensity = vehicleEnvFor(VEHICLE_ENV_BASE.dark, course.mood);
   const box = (n: string, w: number, h: number, d: number, at: [number, number, number], m = paint): void => {
     const b = MeshBuilder.CreateBox(`${n}_${name}`, { width: w, height: h, depth: d }, ctx.scene);
     b.position.set(at[0], at[1], at[2]);
@@ -455,9 +458,11 @@ function paintTarmac(scene: ModeContext['scene']): DynamicTexture {
   }
   g.putImageData(img, 0, 0);
 
-  // EDGE LINES at the track boundary — u = 0 and u = 1 are the two edges onTrack() tests
-  const edge = Math.round(S * 0.035);
-  g.fillStyle = 'rgba(232,236,242,0.88)';
+  // EDGE LINES at the track boundary — u = 0 and u = 1 are the two edges onTrack() tests.
+  // phase 7 (contrast against the verge): 0.035 → 0.05 of the width and 0.88 → 0.95 alpha — on the snow
+  // and the night grass the 3.5 % line read as a hair; the tested edge must be the first thing the eye finds.
+  const edge = Math.round(S * 0.05);
+  g.fillStyle = 'rgba(232,236,242,0.95)';
   g.fillRect(0, 0, edge, S);
   g.fillRect(S - edge, 0, edge, S);
   // and the dashed centre line, which is what gives the road SPEED at 26 m/s
@@ -935,7 +940,8 @@ return {
     marks = buildMarks(ctx);
     kart = buildKart(ctx);
     // models pass phase 5: the garage pick's Meshy body mounts under the root; the primitives hide when it arrives (and stay if it never does)
-    { const k = kart; void dressVehicle(ctx.scene, k, 'kart', kartId, { hide: k.getChildMeshes(), y: KART_GROUND_Y }); }
+    // phase 7: the arriving body joins the vehicle light (receiveShadows + the flat-mood fill) with the primitives
+    { const k = kart; void dressVehicle(ctx.scene, k, 'kart', kartId, { hide: k.getChildMeshes(), y: KART_GROUND_Y }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); }); }
 
     state = spawnKart(course.start.at, course.start.heading);
     bodyRoll = 0; bodyPitch = 0; lastSpeed = 0;
@@ -989,7 +995,11 @@ return {
     // the field's own karts, on the grid it was dealt (10-phase pass, phase 5)
     const driveLine = circuit?.line ?? null;
     rivalDrive = driveLine ? rivals.map((r) => spawnKartDrive(driveLine, r)) : [];
-    for (const rk of rivalKarts) void dressVehicle(ctx.scene, rk, 'kart', 'rival', { hide: rk.getChildMeshes(), y: KART_GROUND_Y });   // phase 5: the field wears the fifth body
+    for (const rk of rivalKarts) void dressVehicle(ctx.scene, rk, 'kart', 'rival', { hide: rk.getChildMeshes(), y: KART_GROUND_Y }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); });   // phase 5: the field wears the fifth body
+    // phase 7: one vehicle light for the whole field — every kart RECEIVES the venue's shadows (they fell
+    // through the primitives before), and a flat mood gets a weak fill sun that lights only the karts.
+    vehicleLight?.dispose();
+    vehicleLight = fitVehicleLight(ctx.scene, course.mood, [kart, ...rivalKarts], 'kart');
     playerDist = 0;
     // a fresh recorder per race, and whatever the device remembers for THIS course as the thing to chase
     ghostRec = new GhostRecorder();
@@ -1438,6 +1448,7 @@ return {
     driver?.dispose(); driver = null;
     steerWheel = null;
     venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null; clouds?.dispose(); clouds = null;
+    vehicleLight?.dispose(); vehicleLight = null;
     roadTex?.dispose(); roadTex = null;
     for (const rk of rivalKarts) rk.dispose();
     pickups?.dispose(); pickups = null; missiles = []; mines = []; balloons = [];

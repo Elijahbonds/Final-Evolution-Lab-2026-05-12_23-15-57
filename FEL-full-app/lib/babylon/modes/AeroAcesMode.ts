@@ -67,6 +67,7 @@ import {
 import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/aeroCircuits';
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
 import { buildToyPlane, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
+import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { AeroPickups } from '../racing/aeroPickups';
 import { steerLane, resolveContact, nearMisses, personalityFor } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, wing-to-wing bumps and punts
 
@@ -101,6 +102,7 @@ export function makeAeroAcesMode(): ModeDefinition {
   let scarf: Scarf | null = null;
   let pickups: AeroPickups | null = null;
   let boostFx: BoostFx | null = null;
+  let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
   let flight: ArcadeState | null = null;
   let race: RaceProgress = startRace();
   let line: RaceLine | null = null;
@@ -204,8 +206,8 @@ export function makeAeroAcesMode(): ModeDefinition {
     rivalDrive = rivals.map((r) => spawnAeroDrive(driveLine!, r, tune));
     S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, slingshots: 0 };
     S.draft = noDraft(); S.draftSaid = false;
-    rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
-    for (const rp of rivalPlanes) void dressVehicle(scene, rp.root, 'plane', 'rival', { hide: rp.parts });   // phase 5: the field wears the fifth body
+    rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true, mood: readCourse('aero').mood }));
+    for (const rp of rivalPlanes) void dressVehicle(scene, rp.root, 'plane', 'rival', { hide: rp.parts }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); });   // phase 5: the field wears the fifth body
   }
 
   function resetPickups(): void {
@@ -349,8 +351,8 @@ export function makeAeroAcesMode(): ModeDefinition {
       pickups = new AeroPickups(ctx.scene);
       resetPickups();
 
-      player = buildToyPlane(ctx.scene, 'player', '#e63946', '#ffd166');
-      { const pl = player; void dressVehicle(ctx.scene, pl.root, 'plane', readPlane().id, { hide: pl.parts }); }   // phase 5: the garage pick's body
+      player = buildToyPlane(ctx.scene, 'player', '#e63946', '#ffd166', { mood: circuit.course.mood });
+      { const pl = player; void dressVehicle(ctx.scene, pl.root, 'plane', readPlane().id, { hide: pl.parts }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); }); }   // phase 5: the garage pick's body
       // THE PILOT IN THE OPEN COCKPIT: the hero, seated, chest up out of the rim. Parented to the seat, so the plane
       // carries the body through every roll and loop with no second copy of the attitude maths.
       pilot = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 0), yawRad: 0, startClip: 'idle_stand' });
@@ -364,6 +366,10 @@ export function makeAeroAcesMode(): ModeDefinition {
       scarf = new Scarf(ctx.scene, player.scarfAnchor, '#ffffff');
 
       buildRivals(ctx.scene);
+
+      // phase 7: one vehicle light over every plane on the grid (receiveShadows on all, fill where the mood is flat)
+      vehicleLight?.dispose();
+      vehicleLight = fitVehicleLight(ctx.scene, circuit.course.mood, [player.root, ...rivalPlanes.map((p) => p.root)], 'plane');
 
       flight = spawnArcade(circuit.course.start.at, circuit.course.start.heading, tune);
       prevPos.copyFrom(flight.pos);
@@ -768,6 +774,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
     dispose(): void {
       boostFx?.dispose(); boostFx = null;
+      vehicleLight?.dispose(); vehicleLight = null;
       scarf?.dispose(); scarf = null;
       seated?.dispose(); seated = null;
       pilot?.dispose(); pilot = null;

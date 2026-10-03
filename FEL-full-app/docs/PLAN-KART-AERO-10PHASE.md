@@ -220,7 +220,14 @@ flat, and flagged.
 
 **Pass check:** before/after screenshots; perf line flat; ci-suite green.
 
-- [ ] done
+- [x] done — new `racing/vehicleLight.ts`: VEHICLE_ENV_BASE (the signed-off 0.4/0.3/0.5) scaled per mood
+  (overcast ×1.3, alpine ×1.15, nightGame ×1.1), a vehicle-only fill sun for the flat moods (overcast 0.55,
+  alpine 0.35, nightGame 0.3 — includedOnlyMeshes, the venue's own lights untouched), receiveShadows on every
+  vehicle mesh (venue shadows fell THROUGH the primitives before; the GLB bodies already received). Kart edge
+  lines widened 0.035→0.05 / alpha 0.88→0.95 (road-vs-verge contrast, flagged in the commit). Both modes wired;
+  shots `docs/shots/pr138/p7-before*/p7-after*` (overcast summit + alpine frostbite are the telling frames).
+  Perf flat on the mid-phone proxy: kart 60fps/296 draws/38 meshes (base 46/295/38), aero 60fps/159/92
+  (base 60/160/102). tsc 0; vitest 696/696; ci-suite 189 green.
 
 ## Phase 8 — Speed lines and particles
 

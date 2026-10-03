@@ -16,6 +16,8 @@
 import { Color3, Mesh, MeshBuilder, TransformNode, Vector3 } from '@babylonjs/core';
 import type { PBRMaterial, Scene } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
+import { vehicleEnvFor, PLANE_ENV_BASE } from './vehicleLight';   // 10-phase pass, phase 7
+import type { VenueMood } from '../scene/moods';
 
 export interface ToyPlane {
   root: TransformNode;
@@ -36,23 +38,25 @@ export const TOY_SCALE = 0.62;
 /** Where the pilot's hips sit, in MODEL units (scaled to the root by TOY_SCALE). */
 export const TOY_SEAT = { y: 0.95, z: 0.2 };
 
-const paint = (scene: Scene, name: string, hex: string, e = 0.08, r = 0.45): PBRMaterial => {
+const paint = (scene: Scene, name: string, hex: string, e = 0.08, r = 0.45, env = PLANE_ENV_BASE): PBRMaterial => {
   const m = VenueKit.paint(scene, name, hex, e, r);
-  m.environmentIntensity = 0.55; m.metallic = 0.05;
+  m.environmentIntensity = env; m.metallic = 0.05;
   return m;
 };
 
-export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimHex: string, opts: { toyPilot?: boolean } = {}): ToyPlane {
+export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimHex: string, opts: { toyPilot?: boolean; mood?: VenueMood } = {}): ToyPlane {
+  // phase 7: the flat 0.55 was tuned under goldenHour; the mood scales it (a flat-light mood leans on the IBL)
+  const env = vehicleEnvFor(PLANE_ENV_BASE, opts.mood ?? 'goldenHour');
   const root = new TransformNode(`toy_${name}`, scene);
   // THE MODEL IS BUILT BIG AND SHOWN AT TOY_SCALE: authored against a 2 m fuselage for easy numbers, the plane dwarfed its
   // pilot (a hero 1.3 m tall in an 8 m aircraft read as a doll in a jumbo — measured on the first frame). The body parts
   // hang off `model`; the seat and scarf anchors stay on the root so the pilot keeps its own scale.
   const model = new TransformNode(`toy_model_${name}`, scene);
   model.parent = root; model.scaling.setAll(TOY_SCALE);
-  const body = paint(scene, `toy_body_${name}`, bodyHex, 0.1, 0.38);
-  const trim = paint(scene, `toy_trim_${name}`, trimHex, 0.12, 0.4);
-  const dark = paint(scene, `toy_dark_${name}`, '#20232b', 0.03, 0.6);
-  const cream = paint(scene, `toy_cream_${name}`, '#f6efdc', 0.12, 0.5);
+  const body = paint(scene, `toy_body_${name}`, bodyHex, 0.1, 0.38, env);
+  const trim = paint(scene, `toy_trim_${name}`, trimHex, 0.12, 0.4, env);
+  const dark = paint(scene, `toy_dark_${name}`, '#20232b', 0.03, 0.6, env);
+  const cream = paint(scene, `toy_cream_${name}`, '#f6efdc', 0.12, 0.5, env);
   const parts: Mesh[] = [];
   const add = <T extends Mesh>(m: T, mat: PBRMaterial, parent: TransformNode = model): T => { m.material = mat; m.parent = parent; m.isPickable = false; parts.push(m); return m; };
 
@@ -117,12 +121,12 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
 
   if (opts.toyPilot) {
     // a simple toy pilot for the rivals: head, leather cap, goggles, shoulders
-    const skin = paint(scene, `toy_skin_${name}`, '#d9a27a', 0.08, 0.7);
+    const skin = paint(scene, `toy_skin_${name}`, '#d9a27a', 0.08, 0.7, env);
     const shoulders = add(MeshBuilder.CreateSphere(`toy_pshoulders_${name}`, { diameterX: 1.1, diameterY: 0.7, diameterZ: 0.7, segments: 10 }, scene), trim);
     shoulders.position.set(0, 1.25, TOY_SEAT.z);
     const head = add(MeshBuilder.CreateSphere(`toy_phead_${name}`, { diameter: 0.72, segments: 12 }, scene), skin);
     head.position.set(0, 1.85, TOY_SEAT.z);
-    const capM = paint(scene, `toy_cap_${name}`, '#6b4a2f', 0.04, 0.8);
+    const capM = paint(scene, `toy_cap_${name}`, '#6b4a2f', 0.04, 0.8, env);
     const cap = add(MeshBuilder.CreateSphere(`toy_pcap_${name}`, { diameter: 0.78, segments: 12, slice: 0.55 }, scene), capM);
     cap.position.set(0, 1.9, TOY_SEAT.z);
     const goggles = add(MeshBuilder.CreateTorus(`toy_pgog_${name}`, { diameter: 0.72, thickness: 0.12, tessellation: 16 }, scene), dark);
