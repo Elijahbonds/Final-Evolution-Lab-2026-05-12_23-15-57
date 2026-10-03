@@ -1,4 +1,5 @@
-// Phase 9: retired modes must stay dark for a LOGGED-IN player (they redirect to the Lab).
+// Revived-mode route smoke: sprint/showdown/duel were retired once, then
+// deliberately re-enabled. For a logged-in player they should stay live.
 import { request } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:3000';
 const ctx = await request.newContext({ baseURL: BASE, maxRedirects: 0 });
