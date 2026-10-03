@@ -364,9 +364,121 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
-  // Showdown: RETIRED from the v1 roster with the combat-family trim (owner,
-  // 2026-09-01 — karate-vs is the Storm mode). Schema removed so phones don't
-  // join a mode the roster no longer offers; the mode file stays registered.
+  // Revived/live modes must be controller-linkable too. The touch rig already
+  // had honest verbs for these modes; without these rows `/host?mode=<id>` said
+  // "No controller layout" for games the Play shelf and registry had revived.
+  sprint: {
+    modeId: 'sprint',
+    title: 'Beach Sprint',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+    ],
+  },
+  showdown: {
+    modeId: 'showdown',
+    title: 'Showdown',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'JAB' },
+        { action: 'B', label: 'KICK' },
+        { action: 'X', label: 'GUARD' },
+        { action: 'Y', label: 'ULTIMATE' },
+      ] },
+    ],
+  },
+  duel: {
+    modeId: 'duel',
+    title: 'Duel',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'FISTS' },
+        { action: 'B', label: 'BLADE' },
+        { action: 'X', label: 'BLOCK' },
+        { action: 'Y', label: 'STAFF' },
+      ] },
+    ],
+  },
+  brainbrawl: {
+    modeId: 'brainbrawl',
+    title: 'Brain Brawl',
+    maxPlayers: 2,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'A' },
+        { action: 'B', label: 'B' },
+        { action: 'X', label: 'C' },
+        { action: 'Y', label: 'D' },
+      ] },
+    ],
+  },
+  tiebreak: {
+    modeId: 'tiebreak',
+    title: 'Tiebreak Blitz',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'X', label: 'SWING L' },
+        { action: 'B', label: 'SWING R' },
+      ] },
+    ],
+  },
+  velocitykart: {
+    modeId: 'velocitykart',
+    title: 'Velocity Kart',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'GAS', hold: true },
+        { action: 'A', label: 'FIRE' },
+        { action: 'X', label: 'DRIFT', hold: true },
+        { action: 'B', label: 'TRICK' },
+      ] },
+    ],
+  },
+  aeroaces: {
+    modeId: 'aeroaces',
+    title: 'Aero Aces',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'GAS', hold: true },
+        { action: 'A', label: 'FIRE' },
+        { action: 'B', label: 'STUNT' },
+        { action: 'Y', label: 'LOOP' },
+      ] },
+    ],
+  },
+  who_scene_it: {
+    modeId: 'who_scene_it',
+    title: 'Who Scene It',
+    maxPlayers: 2,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'A' },
+        { action: 'B', label: 'B' },
+        { action: 'X', label: 'C' },
+        { action: 'Y', label: 'D' },
+      ] },
+    ],
+  },
 
   // The Cypher: tap on the beat — one verb, no movement. (The touch overlay
   // already covers playing ON the phone; this is the second-screen path.)
