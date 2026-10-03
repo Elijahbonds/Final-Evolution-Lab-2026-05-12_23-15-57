@@ -19,6 +19,8 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
       const p = Number(r.stats?.place ?? 0);
       const g = ' DCBAS'[Number(r.stats?.grade ?? 0)]?.trim() ?? '';
       const ord = p === 1 ? '1ST' : p === 2 ? '2ND' : p === 3 ? '3RD' : `${p}TH`;
-      onEnd(gameResultFromSession(r, {
+      onEndRef.current(gameResultFromSession(r, {
         won: r.outcome === 'win',
         headline: r.outcome === 'timeout' ? `OUT OF TIME · ${t}s` : `${p > 0 ? `${ord} · ` : ''}${t}s${g ? ` · GRADE ${g}` : ''}`,
       }));
@@ -53,7 +55,8 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-FREERUN] boot failed', e));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
