@@ -174,7 +174,20 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
           pause screen at all: a pad's START froze the quiz with no word, and nothing said both hands up bring it back. */}
       {phase === 'paused' && <PausedLayer onResume={tapStart} />}
       {phase === 'countdown' && countdown != null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="fel-heading text-7xl font-black text-white drop-shadow">{countdown}</span></div>}
-      {phase === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-6 text-center font-mono text-sm text-[var(--fel-red)]">{loadError}</div>}
+      {phase === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6 text-center">
+          <div className="fel-panel max-w-md rounded-2xl border-[var(--fel-red)]/50 px-6 py-5">
+            <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
+            <button
+              type="button"
+              onClick={tapStart}
+              className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
+            >
+              RETRY
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
