@@ -16,10 +16,14 @@ import { hnode, hnum } from './hud-format';
 
 type Hud = Record<string, HudValue>;
 
+const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
+
 export default function ShowdownBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -28,6 +32,8 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const token = {};
+    canvasOwner.set(canvas, token);
     const bus = new InputBus();
     busRef.current = bus;
     let stop: (() => void) | null = null;
@@ -49,32 +55,38 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'SHOWDOWN WON' : 'SHOWDOWN LOST',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
-    runMode(MODES.showdown, {
-      canvas,
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-      },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-      resultSink,
-    })
-      .then((s) => {
-        if (disposed) { s(); return; }
-        stop = s;
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.showdown, {
+        canvas,
+        input: bus,
+        onPhase: (p, cd) => {
+          if (disposed) return;
+          setPhase(p);
+          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        },
+        onHud: (u) => { if (!disposed) setHud((prev) => ({ ...prev, ...u })); },
+        resultSink,
       })
-      .catch((e) => console.error('[FEL-COMBAT] boot failed', e));
+        .then((s) => {
+          if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+          stop = s;
+        })
+        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+    }, 0);
 
     return () => {
       disposed = true;
-      stop?.();
+      clearTimeout(startTimer);
+      if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks are read through refs; the Babylon stage is mount-owned.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
