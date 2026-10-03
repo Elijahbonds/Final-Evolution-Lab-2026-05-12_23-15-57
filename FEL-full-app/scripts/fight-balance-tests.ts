@@ -102,7 +102,12 @@ ok(Math.abs(short - long) < 0.08,
   `${(long * 100).toFixed(0)}%) — startup length must not multiply the rival's odds`);
 
 // ── C. the rival still guards, and still fights ────────────────────────────
-ok(readsOneWindUp(2.0), 'C1 a maxed-difficulty rival always reads the wind-up (guard or step)');
+let maxReads = 0;
+for (let i = 0; i < N; i++) if (readsOneWindUp(2.0)) maxReads++;
+const maxReadRate = maxReads / N;
+ok(maxReadRate > 0.75 && maxReadRate < 0.93,
+  `C1 a maxed-difficulty rival reads ${(maxReadRate * 100).toFixed(0)}% of wind-ups — ` +
+  'formidable without becoming an omniscient wall');
 let neverGuards = 0;
 for (let i = 0; i < 200; i++) if (blocksOneWindUp(0)) neverGuards++;
 ok(neverGuards === 0, 'C2 a zero-difficulty rival never guards');
