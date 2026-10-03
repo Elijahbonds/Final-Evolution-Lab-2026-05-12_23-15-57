@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { ArenaView } from '@/components/arena-view';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function ArenaPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(loginPath('/arena'));
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <main className="mx-auto max-w-[960px] px-4 py-8">

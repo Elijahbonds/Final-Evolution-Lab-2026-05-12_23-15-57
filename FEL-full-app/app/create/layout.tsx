@@ -1,17 +1,14 @@
+import type { ReactNode } from 'react';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
-import { CoachView } from './_components/coach-view';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CoachPage() {
+export default async function CreateLayout({ children }: { children: ReactNode }) {
   const session = await getServerSession(authOptions);
-  if (!session) redirect(loginPath('/coach'));
-  return (
-    <div className="min-h-screen bg-[#050505] pb-20">
-      <CoachView />
-    </div>
-  );
+  if (!session) redirect(loginPath('/create'));
+
+  return <>{children}</>;
 }
