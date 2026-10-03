@@ -20,7 +20,8 @@ describe('capture HUD and review reel render', () => {
       <CaptureHudView
         phase="idle" aspect="16:9" streamOn={false} controlsHidden={false}
         note={null} codecNote={null} dunkFilm canShareTake={false} canShareReplay={false}
-        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop}
+        busy={false}
+        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop} onDiscard={noop}
         onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
       />,
     );
@@ -37,7 +38,8 @@ describe('capture HUD and review reel render', () => {
           phase="idle" aspect="16:9" streamOn controlsHidden={false}
           note={null} codecNote="iOS Safari cannot record video/webm;codecs=vp9,opus. This clip uses video/mp4 instead."
           dunkFilm={false} canShareTake={false} canShareReplay={false}
-          onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop}
+          busy={false}
+          onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop} onDiscard={noop}
           onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
         />
         <StreamGuides />
@@ -51,6 +53,35 @@ describe('capture HUD and review reel render', () => {
     expect(html).toMatch(/RTMP/);
     expect(html).toMatch(/not built/i);
     expect(html).toContain('iOS Safari');
+  });
+
+  it('shows separate share buttons and discard when both clip types are saved', () => {
+    const html = renderToStaticMarkup(
+      <CaptureHudView
+        phase="ready" aspect="9:16" streamOn={false} controlsHidden={false}
+        note={null} codecNote={null} dunkFilm={false} canShareTake canShareReplay
+        busy={false}
+        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop} onDiscard={noop}
+        onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
+      />,
+    );
+    expect(html).toContain('data-testid="capture-share-take"');
+    expect(html).toContain('data-testid="capture-share-replay"');
+    expect(html).toContain('data-testid="capture-discard"');
+  });
+
+  it('surfaces recorder errors with a reset path', () => {
+    const html = renderToStaticMarkup(
+      <CaptureHudView
+        phase="error" aspect="16:9" streamOn={false} controlsHidden={false}
+        note="Recording is not available." codecNote={null} dunkFilm={false} canShareTake={false} canShareReplay={false}
+        busy={false}
+        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop} onDiscard={noop}
+        onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
+      />,
+    );
+    expect(html).toContain('data-testid="capture-reset"');
+    expect(html).toContain('Recording is not available.');
   });
 
   it('the review reel lists the jump and the session summary', () => {
