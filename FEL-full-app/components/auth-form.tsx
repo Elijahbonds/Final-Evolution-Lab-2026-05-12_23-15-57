@@ -17,6 +17,12 @@ import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 import { loginDestination } from '@/lib/auth/safeNext';
+import {
+  challengeCodeFromReturnPath,
+  challengeLoginHref,
+  challengeReturnPath,
+  challengeSignupHref,
+} from '@/lib/social/challenge-routes';
 import { toast } from 'sonner';
 
 // M8.6 — landing hook: marquee sports so the pre-auth page actually shows what
@@ -36,6 +42,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // Phase 5 — referral attribution. A ?ref=CODE from a shared link is captured
   // here (and persisted by EmailCapture) so it survives the hop to /signup.
   const [refCode, setRefCode] = useState<string | null>(null);
+  const [challengeCode, setChallengeCode] = useState<string | null>(null);
   // WHAT THEY CAME FOR, asked before they commit to anything. Some people arrive to play and some arrive to be
   // assessed; sending both to the same shelf loses one of them.
   const [path, setPath] = useState<OnboardingPath>('play');
@@ -55,6 +62,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     } catch { /* a blocked or empty store is not an error here */ }
     try {
       const url = new URL(window.location.href);
+      const directChallenge = url.searchParams.get('c');
+      const nextChallenge = challengeCodeFromReturnPath(url.searchParams.get('next'));
+      setChallengeCode(directChallenge || nextChallenge);
       const fromUrl = url.searchParams.get('ref');
       const stored = localStorage.getItem('fel:ref');
       const code = (fromUrl || stored || '').toUpperCase();
@@ -132,6 +142,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             : 'Invalid email or password'
         );
         setLoading(false);
+        return;
+      }
+      if (mode === 'signup' && challengeCode) {
+        router.replace(challengeReturnPath(challengeCode));
         return;
       }
       // Land them in the thing they said they came for, not on a menu about it.
@@ -355,14 +369,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {mode === 'login' ? (
             <>
               New athlete?{' '}
-              <Link href="/signup" className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeSignupHref(challengeCode) : '/signup'} className="font-semibold text-[#00E5FF] hover:underline">
                 Create account
               </Link>
             </>
           ) : (
             <>
               Already registered?{' '}
-              <Link href="/login" className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeLoginHref(challengeCode) : '/login'} className="font-semibold text-[#00E5FF] hover:underline">
                 Sign in
               </Link>
             </>

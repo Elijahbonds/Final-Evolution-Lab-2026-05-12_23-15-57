@@ -11,11 +11,12 @@ import type { FelInput } from '@/lib/babylon/core/InputBus';
 import { HostInput } from './hostInput';
 import { sampleFrame, PadSender } from './padSampler';
 import { decodePadFrame, PAD_FRAME_BYTES, packButtons, type PadFrame } from './wire';
-import { controllerConfigFor } from './schemas/registry';
+import { controllerConfigFor, MODE_CONTROLLERS } from './schemas/registry';
 import { factorFor, widen } from './tvMode';
 import { PERFECT_BAND, GOOD_BAND, SHOT_TARGET } from '@/lib/babylon/core/shootoutHud';
 import type { PadLike } from '@/lib/input/profiles';
 import { stripComments } from '@/lib/testing/sourceScan';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -58,6 +59,20 @@ describe('4 PAD CLIENTS AGAINST 1 HOST', () => {
     }
     expect(seen).toContain(1);
     expect(host.stats().dropped).toBe(5);
+  });
+});
+
+describe('CONTROLLER REGISTRY DRIFT', () => {
+  it('every enabled Babylon mode has a Controller Link schema', () => {
+    const missing = [...ENABLED_BABYLON_MODES].filter((id) => !(id in MODE_CONTROLLERS));
+    expect(missing).toEqual([]);
+  });
+
+  it('each controller schema is keyed by its own mode id', () => {
+    const mismatched = Object.entries(MODE_CONTROLLERS)
+      .filter(([id, config]) => config.modeId !== id)
+      .map(([id, config]) => `${id} -> ${config.modeId}`);
+    expect(mismatched).toEqual([]);
   });
 });
 

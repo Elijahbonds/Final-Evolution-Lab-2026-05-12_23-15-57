@@ -30,6 +30,7 @@ import { FreeRunMode } from './FreeRunMode';    // A+ mission #10: free-running 
 import { SprintMode } from './SprintMode';
 import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
 import { BrainBrawlMode } from './BrainBrawlMode';   // A+ mission #11 — the trivia deck as a party mode
+import { TiebreakMode } from './TiebreakMode';
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -87,6 +88,9 @@ export const MODES: Record<string, ModeDefinition> = {
   // enabled set now (see the note beside it there), and the comment outlived the decision by long enough to say
   // the opposite of the code. Every registered mode is enabled today.
   brainbrawl: BrainBrawlMode,
+  // Tiebreak's live route builds a grade-specific definition, but the mode still
+  // belongs in the central roster so /dev/mode and drift checks can exercise it.
+  tiebreak: TiebreakMode,
 };
 
 /** Modes proven safe to serve on Babylon right now (dunk = the gate; karate +
@@ -130,4 +134,5 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   // Brain Brawl was registered in MODES but never in ENABLED, so its Babylon mode was unreachable while the
   // route quietly rendered the 2D version instead.
   'brainbrawl',
+  'tiebreak',
 ]);

@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { installedTsxCli } from './ci-suite';
 
 /** Every headless suite, with the subsystem it guards. */
 const SUITES: { script: string; guards: string }[] = [
@@ -82,9 +83,10 @@ describe('headless check suites', () => {
 
       let output = '';
       try {
-        output = execFileSync('npx', ['tsx', path], {
+        output = execFileSync(process.execPath, [installedTsxCli(), path], {
           cwd: ROOT,
           encoding: 'utf8',
+          env: { ...process.env, NODE_ENV: 'test' },
           stdio: ['ignore', 'pipe', 'pipe'],
           timeout: 120_000,
         });

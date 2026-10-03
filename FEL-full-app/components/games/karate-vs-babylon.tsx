@@ -18,6 +18,8 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'VICTORY' : 'DEFEATED',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     // StrictMode runs effect -> cleanup -> effect. Starting immediately means the
     // PHANTOM mount also builds a Babylon engine its cleanup cannot cancel, and
@@ -83,7 +85,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+  }, []);   // mount once — see onEndRef above
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
