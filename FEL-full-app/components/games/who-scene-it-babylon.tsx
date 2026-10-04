@@ -4,6 +4,7 @@
 // buttons on any pad (the mode reads A/B/X/Y). Results flow back through GameShell's onEnd like every other mode.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
@@ -27,6 +28,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('who_scene_it', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;

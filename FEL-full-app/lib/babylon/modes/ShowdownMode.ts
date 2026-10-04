@@ -36,6 +36,7 @@ import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeAren
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS } from '../core/FightCore';
+import { RivalCombatBrain, threatLandsIn } from '../core/RivalCombatBrain';
 import { StrikeController, karateMoveset, bookMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
 import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4: the Storm strings on showdown
 import { readBlend, blendTraits } from '../combat/schools';
@@ -165,7 +166,8 @@ export const ShowdownMode: ModeDefinition = (() => {
   let foeLaunchedSec = 0;   // phase 5: a launcher lifts him; the air string is open while it runs
   const xBtn = new XButtonReader();   // phase 3: the Storm X — showdown's X used to be the block alone; the dash was a chi buy on L1
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
-  let foeReadThisSwing = false, foeGuardUntil = 0;   // phase 10: one block read per wind-up, held for a beat
+  let foeGuardUntil = 0;
+  let rivalBrain = new RivalCombatBrain({ difficulty: 0.72 });
   let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
   // MOVEMENT PLAY P7: the body's fight read (see KarateVSMode: the same seam) — the strikes through the book and the
   // StrikeController's elapsed start, the rival's hits on a body player resolved at impact against the ledger
@@ -505,8 +507,20 @@ export const ShowdownMode: ModeDefinition = (() => {
       myMoves = styleMoveset(bookMoveset(KARATE_ATTACKS), blendTraits(readBlend()), MIN_STARTUP_SEC);
       meStrike = new StrikeController(myMoves);   // phase 4: the book, styled (P7: kept for a body strike's range)
       foeStrike = new StrikeController(karateMoveset(KARATE_ATTACKS));
-      // phase 6 seam: seconds until the rival's swing lands (−1 = nothing in flight) — the probe's perfect driver reads it
-      (ctx.scene.metadata ??= {}).fight = { landsIn: () => { const c = foeStrike.current; return c && c.phase === 'startup' ? c.secToActive : -1; } };
+      rivalBrain = new RivalCombatBrain({
+        difficulty: 0.72,
+        moves: Object.entries(karateMoveset(KARATE_ATTACKS)).map(([id, m]) => ({
+          id,
+          kind: m.weight === 'light' ? 'jab' as const : m.weight === 'medium' ? 'kick' as const : 'heavy' as const,
+          range: m.atk.range,
+        })),
+      });
+      // seconds until the rival's swing lands (−1 = nothing in flight, or a swing that cannot reach)
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => {
+        const c = foeStrike.current;
+        if (!c || c.phase !== 'startup') return -1;
+        return threatLandsIn(Vector3.Distance(rival.root.position, player.root.position), c.move.atk.range, c.secToActive);
+      } };
       meMove = new CombatMovement(); foeMove = new CombatMovement();
       meDef = new DefenseController(); foeDef = new DefenseController();
       meAnim = new CombatAnimTree(player.animator); foeAnim = new CombatAnimTree(rival.animator);
@@ -687,44 +701,38 @@ export const ShowdownMode: ModeDefinition = (() => {
         }
       }
 
-      // ── rival AI (simple: approach, swing on cooldown, reactive block) ──
+      // ── rival AI: the shared brain approaches, uses the moveset, and spends chakra ──
       if (foeState.controllable && phase === 'fighting') {
-        const to = player.root.position.subtract(rival.root.position); to.y = 0;
-        const dist = to.length();
-        if (!foeStrike.busy && dist > 2) {
-          const dir = to.normalize();
-          foeMove.update(sdtRoom, dir.x, -dir.z, dist > 6);
+        const nrv = nerve(standingOf(foeRounds, myRounds, 2, Math.min(1, Math.max(myRounds, foeRounds) / 2)));
+        rivalBrain.setNerve(nrv.aggression, nrv.mistake);
+        const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
+        const incoming = meWinding && meStrike.current ? meStrike.current.secToActive : -1;
+        const dist = Vector3.Distance(rival.root.position, player.root.position);
+        const reach = meStrike.current?.move.atk.range ?? 1.8;
+        const decision = rivalBrain.decide(
+          sdtRoom, rival.root.position, player.root.position, foeState, meWinding,
+          { value: foeChakra.value, max: CHAKRA.max, dashCost: DASH_CHI_COST, subCost: SUBSTITUTION_CHI_COST },
+          threatLandsIn(dist, reach, incoming < 0 ? null : incoming),
+        );
+        if (!foeStrike.busy) {
+          const sprint = dist > 6 && decision.spend !== 'dash';
+          foeMove.update(sdtRoom, decision.moveX, decision.moveY, sprint);
+          if (decision.attackId) foeStrike.request(decision.attackId, now());
         } else {
           foeMove.update(sdtRoom, 0, 0, false);
-          // AI RATES ARE PER SECOND NOW, NOT PER FRAME.
-          //
-          // These were `Math.random() < 0.02` evaluated once per rendered frame, which makes the rival's
-          // aggression a function of the player's REFRESH RATE: at 144 fps it rolls 2.4x as often as at 60, so
-          // the same opponent attacks more than twice as much on a better monitor. `1 - exp(-rate*dt)` is the
-          // same chance per second of wall-clock time at any frame rate. The rates below are the old per-frame
-          // numbers x 60, so a 60 fps game plays exactly as it did.
-          //
-          // NERVE rides the same line, on two DIFFERENT mechanisms as the module requires: `aggression` speeds
-          // the swing rate up, `mistake` cuts the reactive block down. Behind on rounds it comes forward more
-          // and guards less.
-          const nrv = nerve(standingOf(foeRounds, myRounds, 2, Math.min(1, Math.max(myRounds, foeRounds) / 2)));
-          const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * sdtRoom);   // phase 8: the rival's nerve runs on the room clock
-          if (!foeStrike.busy && dist <= 2 && chance(1.2 * nrv.aggression)) {
-            foeStrike.request(['jab', 'kick', 'heavy'][Math.floor(Math.random() * 3)], now());
-          }
-          // reactive block
-          // phase 10 — ONE READ PER WIND-UP (FightCore's RivalFightBrain rule). Rolling 1.8/s for the whole of my swing blocked
-          // most lights and, because the press landed inside PARRY_WINDOW_MS of the hit, PARRIED them for free: three runs of
-          // strings landed nothing but ultimates. The rival reads my startup once (0.3, cut by his nerve's `mistake`), the
-          // guard he raises is stamped 200 ms early — a block, never a lucky parry — and held for 0.6 s.
-          const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
-          if (!meWinding) foeReadThisSwing = false;
-          if (meWinding && !foeReadThisSwing) {
-            foeReadThisSwing = true;
-            if (Math.random() < 0.3 / Math.max(0.5, nrv.mistake)) { foeDef.pressBlock(now() - 200, false); foeState.pressBlock(now() - 200); foeGuardUntil = now() + 600; console.info('[SD-AI] read the wind-up — guard'); }
-          }
-          if (foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         }
+        if (decision.spend === 'dash' && foeChakra.spend(DASH_CHI_COST)) {
+          const to = player.root.position.subtract(rival.root.position); to.y = 0;
+          if (to.length() > 0.2) foeMove.dash(to.x, to.z);
+        }
+        if (decision.spend === 'ultimate') foeChakra.spendUltimate();
+        if (decision.spend === 'substitution' && foeChakra.spend(SUBSTITUTION_CHI_COST)) {
+          rival.root.position.copyFrom(DefenseController.substitutionSpot(player.root.position, player.root.rotation.y));
+        }
+        if (decision.block && !foeState.blockHeld) {
+          foeDef.pressBlock(now() - 200, false); foeState.pressBlock(now() - 200); foeGuardUntil = now() + 600;
+        }
+        if (!decision.block && foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         rival.root.position.addInPlace(foeMove.vel.scale(sdtRoom));
         arenaClamp(rival.root.position, arena); if (!modeVenue?.constrain(rival.root.position)) { rival.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.x)); rival.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, rival.root.position.z)); }
       }

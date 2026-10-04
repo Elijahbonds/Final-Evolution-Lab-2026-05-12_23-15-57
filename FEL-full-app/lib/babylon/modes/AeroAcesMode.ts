@@ -615,7 +615,7 @@ export function makeAeroAcesMode(): ModeDefinition {
         SoundKit.play('powerUp', { pitch: 1 + S.held.level * 0.12, volume: 0.55 });
         EffectsKit.burst(ctx.scene, b.pos.clone(), 'confetti');
         ctx.feel.impact(0.15);
-        say(before && before.kind === b.kind ? `${ITEM_LABEL[b.kind]} LEVEL ${S.held.level}` : ITEM_LABEL[b.kind], 0.8);
+        say(before && before.kind === kind ? `${ITEM_LABEL[kind]} LEVEL ${S.held.level}` : ITEM_LABEL[kind], 0.8);
       }
 
       // ── the field ──

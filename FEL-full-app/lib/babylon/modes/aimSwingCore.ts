@@ -109,6 +109,17 @@ export function swingQuality(ballZ: number, contactZ: number, speed: number, win
   return Math.max(0, 1 - dt / (windowSec / 2));
 }
 
+/**
+ * Signed contact: early (ball still short of the contact point) pulls,
+ * late pushes the other way, perfect is the middle. The stick does not
+ * pick this — swing timing does.
+ */
+export function swingSide(ballZ: number, contactZ: number, speed: number, windowSec = 0.3): number {
+  const signed = (ballZ - contactZ) / Math.max(speed, 0.1);
+  const half = Math.max(0.05, windowSec / 2);
+  return Math.max(-1, Math.min(1, signed / half));
+}
+
 // ── Ball flight ────────────────────────────────────────────────────────────
 export class Flight {
   vel = new Vector3();

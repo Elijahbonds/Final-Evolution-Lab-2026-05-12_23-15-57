@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -22,6 +23,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('karate_vs', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;

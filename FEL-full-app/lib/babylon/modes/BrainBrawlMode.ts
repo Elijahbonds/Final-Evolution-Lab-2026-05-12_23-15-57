@@ -56,6 +56,7 @@
 import { Vector3, Matrix, TransformNode, type Scene } from '@babylonjs/core';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { answerOwner, type LocalPress } from '../core/localPads';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { Onlookers } from '../visual/Onlookers';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -177,6 +178,7 @@ interface St {
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
+let unseat: (() => void) | null = null;
 
 /**
  * GO AGAIN, in place (the Features review's HARD, 2026-09-24): REPLAY on the shell's end card used to bump the shell's game key
@@ -590,6 +592,38 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     if (w.__FEL_MIC__.length > 80) w.__FEL_MIC__.shift();
   }
 
+  function pressFrom(e: FelInput): LocalPress | null {
+    if (e.t === 'button' && e.pressed) return 'face';
+    if (e.t === 'dpad' && e.pressed) return e.src === 'key' ? 'key-dpad' : 'dpad';
+    return null;
+  }
+
+  function seatAnswer(ctx: ModeContext, e: FelInput, slot: number): void {
+    const S = st(ctx); if (!S) return;
+    const from = pressFrom(e);
+    if (!from) return;
+    const pads = ctx.input.pads().length;
+    const who = answerOwner({ pads, slot, playerCount: S.players, from });
+    if (S.phase === 'result') {
+      if (who !== null && S.resultAge >= RESULT_SKIP_S) { SoundKit.play('uiTick', { volume: 0.3, pitch: 0.9 }); afterResult(ctx, S); }
+      return;
+    }
+    if (S.phase !== 'answer') {
+      if (who === 0 && from === 'face' && S.phase !== 'done') refuse(ctx, S.phase === 'expose' ? 'MEMORISE…' : S.phase === 'spin' ? (S.landed ? `${S.category}…` : 'SPINNING…') : 'NEXT QUESTION…');
+      return;
+    }
+    if (who === null) return;
+    if (who === 0 && from === 'face' && e.t === 'button') {
+      const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
+      if (i >= 0 && S.answers[0] !== null) refuse(ctx, 'LOCKED IN');
+      else if (i >= 0) answer(ctx, S, 0, i);
+    } else if (who === 1 && (from === 'dpad' || from === 'key-dpad') && e.t === 'dpad') {
+      const i = DPAD.indexOf(e.dir);
+      if (i >= 0 && S.answers[1] !== null) refuse(ctx, 'P2 LOCKED IN');
+      else if (i >= 0) answer(ctx, S, 1, i);
+    }
+  }
+
   return {
     modeId: 'brainbrawl', mood: 'nightGame', camPreset: 'court',
 
@@ -635,38 +669,24 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       seatAudience(S);
       ctx.scene.getEngine().onResizeObservable.add(() => { if (!S.scene.isDisposed) { restage(S); seatAudience(S); } });
       SoundKit.startAmbient('stadium');
+      unseat?.();
+      unseat = ctx.input.onSlot((ev, slot) => {
+        if (ctx.input.pads().length < 2) return;
+        seatAnswer(ctx, ev, slot);
+      });
       if (!S.autoBegin) showPick(ctx, S);
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       const S = st(ctx); if (!S) return;
-      const face = e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A');
       if (S.phase === 'pick') {
         if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) { S.players = e.dir === 'right' ? Math.min(2, S.players + 1) : Math.max(1, S.players - 1); SoundKit.play('uiTick', { volume: 0.3 }); seats(S); showPick(ctx, S); }
-        else if (face) begin(ctx, S);
+        else if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) begin(ctx, S);
         return;
       }
-      if (S.phase === 'result') {
-        // the verdict has had its beat: a press (either seat) moves the match on instead of being refused for 2.8 s
-        const p2 = e.t === 'dpad' && e.pressed && S.players > 1;
-        if (face || p2) { if (S.resultAge >= RESULT_SKIP_S) { SoundKit.play('uiTick', { volume: 0.3, pitch: 0.9 }); afterResult(ctx, S); } }
-        return;
-      }
-      if (S.phase !== 'answer') {
-        // MECHANICS PASS: an answer button between questions was silently dropped (64 % of presses) — say what is happening
-        if (face && S.phase !== 'done') refuse(ctx, S.phase === 'expose' ? 'MEMORISE…' : S.phase === 'spin' ? (S.landed ? `${S.category}…` : 'SPINNING…') : 'NEXT QUESTION…');
-        return;
-      }
-      if (e.t === 'button' && e.pressed) {
-        const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
-        if (i >= 0 && S.answers[0] !== null) refuse(ctx, 'LOCKED IN');
-        else if (i >= 0) answer(ctx, S, 0, i);
-      }
-      else if (e.t === 'dpad' && e.pressed && S.players > 1) {
-        const i = DPAD.indexOf(e.dir);
-        if (i >= 0 && S.answers[1] !== null) refuse(ctx, 'P2 LOCKED IN');
-        else if (i >= 0) answer(ctx, S, 1, i);
-      }
+      // Two pads: each seat answers on its own slot. The merged stream would let P1's d-pad answer for P2.
+      if (ctx.input.pads().length >= 2) return;
+      seatAnswer(ctx, e, 0);
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -722,6 +742,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      unseat?.(); unseat = null;
       setTimeout(() => {
         for (const S of live) if (S.scene.isDisposed) {
           for (const t of S.timers) clearTimeout(t);

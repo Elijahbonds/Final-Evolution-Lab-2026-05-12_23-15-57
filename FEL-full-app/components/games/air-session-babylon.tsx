@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -44,6 +45,7 @@ export function makeAirHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -55,7 +57,9 @@ export function makeAirHost(modeKey: string, title: string) {
       let stop: (() => void) | null = null;
       let disposed = false;
 
-      runMode(MODES[modeKey], {
+      const startTimer = setTimeout(() => {
+        if (disposed) return;
+        runMode(MODES[modeKey], {
         canvas,
         input: bus,
         onPhase: (p, d) => {
@@ -82,9 +86,11 @@ export function makeAirHost(modeKey: string, title: string) {
         stop = s;
       })
         .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      }, 0);
 
       return () => {
         disposed = true;
+        clearTimeout(startTimer);
         if (canvasOwner.get(canvas) === token) stop?.();
       };
     }, []);   // mount once — see onEndRef above

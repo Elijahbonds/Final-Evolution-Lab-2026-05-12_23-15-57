@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { enabledModes } from '../../scripts/probes/_mode-list-source.mts';
 
 function wordsBetween(src: string, start: string, end: string): string[] {
   const from = src.indexOf(start);
@@ -22,5 +23,16 @@ describe('play gauntlet route coverage', () => {
     expect(loopModes.filter((mode) => !routes[mode])).toEqual([]);
     expect(routes.freerun).toBe('freerun');
     expect(routes.sprint).toBe('sprint');
+    const play = [...loopModes].sort();
+    const enabled = enabledModes().filter((id) => id !== 'dunkduel').sort();
+    expect(play).toEqual(enabled);
+    expect(loopModes).not.toContain('dunkduel');
+  });
+
+  it('puts every enabled mode in the dev gauntlet, including Prove It', () => {
+    const src = readFileSync('scripts/gauntlet.sh', 'utf8');
+    const loopModes = wordsBetween(src, 'for m in ', '; do').sort();
+    expect(loopModes).toEqual([...enabledModes()].sort());
+    expect(loopModes).toContain('dunkduel');
   });
 });
