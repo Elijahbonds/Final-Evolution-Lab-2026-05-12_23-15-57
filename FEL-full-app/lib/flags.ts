@@ -80,3 +80,8 @@ export function isCoachReviewUploadsEnabled(): boolean {
 export function isPayoutsEnabled(): boolean {
   return envOn('PAYOUTS_ENABLED');
 }
+
+/** LIVE-PAGE-FLAGOFF. Default OFF. /live/schedule 404s while unset. */
+export function isLiveStreamScheduleEnabled(): boolean {
+  return envOn('LIVE_STREAM_SCHEDULE_ENABLED');
+}
