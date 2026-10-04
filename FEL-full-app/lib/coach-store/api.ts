@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@/public/_prisma/client';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { isVerifiedAdult } from './adult';
@@ -19,6 +20,7 @@ import { deleteOriginalObject, extForMime, originalObjectName, replyObjectName, 
 import { hashSecret } from './teen';
 import { addressRejected, blockedAddressTerms } from './address';
 import { SCREEN_CONTACT_EMAIL } from '@/lib/screen/copy';
+import { validateBlackoutDates, validateWeeklyHours } from './hours';
 
 function unavailable(err: unknown): NextResponse | null {
   if (isMissingTable(err)) {
@@ -507,7 +509,14 @@ export function icsFor(bookingId: string, startsAt: Date, endsAt: Date, origin: 
 
 export async function saveCoachSettings(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
   if (!isAllowlistedCoach(userId)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  const data: { businessMailingAddress?: string | null; reviewSlaHours?: number; clientFullRefundHours?: number; refundBusinessDays?: number | null } = {};
+  const data: {
+    businessMailingAddress?: string | null;
+    reviewSlaHours?: number;
+    clientFullRefundHours?: number;
+    refundBusinessDays?: number | null;
+    weeklyHours?: Prisma.InputJsonValue;
+    blackoutDates?: Prisma.InputJsonValue;
+  } = {};
   if (typeof body.businessMailingAddress === 'string') {
     const why = addressRejected(body.businessMailingAddress, blockedAddressTerms());
     if (why) return NextResponse.json({ error: why }, { status: 400 });
@@ -517,7 +526,24 @@ export async function saveCoachSettings(userId: string, body: Record<string, unk
   if (typeof body.clientFullRefundHours === 'number') data.clientFullRefundHours = body.clientFullRefundHours;
   if (body.refundBusinessDays === null) data.refundBusinessDays = null;
   if (typeof body.refundBusinessDays === 'number') data.refundBusinessDays = body.refundBusinessDays;
+
+  const touchesHours = body.weeklyHours !== undefined || body.blackoutDates !== undefined;
+  if (body.weeklyHours !== undefined) {
+    const result = validateWeeklyHours(body.weeklyHours);
+    if (!result.ok) return NextResponse.json({ error: result.error, detail: result.detail }, { status: 400 });
+    data.weeklyHours = result.value as unknown as Prisma.InputJsonValue;
+  }
+  if (body.blackoutDates !== undefined) {
+    const result = validateBlackoutDates(body.blackoutDates, new Date());
+    if (!result.ok) return NextResponse.json({ error: result.error, detail: result.detail }, { status: 400 });
+    data.blackoutDates = result.value as unknown as Prisma.InputJsonValue;
+  }
+
   try {
+    if (touchesHours) {
+      const instructor = await prisma.instructor.findUnique({ where: { userId } });
+      if (!instructor) return NextResponse.json({ error: 'coach_profile_missing' }, { status: 409 });
+    }
     await prisma.instructor.updateMany({ where: { userId }, data });
     return NextResponse.json({ ok: true, contact: SCREEN_CONTACT_EMAIL });
   } catch (err) {
