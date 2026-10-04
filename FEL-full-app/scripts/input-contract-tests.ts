@@ -45,6 +45,8 @@ const LOADER_BYPASS_ROUTES: Record<string, string> = {
   // Prove It is the real-life camera contest. The Babylon loader stays available for /dev/mode/dunkduel, while
   // /play/dunkduel deliberately mounts the on-device pose tracker and pays only the played floor server-side.
   dunkduel: 'IRL Prove It route mounts its camera tracker instead of the legacy Babylon loader',
+  // IRON-PARADISE-OUT: /play/training is a temporary redirect to /train. The loader file stays; the page does not mount it.
+  training: 'Iron Paradise is parked; /play/training redirects to /train and does not mount its loader',
 };
 
 function routeUsesLoader(route: string): boolean {
