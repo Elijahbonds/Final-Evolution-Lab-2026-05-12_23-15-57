@@ -131,6 +131,7 @@ import {
 } from '../core/TripleThreat';   // standing still with the ball is not idle — it is threatening
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { MomentumBus } from '../core/MomentumBus';   // Phase 6: the shared Game-Breaker layer
+import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { heroSwing } from '../core/HoopsSwing';   // finish-release: a play between the sides reports on MY meter by who did it to whom
 import {
   dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
@@ -390,6 +391,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // steals in this mode were invisible to the momentum system, so the tier never moved, the multiplier
   // never applied and the crowd never escalated — the highlight plays happened and the game did not notice.
   let mbus = new MomentumBus();
+  /** HOOPS-10PHASE-2 phase 4: see the 1v1 note at its own declaration — publish-only, additive. */
+  const myStateMachine = new PlayerStateMachine();
   let momentum = 0;
   let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
   /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). Null = heroSwing says not mine. */
@@ -1191,6 +1194,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // contextual verb on this diamond (Y: BLOCK/ALREADY UP, B: SCREEN/CHARGE).
       ctx.setHud({ onBall: iAmCarrier });
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
+      // HOOPS-10PHASE-2 phase 4: the explicit state, once per frame — idle, dribble, gather, shoot, pass (THIS
+      // body's own pass out, not a catch), dunk, land. Publish-only, same reasoning as 1v1: the booleans below
+      // stay the single source of truth for behaviour, this only names what they already mean.
+      ctx.setHud({ playerState: myStateMachine.update({
+        hasBall: iAmCarrier, moving, gathering: !!gather, shooting, dunking,
+        passing: lastPasserWasMe && passFlight.active,   // a pass just thrown by me, still in flight
+        landing: me.landSec > 0,
+      }).state });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
       // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat

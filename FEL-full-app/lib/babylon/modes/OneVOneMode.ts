@@ -178,6 +178,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
 } from '../core/HoopsDefense';
 import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
 import { MomentumBus } from '../core/MomentumBus';
+import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { AiMover } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
@@ -328,6 +329,10 @@ export const OneVOneMode: ModeDefinition = (() => {
   let myScore = 0, foeScore = 0, momentum = 0;
   let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
   let mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
+  /** HOOPS-10PHASE-2 phase 4: the explicit state machine, fed from the SAME booleans below every frame (idle,
+   *  dribble, gather, shoot, pass [never fires in 1v1 — no teammate to pass to], dunk, land). Publish-only: the
+   *  mode's own booleans stay the single source of truth for behaviour; this names what they already mean. */
+  const myStateMachine = new PlayerStateMachine();
   /** Report a highlight and mirror the bus into the HUD momentum meter. */
   function swing(kind: Parameters<MomentumBus['report']>[0]['kind']): void {
     if (kind === 'miss' || kind === 'turnover') micDry++;   // THE MIC: counted before the report, so a fall to cold knows it was earned
@@ -2032,6 +2037,13 @@ export const OneVOneMode: ModeDefinition = (() => {
 
       // ── BIOMECH-HOOPS-WAVE1: this frame's hoops windows for the Posture Poses layer (read in after-animations) ──
       meLandSec = Math.max(0, meLandSec - dt); meCelebrateSec = Math.max(0, meCelebrateSec - dt);
+      // HOOPS-10PHASE-2 phase 4: the explicit state, once per frame (not inside the possession branch, same
+      // reasoning as the scuff tick above — a stale read across a turnover is exactly the kind of pop this exists
+      // to prevent). `moving` reads meSpeed01 (already the body's own speed01 from CourtMovement/DribbleController).
+      ctx.setHud({ playerState: myStateMachine.update({
+        hasBall: possession === 'mine' && carrying, moving: meSpeed01 > 0.05, gathering: !!gather,
+        shooting, dunking, passing: false /* 1v1 has no teammate to pass to */, landing: meLandSec > 0,
+      }).state });
       if (meShotWin === 'release') { meShotSec += dt; if (meShotSec >= RELEASE_SEC) meShotWin = 'follow'; }
       if (foeShotWin === 'release') { foeShotSec += dt; if (foeShotSec >= RELEASE_SEC) foeShotWin = 'follow'; }
       if (foeShotWin !== 'none' && possession === 'defense' && defPhase === 'over' && !arc.active) foeShotWin = 'none';
