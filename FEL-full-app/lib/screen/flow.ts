@@ -3,10 +3,12 @@
 //   start → age → (under 18 or no age: "A grown-up is with me") → "Does anything hurt right now?" → the camera card
 //         → camera
 //
-// The age is asked ONCE per tab: a `start` carrying the tab's locked answer (lib/screen/store.ts lockAge) skips the
-// question. "Yes" to pain ends it: no camera, no checks, nothing kept. The camera is asked for ONLY from the camera
-// card's button (`cameraOn`), after the card has said what the camera is for, so nothing before it can open one. The
-// gate record is built here and held by the page, in memory; it reaches sessionStorage only with the result.
+// The age is asked ONCE per run: a `start` carrying a locked answer (lib/screen/store.ts lockAge) skips the question —
+// and since AGE-RESET (audit 2.2, 2026-10-03) the page clears the answer on every new Start, so a `start` in practice
+// carries none and the question is asked. "Yes" to pain ends it: no camera, no checks, nothing kept. The camera is asked
+// for ONLY from the camera card's button (`cameraOn`), after the card has said what the camera is for, so nothing before
+// it can open one. The gate record is built here and held by the page, in memory; it reaches sessionStorage only with
+// the result.
 //
 // `back` is the back arrow: one step back WITHIN the flow, never out of it (the page takes the start card's arrow to
 // /screen). The age question is locked once answered, so a step before which it would sit goes to the start card.

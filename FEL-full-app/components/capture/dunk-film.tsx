@@ -15,7 +15,7 @@ import { exportFramed } from '@/lib/capture/exportVideo';
 import { cameraMayStart, selfVideoMayLeave } from '@/lib/capture/privacy';
 import { downloadBlob, deliverClip, extForMime, shareFileName } from '@/lib/capture/shareClip';
 import { needsGrownUp, type AgeBand } from '@/lib/screen/age';
-import { lockAge, readAge } from '@/lib/screen/store';
+import { lockAge, resetAge } from '@/lib/screen/store';
 import { deviceNumbers, dunkHistoryBody } from '@/lib/dunk-film/history';
 import { jumpLines, readJumps, type JumpRead } from '@/lib/dunk-film/jumpDetect';
 import { buildReel, type Reel } from '@/lib/dunk-film/reel';
@@ -56,11 +56,10 @@ export function DunkFilm(props: { onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const had = typeof sessionStorage !== 'undefined' ? readAge(sessionStorage) : null;
-    if (had) {
-      setAge(had);
-      setPhase(needsGrownUp(had) ? 'grownUp' : 'ready');
-    }
+    // AGE-RESET (audit 2.2, 2026-10-03): a new Film dunk session is maybe a new athlete on a shared phone — the last
+    // session's stored age (and with it the grown-up tick) is cleared, so the age question is asked again. The answer
+    // then stays locked for this session (lockAge): no changing to a looser band mid-session.
+    resetAge(typeof sessionStorage !== 'undefined' ? sessionStorage : null);
     return () => { teardown(); };
     // teardown on leave only
     // eslint-disable-next-line react-hooks/exhaustive-deps

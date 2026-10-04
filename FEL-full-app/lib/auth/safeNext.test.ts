@@ -43,3 +43,28 @@ describe('safeLoginNext', () => {
     expect(loginDestination(undefined, '/play/dunk')).toBe('/play/dunk');
   });
 });
+
+// AGE-RESET-LOGIN-NEXT (audit 2.10, 2026-10-03): the court-session login walls send ?next= so signing in at a court
+// returns you where you were. These pin both halves: the pages pass it, and the sanitizer honours exactly those paths.
+describe('the login walls that send ?next= (audit 2.10)', () => {
+  const ROUTES: [string, string][] = [
+    ['app/play/dunkduel/page.tsx', '/play/dunkduel'],
+    ['app/play/irl/page.tsx', '/play/irl'],
+    ['app/play/dunk/page.tsx', '/play/dunk'],
+    ['app/play/mirror/page.tsx', '/play/mirror'],
+    ['app/coach/page.tsx', '/coach'],
+  ];
+
+  it('each route\'s next path is a safe same-origin path (no "//", no scheme)', () => {
+    for (const [, p] of ROUTES) expect(safeLoginNext(p), p).toBe(p);
+  });
+
+  it('each page redirects to /login with its own path in ?next=', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    for (const [file, p] of ROUTES) {
+      const src = readFileSync(join(__dirname, '../../', file), 'utf8');
+      expect(src, file).toContain(`redirect(\`/login?next=\${encodeURIComponent('${p}')}\`)`);
+    }
+  });
+});

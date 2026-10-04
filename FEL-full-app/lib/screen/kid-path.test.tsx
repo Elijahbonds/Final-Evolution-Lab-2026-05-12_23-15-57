@@ -1,10 +1,10 @@
 // SCREEN-FIX-2 item 3 (Research 11:01 AM PT; FE PM + Research amend 11:50 AM PT, which sets the storage rule):
 // UNDER 18 (under 13, 13–17, "rather not say") SEES ONLY THEIR OWN NUMBER, AND KEEPS ONLY THE AGE ANSWER.
 //
-//   · The one thing an under-18 run keeps is the AGE ANSWER, in this tab's sessionStorage (the per-tab lock, S-12). Their
-//     result, takeoff leg, gate record and everything else live in page memory only, grown-up ticked or not. Nothing in
-//     localStorage, IndexedDB or cookies, and nothing sent (no fetch, XHR, beacon or socket), start to finish, "Run it
-//     again" included.
+//   · The one thing an under-18 run keeps is the AGE ANSWER, in this tab's sessionStorage (the per-run lock, S-12;
+//     AGE-RESET: every new Start asks it again, "Run it again" included). Their result, takeoff leg, gate record and
+//     everything else live in page memory only, grown-up ticked or not. Nothing in localStorage, IndexedDB or cookies,
+//     and nothing sent (no fetch, XHR, beacon or socket), start to finish.
 //   · 18 or older keep the age answer and their results in this tab's sessionStorage (fel.screen.* keys), as before.
 //   · The kid view: the jump, the change since their last screen on this page, the save-your-number line, "Run it again"
 //     and the privacy page. No band, colour, grade, priority, cue, label, rank or "personal best".
@@ -23,7 +23,7 @@ import { ResultsView } from '@/app/play/mirror/assess/_components/results-view';
 import { screenPose } from '@/app/play/mirror/assess/_components/screen-pose';
 import { summarize, type ScreenSummary } from './checks';
 import { PRE_START, preStep, type PreEvent, type PreState } from './flow';
-import { KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, keepResult, localForClear, lockAge, readAge, readResult, recall, tabStorage, writeTakeoff } from './store';
+import { KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, keepResult, localForClear, lockAge, readAge, readResult, recall, resetAge, tabStorage, writeTakeoff } from './store';
 import { isKid, type AgeBand } from './age';
 import { jumpChange, jumpChangeLine } from './kid';
 import { BAND_WORDS } from './PROPOSED-thresholds';
@@ -80,7 +80,7 @@ function page() {
   let lastIn: number | null = null;
   const views: string[] = [];
   const ev = (e: PreEvent) => {
-    if (e.type === 'start') clearScreen(tabStorage(), localForClear());
+    if (e.type === 'start') { clearScreen(tabStorage(), localForClear()); resetAge(tabStorage()); }
     const x: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()) }
       : e.type === 'age' ? { type: 'age', age: lockAge(tabStorage(), e.age) } : e;
     pre = preStep(pre, x);
@@ -104,22 +104,30 @@ function page() {
 const through = (age: AgeBand, grownUp = true): PreEvent[] => [
   { type: 'start' }, { type: 'age', age }, ...(age === '18+' || !grownUp ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'cameraOn' },
 ];
-const again: PreEvent[] = [{ type: 'start' }, { type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }];   // "Run it again"
+// "Run it again" (AGE-RESET): a fresh run — the age and the grown-up step are asked again, for the same kid too.
+const again = (age: AgeBand): PreEvent[] => [
+  { type: 'start' }, { type: 'age', age }, ...(age === '18+' ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'cameraOn' },
+];
 
 const KIDS = ['under-13', '13-17', 'unknown'] as const;
 const writes = () => calls.filter((c) => c.op !== 'send');
 const sends = () => calls.filter((c) => c.op === 'send');
 
 describe('an under-18 run keeps the age answer and nothing else, and sends nothing', () => {
-  it.each(KIDS)('%s, grown-up ticked: two screens ("Run it again"), then one sessionStorage write in all: the age answer', (age) => {
+  it.each(KIDS)('%s, grown-up ticked: two screens ("Run it again" re-asks the age); the age answer is the only value kept, and nothing is sent', (age) => {
     const p = page();
     for (const e of through(age)) p.ev(e);
     expect(p.pre.step).toBe('camera');
     expect(p.checks(FIRST)).toBe('kid');
-    for (const e of again) p.ev(e);
+    for (const e of again(age)) p.ev(e);
     expect(p.pre.step).toBe('camera');
     expect(p.checks(SECOND)).toBe('kid');
-    expect(writes()).toEqual([{ where: 'sessionStorage', op: 'setItem', key: KEYS.age }]);
+    // the age answer is written per run: run 1's answer, the new Start's reset, run 2's answer — nothing else, ever
+    expect(writes()).toEqual([
+      { where: 'sessionStorage', op: 'setItem', key: KEYS.age },
+      { where: 'sessionStorage', op: 'removeItem', key: KEYS.age },
+      { where: 'sessionStorage', op: 'setItem', key: KEYS.age },
+    ]);
     expect(sends()).toEqual([]);
     expect(session.keys()).toEqual([KEYS.age]);
     expect(local.keys()).toEqual([]);
@@ -151,7 +159,7 @@ describe('18 or older keep the age answer and their results in this tab, and not
     const p = page();
     for (const e of through('18+')) p.ev(e);
     expect(p.checks(FIRST)).toBe('adult');
-    for (const e of [{ type: 'start' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }] as PreEvent[]) p.ev(e);
+    for (const e of again('18+')) p.ev(e);                          // the second screen answers the age again (AGE-RESET)
     expect(p.checks(SECOND)).toBe('adult');
     expect(writes().length).toBeGreaterThan(1);
     for (const w of writes()) {
