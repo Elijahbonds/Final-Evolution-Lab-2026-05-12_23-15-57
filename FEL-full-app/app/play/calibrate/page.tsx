@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { safeReturnPath } from '@/lib/feel/rhythm-calibrate';
 import { CalibrateClient } from './_components/calibrate-client';
 
@@ -9,15 +10,14 @@ export const dynamic = 'force-dynamic';
 // MUSIC-SUITE P2 (2026-09-25): the rooms link here with ?return=<path> (the dance pick screen, the Academy header), and
 // the screen offers "Back to the room" once the offset is saved. Only a same-origin path is honoured (safeReturnPath);
 // anything else is dropped and the screen falls back to "Back to modes". A signed-out player is sent to sign in with
-// the way back in ?next= (as app/guidance/page.tsx does) — though the sign-in form does not read `next` yet
-// (components/auth-form.tsx:126 lands on the first game), so today it is a way back for the day it does.
+// the way back in ?next= (loginPath), which the sign-in form honours after safeLoginNext accepts it.
 export default async function CalibratePage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const raw = searchParams?.return;
   const returnTo = safeReturnPath(Array.isArray(raw) ? raw[0] : raw);
   const session = await getServerSession(authOptions);
   if (!session) {
     const here = returnTo ? `/play/calibrate?return=${encodeURIComponent(returnTo)}` : '/play/calibrate';
-    redirect(`/login?next=${encodeURIComponent(here)}`);
+    redirect(loginPath(here));
   }
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
