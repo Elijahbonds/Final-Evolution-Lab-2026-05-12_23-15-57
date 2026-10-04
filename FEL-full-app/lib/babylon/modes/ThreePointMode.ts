@@ -34,8 +34,8 @@
 //      load / release / follow and keeps the eyes on the iron.
 
 import { SPORT_CLIP } from '../anim/clipRegistry';
-import { SHOT_TARGET as HUD_TARGET, PERFECT_BAND as HUD_PERFECT, GOOD_BAND as HUD_GOOD, heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
-import { readDisplaySetting, displayBanner, widen } from '@/lib/controller-link/tvMode';
+import { heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
+import { readDisplaySetting, displayBanner } from '@/lib/controller-link/tvMode';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Material, Mesh, ParticleSystem } from '@babylonjs/core';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';   // suite pass: the net's answer and the hot hand's trail (the dunk contest's)
@@ -50,8 +50,9 @@ import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   //
 import { BeatOwner } from '../anim/beatOwner';   // HOOPS MOTION phase 3d: one owner per body (the raw onEnd chains are gone)
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
-import { RELEASE_FRAME_01 } from '../core/BallHandling';
+import { RELEASE_FRAME_01, syncedShotSpeed } from '../core/BallHandling';
 import { releaseFrameOf, riseStartOf } from '../anim/opponentMotion';
+import { readShotInputMode, DEFAULT_SHOT_INPUT, type ShotInputMode } from '../core/ShotInputMode';   // HOOPS-10PHASE-2 phase 2
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths
@@ -67,7 +68,7 @@ import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';  
 import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { applyOceanCourt } from '../visual/CourtSurface';
-import { ShotArc, followThroughFor } from '../core/BasketballCore';
+import { ShotArc, followThroughFor, ShotMeter, SHOT_QUALITY_PCT, distanceContest01, type ShotQuality } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';   // a shootout miss you can READ
 import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
@@ -90,8 +91,6 @@ const GAME_LEN = 60;
 /** 2009 field size. Top FINALISTS advance from qualifying to the final round. */
 const FIELD_SIZE = 6;
 const FINALISTS = 3;
-// A+ mission #4: the sweet centre and bands live in core/shootoutHud.ts so the host draws the SAME band it grades.
-const SHOT_TARGET = HUD_TARGET;
 // The real NBA three-point line is NOT a constant radius: 6.71m in the corners,
 // 7.24m at the top of the arc. The racks sit ON that line, so a corner rack is a
 // genuinely shorter shot than the top-of-key rack — which is the reason the top
@@ -112,28 +111,22 @@ const RACK_POS = RACK_ANGLES.map(
   (a) => new Vector3(RIM.x + rackRadius(a) * Math.cos(a), 0, RIM.z + rackRadius(a) * Math.sin(a)),
 );
 
-/** How wide the "perfect" window is around SHOT_TARGET (shared with the host). */
-const PERFECT_BAND = HUD_PERFECT;
 /**
  * TV MODE (mission Phase C, 2026-09-13).
  *
  * Mirroring delays the PICTURE, not the input: on AirPlay or Chromecast the player sees the meter at the
  * perfect moment, presses, and the press lands 60–300 ms late — every time, consistently, through no error
- * of their own. So on a mirrored display the bands are widened to give that time back. It is compensation
- * for a display, not a difficulty setting, and `widen` can only ever ADD time (FACTOR_MIN is 1).
+ * of their own. So on a mirrored display the window is widened to give that time back. It is compensation
+ * for a display, not a difficulty setting.
  *
  * Read once per load rather than per shot: a player who changes the setting mid-rack would otherwise be
- * judged by two different windows inside one rack.
+ * judged by two different windows inside one rack. HOOPS-10PHASE-2 phase 2: applied to the shared ShotMeter
+ * via `widenBy` now, not to a pair of fixed constants — the window it widens IS the window the meter grades.
  */
 let shotFactor = 1;
-const perfectBand = (): number => widen(PERFECT_BAND, shotFactor);
-const goodBand = (): number => widen(GOOD_BAND, shotFactor);
 /** How long the ball lives off the iron before the next ball is in the hand. Long enough to SEE where
  *  the miss went (that is the whole point), short enough that a shootout still feels like a shootout. */
 const RIM_OUT_SEC = 0.85;
-const GOOD_BAND = HUD_GOOD;
-/** Bar sweeps a full cycle in this many seconds. */
-const BAR_PERIOD = 1.15;           //TUNE(elijah)
 /** Seconds to travel between rack stations. */
 const MOVE_SEC = 0.85;             //TUNE(elijah)
 /** How long the standings board holds between rounds. */
@@ -169,8 +162,30 @@ export function simulateRival(skill: number, round: Round): number {
 
 let player: SpawnedCharacter | null = null;
 let meter3d: ShotMeter3DHandle | null = null;
-/** The bar starts (or restarts) beside the shooter with the sweet spot drawn on it — the same window `fire` grades by. */
-function meterBegin(): void { meter3d?.begin({ center: SHOT_TARGET, half: goodBand(), perfectHalf: perfectBand() }); }   // HOOPS-DEPTH S6: the PERFECT band drawn is the one fire() grades (it drew 0.35 of the good band: 0.056 against 0.06)
+// HOOPS-10PHASE-2 phase 2: ONE METER, shared with 1v1 / 3v3 (BasketballCore.ShotMeter), graded against the
+// jumpshot clip's real release frame instead of an independent sweeping bar. `shotInputMode` picks which edge
+// of the press grades it; both modes read the SAME greenCenter01 / greenHalfWidth01 this meter computes.
+let shotMeter = new ShotMeter();
+let shotInputMode: ShotInputMode = DEFAULT_SHOT_INPUT;
+/** True while a hold-release press is held (the gather + jumper are playing, the meter is running toward its own end). */
+let holding = false;
+/** Distance narrows the window exactly like a defender does (BasketballCore.distanceContest01 → ShotMeter.start's
+ *  contestLevel01) — the top-of-key rack (7.24 m) is the hard one, the corners (6.71 m) the forgiving ones, same
+ *  as the real event. Capped at 0.4 so a deep rack is harder, not a different game. */
+function distanceContestForRack(rackIdx: number): number {
+  const at = RACK_POS[Math.min(Math.max(rackIdx, 0), RACKS - 1)];
+  return distanceContest01(Vector3.Distance(at, RIM), RACK_CORNER_R, RACK_TOP_R) * 0.4;
+}
+/** A fresh ball in the shooter's hand: draw the band at this rack's window. Tap-timing starts the sweep running
+ *  (desynced so it cannot be memorised); hold-release shows the band but leaves the meter paused for the press. */
+function beginShootPhase(): void {
+  shotMeter.start(distanceContestForRack(S.rack), 'jumper', 0);
+  shotMeter.widenBy(shotFactor);
+  meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
+  if (shotInputMode === 'tap-timing') shotMeter.update(Math.random() * shotMeter.durationSec);
+  else shotMeter.active = false;   // HOLD-RELEASE: shown, not running — the press starts it
+  holding = false;
+}
 /** Owner decision 2026-09-05: the contest's other shooters are ROSTER BODIES waiting behind the arc (idle, never seen
  *  shooting — D4's ruling stands); they replace the venue's capsule placeholders. */
 let rivalBodies: SpawnedCharacter[] = [];
@@ -330,7 +345,6 @@ const S = {
   streak: 0,
   best: 0,
   clock: GAME_LEN,
-  barT: 0,
   moveT: 0,
   from: new Vector3(),
   /** Live wind-up charge streamed from a phone; 0 when playing on keys. */
@@ -362,7 +376,7 @@ const S = {
 
 function resetState(): void {
   S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0; S.best = 0;
-  S.clock = GAME_LEN; S.barT = 0; S.moveT = 0; S.charge = 0; S.fired = false;
+  S.clock = GAME_LEN; S.moveT = 0; S.charge = 0; S.fired = false;
   S.from.copyFrom(RACK_POS[0]);
   S.round = 'qualifying';
   S.standingsT = 0;
@@ -385,9 +399,9 @@ function resetState(): void {
 /** Reset only the per-run shooting state, keeping contest standings. */
 function resetRun(): void {
   S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0;
-  S.clock = GAME_LEN; S.barT = 0; S.moveT = 0; S.charge = 0; S.fired = false;
+  S.clock = GAME_LEN; S.moveT = 0; S.charge = 0; S.fired = false;
   S.from.copyFrom(RACK_POS[0]);
-  shotWin = 'none'; releaseIn = -1;
+  shotWin = 'none'; releaseIn = -1; holding = false;
   if (player && ball) attachBallToHand(ball, player.skeleton, hoopsHand(player));   // BIOMECH-HOOPS-WAVE1 — HOOPS MOTION phase 3: the right hand as drawn
 }
 
@@ -419,7 +433,9 @@ function pushHud(ctx: ModeContext, banner?: string): void {
     ball: `${Math.min(S.ballIdx + 1, BALLS_PER_RACK)}/${BALLS_PER_RACK}`,
     streak: S.streak,
     clock: Math.max(0, Math.ceil(S.clock)),
-    meter: S.phase === 'shoot' ? Number(S.barT.toFixed(2)) : null,
+    meter: S.phase === 'shoot' ? Number(shotMeter.t.toFixed(2)) : null,
+    meterGreen: S.phase === 'shoot' ? Number(shotMeter.greenCenter01.toFixed(3)) : null,
+    meterHalf: S.phase === 'shoot' ? Number(shotMeter.greenHalfWidth01.toFixed(3)) : null,
     money: isMoneyBall(S.ballIdx),
     // A+ mission #4 (Wii readability): the host draws rack pips, points left and the heat from these numbers
     rackIdx: S.rack, ballIdx: S.ballIdx, left: pointsLeft(S.rack, S.ballIdx), heat: heatLevel(S.streak),
@@ -476,26 +492,26 @@ export function releaseDelaySec(release01: number, start01: number, durationSec:
   return Math.max(0, release01 - start01) * durationSec / speedRatio;
 }
 
-/** Release the loaded ball, grading on how close the bar was to the sweet spot. */
-function fire(ctx: ModeContext, power?: number): void {
-  if (S.phase !== 'shoot' || S.fired || !player || !ball || !arc) return;
-  S.fired = true;
-
-  const signed = S.barT - SHOT_TARGET;   // the SIGN is the feedback: early is short, late is long
-  shotErr = signed;
-  const err = Math.abs(signed);
-  meter3d?.end(err < perfectBand() ? 'perfect' : err < goodBand() ? 'good' : signed < 0 ? 'early' : 'late');
+/**
+ * HOOPS-10PHASE-2 phase 2: the decision + scoring + mic/juice feedback, shared by BOTH shot inputs — `fire()`
+ * (tap-timing: the tap already graded it) and `releaseHold()` (hold-release: the button-up grades it). Only the
+ * ANIMATION start differs between them (tap starts the clip here; hold already started it at the press), so that
+ * stays with each caller. `shotErr` must already be set (t − greenCenter01 at the graded instant) before this runs.
+ */
+function applyShotOutcome(ctx: ModeContext, quality: ShotQuality, power?: number): void {
+  meter3d?.end(quality);
+  const err = Math.abs(shotErr);
   // A tilt charge nudges the odds but never replaces timing — a phone player and
   // a keyboard player are judged on the same window.
   const powerBonus = typeof power === 'number' ? (1 - Math.abs(power - 0.75)) * 0.05 : 0;
-  const perfect = err < perfectBand();
-  // THE RIM DECIDES (Phase 7): the bands are the timing's grade and set the make RATE (a perfect release 0.97, the good
-  // window 0.55 + the tilt, outside it a brick's 0.04); the ring's geometry decides this shot, and its dwell is planned
-  // from the same error, so what you see on the iron is what the scoreboard says. The meter grade above is unchanged.
-  const pct3 = perfect ? 0.97 : err < goodBand() ? 0.55 + powerBonus : 0.04;
+  const perfect = quality === 'perfect';
+  // THE RIM DECIDES (Phase 7): the grade sets the make RATE (SHOT_QUALITY_PCT — the SAME table 1v1 / 3v3 shoot
+  // by), a power-ring tilt only sweetens a 'good' release; the ring's geometry decides this shot, and its dwell is
+  // planned from the same error, so what you see on the iron is what the scoreboard says.
+  const pct3 = Math.min(0.97, SHOT_QUALITY_PCT[quality] + (quality === 'good' ? powerBonus : 0));
   const q01 = perfect ? 0.95 : Math.max(0.15, 1 - err / Math.PI);
-  const bias = { short: signed < 0 ? 0.8 : -0.8 };
-  const toShooter3 = player.root.position.subtract(RIM); toShooter3.y = 0;
+  const bias = { short: shotErr < 0 ? 0.8 : -0.8 };
+  const toShooter3 = player!.root.position.subtract(RIM); toShooter3.y = 0;
   const verdict3: RimVerdict = rimDecides(RIM, toShooter3, pct3, q01, bias);
   const made = verdict3.made;
   console.info(`[3PT-RIM] ring ${made ? 'YES' : 'no'} radial ${verdict3.radial.toFixed(3)} m at pct ${pct3.toFixed(2)}`);
@@ -508,18 +524,6 @@ function fire(ctx: ModeContext, power?: number): void {
   } else {
     S.streak = 0;
   }
-
-  // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias. BIOMECH-HOOPS-WAVE1: the clip is CUT at its
-  // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
-  // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
-  // HOOPS-10PHASE-2 phase 1: the capture's own dip is cut too (from01 = the rise start) — the set the shooter is holding
-  // IS the load, and replaying it read as a SECOND arm-raise, two shots from one press. One press now reads as one
-  // motion: set (held) → rise → release → follow-through → absorb.
-  const release01 = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01);
-  const rise01 = Math.min(riseStartOf(player.animator, 'jumpshot', 0), release01);
-  beats?.beat('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, holdEnd: true, from01: rise01 });   // S2: the rise fades out of the SET; cut at the release (a late end holds its last frame)
-  releaseIn = releaseDelaySec(release01, rise01, player.animator.durationOf('jumpshot') ?? 0.9, SHOT_CLIP_SPEED);
-  console.info(`[3PT-SHOT] one press: set(held) → jumpshot ${rise01.toFixed(2)}→${release01.toFixed(2)} (${releaseIn.toFixed(2)} s to the release) → follow-through → absorb`);
   pendingMade = made;
   {   // RIM PLAY: what this timing earned on the iron — early is short, late is long; a make inside the good window can rattle
     pendingPlay = verdict3.play;
@@ -532,7 +536,7 @@ function fire(ctx: ModeContext, power?: number): void {
   landing = { perfect, money }; contactLatch = false;   // A+ P0: the landing beat (update → 'made' | 'missed') reads these
   // THE MIC: the call is picked now, with the counts this shot just set, and its clip decoded while the ball flies
   missRun = made ? 0 : missRun + 1;
-  micLanding = micShotCall(made, money, err >= goodBand());
+  micLanding = micShotCall(made, money, quality !== 'perfect' && quality !== 'good');
   mic?.expect(micLanding);
   if (made) {
     ctx.juice.scorePop(RIM.clone(), perfect ? `PERFECT +${worth}` : `+${worth}`,
@@ -560,8 +564,62 @@ function fire(ctx: ModeContext, power?: number): void {
   // Phase 9: the release says what the TIMING was (the ball is still in the air); the ring's answer goes on the banner
   // when the ball gets there (the rim-contact sites below) — measured before: "MISS — OFF THE LEFT IRON" at the release and
   // "OFF THE LEFT IRON" again at the iron, two banners for one shot
-  pushHud(ctx, perfect ? 'PERFECT' : err < goodBand() ? 'GOOD' : signed < 0 ? 'EARLY' : 'LATE');
+  pushHud(ctx, quality === 'perfect' ? 'PERFECT' : quality === 'good' ? 'GOOD' : quality === 'early' ? 'EARLY' : 'LATE');
   pendingPerfect = perfect;
+}
+
+/**
+ * HOLD-RELEASE (HOOPS-10PHASE-2 phase 2): the press starts the gather + jumper and arms the meter — modelled on
+ * OneVOneMode's meterStart/beginRise. The clip is paced so ITS OWN release frame lands when the meter reaches its
+ * green centre, so holding through the green reads as the top of the jump; releaseHold (the button-up, or the
+ * meter running out) is what actually grades and fires — same split as the 1v1 jumper.
+ */
+function pressHold(ctx: ModeContext): void {
+  if (S.phase !== 'shoot' || S.fired || holding || !player || !ball || !arc) return;
+  holding = true;
+  shotMeter.active = true;
+  const release01 = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01);
+  const rise01 = Math.min(riseStartOf(player.animator, 'jumpshot', 0), release01);
+  const riseLeftSec = Math.max(0.05, release01 - rise01) * (player.animator.durationOf('jumpshot') ?? 0.9);
+  const toGreenSec = Math.max(0.05, shotMeter.greenCenter01 * shotMeter.durationSec);
+  const speedRatio = riseLeftSec / toGreenSec;   // the clip's OWN pace, re-timed so its release frame lands on the meter's green
+  beats?.beat('jumpshot', { speedRatio, fadeSec: 0.08, holdEnd: true, from01: rise01 });
+  console.info(`[3PT-SHOT] hold: set(held) → jumpshot ${rise01.toFixed(2)}→${release01.toFixed(2)}, meter armed at speed ${speedRatio.toFixed(2)}`);
+}
+
+/** The button-up (or the meter timing out): grade NOW and fire — the ball leaves the hand immediately, same shape
+ *  as OneVOneMode.releaseJumper; the clip is already mid-rise and keeps playing to its own held end. */
+function releaseHold(ctx: ModeContext): void {
+  if (S.phase !== 'shoot' || S.fired || !holding || !player || !ball || !arc) return;
+  S.fired = true; holding = false;
+  const quality = shotMeter.release();
+  shotErr = shotMeter.t - shotMeter.greenCenter01;
+  releaseIn = 0;   // the clip is already rising; the ball leaves the hand on this frame's flight step
+  console.info(`[3PT-SHOT] release: ${quality} at t=${shotMeter.t.toFixed(2)} (green ${shotMeter.greenCenter01.toFixed(2)} ± ${shotMeter.greenHalfWidth01.toFixed(2)})`);
+  applyShotOutcome(ctx, quality);
+}
+
+/** Release the loaded ball, grading on how close the bar was to the sweet spot. */
+function fire(ctx: ModeContext, power?: number): void {
+  if (S.phase !== 'shoot' || S.fired || !player || !ball || !arc) return;
+  S.fired = true;
+
+  const quality = shotMeter.release();
+  shotErr = shotMeter.t - shotMeter.greenCenter01;   // the SIGN is the feedback: early is short, late is long
+
+  // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias. BIOMECH-HOOPS-WAVE1: the clip is CUT at its
+  // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
+  // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
+  // HOOPS-10PHASE-2 phase 1: the capture's own dip is cut too (from01 = the rise start) — the set the shooter is holding
+  // IS the load, and replaying it read as a SECOND arm-raise, two shots from one press. One press now reads as one
+  // motion: set (held) → rise → release → follow-through → absorb.
+  const release01 = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01);
+  const rise01 = Math.min(riseStartOf(player.animator, 'jumpshot', 0), release01);
+  beats?.beat('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, holdEnd: true, from01: rise01 });   // S2: the rise fades out of the SET; cut at the release (a late end holds its last frame)
+  releaseIn = releaseDelaySec(release01, rise01, player.animator.durationOf('jumpshot') ?? 0.9, SHOT_CLIP_SPEED);
+  console.info(`[3PT-SHOT] one press: set(held) → jumpshot ${rise01.toFixed(2)}→${release01.toFixed(2)} (${releaseIn.toFixed(2)} s to the release) → follow-through → absorb`);
+
+  applyShotOutcome(ctx, quality, power);
 }
 
 // ── THE MIC ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -667,7 +725,7 @@ function advanceBall(ctx: ModeContext): void {
     S.phase = 'move';
     return;
   }
-  S.barT = Math.random(); meterBegin();   // desync the bar so it cannot be memorised (in range: ×π read up to 3.14 until the next frame's wrap, and a press on that frame was graded against it)
+  beginShootPhase();   // HOOPS-10PHASE-2 phase 2: the shared ShotMeter, graded at this rack's distance
   S.phase = 'shoot';
   dressBall();
   // THE MIC: the gold ball is up (an ordinary call: it waits behind the last shot's call rather than cutting it); the last
@@ -864,6 +922,9 @@ export const ThreePointMode: ModeDefinition = {
     });
     shotFactor = display.factor;
     if (display.mode === 'mirrored') console.info(`[3PT] ${displayBanner(display)}`);
+    // HOOPS-10PHASE-2 phase 2: read once at load, same reasoning as shotFactor above — one setting per run.
+    shotInputMode = readShotInputMode();
+    holding = false;
 
     // ship pass 4: the venue spec (with its baked map) first; the kit venue only if no spec
 
@@ -1003,12 +1064,16 @@ export const ThreePointMode: ModeDefinition = {
     // HOOPS-10PHASE-2 phase 1: through the latch — one press EDGE acts once, however many times the delivery layer
     // repeats it; the latch re-arms on the release edge alone.
     if (e.t === 'button' && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X')) {   // X too: SQUARE shoots in the 2K map every other hoops mode plays by
+      // HOOPS-10PHASE-2 phase 2: hold-release grades on the button-up (or the meter running out, in update()) —
+      // this fires BEFORE the latch's own release edge so the latch's bookkeeping below is untouched.
+      if (!e.pressed && shotInputMode === 'hold-release' && holding) releaseHold(ctx);
       if (!e.pressed) { shotLatch.release(); return; }
       if (!shotLatch.press()) return;   // a duplicate delivery of a press already spent — not a shot, not a refusal
       // MECHANICS PASS (2026-09-15): 43 % of SHOOT presses were silent — pressed while the ball was in the air or the next
       // one was still coming off the rack. Answered now, with where the ball is.
       if (S.phase === 'shoot' && S.fired) refuse(ctx, "BALL'S IN THE AIR");
       else if (S.phase !== 'shoot') refuse(ctx, 'NEXT BALL…');
+      else if (shotInputMode === 'hold-release') pressHold(ctx);
       else fire(ctx, S.charge > 0.02 ? S.charge : undefined);
     }
   },
@@ -1098,7 +1163,7 @@ export const ThreePointMode: ModeDefinition = {
       if (S.moveT >= 1) {
         S.phase = 'shoot';
         S.fired = false;
-        S.barT = Math.random(); meterBegin();   // in range from this frame (see advanceBall)
+        beginShootPhase();   // in range from this frame (see advanceBall)
         dressBall();
         setFeet();   // S2: the first ball of a rack is already in hand — the arrival at the rack is its catch
         pushHud(ctx, `RACK ${S.rack + 1}`);
@@ -1109,10 +1174,15 @@ export const ThreePointMode: ModeDefinition = {
         else if (S.rack > 0) mic?.say({ moment: 'three.rack', priority: 1 });
       }
     } else if (S.phase === 'shoot') {
-      // Sawtooth sweep 0→1, then wraps back to 0 — linear, so the bar crosses the sweet spot at one steady speed (a sine
-      // would linger at the extremes and make the sweet spot easier at the top of the arc than the bottom).
-      S.barT = (S.barT + dt / BAR_PERIOD) % 1;
-      if (!S.fired) meter3d?.set(S.barT, player.root.position.add(new Vector3(0, 1.72, 0)));
+      if (shotInputMode === 'tap-timing') {
+        // Sawtooth sweep 0→1, then wraps back to 0 — linear, so the bar crosses the sweet spot at one steady speed (a
+        // sine would linger at the extremes and make the sweet spot easier at the top of the arc than the bottom).
+        shotMeter.t = (shotMeter.t + dt / shotMeter.durationSec) % 1;
+      } else if (holding) {
+        shotMeter.update(dt);
+        if (shotMeter.t >= 1) releaseHold(ctx);   // held past the top of the jump — auto-release, same grade a timeout earns on 1v1's meter
+      }
+      if (!S.fired) meter3d?.set(shotMeter.t, player.root.position.add(new Vector3(0, 1.72, 0)));
       // Face the rim while loaded — slewed onto it (BIOMECH-HOOPS-WAVE1 G1/G3: a lookAt snap before), the ball in the hand.
       player.root.rotation.y = slewYaw(player.root.rotation.y, yawTo(player.root.position, RIM), FACE_RIM_RATE, dt);
     } else if (S.phase === 'flight') {
@@ -1125,7 +1195,7 @@ export const ThreePointMode: ModeDefinition = {
           const from = ball.getAbsolutePosition().clone(); releaseBall(ball); arc.start(from, RIM, pendingMade, 'jumper', 0, null, pendingPlay); pendingPlay = null; shotWin = 'release'; shotSec = 0; releaseIn = -1;
           // HOOPS-DEPTH S4: the follow-through comes down on an ABSORB (knees, torso, arms), then the idle — it faded arms-overhead straight into idle_stand
           // HOOPS-DEPTH S6: outside the good band the body shows the miss before the rim does: short = the early short arm, long = the late push
-          const ftClip = followThroughFor(Math.abs(shotErr) < goodBand() ? 'good' : shotErr < 0 ? 'early' : 'late');
+          const ftClip = followThroughFor(Math.abs(shotErr) < shotMeter.greenHalfWidth01 ? 'good' : shotErr < 0 ? 'early' : 'late');
           console.info(`[3PT-SHOT] follow-through ${ftClip} (err ${shotErr.toFixed(3)})`);
           beats?.beat(ftClip, { fadeSec: 0.08, onSettle: () => beats?.beat('bball_land_absorb', { fadeSec: 0.1 }) });   // from the release frame: arms overhead → the wrist snap → down the front; the absorb, then the loop
         }
