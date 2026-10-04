@@ -30,8 +30,9 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   ok(src.includes("ctx.juice.callout('BALL!'"), 'a BALL! callout fires either way — the press is never silent');
   ok(/passTargetId = 'me'/.test(src), "the mate's pass targets 'me' (passTargetId's widened type)");
   ok(/lastPasserWasMe = false;\s*\/\/ the mate threw this one/.test(src), 'no stray assist credit from a call-for-ball catch');
-  ok(/passFlight\.start\(body\.char\.root\.position\.add\(new Vector3\(0, 1\.2, 0\)\), me\.char\.root\.position/.test(src),
-    'the ball actually flies mate → hero (PassFlight, same system a human throw uses)');
+  ok(/const toMe = leadPoint\(body\.char\.root\.position, me\.char\.root\.position, me\.drib\.vel, PASS_SPEED\.chest\)/.test(src) &&
+     /passFlight\.start\(body\.char\.root\.position\.add\(new Vector3\(0, 1\.2, 0\)\), toMe, 'chest', 1\);/.test(src),
+    'the ball actually flies mate → hero (PassFlight, same system a human throw uses — now led toward "me" via leadPoint, HOOPS-10PHASE-2 phase 6)');
   ok(/if \(!\(carrierId === 'mate0' \|\| carrierId === 'mate1'\) \|\| passFlight\.active\) return;/.test(src),
     'a call with no mate carrying, or a pass already in flight, is a no-op (one pass at a time)');
   ok(/ctx\.setHud\(\{ onBall: iAmCarrier \}\);/.test(src), 'the HUD publishes onBall every frame for the touch pad to read');

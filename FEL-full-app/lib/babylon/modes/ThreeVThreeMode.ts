@@ -94,7 +94,7 @@ import {
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
   SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
-import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/BallHandling';
+import { lockTarget, choosePassType, PassFlight, type PassType, leadPoint, PASS_SPEED } from '../core/BallHandling';
 import { HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A
   canPostUp, postYaw, postWish, postFadeAway, POST_FADE_STICK_MIN, fadeDrift,   // HOOPS-MOVE-KIT-B (2026-09-08): M4 the fade
@@ -591,7 +591,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     passTargetId = 'me';
     lastPasserWasMe = false;   // the mate threw this one, not me — no assist to credit on whatever I do next
     slingPass = false;
-    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), me.char.root.position.add(new Vector3(0, 1.2, 0)), 'chest', 1);
+    // HOOPS-10PHASE-2 phase 6: led the same way the live pass is — a call made mid-cut still arrives on me, not
+    // behind me.
+    const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
+    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, 'chest', 1);
     console.info('[3V3-OFF] call for the ball answered — mate passes it back');
   }
 
@@ -1736,9 +1739,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // any pass but the lob (the alley-oop is its own thing); the turbo HELD at the throw, not the gate — an unaimed pass lets the
           // stick go the frame it throws (that is how a bounce pass is asked for) and the gate has already dropped on that frame
           slingPass = type !== 'lob' && slingRead(sprintOk || !!meIntent.sprint, Math.hypot(me.drib.vel.x, me.drib.vel.z));
+          // HOOPS-10PHASE-2 phase 6: lead the catch — chest/bounce aim where he'll BE, not where he IS, so a mate
+          // cutting into the lane doesn't have to break stride for it. The lob keeps its own target: the alley-oop's
+          // cutting-speed/rim-radius read (choosePassType above) already times it to land above the iron, which a
+          // second, independent lead on top of would just fight.
+          const toTarget = type === 'lob'
+            ? locked.pos.add(new Vector3(0, 1.2, 0))
+            : leadPoint(ball.getAbsolutePosition(), locked.pos, mateVel[locked.id === 'mate0' ? 0 : 1], PASS_SPEED[type] * (slingPass ? SLING.ballMult : 1)).add(new Vector3(0, 1.2, 0));
           passFlight.start(
             ball.getAbsolutePosition(),
-            locked.pos.add(new Vector3(0, 1.2, 0)),
+            toTarget,
             type,
             slingPass ? SLING.ballMult : 1,
           );
@@ -1784,13 +1794,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (!passFlight.active) { /* picked */ }
         else if (passFlight.step(dt, ball.position)) {
           if (passType === 'lob') {
-            // caught above the rim: the cutter finishes it, no dribble in between
+            // caught above the rim: the cutter finishes it, no dribble in between — the catch beat is skipped on
+            // purpose, the alley-oop's own flight (mates[idx].tree) goes straight into the finish
             const idx = passTargetId === 'mate0' ? 0 : 1;
             giveBallTo(passTargetId);
             void teammateShoots(ctx, mates[idx], idx, 'alleyoop');
             return;
           }
           giveBallTo(passTargetId);
+          // HOOPS-10PHASE-2 phase 6: the catch — hands out to meet it, in to secure it. Plays on whichever body just
+          // received it (me or a mate), on top of their own stance, the same way bball_contact_react layers onto one.
+          (passTargetId === 'me' ? me : mates[passTargetId === 'mate0' ? 0 : 1]).tree.beat('bball_catch', { fadeSec: 0.05 });
           if (slingPass) { slingPass = false; mateBurst[passTargetId === 'mate0' ? 0 : 1] = SLING.burstSec; bannerFlash(ctx, 'SLING — BURST!', 500); console.info('[3V3-KIN] sling burst on the catch'); }
           if (passType === 'bounce') {
             ctx.setHud({ banner: 'BOUNCE PASS!' });
