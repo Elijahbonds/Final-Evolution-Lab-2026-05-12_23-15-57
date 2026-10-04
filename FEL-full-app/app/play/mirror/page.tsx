@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { youthGateFor } from '@/lib/mirror/screenCorrectives';
 import { isHardStopped, latestIntake, needsIntake } from '@/lib/health/intake';
@@ -28,7 +29,7 @@ async function gateOrFalse(userId: string | undefined, gate: (userId: string) =>
 // in the browser; nothing is uploaded. See lib/babylon/nexus/neuro-mirror/.
 export default async function MirrorPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect(`/login?next=${encodeURIComponent('/play/mirror')}`);
+  if (!session) redirect(loginPath('/play/mirror'));
   // YOUTH RULES (MIRROR-COACH P3 review, 2026-09-26; PLAN item 9, owner decisions #6, #20): the screen's written
   // corrective blocks are off under 18 or with no birth year on file. A read that fails is no birth year — youth rules.
   const userId = (session.user as { id?: string } | undefined)?.id;

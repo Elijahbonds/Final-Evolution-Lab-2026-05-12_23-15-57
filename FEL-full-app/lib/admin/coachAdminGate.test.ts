@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isValidElement } from 'react';
 import { NextRequest } from 'next/server';
-import { safeLoginNext } from '@/lib/auth/safeNext';
+import { loginPath, safeLoginNext } from '@/lib/auth/safeNext';
 
 type Ex = { id: string; slug: string; name: string; published: boolean; category: { id: string; name: string } };
 
@@ -130,8 +130,9 @@ describe('/coach/admin', () => {
 
   it('sends a signed-out visitor to login with a same-origin ?next=', async () => {
     h.session = null;
-    await expect(CoachAdminPage()).rejects.toThrow('NEXT_REDIRECT /login?next=%2Fcoach%2Fadmin');
-    const next = new URL('http://fel.test/login?next=%2Fcoach%2Fadmin').searchParams.get('next');
+    const dest = loginPath('/coach/admin');
+    await expect(CoachAdminPage()).rejects.toThrow(`NEXT_REDIRECT ${dest}`);
+    const next = new URL(`http://fel.test${dest}`).searchParams.get('next');
     expect(safeLoginNext(next)).toBe('/coach/admin');
   });
 });

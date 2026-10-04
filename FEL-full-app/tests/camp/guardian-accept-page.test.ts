@@ -15,9 +15,9 @@ const render = (step: Parameters<typeof PlayerRequest>[0]['step']) =>
 describe('PlayerRequest — one screen per step, a button only where the route would say yes', () => {
   it('signed out: sign in or make an account, and NO accept button', () => {
     const html = render('sign_in');
-    expect(html).toContain('href="/login"');
-    expect(html).toContain('href="/signup"');
-    expect(html).toContain('then open this link again'); // auth-form ignores ?next=, so no return trip is promised
+    expect(html).toContain('href="/login?next=%2Fconsent%2Fguardian%2Ftok-1"');
+    expect(html).toContain('href="/signup?next=%2Fconsent%2Fguardian%2Ftok-1"');
+    expect(html).toContain('come back to this page');
     expect(html).not.toContain('<button');
   });
 
