@@ -1,71 +1,142 @@
 'use client';
 
-// PROVE IT — the IRL head-to-head dunk contest. Real footage, measured on
-// the device: the neuro-mirror MediaPipe pose pipeline watches the attempt,
-// lib/irl/dunkTracker.ts turns the landmark stream into flight time /
-// vertical / approach / family, the SAME judge panel as Flight Night scores
-// it, PRQ-relative (the feat is read against YOUR measured level).
-//
-// PRIVACY (the neuro-mirror rule, unchanged): the camera feed and the pose
-// stream never leave the browser. No video is recorded or uploaded — only
-// the computed metrics exist, and they stay in the page.
+// PROVE IT — a court session on one phone. 1 to 8 athletes, 1 to 5 dunks each
+// (3 is the default). The pose model loads only after SET UP THE CAMERA.
+// The camera feed stays on this device. A clip can be saved to the phone for a
+// server-verified adult only, through the download or share sheet, never uploaded.
+// Jump numbers reach the server only when this account is a verified adult who
+// opted in, and only that account's own jumps: one AB-04 Prove It record per dunk
+// (/api/mirror/prove-it), roster slot 0 only. There is no second session-form save.
+// Under 18 and unknown age stay in page memory.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { setReady } from '@/lib/babylon/core/readyMarker';
-import { Camera, CameraOff, RotateCcw, Users, Trophy } from 'lucide-react';
+import { Camera, CameraOff, Pause, Play, RotateCcw, SwitchCamera, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
+import { downloadBlob } from '@/lib/capture/shareClip';
+import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
+import {
+  DEFAULT_DUNKS, MAX_DUNKS, MAX_PLAYERS, MIN_DUNKS, MIN_PLAYERS,
+  readAdults, rosterReady, sealRoster,
+  type Athlete, type ClaimedAge, type RosterRow, type SessionBand,
+} from '@/lib/session-setup/roster';
+import { REARM_MS, freshBoard, phaseAfterCountdown, phaseAfterDunk, recordDunk, type Board } from '@/lib/session-setup/rotation';
+import {
+  MUTE_KEY, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, speakCues, writeMuted,
+  type Speaker,
+} from '@/lib/session-setup/voice';
+import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@/lib/session-setup/record';
+import { PLACEMENT_LINES, dunkFraming, firstAttemptAllowed, shotLight, type FramingLight } from '@/lib/session-setup/framing';
+import { endSession, readSession } from '@/lib/session-setup/memory';
+import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
 
-const BG = '#050505';
 const CYAN = '#00E5FF';
 const GOLD = '#FFD700';
 const GREEN = '#00FF9D';
 const PINK = '#FF2D95';
 const RED = '#FF3366';
 
-const DUNKS_EACH = 2;
-
 type Stage =
   | 'consent' | 'camera-off' | 'loading-model' | 'prop-phone'
-  | 'arm' | 'watching' | 'judged' | 'handoff' | 'final';
+  | 'watching' | 'countdown' | 'paused' | 'final';
 
-interface Attempt { metrics: DunkMetrics; scores: JudgeScore[]; total: number }
+interface Attempt { metrics: DunkMetrics; scores: JudgeScore[]; total: number; playerIndex: number }
 
-export default function ProveIt() {
+const CLAIMS: { id: ClaimedAge; label: string }[] = [
+  { id: '13-17', label: '13–17' },
+  { id: '18+', label: '18+' },
+  { id: 'unknown', label: 'Rather not say' },
+];
+
+function browserSpeaker(): Speaker {
+  return {
+    cancel() {
+      try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch { /* nothing speaking */ }
+    },
+    speak(line, onend) {
+      try {
+        if (typeof speechSynthesis === 'undefined') { onend?.(); return; }
+        const u = new SpeechSynthesisUtterance(line);
+        u.rate = 0.96;
+        u.onend = () => onend?.();
+        u.onerror = () => onend?.();
+        speechSynthesis.speak(u);
+      } catch { onend?.(); }
+    },
+  };
+}
+
+export default function ProveIt({
+  dobYear = null,
+  optedIn: optedInProp = false,
+}: {
+  /** User.dobYear from the database. Record calls verifiedAdult on this year. */
+  dobYear?: number | null;
+  /** Verified adult AND the AB-04 opt-in. False until that record exists, so nothing is posted. */
+  optedIn?: boolean;
+} = {}) {
+  const serverVerified = verifiedAdult(dobYear);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const adapterRef = useRef<MediaPipePoseAdapter | null>(null);
   const trackerRef = useRef(new DunkTracker());
   const rafRef = useRef(0);
   const liveRef = useRef(false);
+  const genRef = useRef(0);
+  const facingRef = useRef<'environment' | 'user'>('environment');
+  const rosterRef = useRef<Athlete[]>([]);
+  const boardRef = useRef<Board>(freshBoard([], DEFAULT_DUNKS));
+  const attemptsRef = useRef<Attempt[][]>([]);
+  const pausedRef = useRef(false);
+  const mutedRef = useRef(false);
+  const framingRef = useRef<FramingLight>('red');
+  const speakerRef = useRef<Speaker>(browserSpeaker());
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const remindedRef = useRef(false);
+  const saveOnceRef = useRef(false);
+  const proveSavesRef = useRef<Promise<boolean>[]>([]);
+  const prqRef = useRef(60);
+  const levelsRef = useRef<(number | null)[]>([]);
 
   const [stage, setStage] = useState<Stage>('consent');
   const [error, setError] = useState<string | null>(null);
   const [prq, setPrq] = useState(60);
-  const [player, setPlayer] = useState<0 | 1>(0);
-  const [attempts, setAttempts] = useState<[Attempt[], Attempt[]]>([[], []]);
+  const [rows, setRows] = useState<RosterRow[]>([{ name: '', claimed: 'unknown' }]);
+  const [levels, setLevels] = useState<string[]>(['']);
+  const [dunksEach, setDunksEach] = useState(DEFAULT_DUNKS);
+  const [blockedUnder13, setBlockedUnder13] = useState(false);
+  const [roster, setRoster] = useState<Athlete[]>([]);
+  const [attempts, setAttempts] = useState<Attempt[][]>([]);
+  const [index, setIndex] = useState(0);
   const [current, setCurrent] = useState<Attempt | null>(null);
   const [trackerState, setTrackerState] = useState('idle');
-  // an attempt the tracker refused (the dunks route would too): said on the pill instead of vanishing
   const [refused, setRefused] = useState<DunkRefusal | null>(null);
-  // First paint stays the non-adult card. A verified adult replaces it after this read.
-  const [serverAdult, setServerAdult] = useState(false);
-  const [optedIn, setOptedIn] = useState(false);
-  const [saveChecked, setSaveChecked] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [facing, setFacing] = useState<'environment' | 'user'>('environment');
+  const [light, setLight] = useState<FramingLight>('red');
+  const [framingLine, setFramingLine] = useState('Step into the shot.');
+  const [secondsLeft, setSecondsLeft] = useState(3);
+  const [recording, setRecording] = useState(false);
+  const [remind, setRemind] = useState(false);
+  const [saveLine, setSaveLine] = useState('');
+  const [savedAdults, setSavedAdults] = useState(0);
+  const trackerSeen = useRef('');
+
+  prqRef.current = prq;
+  mutedRef.current = muted;
+  attemptsRef.current = attempts;
+
+  // AB-04: the page reads the opt-in on the server (canSaveScanNumbers) and the
+  // birth year (verifiedAdult), so the first paint already shows the right card.
+  const serverAdult = serverVerified;
+  const [optedIn, setOptedIn] = useState(optedInProp);
+  const [saveChecked, setSaveChecked] = useState(optedInProp);
   const saveRef = useRef({ adult: false, optedIn: false, checked: false });
   saveRef.current = { adult: serverAdult, optedIn, checked: saveChecked };
-
-  useEffect(() => {
-    let gone = false;
-    fetch('/api/account/scan-save').then((r) => (r.ok ? r.json() : null)).then((j) => {
-      if (gone || !j || j.verifiedAdult !== true) return;
-      setServerAdult(true);
-      if (j.optedIn === true) { setOptedIn(true); setSaveChecked(true); }
-    }).catch(() => {});
-    return () => { gone = true; };
-  }, []);
 
   useEffect(() => {
     fetch('/api/profile').then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -73,150 +144,334 @@ export default function ProveIt() {
     }).catch(() => {});
   }, []);
 
-  // THE READY MARKER (SCORECARD, 2026-09-15). Every Babylon mode publishes #fel-ready, and the scorecard capture waits
-  // on it; this page is React and published nothing, so 150 seconds of waiting produced "not ready ()" and PROVE IT
-  // scored N/A on all six categories for four release candidates. The contest is a camera flow, not a pad — but its
-  // frames, its errors and its load time are measurable like anything else, and they only get measured if the page
-  // says when it is up. 'playing' follows the stage into the contest itself.
+  useEffect(() => {
+    const held = readSession();
+    if (!held || held.athletes.length === 0) return;
+    setRows(held.athletes.map((a) => ({ name: a.name, claimed: a.band })));
+    setLevels(held.athletes.map(() => ''));
+    if (held.dunksEach != null) setDunksEach(held.dunksEach);
+  }, []);
+
+  useEffect(() => {
+    if (typeof sessionStorage === 'undefined') return;
+    try { setMuted(readMuted(sessionStorage)); } catch { /* private mode */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      setSavedAdults(readAdults(localStorage).length);
+    } catch { /* private mode */ }
+  }, []);
+
   useEffect(() => { setReady('dunkduel', 'loaded'); return () => setReady('dunkduel', 'loading'); }, []);
   useEffect(() => {
-    if (stage === 'arm' || stage === 'watching' || stage === 'judged' || stage === 'handoff') setReady('dunkduel', 'playing');
+    if (stage === 'watching' || stage === 'countdown' || stage === 'paused') setReady('dunkduel', 'playing');
     else if (stage === 'final') setReady('dunkduel', 'ended');
   }, [stage]);
 
-  // Bumped by every stopAll(), so a start whose await lands after the page was left (or after a retry began) knows it
-  // is stale and frees what it got instead of switching a camera on for nobody.
-  const genRef = useRef(0);
+  const stopRecorder = useCallback((discard: boolean) => {
+    const rec = recRef.current;
+    recRef.current = null;
+    setRecording(false);
+    if (!rec || rec.state === 'inactive') { chunksRef.current = []; return; }
+    rec.onstop = () => {
+      const parts = chunksRef.current;
+      chunksRef.current = [];
+      if (discard || parts.length === 0) return;
+      const blob = new Blob(parts, { type: parts[0].type || 'video/webm' });
+      const share = typeof navigator !== 'undefined' && navigator.share ? (data: ShareData) => navigator.share(data) : undefined;
+      const canShare = typeof navigator !== 'undefined' && navigator.canShare ? (data: ShareData) => navigator.canShare!(data) : undefined;
+      void saveClipOnDevice(blob, { share, canShare, download: downloadBlob });
+    };
+    try { rec.stop(); } catch { chunksRef.current = []; }
+  }, []);
 
   const stopAll = useCallback(() => {
     genRef.current++;
     liveRef.current = false;
     cancelAnimationFrame(rafRef.current);
+    stopRecorder(true);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    // The landmarker holds a wasm heap; leaving the page without closing it leaked one per visit. One still loading
-    // when this runs is freed when it lands: startCamera's stale check after init() disposes it.
     adapterRef.current?.dispose();
     adapterRef.current = null;
-  }, []);
+    speakerRef.current.cancel();
+  }, [stopRecorder]);
   useEffect(() => () => stopAll(), [stopAll]);
 
+  const openCamera = useCallback(async (facingMode: 'environment' | 'user', gen: number) => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facingMode }, width: { ideal: 960 }, height: { ideal: 540 } },
+      audio: false,
+    });
+    if (gen !== genRef.current) { stream.getTracks().forEach((t) => t.stop()); return false; }
+    streamRef.current = stream;
+    const v = videoRef.current;
+    if (!v) { stream.getTracks().forEach((t) => t.stop()); return false; }
+    v.srcObject = stream;
+    await v.play();
+    return gen === genRef.current;
+  }, []);
+
   const startCamera = useCallback(async () => {
-    // TRY AGAIN after a refusal: the last attempt's model (and any camera it opened) go first, or each retry leaked one.
     stopAll();
     const gen = genRef.current;
     const stale = () => gen !== genRef.current;
     setError(null);
+    setRemind(false);
+    const sealed = sealRoster(rows, serverVerified);
+    const athletes = sealed.athletes.length > 0
+      ? sealed.athletes
+      : [{ id: 'p0', name: rows[0]?.name.trim() || 'Athlete', band: 'unknown' as SessionBand }];
+    rosterRef.current = athletes;
+    const dunks = dunksEach;
+    boardRef.current = freshBoard(athletes, dunks);
+    levelsRef.current = athletes.map((_, i) => {
+      const n = Number(levels[i]);
+      return Number.isFinite(n) && n >= 1 && n <= 100 ? Math.round(n) : null;
+    });
+    setRoster(athletes);
+    setAttempts(athletes.map(() => []));
+    setIndex(0);
     setStage('loading-model');
     try {
       const adapter = new MediaPipePoseAdapter();
-      adapterRef.current = adapter;   // owned while it loads, so leaving the page mid-download frees it
+      adapterRef.current = adapter;
       await adapter.init();
-      // LEFT MID-DOWNLOAD (MOVEMENT PLAY P2, 2026-09-24): the model landed after the page was left. stopAll()'s
-      // dispose() ran while there was no landmarker yet, and an adapter that cannot cancel a load in flight still keeps
-      // it when it arrives, so this is the last place anyone holds it: closed here or leaked. (An adapter that refuses
-      // a disposed load rejects init() instead, and the catch below returns.)
       if (stale()) { adapter.dispose(); return; }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        // the environment camera watches the dunker; the phone is propped.
-        // IDEAL, not hard — a hard 'environment' constraint rejects devices
-        // that don't declare facing modes (measured: webcams/fake devices
-        // refuse and the contest never starts)
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 960 }, height: { ideal: 540 } },
-        audio: false,
-      });
-      // Allowed after the page was left: this camera has no owner, so it goes off now.
-      if (stale()) { stream.getTracks().forEach((t) => t.stop()); return; }
-      streamRef.current = stream;
-      const v = videoRef.current!;
-      v.srcObject = stream;
-      await v.play();
-      if (stale()) return;
+      const ok = await openCamera(facingRef.current, gen);
+      if (!ok || stale()) return;
       setStage('prop-phone');
     } catch (e) {
-      if (stale()) return;   // left or restarted meanwhile: stopAll() already freed this attempt
-      stopAll();             // a camera that opened but would not play must not stay on behind "no camera"
+      if (stale()) return;
+      stopAll();
       setError(e instanceof DOMException && e.name === 'NotAllowedError'
         ? 'Camera access was denied. Prove It measures your dunk through the camera — allow it to play.'
         : 'No usable camera on this device. Prove It needs to see you.');
       setStage('camera-off');
     }
-  }, [stopAll]);
+  }, [dunksEach, levels, openCamera, rows, serverVerified, stopAll]);
 
-  // the pose loop — runs only while an attempt is armed
-  const runLoop = useCallback(() => {
+  const flipCamera = useCallback(async () => {
+    if (!streamRef.current) return;
+    const gen = genRef.current;
+    const next = facingRef.current === 'environment' ? 'user' : 'environment';
+    facingRef.current = next;
+    setFacing(next);
+    stopRecorder(true);
+    streamRef.current.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    trackerRef.current.reset();
+    try {
+      const ok = await openCamera(next, gen);
+      if (!ok) return;
+      setStage('prop-phone');
+    } catch {
+      setError('The other camera did not start.');
+      setStage('camera-off');
+    }
+  }, [openCamera, stopRecorder]);
+
+  const onMeasured = useCallback((got: DunkMetrics) => {
+    const board = boardRef.current;
+    const idx = board.index;
+    const athlete = board.players[idx];
+    if (!athlete) return;
+    const level = levelsRef.current[idx] ?? prqRef.current;
+    const s = scoreIrlDunk(got, level);
+    const scores = judgeDunk(s.difficulty, s.execution, s.style);
+    const total = scores.reduce((sum, j) => sum + j.score, 0);
+    const attempt: Attempt = { metrics: got, scores, total, playerIndex: idx };
+    // AB-04 Prove It history: only roster slot 0 (the signed-in athlete), only 18+,
+    // only with the opt-in on and the box checked. Other athletes on this phone are never saved.
+    const gate = saveRef.current;
+    if (idx === 0 && athlete.band === '18+' && gate.adult && gate.optedIn && gate.checked) {
+      const raw = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}proveit`).replace(/-/g, '');
+      const runId = raw.length >= 8 ? raw.slice(0, 40) : `proveit${raw}00000000`.slice(0, 32);
+      const saved = fetch('/api/mirror/prove-it', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          runId,
+          verticalCm: got.verticalCm,
+          flightTimeMs: got.flightTimeMs,
+          takeoff: got.takeoff,
+          landingStability: got.landingStability,
+          family: got.family,
+          judgesScore: total,
+        }),
+      }).then((r) => r.ok).catch(() => false);
+      proveSavesRef.current.push(saved);
+    }
+    setCurrent(attempt);
+    setAttempts((prev) => {
+      const next = prev.map((list) => list.slice());
+      while (next.length <= idx) next.push([]);
+      next[idx] = [...next[idx], attempt];
+      return next;
+    });
+    // Save this jumper's clip only when they may be recorded. The index effect
+    // discards anything still rolling when the next athlete is a kid or unknown.
+    stopRecorder(!mayRecord(athlete.band, dobYear));
+    const adv = recordDunk(board);
+    boardRef.current = adv.board;
+    setIndex(adv.board.index);
+    const lines = [resultLine(athlete.name, got.verticalCm, judgeAverage(scores.map((j) => j.score)))];
+    if (adv.next) lines.push(nextUpLine(adv.next.name));
+    speakCues(speakerRef.current, lines, mutedRef.current);
+    const phase = phaseAfterDunk(pausedRef.current, adv.done);
+    setStage(phase === 'paused' ? 'paused' : phase === 'final' ? 'final' : 'countdown');
+  }, [dobYear, stopRecorder]);
+
+  useEffect(() => {
+    const preview = stage === 'prop-phone' || stage === 'watching' || stage === 'countdown' || stage === 'paused';
+    if (!preview) return;
+    liveRef.current = true;
     const loop = () => {
       if (!liveRef.current) return;
       const v = videoRef.current;
       const adapter = adapterRef.current;
       if (v && adapter?.ready) {
         const frame = adapter.detect(v, performance.now());
-        const got = trackerRef.current.feed(frame);
-        setTrackerState(trackerRef.current.state);
-        const why = trackerRef.current.takeRefusal();
-        if (why) setRefused(why);
-        else if (trackerRef.current.state === 'airborne') setRefused(null);
-        if (got) {
-          const s = scoreIrlDunk(got, prq);
-          const scores = judgeDunk(s.difficulty, s.execution, s.style);
-          const total = scores.reduce((sum, j) => sum + j.score, 0);
-          const attempt: Attempt = { metrics: got, scores, total };
-          const gate = saveRef.current;
-          if (gate.adult && gate.optedIn && gate.checked) {
-            const raw = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}proveit`).replace(/-/g, '');
-            const runId = raw.length >= 8 ? raw.slice(0, 40) : `proveit${raw}00000000`.slice(0, 32);
-            void fetch('/api/mirror/prove-it', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                runId,
-                verticalCm: got.verticalCm,
-                flightTimeMs: got.flightTimeMs,
-                takeoff: got.takeoff,
-                landingStability: got.landingStability,
-                family: got.family,
-                judgesScore: total,
-              }),
-            }).catch(() => {});
+        const check = dunkFraming({ landmarks: frame.landmarks, present: frame.present });
+        const nextLight = shotLight(check);
+        if (nextLight !== framingRef.current) {
+          framingRef.current = nextLight;
+          setLight(nextLight);
+          setFramingLine(check.ok ? 'Framing looks good.' : check.instruction);
+        }
+        if (stage === 'watching') {
+          const got = trackerRef.current.feed(frame);
+          const st = trackerRef.current.state;
+          if (st !== trackerSeen.current) { trackerSeen.current = st; setTrackerState(st); }
+          const why = trackerRef.current.takeRefusal();
+          if (why) setRefused(why);
+          else if (st === 'airborne') setRefused(null);
+          if (got) {
+            liveRef.current = false;
+            onMeasured(got);
+            return;
           }
-          setCurrent(attempt);
-          setAttempts((prev) => {
-            const next: [Attempt[], Attempt[]] = [prev[0].slice(), prev[1].slice()] as [Attempt[], Attempt[]];
-            next[player].push(attempt);
-            return next as [Attempt[], Attempt[]];
-          });
-          liveRef.current = false;
-          setStage('judged');
-          return;
         }
       }
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
-  }, [player, prq]);
+    return () => { liveRef.current = false; cancelAnimationFrame(rafRef.current); };
+  }, [onMeasured, stage]);
 
-  const armAttempt = useCallback(() => {
-    trackerRef.current.reset();
-    setCurrent(null);
-    setRefused(null);
-    setStage('watching');
-    liveRef.current = true;
-    runLoop();
-  }, [runLoop]);
-
-  const nextUp = useCallback(() => {
-    const mine = attempts[player].length;
-    const other = attempts[1 - player].length;
-    const bothDone = attempts[0].length >= DUNKS_EACH && attempts[1].length >= DUNKS_EACH;
-    if (bothDone) { setStage('final'); return; }
-    // alternate; if the other player is behind, it's their turn
-    if (mine > other || (mine >= DUNKS_EACH && other < DUNKS_EACH)) {
-      setPlayer((1 - player) as 0 | 1);
-      setStage('handoff');
-    } else {
-      setStage('arm');
+  const armNext = useCallback((forceRecalibrate: boolean) => {
+    const green = firstAttemptAllowed(framingRef.current);
+    if (!green) {
+      trackerRef.current.reset();
+      setStage('prop-phone');
+      return;
     }
-  }, [attempts, player]);
+    if (forceRecalibrate || trackerRef.current.state !== 'ready') trackerRef.current.reset();
+    else trackerRef.current.rearm();
+    setRefused(null);
+    setCurrent(null);
+    setStage('watching');
+    speakCues(speakerRef.current, [goWhenReadyLine()], mutedRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (stage !== 'countdown') return;
+    setSecondsLeft(3);
+    const started = Date.now();
+    const tick = window.setInterval(() => {
+      setSecondsLeft(Math.max(0, Math.ceil((REARM_MS - (Date.now() - started)) / 1000)));
+    }, 200);
+    const done = window.setTimeout(() => {
+      if (pausedRef.current) return;
+      const phase = phaseAfterCountdown(false, false, firstAttemptAllowed(framingRef.current));
+      if (phase === 'watching') armNext(false);
+      else setStage('prop-phone');
+    }, REARM_MS);
+    return () => { window.clearInterval(tick); window.clearTimeout(done); };
+  }, [armNext, stage]);
+
+  useEffect(() => {
+    const athlete = roster[index];
+    if (!athlete) return;
+    const off = recordingOnHandoff(recRef.current != null, athlete.band, dobYear);
+    if (!off.recording) stopRecorder(off.discard);
+  }, [dobYear, index, roster, stopRecorder]);
+
+  useEffect(() => {
+    if (stage !== 'final' || saveOnceRef.current) return;
+    saveOnceRef.current = true;
+    // AB-04's per-dunk Prove It record is the only save path. This line reports it.
+    const pending = proveSavesRef.current.slice();
+    if (pending.length === 0) { setSaveLine('Stays on this phone.'); return; }
+    void Promise.all(pending).then((oks) => {
+      setSaveLine(oks.every(Boolean)
+        ? 'Jump numbers saved for this account.'
+        : 'Some jump numbers could not be saved. The result stays on this screen.');
+    });
+  }, [stage]);
+
+  function toggleMute() {
+    setMuted((prev) => {
+      const next = !prev;
+      mutedRef.current = next;
+      if (next) speakerRef.current.cancel();
+      try {
+        if (typeof sessionStorage !== 'undefined') writeMuted(sessionStorage, next);
+      } catch { /* private mode */ }
+      return next;
+    });
+  }
+
+  function pauseToggle() {
+    pausedRef.current = !pausedRef.current;
+    if (pausedRef.current) {
+      speakerRef.current.cancel();
+      setStage('paused');
+    } else {
+      setStage('countdown');
+    }
+  }
+
+  function startRecording() {
+    const athlete = roster[index];
+    if (!athlete || !mayRecord(athlete.band, dobYear)) return;
+    if (!remindedRef.current) { setRemind(true); return; }
+    const stream = streamRef.current;
+    if (!stream || typeof MediaRecorder === 'undefined' || recRef.current) return;
+    let rec: MediaRecorder;
+    try { rec = new MediaRecorder(stream); } catch { return; }
+    chunksRef.current = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
+    rec.start(200);
+    recRef.current = rec;
+    setRecording(true);
+  }
+
+  const ready = rosterReady(rows, dunksEach) && !blockedUnder13;
+  const up = roster[index];
+  const showRecord = !!up && mayRecord(up.band, dobYear) && stage !== 'consent' && stage !== 'loading-model' && stage !== 'camera-off';
+  const totals = roster.map((_, i) => (attempts[i] ?? []).reduce((s, a) => s + a.total, 0));
+  const best = (i: number) => (attempts[i] ?? []).reduce((m, a) => Math.max(m, a.metrics.verticalCm), 0);
+  const summaryRows: SummaryRow[] = roster.map((p, i) => ({
+    name: p.name,
+    band: p.band,
+    verticalCm: best(i),
+    judges: judgeAverage((attempts[i] ?? []).flatMap((a) => a.scores.map((s) => s.score))),
+  }));
+
+  function runItBack() {
+    saveOnceRef.current = false;
+    proveSavesRef.current = [];
+    setSaveLine('');
+    boardRef.current = freshBoard(rosterRef.current, boardRef.current.dunksEach || dunksEach);
+    setAttempts(rosterRef.current.map(() => []));
+    setIndex(0);
+    setCurrent(null);
+    trackerRef.current.reset();
+    setStage('prop-phone');
+  }
 
   async function setProveOptIn(next: boolean) {
     setSaveChecked(next);
@@ -233,72 +488,183 @@ export default function ProveIt() {
     }
   }
 
-  const totals = [0, 1].map((i) => attempts[i].reduce((s, a) => s + a.total, 0));
-  const winner = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
 
   return (
-    <div className="mx-auto max-w-[880px] px-4 py-6 font-mono text-white">
+    <div className="mx-auto max-w-[880px] overflow-x-hidden px-4 py-6 text-base text-white">
       <div className="flex items-center gap-3">
-        <Camera className="h-6 w-6" style={{ color: PINK }} />
+        <Camera className="h-8 w-8" style={{ color: PINK }} />
         <h1 className="fel-heading text-3xl font-bold">PROVE <span style={{ color: PINK }}>IT</span></h1>
+        <button
+          type="button"
+          onClick={toggleMute}
+          aria-pressed={muted}
+          className="ml-auto inline-flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-lg border border-white/20 px-4 text-base font-bold"
+        >
+          {muted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+          {muted ? 'Muted' : 'Mute'}
+        </button>
       </div>
-      <p className="mt-1 max-w-2xl text-xs text-white/50">
-        The real-life dunk contest. Two dunkers, one phone, real footage — the AI
-        judges track your flight time, vertical, approach and difficulty, and score
-        against your PRQ. Nothing is recorded or uploaded: the camera feed never
-        leaves this device.
+      <p className="mt-2 max-w-2xl text-base text-white/70">
+        One phone, up to eight athletes. Voice is on. A clip stays on this phone, and only for a verified adult.
+        No video is uploaded.
       </p>
 
-      {/* scoreboard */}
-      <div className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3">
-        {[0, 1].map((i) => (
-          <div key={i} className="text-center">
-            <div className="text-[11px] tracking-wider text-white/40" style={{ color: i === player && stage !== 'final' ? CYAN : undefined }}>
-              PLAYER {i + 1} {i === player && stage !== 'final' ? '· UP' : ''}
+      {stage === 'consent' && (
+        <div className="mt-4 rounded-xl border border-white/15 bg-white/[0.03] p-4">
+          <h2 className="text-xl font-bold">Set the phone</h2>
+          <ul className="mt-2 space-y-1 text-base text-white/80">
+            {PLACEMENT_LINES.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+          <svg viewBox="0 0 320 120" className="mt-3 h-28 w-full max-w-md" role="img" aria-label="Phone on its side, athlete side-on, feet and rim in frame">
+            <rect x="8" y="36" width="70" height="40" rx="6" fill="#111" stroke="#00E5FF" strokeWidth="3" />
+            <text x="18" y="60" fill="#00E5FF" fontSize="14">phone</text>
+            <path d="M100 90 L140 40 L160 90" fill="none" stroke="#fff" strokeWidth="3" />
+            <circle cx="140" cy="32" r="8" fill="#fff" />
+            <rect x="230" y="28" width="70" height="8" fill="#FFD700" />
+            <text x="232" y="22" fill="#FFD700" fontSize="14">rim</text>
+            <text x="96" y="112" fill="#fff" fontSize="14">side-on, landscape</text>
+          </svg>
+          {serverAdult && (
+            <div className="mt-3">
+              <ScanSaveCard checked={saveChecked} onChange={(next) => { void setProveOptIn(next); }} />
             </div>
-            <div className="fel-heading text-3xl font-black" style={{ color: i === 0 ? CYAN : PINK }}>{totals[i]}</div>
-            <div className="text-[10px] text-white/35">{attempts[i].length}/{DUNKS_EACH} dunks</div>
+          )}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="self-center text-sm text-white/70">Players</span>
+            {Array.from({ length: MAX_PLAYERS }, (_, n) => n + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setRows((prev) => {
+                    const next = prev.slice(0, n);
+                    while (next.length < n) next.push({ name: '', claimed: 'unknown' });
+                    return next;
+                  });
+                  setLevels((prev) => {
+                    const next = prev.slice(0, n);
+                    while (next.length < n) next.push('');
+                    return next;
+                  });
+                }}
+                className="min-h-12 min-w-12 rounded-lg border border-white/20 text-base font-bold"
+                style={{ background: rows.length === n ? CYAN : 'transparent', color: rows.length === n ? '#000' : '#fff' }}
+              >
+                {n}
+              </button>
+            ))}
           </div>
-        ))}
-        <div className="text-center text-[11px] text-white/40">
-          JUDGED VS PRQ <span className="text-white">{prq}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-white/70">Dunks each</span>
+            {Array.from({ length: MAX_DUNKS }, (_, n) => n + MIN_DUNKS).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setDunksEach(n)}
+                className="min-h-12 min-w-12 rounded-lg border border-white/20 text-base font-bold"
+                style={{ background: dunksEach === n ? PINK : 'transparent', color: dunksEach === n ? '#000' : '#fff' }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 space-y-3">
+            {rows.map((row, i) => (
+              <div key={i} className="rounded-lg border border-white/10 p-3">
+                <label className="block text-sm text-white/70" htmlFor={`name-${i}`}>Name or nickname</label>
+                <input
+                  id={`name-${i}`}
+                  value={row.name}
+                  onChange={(e) => setRows((prev) => prev.map((r, j) => j === i ? { ...r, name: e.target.value } : r))}
+                  className="mt-1 min-h-12 w-full rounded-lg border border-white/20 bg-black px-3 text-base text-white"
+                  autoComplete="off"
+                  maxLength={40}
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {CLAIMS.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setBlockedUnder13(false);
+                        setRows((prev) => prev.map((r, j) => j === i ? { ...r, claimed: c.id } : r));
+                      }}
+                      className="min-h-12 rounded-lg border border-white/20 px-3 text-base"
+                      style={{ background: row.claimed === c.id ? GREEN : 'transparent', color: row.claimed === c.id ? '#000' : '#fff' }}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setBlockedUnder13(true)}
+                    className="min-h-12 rounded-lg border border-white/20 px-3 text-base text-white/80"
+                  >
+                    Under 13
+                  </button>
+                </div>
+                {row.claimed === '18+' && !serverVerified && (
+                  <p className="mt-2 text-base text-white/70">18+ counts only after this account is verified. Until then this athlete stays in this session only.</p>
+                )}
+                <label className="mt-2 block text-sm text-white/70" htmlFor={`level-${i}`}>Level, optional. Blank uses {prq}.</label>
+                <input
+                  id={`level-${i}`}
+                  inputMode="numeric"
+                  value={levels[i] ?? ''}
+                  onChange={(e) => setLevels((prev) => prev.map((v, j) => j === i ? e.target.value : v))}
+                  className="mt-1 min-h-12 w-28 rounded-lg border border-white/20 bg-black px-3 text-base text-white"
+                />
+              </div>
+            ))}
+          </div>
+          {blockedUnder13 && <p className="mt-3 text-base" style={{ color: RED }}>Under 13 can&apos;t be added.</p>}
+          {savedAdults > 0 && (
+            <button
+              type="button"
+              className="mt-3 min-h-12 rounded-lg border border-white/20 px-4 text-base"
+              onClick={() => {
+                try {
+                  const saved = readAdults(localStorage);
+                  if (saved.length === 0) return;
+                  const take = saved.slice(0, MAX_PLAYERS);
+                  setRows(take.map((a) => ({ name: a.name, claimed: '18+' as const })));
+                  setLevels(take.map(() => ''));
+                } catch { /* private mode */ }
+              }}
+            >
+              Add saved adults
+            </button>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* the stage */}
+      {roster.length > 0 && stage !== 'consent' && (
+        <div className="mt-4 grid grid-cols-2 gap-2 overflow-x-hidden sm:grid-cols-4">
+          {roster.map((p, i) => (
+            <div key={p.id} className="rounded-xl border border-white/10 px-3 py-2" style={{ outline: i === index && stage !== 'final' ? `2px solid ${CYAN}` : undefined }}>
+              <div className="truncate text-sm text-white/70">{p.name}{i === index && stage !== 'final' ? ' · up' : ''}</div>
+              <div className="text-2xl font-black" style={{ color: i % 2 === 0 ? CYAN : PINK }}>{totals[i] ?? 0}</div>
+              <div className="text-sm text-white/70">{(attempts[i] ?? []).length}/{boardRef.current.dunksEach || dunksEach} dunks</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="relative mt-4 aspect-[16/9] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <video
           ref={videoRef}
           playsInline
           muted
-          className={`absolute inset-0 h-full w-full object-cover ${stage === 'watching' || stage === 'prop-phone' || stage === 'arm' ? '' : 'opacity-0'}`}
+          className={`absolute inset-0 h-full w-full object-cover ${stage === 'watching' || stage === 'prop-phone' || stage === 'countdown' || stage === 'paused' ? '' : 'opacity-0'}`}
         />
 
-        {stage === 'consent' && serverAdult && (
-          <div data-testid="prove-it-consent" className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-6 text-center">
-            <Camera className="h-8 w-8" style={{ color: CYAN }} />
-            <div className="fel-heading text-xl font-bold text-white">BEFORE THE CAMERA</div>
-            <p className="max-w-md text-xs leading-relaxed text-white/60">
-              The camera measures flight time, vertical, takeoff and landing on this device. No video is recorded.
-              Numbers are saved to your account only if you opt in.
-            </p>
-            <ScanSaveCard checked={saveChecked} onChange={(next) => { void setProveOptIn(next); }} />
-            <button
-              type="button"
-              onClick={startCamera}
-              className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black"
-              style={{ background: CYAN }}
-            >
-              SET UP THE CAMERA
-            </button>
-          </div>
-        )}
-        {stage === 'consent' && !serverAdult && (
+        {stage === 'consent' && (
           <Gate
             icon={<Camera className="h-8 w-8" style={{ color: CYAN }} />}
             title="READY WHEN YOU ARE"
-            body="Prop the phone so it sees the whole approach and the rim, then take your run. The tracker reads takeoff and landing by itself — no button to hit mid-air."
+            body="Names first. The tracker downloads after you start, and it runs on this phone."
             cta="SET UP THE CAMERA"
+            disabled={!ready || rows.length < MIN_PLAYERS}
             onClick={startCamera}
           />
         )}
@@ -316,119 +682,134 @@ export default function ProveIt() {
         )}
         {stage === 'prop-phone' && (
           <Gate
-            icon={<Camera className="h-8 w-8" style={{ color: GOLD }} />}
-            title="PROP IT. STEP BACK. STAND STILL."
-            body="Full body in frame, feet visible. Hold still for a beat — the floor line calibrates itself."
-            cta={`PLAYER ${player + 1} — START THE ATTEMPT`}
-            onClick={armAttempt}
-          />
-        )}
-        {stage === 'arm' && (
-          <Gate
-            icon={<Camera className="h-8 w-8" style={{ color: CYAN }} />}
-            title={`PLAYER ${player + 1} — DUNK ${attempts[player].length + 1} OF ${DUNKS_EACH}`}
-            body="Same spot. Run it, jump it, land it. The tracker knows."
-            cta="START THE ATTEMPT"
-            onClick={armAttempt}
+            icon={<Camera className="h-8 w-8" style={{ color: light === 'green' ? GREEN : light === 'yellow' ? GOLD : RED }} />}
+            title={light === 'green' ? 'FRAMING LOOKS GOOD' : light === 'yellow' ? 'ALMOST' : 'FIX THE SHOT'}
+            body={framingLine}
+            cta={up ? `${up.name} — start the attempt` : 'START THE ATTEMPT'}
+            disabled={!firstAttemptAllowed(light)}
+            onClick={() => armNext(true)}
           />
         )}
         {stage === 'watching' && (
           <div className="pointer-events-none absolute inset-x-0 top-3 text-center">
-            <span className="fel-panel px-4 py-2 text-sm font-bold" style={{ color: trackerState === 'airborne' ? GOLD : refused && trackerState === 'ready' ? RED : CYAN }}>
+            <span className="fel-panel px-4 py-2 text-base font-bold" style={{ color: trackerState === 'airborne' ? GOLD : refused && trackerState === 'ready' ? RED : CYAN }}>
               {trackerState === 'airborne' ? 'AIRBORNE' : trackerState === 'ready' ? (refused ? refusalLine(refused) : 'TRACKING — GO WHEN READY') : trackerState === 'settling' ? 'LANDING…' : 'CALIBRATING — HOLD STILL'}
             </span>
           </div>
         )}
-        {stage === 'judged' && current && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4">
-            <div className="fel-heading text-xl font-bold" style={{ color: GOLD }}>
-              READS AS: {current.metrics.family}
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-white/70 sm:grid-cols-4">
-              <span>FLIGHT <b className="text-white">{current.metrics.flightTimeMs}ms</b></span>
-              <span>VERT <b className="text-white">{current.metrics.verticalCm}cm</b></span>
-              <span>TAKEOFF <b className="text-white">{current.metrics.takeoff}</b></span>
-              <span>LANDING <b className="text-white">{Math.round(current.metrics.landingStability * 100)}%</b></span>
-            </div>
-            <div className="flex items-end justify-center gap-1.5">
-              {current.scores.map((j) => (
-                <div key={j.name} className="fel-panel flex flex-col items-center px-2.5 py-1">
-                  <span className="text-[9px] uppercase tracking-wider" style={{ color: CYAN }}>{j.name}</span>
-                  <span className="text-2xl font-black leading-none" style={{ color: GOLD }}>{j.score}</span>
-                </div>
-              ))}
-              <div className="fel-panel ml-1 flex flex-col items-center px-3 py-1" style={{ borderColor: `${GOLD}66` }}>
-                <span className="text-[9px] uppercase tracking-wider text-white/50">total</span>
-                <span className="text-2xl font-black leading-none text-white">{current.total}</span>
-              </div>
-            </div>
-            <div className="max-w-[85%] truncate text-[11px] text-white/60">{current.scores[current.scores.length - 1]?.line}</div>
-            <button
-              onClick={nextUp}
-              className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black transition-transform active:scale-95"
-              style={{ background: GREEN }}
-            >
-              NEXT UP →
+        {(stage === 'countdown' || stage === 'paused') && current && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4 text-center">
+            <div className="text-xl font-bold" style={{ color: GOLD }}>{current.metrics.family}</div>
+            <p className="text-base text-white">
+              {resultLine(roster[current.playerIndex]?.name ?? '', current.metrics.verticalCm, judgeAverage(current.scores.map((j) => j.score)))}
+            </p>
+            <p className="text-2xl font-black">{stage === 'paused' ? 'Paused' : `Next up in ${secondsLeft}`}</p>
+            {boardRef.current.players[boardRef.current.index] && (
+              <p className="text-base">{nextUpLine(boardRef.current.players[boardRef.current.index].name)}</p>
+            )}
+            <button type="button" onClick={pauseToggle} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black" style={{ background: GOLD }}>
+              {stage === 'paused' ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+              {stage === 'paused' ? 'Resume' : 'Pause'}
             </button>
           </div>
         )}
-        {stage === 'handoff' && (
-          <Gate
-            icon={<Users className="h-8 w-8" style={{ color: PINK }} />}
-            title={`PASS THE PHONE TO PLAYER ${player + 1}`}
-            body="Same spot, same test. Their dunks, their judges."
-            cta={`PLAYER ${player + 1} IS READY`}
-            onClick={() => setStage('arm')}
-          />
-        )}
         {stage === 'final' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85 p-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/85 p-4 text-center">
             <Trophy className="h-10 w-10" style={{ color: GOLD }} />
-            <div className="fel-heading text-3xl font-black text-white">
-              {winner === null ? 'DEAD HEAT' : `PLAYER ${winner + 1} PROVED IT`}
+            <div className="text-2xl font-black">Session done</div>
+            <ul className="w-full max-w-md space-y-1 text-left text-base">
+              {roster.map((p, i) => (
+                <li key={p.id} className="flex justify-between gap-3">
+                  <span className="truncate">{p.name}</span>
+                  <span>{Math.round(best(i) / 2.54)} in · {totals[i]}</span>
+                </li>
+              ))}
+            </ul>
+            {saveLine && <p className="text-base text-white/80">{saveLine}</p>}
+            <div className="flex flex-wrap justify-center gap-2">
+              <button type="button" onClick={runItBack} className="min-h-12 rounded-lg px-4 text-base font-bold text-black" style={{ background: CYAN }}>Run it back</button>
+              {serverVerified && summaryRows.some((r) => r.band === '18+') && (
+                <button
+                  type="button"
+                  className="min-h-12 rounded-lg border border-white/20 px-4 text-base font-bold"
+                  onClick={() => downloadBlob(new Blob([adultCsv(summaryRows)], { type: 'text/csv' }), 'fel-prove-it.csv')}
+                >
+                  CSV on this phone
+                </button>
+              )}
+              <button
+                type="button"
+                className="min-h-12 rounded-lg border border-white/20 px-4 text-base font-bold"
+                onClick={() => { endSession(); setRoster([]); setStage('consent'); }}
+              >
+                End session
+              </button>
             </div>
-            <div className="text-sm text-white/60">{totals[0]} — {totals[1]}</div>
-            <button
-              onClick={() => { setAttempts([[], []]); setPlayer(0); setCurrent(null); setStage('arm'); }}
-              className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black"
-              style={{ background: CYAN }}
-            >
-              RUN IT BACK
-            </button>
           </div>
         )}
       </div>
 
-      {/* attempt log */}
-      {attempts.some((a) => a.length > 0) && (
+      {(stage === 'prop-phone' || stage === 'watching' || stage === 'countdown' || stage === 'paused') && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => void flipCamera()} className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-white/20 px-4 text-base font-bold">
+            <SwitchCamera className="h-5 w-5" />
+            {facing === 'environment' ? 'Rear camera' : 'Front camera'}
+          </button>
+          {showRecord && (
+            <button type="button" onClick={startRecording} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black" style={{ background: recording ? RED : GREEN }}>
+              {recording ? 'Recording' : 'Record'}
+            </button>
+          )}
+        </div>
+      )}
+      {remind && showRecord && (
+        <div className="mt-3 rounded-xl border border-white/15 p-4">
+          <p className="text-base">{KIDS_IN_SHOT}</p>
+          <button
+            type="button"
+            className="mt-3 min-h-12 rounded-lg px-4 text-base font-bold text-black"
+            style={{ background: CYAN }}
+            onClick={() => { remindedRef.current = true; setRemind(false); startRecording(); }}
+          >
+            The shot is clear
+          </button>
+        </div>
+      )}
+
+      {attempts.some((list) => list.length > 0) && stage !== 'consent' && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {[0, 1].map((i) => (
-            <div key={i} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-              <div className="text-[11px] font-bold" style={{ color: i === 0 ? CYAN : PINK }}>PLAYER {i + 1}</div>
-              {attempts[i].map((a, n) => (
-                <div key={n} className="mt-1 flex justify-between text-[11px] text-white/60">
-                  <span>{a.metrics.family} · {a.metrics.verticalCm}cm · {a.metrics.flightTimeMs}ms</span>
-                  <b className="text-white">{a.total}</b>
+          {roster.map((p, i) => (
+            <div key={p.id} className="rounded-xl border border-white/10 p-3">
+              <div className="text-base font-bold" style={{ color: i % 2 === 0 ? CYAN : PINK }}>{p.name}</div>
+              {(attempts[i] ?? []).map((a, n) => (
+                <div key={n} className="mt-1 flex justify-between gap-2 text-base text-white/80">
+                  <span className="truncate">{a.metrics.family} · {a.metrics.verticalCm} cm</span>
+                  <b>{a.total}</b>
                 </div>
               ))}
             </div>
           ))}
         </div>
       )}
+      {stage === 'final' && adultShareText(summaryRows) && (
+        <p className="mt-3 text-base text-white/70">{adultShareText(summaryRows)}</p>
+      )}
     </div>
   );
 }
 
-function Gate(props: { icon: React.ReactNode; title: string; body: string; cta?: string; onClick?: () => void }) {
+function Gate(props: { icon: React.ReactNode; title: string; body: string; cta?: string; onClick?: () => void; disabled?: boolean }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-6 text-center">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/70 p-6 text-center">
       {props.icon}
-      <div className="fel-heading text-xl font-bold text-white">{props.title}</div>
-      <p className="max-w-md text-xs leading-relaxed text-white/60">{props.body}</p>
+      <div className="text-xl font-bold text-white">{props.title}</div>
+      <p className="max-w-md text-base leading-relaxed text-white/80">{props.body}</p>
       {props.cta && props.onClick && (
         <button
+          type="button"
           onClick={props.onClick}
-          className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black transition-transform active:scale-95"
+          disabled={props.disabled}
+          className="mt-2 min-h-12 rounded-lg px-5 text-base font-bold text-black disabled:opacity-40"
           style={{ background: CYAN }}
         >
           {props.cta}
