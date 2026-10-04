@@ -29,12 +29,19 @@
 // is exposed here, tested, and ready — same treatment as isYouth above — for whichever surface adds a daily/weekly
 // target next; it is not wired into a screen by this phase because there is no screen yet to wire it into.
 
+import { gapUnderEighteenYears } from '@/lib/age/ageRules';
+
 /** Under 18, or no birth year on file at all (owner decision #20 — a blank answer reads as the more careful case
  *  until it is answered, the same default lib/mirror/youth.ts, lib/coach/taxonomy.ts and lib/camp/certification.ts
- *  each already use for their own feature). A year-only birth date is compared by calendar year, same as those. */
+ *  each already use for their own feature). A year-only birth date is compared by calendar year, same as those.
+ *
+ *  AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): this file's own guard (`== null` only — NOT `!dobYear`, so a
+ *  dobYear of 0 or NaN falls through to the arithmetic below rather than short-circuiting) is unchanged; only the
+ *  `< 18` threshold line itself is shared, from lib/age/ageRules.ts's gapUnderEighteenYears (its NaN-safe `< 18`
+ *  form — see that function's own doc comment for why this is NOT `!gapAtLeastEighteenYears(...)`). */
 export function needsGuardian(dobYear: number | null | undefined, now: Date = new Date()): boolean {
   if (dobYear == null) return true;
-  return now.getFullYear() - dobYear < 18;
+  return gapUnderEighteenYears(dobYear, now);
 }
 
 /**
