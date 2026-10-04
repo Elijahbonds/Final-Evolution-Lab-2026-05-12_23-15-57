@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
@@ -31,6 +32,7 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-3xl px-4 py-8 text-white">
       <h1 className="text-2xl font-black">Today</h1>
       <p className="mt-2 text-sm">All times Pacific.</p>
+      <p className="mt-2 text-sm"><Link className="underline" href="/coach/dashboard/settings">Hours and days off</Link></p>
       <p className="mt-2 text-sm">Balance (accrued) ${(earned / 100).toFixed(2)}. Payouts are manual for now.</p>
       <p className="mt-1 text-sm text-white/60">FEL keeps 15%. Stripe&apos;s card fee comes out of your share.</p>
       <ul className="mt-4 space-y-2 text-sm">
