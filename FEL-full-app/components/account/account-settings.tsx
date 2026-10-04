@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Download, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { healthEraseToast } from '@/lib/health/healthDataCopy';
+import { forgetIntakeMemory } from '@/lib/health/intakeForget';
 
 const ERASE_WARNING =
   'This permanently deletes your health intake, pain check-ins, daily check-ins, and Dial-Up Breath uses. '
@@ -34,6 +35,13 @@ export function AccountDataPanel({
         >
           <Download className="h-3.5 w-3.5" /> Download my data
         </a>
+        <button
+          type="button"
+          onClick={() => { forgetIntakeMemory(); toast.success('Saved answers on this device are gone.'); }}
+          className="inline-flex min-h-12 items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-[16px] font-bold text-white/80"
+        >
+          Forget my answers
+        </button>
         {!confirming ? (
           <button
             type="button"
@@ -75,6 +83,7 @@ export function AccountSettings({ email }: { email: string }) {
 
   const confirmErase = async () => {
     if (erasing) return;
+    forgetIntakeMemory();
     setErasing(true);
     try {
       const res = await fetch('/api/account/health-erase', { method: 'POST' });

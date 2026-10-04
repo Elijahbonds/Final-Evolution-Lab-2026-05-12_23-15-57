@@ -8,7 +8,7 @@ import { AlertOctagon, AlertTriangle, ArrowLeft, CheckCircle2, CircleDashed, Use
 import { BAND_WORDS, type BandWord } from '@/lib/screen/PROPOSED-thresholds';
 import { EARLY_VERSION, EARLY_VERSION_LINE, PARENT_BODY, PARENT_TITLE, STOP_LINE } from '@/lib/screen/copy';
 import { SCREEN_HOME } from '@/lib/screen/routes';
-import { SYSTEM_FONT_STACK } from '@/lib/screen/ui';
+import { SYSTEM_FONT_STACK } from '@/lib/screen/font';
 
 /** The band's colour token (the app's palette): the chip also carries an icon and a word, so the colour is never alone. */
 export const BAND_COLOUR: Record<BandWord | 'unread', string> = {
@@ -23,7 +23,7 @@ export function BandChip({ band, size = 'md' }: { band: BandWord | null; size?: 
   const Icon = ICON[key];
   const word = band ? BAND_WORDS[band] : UNREAD_WORD;
   return (
-    <span data-band={key} data-colour={BAND_COLOUR[key]} className={`inline-flex items-center gap-1.5 font-bold ${size === 'lg' ? 'text-[16px]' : 'text-[14px]'}`} style={{ color: BAND_COLOUR[key] }}>
+    <span data-band={key} data-colour={BAND_COLOUR[key]} className={`inline-flex items-center gap-1.5 font-bold ${size === 'lg' ? 'text-[16px]' : 'text-[16px]'}`} style={{ color: BAND_COLOUR[key] }}>
       <Icon aria-hidden data-band-icon={key} className={size === 'lg' ? 'h-5 w-5' : 'h-4 w-4'} />
       <span data-band-word>{word}</span>
     </span>
@@ -37,21 +37,21 @@ export function BandChip({ band, size = 'md' }: { band: BandWord | null; size?: 
 export function PreviewLabel({ line = true }: { line?: boolean }) {
   return (
     <div data-preview-label className="flex flex-wrap items-center gap-2">
-      <span title={EARLY_VERSION_LINE} className="rounded-full border border-[#FFB020]/50 bg-[#FFB020]/10 px-2.5 py-0.5 text-[12px] font-bold text-[#FFB020]">
+      <span title={EARLY_VERSION_LINE} className="rounded-full border border-[#FFB020]/50 bg-[#FFB020]/10 px-2.5 py-0.5 text-[16px] font-bold text-[#FFB020]">
         {EARLY_VERSION}
       </span>
-      {line ? <span className="text-[12px] text-white/60">{EARLY_VERSION_LINE}.</span> : null}
+      {line ? <span className="text-[16px] text-white/60">{EARLY_VERSION_LINE}.</span> : null}
     </div>
   );
 }
 
 /** A small "Early version" tag for a cue. */
 export const EarlyTag = () => (
-  <span data-early-tag title={EARLY_VERSION_LINE} className="ml-1.5 whitespace-nowrap rounded border border-[#FFB020]/50 px-1.5 py-px align-middle text-[11px] font-bold text-[#FFB020]">{EARLY_VERSION}</span>
+  <span data-early-tag title={EARLY_VERSION_LINE} className="ml-1.5 whitespace-nowrap rounded border border-[#FFB020]/50 px-1.5 py-px align-middle text-[16px] font-bold text-[#FFB020]">{EARLY_VERSION}</span>
 );
 
 /** "If anything hurts, stop." Under DISCLAIMER on the results and the program page (owner, 2026-09-29; S-13). */
-export const StopLine = ({ className = 'text-[13px] text-white/70' }: { className?: string }) => (
+export const StopLine = ({ className = 'text-[16px] text-white/70' }: { className?: string }) => (
   <p data-stop-line className={className}>{STOP_LINE}</p>
 );
 
@@ -63,7 +63,7 @@ export function ParentCard() {
   return (
     <section data-parent-card className="rounded-2xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.05] p-4">
       <div className="flex items-center gap-2 text-[#00E5FF]"><Users aria-hidden className="h-5 w-5" /><p className="text-[17px] font-black text-white">{PARENT_TITLE}</p></div>
-      <p className="mt-1.5 text-[14px] leading-snug text-white/75">{PARENT_BODY}</p>
+      <p className="mt-1.5 text-[16px] leading-snug text-white/75">{PARENT_BODY}</p>
     </section>
   );
 }
@@ -76,7 +76,7 @@ export function ParentCard() {
  * mount next-auth (a session request, `nextauth.message` in localStorage) or set a guest cookie.
  */
 export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quick Screen' }: { children: ReactNode; right?: ReactNode; back?: string | (() => void); title?: string }) {
-  const arrow = 'grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/70';
+  const arrow = 'grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/70';
   return (
     <div data-screen-frame className="relative min-h-screen bg-[#050505] text-white" style={{ fontFamily: SYSTEM_FONT_STACK }}>
       <div className="relative mx-auto max-w-[560px] px-4 pb-10 pt-3">
@@ -91,7 +91,7 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
             </Link>
           )}
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#00E5FF]">Free movement check</p>
+            <p className="text-[16px] font-bold uppercase tracking-[0.18em] text-[#00E5FF]">Free movement check</p>
             <h1 className="truncate text-[22px] font-black leading-none tracking-tight">{title}</h1>
           </div>
           {right ? <div className="ml-auto">{right}</div> : null}
@@ -111,6 +111,6 @@ export function StepCard({ children, testId }: { children: ReactNode; testId?: s
   );
 }
 
-export const primaryBtn = 'inline-flex w-full items-center justify-center rounded-full bg-[#00E5FF] px-6 py-3.5 text-[16px] font-black text-black disabled:opacity-40';
-export const outlineBtn = 'inline-flex w-full items-center justify-center rounded-full border-2 border-[#00E5FF] px-6 py-3 text-[15px] font-bold text-[#00E5FF]';
-export const quietBtn = 'inline-flex w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-[15px] font-bold text-white';
+export const primaryBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#00E5FF] px-6 py-3.5 text-[16px] font-black text-black disabled:opacity-40';
+export const outlineBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#00E5FF] px-6 py-3 text-[16px] font-bold text-[#00E5FF]';
+export const quietBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-[16px] font-bold text-white';

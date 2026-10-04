@@ -8,7 +8,7 @@ import type { RunnerView } from '@/lib/assess/runner';
 import { testDef, type Side } from '@/lib/assess/protocol';
 import type { FramingIssue } from '@/lib/mirror/framing';
 import { repDots } from '@/lib/screen/ui';
-import { TRACKING_LOSS_PROMPT } from '@/lib/screen/copy';
+import { SCREEN_TEST_NAMES, TRACKING_LOSS_PROMPT } from '@/lib/screen/copy';
 import { cueFlash, cueRep, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
 
 const CHIP: Record<FramingIssue, string> = {
@@ -55,14 +55,14 @@ export function LiveHud({ view, onPain, onTakeoff, onStop }: {
       {/* move header: readable from ~3 m */}
       {v.move ? (
         <div className="absolute inset-x-2 top-2 z-[6] text-center">
-          <p className="text-[13px] font-bold uppercase tracking-[0.2em] text-white/70">Move {v.move.index} of {v.move.total}</p>
-          <p className="mt-0.5 text-[clamp(28px,8vw,44px)] font-black leading-none text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{v.move.name}</p>
+          <p className="text-[16px] font-bold uppercase tracking-[0.2em] text-white/70">Move {v.move.index} of {v.move.total}</p>
+          <p className="mt-0.5 text-[clamp(28px,8vw,44px)] font-black leading-none text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{v.test && v.test in SCREEN_TEST_NAMES ? SCREEN_TEST_NAMES[v.test as keyof typeof SCREEN_TEST_NAMES] : v.move.name}</p>
           <p className="mt-1 text-[clamp(16px,4.5vw,22px)] font-bold leading-snug text-[#00E5FF]">{v.move.cue}</p>
         </div>
       ) : (
         <div className="absolute left-3 top-3 flex flex-col gap-1.5 z-[6]">
-          {v.test ? <span className="rounded-full bg-black/60 px-3 py-1 text-[12px] font-bold uppercase tracking-[0.12em] text-white/85">{testDef(v.test).short}</span> : null}
-          {v.label ? <span className="rounded-full bg-[#00E5FF] px-3 py-1 text-[14px] font-black tracking-wide text-black">{v.label}</span> : null}
+          {v.test ? <span className="rounded-full bg-black/60 px-3 py-1 text-[16px] font-bold text-white/85">{v.test in SCREEN_TEST_NAMES ? SCREEN_TEST_NAMES[v.test as keyof typeof SCREEN_TEST_NAMES] : testDef(v.test).short}</span> : null}
+          {v.label ? <span className="rounded-full bg-[#00E5FF] px-3 py-1 text-[16px] font-black tracking-wide text-black">{v.label}</span> : null}
         </div>
       )}
 
@@ -84,8 +84,8 @@ export function LiveHud({ view, onPain, onTakeoff, onStop }: {
             </g>
           </svg>
           <div className="absolute inset-x-3 bottom-20 z-[6] rounded-2xl border border-white/15 bg-black/75 p-3 text-center backdrop-blur">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">Camera setup</p>
-            <p className="mt-1 text-[14px] leading-snug text-white/85">Prop your device at hip height, 2–3 m away, portrait or landscape.</p>
+            <p className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Camera setup</p>
+            <p className="mt-1 text-[16px] leading-snug text-white/85">Prop your device at hip height, 2–3 m away, portrait or landscape.</p>
             <p className={`mt-2 text-[clamp(18px,5vw,26px)] font-black leading-tight ${v.setupReady ? 'text-[#00FF9D]' : 'text-[#FFB020]'}`}>
               {v.setupReady ? 'Whole body in view — ready' : (v.framing?.instruction ?? 'Step into the shot')}
             </p>
@@ -94,11 +94,11 @@ export function LiveHud({ view, onPain, onTakeoff, onStop }: {
       ) : null}
       {showGuide && v.framing && !v.framing.ok && !v.setupReady ? (
         <div className="absolute inset-x-3 top-28 z-[6] flex flex-wrap justify-center gap-1.5">
-          {v.framing.issues.filter((i) => i !== 'dim').map((i) => <span key={i} className="rounded-full bg-black/70 px-3 py-1 text-[13px] font-bold text-[#FFB020]">{CHIP[i]}</span>)}
+          {v.framing.issues.filter((i) => i !== 'dim').map((i) => <span key={i} className="rounded-full bg-black/70 px-3 py-1 text-[16px] font-bold text-[#FFB020]">{CHIP[i]}</span>)}
         </div>
       ) : null}
       {v.dimWarning ? (
-        <p className="absolute inset-x-3 top-[7.5rem] z-[6] text-center text-[14px] font-bold text-[#FFB020]">Low light — move closer to a window if you can</p>
+        <p className="absolute inset-x-3 top-[7.5rem] z-[6] text-center text-[16px] font-bold text-[#FFB020]">Low light — move closer to a window if you can</p>
       ) : null}
       {(v.step === 'calibrate' || v.step === 'calibrateSide') && v.hold > 0 ? (
         <div className="absolute inset-x-10 bottom-24 z-[6] h-2 overflow-hidden rounded-full bg-white/15">
@@ -136,7 +136,7 @@ export function LiveHud({ view, onPain, onTakeoff, onStop }: {
           <div>
             <p className="text-[clamp(24px,7vw,34px)] font-black">{TRACKING_LOSS_PROMPT}</p>
             <p className="mt-1 text-[16px] text-white/80">Paused. {v.framing && !v.framing.ok ? v.framing.instruction : 'Step back into the shot to carry on.'}</p>
-            {v.restartInMs !== null ? <p className="mt-2 text-[12px] text-white/55">This check starts again in {Math.ceil(v.restartInMs / 1000)} s</p> : null}
+            {v.restartInMs !== null ? <p className="mt-2 text-[16px] text-white/55">This check starts again in {Math.ceil(v.restartInMs / 1000)} s</p> : null}
           </div>
         </div>
       ) : null}
@@ -155,20 +155,20 @@ export function LiveHud({ view, onPain, onTakeoff, onStop }: {
       {!v.handsFree && (v.step === 'pain' || v.step === 'painCheck') ? (
         <Prompt title={v.step === 'pain' ? 'Any pain right now?' : 'Any pain in that one?'}
           note="If something hurts, the screen stops here and nothing is saved.">
-          <button type="button" onClick={() => onPain(false)} className="rounded-full bg-[#00FF9D] px-7 py-3 text-[18px] font-black text-black">No</button>
-          <button type="button" onClick={() => onPain(true)} className="rounded-full bg-[#FFB020] px-7 py-3 text-[18px] font-black text-black">Yes</button>
+          <button type="button" onClick={() => onPain(false)} className="inline-flex min-h-12 items-center rounded-full bg-[#00FF9D] px-7 text-[18px] font-black text-black">No</button>
+          <button type="button" onClick={() => onPain(true)} className="inline-flex min-h-12 items-center rounded-full bg-[#FFB020] px-7 text-[18px] font-black text-black">Yes</button>
         </Prompt>
       ) : null}
       {!v.handsFree && v.step === 'takeoff' ? (
         <Prompt title="Which foot do you take off from?" note="Asked once. Your sided results are labelled with your jumping leg.">
-          <button type="button" onClick={() => onTakeoff('left')} className="rounded-full bg-white px-7 py-3 text-[18px] font-black text-black">Left</button>
-          <button type="button" onClick={() => onTakeoff('right')} className="rounded-full bg-white px-7 py-3 text-[18px] font-black text-black">Right</button>
+          <button type="button" onClick={() => onTakeoff('left')} className="inline-flex min-h-12 items-center rounded-full bg-white px-7 text-[18px] font-black text-black">Left</button>
+          <button type="button" onClick={() => onTakeoff('right')} className="inline-flex min-h-12 items-center rounded-full bg-white px-7 text-[18px] font-black text-black">Right</button>
         </Prompt>
       ) : null}
 
       {inTest || v.step === 'calibrate' ? (
         <div className="absolute bottom-3 right-3 z-[6]">
-          <button type="button" onClick={onStop} data-stop className="rounded-2xl border border-[#FFB020]/60 bg-black/70 px-3 py-2 text-[12.5px] font-bold text-[#FFB020]">
+          <button type="button" onClick={onStop} data-stop className="inline-flex min-h-12 items-center rounded-2xl border border-[#FFB020]/60 bg-black/70 px-3 text-[16px] font-bold text-[#FFB020]">
             Something hurts: stop
           </button>
         </div>
@@ -182,7 +182,7 @@ function Prompt({ title, note, children }: { title: string; note: string; childr
     <div className="absolute inset-0 z-[9] grid place-items-center bg-black/65 px-6 text-center">
       <div>
         <p className="text-[26px] font-black leading-tight">{title}</p>
-        <p className="mx-auto mt-2 max-w-sm text-[13.5px] text-white/65">{note}</p>
+        <p className="mx-auto mt-2 max-w-sm text-[16px] text-white/65">{note}</p>
         <div className="mt-5 flex justify-center gap-3">{children}</div>
       </div>
     </div>
