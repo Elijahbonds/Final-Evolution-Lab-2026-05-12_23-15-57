@@ -52,7 +52,7 @@ describe('capture HUD and review reel render', () => {
     expect(html).toContain('Last 30s');
     expect(html).toContain('Share');
     expect(html).toContain('Film dunk');
-    expect(html.match(/role="menuitem"/g)?.length).toBe(7);
+    expect((html.match(/role="menuitem"/g)?.length ?? 0) + (html.match(/role="menuitemcheckbox"/g)?.length ?? 0)).toBe(7);
     for (const label of [
       'Start recording', 'Keep the last 30 seconds', 'Portrait 9:16 export shape',
       'Landscape 16:9 export shape', 'Share the clip', 'Turn stream mode on', 'Film a dunk with the camera',
