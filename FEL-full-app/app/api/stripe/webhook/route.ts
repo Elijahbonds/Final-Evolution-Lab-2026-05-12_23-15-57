@@ -11,6 +11,7 @@ import {
   ledgerMarketplaceSale,
 } from '@/lib/stripe-helpers';
 import { ledgerStudioCreditsGrant } from '@/lib/studio-credits';
+import { coachStoreMeta, fulfilCoachStore } from '@/lib/coach-store/webhook';
 import type Stripe from 'stripe';
 
 /**
@@ -19,12 +20,13 @@ import type Stripe from 'stripe';
  * Replay-safe: uses event.id as idempotency key for ledger.
  */
 export async function POST(req: NextRequest) {
-  const stripe = getStripe();
+  const key = (process.env.STRIPE_SECRET_KEY ?? '').trim();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET not set');
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+  if (!key || !webhookSecret) {
+    console.error('[stripe-webhook] payments not set up');
+    return NextResponse.json({ error: 'payments not set up', message: 'payments not set up' }, { status: 503 });
   }
+  const stripe = getStripe();
 
   const rawBody = await req.text();
   const sig = req.headers.get('stripe-signature');
@@ -51,7 +53,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    switch (event.type) {
+    if (coachStoreMeta(event)) {
+      // Coach-store fulfilment ignores event.livemode. Other products keep the switch below.
+      await fulfilCoachStore(event, eventIdempotencyKey);
+    } else switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event, eventIdempotencyKey);
         break;
@@ -72,8 +77,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     console.error(`[stripe-webhook] Error handling ${event.type}:`, err.message);
-    // Return 200 to prevent Stripe retries on business-logic errors
-    // (duplicate processing, etc). Only 5xx for infra failures.
+    return NextResponse.json({ error: 'handler_failed' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
