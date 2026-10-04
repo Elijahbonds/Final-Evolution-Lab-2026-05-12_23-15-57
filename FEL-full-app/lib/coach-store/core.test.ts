@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PLATFORM_FEE_RATE } from '@/lib/fees';
 import { addressRejected } from './address';
-import { coachStorePostings, coachStoreSplit, decideReferral, nextReviewCredits, referralShareOfFee, weeklyEquivalentCents } from './money';
+import { coachStorePostings, coachStoreSplit, decideReferral, nextReviewCredits, referralShareOfFee } from './money';
 import { decideCancel, decideJoin } from './policy';
 import { clipRejected, originalsDue, reviewOpening } from './reviews';
 import { openSlots } from './slots';
@@ -29,7 +29,7 @@ describe('coach store money', () => {
     const referral = decideReferral({
       referrerUserId: 'ref', buyerUserId: 'buy', coachUserId: 'coach',
       referrerIsAdult: true, buyerIsAdult: true, priceCents: 10000, platformFeeCents: 1500,
-      renewalIndex: 0, source: 'program', weeklyCents: null, monthCutCents: 0, share: 0.2,
+      renewalIndex: 0, source: 'program', billing: 'one_time', weeklyCents: null, monthCutCents: 0, share: 0.2,
       paidAt: new Date('2026-06-01T00:00:00Z'), sessionEndsAt: null,
     });
     expect(referral.cutCents).toBe(300);
@@ -41,7 +41,7 @@ describe('coach store money', () => {
     const base = {
       referrerUserId: 'ref', buyerUserId: 'buy', coachUserId: 'coach',
       referrerIsAdult: true, buyerIsAdult: true, priceCents: 10000, platformFeeCents: 1500,
-      renewalIndex: 0, source: 'program' as const, weeklyCents: null, monthCutCents: 0, share: 0.2,
+      renewalIndex: 0, source: 'program' as const, billing: 'one_time' as const, weeklyCents: null, monthCutCents: 0, share: 0.2,
       paidAt: new Date('2026-06-01T00:00:00Z'), sessionEndsAt: null,
     };
     expect(decideReferral({ ...base, referrerUserId: 'buy' }).reason).toBe('self_referral');
@@ -49,7 +49,9 @@ describe('coach store money', () => {
     expect(decideReferral({ ...base, referrerIsAdult: false }).reason).toBe('referrer_not_adult');
     expect(decideReferral({ ...base, buyerIsAdult: false }).reason).toBe('buyer_not_adult');
     expect(decideReferral({ ...base, renewalIndex: 13 }).reason).toBe('renewal_cap');
-    expect(decideReferral({ ...base, source: 'membership', weeklyCents: weeklyEquivalentCents(2000, 'month') }).reason).toBe('under_ten_a_week');
+    // Floor applies only to weekly-billed plans (Elijah 11:53 PT); monthly no longer fails here.
+    expect(decideReferral({ ...base, source: 'membership', billing: 'week', priceCents: 999, weeklyCents: 999 }).reason).toBe('under_ten_a_week');
+    expect(decideReferral({ ...base, source: 'membership', billing: 'month', priceCents: 2000, weeklyCents: null }).reason).toBeNull();
     expect(decideReferral({ ...base, monthCutCents: 50000 }).reason).toBe('month_cap');
     expect(referralShareOfFee({} as NodeJS.ProcessEnv)).toBe(0.2);
     expect(referralShareOfFee({ COACH_STORE_REFERRAL_SHARE_OF_FEE: '0.9' } as NodeJS.ProcessEnv)).toBe(0.5);

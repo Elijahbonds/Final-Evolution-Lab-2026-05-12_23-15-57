@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { coachManifest, priceOk } from './manifest';
 import { SESSION_LENGTHS } from './constants';
 import { PROGRAM_LIBRARY_SEED } from './programLibrarySeed';
-import { decideReferral, weeklyEquivalentCents } from './money';
+import { decideReferral } from './money';
 import {
   getStorePrices,
   getStoreProgramGroupings,
@@ -163,22 +163,48 @@ describe('flag-gated read path', () => {
   });
 });
 
-describe('referral pin: both memberships fall under the $10/week floor today', () => {
-  it.each(['membership', 'teen-membership'])('%s: decideReferral returns cutCents 0, reason under_ten_a_week', (key) => {
+describe('referral: memberships pay referrers; $10/wk floor is weekly-billed only (Elijah 11:53 PT)', () => {
+  function membershipDecision(key: string) {
     const row = storePriceByKey(key)!;
-    const weeklyCents = weeklyEquivalentCents(row.priceCents, 'month');
-    const decision = decideReferral({
+    return decideReferral({
       referrerUserId: 'ref', buyerUserId: 'buy', coachUserId: 'coach',
       referrerIsAdult: true, buyerIsAdult: true, priceCents: row.priceCents, platformFeeCents: Math.floor(row.priceCents * 0.15),
-      renewalIndex: 0, source: 'membership', weeklyCents, monthCutCents: 0, share: 0.2,
+      renewalIndex: 0, source: 'membership', billing: 'month', weeklyCents: null, monthCutCents: 0, share: 0.2,
+      paidAt: new Date('2026-10-04T00:00:00Z'), sessionEndsAt: null,
+    });
+  }
+
+  it('monthly $29.99 membership pays referrer, no floor', () => {
+    const decision = membershipDecision('membership');
+    expect(decision.reason).toBeNull();
+    expect(decision.cutCents).toBe(Math.floor(Math.floor(2999 * 0.15) * 0.2));
+  });
+
+  it('monthly $14.99 teen membership pays referrer, no floor', () => {
+    const decision = membershipDecision('teen-membership');
+    expect(decision.reason).toBeNull();
+    expect(decision.cutCents).toBe(Math.floor(Math.floor(1499 * 0.15) * 0.2));
+  });
+
+  it('weekly-billed under 1000¢/week still gets no referral', () => {
+    const decision = decideReferral({
+      referrerUserId: 'ref', buyerUserId: 'buy', coachUserId: 'coach',
+      referrerIsAdult: true, buyerIsAdult: true, priceCents: 999, platformFeeCents: Math.floor(999 * 0.15),
+      renewalIndex: 0, source: 'membership', billing: 'week', weeklyCents: 999, monthCutCents: 0, share: 0.2,
       paidAt: new Date('2026-10-04T00:00:00Z'), sessionEndsAt: null,
     });
     expect(decision.cutCents).toBe(0);
     expect(decision.reason).toBe('under_ten_a_week');
   });
 
-  it('pins the exact weekly-equivalent numbers today (699 / 349)', () => {
-    expect(weeklyEquivalentCents(2999, 'month')).toBe(699);
-    expect(weeklyEquivalentCents(1499, 'month')).toBe(349);
+  it('weekly-billed at/above 1000¢/week pays referrer', () => {
+    const decision = decideReferral({
+      referrerUserId: 'ref', buyerUserId: 'buy', coachUserId: 'coach',
+      referrerIsAdult: true, buyerIsAdult: true, priceCents: 1000, platformFeeCents: Math.floor(1000 * 0.15),
+      renewalIndex: 0, source: 'membership', billing: 'week', weeklyCents: 1000, monthCutCents: 0, share: 0.2,
+      paidAt: new Date('2026-10-04T00:00:00Z'), sessionEndsAt: null,
+    });
+    expect(decision.reason).toBeNull();
+    expect(decision.cutCents).toBe(Math.floor(Math.floor(1000 * 0.15) * 0.2));
   });
 });
