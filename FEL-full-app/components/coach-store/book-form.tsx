@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BundleMissingParts } from './bundle-missing-parts';
+import { parseAlreadyOwned, partCheckoutBody, type AlreadyOwnedBundleView, type BundlePartWithListing } from '@/lib/coach-store/bundleParts';
 
 export function BookForm({
   slug,
@@ -22,6 +24,9 @@ export function BookForm({
   const [painYes, setPainYes] = useState<boolean | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [bundleView, setBundleView] = useState<AlreadyOwnedBundleView | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [partErrors, setPartErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (kind !== 'live_1on1') return;
@@ -31,9 +36,12 @@ export function BookForm({
       .catch(() => setSlots([]));
   }, [kind, slug, durationMin]);
 
+  const currentBeneficiary = (): 'self' | 'teen' => (kind === 'membership' ? (audience === 'teen' ? 'teen' : 'self') : who);
+
   const submit = async () => {
     setError('');
-    const beneficiary = kind === 'membership' ? (audience === 'teen' ? 'teen' : 'self') : who;
+    setBundleView(null);
+    const beneficiary = currentBeneficiary();
     const res = await fetch('/api/coach-store/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -47,9 +55,36 @@ export function BookForm({
       }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) { setError(json.message || json.error || 'Could not start checkout'); return; }
+    if (!res.ok) {
+      const parsed = json.error === 'already_owned' ? parseAlreadyOwned(json) : null;
+      if (parsed) { setBundleView(parsed); return; }
+      setError(json.message || json.error || 'Could not start checkout');
+      return;
+    }
     if (json.unlockCode) sessionStorage.setItem(`fel-unlock-${json.rowId}`, json.unlockCode);
     if (json.url) window.location.href = json.url;
+  };
+
+  const buyPart = async (part: BundlePartWithListing) => {
+    if (!part.listingId) return;
+    setPartErrors((prev) => { const next = { ...prev }; delete next[part.key]; return next; });
+    setBusyKey(part.key);
+    try {
+      const res = await fetch('/api/coach-store/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partCheckoutBody(part, currentBeneficiary())),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPartErrors((prev) => ({ ...prev, [part.key]: json.message || json.error || 'Could not start checkout' }));
+        return;
+      }
+      if (json.unlockCode) sessionStorage.setItem(`fel-unlock-${json.rowId}`, json.unlockCode);
+      if (json.url) window.location.href = json.url;
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const labelFor = (slot: { startsAt: string; label: string }) => {
@@ -94,7 +129,15 @@ export function BookForm({
           <p className="text-sm text-white/60">Your original clip is deleted 30 days after your review.</p>
         </>
       ) : null}
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {bundleView ? (
+        <BundleMissingParts
+          owned={bundleView.ownedParts}
+          missing={bundleView.missing}
+          onBuy={buyPart}
+          busyKey={busyKey}
+          errors={partErrors}
+        />
+      ) : error ? <p className="text-sm text-red-300">{error}</p> : null}
       <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black" onClick={submit}>Continue</button>
     </div>
   );

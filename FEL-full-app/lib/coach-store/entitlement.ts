@@ -67,3 +67,13 @@ export function missingBundleParts(members: readonly string[], owned: ReadonlySe
       return { key, title: row?.title ?? null, priceCents: row?.priceCents ?? null };
     });
 }
+
+export interface OwnedBundlePart {
+  key: string;
+  title: string | null;
+}
+
+/** Pure helper: the already-owned bundle members, named from storePrices (for the already_owned UI). */
+export function ownedBundleParts(ownedKeys: readonly string[]): OwnedBundlePart[] {
+  return ownedKeys.map((key) => ({ key, title: storePriceByKey(key)?.title ?? null }));
+}

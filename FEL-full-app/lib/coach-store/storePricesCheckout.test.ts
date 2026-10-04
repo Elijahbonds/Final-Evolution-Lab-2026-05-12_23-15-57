@@ -151,8 +151,11 @@ describe('STORE-LISTING-FORMAT: course, series and bundle checkout', () => {
     });
   }
 
-  it('block_if_any_owned (default): owning a member (course) and buying the bundle → 409 already_owned with the missing parts and their prices, no Stripe call', async () => {
+  it('block_if_any_owned (default): owning a member (course) and buying the bundle → 409 already_owned with the missing parts and their prices (plus BUNDLE-MISSING-PARTS-UI\'s additive listingId/listingPriceCents, one matched to a single-product listing and one unmatched), no Stripe call', async () => {
     ownCourse();
+    // dunking-plyometrics-8wk also has its own single-product listing (the coach sells it standalone) so its
+    // Buy-this-part button has somewhere to go; blueprint-series does not, so its listingId stays null.
+    const dunkingListingId = seedListing('dunking-plyometrics-8wk');
     const bundleListingId = seedListing('bundle-all-three');
     const r = await checkout(bundleListingId);
     expect(r.status).toBe(409);
@@ -160,9 +163,10 @@ describe('STORE-LISTING-FORMAT: course, series and bundle checkout', () => {
       error: 'already_owned',
       owned: ['signature-dunk-course'],
       missing: [
-        { key: 'dunking-plyometrics-8wk', title: 'Dunking & Plyometrics 8-week', priceCents: 7900 },
-        { key: 'blueprint-series', title: 'Blueprint series', priceCents: 2900 },
+        { key: 'dunking-plyometrics-8wk', title: 'Dunking & Plyometrics 8-week', priceCents: 7900, listingId: dunkingListingId, listingPriceCents: 7900 },
+        { key: 'blueprint-series', title: 'Blueprint series', priceCents: 2900, listingId: null, listingPriceCents: null },
       ],
+      ownedParts: [{ key: 'signature-dunk-course', title: 'Signature Dunk Course' }],
     });
     expect(h.stripe.checkout.sessions.create).not.toHaveBeenCalled();
     expect(h.db.tables.programAccess.find((row) => row.listingId === bundleListingId)).toBeUndefined();
@@ -229,7 +233,7 @@ describe('STORE-LISTING-FORMAT: course, series and bundle checkout', () => {
     const b = await checkout(seedListing('bundle-all-three'));
     expect(b.status).toBe(409);
     expect(b.json.owned).toEqual(['signature-dunk-course', 'blueprint-series']);
-    expect(b.json.missing).toEqual([{ key: 'dunking-plyometrics-8wk', title: 'Dunking & Plyometrics 8-week', priceCents: 7900 }]);
+    expect(b.json.missing).toEqual([{ key: 'dunking-plyometrics-8wk', title: 'Dunking & Plyometrics 8-week', priceCents: 7900, listingId: null, listingPriceCents: null }]);
     expect(h.stripe.checkout.sessions.create).not.toHaveBeenCalled();
   });
 

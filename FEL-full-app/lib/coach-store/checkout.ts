@@ -4,9 +4,10 @@ import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { isVerifiedAdult } from './adult';
+import { attachListingMatches, type PartListingMatch } from './bundleParts';
 import { isAllowlistedCoach } from './coaches';
 import * as bundlePolicy from './bundlePolicy';
-import { missingBundleParts, productsGrantedBy } from './entitlement';
+import { missingBundleParts, ownedBundleParts, productsGrantedBy } from './entitlement';
 import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
@@ -127,6 +128,28 @@ async function ownedProductsFor(userId: string, beneficiary: 'self' | 'teen', ex
     const m = parseManifest(l.manifest);
     if (!m) continue;
     for (const p of productsGrantedBy(m)) out.add(p);
+  }
+  return out;
+}
+
+/**
+ * For the bundle 409's `missing` parts: the same coach's own active COACH_STORE listing that sells each
+ * missing part on its own (a program/course/series manifest whose `productsGrantedBy` is exactly that one
+ * key) — so a part's Buy button can start a normal single-item checkout. One findMany read; no writes.
+ */
+async function findPartListingsFor(keys: readonly string[], creatorId: string): Promise<Map<string, PartListingMatch>> {
+  const out = new Map<string, PartListingMatch>();
+  if (!keys.length) return out;
+  const listings = await prisma.marketplaceListing.findMany({
+    where: { creatorId, active: true, listingType: 'COACH_STORE' },
+    select: { id: true, manifest: true, priceUsd: true },
+  });
+  for (const row of listings) {
+    const manifest = parseManifest(row.manifest);
+    if (!manifest || (manifest.kind !== 'program' && manifest.kind !== 'course' && manifest.kind !== 'series')) continue;
+    const products = productsGrantedBy(manifest);
+    if (products.length !== 1 || !keys.includes(products[0])) continue;
+    if (!out.has(products[0])) out.set(products[0], { listingId: row.id, priceCents: row.priceUsd });
   }
   return out;
 }
@@ -283,8 +306,15 @@ async function buyAccess(
     const owned = await ownedProductsFor(userId, beneficiary, listing.id);
     const ownedParts = manifest.members.filter((m) => owned.has(m));
     if (ownedParts.length) {
+      const missing = missingBundleParts(manifest.members, owned);
+      const listingsByKey = await findPartListingsFor(missing.map((p) => p.key), listing.creatorId);
       return NextResponse.json(
-        { error: 'already_owned', owned: ownedParts, missing: missingBundleParts(manifest.members, owned) },
+        {
+          error: 'already_owned',
+          owned: ownedParts,
+          missing: attachListingMatches(missing, listingsByKey),
+          ownedParts: ownedBundleParts(ownedParts),
+        },
         { status: 409 },
       );
     }
