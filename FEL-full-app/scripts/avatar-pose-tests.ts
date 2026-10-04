@@ -6,10 +6,12 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { installedTsxCli } from './ci-suite';
 
-const out = execFileSync('npx', ['tsx', 'scripts/avatar/validate-pose.mts', 'public/models/fel-hero.glb'], {
+const out = execFileSync(process.execPath, [installedTsxCli(), 'scripts/avatar/validate-pose.mts', 'public/models/fel-hero.glb'], {
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe'],
+  env: { ...process.env, NODE_ENV: 'test' },
 });
 process.stdout.write(out);
 

@@ -83,4 +83,19 @@ describe('the recorder keeps the piece that was open when Stop was pressed', () 
     expect(take).toHaveLength(3);
     expect(rec.model.phase).toBe('ready');
   });
+
+  it('moves to error when a live source cannot produce a segment', async () => {
+    const changes: string[] = [];
+    const rec = new GameRecorder({
+      next: async () => null,
+      stop: () => {},
+    }, () => 1_000, (model) => { changes.push(model.phase); });
+
+    await rec.record();
+    await Promise.resolve();
+
+    expect(rec.model.phase).toBe('error');
+    expect(rec.model.note).toMatch(/not available/i);
+    expect(changes).toEqual(['error']);
+  });
 });
