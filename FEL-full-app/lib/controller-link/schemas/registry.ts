@@ -370,44 +370,10 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
-  // The combat pair are enabled again, so their earlier "retired" phone silence
-  // became a shipped-route blocker. Both read left-stick movement, face attacks,
-  // X press/release for guard/step, and R-trigger Matrix Focus.
-  showdown: {
-    modeId: 'showdown',
-    title: 'Showdown',
-    maxPlayers: 1,
-    askName: true,
-    schemas: [
-      { kind: 'dpad', dpad: { action: 'move' } },
-      { kind: 'button', buttons: [
-        { action: 'charge', label: 'FOCUS', hold: true },
-        { action: 'A', label: 'JAB' },
-        { action: 'B', label: 'KICK' },
-        { action: 'X', label: 'GUARD / STEP', hold: true },
-        { action: 'Y', label: 'HEAVY / ULT' },
-        { action: 'L1', label: 'DASH' },
-        { action: 'R1', label: 'SUB' },
-        { action: 'SELECT', label: 'ASSIST' },
-      ] },
-    ],
-  },
-  duel: {
-    modeId: 'duel',
-    title: 'Duel',
-    maxPlayers: 1,
-    askName: true,
-    schemas: [
-      { kind: 'dpad', dpad: { action: 'move' } },
-      { kind: 'button', buttons: [
-        { action: 'charge', label: 'FOCUS', hold: true },
-        { action: 'A', label: 'FISTS / LIGHT' },
-        { action: 'B', label: 'BLADE / MID' },
-        { action: 'Y', label: 'STAFF / HEAVY' },
-        { action: 'X', label: 'GUARD / STEP', hold: true },
-      ] },
-    ],
-  },
+  // Showdown: RETIRED from the v1 roster with the combat-family trim (owner,
+  // 2026-09-01 — karate-vs is the Storm mode). Schema removed so phones don't
+  // join a mode the roster no longer offers; the mode file stays registered.
+  // Duel stays off the phone pad for the same reason.
 
   // Kart-racer controls. The bridge maps 'charge' to RT, 'brake' to LT, and the
   // held R1 button to the boost shoulder, matching the local pad path.

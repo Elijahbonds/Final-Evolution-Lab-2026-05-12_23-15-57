@@ -32,6 +32,9 @@ const playGauntletExempt = new Set([
   // DunkDuelMode remains registry/dev-mode coverage only.
   'dunkduel',
 ]);
+// Showdown: RETIRED from the v1 roster (owner, 2026-09-01). Duel stays off the
+// phone pad with it. The mode files remain registered; phones do not join them.
+const phoneSchemaExempt = new Set(['showdown', 'duel']);
 const devGauntletModes = modesInForLoops(devGauntlet);
 const playGauntletModes = modesInForLoops(playGauntlet);
 
@@ -79,7 +82,7 @@ for (const key of enabledModes) {
   const slug = route.slice('/play/'.length);
   if (!existsSync(join(ROOT, 'app/play', slug, 'page.tsx'))) missingRoutes.push(`${key} -> ${route}`);
   if (!gameData.includes(`href: '${route}'`)) missingMenuLinks.push(`${key} -> ${route}`);
-  if (!(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
+  if (!phoneSchemaExempt.has(key) && !(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
   if (!devGauntletModes.has(key)) missingDevGauntlet.push(key);
   if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);
 }
