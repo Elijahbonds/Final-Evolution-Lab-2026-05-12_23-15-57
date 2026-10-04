@@ -7,7 +7,7 @@
 export type GameModeKey =
   | 'dunkContest' | 'hoops1v1' | 'streetball' | 'threePoint'
   | 'karate' | 'tennis' | 'skateboard' | 'soccer' | 'baseball'
-  | 'golf' | 'freerun' | 'training' | 'carnival'
+  | 'golf' | 'freerun' | 'training' | 'carnival' | 'tiebreak'
   | 'mixedcombat' | 'dunkduel' | 'sprint' | 'showdown' | 'duel' | 'brainBrawl';
 
 // Modes rendered with the real-time 3D engine. Everything else stays 2D.
@@ -68,6 +68,7 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   showdown: true,
   duel: true,
   brainBrawl: true,
+  tiebreak: true,
   // Rollout wave 5 — Court Carnival hub (M49). New Babylon-only hub mode.
   carnival: true,
   // Rollout wave 6 — combat/duel modes (M53/M56)

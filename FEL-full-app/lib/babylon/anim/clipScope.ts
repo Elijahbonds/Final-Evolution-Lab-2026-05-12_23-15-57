@@ -86,7 +86,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   freerun: { suites: ['freerun'], borrow: ['karate_floor_hold', 'karate_get_up', 'football_tackled_fall', 'dunk_celebrate_big'] },
   sprint: { suites: [], borrow: [] },
   dance: { suites: [], borrow: ['karate_hit_react'] },
-  tennis: NET, volleyball: NET,
+  tennis: NET, tiebreak: { suites: ['tennis'], borrow: [] }, volleyball: NET,
   golf: { suites: ['golf'], borrow: [] },
   baseball: DERBY, derby: DERBY,
   soccer: { suites: ['soccer'], borrow: ['football_juke_left'] }, penalty: { suites: ['soccer'], borrow: ['football_juke_left'] },
