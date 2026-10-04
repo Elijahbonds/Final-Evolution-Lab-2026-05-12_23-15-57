@@ -12,7 +12,7 @@ export async function holdPrivateSlot(
   const now = input.now ?? new Date();
   const staleBefore = new Date(now.getTime() - PENDING_SLOT_MS);
   return db.$transaction(async (tx) => {
-    await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext($1))`, input.sessionKey);
+    await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext($1))::text`, input.sessionKey);
     await tx.sessionBooking.updateMany({
       where: { sessionKey: input.sessionKey, status: 'pending', createdAt: { lt: staleBefore } },
       data: { status: 'cancelled' },
