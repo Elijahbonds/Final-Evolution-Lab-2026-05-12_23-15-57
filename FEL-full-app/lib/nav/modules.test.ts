@@ -43,6 +43,12 @@ const NOT_IMPORTED: Record<string, string> = {
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
+  // STORE-PRICES (2026-10-04): Elijah's approved coach-store prices, typed and flag-gated (COACH_STORE_ENABLED,
+  // still off). No route, page or component reads from it yet — this tip writes no database rows and the
+  // sellable six still read their price from MarketplaceListing.priceUsd. It is the typed source of truth the
+  // eventual DB-seeding step (see ~/Claude/_observe/STORE-PRICES-LIVE-ROWS.txt) and a future listing/settings UI
+  // read from; wiring either one up means deleting this line.
+  'lib/coach-store/storePrices.ts': 'STAGED, not wired to prod — typed price data for the coach store\'s eventual DB seed; no route/page reads it yet',
   // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
   // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
   // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this
