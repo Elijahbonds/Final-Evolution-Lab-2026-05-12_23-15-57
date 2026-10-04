@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
 import { VenueShelf } from '@/components/shell/venue-shelf';
 import { VENUES } from '@/lib/game-data';
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function VenuesPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login?next=%2Fvenues');
+  if (!session) redirect(loginPath('/venues'));
 
   const live = VENUES.filter((v) => v.playable).length;
 

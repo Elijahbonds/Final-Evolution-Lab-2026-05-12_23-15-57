@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { notFound, redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { RigHarness } from './_components/rig-harness';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export default async function RigDevPage() {
   if (process.env.NODE_ENV !== 'development') notFound();   // dev-only harness: hard 404 in production
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(loginPath('/dev/rig'));
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#050505]" />}>
       <RigHarness />
