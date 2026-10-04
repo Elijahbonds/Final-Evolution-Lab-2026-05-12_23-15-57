@@ -327,6 +327,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   let arc: ShotArc;
   let arcPoints = 0, arcLabel = '';
+  let myJumperQuality: ShotQuality = 'good';   // HOOPS-10PHASE-2 phase 9: 3v3 keeps arcQuality past the release so a
+  // perfect splash reads bigger than a good one at the hoop; 1v1 threw the release's own grade away the instant the
+  // ball left the hand. Stored here so the make can ask for it, same as 3v3 already does.
   let myScore = 0, foeScore = 0, momentum = 0;
   let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
   let mbus = new MomentumBus();               // Phase 6: shared Game-Breaker
@@ -1084,6 +1087,13 @@ export const OneVOneMode: ModeDefinition = (() => {
             ctx.feel.impact(0.4);
             ctx.juice.shake(0.06, 100);
             hoopJuice?.punch(true);   // escalates over a rattle's graze
+            // HOOPS-10PHASE-2 phase 9: PARITY THE OTHER WAY (again) — 3v3 already pulses the camera on a perfect
+            // release or a three; 1v1 had no equivalent, so an identical splash read as a bigger moment in one
+            // mode than the other for no stated reason.
+            if (arcPoints === 3 || myJumperQuality === 'perfect') {
+              SoundKit.play('crowdCheer', { volume: arcPoints === 3 ? 0.6 : 0.4 });
+              ctx.camDirector.pulse(arcPoints === 3 ? 0.85 : 0.5, 0.5);
+            }
             console.info(`[1V1-JUICE] jumper make${arc.play ? ` (${arc.play.kind})` : ''}`);
             // the WHY was named at release (GREEN/EARLY/LATE + contest); the
             // resolution just confirms the result and the points
@@ -2917,6 +2927,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   function releaseJumper(ctx: ModeContext, quality: ShotQuality): void {
     shooting = false;
+    myJumperQuality = quality;   // HOOPS-10PHASE-2 phase 9: kept past the release for the make's own camera pulse
     const pctMod = currentShot?.pctMod ?? 1;
     // D3: the contest at the RELEASE (a hand up, a contest jump, the body) bites the make chance itself
     const foeDist = distXZ(me.root.position, foe.root.position);
