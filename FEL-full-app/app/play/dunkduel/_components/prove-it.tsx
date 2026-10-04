@@ -5,7 +5,8 @@
 // The camera feed stays on this device. A clip can be saved to the phone for a
 // server-verified adult only, through the download or share sheet, never uploaded.
 // Jump numbers reach the server only when this account is a verified adult who
-// opted in, and only that account's own jumps (see lib/session-setup/saveNumbers.ts).
+// opted in, and only that account's own jumps: one AB-04 Prove It record per dunk
+// (/api/mirror/prove-it), roster slot 0 only. There is no second session-form save.
 // Under 18 and unknown age stay in page memory.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,8 +31,6 @@ import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@
 import { PLACEMENT_LINES, dunkFraming, firstAttemptAllowed, shotLight, type FramingLight } from '@/lib/session-setup/framing';
 import { endSession, readSession } from '@/lib/session-setup/memory';
 import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
-import { postOptInSession, type MeasuredJump } from '@/lib/session-setup/saveNumbers';
-import { queueAdultNumbers } from '@/lib/session-setup/sync';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
 
 const CYAN = '#00E5FF';
@@ -99,6 +98,7 @@ export default function ProveIt({
   const chunksRef = useRef<Blob[]>([]);
   const remindedRef = useRef(false);
   const saveOnceRef = useRef(false);
+  const proveSavesRef = useRef<Promise<boolean>[]>([]);
   const prqRef = useRef(60);
   const levelsRef = useRef<(number | null)[]>([]);
 
@@ -289,7 +289,7 @@ export default function ProveIt({
     if (idx === 0 && athlete.band === '18+' && gate.adult && gate.optedIn && gate.checked) {
       const raw = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}proveit`).replace(/-/g, '');
       const runId = raw.length >= 8 ? raw.slice(0, 40) : `proveit${raw}00000000`.slice(0, 32);
-      void fetch('/api/mirror/prove-it', {
+      const saved = fetch('/api/mirror/prove-it', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -301,7 +301,8 @@ export default function ProveIt({
           family: got.family,
           judgesScore: total,
         }),
-      }).catch(() => {});
+      }).then((r) => r.ok).catch(() => false);
+      proveSavesRef.current.push(saved);
     }
     setCurrent(attempt);
     setAttempts((prev) => {
@@ -401,28 +402,15 @@ export default function ProveIt({
   useEffect(() => {
     if (stage !== 'final' || saveOnceRef.current) return;
     saveOnceRef.current = true;
-    const jumps: MeasuredJump[] = attemptsRef.current.flatMap((list, playerIndex) => {
-      const athlete = rosterRef.current[playerIndex];
-      if (!athlete) return [];
-      return list.map((a) => ({
-        playerIndex,
-        band: athlete.band,
-        name: athlete.name,
-        family: a.metrics.family,
-        takeoff: a.metrics.takeoff,
-        verticalCm: a.metrics.verticalCm,
-        flightTimeMs: a.metrics.flightTimeMs,
-        landingStability: a.metrics.landingStability,
-      }));
+    // AB-04's per-dunk Prove It record is the only save path. This line reports it.
+    const pending = proveSavesRef.current.slice();
+    if (pending.length === 0) { setSaveLine('Stays on this phone.'); return; }
+    void Promise.all(pending).then((oks) => {
+      setSaveLine(oks.every(Boolean)
+        ? 'Jump numbers saved for this account.'
+        : 'Some jump numbers could not be saved. The result stays on this screen.');
     });
-    // The dormant queue does not fetch. The post below returns before any request when the gate is shut.
-    queueAdultNumbers();
-    void postOptInSession(jumps, { serverVerified, optedIn: optedIn && saveChecked }).then((outcome) => {
-      if (outcome === 'skipped') setSaveLine('Stays on this phone.');
-      else if (outcome === 'saved') setSaveLine('Jump numbers saved for this account.');
-      else setSaveLine('Could not save. The result stays on this screen.');
-    });
-  }, [optedIn, saveChecked, serverVerified, stage]);
+  }, [stage]);
 
   function toggleMute() {
     setMuted((prev) => {
@@ -475,6 +463,7 @@ export default function ProveIt({
 
   function runItBack() {
     saveOnceRef.current = false;
+    proveSavesRef.current = [];
     setSaveLine('');
     boardRef.current = freshBoard(rosterRef.current, boardRef.current.dunksEach || dunksEach);
     setAttempts(rosterRef.current.map(() => []));
