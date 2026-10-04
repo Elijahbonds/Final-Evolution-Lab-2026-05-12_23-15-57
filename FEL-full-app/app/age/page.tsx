@@ -2,25 +2,23 @@ import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath, safeLoginNext } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { AgeStep, AgeTurnAway } from '@/components/age-step';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 
 export const dynamic = 'force-dynamic';
 
-/** Same-origin paths only. Anything else, including protocol-relative URLs, falls back to '/'. */
-function sameOriginPath(raw: string | undefined): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || raw.includes('://')) return '/';
-  return raw;
-}
-
-export default async function AgePage({ searchParams }: { searchParams?: { next?: string } }) {
+export default async function AgePage({ searchParams }: { searchParams?: { next?: string | string[] } }) {
   const session = await getServerSession(authOptions);
   const id = (session?.user as { id?: string } | undefined)?.id;
-  if (!id) redirect('/login');
+  const raw = searchParams?.next;
+  const next = safeLoginNext(Array.isArray(raw) ? raw[0] : raw) ?? '/';
+  // A signed-out visitor comes back here after login, still carrying the post-age destination.
+  const ageReturnPath = next === '/' ? '/age' : `/age?next=${encodeURIComponent(next)}`;
+  if (!id) redirect(loginPath(ageReturnPath));
   if (cookies().get(AGE_BLOCK_COOKIE)) return <AgeTurnAway />;
   const user = await prisma.user.findUnique({ where: { id }, select: { dobYear: true } });
-  const next = sameOriginPath(searchParams?.next);
   if (user?.dobYear != null) redirect(next);
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050505] px-3 py-6 sm:px-4">

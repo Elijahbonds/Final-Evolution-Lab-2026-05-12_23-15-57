@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { canSaveScanNumbers, readDobYear } from '@/lib/privacy/scanSaveGate';
 import ProveIt from './_components/prove-it';
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic';
 // /api/profile and would replace this camera contest with the Babylon game.
 export default async function DunkDuelPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect(`/login?next=${encodeURIComponent('/play/dunkduel')}`);
+  if (!session) redirect(loginPath('/play/dunkduel'));
   const userId = (session.user as { id?: string } | undefined)?.id;
   const dobYear = userId ? await readDobYear(prisma, userId, 'prove_it_page') : null;
   const optedIn = userId ? await canSaveScanNumbers(prisma, userId) : false;

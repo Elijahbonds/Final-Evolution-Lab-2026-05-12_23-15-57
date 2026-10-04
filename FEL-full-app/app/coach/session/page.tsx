@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { canSaveScanNumbers, readDobYear } from '@/lib/privacy/scanSaveGate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function CoachSessionPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect(`/login?next=${encodeURIComponent('/coach/session')}`);
+  if (!session) redirect(loginPath('/coach/session'));
   const userId = (session.user as { id?: string } | undefined)?.id;
   const serverVerified = userId ? verifiedAdult(await readDobYear(prisma, userId, 'coach_session_page')) : false;
   const optedIn = userId ? await canSaveScanNumbers(prisma, userId) : false;

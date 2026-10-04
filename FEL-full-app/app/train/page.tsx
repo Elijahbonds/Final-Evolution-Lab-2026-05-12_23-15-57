@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
 import { TabPage } from '@/components/shell/tab-page';
@@ -20,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export default async function TrainPage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!me) redirect('/login?next=%2Ftrain');
+  if (!me) redirect(loginPath('/train'));
 
   const [coachLink, coachesAnyone, programCount] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
