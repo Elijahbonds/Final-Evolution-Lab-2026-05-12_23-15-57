@@ -7,14 +7,34 @@ import {
 } from './config';
 
 const APP = join(__dirname, '../../app');
+const redirectsSignedOutToLogin = (src: string) => /redirect\(\s*(?:['"`]\/login|loginPath\()/.test(src);
 
 describe('the free game is /try, the guest dunk contest', () => {
-  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to /login', () => {
+  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to login and back', () => {
     expect(DEFAULT_FREE_GAME_ROUTE).toBe('/try');
     const tryPage = readFileSync(join(APP, 'try/page.tsx'), 'utf8');
     expect(tryPage).toMatch(/return <GuestDunkShell/);
     expect(tryPage).not.toMatch(/redirect\(\s*['"`]\/login/);
-    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(/if \(!session\) redirect\('\/login'\)/);
+    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toContain(
+      "if (!session) redirect(loginPath('/play/brain-brawl'))",
+    );
+  });
+
+  it('every signed-in play route preserves its destination through login', () => {
+    const misses: string[] = [];
+    const walk = (dir: string) => {
+      for (const f of readdirSync(dir)) {
+        const p = join(dir, f);
+        if (statSync(p).isDirectory()) { walk(p); continue; }
+        if (f !== 'page.tsx') continue;
+        const src = readFileSync(p, 'utf8');
+        if (!redirectsSignedOutToLogin(src)) continue;
+        if (src.includes('loginPath(') || src.includes('?next=')) continue;
+        misses.push(`/${relative(APP, dir)}`);
+      }
+    };
+    walk(join(APP, 'play'));
+    expect(misses, 'play routes that drop the intended mode after login').toEqual([]);
   });
 
   // CHANGED (SCREEN-FIX-2, S-10): was 13 and older; 13–17 lose the /try link (no page reads this now: the results'
@@ -62,7 +82,7 @@ describe('the free game is /try, the guest dunk contest', () => {
         if (statSync(p).isDirectory()) { if (f !== 'api') walk(p); continue; }
         if (!/^(page|layout)\.tsx?$/.test(f)) continue;
         const src = readFileSync(p, 'utf8');
-        if (!/redirect\(\s*['"`]\/login/.test(src)) continue;
+        if (!redirectsSignedOutToLogin(src)) continue;
         // the route: route groups dropped; a dynamic segment ends it (everything under the prefix is walled)
         const segs = relative(APP, dir).split('/').filter((x) => x && !/^\(.*\)$/.test(x));
         const cut = segs.findIndex((x) => x.startsWith('['));
