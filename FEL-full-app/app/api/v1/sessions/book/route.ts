@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { spend, readWallet, WalletError } from '@/lib/wallet/wallet-service';
 import { upcomingGroupSlots, privateSlots, privateBookingAvailable } from '@/lib/sessions/schedule';
+import { recordCoachShare } from '@/lib/privacy/coachShare';
 
 const SKU_FOR_KIND: Record<string, string> = {
   group_workout: 'session_group_workout',
@@ -73,7 +74,13 @@ export async function POST(req: NextRequest) {
     const booking = await prisma.sessionBooking.create({
       data: { userId, kind, sessionKey, shardsPaid: result.spent.amount, startsAt: startsAt! },
     });
-    return NextResponse.json({ booked: true, booking, balances: result.balances });
+    // AB-04: "Share with my coach" is optional. A failed share does not undo the booking, and the response
+    // shape stays the same unless a share was actually recorded.
+    let shared = false;
+    if (body?.shareWithCoach === true && typeof body?.coachId === 'string') {
+      shared = await recordCoachShare(prisma, userId, booking.id, body.coachId);
+    }
+    return NextResponse.json({ booked: true, booking, balances: result.balances, ...(shared ? { shared: true } : {}) });
   } catch (e) {
     if (e instanceof WalletError && e.code === 'INSUFFICIENT_FUNDS') {
       const bal = await readWallet(prisma, userId);
