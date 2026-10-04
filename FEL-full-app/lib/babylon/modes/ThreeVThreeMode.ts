@@ -296,8 +296,12 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
   let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
   let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE
-  let passTargetId: 'mate0' | 'mate1' = 'mate0';
+  // CALL FOR THE BALL (Elijah item 2, Oct 3 2026): 'me' is a legal passTargetId now — the only new value this
+  // type takes on, when a mate throws the ball back to the hero instead of the hero throwing it to a mate.
+  let passTargetId: 'me' | 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
+  /** Debounce for the "BALL!" callout so a held/spammed call doesn't restate it every frame. */
+  let ballCallCalloutAt = -Infinity;
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
   const mateVel: Vector3[] = [new Vector3(), new Vector3()];
   /** The defenders' brains and their current marks — the scram switch re-marks them (lock: defensive switching). */
@@ -551,6 +555,39 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (body) { const c = carries.get(body); c?.reset(); gatherBallToHand(ball, body.char.skeleton, c?.handBone ?? hoopsHand(body.char)); }
   }
 
+  // CALL FOR THE BALL (Elijah item 2, Oct 3 2026 9:35 PM PT). The PASS button already asks a question
+  // ("throw it to a mate") when I carry; off the ball it asks the opposite one ("mate, throw it to ME") —
+  // 2K's call-for-the-ball, hung on the same press instead of a new button, because that press already
+  // means "I want the ball to move" in both directions.
+  //
+  // The teammate who has it answers RIGHT AWAY unless he is busy — mid-shot (mateShooting, shared across
+  // both mates since only one shoots at a time), stunned/trapped (stunSec > 0, the same flag an ankle-
+  // breaker or a drift sets), or down (floored). Busy: the call is heard (a callout, so a press is never
+  // silent) and the ordinary flow decides what happens next — his own shot read (teammateShoots' contest-
+  // weighted roll) or another call once he is free — exactly as if nobody had asked. There is no separate
+  // "mid-dribble move" flag to read yet (3v3 mates don't run size-up moves — that's HOOPS-10PHASE-2 phase 5,
+  // not landed); when it lands, add it to `busy` here.
+  function callForBall(ctx: ModeContext): void {
+    if (!(carrierId === 'mate0' || carrierId === 'mate1') || passFlight.active) return;
+    const idx = carrierId === 'mate0' ? 0 : 1;
+    const body = mates[idx];
+    const busy = mateShooting || body.stunSec > 0 || body.floored;
+    const now = performance.now();
+    if (now - ballCallCalloutAt > 500) {
+      ballCallCalloutAt = now;
+      ctx.juice.callout('BALL!', busy ? '#94a3b8' : '#39ff88', busy ? 340 : 420);
+    }
+    if (busy) { console.info('[3V3-OFF] call for the ball — teammate busy, AI logic stands'); return; }
+    SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
+    releaseBall(ball);
+    passType = 'chest';
+    passTargetId = 'me';
+    lastPasserWasMe = false;   // the mate threw this one, not me — no assist to credit on whatever I do next
+    slingPass = false;
+    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), me.char.root.position.add(new Vector3(0, 1.2, 0)), 'chest', 1);
+    console.info('[3V3-OFF] call for the ball answered — mate passes it back');
+  }
+
   /**
    * LEAVE THE FLOOR TO CONTEST. Returns true if the jump happened. One body, two callers: the raw A press and the
    * slot's `jump` edge — see the note on `PlayerSlot.Intent.jump` for why the block needed a wire of its own.
@@ -801,8 +838,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // press is judged in, so a HELD pass read as a dead button on the capture (4 of 11). A passer's hands move the
         // instant the button goes down; the tick says so, and the pass or the fake still lands on its own beat.
         SoundKit.play('uiTick', { pitch: 1.15, volume: 0.3 });
+      } else if (e.t === 'button' && e.btn === 'A' && e.pressed && (carrierId === 'mate0' || carrierId === 'mate1') && !ended) {
+        // CALL FOR THE BALL (Elijah item 2): off the ball, the PASS button calls for it instead of throwing it.
+        callForBall(ctx);
       } else if (e.t === 'button' && e.btn === 'A' && e.pressed) {
-        refuse(ctx, carrierId === 'foeTeam' ? 'NO BALL TO PASS' : 'YOUR TEAMMATE HAS IT');   // SCORECARD CONTROLS (2026-09-15)
+        refuse(ctx, 'NO BALL TO PASS');   // only carrierId === 'foeTeam' reaches here now — the mate case calls for it above
       } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId === 'foeTeam') {
         refuse(ctx, 'NOBODY TO SCREEN FOR ON D');   // Circle is the screen call; on defence it is the charge, held
       } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId !== 'me') {
@@ -1146,6 +1186,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
+      // CALL FOR THE BALL (Elijah item 2): the phone pad's PASS button relabels to BALL! whenever I don't have
+      // it, so the touch verb reads honestly in both directions — same slot, same owner rule as every other
+      // contextual verb on this diamond (Y: BLOCK/ALREADY UP, B: SCREEN/CHARGE).
+      ctx.setHud({ onBall: iAmCarrier });
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a

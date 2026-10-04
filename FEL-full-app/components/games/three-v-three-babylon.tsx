@@ -172,7 +172,14 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       />
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
-        <TouchOverlay bus={busRef.current} modeId="threevthree" visible />
+        <TouchOverlay
+          bus={busRef.current}
+          modeId="threevthree"
+          visible
+          // CALL FOR THE BALL (Elijah item 2): the pad's PASS slot is BALL! whenever `onBall` reads false — shown
+          // only while off-ball, same press (button A), same wire LocalInputSource already reads as intent.pass.
+          overrides={hud.onBall === false ? { A: { label: 'BALL!', color: '#fbbf24' } } : undefined}
+        />
       )}
     </div>
   );
