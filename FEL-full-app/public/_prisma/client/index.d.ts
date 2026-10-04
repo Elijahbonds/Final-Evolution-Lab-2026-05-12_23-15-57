@@ -498,6 +498,22 @@ export type PainCheckIn = $Result.DefaultSelection<Prisma.$PainCheckInPayload>
  */
 export type HealthConsent = $Result.DefaultSelection<Prisma.$HealthConsentPayload>
 /**
+ * Model ScanSaveOptIn
+ * AB-04 (2026-10-03, Elijah): one row per account for saving movement NUMBERS.
+ * Scope `jump_numbers` is the only scope. It covers jump numbers, Prove It, and
+ * re-screen history together — not three consents. `granted` defaults false.
+ * `revokedAt` set means withdrawn; the row stays so the withdrawal has a time.
+ * Video, images, and pose frames are never stored under this grant.
+ * 
+ * `coachShares` is the per-booking "Share with my coach" list, JSON so this
+ * lane does not add columns to SessionBooking (that table is read on the
+ * sessions page; a missing column there would 500 a deploy that raced the SQL).
+ * Each entry is `{ bookingId, coachId, sharedAt, withdrawnAt }`. A withdrawn
+ * entry stays. COACH-STORE-V1 should call `adultOptedInAndSharedWithCoach`
+ * (lib/privacy/coachShare.ts) rather than reading this JSON itself.
+ */
+export type ScanSaveOptIn = $Result.DefaultSelection<Prisma.$ScanSaveOptInPayload>
+/**
  * Model ReadinessCheckIn
  * MIRROR-COACH P6 (2026-09-29): the unscored daily readiness check-in — four tap scales on Today before a session,
  * every one optional, the whole card skippable (lib/health/readiness.ts; owner decision #12). A NEW table rather than
@@ -1874,6 +1890,16 @@ export class PrismaClient<
   get healthConsent(): Prisma.HealthConsentDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.scanSaveOptIn`: Exposes CRUD operations for the **ScanSaveOptIn** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ScanSaveOptIns
+    * const scanSaveOptIns = await prisma.scanSaveOptIn.findMany()
+    * ```
+    */
+  get scanSaveOptIn(): Prisma.ScanSaveOptInDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.readinessCheckIn`: Exposes CRUD operations for the **ReadinessCheckIn** model.
     * Example usage:
     * ```ts
@@ -2449,6 +2475,7 @@ export namespace Prisma {
     HealthIntake: 'HealthIntake',
     PainCheckIn: 'PainCheckIn',
     HealthConsent: 'HealthConsent',
+    ScanSaveOptIn: 'ScanSaveOptIn',
     ReadinessCheckIn: 'ReadinessCheckIn',
     BreathLog: 'BreathLog',
     ShareLink: 'ShareLink',
@@ -2472,7 +2499,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -8914,6 +8941,80 @@ export namespace Prisma {
           }
         }
       }
+      ScanSaveOptIn: {
+        payload: Prisma.$ScanSaveOptInPayload<ExtArgs>
+        fields: Prisma.ScanSaveOptInFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ScanSaveOptInFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ScanSaveOptInFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          findFirst: {
+            args: Prisma.ScanSaveOptInFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ScanSaveOptInFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          findMany: {
+            args: Prisma.ScanSaveOptInFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>[]
+          }
+          create: {
+            args: Prisma.ScanSaveOptInCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          createMany: {
+            args: Prisma.ScanSaveOptInCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ScanSaveOptInCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>[]
+          }
+          delete: {
+            args: Prisma.ScanSaveOptInDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          update: {
+            args: Prisma.ScanSaveOptInUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          deleteMany: {
+            args: Prisma.ScanSaveOptInDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ScanSaveOptInUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ScanSaveOptInUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>[]
+          }
+          upsert: {
+            args: Prisma.ScanSaveOptInUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          aggregate: {
+            args: Prisma.ScanSaveOptInAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateScanSaveOptIn>
+          }
+          groupBy: {
+            args: Prisma.ScanSaveOptInGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ScanSaveOptInGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ScanSaveOptInCountArgs<ExtArgs>
+            result: $Utils.Optional<ScanSaveOptInCountAggregateOutputType> | number
+          }
+        }
+      }
       ReadinessCheckIn: {
         payload: Prisma.$ReadinessCheckInPayload<ExtArgs>
         fields: Prisma.ReadinessCheckInFieldRefs
@@ -9455,6 +9556,7 @@ export namespace Prisma {
     healthIntake?: HealthIntakeOmit
     painCheckIn?: PainCheckInOmit
     healthConsent?: HealthConsentOmit
+    scanSaveOptIn?: ScanSaveOptInOmit
     readinessCheckIn?: ReadinessCheckInOmit
     breathLog?: BreathLogOmit
     shareLink?: ShareLinkOmit
@@ -11242,6 +11344,7 @@ export namespace Prisma {
     avatarLook?: boolean | User$avatarLookArgs<ExtArgs>
     ownedWearables?: boolean | User$ownedWearablesArgs<ExtArgs>
     sessionBookings?: boolean | User$sessionBookingsArgs<ExtArgs>
+    scanSaveOptIn?: boolean | User$scanSaveOptInArgs<ExtArgs>
     facilitatorProfile?: boolean | User$facilitatorProfileArgs<ExtArgs>
     goalPlansAsMentee?: boolean | User$goalPlansAsMenteeArgs<ExtArgs>
     goalPlansAsFacilitator?: boolean | User$goalPlansAsFacilitatorArgs<ExtArgs>
@@ -11359,6 +11462,7 @@ export namespace Prisma {
     avatarLook?: boolean | User$avatarLookArgs<ExtArgs>
     ownedWearables?: boolean | User$ownedWearablesArgs<ExtArgs>
     sessionBookings?: boolean | User$sessionBookingsArgs<ExtArgs>
+    scanSaveOptIn?: boolean | User$scanSaveOptInArgs<ExtArgs>
     facilitatorProfile?: boolean | User$facilitatorProfileArgs<ExtArgs>
     goalPlansAsMentee?: boolean | User$goalPlansAsMenteeArgs<ExtArgs>
     goalPlansAsFacilitator?: boolean | User$goalPlansAsFacilitatorArgs<ExtArgs>
@@ -11428,6 +11532,10 @@ export namespace Prisma {
       avatarLook: Prisma.$AvatarLookPayload<ExtArgs> | null
       ownedWearables: Prisma.$OwnedWearablePayload<ExtArgs>[]
       sessionBookings: Prisma.$SessionBookingPayload<ExtArgs>[]
+      /**
+       * AB-04: one opt-in row for saving movement numbers (jump, Prove It, re-screen).
+       */
+      scanSaveOptIn: Prisma.$ScanSaveOptInPayload<ExtArgs> | null
       facilitatorProfile: Prisma.$FacilitatorProfilePayload<ExtArgs> | null
       goalPlansAsMentee: Prisma.$GoalPlanPayload<ExtArgs>[]
       goalPlansAsFacilitator: Prisma.$GoalPlanPayload<ExtArgs>[]
@@ -11899,6 +12007,7 @@ export namespace Prisma {
     avatarLook<T extends User$avatarLookArgs<ExtArgs> = {}>(args?: Subset<T, User$avatarLookArgs<ExtArgs>>): Prisma__AvatarLookClient<$Result.GetResult<Prisma.$AvatarLookPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     ownedWearables<T extends User$ownedWearablesArgs<ExtArgs> = {}>(args?: Subset<T, User$ownedWearablesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OwnedWearablePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sessionBookings<T extends User$sessionBookingsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionBookingsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionBookingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    scanSaveOptIn<T extends User$scanSaveOptInArgs<ExtArgs> = {}>(args?: Subset<T, User$scanSaveOptInArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     facilitatorProfile<T extends User$facilitatorProfileArgs<ExtArgs> = {}>(args?: Subset<T, User$facilitatorProfileArgs<ExtArgs>>): Prisma__FacilitatorProfileClient<$Result.GetResult<Prisma.$FacilitatorProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     goalPlansAsMentee<T extends User$goalPlansAsMenteeArgs<ExtArgs> = {}>(args?: Subset<T, User$goalPlansAsMenteeArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GoalPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     goalPlansAsFacilitator<T extends User$goalPlansAsFacilitatorArgs<ExtArgs> = {}>(args?: Subset<T, User$goalPlansAsFacilitatorArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GoalPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -13401,6 +13510,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SessionBookingScalarFieldEnum | SessionBookingScalarFieldEnum[]
+  }
+
+  /**
+   * User.scanSaveOptIn
+   */
+  export type User$scanSaveOptInArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    where?: ScanSaveOptInWhereInput
   }
 
   /**
@@ -112973,6 +113101,1131 @@ export namespace Prisma {
 
 
   /**
+   * Model ScanSaveOptIn
+   */
+
+  export type AggregateScanSaveOptIn = {
+    _count: ScanSaveOptInCountAggregateOutputType | null
+    _min: ScanSaveOptInMinAggregateOutputType | null
+    _max: ScanSaveOptInMaxAggregateOutputType | null
+  }
+
+  export type ScanSaveOptInMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    scope: string | null
+    granted: boolean | null
+    grantedAt: Date | null
+    revokedAt: Date | null
+    consentTextVersion: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ScanSaveOptInMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    scope: string | null
+    granted: boolean | null
+    grantedAt: Date | null
+    revokedAt: Date | null
+    consentTextVersion: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ScanSaveOptInCountAggregateOutputType = {
+    id: number
+    userId: number
+    scope: number
+    granted: number
+    grantedAt: number
+    revokedAt: number
+    consentTextVersion: number
+    coachShares: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ScanSaveOptInMinAggregateInputType = {
+    id?: true
+    userId?: true
+    scope?: true
+    granted?: true
+    grantedAt?: true
+    revokedAt?: true
+    consentTextVersion?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ScanSaveOptInMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    scope?: true
+    granted?: true
+    grantedAt?: true
+    revokedAt?: true
+    consentTextVersion?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ScanSaveOptInCountAggregateInputType = {
+    id?: true
+    userId?: true
+    scope?: true
+    granted?: true
+    grantedAt?: true
+    revokedAt?: true
+    consentTextVersion?: true
+    coachShares?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ScanSaveOptInAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ScanSaveOptIn to aggregate.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ScanSaveOptIns
+    **/
+    _count?: true | ScanSaveOptInCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ScanSaveOptInMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ScanSaveOptInMaxAggregateInputType
+  }
+
+  export type GetScanSaveOptInAggregateType<T extends ScanSaveOptInAggregateArgs> = {
+        [P in keyof T & keyof AggregateScanSaveOptIn]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateScanSaveOptIn[P]>
+      : GetScalarType<T[P], AggregateScanSaveOptIn[P]>
+  }
+
+
+
+
+  export type ScanSaveOptInGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ScanSaveOptInWhereInput
+    orderBy?: ScanSaveOptInOrderByWithAggregationInput | ScanSaveOptInOrderByWithAggregationInput[]
+    by: ScanSaveOptInScalarFieldEnum[] | ScanSaveOptInScalarFieldEnum
+    having?: ScanSaveOptInScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ScanSaveOptInCountAggregateInputType | true
+    _min?: ScanSaveOptInMinAggregateInputType
+    _max?: ScanSaveOptInMaxAggregateInputType
+  }
+
+  export type ScanSaveOptInGroupByOutputType = {
+    id: string
+    userId: string
+    scope: string
+    granted: boolean
+    grantedAt: Date | null
+    revokedAt: Date | null
+    consentTextVersion: string
+    coachShares: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ScanSaveOptInCountAggregateOutputType | null
+    _min: ScanSaveOptInMinAggregateOutputType | null
+    _max: ScanSaveOptInMaxAggregateOutputType | null
+  }
+
+  type GetScanSaveOptInGroupByPayload<T extends ScanSaveOptInGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ScanSaveOptInGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ScanSaveOptInGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ScanSaveOptInGroupByOutputType[P]>
+            : GetScalarType<T[P], ScanSaveOptInGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ScanSaveOptInSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["scanSaveOptIn"]>
+
+  export type ScanSaveOptInSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["scanSaveOptIn"]>
+
+  export type ScanSaveOptInSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["scanSaveOptIn"]>
+
+  export type ScanSaveOptInSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ScanSaveOptInOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "scope" | "granted" | "grantedAt" | "revokedAt" | "consentTextVersion" | "coachShares" | "createdAt" | "updatedAt", ExtArgs["result"]["scanSaveOptIn"]>
+  export type ScanSaveOptInInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ScanSaveOptInIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ScanSaveOptInIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ScanSaveOptInPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ScanSaveOptIn"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      /**
+       * 'jump_numbers' — jump numbers, Prove It, and re-screen history.
+       */
+      scope: string
+      granted: boolean
+      grantedAt: Date | null
+      revokedAt: Date | null
+      consentTextVersion: string
+      /**
+       * Per-booking coach shares. Null means none. See the model note.
+       */
+      coachShares: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["scanSaveOptIn"]>
+    composites: {}
+  }
+
+  type ScanSaveOptInGetPayload<S extends boolean | null | undefined | ScanSaveOptInDefaultArgs> = $Result.GetResult<Prisma.$ScanSaveOptInPayload, S>
+
+  type ScanSaveOptInCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ScanSaveOptInFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ScanSaveOptInCountAggregateInputType | true
+    }
+
+  export interface ScanSaveOptInDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ScanSaveOptIn'], meta: { name: 'ScanSaveOptIn' } }
+    /**
+     * Find zero or one ScanSaveOptIn that matches the filter.
+     * @param {ScanSaveOptInFindUniqueArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ScanSaveOptInFindUniqueArgs>(args: SelectSubset<T, ScanSaveOptInFindUniqueArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ScanSaveOptIn that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ScanSaveOptInFindUniqueOrThrowArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ScanSaveOptInFindUniqueOrThrowArgs>(args: SelectSubset<T, ScanSaveOptInFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ScanSaveOptIn that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInFindFirstArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ScanSaveOptInFindFirstArgs>(args?: SelectSubset<T, ScanSaveOptInFindFirstArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ScanSaveOptIn that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInFindFirstOrThrowArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ScanSaveOptInFindFirstOrThrowArgs>(args?: SelectSubset<T, ScanSaveOptInFindFirstOrThrowArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ScanSaveOptIns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ScanSaveOptIns
+     * const scanSaveOptIns = await prisma.scanSaveOptIn.findMany()
+     * 
+     * // Get first 10 ScanSaveOptIns
+     * const scanSaveOptIns = await prisma.scanSaveOptIn.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const scanSaveOptInWithIdOnly = await prisma.scanSaveOptIn.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ScanSaveOptInFindManyArgs>(args?: SelectSubset<T, ScanSaveOptInFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ScanSaveOptIn.
+     * @param {ScanSaveOptInCreateArgs} args - Arguments to create a ScanSaveOptIn.
+     * @example
+     * // Create one ScanSaveOptIn
+     * const ScanSaveOptIn = await prisma.scanSaveOptIn.create({
+     *   data: {
+     *     // ... data to create a ScanSaveOptIn
+     *   }
+     * })
+     * 
+     */
+    create<T extends ScanSaveOptInCreateArgs>(args: SelectSubset<T, ScanSaveOptInCreateArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ScanSaveOptIns.
+     * @param {ScanSaveOptInCreateManyArgs} args - Arguments to create many ScanSaveOptIns.
+     * @example
+     * // Create many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ScanSaveOptInCreateManyArgs>(args?: SelectSubset<T, ScanSaveOptInCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ScanSaveOptIns and returns the data saved in the database.
+     * @param {ScanSaveOptInCreateManyAndReturnArgs} args - Arguments to create many ScanSaveOptIns.
+     * @example
+     * // Create many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ScanSaveOptIns and only return the `id`
+     * const scanSaveOptInWithIdOnly = await prisma.scanSaveOptIn.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ScanSaveOptInCreateManyAndReturnArgs>(args?: SelectSubset<T, ScanSaveOptInCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ScanSaveOptIn.
+     * @param {ScanSaveOptInDeleteArgs} args - Arguments to delete one ScanSaveOptIn.
+     * @example
+     * // Delete one ScanSaveOptIn
+     * const ScanSaveOptIn = await prisma.scanSaveOptIn.delete({
+     *   where: {
+     *     // ... filter to delete one ScanSaveOptIn
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ScanSaveOptInDeleteArgs>(args: SelectSubset<T, ScanSaveOptInDeleteArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ScanSaveOptIn.
+     * @param {ScanSaveOptInUpdateArgs} args - Arguments to update one ScanSaveOptIn.
+     * @example
+     * // Update one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ScanSaveOptInUpdateArgs>(args: SelectSubset<T, ScanSaveOptInUpdateArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ScanSaveOptIns.
+     * @param {ScanSaveOptInDeleteManyArgs} args - Arguments to filter ScanSaveOptIns to delete.
+     * @example
+     * // Delete a few ScanSaveOptIns
+     * const { count } = await prisma.scanSaveOptIn.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ScanSaveOptInDeleteManyArgs>(args?: SelectSubset<T, ScanSaveOptInDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ScanSaveOptIns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ScanSaveOptInUpdateManyArgs>(args: SelectSubset<T, ScanSaveOptInUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ScanSaveOptIns and returns the data updated in the database.
+     * @param {ScanSaveOptInUpdateManyAndReturnArgs} args - Arguments to update many ScanSaveOptIns.
+     * @example
+     * // Update many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ScanSaveOptIns and only return the `id`
+     * const scanSaveOptInWithIdOnly = await prisma.scanSaveOptIn.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ScanSaveOptInUpdateManyAndReturnArgs>(args: SelectSubset<T, ScanSaveOptInUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ScanSaveOptIn.
+     * @param {ScanSaveOptInUpsertArgs} args - Arguments to update or create a ScanSaveOptIn.
+     * @example
+     * // Update or create a ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.upsert({
+     *   create: {
+     *     // ... data to create a ScanSaveOptIn
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ScanSaveOptIn we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ScanSaveOptInUpsertArgs>(args: SelectSubset<T, ScanSaveOptInUpsertArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ScanSaveOptIns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInCountArgs} args - Arguments to filter ScanSaveOptIns to count.
+     * @example
+     * // Count the number of ScanSaveOptIns
+     * const count = await prisma.scanSaveOptIn.count({
+     *   where: {
+     *     // ... the filter for the ScanSaveOptIns we want to count
+     *   }
+     * })
+    **/
+    count<T extends ScanSaveOptInCountArgs>(
+      args?: Subset<T, ScanSaveOptInCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ScanSaveOptInCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ScanSaveOptIn.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ScanSaveOptInAggregateArgs>(args: Subset<T, ScanSaveOptInAggregateArgs>): Prisma.PrismaPromise<GetScanSaveOptInAggregateType<T>>
+
+    /**
+     * Group by ScanSaveOptIn.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ScanSaveOptInGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ScanSaveOptInGroupByArgs['orderBy'] }
+        : { orderBy?: ScanSaveOptInGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ScanSaveOptInGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetScanSaveOptInGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ScanSaveOptIn model
+   */
+  readonly fields: ScanSaveOptInFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ScanSaveOptIn.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ScanSaveOptInClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ScanSaveOptIn model
+   */
+  interface ScanSaveOptInFieldRefs {
+    readonly id: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly userId: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly scope: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly granted: FieldRef<"ScanSaveOptIn", 'Boolean'>
+    readonly grantedAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+    readonly revokedAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+    readonly consentTextVersion: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly coachShares: FieldRef<"ScanSaveOptIn", 'Json'>
+    readonly createdAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+    readonly updatedAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ScanSaveOptIn findUnique
+   */
+  export type ScanSaveOptInFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn findUniqueOrThrow
+   */
+  export type ScanSaveOptInFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn findFirst
+   */
+  export type ScanSaveOptInFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ScanSaveOptIns.
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ScanSaveOptIns.
+     */
+    distinct?: ScanSaveOptInScalarFieldEnum | ScanSaveOptInScalarFieldEnum[]
+  }
+
+  /**
+   * ScanSaveOptIn findFirstOrThrow
+   */
+  export type ScanSaveOptInFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ScanSaveOptIns.
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ScanSaveOptIns.
+     */
+    distinct?: ScanSaveOptInScalarFieldEnum | ScanSaveOptInScalarFieldEnum[]
+  }
+
+  /**
+   * ScanSaveOptIn findMany
+   */
+  export type ScanSaveOptInFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIns to fetch.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ScanSaveOptIns.
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    distinct?: ScanSaveOptInScalarFieldEnum | ScanSaveOptInScalarFieldEnum[]
+  }
+
+  /**
+   * ScanSaveOptIn create
+   */
+  export type ScanSaveOptInCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ScanSaveOptIn.
+     */
+    data: XOR<ScanSaveOptInCreateInput, ScanSaveOptInUncheckedCreateInput>
+  }
+
+  /**
+   * ScanSaveOptIn createMany
+   */
+  export type ScanSaveOptInCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ScanSaveOptIns.
+     */
+    data: ScanSaveOptInCreateManyInput | ScanSaveOptInCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ScanSaveOptIn createManyAndReturn
+   */
+  export type ScanSaveOptInCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * The data used to create many ScanSaveOptIns.
+     */
+    data: ScanSaveOptInCreateManyInput | ScanSaveOptInCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ScanSaveOptIn update
+   */
+  export type ScanSaveOptInUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ScanSaveOptIn.
+     */
+    data: XOR<ScanSaveOptInUpdateInput, ScanSaveOptInUncheckedUpdateInput>
+    /**
+     * Choose, which ScanSaveOptIn to update.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn updateMany
+   */
+  export type ScanSaveOptInUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ScanSaveOptIns.
+     */
+    data: XOR<ScanSaveOptInUpdateManyMutationInput, ScanSaveOptInUncheckedUpdateManyInput>
+    /**
+     * Filter which ScanSaveOptIns to update
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * Limit how many ScanSaveOptIns to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ScanSaveOptIn updateManyAndReturn
+   */
+  export type ScanSaveOptInUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * The data used to update ScanSaveOptIns.
+     */
+    data: XOR<ScanSaveOptInUpdateManyMutationInput, ScanSaveOptInUncheckedUpdateManyInput>
+    /**
+     * Filter which ScanSaveOptIns to update
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * Limit how many ScanSaveOptIns to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ScanSaveOptIn upsert
+   */
+  export type ScanSaveOptInUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ScanSaveOptIn to update in case it exists.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+    /**
+     * In case the ScanSaveOptIn found by the `where` argument doesn't exist, create a new ScanSaveOptIn with this data.
+     */
+    create: XOR<ScanSaveOptInCreateInput, ScanSaveOptInUncheckedCreateInput>
+    /**
+     * In case the ScanSaveOptIn was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ScanSaveOptInUpdateInput, ScanSaveOptInUncheckedUpdateInput>
+  }
+
+  /**
+   * ScanSaveOptIn delete
+   */
+  export type ScanSaveOptInDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter which ScanSaveOptIn to delete.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn deleteMany
+   */
+  export type ScanSaveOptInDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ScanSaveOptIns to delete
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * Limit how many ScanSaveOptIns to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ScanSaveOptIn without action
+   */
+  export type ScanSaveOptInDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model ReadinessCheckIn
    */
 
@@ -120082,6 +121335,22 @@ export namespace Prisma {
   export type HealthConsentScalarFieldEnum = (typeof HealthConsentScalarFieldEnum)[keyof typeof HealthConsentScalarFieldEnum]
 
 
+  export const ScanSaveOptInScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    scope: 'scope',
+    granted: 'granted',
+    grantedAt: 'grantedAt',
+    revokedAt: 'revokedAt',
+    consentTextVersion: 'consentTextVersion',
+    coachShares: 'coachShares',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ScanSaveOptInScalarFieldEnum = (typeof ScanSaveOptInScalarFieldEnum)[keyof typeof ScanSaveOptInScalarFieldEnum]
+
+
   export const ReadinessCheckInScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
@@ -120673,6 +121942,7 @@ export namespace Prisma {
     avatarLook?: XOR<AvatarLookNullableScalarRelationFilter, AvatarLookWhereInput> | null
     ownedWearables?: OwnedWearableListRelationFilter
     sessionBookings?: SessionBookingListRelationFilter
+    scanSaveOptIn?: XOR<ScanSaveOptInNullableScalarRelationFilter, ScanSaveOptInWhereInput> | null
     facilitatorProfile?: XOR<FacilitatorProfileNullableScalarRelationFilter, FacilitatorProfileWhereInput> | null
     goalPlansAsMentee?: GoalPlanListRelationFilter
     goalPlansAsFacilitator?: GoalPlanListRelationFilter
@@ -120751,6 +122021,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookOrderByWithRelationInput
     ownedWearables?: OwnedWearableOrderByRelationAggregateInput
     sessionBookings?: SessionBookingOrderByRelationAggregateInput
+    scanSaveOptIn?: ScanSaveOptInOrderByWithRelationInput
     facilitatorProfile?: FacilitatorProfileOrderByWithRelationInput
     goalPlansAsMentee?: GoalPlanOrderByRelationAggregateInput
     goalPlansAsFacilitator?: GoalPlanOrderByRelationAggregateInput
@@ -120832,6 +122103,7 @@ export namespace Prisma {
     avatarLook?: XOR<AvatarLookNullableScalarRelationFilter, AvatarLookWhereInput> | null
     ownedWearables?: OwnedWearableListRelationFilter
     sessionBookings?: SessionBookingListRelationFilter
+    scanSaveOptIn?: XOR<ScanSaveOptInNullableScalarRelationFilter, ScanSaveOptInWhereInput> | null
     facilitatorProfile?: XOR<FacilitatorProfileNullableScalarRelationFilter, FacilitatorProfileWhereInput> | null
     goalPlansAsMentee?: GoalPlanListRelationFilter
     goalPlansAsFacilitator?: GoalPlanListRelationFilter
@@ -127862,6 +129134,86 @@ export namespace Prisma {
     revokedAt?: DateTimeNullableWithAggregatesFilter<"HealthConsent"> | Date | string | null
   }
 
+  export type ScanSaveOptInWhereInput = {
+    AND?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    OR?: ScanSaveOptInWhereInput[]
+    NOT?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    id?: StringFilter<"ScanSaveOptIn"> | string
+    userId?: StringFilter<"ScanSaveOptIn"> | string
+    scope?: StringFilter<"ScanSaveOptIn"> | string
+    granted?: BoolFilter<"ScanSaveOptIn"> | boolean
+    grantedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    consentTextVersion?: StringFilter<"ScanSaveOptIn"> | string
+    coachShares?: JsonNullableFilter<"ScanSaveOptIn">
+    createdAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    updatedAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type ScanSaveOptInOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrderInput | SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    consentTextVersion?: SortOrder
+    coachShares?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type ScanSaveOptInWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId?: string
+    AND?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    OR?: ScanSaveOptInWhereInput[]
+    NOT?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    scope?: StringFilter<"ScanSaveOptIn"> | string
+    granted?: BoolFilter<"ScanSaveOptIn"> | boolean
+    grantedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    consentTextVersion?: StringFilter<"ScanSaveOptIn"> | string
+    coachShares?: JsonNullableFilter<"ScanSaveOptIn">
+    createdAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    updatedAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId">
+
+  export type ScanSaveOptInOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrderInput | SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    consentTextVersion?: SortOrder
+    coachShares?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ScanSaveOptInCountOrderByAggregateInput
+    _max?: ScanSaveOptInMaxOrderByAggregateInput
+    _min?: ScanSaveOptInMinOrderByAggregateInput
+  }
+
+  export type ScanSaveOptInScalarWhereWithAggregatesInput = {
+    AND?: ScanSaveOptInScalarWhereWithAggregatesInput | ScanSaveOptInScalarWhereWithAggregatesInput[]
+    OR?: ScanSaveOptInScalarWhereWithAggregatesInput[]
+    NOT?: ScanSaveOptInScalarWhereWithAggregatesInput | ScanSaveOptInScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    userId?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    scope?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    granted?: BoolWithAggregatesFilter<"ScanSaveOptIn"> | boolean
+    grantedAt?: DateTimeNullableWithAggregatesFilter<"ScanSaveOptIn"> | Date | string | null
+    revokedAt?: DateTimeNullableWithAggregatesFilter<"ScanSaveOptIn"> | Date | string | null
+    consentTextVersion?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    coachShares?: JsonNullableWithAggregatesFilter<"ScanSaveOptIn">
+    createdAt?: DateTimeWithAggregatesFilter<"ScanSaveOptIn"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ScanSaveOptIn"> | Date | string
+  }
+
   export type ReadinessCheckInWhereInput = {
     AND?: ReadinessCheckInWhereInput | ReadinessCheckInWhereInput[]
     OR?: ReadinessCheckInWhereInput[]
@@ -128296,6 +129648,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -128374,6 +129727,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -128452,6 +129806,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -128530,6 +129885,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -136241,6 +137597,96 @@ export namespace Prisma {
     revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type ScanSaveOptInCreateInput = {
+    id?: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutScanSaveOptInInput
+  }
+
+  export type ScanSaveOptInUncheckedCreateInput = {
+    id?: string
+    userId: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutScanSaveOptInNestedInput
+  }
+
+  export type ScanSaveOptInUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ScanSaveOptInCreateManyInput = {
+    id?: string
+    userId: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ScanSaveOptInUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ReadinessCheckInCreateInput = {
     id?: string
     date: string
@@ -136938,6 +138384,11 @@ export namespace Prisma {
     every?: SessionBookingWhereInput
     some?: SessionBookingWhereInput
     none?: SessionBookingWhereInput
+  }
+
+  export type ScanSaveOptInNullableScalarRelationFilter = {
+    is?: ScanSaveOptInWhereInput | null
+    isNot?: ScanSaveOptInWhereInput | null
   }
 
   export type FacilitatorProfileNullableScalarRelationFilter = {
@@ -142114,6 +143565,43 @@ export namespace Prisma {
     revokedAt?: SortOrder
   }
 
+  export type ScanSaveOptInCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrder
+    revokedAt?: SortOrder
+    consentTextVersion?: SortOrder
+    coachShares?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ScanSaveOptInMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrder
+    revokedAt?: SortOrder
+    consentTextVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ScanSaveOptInMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrder
+    revokedAt?: SortOrder
+    consentTextVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type ReadinessCheckInUserIdDateCompoundUniqueInput = {
     userId: string
     date: string
@@ -142644,6 +144132,12 @@ export namespace Prisma {
     connect?: SessionBookingWhereUniqueInput | SessionBookingWhereUniqueInput[]
   }
 
+  export type ScanSaveOptInCreateNestedOneWithoutUserInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    connect?: ScanSaveOptInWhereUniqueInput
+  }
+
   export type FacilitatorProfileCreateNestedOneWithoutUserInput = {
     create?: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: FacilitatorProfileCreateOrConnectWithoutUserInput
@@ -143059,6 +144553,12 @@ export namespace Prisma {
     connectOrCreate?: SessionBookingCreateOrConnectWithoutUserInput | SessionBookingCreateOrConnectWithoutUserInput[]
     createMany?: SessionBookingCreateManyUserInputEnvelope
     connect?: SessionBookingWhereUniqueInput | SessionBookingWhereUniqueInput[]
+  }
+
+  export type ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    connect?: ScanSaveOptInWhereUniqueInput
   }
 
   export type FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput = {
@@ -143795,6 +145295,16 @@ export namespace Prisma {
     update?: SessionBookingUpdateWithWhereUniqueWithoutUserInput | SessionBookingUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: SessionBookingUpdateManyWithWhereWithoutUserInput | SessionBookingUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: SessionBookingScalarWhereInput | SessionBookingScalarWhereInput[]
+  }
+
+  export type ScanSaveOptInUpdateOneWithoutUserNestedInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    upsert?: ScanSaveOptInUpsertWithoutUserInput
+    disconnect?: ScanSaveOptInWhereInput | boolean
+    delete?: ScanSaveOptInWhereInput | boolean
+    connect?: ScanSaveOptInWhereUniqueInput
+    update?: XOR<XOR<ScanSaveOptInUpdateToOneWithWhereWithoutUserInput, ScanSaveOptInUpdateWithoutUserInput>, ScanSaveOptInUncheckedUpdateWithoutUserInput>
   }
 
   export type FacilitatorProfileUpdateOneWithoutUserNestedInput = {
@@ -144609,6 +146119,16 @@ export namespace Prisma {
     update?: SessionBookingUpdateWithWhereUniqueWithoutUserInput | SessionBookingUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: SessionBookingUpdateManyWithWhereWithoutUserInput | SessionBookingUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: SessionBookingScalarWhereInput | SessionBookingScalarWhereInput[]
+  }
+
+  export type ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    upsert?: ScanSaveOptInUpsertWithoutUserInput
+    disconnect?: ScanSaveOptInWhereInput | boolean
+    delete?: ScanSaveOptInWhereInput | boolean
+    connect?: ScanSaveOptInWhereUniqueInput
+    update?: XOR<XOR<ScanSaveOptInUpdateToOneWithWhereWithoutUserInput, ScanSaveOptInUpdateWithoutUserInput>, ScanSaveOptInUncheckedUpdateWithoutUserInput>
   }
 
   export type FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput = {
@@ -148013,6 +149533,20 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutHealthConsentsInput, UserUpdateWithoutHealthConsentsInput>, UserUncheckedUpdateWithoutHealthConsentsInput>
   }
 
+  export type UserCreateNestedOneWithoutScanSaveOptInInput = {
+    create?: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+    connectOrCreate?: UserCreateOrConnectWithoutScanSaveOptInInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutScanSaveOptInNestedInput = {
+    create?: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+    connectOrCreate?: UserCreateOrConnectWithoutScanSaveOptInInput
+    upsert?: UserUpsertWithoutScanSaveOptInInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutScanSaveOptInInput, UserUpdateWithoutScanSaveOptInInput>, UserUncheckedUpdateWithoutScanSaveOptInInput>
+  }
+
   export type UserCreateNestedOneWithoutReadinessCheckInsInput = {
     create?: XOR<UserCreateWithoutReadinessCheckInsInput, UserUncheckedCreateWithoutReadinessCheckInsInput>
     connectOrCreate?: UserCreateOrConnectWithoutReadinessCheckInsInput
@@ -150354,6 +151888,35 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type ScanSaveOptInCreateWithoutUserInput = {
+    id?: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInUncheckedCreateWithoutUserInput = {
+    id?: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInCreateOrConnectWithoutUserInput = {
+    where: ScanSaveOptInWhereUniqueInput
+    create: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+  }
+
   export type FacilitatorProfileCreateWithoutUserInput = {
     id?: string
     certificationStatus?: $Enums.CertificationStatus
@@ -152314,6 +153877,41 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"SessionBooking"> | Date | string
   }
 
+  export type ScanSaveOptInUpsertWithoutUserInput = {
+    update: XOR<ScanSaveOptInUpdateWithoutUserInput, ScanSaveOptInUncheckedUpdateWithoutUserInput>
+    create: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    where?: ScanSaveOptInWhereInput
+  }
+
+  export type ScanSaveOptInUpdateToOneWithWhereWithoutUserInput = {
+    where?: ScanSaveOptInWhereInput
+    data: XOR<ScanSaveOptInUpdateWithoutUserInput, ScanSaveOptInUncheckedUpdateWithoutUserInput>
+  }
+
+  export type ScanSaveOptInUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ScanSaveOptInUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type FacilitatorProfileUpsertWithoutUserInput = {
     update: XOR<FacilitatorProfileUpdateWithoutUserInput, FacilitatorProfileUncheckedUpdateWithoutUserInput>
     create: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
@@ -152834,6 +154432,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -152911,6 +154510,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -153004,6 +154604,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -153081,6 +154682,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -153158,6 +154760,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -153235,6 +154838,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -153371,6 +154975,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -153448,6 +155053,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -153574,6 +155180,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -153651,6 +155258,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -153817,6 +155425,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -153894,6 +155503,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -154038,6 +155648,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -154115,6 +155726,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -154251,6 +155863,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -154328,6 +155941,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -154454,6 +156068,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -154531,6 +156146,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -154624,6 +156240,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -154701,6 +156318,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -154778,6 +156396,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -154855,6 +156474,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -154948,6 +156568,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -155025,6 +156646,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -155102,6 +156724,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -155179,6 +156802,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -155272,6 +156896,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -155349,6 +156974,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -155426,6 +157052,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -155503,6 +157130,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -155596,6 +157224,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -155673,6 +157302,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -155750,6 +157380,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -155827,6 +157458,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -156046,6 +157678,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -156123,6 +157756,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -156323,6 +157957,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -156400,6 +158035,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -156493,6 +158129,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -156570,6 +158207,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -156647,6 +158285,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -156724,6 +158363,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -156817,6 +158457,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -156894,6 +158535,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -157638,6 +159280,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -157715,6 +159358,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -157808,6 +159452,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -157885,6 +159530,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -157962,6 +159608,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -158039,6 +159686,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -158132,6 +159780,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -158209,6 +159858,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -158286,6 +159936,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -158363,6 +160014,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -158456,6 +160108,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -158533,6 +160186,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -158610,6 +160264,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -158687,6 +160342,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -158780,6 +160436,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -158857,6 +160514,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -158934,6 +160592,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -159011,6 +160670,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -159130,6 +160790,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -159207,6 +160868,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -159300,6 +160962,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -159377,6 +161040,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -159500,6 +161164,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -159577,6 +161242,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -159756,6 +161422,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -159833,6 +161500,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -159963,6 +161631,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -160040,6 +161709,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -160231,6 +161901,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160308,6 +161979,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160432,6 +162104,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -160509,6 +162182,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -160586,6 +162260,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160663,6 +162338,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160745,6 +162421,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160822,6 +162499,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160904,6 +162582,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160981,6 +162660,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -161102,6 +162782,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161179,6 +162860,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161267,6 +162949,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161344,6 +163027,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161432,6 +163116,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161509,6 +163194,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161661,6 +163347,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -161738,6 +163425,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -161896,6 +163584,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161973,6 +163662,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -162050,6 +163740,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -162127,6 +163818,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -162220,6 +163912,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -162297,6 +163990,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -162374,6 +164068,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -162451,6 +164146,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -162544,6 +164240,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -162621,6 +164318,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -162965,6 +164663,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -163042,6 +164741,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -163169,6 +164869,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -163246,6 +164947,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -163415,6 +165117,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -163492,6 +165195,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -163585,6 +165289,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -163662,6 +165367,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -163739,6 +165445,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -163816,6 +165523,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -163909,6 +165617,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -163986,6 +165695,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -164063,6 +165773,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164140,6 +165851,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -164233,6 +165945,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -164310,6 +166023,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -164387,6 +166101,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164464,6 +166179,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -164583,6 +166299,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -164660,6 +166377,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -164817,6 +166535,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164894,6 +166613,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -164976,6 +166696,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -165053,6 +166774,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -165146,6 +166868,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165223,6 +166946,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -165311,6 +167035,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165388,6 +167113,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -165465,6 +167191,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -165542,6 +167269,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -165635,6 +167363,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165712,6 +167441,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -165789,6 +167519,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -165866,6 +167597,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -165959,6 +167691,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -166036,6 +167769,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -166113,6 +167847,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -166190,6 +167925,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -166283,6 +168019,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -166360,6 +168097,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -166437,6 +168175,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -166514,6 +168253,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -166635,6 +168375,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -166712,6 +168453,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -166805,6 +168547,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -166882,6 +168625,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -166998,6 +168742,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -167075,6 +168820,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -167181,6 +168927,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -167258,6 +169005,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -167351,6 +169099,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -167428,6 +169177,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -167505,6 +169255,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -167582,6 +169333,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -167675,6 +169427,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -167752,6 +169505,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -167829,6 +169583,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -167906,6 +169661,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -167999,6 +169755,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -168076,6 +169833,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -168153,6 +169911,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -168230,6 +169989,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -168323,6 +170083,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -168400,6 +170161,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -168600,6 +170362,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -168677,6 +170440,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -168792,6 +170556,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -168869,6 +170634,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -169068,6 +170834,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -169145,6 +170912,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -169272,6 +171040,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -169349,6 +171118,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -169550,6 +171320,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -169627,6 +171398,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -169872,6 +171644,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -169949,6 +171722,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -170138,6 +171912,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -170215,6 +171990,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -170400,6 +172176,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -170477,6 +172254,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -170634,6 +172412,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -170711,6 +172490,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -170896,6 +172676,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -170973,6 +172754,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -172455,6 +174237,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialCreateNestedManyWithoutUserInput
@@ -172532,6 +174315,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
@@ -172749,6 +174533,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUpdateManyWithoutUserNestedInput
@@ -172826,6 +174611,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -172988,6 +174774,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -173065,6 +174852,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -173158,6 +174946,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -173235,6 +175024,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -173312,6 +175102,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -173389,6 +175180,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -173482,6 +175274,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -173559,6 +175352,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -173636,6 +175430,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialCreateNestedManyWithoutUserInput
@@ -173713,6 +175508,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
@@ -173795,6 +175591,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     credentials?: CredentialCreateNestedManyWithoutUserInput
@@ -173872,6 +175669,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
@@ -174042,6 +175840,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUpdateManyWithoutUserNestedInput
@@ -174119,6 +175918,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -174207,6 +176007,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     credentials?: CredentialUpdateManyWithoutUserNestedInput
@@ -174284,6 +176085,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -174667,6 +176469,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -174744,6 +176547,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -174837,6 +176641,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -174914,6 +176719,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -174992,6 +176798,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -175069,6 +176876,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -175162,6 +176970,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -175239,6 +177048,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -175316,6 +177126,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -175393,6 +177204,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -175486,6 +177298,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -175563,6 +177376,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -175640,6 +177454,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -175717,6 +177532,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -175810,6 +177626,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -175887,6 +177704,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -175894,6 +177712,334 @@ export namespace Prisma {
     guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
     healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
     painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserCreateWithoutScanSaveOptInInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutScanSaveOptInInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutScanSaveOptInInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+  }
+
+  export type UserUpsertWithoutScanSaveOptInInput = {
+    update: XOR<UserUpdateWithoutScanSaveOptInInput, UserUncheckedUpdateWithoutScanSaveOptInInput>
+    create: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutScanSaveOptInInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutScanSaveOptInInput, UserUncheckedUpdateWithoutScanSaveOptInInput>
+  }
+
+  export type UserUpdateWithoutScanSaveOptInInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutScanSaveOptInInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
     readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
     breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
     crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
@@ -175964,6 +178110,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -176041,6 +178188,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -176134,6 +178282,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -176211,6 +178360,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -176288,6 +178438,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -176365,6 +178516,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -176458,6 +178610,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -176535,6 +178688,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -176611,6 +178765,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -176688,6 +178843,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -176781,6 +178937,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -176858,6 +179015,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -176935,6 +179093,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -177012,6 +179171,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -177105,6 +179265,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -177182,6 +179343,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -177259,6 +179421,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -177336,6 +179499,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -177418,6 +179582,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -177495,6 +179660,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -177588,6 +179754,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -177665,6 +179832,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -177753,6 +179921,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -177830,6 +179999,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput

@@ -14,8 +14,10 @@ import { pickCodec } from '@/lib/capture/codecs';
 import { exportFramed } from '@/lib/capture/exportVideo';
 import { cameraMayStart, selfVideoMayLeave } from '@/lib/capture/privacy';
 import { downloadBlob, deliverClip, extForMime, shareFileName } from '@/lib/capture/shareClip';
-import { needsGrownUp, type AgeBand } from '@/lib/screen/age';
+import { isKid, needsGrownUp, type AgeBand } from '@/lib/screen/age';
 import { lockAge, resetAge } from '@/lib/screen/store';
+import { ScanSaveCard } from '@/components/privacy/scan-save-card';
+import { postDunkNumbers } from '@/lib/dunk-film/serverSave';
 import { deviceNumbers, dunkHistoryBody } from '@/lib/dunk-film/history';
 import { jumpLines, readJumps, type JumpRead } from '@/lib/dunk-film/jumpDetect';
 import { buildReel, type Reel } from '@/lib/dunk-film/reel';
@@ -44,6 +46,9 @@ export function DunkFilm(props: { onClose: () => void }) {
   const [reel, setReel] = useState<Reel | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [serverAdult, setServerAdult] = useState(false);
+  const [optedIn, setOptedIn] = useState(false);
+  const [saveChecked, setSaveChecked] = useState(false);
 
   const frames = useRef<PoseFrame[]>([]);
   const startedHere = useRef(false);
@@ -54,6 +59,7 @@ export function DunkFilm(props: { onClose: () => void }) {
   const blobRef = useRef<Blob | null>(null);
   const clipUrlRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const runIds = useRef<Map<number, string>>(new Map());
 
   useEffect(() => {
     // AGE-RESET (audit 2.2, 2026-10-03): a new Film dunk session is maybe a new athlete on a shared phone — the last
@@ -64,6 +70,19 @@ export function DunkFilm(props: { onClose: () => void }) {
     // teardown on leave only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Server age, not the tap. Kids and unknown never ask. A self-reported 18+ who is not verified gets no card.
+  useEffect(() => {
+    if (phase !== 'review' || isKid(age)) return;
+    let gone = false;
+    fetch('/api/account/scan-save').then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (gone || !j) return;
+      if (j.verifiedAdult !== true) return;
+      setServerAdult(true);
+      if (j.optedIn === true) { setOptedIn(true); setSaveChecked(true); }
+    }).catch(() => {});
+    return () => { gone = true; };
+  }, [phase, age]);
 
   function teardown() {
     const rec = recorder.current;
@@ -216,34 +235,53 @@ export function DunkFilm(props: { onClose: () => void }) {
     }
   }
 
+  function runIdFor(index: number): string {
+    const existing = runIds.current.get(index);
+    if (existing) return existing;
+    const raw = (globalThis.crypto?.randomUUID?.() ?? `fixed${index}abcdefgh`).replace(/-/g, '');
+    const id = `dunkfilm${index}${raw}`.slice(0, 40);
+    runIds.current.set(index, id);
+    return id;
+  }
+
+  async function onSaveCheck(next: boolean) {
+    setSaveChecked(next);
+    if (!serverAdult) { setSaveChecked(false); return; }
+    try {
+      const res = await fetch('/api/account/scan-save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ granted: next }),
+      });
+      if (!res.ok) { setSaveChecked(false); setOptedIn(false); return; }
+      setOptedIn(next);
+    } catch {
+      setSaveChecked(false);
+    }
+  }
+
   function saveNumbers() {
     if (!reel) return;
     const heightCm = parseHeight(height);
     const record = deviceNumbers(reel, heightCm);
     try { sessionStorage.setItem(DEVICE_KEY, JSON.stringify(record)); } catch { /* private mode */ }
-    if (age !== '18+') {
-      setNote('These numbers stay on this device. A jump is saved to your history only for a verified adult account.');
-      return;
-    }
     const bodies = reel.clips.map((c) => dunkHistoryBody(c.jump)).filter((b): b is NonNullable<typeof b> => b != null);
+    const deviceOnly = isKid(age)
+      ? 'These numbers stay on this device. A jump is saved to your history only for a verified adult account.'
+      : 'These numbers stay on this device. A jump is saved to your history only for a verified adult account that has opted in.';
+    if (isKid(age) || !serverAdult || !optedIn || !saveChecked) { setNote(deviceOnly); return; }
     if (!bodies.length) { setNote('Nothing in this session was a jump the history can store. The card stays on this device.'); return; }
     void (async () => {
-      let kept = 0;
-      let refused = '';
-      for (const body of bodies) {
-        try {
-          const res = await fetch('/api/mirror/dunks', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-          });
-          if (res.ok) kept += 1;
-          else refused = refused || `The history did not keep it (${res.status}). The card stays on this device.`;
-        } catch {
-          refused = 'The history could not be reached. The card stays on this device.';
-        }
-      }
-      setNote(kept
-        ? `Saved ${kept} jump ${kept === 1 ? 'number' : 'numbers'} to your history. The video stayed here.${refused ? ` ${refused}` : ''}`
-        : refused);
+      const result = await postDunkNumbers({
+        selfReportedAge: age,
+        serverVerifiedAdult: serverAdult,
+        optedIn,
+        checked: saveChecked,
+        bodies,
+        runIdFor,
+      });
+      if (!result.posted) { setNote(deviceOnly); return; }
+      setNote(result.kept
+        ? `Saved ${result.kept} jump ${result.kept === 1 ? 'number' : 'numbers'} to your history. The video stayed here.${result.refused ? ` ${result.refused}` : ''}`
+        : result.refused);
     })();
   }
 
@@ -310,6 +348,9 @@ export function DunkFilm(props: { onClose: () => void }) {
           onExport={(aspect) => { void exportReel(aspect); }}
           onShare={() => { void shareReel(); }}
           onSaveNumbers={saveNumbers}
+          saveCard={!isKid(age) && serverAdult ? (
+            <ScanSaveCard checked={saveChecked} onChange={(next) => { void onSaveCheck(next); }} />
+          ) : null}
           video={clipUrl ? (
             <video
               ref={videoRef}

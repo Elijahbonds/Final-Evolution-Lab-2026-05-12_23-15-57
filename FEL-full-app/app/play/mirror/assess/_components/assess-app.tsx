@@ -7,8 +7,10 @@
 // SCREEN-SHIP (2026-09-29), SCREEN-FIX: portrait first, one step per screen, system font. Start → age (every new Start:
 // the last person's answer is reset first, audit 2.2) → "A grown-up is with me" (under 18, or an age not given) →
 // "Does anything hurt right now?" → the camera card → only then the camera → the checks → results.
-//   · NOTHING IS SENT. No server save in this ship (A2-3): the screen never calls POST /api/mirror/assessment, no PRQ
-//     write, no analytics, no crash report (SCREEN-FIX-2 amend 4). The age answer is kept in this tab's sessionStorage,
+//   · KIDS SEND NOTHING. This file has no fetch. Under 18 (and "rather not say") return before any save. A self-reported
+//     18+ result stays in this tab, and lib/privacy/screenHistoryClient.ts may POST numbers only after the server says
+//     the account is a verified adult who opted in. No assessment POST, no PRQ write, no analytics (SCREEN-FIX-2 amend 4).
+//     The age answer is kept in this tab's sessionStorage,
 //     so it is asked once per run (every new Start resets it first, AGE-RESET audit 2.2). 18 or older keep their results
 //     there too; UNDER 18 (and "rather not say") keep
 //     NOTHING ELSE: their number is shown from this page's memory, with the change since their last screen here
@@ -41,6 +43,7 @@ import type { PoseFrame } from '@/lib/pose/landmarks';
 import { AssessRunner, JUMP_PARTS, REST_PARTS, type RunnerView } from '@/lib/assess/runner';
 import type { TestResult } from '@/lib/assess/scoring';
 import type { Side } from '@/lib/assess/protocol';
+import { maybeSaveAdultScreen } from '@/lib/privacy/screenHistoryClient';
 import { summarize } from '@/lib/screen/checks';
 import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
@@ -212,6 +215,9 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       setPhase('kidResults');
       return;
     }
+    // Adult branch only. The helper asks the server; kids never get here, and a self-reported 18+ who is not
+    // verified (or who has not opted in) is not saved.
+    void maybeSaveAdultScreen(summary);
     setPhase('toResults');                                        // 18 or older: kept in this tab (keepResult)
     router.replace(RESULTS_PATH);
   }, [cleanup, router]);

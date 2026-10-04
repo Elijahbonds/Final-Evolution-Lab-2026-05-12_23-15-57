@@ -16,6 +16,7 @@ import { Camera, CameraOff, RotateCcw, Users, Trophy } from 'lucide-react';
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
+import { ScanSaveCard } from '@/components/privacy/scan-save-card';
 
 const BG = '#050505';
 const CYAN = '#00E5FF';
@@ -49,6 +50,22 @@ export default function ProveIt() {
   const [trackerState, setTrackerState] = useState('idle');
   // an attempt the tracker refused (the dunks route would too): said on the pill instead of vanishing
   const [refused, setRefused] = useState<DunkRefusal | null>(null);
+  // First paint stays the non-adult card. A verified adult replaces it after this read.
+  const [serverAdult, setServerAdult] = useState(false);
+  const [optedIn, setOptedIn] = useState(false);
+  const [saveChecked, setSaveChecked] = useState(false);
+  const saveRef = useRef({ adult: false, optedIn: false, checked: false });
+  saveRef.current = { adult: serverAdult, optedIn, checked: saveChecked };
+
+  useEffect(() => {
+    let gone = false;
+    fetch('/api/account/scan-save').then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (gone || !j || j.verifiedAdult !== true) return;
+      setServerAdult(true);
+      if (j.optedIn === true) { setOptedIn(true); setSaveChecked(true); }
+    }).catch(() => {});
+    return () => { gone = true; };
+  }, []);
 
   useEffect(() => {
     fetch('/api/profile').then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -144,6 +161,24 @@ export default function ProveIt() {
           const scores = judgeDunk(s.difficulty, s.execution, s.style);
           const total = scores.reduce((sum, j) => sum + j.score, 0);
           const attempt: Attempt = { metrics: got, scores, total };
+          const gate = saveRef.current;
+          if (gate.adult && gate.optedIn && gate.checked) {
+            const raw = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}proveit`).replace(/-/g, '');
+            const runId = raw.length >= 8 ? raw.slice(0, 40) : `proveit${raw}00000000`.slice(0, 32);
+            void fetch('/api/mirror/prove-it', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                runId,
+                verticalCm: got.verticalCm,
+                flightTimeMs: got.flightTimeMs,
+                takeoff: got.takeoff,
+                landingStability: got.landingStability,
+                family: got.family,
+                judgesScore: total,
+              }),
+            }).catch(() => {});
+          }
           setCurrent(attempt);
           setAttempts((prev) => {
             const next: [Attempt[], Attempt[]] = [prev[0].slice(), prev[1].slice()] as [Attempt[], Attempt[]];
@@ -182,6 +217,21 @@ export default function ProveIt() {
       setStage('arm');
     }
   }, [attempts, player]);
+
+  async function setProveOptIn(next: boolean) {
+    setSaveChecked(next);
+    try {
+      const res = await fetch('/api/account/scan-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ granted: next }),
+      });
+      if (!res.ok) { setSaveChecked(false); setOptedIn(false); return; }
+      setOptedIn(next);
+    } catch {
+      setSaveChecked(false);
+    }
+  }
 
   const totals = [0, 1].map((i) => attempts[i].reduce((s, a) => s + a.total, 0));
   const winner = totals[0] === totals[1] ? null : totals[0] > totals[1] ? 0 : 1;
@@ -224,7 +274,26 @@ export default function ProveIt() {
           className={`absolute inset-0 h-full w-full object-cover ${stage === 'watching' || stage === 'prop-phone' || stage === 'arm' ? '' : 'opacity-0'}`}
         />
 
-        {stage === 'consent' && (
+        {stage === 'consent' && serverAdult && (
+          <div data-testid="prove-it-consent" className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-6 text-center">
+            <Camera className="h-8 w-8" style={{ color: CYAN }} />
+            <div className="fel-heading text-xl font-bold text-white">BEFORE THE CAMERA</div>
+            <p className="max-w-md text-xs leading-relaxed text-white/60">
+              The camera measures flight time, vertical, takeoff and landing on this device. No video is recorded.
+              Numbers are saved to your account only if you opt in.
+            </p>
+            <ScanSaveCard checked={saveChecked} onChange={(next) => { void setProveOptIn(next); }} />
+            <button
+              type="button"
+              onClick={startCamera}
+              className="mt-2 rounded-lg px-5 py-2.5 text-sm font-bold text-black"
+              style={{ background: CYAN }}
+            >
+              SET UP THE CAMERA
+            </button>
+          </div>
+        )}
+        {stage === 'consent' && !serverAdult && (
           <Gate
             icon={<Camera className="h-8 w-8" style={{ color: CYAN }} />}
             title="READY WHEN YOU ARE"
