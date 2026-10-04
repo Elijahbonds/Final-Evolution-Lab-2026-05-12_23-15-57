@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { ACCOUNT_SETTINGS_PATH } from '@/lib/account/paths';
 import { AccountSettings } from '@/components/account/account-settings';
+import Link from 'next/link';
 import { TabPage } from '@/components/shell/tab-page';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export default async function AccountPage() {
       accent="#00E5FF"
     >
       <AccountSettings email={session.user.email ?? ''} />
+      <p className="mt-4 text-sm"><Link href="/account/coaching">Coaching</Link></p>
     </TabPage>
   );
 }

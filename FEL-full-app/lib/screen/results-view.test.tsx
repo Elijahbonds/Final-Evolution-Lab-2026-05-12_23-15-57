@@ -183,6 +183,26 @@ describe('item 4 and L5 (retest 1): 18 or older get EXACTLY ONE next step, the K
     }
   });
 
+  it('Train with Elijah is absent until the server passes a verified-adult href, and a kid never sees it', () => {
+    const adult = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '18+', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: '/coach/elijah' }));
+    expect(adult).toContain('data-train-with-elijah');
+    expect(adult).toContain('Train with Elijah');
+    const step = adult.slice(adult.indexOf('data-next-step')).split('</div>')[0];
+    expect(step).not.toContain('Train with Elijah');
+    const kid = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '13-17', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: '/coach/elijah' }));
+    expect(kid).not.toContain('Train with Elijah');
+  });
+
+  it('Build my Dunk Program appears only when the lane is given a dunk href', () => {
+    const plain = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED }));
+    expect(plain).not.toContain('Build my Dunk Program');
+    expect(plain).toContain('data-coming-soon');
+    const linked = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
+    expect(linked).toContain('Build my Dunk Program');
+    const other = renderToStaticMarkup(createElement(LaneBody, { lane: 'posture', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
+    expect(other).not.toContain('Build my Dunk Program');
+  });
+
   it('CHANGED (L5): "Build my Dunk Program" and "Play the Dunk Game, free" are gone (was: exactly two CTAs, program then game)', () => {
     for (const s of [FLAGGED, CLEAN, session({ dimT5: true })]) {
       const h = html(s);

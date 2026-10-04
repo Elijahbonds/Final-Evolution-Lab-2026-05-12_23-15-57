@@ -2260,3 +2260,178 @@ model CoachClient {
   @@unique([coachId, clientId])
   @@index([clientId])
 }
+
+// ===========================================================================
+// COACH-STORE-V1. New tables only. User ids are plain strings (no relation),
+// like SessionJoinLink, so User is untouched. Nothing here is applied to
+// production by the lane: prisma/pending/ holds the SQL for Elijah's yes.
+// ===========================================================================
+
+/// Coach storefront profile and the hours he sells. One row per coach.
+model Instructor {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  slug                   String   @unique
+  displayName            String
+  headline               String?
+  bio                    String?
+  certifications         String[] @default([])
+  specialties            String[] @default([])
+  affiliationLine        String?
+  creatorCardId          String?
+  timeZone               String   @default("America/Los_Angeles")
+  weeklyHours            Json     @default("[]")
+  blackoutDates          Json     @default("[]")
+  bufferMinutes          Int      @default(15)
+  minNoticeHours         Int      @default(12)
+  maxDaysAhead           Int      @default(28)
+  /// Elijah, 6:03 PM PT: reviews are promised within 48 hours. A dashboard setting, not a hardcoded promise.
+  reviewSlaHours         Int      @default(48)
+  /// Free cancel/reschedule window before start, in hours. Dashboard setting (default 24).
+  clientFullRefundHours  Int      @default(24)
+  /// CA refund window in business days. Null until set. No default address and no default ruling.
+  refundBusinessDays     Int?
+  /// Shown on the store only when set. Never a home address.
+  businessMailingAddress String?
+  published              Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  programAccess ProgramAccess[]
+  bookings      Booking[]
+}
+
+/// A buyer's access to a program, the adult membership, or a parent-bought teen code.
+model ProgramAccess {
+  id                    String    @id @default(cuid())
+  userId                String
+  instructorId          String
+  instructor            Instructor @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  listingId             String
+  lane                  String
+  billing               String
+  /// lane | all | teen_all
+  scope                 String    @default("lane")
+  /// self | teen
+  beneficiary           String    @default("self")
+  status                String    @default("PENDING")
+  priceCents            Int
+  platformFeeCents      Int       @default(0)
+  stripeFeeCents        Int       @default(0)
+  reviewCredits         Int       @default(0)
+  lastCreditInvoiceId   String?
+  stripeCheckoutId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  stripePaymentIntentId String?   @unique
+  accessUntil           DateTime?
+  cancelAtPeriodEnd     Boolean   @default(false)
+  coachingProgramId     String?
+  startedAt             DateTime?
+  nextRescreenAt        DateTime?
+  unlockCodeHash        String?   @unique
+  deviceTokenHash       String?
+  codeActive            Boolean   @default(true)
+  redeemedAt            DateTime?
+  reissueCount          Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([userId, listingId, beneficiary])
+  @@index([instructorId, status])
+  @@index([unlockCodeHash])
+}
+
+/// One paid unit of the coach's time: a live 1:1 or an async video review.
+model Booking {
+  id                    String    @id @default(cuid())
+  kind                  String
+  instructorId          String
+  instructor            Instructor @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  coachUserId           String
+  clientUserId          String
+  listingId             String
+  status                String    @default("HELD")
+  durationMin           Int?
+  priceCents            Int
+  platformFeeCents      Int       @default(0)
+  stripeFeeCents        Int       @default(0)
+  refundCents           Int       @default(0)
+  stripeCheckoutId      String?   @unique
+  stripePaymentIntentId String?   @unique
+  holdExpiresAt         DateTime?
+  startsAt              DateTime?
+  endsAt                DateTime?
+  slotLock              String?   @unique
+  clientTimeZone        String?
+  clientNote            String?
+  reschedulesUsed       Int       @default(0)
+  connectionFailedAt    DateTime?
+  failureCreditOpen     Boolean   @default(false)
+  shareWithCoach        Boolean   @default(false)
+  goal                  String?
+  painYes               Boolean?
+  reviewNote            String?
+  clipPaths             Json?
+  clipConsentAt         DateTime?
+  consentTextVersion    String?
+  submittedAt           DateTime?
+  dueAt                 DateTime?
+  replyText             String?
+  replyClipPath         String?
+  attachedDrillIds      Json?
+  deliveredAt           DateTime?
+  originalClipDeleteAt  DateTime?
+  originalsDeletedAt    DateTime?
+  cancelledAt           DateTime?
+  cancelledBy           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  signals CallSignal[]
+
+  @@index([coachUserId, startsAt])
+  @@index([clientUserId, createdAt])
+  @@index([status, holdExpiresAt])
+  @@index([kind, status, dueAt])
+  @@index([originalClipDeleteAt])
+}
+
+/// Short-lived WebRTC handshake rows. The app sweeps expired ones. That is the only delete in this lane.
+model CallSignal {
+  id        Int      @id @default(autoincrement())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromRole  String
+  epoch     Int      @default(0)
+  kind      String
+  payload   String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([bookingId, id])
+  @@index([expiresAt])
+}
+
+/// Referral cut on a coach-store sale, paid out of FEL's 15% fee. The ledger has no referral account, so this table holds it.
+model CoachStoreReferral {
+  id               String   @id @default(cuid())
+  paymentKey       String   @unique
+  referrerUserId   String
+  buyerUserId      String
+  coachUserId      String
+  sourceKind       String
+  sourceId         String
+  grossCents       Int
+  platformFeeCents Int
+  shareOfFee       Float
+  cutCents         Int
+  renewalIndex     Int      @default(0)
+  status           String   @default("PENDING")
+  holdUntil        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([referrerUserId, status])
+  @@index([buyerUserId])
+  @@index([holdUntil])
+}

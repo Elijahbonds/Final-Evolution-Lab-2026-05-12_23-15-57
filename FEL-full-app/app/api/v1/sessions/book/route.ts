@@ -6,6 +6,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { spend, readWallet, WalletError } from '@/lib/wallet/wallet-service';
 import { upcomingGroupSlots, privateSlots, privateBookingAvailable } from '@/lib/sessions/schedule';
+import { holdPrivateSlot } from '@/lib/sessions/privateHold';
+import { canWriteHealthData } from '@/lib/privacy/healthWriteGate';
 
 const SKU_FOR_KIND: Record<string, string> = {
   group_workout: 'session_group_workout',
@@ -16,8 +18,8 @@ const SKU_FOR_KIND: Record<string, string> = {
 /**
  * POST /api/v1/sessions/book
  * Body: { idempotency_key, kind, sessionKey }
- * Pays with SHARDS. Server verifies the slot exists before charging. Minors
- * (dobYear implies <18) cannot book private 1-on-1. A private 1-on-1 slot holds
+ * Pays with SHARDS. Server verifies the slot exists before charging. Private 1-on-1
+ * uses the verified-adult check (unknown age is refused). A private 1-on-1 slot holds
  * one player: once anyone holds a confirmed booking for it, the next player is
  * refused (409 slot_taken) before any shards move. Booking the same slot again
  * answers alreadyBooked; any other use of a key already in the ledger books
@@ -48,8 +50,7 @@ export async function POST(req: NextRequest) {
     const count = await prisma.sessionBooking.count({ where: { sessionKey, status: 'confirmed' } });
     if (count >= slot.capacity) return NextResponse.json({ error: 'session_full' }, { status: 409 });
   } else if (kind === 'private_1on1') {
-    const me = await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } });
-    if (me?.dobYear && (now.getFullYear() - me.dobYear) < 18) {
+    if (!(await canWriteHealthData(prisma, userId))) {
       return NextResponse.json({ error: 'minors_cannot_book_private' }, { status: 403 });
     }
     if (!privateBookingAvailable(now, [])) return NextResponse.json({ error: 'private_closed' }, { status: 409 });
@@ -62,10 +63,26 @@ export async function POST(req: NextRequest) {
 
   const existing = await prisma.sessionBooking.findFirst({ where: { userId, sessionKey, status: 'confirmed' } });
   if (existing) return NextResponse.json({ booked: true, alreadyBooked: true, booking: existing });
-  // Somebody else's booking of a private slot: it is theirs, and so is its join link. Two bookings racing each other
-  // can still both land; the link then goes to the first (lib/sessions/joinLink.ts privateHolders).
-  if (kind === 'private_1on1' && (await prisma.sessionBooking.count({ where: { sessionKey, status: 'confirmed' } })) > 0) {
-    return NextResponse.json({ error: 'slot_taken' }, { status: 409 });
+
+  if (kind === 'private_1on1') {
+    const held = await holdPrivateSlot(prisma, { userId, kind, sessionKey, startsAt: startsAt! });
+    if ('taken' in held) return NextResponse.json({ error: 'slot_taken' }, { status: 409 });
+    try {
+      const result = await spend(prisma, { playerId: userId, idempotencyKey, skuId, quantity: 1, rejectReplay: true });
+      const booking = await prisma.sessionBooking.update({
+        where: { id: held.id },
+        data: { status: 'confirmed', shardsPaid: result.spent.amount },
+      });
+      return NextResponse.json({ booked: true, booking, balances: result.balances });
+    } catch (e) {
+      await prisma.sessionBooking.update({ where: { id: held.id }, data: { status: 'cancelled' } });
+      if (e instanceof WalletError && e.code === 'INSUFFICIENT_FUNDS') {
+        const bal = await readWallet(prisma, userId);
+        return NextResponse.json({ error: 'insufficient_funds', balances: { coins: bal.coins, shards: bal.shards }, needShards: true }, { status: 409 });
+      }
+      if (e instanceof WalletError && e.code === 'REPLAYED_KEY') return NextResponse.json({ error: 'replayed_key' }, { status: 409 });
+      throw e;
+    }
   }
 
   try {
