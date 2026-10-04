@@ -24,15 +24,17 @@ function withRand(seed: number, run: () => void): void {
 }
 
 function simulate(difficulty: number, startZ: number, frames: number, seed: number) {
-  const brain = new RivalCombatBrain({ difficulty, moves: MOVES });
-  const self = new Vector3(0, 0, startZ);
-  const foe = new Vector3(0, 0, 0);
-  const state = new FighterState(100);
   let hitAt = -1;
   let minDist = startZ;
   const ids = new Set<string>();
   let attacks = 0;
+  // The brain is built INSIDE the seeded scope: RivalFightBrain rolls its attackBias with
+  // Math.random() in the constructor, and building it outside left that roll unseeded (CI flake).
   withRand(seed, () => {
+    const brain = new RivalCombatBrain({ difficulty, moves: MOVES });
+    const self = new Vector3(0, 0, startZ);
+    const foe = new Vector3(0, 0, 0);
+    const state = new FighterState(100);
     for (let f = 0; f < frames; f++) {
       const d = brain.decide(DT, self, foe, state, false);
       const dist = Vector3.Distance(self, foe);
@@ -89,12 +91,12 @@ describe('RivalCombatBrain', () => {
   });
 
   it('dashes when it is far and the meter can pay', () => {
-    const brain = new RivalCombatBrain({ difficulty: 0.7, moves: MOVES });
     const self = new Vector3(0, 0, 8);
     const foe = new Vector3(0, 0, 0);
     const state = new FighterState(100);
     let dashed = false;
     withRand(2, () => {
+      const brain = new RivalCombatBrain({ difficulty: 0.7, moves: MOVES });
       for (let f = 0; f < 30 && !dashed; f++) {
         const d = brain.decide(DT, self, foe, state, false, { value: 40, max: CHI_MAX, dashCost: 12, subCost: 25 });
         if (d.spend === 'dash') dashed = true;
@@ -104,13 +106,13 @@ describe('RivalCombatBrain', () => {
   });
 
   it('spends the ultimate when the meter is full and it is in range', () => {
-    const brain = new RivalCombatBrain({ difficulty: 0.95, moves: MOVES });
     const self = new Vector3(0, 0, 1.2);
     const foe = new Vector3(0, 0, 0);
     const state = new FighterState(100);
     state.chi = CHI_MAX;
     let spent = false;
     withRand(9, () => {
+      const brain = new RivalCombatBrain({ difficulty: 0.95, moves: MOVES });
       for (let f = 0; f < 180 && !spent; f++) {
         const d = brain.decide(DT, self, foe, state, false, { value: CHI_MAX, max: CHI_MAX, dashCost: 12, subCost: 25 });
         if (d.spend === 'ultimate' && d.attack === 'heavy') spent = true;
