@@ -74,7 +74,15 @@ export interface ReferralInput {
   /** 0 = first payment, 1..12 = renewals that still pay, above that pays nothing. */
   renewalIndex: number;
   source: ReferralSource;
-  /** Weekly price for a plan, or null for a one-time purchase (the $10/week floor does not apply). */
+  /**
+   * Real billing interval of the plan. The $10/week referral floor applies only when this is `'week'`
+   * (Elijah 11:53 PT Oct 4 2026). Monthly and one-time skip the floor.
+   */
+  billing: 'one_time' | 'week' | 'month';
+  /**
+   * Weekly price when billing is `'week'`, else null. Kept for callers; the floor no longer uses a
+   * weekly-equivalent of a monthly amount.
+   */
   weeklyCents: number | null;
   /** Cut already recorded for this referrer in the current month, in cents. */
   monthCutCents: number;
@@ -112,7 +120,8 @@ export function decideReferral(input: ReferralInput): ReferralDecision {
   if (!input.referrerIsAdult) return none('referrer_not_adult');
   if (!input.buyerIsAdult) return none('buyer_not_adult');
   if (input.renewalIndex < 0 || input.renewalIndex > MAX_REFERRAL_RENEWALS) return none('renewal_cap');
-  if (input.weeklyCents !== null && input.weeklyCents < REFERRAL_MIN_WEEKLY_CENTS) return none('under_ten_a_week');
+  // Floor is weekly-billed only (Elijah 11:53 PT). Monthly pays normal referrer share; one-time unchanged.
+  if (input.billing === 'week' && input.priceCents < REFERRAL_MIN_WEEKLY_CENTS) return none('under_ten_a_week');
 
   let cut = Math.floor(input.platformFeeCents * share);
   if (cut > input.platformFeeCents) cut = input.platformFeeCents;

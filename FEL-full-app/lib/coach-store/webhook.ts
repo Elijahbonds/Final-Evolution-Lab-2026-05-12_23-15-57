@@ -10,7 +10,6 @@ import {
   decideReferral,
   nextReviewCredits,
   referralShareOfFee,
-  weeklyEquivalentCents,
   type ReferralSource,
 } from './money';
 import { invoiceChargeOrIntent, invoiceSubscriptionId, subscriptionPeriodEndUnix } from './stripeShapes';
@@ -296,7 +295,9 @@ async function recordReferral(input: {
     platformFeeCents,
     renewalIndex: input.renewalIndex,
     source: input.source,
-    weeklyCents: weeklyEquivalentCents(input.priceCents, input.billing),
+    billing: input.billing,
+    // Floor uses billing === 'week' only; weeklyCents is the weekly price when billed weekly, else null.
+    weeklyCents: input.billing === 'week' ? input.priceCents : null,
     monthCutCents: month._sum.cutCents ?? 0,
     share: referralShareOfFee(),
     paidAt: new Date(),
