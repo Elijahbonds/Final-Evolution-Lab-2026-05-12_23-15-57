@@ -56,7 +56,7 @@ export function ProgramLaneView({ lane, state }: { lane: LaneSlug; state: LaneSt
     return (
       <div data-parent-view className="space-y-3">
         <div className="space-y-1">
-          <p className="text-[13px] text-white/60">{DISCLAIMER}</p>
+          <p className="text-[16px] text-white/60">{DISCLAIMER}</p>
           <StopLine />
         </div>
         <ParentCard />
@@ -73,9 +73,9 @@ export function LaneBody({ lane, s }: { lane: LaneSlug; s: ScreenSummary }) {
   if (!s.lane) {
     return (
       <StepCard testId="no-pick">
-        <p className="text-[13px] text-white/60">{DISCLAIMER}</p>
-        <StopLine className="mt-1 text-[13px] text-white/70" />
-        <p className="mt-3 text-[15px] leading-snug text-white/80">Your screen was not finished, so there is no program pick yet. {NO_PICK_LINE}</p>
+        <p className="text-[16px] text-white/60">{DISCLAIMER}</p>
+        <StopLine className="mt-1 text-[16px] text-white/70" />
+        <p className="mt-3 text-[16px] leading-snug text-white/80">Your screen was not finished, so there is no program pick yet. {NO_PICK_LINE}</p>
         <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={`${quietBtn} mt-4`}>{BACK_TO_RESULTS}</Link>
       </StepCard>
     );
@@ -86,11 +86,11 @@ export function LaneBody({ lane, s }: { lane: LaneSlug; s: ScreenSummary }) {
   return (
     <div data-lane-page={lane} className="space-y-3">
       <div className="space-y-1">
-        <p className="text-[13px] text-white/60">{DISCLAIMER}</p>
+        <p className="text-[16px] text-white/60">{DISCLAIMER}</p>
         <StopLine />
       </div>
       <section data-lane-header className="rounded-3xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.05] p-4">
-        <div className="flex items-center gap-2 text-[#00E5FF]"><Dumbbell aria-hidden className="h-5 w-5" /><span className="text-[12px] font-bold uppercase tracking-[0.16em]">Program lane</span></div>
+        <div className="flex items-center gap-2 text-[#00E5FF]"><Dumbbell aria-hidden className="h-5 w-5" /><span className="text-[16px] font-bold uppercase tracking-[0.16em]">Program lane</span></div>
         <h2 className="mt-1 text-[22px] font-black leading-tight">{L.name}</h2>
         <div className="mt-1.5"><BandChip band={band} /></div>
       </section>
@@ -98,13 +98,13 @@ export function LaneBody({ lane, s }: { lane: LaneSlug; s: ScreenSummary }) {
         {flag ? `Your top flag: ${flag.name.toLowerCase()}, so start with ${L.name}.` : WIN_LINE}
       </p>
       <section data-sample-drill className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-white/55">Free sample drill</p>
-        <p className="mt-1 text-[15px] leading-snug">{drill.cue}<EarlyTag /></p>
+        <p className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Free sample drill</p>
+        <p className="mt-1 text-[16px] leading-snug">{drill.cue}<EarlyTag /></p>
         <div className="mt-2"><PreviewLabel /></div>
       </section>
       <section data-coming-soon className="rounded-2xl border border-dashed border-white/20 p-4">
         <p className="text-[16px] font-black">{PROGRAM_COMING}</p>
-        <p className="mt-1 text-[13px] text-white/60">A full plan built from your screen. Nothing is saved or sent from this page.</p>
+        <p className="mt-1 text-[16px] text-white/60">A full plan built from your screen. Nothing is saved or sent from this page.</p>
       </section>
       <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={quietBtn}>{BACK_TO_RESULTS}</Link>
     </div>

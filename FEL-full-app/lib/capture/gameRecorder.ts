@@ -117,7 +117,11 @@ export class GameRecorder {
   private loopDone: Promise<void> = Promise.resolve();
   private chain: Promise<void> = Promise.resolve();
 
-  constructor(private readonly source: SegmentSource, private readonly now: () => number = () => Date.now()) {}
+  constructor(
+    private readonly source: SegmentSource,
+    private readonly now: () => number = () => Date.now(),
+    private readonly onModelChange: (model: RecModel) => void = () => {},
+  ) {}
 
   get replay(): readonly Blob[] { return this.replayBlobs; }
   get take(): readonly Blob[] { return this.takeBlobs; }
@@ -220,7 +224,15 @@ export class GameRecorder {
     while (this.gen === gen && this.running && this.mode === run) {
       const t0 = this.now();
       const blob = await this.source.next(SEGMENT_MS);
-      if (this.gen !== gen || !blob) break;
+      if (this.gen !== gen || this.mode !== run) break;
+      if (!blob) {
+        if (!this.running) break;
+        this.running = false;
+        this.mode = null;
+        this.model = recStep(REC_IDLE, { type: 'fail', message: 'Recording is not available in this browser right now.' });
+        this.onModelChange({ ...this.model });
+        break;
+      }
       const t1 = Math.max(this.now(), t0 + 1);
       this.segments.push({ blob, t0, t1 });
       if (run === 'buffer') this.segments = retainSegments(this.segments, t1, REPLAY_MS);

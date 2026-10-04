@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -36,6 +37,8 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      onEnd(gameResultFromSession(r, {
+      onEndRef.current(gameResultFromSession(r, {
         won: r.outcome === 'CHAMPION',
         opponentScore: opponentScoreFromStats(r.stats),
         headline: r.outcome === 'CHAMPION' ? 'CARNIVAL CHAMPION' : 'RUNNER-UP',
@@ -78,14 +81,15 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
-      .catch((e) => console.error('[FEL-CARNIVAL] boot failed', e));
+      .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-CARNIVAL] boot failed', setPhase, setLoadError }));
 
     return () => {
       disposed = true;
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);

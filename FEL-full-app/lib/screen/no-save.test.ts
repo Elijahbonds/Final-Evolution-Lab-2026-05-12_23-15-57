@@ -171,7 +171,7 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
     expect(m.writes).toEqual([]);
   });
 
-  it('a signed-in adult: the screen still never posts (no save in this ship)', () => {
+  it('a signed-in adult: this on-device pipeline still never posts (the page\'s adult save is maybeSaveAdultScreen, after the kid return)', () => {
     m.session = { user: { id: 'adult-1' } };
     m.users.push({ id: 'adult-1', dobYear: 1990 });
     playScreen(whole('18+'));

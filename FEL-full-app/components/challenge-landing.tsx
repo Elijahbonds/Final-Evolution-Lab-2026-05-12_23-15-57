@@ -41,8 +41,8 @@ export function ChallengeLanding({
     fetch(`/api/challenge/${code}/open`, { method: 'POST' }).catch(() => {});
   }, [code]);
 
-  // dunkContest is guest-playable end-to-end; other modes route to signup.
-  // A signed-in accept goes to that mode's play route with the code kept.
+  // dunkContest is guest-playable end-to-end; signed-in athletes go straight
+  // to the real play route so GameShell can settle the same `?c=` attempt.
   const guestPlayable = modeKey === 'dunkContest';
   const authedHref = challengePlayHref(modeKey, code);
   const ctaHref = isAuthed && authedHref ? authedHref : guestPlayable ? `/try?c=${encodeURIComponent(code)}` : challengeSignupHref(code);

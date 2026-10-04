@@ -20,10 +20,10 @@ export default function ScreenPrivacyPage() {
       <StepCard testId="privacy">
         <div data-privacy-text>
           <h2 className="text-[21px] font-black leading-tight">{PRIVACY_TITLE}</h2>
-          <ul data-privacy-points className="mt-3 list-disc space-y-2.5 pl-5 text-[15px] leading-snug text-white/85">
+          <ul data-privacy-points className="mt-3 list-disc space-y-2.5 pl-5 text-[16px] leading-snug text-white/85">
             {PRIVACY_POINTS.map((p) => <li key={p}>{p}</li>)}
           </ul>
-          <p data-contact className="mt-5 text-[14px] text-white/75">{PRIVACY_CONTACT}</p>
+          <p data-contact className="mt-5 text-[16px] text-white/75">{PRIVACY_CONTACT}</p>
         </div>
         <div className="mt-4"><ClearResults /></div>
       </StepCard>

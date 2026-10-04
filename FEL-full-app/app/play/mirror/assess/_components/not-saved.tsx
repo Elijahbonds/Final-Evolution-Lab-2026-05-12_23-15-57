@@ -9,9 +9,9 @@ export function NotSavedCard({ line }: { line?: string }) {
   return (
     <StepCard testId="not-saved">
       <h2 data-not-saved className="text-[21px] font-black leading-tight">{NOT_SAVED_TITLE}</h2>
-      <p className="mt-2 text-[14px] leading-snug text-white/70">{line ?? NOT_SAVED_BODY}</p>
-      <p className="mt-2 text-[12.5px] text-white/50">{DISCLAIMER}</p>
-      <StopLine className="mt-1 text-[12.5px] text-white/60" />
+      <p className="mt-2 text-[16px] leading-snug text-white/70">{line ?? NOT_SAVED_BODY}</p>
+      <p className="mt-2 text-[16px] text-white/50">{DISCLAIMER}</p>
+      <StopLine className="mt-1 text-[16px] text-white/60" />
       <Link href={ASSESS_PATH} prefetch={false} data-primary data-restart className={`${primaryBtn} mt-4`}>{RUN_AGAIN}</Link>
     </StepCard>
   );

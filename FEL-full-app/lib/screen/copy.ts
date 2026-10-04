@@ -62,6 +62,20 @@ export const SCREEN_TEST_NAMES = {
   T5: 'Hands-on-hips jump',
 } as const;
 
+/** The two ways in, on /screen and the assess start card. The jump is first. */
+export const JUMP_ONLY_BUTTON = 'Just test my jump (about 1 min)';
+export const FULL_SCREEN_BUTTON = 'Full movement screen (about 5 min)';
+/** After a jump-only result: continue this run through T1–T3 and keep the jump. */
+export const JUMP_DO_FULL = 'Do the full screen';
+/** Adults only. Same-origin lane page. Not the removed results constant. */
+export const JUMP_BUILD_PROGRAM = 'Build my Dunk Program';
+/** Adults only. Same-origin free play. The screen itself stays signed-out. */
+export const JUMP_PLAY_FREE = 'Play free (Brain Brawl)';
+/** Adults only. Height has no band in the register: this is the existing personal-best sentence. */
+export const JUMP_MEANING = 'A personal best to beat next time.';
+/** Shown while the pose model and its runtime load, which starts only after Start. */
+export const COACH_READY = 'Getting the camera coach ready…';
+
 /**
  * Under the list: the checks still to come. It used to be built from the engine's NOT_BUILT_LINE, which rendered as
  * "More checks: full screen: coming later." (the double colon, S-7).

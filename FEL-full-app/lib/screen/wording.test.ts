@@ -65,7 +65,7 @@ describe('S-7: plain words', () => {
 
   it('owner addendum 2: "Ankle bend (knee-to-wall)" and "Hands-on-hips jump" on the start card', () => {
     expect(COPY.SCREEN_TEST_NAMES).toEqual({ T1: 'Overhead squat', T2: 'Ankle bend (knee-to-wall)', T3: 'Single-leg squat', T5: 'Hands-on-hips jump' });
-    const t = text(renderToStaticMarkup(createElement(StartStep, { onStart: () => {} })));
+    const t = text(renderToStaticMarkup(createElement(StartStep, { onJump: () => {}, onFull: () => {} })));
     expect(t).toContain('Ankle bend (knee-to-wall), each side');
     expect(t).toContain('Hands-on-hips jump');
     expect(t).not.toMatch(/dorsiflexion|countermovement/i);
@@ -73,7 +73,7 @@ describe('S-7: plain words', () => {
   });
 
   it('the double colon is gone: no line on the start card says "X: y: z"', () => {
-    const h = renderToStaticMarkup(createElement(StartStep, { onStart: () => {} }));
+    const h = renderToStaticMarkup(createElement(StartStep, { onJump: () => {}, onFull: () => {} }));
     const lines = h.split(/<\/?(?:p|li|h2|button|section|div)[^>]*>/).map((x) => text(x).trim()).filter(Boolean);
     expect(lines).toContain(COPY.MORE_CHECKS_LINE);
     for (const l of lines) expect(l.match(/:/g)?.length ?? 0, l).toBeLessThan(2);

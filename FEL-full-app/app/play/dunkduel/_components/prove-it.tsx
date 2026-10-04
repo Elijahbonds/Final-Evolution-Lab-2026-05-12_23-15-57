@@ -32,6 +32,7 @@ import { endSession, readSession } from '@/lib/session-setup/memory';
 import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
 import { postOptInSession, type MeasuredJump } from '@/lib/session-setup/saveNumbers';
 import { queueAdultNumbers } from '@/lib/session-setup/sync';
+import { ScanSaveCard } from '@/components/privacy/scan-save-card';
 
 const CYAN = '#00E5FF';
 const GOLD = '#FFD700';
@@ -71,7 +72,7 @@ function browserSpeaker(): Speaker {
 
 export default function ProveIt({
   dobYear = null,
-  optedIn = false,
+  optedIn: optedInProp = false,
 }: {
   /** User.dobYear from the database. Record calls verifiedAdult on this year. */
   dobYear?: number | null;
@@ -128,6 +129,14 @@ export default function ProveIt({
   prqRef.current = prq;
   mutedRef.current = muted;
   attemptsRef.current = attempts;
+
+  // AB-04: the page reads the opt-in on the server (canSaveScanNumbers) and the
+  // birth year (verifiedAdult), so the first paint already shows the right card.
+  const serverAdult = serverVerified;
+  const [optedIn, setOptedIn] = useState(optedInProp);
+  const [saveChecked, setSaveChecked] = useState(optedInProp);
+  const saveRef = useRef({ adult: false, optedIn: false, checked: false });
+  saveRef.current = { adult: serverAdult, optedIn, checked: saveChecked };
 
   useEffect(() => {
     fetch('/api/profile').then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -274,6 +283,26 @@ export default function ProveIt({
     const scores = judgeDunk(s.difficulty, s.execution, s.style);
     const total = scores.reduce((sum, j) => sum + j.score, 0);
     const attempt: Attempt = { metrics: got, scores, total, playerIndex: idx };
+    // AB-04 Prove It history: only roster slot 0 (the signed-in athlete), only 18+,
+    // only with the opt-in on and the box checked. Other athletes on this phone are never saved.
+    const gate = saveRef.current;
+    if (idx === 0 && athlete.band === '18+' && gate.adult && gate.optedIn && gate.checked) {
+      const raw = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}proveit`).replace(/-/g, '');
+      const runId = raw.length >= 8 ? raw.slice(0, 40) : `proveit${raw}00000000`.slice(0, 32);
+      void fetch('/api/mirror/prove-it', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          runId,
+          verticalCm: got.verticalCm,
+          flightTimeMs: got.flightTimeMs,
+          takeoff: got.takeoff,
+          landingStability: got.landingStability,
+          family: got.family,
+          judgesScore: total,
+        }),
+      }).catch(() => {});
+    }
     setCurrent(attempt);
     setAttempts((prev) => {
       const next = prev.map((list) => list.slice());
@@ -388,12 +417,12 @@ export default function ProveIt({
     });
     // The dormant queue does not fetch. The post below returns before any request when the gate is shut.
     queueAdultNumbers();
-    void postOptInSession(jumps, { serverVerified, optedIn }).then((outcome) => {
+    void postOptInSession(jumps, { serverVerified, optedIn: optedIn && saveChecked }).then((outcome) => {
       if (outcome === 'skipped') setSaveLine('Stays on this phone.');
       else if (outcome === 'saved') setSaveLine('Jump numbers saved for this account.');
       else setSaveLine('Could not save. The result stays on this screen.');
     });
-  }, [optedIn, serverVerified, stage]);
+  }, [optedIn, saveChecked, serverVerified, stage]);
 
   function toggleMute() {
     setMuted((prev) => {
@@ -455,6 +484,22 @@ export default function ProveIt({
     setStage('prop-phone');
   }
 
+  async function setProveOptIn(next: boolean) {
+    setSaveChecked(next);
+    try {
+      const res = await fetch('/api/account/scan-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ granted: next }),
+      });
+      if (!res.ok) { setSaveChecked(false); setOptedIn(false); return; }
+      setOptedIn(next);
+    } catch {
+      setSaveChecked(false);
+    }
+  }
+
+
   return (
     <div className="mx-auto max-w-[880px] overflow-x-hidden px-4 py-6 text-base text-white">
       <div className="flex items-center gap-3">
@@ -472,7 +517,7 @@ export default function ProveIt({
       </div>
       <p className="mt-2 max-w-2xl text-base text-white/70">
         One phone, up to eight athletes. Voice is on. A clip stays on this phone, and only for a verified adult.
-        Nothing is uploaded.
+        No video is uploaded.
       </p>
 
       {stage === 'consent' && (
@@ -490,6 +535,11 @@ export default function ProveIt({
             <text x="232" y="22" fill="#FFD700" fontSize="14">rim</text>
             <text x="96" y="112" fill="#fff" fontSize="14">side-on, landscape</text>
           </svg>
+          {serverAdult && (
+            <div className="mt-3">
+              <ScanSaveCard checked={saveChecked} onChange={(next) => { void setProveOptIn(next); }} />
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="self-center text-sm text-white/70">Players</span>
             {Array.from({ length: MAX_PLAYERS }, (_, n) => n + 1).map((n) => (

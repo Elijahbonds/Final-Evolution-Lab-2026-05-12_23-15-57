@@ -79,6 +79,8 @@ jobs:
         run: npx tsc --noEmit
       - name: lint
         run: npm run lint
+      - name: mode list matches registry
+        run: npx tsx scripts/mode-list-check.ts
       - name: unit tests
         run: npx vitest run
       # THE HEADLESS SUITES. Until 2026-09-16 these ran nowhere: CI was tsc + vitest +

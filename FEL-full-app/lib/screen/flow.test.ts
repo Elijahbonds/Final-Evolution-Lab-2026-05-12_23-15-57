@@ -80,14 +80,16 @@ describe('nothing skips the grown-up step, and the camera waits for the camera c
     // the one call from the steps before the camera
     expect(app).toMatch(/if \(next\.step === 'camera'\) \{ void startCamera\(\); return; \}/);
     const calls = app.match(/startCamera\(/g)!.length;
-    expect(calls).toBe(3);      // the camera step, the lighter-model restart and the camera card's retry: nothing earlier
+    // the camera step, the lighter-model restart, the camera card's retry, and "Do the full screen"
+    // after a jump (the camera was already allowed this run — nothing before the camera card opens one)
+    expect(calls).toBe(4);
     // a new screen wipes the last one before anything else
     expect(app).toMatch(/if \(e\.type === 'start'\) clearScreen\(tabStorage\(\), localForClear\(\)\);/);
     // AGE-RESET (audit 2.2): a new Start also clears the last person's age answer, so it is asked again
     expect(app).toMatch(/if \(e\.type === 'start'\) resetAge\(tabStorage\(\)\);/);
     // the age answer is locked as it is given, and a start reads the lock (now always none, after the reset above)
     expect(app).toMatch(/\{ type: 'age', age: lockAge\(tabStorage\(\), e\.age\) \}/);
-    expect(app).toMatch(/\{ type: 'start', locked: readAge\(tabStorage\(\)\) \}/);
+    expect(app).toMatch(/\{ type: 'start', locked: readAge\(tabStorage\(\)\), kind: e\.kind \}/);
   });
 
   it('restart forgets the steps (the tab\'s age lock lives in its storage, not here)', () => {
@@ -97,7 +99,7 @@ describe('nothing skips the grown-up step, and the camera waits for the camera c
 });
 
 describe('S-2: the back arrow is one step back, inside the flow', () => {
-  const at = (step: PreStep, age: PreState['age'] = '13-17'): PreState => ({ step, age, gate: null });
+  const at = (step: PreStep, age: PreState['age'] = '13-17'): PreState => ({ step, age, gate: null, kind: 'full' });
   it('age → the start; grown-up → the start (the age is locked); pain → the grown-up step, or the start for 18+', () => {
     expect(backStep(at('age', null))).toEqual(PRE_START);
     expect(backStep(at('grownUp'))).toEqual(PRE_START);
@@ -118,6 +120,6 @@ describe('S-2: the back arrow is one step back, inside the flow', () => {
 
   it('every step\'s back lands on a step of the flow: never a URL, never out of the screen', () => {
     const steps: PreStep[] = ['intro', 'age', 'grownUp', 'pain', 'painStop', 'cameraInfo', 'camera'];
-    for (const step of steps) for (const age of [...AGE_BANDS, null]) expect(steps, `${step}/${age}`).toContain(backStep({ step, age, gate: null }).step);
+    for (const step of steps) for (const age of [...AGE_BANDS, null]) expect(steps, `${step}/${age}`).toContain(backStep({ step, age, gate: null, kind: 'full' }).step);
   });
 });

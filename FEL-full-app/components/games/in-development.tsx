@@ -27,7 +27,7 @@ export function InDevelopment({ title, reason }: { title: string; reason: string
       </p>
 
       <Link
-        href="/modes"
+        href="/play"
         className="fel-cta mt-2 rounded-2xl bg-white px-8 py-3 font-black text-black transition-transform active:scale-95"
       >
         BACK TO THE LAB
