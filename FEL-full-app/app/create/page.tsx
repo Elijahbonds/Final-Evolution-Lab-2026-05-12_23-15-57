@@ -11,6 +11,7 @@
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import CreativeHub from '@/components/creator/creative-hub';
 import MyCreations from '@/components/creator/my-creations';
@@ -176,7 +177,13 @@ export default function CreatePage() {
       {sel.primary === 'sport' && (
         <div className="min-h-screen bg-neutral-950 p-6 text-neutral-100">
           <h2 className="mb-2 text-2xl font-black">Sport Cards</h2>
-          <p className="text-sm text-neutral-400">Sport routines are authored from your game sessions — play a mode, then save a highlight as a card. Pick Art, Music, Dance, or Acting here to author from scratch.</p>
+          <p className="max-w-2xl text-sm text-neutral-400">Sport routines are authored from your game sessions — play a mode, then save a highlight as a card. Start from the Play shelf now, or pick Art, Music, Dance, or Acting here to author from scratch.</p>
+          <Link
+            href="/play"
+            className="mt-5 inline-flex rounded-lg bg-cyan-400 px-5 py-3 text-sm font-black text-black transition hover:bg-cyan-300"
+          >
+            Open Play shelf
+          </Link>
         </div>
       )}
     </div>

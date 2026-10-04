@@ -42,3 +42,22 @@ describe('Babylon hosts own their boot effect for the mount', () => {
     );
   });
 });
+
+// #158: these hosts defer their Babylon boot one tick so a fast remount does not tear down
+// the shared WebGL context; the lane guard above still requires surfaceBootError on the catch.
+const DEFERRED_HOSTS = [
+  'duel-babylon.tsx',
+  'football-babylon.tsx',
+  'mixedcombat-babylon.tsx',
+  'air-session-babylon.tsx',
+];
+
+describe('deferred Babylon host boot', () => {
+  it.each(DEFERRED_HOSTS)('%s defers boot and reports a load error', (file) => {
+    const src = read(file);
+    expect(src).toContain('const startTimer = setTimeout');
+    expect(src).toContain('clearTimeout(startTimer)');
+    expect(src).toContain('onEndRef');
+    expect(src).toContain('.catch((e) => surfaceBootError(e, {');
+  });
+});

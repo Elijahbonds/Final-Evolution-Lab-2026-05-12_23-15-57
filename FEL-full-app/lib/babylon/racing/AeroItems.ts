@@ -81,7 +81,7 @@ export function weightedItemKind(place: number, fieldSize: number, rng: () => nu
   return ITEM_KINDS[ITEM_KINDS.length - 1];
 }
 
-export interface Balloon { id: number; kind: ItemKind; pos: Vector3; respawn: number }
+export interface Balloon { id: number; kind: ItemKind; pos: Vector3; respawn: number; /** Kart “?” box. The colour is rolled at pickup, not painted on the shell. */ mystery?: boolean }
 
 /** Balloons within reach of the travel segment prev → now pop (swept: 30 m/s covers a balloon in a frame). */
 export function balloonsHit(balloons: Balloon[], prev: Vector3, now: Vector3, radius = BALLOON_RADIUS): Balloon[] {

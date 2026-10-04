@@ -68,6 +68,11 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   ok(host.includes('score: myPts,'), 'tiebreak host: posts the game score (WA-22)');
   ok(host.includes('Math.random() < 0.16 + rally * 0.05'), 'tiebreak host: AI net rate');
   ok(/useStartWake\(!started/.test(host), 'tiebreak host: start card');
+  const loader = src('app/play/tiebreak/_components/loader.tsx');
+  ok(loader.includes('ownControls'), 'tiebreak loader: shell does not draw a second control deck');
+  const registry = src('lib/babylon/modes/registry.ts');
+  ok(registry.includes('tiebreak: TiebreakMode'), 'tiebreak: registered in the Babylon roster');
+  ok(registry.includes("'tiebreak'"), 'tiebreak: enabled in the Babylon roster');
   const mode = src('lib/babylon/modes/TiebreakMode.ts');
   ok(mode.includes("mountVenue(ctx, 'tennis'"), 'tiebreak: mounts the tennis venue');
   ok(mode.includes('MeshBuilder.CreateSphere'), 'tiebreak: the ball is a mesh');
@@ -94,6 +99,7 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   const host = src('components/games/who-scene-it-babylon.tsx');
   ok(!host.includes('h-[calc(100dvh-3.25rem)]'), 'who-scene-it host: canvas is not the old viewport height');
   ok(host.includes('whoSceneItStageBox'), 'who-scene-it host: uses the frame box');
+  ok(host.includes("phase === 'error'") && host.includes('RETRY') && host.includes('onClick={tapStart}'), 'who-scene-it host: error overlay gives touch/mouse players a retry');
   const mode = src('lib/babylon/modes/WhoSceneItMode.ts');
   ok(mode.includes('shelf.preload'), 'who-scene-it: preloads venues');
   ok(mode.includes('shelf.show'), 'who-scene-it: shows a cached venue');

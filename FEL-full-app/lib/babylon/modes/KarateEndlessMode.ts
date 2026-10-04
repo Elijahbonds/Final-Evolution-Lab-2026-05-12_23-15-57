@@ -64,7 +64,7 @@ import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRu
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
-import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
@@ -227,6 +227,7 @@ interface Enemy {
   /** THE-HUNDRED: staggered (helpless, steering held) until this GAME-clock time; 0 = standing */ stunUntil: number;
   /** game-clock time of the last hit this body took (a freshly hit body is grabbable) */ hitAt: number;
   /** in the hero's hands (or in flight): out of the brain, the steering, the arcs and the targeting */ carried: boolean;
+  /** Counter cue while a strike is about to land, and an arrow when the body is off screen. */ cue: Mesh | null; arrow: Mesh | null;
 }
 interface Pickup { kind: DropKind; mesh: Mesh; life: number; phase: number }
 /** A tween on the GAME clock (so slow-mo stretches the sink, the knockback, the slide — one clock, not two). */
@@ -526,7 +527,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // touch, so the health fields existed and meant nothing and there was no bar worth drawing. MookHealth
     // owns the curve; it is shallow and capped on purpose, because one swing still has to clear a crowd.
     const hpPool = mookMaxHp(wave);   // `pool` above is the MOB pool — different thing, same word
-    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null, stunUntil: 0, hitAt: -1e9, carried: false });
+    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null, stunUntil: 0, hitAt: -1e9, carried: false, cue: null, arrow: null });
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
@@ -1216,6 +1217,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   function ko(ctx: ModeContext, e: Enemy): void {
     if (carry?.e === e) carry = null;
     e.bar?.dispose(); e.bar = null;
+    e.cue?.material?.dispose(); e.cue?.dispose(); e.cue = null;
+    e.arrow?.material?.dispose(); e.arrow?.dispose(); e.arrow = null;
     enemies = enemies.filter((x) => x !== e);
     kos++; totalKos++;
     e.mob.down();                                               // the owner: knockdown → the floor hold
@@ -1526,15 +1529,72 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
   }
 
+  const landLeft = (e: Enemy): number => {
+    const b = e.brain;
+    if (!b.attacking) return -1;
+    const left = b.phase === 'windup' ? windupSecFor(b.wave) - b.t + b.landAt : b.landAt - b.t;
+    return left >= 0 ? left : -1;
+  };
   const nextLandIn = (): number => {
     let best = -1;
     for (const e of enemies) {
-      const b = e.brain; if (!b.attacking) continue;
-      const left = b.phase === 'windup' ? windupSecFor(b.wave) - b.t + b.landAt : b.landAt - b.t;
+      const left = landLeft(e);
       if (left >= 0 && (best < 0 || left < best)) best = left;
     }
     return best;
   };
+  function publishFight(ctx: ModeContext): void {
+    const md = (ctx.scene.metadata ??= {}) as Record<string, unknown>;
+    md.fight = { landsIn: () => nextLandIn() };
+  }
+  function tickThreatCues(ctx: ModeContext): void {
+    const cam = ctx.scene.activeCamera;
+    const engine = ctx.scene.getEngine();
+    const w = engine.getRenderWidth();
+    const h = engine.getRenderHeight();
+    const vp = cam && w > 2 && h > 2 ? cam.viewport.toGlobal(w, h) : null;
+    const view = ctx.scene.getTransformMatrix();
+    for (const e of enemies) {
+      const left = landLeft(e);
+      const showCue = left > 0 && left < 0.6 && !e.carried;
+      if (showCue) {
+        if (!e.cue) {
+          const cue = MeshBuilder.CreatePlane(`threat_cue_${e.mob.char.root.uniqueId}`, { width: 0.28, height: 0.28 }, ctx.scene);
+          cue.billboardMode = Mesh.BILLBOARDMODE_ALL;
+          cue.isPickable = false;
+          cue.material = unlitMat(ctx, `${cue.name}_m`, '#ff3355');
+          e.cue = cue;
+        }
+        e.cue.isVisible = true;
+        e.cue.position.copyFrom(e.mob.char.root.position).addInPlace(new Vector3(0, BAR_Y + 0.38, 0));
+        const s = 0.65 + (0.6 - left);
+        e.cue.scaling.set(s, s, 1);
+      } else if (e.cue) e.cue.isVisible = false;
+
+      let off = false;
+      if (vp) {
+        const p = Vector3.Project(e.mob.char.root.position.add(new Vector3(0, 1.2, 0)), Matrix.Identity(), view, vp);
+        off = p.z < 0 || p.z > 1 || p.x < 12 || p.y < 12 || p.x > w - 12 || p.y > h - 12;
+      }
+      if (off && !e.carried) {
+        if (!e.arrow) {
+          const arrow = MeshBuilder.CreateCylinder(`threat_arrow_${e.mob.char.root.uniqueId}`, { diameterTop: 0, diameterBottom: 0.22, height: 0.42, tessellation: 6 }, ctx.scene);
+          arrow.isPickable = false;
+          arrow.material = unlitMat(ctx, `${arrow.name}_m`, '#ffcc33');
+          e.arrow = arrow;
+        }
+        const from = player.root.position;
+        const dir = e.mob.char.root.position.subtract(from);
+        dir.y = 0;
+        const len = dir.length() || 1;
+        dir.scaleInPlace(1 / len);
+        e.arrow.isVisible = true;
+        e.arrow.position.copyFrom(from).addInPlace(dir.scale(3.2)).addInPlace(new Vector3(0, 1.55, 0));
+        e.arrow.rotation.z = Math.PI / 2;
+        e.arrow.rotation.y = Math.atan2(dir.x, dir.z);
+      } else if (e.arrow) e.arrow.isVisible = false;
+    }
+  }
   function publishTelemetry(ctx: ModeContext): void {
     if (process.env.NODE_ENV !== 'development') return;
     const md = (ctx.scene.metadata ??= {}) as Record<string, unknown>;
@@ -1815,6 +1875,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // a swing reads as sitting back
       // the bars ride their bodies: built on first damage, moved every frame after
       for (const e of enemies) if (e.bar) updateBar(ctx, e);
+      publishFight(ctx);
+      tickThreatCues(ctx);
       meAir.update(dtHero);
       player.root.position.y = meAir.height;
       tickMatrix(ctx, dtHero);   // MATRIX: the wall run and the kick own the root while they last
@@ -1911,6 +1973,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pickups = []; tweens = []; shockRings = []; carry = null; queue.clear();
       mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
       youRing?.material?.dispose(); youRing?.dispose(); youRing = null; ring?.dispose(); ring = null;
+      for (const e of enemies) { e.cue?.material?.dispose(); e.cue?.dispose(); e.arrow?.material?.dispose(); e.arrow?.dispose(); }
       crowd?.dispose(); crowd = null; arenaHandle?.dispose(); arenaHandle = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };

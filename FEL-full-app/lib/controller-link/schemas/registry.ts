@@ -370,10 +370,52 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
-  // Showdown: RETIRED from the v1 roster with the combat-family trim (owner,
-  // 2026-09-01 — karate-vs is the Storm mode). Schema removed so phones don't
-  // join a mode the roster no longer offers; the mode file stays registered.
-  // Duel stays off the phone pad for the same reason.
+  // Showdown and Duel were REVIVED (owner, 2026-09-13) and are back in
+  // ENABLED_BABYLON_MODES, so they are controller-linkable again; without these
+  // rows `/host?mode=<id>` said "No controller layout" for revived games.
+  showdown: {
+    modeId: 'showdown',
+    title: 'Showdown',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'JAB' },
+        { action: 'B', label: 'KICK' },
+        { action: 'X', label: 'GUARD' },
+        { action: 'Y', label: 'ULTIMATE' },
+      ] },
+    ],
+  },
+  duel: {
+    modeId: 'duel',
+    title: 'Duel',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'FISTS' },
+        { action: 'B', label: 'BLADE' },
+        { action: 'X', label: 'BLOCK' },
+        { action: 'Y', label: 'STAFF' },
+      ] },
+    ],
+  },
+  tiebreak: {
+    modeId: 'tiebreak',
+    title: 'Tiebreak Blitz',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'X', label: 'SWING L' },
+        { action: 'B', label: 'SWING R' },
+      ] },
+    ],
+  },
 
   // Kart-racer controls. The bridge maps 'charge' to RT, 'brake' to LT, and the
   // held R1 button to the boost shoulder, matching the local pad path.

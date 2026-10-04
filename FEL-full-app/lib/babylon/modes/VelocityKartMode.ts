@@ -1079,7 +1079,7 @@ return {
         const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
         for (const [k, lat] of [-3.2, 0, 3.2].entries()) {
           const kind = ITEM_KINDS[(i + k) % ITEM_KINDS.length];
-          balloons.push({ id: id++, kind, pos: at.point.add(right.scale(lat)).add(new Vector3(0, 1.3, 0)), respawn: 0 });
+          balloons.push({ id: id++, kind, pos: at.point.add(right.scale(lat)).add(new Vector3(0, 1.3, 0)), respawn: 0, mystery: lat === 0 });
         }
       }
     }
@@ -1442,7 +1442,7 @@ return {
     // MINI-TURBO (racing pass phase 8, racing/MiniTurbo): the clean slide's sparks climb blue → orange → purple at the rear
     // wheels, and letting go fires a zip sized by the colour reached. The drift still fills the shared BOOST meter; this
     // is the MOMENT-TO-MOMENT pay, and the sparks are how you know what the release is worth before you let go.
-    const mt = stepMini(S.mini, state.drifting, driftQuality(state), dt);
+    const mt = stepMini(S.mini, state.drifting, driftQuality(state), dt, S.input.drift);
     S.mini = mt.state;
     if (S.mini.tier > 0 && Math.random() < dt * 14) EffectsKit.burst(ctx.scene, state.pos.clone(), 'sparks', 0.45 + 0.2 * S.mini.tier, MINI_COLOR[S.mini.tier]);
     if (mt.tierUp) SoundKit.play('uiTick', { pitch: 0.9 + 0.3 * mt.tierUp, volume: 0.4 });

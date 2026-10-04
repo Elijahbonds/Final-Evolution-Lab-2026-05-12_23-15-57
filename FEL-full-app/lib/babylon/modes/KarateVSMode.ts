@@ -54,6 +54,7 @@ import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC, PARRY_WINDOW_MS, type AttackDef,
 } from '../core/FightCore';
+import { threatLandsIn } from '../core/RivalCombatBrain';
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
 import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (owner): who you are, and the gauge at your feet
@@ -304,6 +305,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   let meCounter = 0;
   /** When the rival's in-flight strike would connect, as a game-clock time; null when nothing is coming. */
   let foeImpactAt: number | null = null;
+  let lastFoeRange = 1.8;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
@@ -363,7 +365,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: homing ? 1.35 : 1.2, volume: 0.45 }); if (homing) ctx.camDirector.pulse(0.25, 0.3);
     console.info(`[KVS-STORM] ${homing ? 'chakra dash' : 'dash'}`);
   }
-  function endStrike(mine: boolean): void { if (mine) striking = false; else foeStriking = false; animOf(mine).strike = null; }
+  function endStrike(mine: boolean): void { if (mine) striking = false; else { foeStriking = false; foeImpactAt = null; } animOf(mine).strike = null; }
   function beatHit(mine: boolean, weight: StrikeWeight): void {
     const f = animOf(mine); f.hitBy = weight; f.hitUntil = now() + (weight === 'finisher' ? LAUNCH_SEC : REACT_SEC) * 1000;
     f.tree.clearBeat(...REACT_STATES);   // a second hit inside the first react re-fires it
@@ -464,7 +466,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     // rival's swing is announced: dodging your own strike is not a read.
     // MATRIX FOCUS: the rival's swing lands on the ROOM clock (inside Focus it takes 1/worldScale longer in real time, and the
     // dodge read is told so); mine stays on the wall clock
-    if (!mine) foeImpactAt = now() + atk.startupMs / focus.worldScale;
+    if (!mine) { lastFoeRange = atk.range; foeImpactAt = now() + atk.startupMs / focus.worldScale; }
     const onHitBeat = (impactAt?: number) => {
       if (phase !== 'fighting') { endStrike(mine); return; }
       // P7: the rival's fist on a BODY player waits for the body's frames to cover the impact (DefenseLedger), then resolves
@@ -749,7 +751,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it
-      (ctx.scene.metadata ??= {}).fight = { landsIn: () => (foeImpactAt === null ? -1 : Math.max(0, (foeImpactAt - now()) / 1000)) };
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => threatLandsIn(Vector3.Distance(player.root.position, rival.root.position), lastFoeRange, foeImpactAt === null ? null : (foeImpactAt - now()) / 1000) };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
       mePosture?.dispose(); foePosture?.dispose();
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / GUARD_MAX), 'KVS-PP');
@@ -817,7 +819,9 @@ export const KarateVSMode: ModeDefinition = (() => {
           if (meEvade.roll(dir.x, dir.z)) {
             // THE REWARD IS A READ, NOT A PRESS (DodgeRead). The window is binary: dodging early pays
             // NOTHING, because any payout for a mistimed press makes mashing optimal again.
-            const secTo = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const secRaw = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const secGate = threatLandsIn(Vector3.Distance(player.root.position, rival.root.position), lastFoeRange, secRaw);
+            const secTo = secGate < 0 ? null : secGate;
             const r = dodgeReward(secTo);
             if (r.perfect) {
               focus.gain(FOCUS.dodgeGain);   // MATRIX: a read refills Focus

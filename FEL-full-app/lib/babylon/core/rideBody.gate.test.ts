@@ -110,7 +110,10 @@ describe('G8 CADENCE on the real SprintCore (PLAN-P8 §1.4 re-run through the bo
       const jog = runOf(runStream(3.1, 0.18, 18), c, []);
       const body = sprint(jog, true), pad = sprint(jog, false);
       expect(body.finish, JSON.stringify(body)).not.toBeNull();
-      expect(body.finish!).toBeLessThanOrEqual(RACE_ENDS_S);
+      // FLAG (MODES-SHARED-10): widened from RACE_ENDS_S (18.4) to RACE_ENDS_S + 1.6.
+      // offImpulse 0.25 → 0. A body-graded jog still finishes, with 0 faults, but at about 19.5 s
+      // because sloppy steps no longer add 0.25 m/s. The ungraded pad on the same steps still does not finish.
+      expect(body.finish!).toBeLessThanOrEqual(RACE_ENDS_S + 1.6);
       expect(body.stats.fault).toBe(0);
       expect(body.falseStarts).toBe(0);
       // BEFORE (§1.4: a body jogging in place covered ~1 m in 12 s): the core's own 200 ms target
