@@ -62,7 +62,7 @@ export function BookForm({
   return (
     <div className="space-y-4 text-white">
       <p className="text-sm text-white/70">Free cancel or reschedule until 24 hours before the start. Inside that window: no refund, one free reschedule. All times Pacific, plus your local zone.</p>
-      {kind === 'program' ? (
+      {kind === 'program' || kind === 'course' || kind === 'series' || kind === 'bundle' ? (
         <fieldset>
           <legend className="text-sm font-bold">Who is this for?</legend>
           <label className="mr-4 text-sm"><input type="radio" name="who" checked={who === 'self'} onChange={() => setWho('self')} /> Me</label>

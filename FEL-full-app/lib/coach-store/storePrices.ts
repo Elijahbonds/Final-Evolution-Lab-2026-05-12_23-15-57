@@ -13,12 +13,15 @@
  * `checkout.ts` parses off a listing row, and `ProgramLibraryVideoEntry`'s `videoId` (./programLibrarySeed) is
  * the same string id used to key the 14-video seed.
  *
- * THREE ITEMS ARE PRICED BUT UNSELLABLE (`manifest: null`): Signature Dunk Course, Blueprint series and the
- * all-three bundle. `coachManifest`'s `program` kind only knows lane `'correctives' | 'posture' | 'dunking'`,
- * `programComingSoon()` lets only `'dunking'` sell, `itemKeyFor()` gives every dunking program the identical
- * key `coach-store:<slug>:program:dunking:one_time`, and there is no bundle kind or entitlement at all. These
- * three need STORE-LISTING-FORMAT (queued after COACH-HOURS-SETTINGS) before they can be represented, let
- * alone sold. No listing-format, checkout or enum change is made in this tip.
+ * THREE ITEMS WERE PRICED BUT UNSELLABLE until STORE-LISTING-FORMAT: Signature Dunk Course (`course`), Blueprint
+ * series (`series`) and the all-three bundle (`bundle`). `coachManifest` (./manifest) now carries those three
+ * kinds alongside the original four; `itemKeyFor()` gives each its own key
+ * (`coach-store:<slug>:course|series|bundle:<product>:one_time`); `checkout.ts`'s `buyAccess()` treats them as
+ * one-time self/teen purchases exactly like `program`, writing `ProgramAccess.scope` `'product'` (course/series)
+ * or `'bundle'` (bundle) with `lane` set to the manifest's `product` key. `lib/coach-store/entitlement.ts`'s
+ * `productsGrantedBy()` is the pure map from a manifest to the store-price keys it grants (the bundle grants all
+ * three members). No schema or SQL change was needed: `MarketplaceListing.manifest` is already a JSON string and
+ * `ProgramAccess.scope`/`lane` are already free-form strings.
  */
 import { isCoachStoreEnabled } from '@/lib/flags';
 import { MAX_CLIPS, MAX_CLIP_SECONDS } from './constants';
@@ -78,7 +81,7 @@ export const STORE_PRICES: readonly StorePriceRow[] = [
     title: 'Signature Dunk Course',
     priceCents: 3900,
     billing: 'one_time',
-    manifest: null, // UNSELLABLE — needs STORE-LISTING-FORMAT
+    manifest: { kind: 'course', product: 'signature-dunk-course', billing: 'one_time' },
     buyer: 'verified_adult',
     videoIds: SIGNATURE_DUNK_COURSE_VIDEO_IDS,
   },
@@ -87,7 +90,7 @@ export const STORE_PRICES: readonly StorePriceRow[] = [
     title: 'Blueprint series',
     priceCents: 2900,
     billing: 'one_time',
-    manifest: null, // UNSELLABLE — needs STORE-LISTING-FORMAT
+    manifest: { kind: 'series', product: 'blueprint-series', billing: 'one_time' },
     buyer: 'verified_adult',
     videoIds: BLUEPRINT_SERIES_VIDEO_IDS,
   },
@@ -96,7 +99,12 @@ export const STORE_PRICES: readonly StorePriceRow[] = [
     title: 'All-three bundle',
     priceCents: 11900,
     billing: 'one_time',
-    manifest: null, // UNSELLABLE — needs STORE-LISTING-FORMAT (no bundle kind/entitlement exists yet)
+    manifest: {
+      kind: 'bundle',
+      product: 'bundle-all-three',
+      billing: 'one_time',
+      members: ['dunking-plyometrics-8wk', 'signature-dunk-course', 'blueprint-series'] as string[],
+    },
     buyer: 'verified_adult',
     videoIds: [...DUNKING_PLYOMETRICS_VIDEO_IDS, ...SIGNATURE_DUNK_COURSE_VIDEO_IDS, ...BLUEPRINT_SERIES_VIDEO_IDS],
     componentKeys: ['dunking-plyometrics-8wk', 'signature-dunk-course', 'blueprint-series'],

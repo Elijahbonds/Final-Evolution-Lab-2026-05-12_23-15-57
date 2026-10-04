@@ -5,6 +5,8 @@ import { getStripe } from '@/lib/stripe';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { isVerifiedAdult } from './adult';
 import { isAllowlistedCoach } from './coaches';
+import * as bundlePolicy from './bundlePolicy';
+import { missingBundleParts, productsGrantedBy } from './entitlement';
 import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
@@ -106,8 +108,27 @@ export async function startCheckout(userId: string, body: CheckoutBody, origin: 
 function beneficiaryFor(manifest: CoachManifest, raw: unknown): 'self' | 'teen' | null {
   if (manifest.kind === 'live_1on1' || manifest.kind === 'video_review') return 'self';
   if (manifest.kind === 'membership') return manifest.audience === 'teen' ? 'teen' : 'self';
+  // program, course, series and bundle all take the same 'self' or 'teen' choice from the buyer.
   const who = raw === 'teen' ? 'teen' : raw === 'self' || raw === undefined ? 'self' : null;
   return who;
+}
+
+/** Every product key the buyer's own active/past-due access (other than the listing just checked) already grants. */
+async function ownedProductsFor(userId: string, beneficiary: 'self' | 'teen', excludeListingId: string): Promise<Set<string>> {
+  const rows = await prisma.programAccess.findMany({
+    where: { userId, beneficiary, status: { in: ['ACTIVE', 'PAST_DUE'] }, listingId: { not: excludeListingId } },
+    select: { listingId: true },
+  });
+  const listingIds = [...new Set(rows.map((r) => r.listingId))];
+  if (!listingIds.length) return new Set();
+  const listings = await prisma.marketplaceListing.findMany({ where: { id: { in: listingIds } }, select: { manifest: true } });
+  const out = new Set<string>();
+  for (const l of listings) {
+    const m = parseManifest(l.manifest);
+    if (!m) continue;
+    for (const p of productsGrantedBy(m)) out.add(p);
+  }
+  return out;
 }
 
 async function referrerFromCode(code: string): Promise<string | null> {
@@ -218,7 +239,7 @@ async function buyAccess(
   userId: string,
   listing: { id: string; priceUsd: number; title: string; creatorId: string },
   instructorId: string,
-  manifest: Extract<CoachManifest, { kind: 'program' | 'membership' }>,
+  manifest: Extract<CoachManifest, { kind: 'program' | 'membership' | 'course' | 'series' | 'bundle' }>,
   beneficiary: 'self' | 'teen',
   origin: string,
   customer: string,
@@ -227,14 +248,46 @@ async function buyAccess(
   stripe: Stripe,
 ): Promise<NextResponse> {
   const instructor = await prisma.instructor.findUnique({ where: { id: instructorId }, select: { slug: true, userId: true } });
-  const scope = manifest.kind === 'membership' ? (manifest.audience === 'teen' ? 'teen_all' : 'all') : 'lane';
-  const lane = manifest.kind === 'program' ? manifest.lane : manifest.audience;
+  const scope = manifest.kind === 'membership'
+    ? (manifest.audience === 'teen' ? 'teen_all' : 'all')
+    : manifest.kind === 'course' || manifest.kind === 'series'
+      ? 'product'
+      : manifest.kind === 'bundle'
+        ? 'bundle'
+        : 'lane';
+  const lane = manifest.kind === 'program'
+    ? manifest.lane
+    : manifest.kind === 'membership'
+      ? manifest.audience
+      : manifest.product;
   const unlock = beneficiary === 'teen' ? newUnlockCode() : null;
   const existing = await prisma.programAccess.findUnique({
     where: { userId_listingId_beneficiary: { userId, listingId: listing.id, beneficiary } },
   });
   if (existing && (existing.status === 'ACTIVE' || existing.status === 'PAST_DUE')) {
     return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+  }
+  // Double-charge guards (./bundlePolicy). A single product (program/course/series) the buyer already owns via
+  // another active/past-due listing (e.g. the bundle) is always 409 already_owned. The bundle, under the default
+  // 'block_if_any_owned', is 409 already_owned when any member is already owned, and the response lists the
+  // missing parts with their individual prices. Memberships are never blocked by these guards.
+  if (manifest.kind === 'program' || manifest.kind === 'course' || manifest.kind === 'series') {
+    const products = productsGrantedBy(manifest);
+    if (products.length) {
+      const owned = await ownedProductsFor(userId, beneficiary, listing.id);
+      if (products.some((p) => owned.has(p))) {
+        return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+      }
+    }
+  } else if (manifest.kind === 'bundle' && bundlePolicy.bundleOwnedPartsMode === 'block_if_any_owned') {
+    const owned = await ownedProductsFor(userId, beneficiary, listing.id);
+    const ownedParts = manifest.members.filter((m) => owned.has(m));
+    if (ownedParts.length) {
+      return NextResponse.json(
+        { error: 'already_owned', owned: ownedParts, missing: missingBundleParts(manifest.members, owned) },
+        { status: 409 },
+      );
+    }
   }
   const row = existing
     ? await prisma.programAccess.update({

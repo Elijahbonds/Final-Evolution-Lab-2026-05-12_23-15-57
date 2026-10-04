@@ -4,7 +4,10 @@ import { MAX_CLIP_SECONDS, MAX_CLIPS, RESERVED_SLUGS, SESSION_LENGTHS } from './
 
 const lane = z.enum(['correctives', 'posture', 'dunking']);
 
-export const coachManifest = z.discriminatedUnion('kind', [
+/** A store-price product key, e.g. 'signature-dunk-course'. Kept generic — storePrices.ts supplies the values. */
+const productSlug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+
+const coachManifestUnion = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('program'),
     lane,
@@ -25,9 +28,36 @@ export const coachManifest = z.discriminatedUnion('kind', [
     audience: z.enum(['adult', 'teen']),
     interval: z.literal('month'),
   }),
+  z.object({
+    kind: z.literal('course'),
+    product: productSlug,
+    billing: z.literal('one_time'),
+  }),
+  z.object({
+    kind: z.literal('series'),
+    product: productSlug,
+    billing: z.literal('one_time'),
+  }),
+  z.object({
+    kind: z.literal('bundle'),
+    product: productSlug,
+    billing: z.literal('one_time'),
+    members: z.array(productSlug).min(1),
+  }),
 ]);
 
-export type CoachManifest = z.infer<typeof coachManifest>;
+/** Adds the bundle-only rules discriminatedUnion can't express on its own: no duplicate and no self-referencing member. */
+export const coachManifest = coachManifestUnion.superRefine((val, ctx) => {
+  if (val.kind !== 'bundle') return;
+  if (new Set(val.members).size !== val.members.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'duplicate bundle member', path: ['members'] });
+  }
+  if (val.members.includes(val.product)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'bundle cannot include itself', path: ['members'] });
+  }
+});
+
+export type CoachManifest = z.infer<typeof coachManifestUnion>;
 
 export function parseManifest(raw: string): CoachManifest | null {
   try {
@@ -52,6 +82,9 @@ export function itemKeyFor(manifest: CoachManifest, slug: string): string {
   if (manifest.kind === 'program') return `coach-store:${slug}:program:${manifest.lane}:one_time`;
   if (manifest.kind === 'live_1on1') return `coach-store:${slug}:live_1on1:${manifest.durationMin}:one_time`;
   if (manifest.kind === 'video_review') return `coach-store:${slug}:video_review:clip:one_time`;
+  if (manifest.kind === 'course') return `coach-store:${slug}:course:${manifest.product}:one_time`;
+  if (manifest.kind === 'series') return `coach-store:${slug}:series:${manifest.product}:one_time`;
+  if (manifest.kind === 'bundle') return `coach-store:${slug}:bundle:${manifest.product}:one_time`;
   return `coach-store:${slug}:membership:${manifest.audience}:month`;
 }
 
