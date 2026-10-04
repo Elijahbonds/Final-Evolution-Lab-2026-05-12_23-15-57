@@ -120,6 +120,7 @@ import {
   dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
+import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10PHASE-2 phase 8: the tip-in
 import { attachBallToHand, gatherBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
 import { rightHandHoops, rightHandBall, hoopsHand } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide';                             // HOOPS MOTION phase 3: the one visual-side helper
@@ -3240,12 +3241,42 @@ export const OneVOneMode: ModeDefinition = (() => {
   function awardBoard(ctx: ModeContext, who: 'me' | 'foe', contested: boolean): void {
     const shooter = board?.shooter ?? possession;
     const sealed = who === 'me' ? (meSlot.intent.brace ?? false) : foeSealing;
+    const ballAt = ballSim.pos.clone();
     board = null;
     foeBrain?.boxOut(null); foeSealing = false;
     ballSim.stop(); loose = false;
     // shooter is the mode's possession wording ('mine' = me, 'defense' = the rival had it)
     const offensive = boardOutcome(who, shooter === 'mine' ? 'me' : 'foe') === 'putback';
     console.info(`[1V1-BOARD] ${who} secures it${contested ? ' (contested)' : ''}${offensive ? ' — OFFENSIVE, play on' : ''}`);
+
+    // HOOPS-10PHASE-2 phase 8: THE TIP-IN. Caught right at/near the rim off your own miss, it goes straight back
+    // up in one motion instead of the ordinary putback (which still hands the ball out for a normal
+    // dribble/gather/shoot). A missed tip just falls through to the existing putback flow below, unchanged.
+    if (offensive && isTipInEligible(ballAt, RIM, true)) {
+      const contest = contestLevel(who === 'me' ? me.root.position : foe.root.position, who === 'me' ? foe.root.position : me.root.position);
+      if (roll() < tipInMakeChance(contest)) {
+        const v = netExitVelocity('layup');
+        launchLoose(RIM.clone(), new Vector3(v.x, v.y, v.z));
+        SoundKit.play('score'); SoundKit.play('swish', { volume: 0.6 }); EffectsKit.burst(ctx.scene, RIM, 'net');
+        console.info(`[1V1-BOARD] TIP-IN by ${who} contest ${contest.toFixed(2)}`);
+        if (who === 'me') {
+          myScore += 2;
+          meAnimTree.beat('bball_score_celebrate', { fadeSec: 0.2 });
+          ctx.setHud({ score: myScore, momentum });
+          bannerFlash(ctx, 'TIP IN!', 900);
+          if (checkGameOver(ctx)) return;
+          later(700, () => { ctx.setHud({ banner: '' }); resetPositions(); });   // make it, take it — same cadence as every other make
+        } else {
+          foeScore += 2;
+          foeAnimTree.beat('bball_score_celebrate', { fadeSec: 0.2 });
+          ctx.setHud({ foeScore });
+          bannerFlash(ctx, 'THEY TIP IT IN', 900);
+          if (checkGameOver(ctx)) return;
+          later(900, () => { ctx.setHud({ banner: '' }); startDefense(ctx, 'THEIR TIP-IN — DEFEND!'); });
+        }
+        return;
+      }
+    }
 
     if (offensive && who === 'me') { securePutback(ctx, contested); return; }
     if (offensive && who === 'foe') { foePutback(ctx, contested); return; }

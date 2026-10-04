@@ -138,6 +138,7 @@ import {
   type ContactDunkKind,
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
+import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10PHASE-2 phase 8: the tip-in
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
@@ -2776,6 +2777,41 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (r.winner) {
       const team: 'me' | 'foe' = r.winner.id.startsWith('foe') ? 'foe' : 'me';
       const putback = boardOutcome(team, board.shooter) === 'putback';
+      // HOOPS-10PHASE-2 phase 8: THE TIP-IN. Caught right at/near the rim off your own miss, it goes straight
+      // back up in one motion — every other board still falls through to the ordinary dribble/gather/shoot loop
+      // below, unchanged. A missed tip attempt changes nothing: the ball is already secured the same way any
+      // other board is, this only adds a NEW instant-make outcome on the rare right-under-the-rim catch.
+      if (putback && isTipInEligible(ballSim.pos, RIM, true)) {
+        const winnerBody = r.winner.id === 'me' ? me : r.winner.id.startsWith('mate') ? mates[Number(r.winner.id.slice(4))] : foes[Number(r.winner.id.slice(3))];
+        const opponents = (team === 'me' ? foes : [me, ...mates]).map((b) => b.char.root.position);
+        const nearestOpp = opponents.reduce<Vector3 | null>((best, p) =>
+          !best || Vector3.Distance(p, winnerBody.char.root.position) < Vector3.Distance(best, winnerBody.char.root.position) ? p : best, null);
+        const contest = contestLevel(winnerBody.char.root.position, nearestOpp);
+        if (roll() < tipInMakeChance(contest)) {
+          board = null; endChase(); endBoxOut(); ballSim.stop();
+          winnerBody.tree.beat('bball_score_celebrate', { fadeSec: 0.2 });
+          const v = netExitVelocity('layup');
+          ballSim.launch(RIM.clone(), new Vector3(v.x, v.y, v.z));
+          SoundKit.play('score'); SoundKit.play('swish', { volume: 0.6 }); EffectsKit.burst(ctx.scene, RIM, 'net');
+          console.info(`[3V3-BOARD] TIP-IN by ${r.winner.id} contest ${contest.toFixed(2)}`);
+          if (team === 'me') {
+            myScore += 2;
+            ctx.setHud({ score: myScore, banner: 'TIP IN!' });
+            bannerClearLater(ctx, 700);
+            swing(heroSwing({ play: 'make', by: 'me' })); ctx.setHud({ momentum });
+            if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
+            resetPossession(true);
+          } else {
+            foeScore += 2;
+            ctx.setHud({ foeScore, banner: 'THEIR TIP IN!' });
+            bannerClearLater(ctx, 700);
+            if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('LOSS'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
+            void opponentPossession(ctx);
+          }
+          return;
+        }
+        // a missed tip attempt falls through to the ordinary board-secured flow below, unchanged
+      }
       board = null;
       endChase();
       endBoxOut();
