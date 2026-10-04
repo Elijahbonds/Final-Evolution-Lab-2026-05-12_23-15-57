@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
 import { isAllowlistedCoach } from '@/lib/coach-store/coaches';
@@ -14,7 +15,7 @@ export default async function DashboardPage() {
   if (!isCoachStoreEnabled()) notFound();
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
-  if (!userId) redirect(`/login?next=${encodeURIComponent('/coach/dashboard')}`);
+  if (!userId) redirect(loginPath('/coach/dashboard'));
   if (!isAllowlistedCoach(userId)) notFound();
   const now = new Date();
   let bookings: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];

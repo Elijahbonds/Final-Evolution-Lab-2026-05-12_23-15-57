@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
 import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export default async function CoachingAccountPage() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
-  if (!userId) redirect(`/login?next=${encodeURIComponent('/account/coaching')}`);
+  if (!userId) redirect(loginPath('/account/coaching'));
   if (!isCoachStoreEnabled()) {
     return <main className="mx-auto max-w-xl px-4 py-8 text-white"><p>Coaching is not open yet.</p><Link href="/account">Account</Link></main>;
   }
