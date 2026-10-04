@@ -15,7 +15,7 @@ const jump: JumpRead = {
 };
 
 describe('capture HUD and review reel render', () => {
-  it('the record button is on the HUD', () => {
+  it('the HUD shows only the overflow button and the dots until it is opened', () => {
     const html = renderToStaticMarkup(
       <CaptureHudView
         phase="idle" aspect="16:9" streamOn={false} controlsHidden={false}
@@ -24,10 +24,71 @@ describe('capture HUD and review reel render', () => {
         onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
       />,
     );
+    expect(html).toContain('data-testid="capture-overflow"');
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-label="Capture and stream menu"');
+    // The gameplay screen stays clean: no controls, no menu, until the ⋯ is pressed.
+    expect(html).not.toContain('role="menu"');
+    expect(html).not.toContain('data-testid="capture-record"');
+    expect(html).not.toContain('data-testid="rec-live"');
+  });
+
+  it('the open menu lists every control as a labelled menuitem', () => {
+    const html = renderToStaticMarkup(
+      <CaptureHudView
+        phase="idle" aspect="16:9" streamOn={false} controlsHidden={false}
+        note={null} codecNote={null} dunkFilm canShareTake={false} canShareReplay={false}
+        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop}
+        onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
+        defaultMenuOpen
+      />,
+    );
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('role="menu"');
+    expect(html).toContain('aria-label="Capture and stream controls"');
     expect(html).toContain('data-testid="capture-record"');
     expect(html).toContain('Record');
     expect(html).toContain('Last 30s');
     expect(html).toContain('Share');
+    expect(html).toContain('Film dunk');
+    expect(html.match(/role="menuitem"/g)?.length).toBe(7);
+    for (const label of [
+      'Start recording', 'Keep the last 30 seconds', 'Portrait 9:16 export shape',
+      'Landscape 16:9 export shape', 'Share the clip', 'Turn stream mode on', 'Film a dunk with the camera',
+    ]) {
+      expect(html).toContain(`aria-label="${label}"`);
+    }
+  });
+
+  it('a red REC dot stays on the HUD while recording, even with the menu closed', () => {
+    const html = renderToStaticMarkup(
+      <CaptureHudView
+        phase="recording" aspect="16:9" streamOn={false} controlsHidden={false}
+        note={null} codecNote={null} dunkFilm={false} canShareTake={false} canShareReplay={false}
+        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop}
+        onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
+      />,
+    );
+    expect(html).toContain('data-testid="rec-live"');
+    expect(html).toContain('REC');
+    expect(html).toContain('aria-label="Recording"');
+    expect(html).not.toContain('LIVE');
+  });
+
+  it('a red LIVE dot stays on the HUD while streaming — even when the controls are hidden for the broadcast', () => {
+    const html = renderToStaticMarkup(
+      <CaptureHudView
+        phase="recording" aspect="16:9" streamOn controlsHidden
+        note={null} codecNote={null} dunkFilm={false} canShareTake={false} canShareReplay={false}
+        onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop}
+        onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
+      />,
+    );
+    expect(html).toContain('data-testid="rec-live"');
+    expect(html).toContain('REC');
+    expect(html).toContain('LIVE');
+    expect(html).toContain('data-testid="capture-show"');
   });
 
   it('stream mode shows the safe area and says there is no RTMP relay', () => {
@@ -39,12 +100,17 @@ describe('capture HUD and review reel render', () => {
           dunkFilm={false} canShareTake={false} canShareReplay={false}
           onRecord={noop} onReplay={noop} onAspect={noop} onShare={noop}
           onStream={noop} onHide={noop} onShow={noop} onFilm={noop}
+          defaultMenuOpen
         />
         <StreamGuides />
       </>,
     );
     expect(html).toContain('data-testid="capture-stream"');
     expect(html).toContain('Stream on');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('data-testid="capture-hide"');
+    expect(html).toContain('data-testid="rec-live"');
+    expect(html).toContain('LIVE');
     expect(html).toContain('data-testid="stream-guides"');
     expect(html).toContain('16:9');
     expect(html).toContain('SAFE AREA');
