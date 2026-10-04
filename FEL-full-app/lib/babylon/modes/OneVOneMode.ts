@@ -364,6 +364,12 @@ export const OneVOneMode: ModeDefinition = (() => {
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
   let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
+  // HOOPS-10PHASE-2 phase 5: the size-up chain's OWN eaten-press fault — the shot button had exactly this bug
+  // (see SHOT_BUFFER_MS above) and the fix is the same tool. A flick thrown mid-gather/mid-finish/mid-spin used
+  // to just vanish (stickGestures cleared with nothing read); now the last one is held long enough to outlive a
+  // short lock, so a size-up chain or an escape thrown a beat early still lands instead of reading as a drop.
+  const STICK_MOVE_BUFFER_MS = 220;
+  let bufferedGesture: StickGesture | null = null, bufferedGestureAt = -Infinity;
   let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE: the dribble stick on the floor
   let currentShot: ShotContext | null = null;
   /** Contest level at shot start — kept so the RESULT banner can say why. */
@@ -679,7 +685,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
     shotBuffer.clear();   // a squeeze from the last possession is not a shot on this one
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('me', me.root, MY_SPAWN, Math.PI);
     place('foe', foe.root, dummyFoe ? new Vector3(5.5, 0, 6) : FOE_SPAWN, 0);   // DEV ?dummy=1: he stands off in the corner
@@ -1392,6 +1398,11 @@ export const OneVOneMode: ModeDefinition = (() => {
         // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
         // flick the MOMENTUM BEHIND THE BACK (slow: the hesi), a hold is PAUSIN' (frozen, the ball out, the release explodes),
         // a half-circle sweep the STEEZO ROLL (the wrap rolled into the spin). In the air the same stick is the trick stick.
+        // HOOPS-10PHASE-2 phase 5: a buffered gesture gets first crack at THIS frame's window, same as any live one —
+        // it is replayed through the exact same loop below, so every gate (handle locks, chains, escape timing) still runs.
+        if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && performance.now() - bufferedGestureAt <= STICK_MOVE_BUFFER_MS) {
+          stickGestures.unshift(bufferedGesture); bufferedGesture = null;
+        } else bufferedGesture = null;
         if (stickGestures.length && carrying && !shooting && !dunking && !finish && !gather && !spin) {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
@@ -1462,7 +1473,14 @@ export const OneVOneMode: ModeDefinition = (() => {
             SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
           }
           stickGestures = [];
-        } else if (stickGestures.length) stickGestures = [];
+        } else if (stickGestures.length) {
+          // BUFFERED, NOT EATEN: hold the newest real move gesture (not a bare hold/release, which resolve to no
+          // move at all — see stickMoveFor) so it gets the replay above once the lock clears, same window as the
+          // shot button's own fix for the identical fault.
+          const last = [...stickGestures].reverse().find((g) => g.kind === 'flick' || g.kind === 'sweep');
+          if (last) { bufferedGesture = last; bufferedGestureAt = performance.now(); }
+          stickGestures = [];
+        }
           if (drib.crossover && !finish && !posting) {
             SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 });
             ctx.feel?.impact?.(0.1);
@@ -2118,7 +2136,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
     if (gather || finish || spin || posting) meAnimTree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; meDribble.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; contact?.setAirborne('me', false);
     clearDefense();
     place('foe', foe.root, CHECK_FOE, Math.PI);
     place('me', me.root, CHECK_ME, 0);

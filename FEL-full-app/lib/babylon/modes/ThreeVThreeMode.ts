@@ -296,6 +296,10 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
   let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
+  // HOOPS-10PHASE-2 phase 5: same fix as 1v1's — a flick thrown mid-gather/mid-finish/mid-spin used to vanish
+  // instead of landing a beat later. See the 1v1 note at its own declaration.
+  const STICK_MOVE_BUFFER_MS = 220;
+  let bufferedGesture: StickGesture | null = null, bufferedGestureAt = -Infinity;
   let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE
   // CALL FOR THE BALL (Elijah item 2, Oct 3 2026): 'me' is a legal passTargetId now — the only new value this
   // type takes on, when a mate throws the ball back to the hero instead of the hero throwing it to a mate.
@@ -644,7 +648,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
     shooting = false; mateShooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; victimSlide = null; lastDunkKind = 'clean';
@@ -1272,6 +1276,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
       // flick the MOMENTUM BEHIND THE BACK (slow: the hesi), a hold is PAUSIN' (frozen, the ball out, the release explodes),
       // a half-circle sweep the STEEZO ROLL (the wrap rolled into the spin). In the air the same stick is the trick stick.
+      // HOOPS-10PHASE-2 phase 5: replay a buffered gesture the instant the lock clears — see the 1v1 note.
+      if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && performance.now() - bufferedGestureAt <= STICK_MOVE_BUFFER_MS) {
+        stickGestures.unshift(bufferedGesture); bufferedGesture = null;
+      } else bufferedGesture = null;
       if (stickGestures.length && iAmCarrier && !shooting && !dunking && !finish && !gather && !spin) {
         const nfS = nearestLiveFoe(); const foeDistS = nfS ? distXZ(me.char.root.position, nfS.char.root.position) : Infinity; const foeLiveS = !!nfS;
         for (const g of stickGestures) {
@@ -1340,7 +1348,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
         }
         stickGestures = [];
-      } else if (stickGestures.length) stickGestures = [];
+      } else if (stickGestures.length) {
+        // BUFFERED, NOT EATEN — see the 1v1 note at its own declaration.
+        const last = [...stickGestures].reverse().find((g) => g.kind === 'flick' || g.kind === 'sweep');
+        if (last) { bufferedGesture = last; bufferedGestureAt = performance.now(); }
+        stickGestures = [];
+      }
       if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) {
         carries.get(me)?.toSide(sideOfVector(me.char.root.rotation.y, wish));   // HOOPS MOTION phase 3: to the hand on the cut's side (a toggle before), crossing in front — a path, not a jump
         // A CROSSOVER IS A CHAIN LINK, not just a hand swap. In 3v3 it only ever switched hands, so the
