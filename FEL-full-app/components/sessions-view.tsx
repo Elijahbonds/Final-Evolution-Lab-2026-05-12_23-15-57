@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { CalendarDays, Loader2, Users, Lock, Check, Sparkles, Dumbbell } from 'lucide-react';
@@ -114,7 +115,7 @@ export function SessionsView() {
       {coachStore ? (
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-white/70">Private 1-on-1</h2>
-          <a href="/coach/elijah" className="text-sm text-cyan-300 underline">Book with Elijah on the coach store</a>
+          <Link href="/coach/elijah" className="text-sm text-cyan-300 underline">Book with Elijah on the coach store</Link>
         </section>
       ) : <section className="mb-8">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/70"><Lock className="h-4 w-4 text-purple-300" /> Private 1-on-1 (18+)</h2>
