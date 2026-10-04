@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { GuardianConsentGate } from '@/app/play/mirror/_components/guardian-consent-gate';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function GuardianConsentPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login?next=%2Fconsent%2Fguardian');
+  if (!session) redirect(loginPath('/consent/guardian'));
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">

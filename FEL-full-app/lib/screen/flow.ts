@@ -19,14 +19,18 @@ import { needsGrownUp, type AgeBand } from './age';
 
 export type PreStep = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'camera';
 
+/** Jump-only runs T5. Full runs T1–T3 and T5. A start with no kind is the full screen. */
+export type ScreenKind = 'jump' | 'full';
+
 export interface PreState {
   step: PreStep;
   age: AgeBand | null;
   gate: GateRecord | null;
+  kind: ScreenKind;
 }
 
 export type PreEvent =
-  | { type: 'start'; locked?: AgeBand | null }
+  | { type: 'start'; locked?: AgeBand | null; kind?: ScreenKind }
   | { type: 'age'; age: AgeBand }
   | { type: 'grownUp' }
   | { type: 'back' }
@@ -34,11 +38,13 @@ export type PreEvent =
   | { type: 'cameraOn' }
   | { type: 'restart' };
 
-export const PRE_START: PreState = { step: 'intro', age: null, gate: null };
+export const PRE_START: PreState = { step: 'intro', age: null, gate: null, kind: 'full' };
 
 /** Where an answered age goes next: the grown-up step, or (18 or older) straight to the pain question. */
-function afterAge(age: AgeBand, now: Date): PreState {
-  return needsGrownUp(age) ? { step: 'grownUp', age, gate: null } : { step: 'pain', age, gate: gateRecord(age, false, now) };
+function afterAge(age: AgeBand, now: Date, kind: ScreenKind): PreState {
+  return needsGrownUp(age)
+    ? { step: 'grownUp', age, gate: null, kind }
+    : { step: 'pain', age, gate: gateRecord(age, false, now), kind };
 }
 
 /** The back arrow, one step back within the flow. */
@@ -46,7 +52,7 @@ export function backStep(s: PreState): PreState {
   switch (s.step) {
     case 'intro': return s;                                        // the page leaves to /screen
     case 'age': case 'grownUp': case 'painStop': return PRE_START;
-    case 'pain': return s.age && needsGrownUp(s.age) ? { step: 'grownUp', age: s.age, gate: null } : PRE_START;
+    case 'pain': return s.age && needsGrownUp(s.age) ? { step: 'grownUp', age: s.age, gate: null, kind: s.kind } : PRE_START;
     case 'cameraInfo': return { ...s, step: 'pain' };
     case 'camera': return { ...s, step: 'cameraInfo' };
   }
@@ -54,19 +60,22 @@ export function backStep(s: PreState): PreState {
 
 export function preStep(s: PreState, e: PreEvent, now: Date = new Date()): PreState {
   switch (e.type) {
-    case 'start': return e.locked ? afterAge(e.locked, now) : { step: 'age', age: null, gate: null };
+    case 'start': {
+      const kind = e.kind ?? 'full';
+      return e.locked ? afterAge(e.locked, now, kind) : { step: 'age', age: null, gate: null, kind };
+    }
     case 'restart': return PRE_START;
     case 'age':
       if (s.step !== 'age') return s;
-      return afterAge(e.age, now);
+      return afterAge(e.age, now, s.kind);
     case 'grownUp':
       if (s.step !== 'grownUp' || !s.age) return s;
-      return { step: 'pain', age: s.age, gate: gateRecord(s.age, true, now) };
+      return { step: 'pain', age: s.age, gate: gateRecord(s.age, true, now), kind: s.kind };
     case 'back':
       return backStep(s);
     case 'pain':
       if (s.step !== 'pain' || !s.gate) return s;
-      return e.hurts ? { step: 'painStop', age: s.age, gate: null } : { ...s, step: 'cameraInfo' };
+      return e.hurts ? { step: 'painStop', age: s.age, gate: null, kind: s.kind } : { ...s, step: 'cameraInfo' };
     case 'cameraOn':
       if (s.step !== 'cameraInfo' || !s.gate) return s;
       return { ...s, step: 'camera' };

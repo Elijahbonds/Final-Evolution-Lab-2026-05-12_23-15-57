@@ -16,7 +16,7 @@ describe('/account and /settings both resolve', () => {
   it('the account page is the settings home and sends a signed-out visitor to login with ?next', () => {
     const page = read('app/account/page.tsx');
     expect(page).toContain('AccountSettings');
-    expect(page).toContain('login?next=');
+    expect(page).toContain('loginPath(ACCOUNT_SETTINGS_PATH)');
     expect(page).toContain('ACCOUNT_SETTINGS_PATH');
     expect(page).not.toContain('notFound(');
   });
@@ -89,7 +89,7 @@ describe('login honors ?next for same-origin paths only', () => {
     const form = read('components/auth-form.tsx');
     expect(form).toContain('loginDestination(nextRaw, fallback)');
     expect(form).toContain("searchParams.get('next')");
-    expect(form).toMatch(/mode === 'login' \? loginDestination/);
+    expect(form).toContain('const dest = loginDestination(nextRaw, fallback)');
     const page = read('app/login/page.tsx');
     expect(page).toContain('loginDestination(raw, \'/\')');
   });

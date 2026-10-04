@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Trophy, Swords, Flame } from 'lucide-react';
-import { challengePlayHref } from '@/lib/social/challenge-routes';
+import { challengePlayHref, challengeSignupHref } from '@/lib/social/challenge-routes';
 
 const MODE_LABEL: Record<string, string> = {
   dunkContest: 'Flight Night',
@@ -45,7 +45,7 @@ export function ChallengeLanding({
   // to the real play route so GameShell can settle the same `?c=` attempt.
   const guestPlayable = modeKey === 'dunkContest';
   const authedHref = challengePlayHref(modeKey, code);
-  const ctaHref = isAuthed && authedHref ? authedHref : guestPlayable ? `/try?c=${code}` : `/signup?c=${code}`;
+  const ctaHref = isAuthed && authedHref ? authedHref : guestPlayable ? `/try?c=${encodeURIComponent(code)}` : challengeSignupHref(code);
   const ctaLabel = guestPlayable ? 'ACCEPT — PLAY NOW' : isAuthed ? 'ACCEPT CHALLENGE' : 'SIGN UP TO ACCEPT';
 
   return (
