@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Trophy, Swords, Flame } from 'lucide-react';
+import { challengePlayHref, challengeSignupHref } from '@/lib/social/challenge-routes';
 
 const MODE_LABEL: Record<string, string> = {
   dunkContest: 'Flight Night',
@@ -41,8 +42,10 @@ export function ChallengeLanding({
   }, [code]);
 
   // dunkContest is guest-playable end-to-end; other modes route to signup.
+  // A signed-in accept goes to that mode's play route with the code kept.
   const guestPlayable = modeKey === 'dunkContest';
-  const ctaHref = guestPlayable ? `/try?c=${code}` : `/signup?c=${code}`;
+  const authedHref = challengePlayHref(modeKey, code);
+  const ctaHref = isAuthed && authedHref ? authedHref : guestPlayable ? `/try?c=${encodeURIComponent(code)}` : challengeSignupHref(code);
   const ctaLabel = guestPlayable ? 'ACCEPT — PLAY NOW' : isAuthed ? 'ACCEPT CHALLENGE' : 'SIGN UP TO ACCEPT';
 
   return (
