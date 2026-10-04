@@ -203,6 +203,16 @@ export const REFUSED_SCAN_CASES: readonly AgeCase[] = [
   withYear('18+ not opted in (1990)', 1990),
 ];
 
+/**
+ * Calls a refused movement save makes. A verified adult who has not opted in also reads ScanSaveOptIn (AB-04).
+ * That is still a refusal: the answer is false and nothing is written. Minors and unknown age stop after User.dobYear.
+ */
+export function refusedGateReads(caseId: string): string[] {
+  return caseId.startsWith('18+')
+    ? ['user.findUnique', 'scanSaveOptIn.findUnique']
+    : ['user.findUnique'];
+}
+
 /** The one account a movement save lets through — with lib/privacy/scanSaveOptIn vi.mocked to true. */
 export const OPTED_IN_ADULT: AgeCase = withYear('18+ opted in (1990, opt-in mocked true)', 1990);
 

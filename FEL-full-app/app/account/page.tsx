@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { ACCOUNT_SETTINGS_PATH } from '@/lib/account/paths';
 import { AccountSettings } from '@/components/account/account-settings';
+import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
 
 export const dynamic = 'force-dynamic';
@@ -16,9 +17,10 @@ export default async function AccountPage() {
     <TabPage
       eyebrow="Account"
       title="Account settings"
-      lede="Download your data, or erase the health data stored for this account."
+      lede="Download your data, choose whether jump numbers are saved, or erase the health data stored for this account."
       accent="#00E5FF"
     >
+      <ScanSaveAccount />
       <AccountSettings email={session.user.email ?? ''} />
     </TabPage>
   );
