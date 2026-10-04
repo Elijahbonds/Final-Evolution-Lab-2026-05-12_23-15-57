@@ -75,7 +75,10 @@ async function checkout(listingId: string, body: Record<string, unknown> = {}) {
 }
 
 describe('CHECKOUT STAYS ADULTS-ONLY: every manifest kind, not-adult → 403 adults_only, Stripe never called', () => {
-  const kinds = ['dunking-plyometrics-8wk', 'membership', 'teen-membership', 'async-review', 'live-1on1-30'];
+  const kinds = [
+    'dunking-plyometrics-8wk', 'membership', 'teen-membership', 'async-review', 'live-1on1-30',
+    'signature-dunk-course', 'blueprint-series', 'bundle-all-three',
+  ];
 
   it.each(kinds)('%s: isVerifiedAdult false → 403 { error: adults_only }', async (key) => {
     seedInstructor();
@@ -86,6 +89,94 @@ describe('CHECKOUT STAYS ADULTS-ONLY: every manifest kind, not-adult → 403 adu
     expect(r.json).toEqual({ error: 'adults_only' });
     expect(h.stripe.checkout.sessions.create).not.toHaveBeenCalled();
     expect(h.stripe.customers.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('STORE-LISTING-FORMAT: course, series and bundle checkout', () => {
+  beforeEach(() => {
+    process.env.COACH_STORE_COACH_USER_IDS = COACH_ID;
+    seedInstructor();
+    h.isAdult = true;
+  });
+
+  const cases: Array<{ key: string; scope: string; lane: string; cents: number }> = [
+    { key: 'signature-dunk-course', scope: 'product', lane: 'signature-dunk-course', cents: 3900 },
+    { key: 'blueprint-series', scope: 'product', lane: 'blueprint-series', cents: 2900 },
+    { key: 'bundle-all-three', scope: 'bundle', lane: 'bundle-all-three', cents: 11900 },
+  ];
+
+  it.each(cases)('$key: ProgramAccess scope $scope / lane $lane, Stripe mode payment, unit_amount $cents', async ({ key, scope, lane, cents }) => {
+    const listingId = seedListing(key);
+    const r = await checkout(listingId);
+    expect(r.status).toBe(200);
+    const access = h.db.tables.programAccess.find((row) => row.listingId === listingId);
+    expect(access).toBeDefined();
+    expect(access!.scope).toBe(scope);
+    expect(access!.lane).toBe(lane);
+    expect(access!.billing).toBe('one_time');
+    expect(h.stripe.checkout.sessions.create).toHaveBeenCalledTimes(1);
+    const call = h.stripe.checkout.sessions.create.mock.calls[0][0];
+    expect(call.mode).toBe('payment');
+    expect(call.line_items[0].price_data.unit_amount).toBe(cents);
+  });
+
+  it('owning the bundle already (ACTIVE) and buying the course → 409 already_owned, no Stripe call', async () => {
+    const bundleListingId = seedListing('bundle-all-three');
+    (h.db.tables.programAccess ??= []).push({
+      id: 'pa-bundle-1', userId: BUYER_ID, instructorId: 'instructor-1', listingId: bundleListingId,
+      lane: 'bundle-all-three', billing: 'one_time', scope: 'bundle', beneficiary: 'self', status: 'ACTIVE', priceCents: 11900,
+    });
+    const courseListingId = seedListing('signature-dunk-course');
+    const r = await checkout(courseListingId);
+    expect(r.status).toBe(409);
+    expect(r.json).toEqual({ error: 'already_owned' });
+    // customerId() runs before the per-kind dispatch (same as every checkout), so only the Stripe *checkout*
+    // call is guaranteed skipped here — not customer lookup/creation.
+    expect(h.stripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('owning a member (course) already and buying the bundle is allowed (no proration)', async () => {
+    const courseListingId = seedListing('signature-dunk-course');
+    (h.db.tables.programAccess ??= []).push({
+      id: 'pa-course-1', userId: BUYER_ID, instructorId: 'instructor-1', listingId: courseListingId,
+      lane: 'signature-dunk-course', billing: 'one_time', scope: 'product', beneficiary: 'self', status: 'ACTIVE', priceCents: 3900,
+    });
+    const bundleListingId = seedListing('bundle-all-three');
+    const r = await checkout(bundleListingId);
+    expect(r.status).toBe(200);
+    expect(h.stripe.checkout.sessions.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('existing kinds unchanged: program and membership scope/lane/mode', () => {
+  beforeEach(() => {
+    process.env.COACH_STORE_COACH_USER_IDS = COACH_ID;
+    seedInstructor();
+    h.isAdult = true;
+  });
+
+  it('the dunking program still writes scope lane / lane dunking, mode payment', async () => {
+    const listingId = seedListing('dunking-plyometrics-8wk');
+    const r = await checkout(listingId);
+    expect(r.status).toBe(200);
+    const access = h.db.tables.programAccess.find((row) => row.listingId === listingId);
+    expect(access!.scope).toBe('lane');
+    expect(access!.lane).toBe('dunking');
+    expect(access!.billing).toBe('one_time');
+    const call = h.stripe.checkout.sessions.create.mock.calls[0][0];
+    expect(call.mode).toBe('payment');
+  });
+
+  it('the adult membership still writes scope all / lane adult, mode subscription', async () => {
+    const listingId = seedListing('membership');
+    const r = await checkout(listingId);
+    expect(r.status).toBe(200);
+    const access = h.db.tables.programAccess.find((row) => row.listingId === listingId);
+    expect(access!.scope).toBe('all');
+    expect(access!.lane).toBe('adult');
+    expect(access!.billing).toBe('month');
+    const call = h.stripe.checkout.sessions.create.mock.calls[0][0];
+    expect(call.mode).toBe('subscription');
   });
 });
 

@@ -72,15 +72,18 @@ describe('manifests: parse, SESSION_LENGTHS, membership shape', () => {
     expect(teen.manifest).toMatchObject({ kind: 'membership', audience: 'teen', interval: 'month' });
   });
 
-  it('Signature, Blueprint and the bundle are priced but manifest null (unsellable)', () => {
-    for (const key of ['signature-dunk-course', 'blueprint-series', 'bundle-all-three']) {
-      expect(storePriceByKey(key)!.manifest).toBeNull();
-    }
+  it('Signature Dunk Course, Blueprint series and the bundle are now sellable (course/series/bundle manifests)', () => {
+    expect(storePriceByKey('signature-dunk-course')!.manifest).toMatchObject({ kind: 'course', product: 'signature-dunk-course', billing: 'one_time' });
+    expect(storePriceByKey('blueprint-series')!.manifest).toMatchObject({ kind: 'series', product: 'blueprint-series', billing: 'one_time' });
+    expect(storePriceByKey('bundle-all-three')!.manifest).toMatchObject({
+      kind: 'bundle', product: 'bundle-all-three', billing: 'one_time',
+      members: ['dunking-plyometrics-8wk', 'signature-dunk-course', 'blueprint-series'],
+    });
   });
 
-  it('the six sellable items have non-null manifests', () => {
-    for (const key of ['dunking-plyometrics-8wk', 'membership', 'teen-membership', 'async-review', 'live-1on1-30', 'live-1on1-60']) {
-      expect(storePriceByKey(key)!.manifest).not.toBeNull();
+  it('all nine items now have non-null manifests', () => {
+    for (const row of STORE_PRICES) {
+      expect(row.manifest, row.key).not.toBeNull();
     }
   });
 });
