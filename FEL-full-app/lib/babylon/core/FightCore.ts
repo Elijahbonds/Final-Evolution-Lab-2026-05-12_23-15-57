@@ -181,6 +181,32 @@ export interface FightAction {
   block: boolean;
 }
 
+/** RIVAL-PRESSURE-FLOOR (2026-10-04): once the rival is in range of a
+ *  stationary, never-blocking foe, it must land its first hit within this
+ *  many seconds of difficulty — otherwise a low roll on the jab share (32%,
+ *  1.6 m) against a rival parked at its circling radius (~1.70 m, outside
+ *  jab range) could whiff indefinitely. Sorted ascending by difficulty,
+ *  clamped at both ends, linearly interpolated between points. Easy rivals
+ *  keep the loose 6 s ceiling — they do not get faster, they just can't
+ *  stall forever. */
+export const PRESSURE_FLOOR_TABLE: Array<[number, number]> = [[0.4, 6.0], [0.7, 3.0]];
+
+export function pressureFloorSec(difficulty: number): number {
+  const table = PRESSURE_FLOOR_TABLE;
+  if (difficulty <= table[0][0]) return table[0][1];
+  const last = table[table.length - 1];
+  if (difficulty >= last[0]) return last[1];
+  for (let i = 0; i < table.length - 1; i++) {
+    const [d0, f0] = table[i];
+    const [d1, f1] = table[i + 1];
+    if (difficulty >= d0 && difficulty <= d1) {
+      const t = (difficulty - d0) / (d1 - d0);
+      return f0 + (f1 - f0) * t;
+    }
+  }
+  return last[1];
+}
+
 export class RivalFightBrain {
   private cooldown = 1.2;
   private circleDir = 1;
@@ -203,6 +229,10 @@ export class RivalFightBrain {
   private roundBonus = 0;
   /** Vary the attack mix so rounds do not read as jab spam. */
   private attackBias = 0;
+  /** RIVAL-PRESSURE-FLOOR: seconds spent continuously inside the swing gate
+   *  (dist <= attacks.heavy.range) since the last committed swing that could
+   *  connect. See pressureFloorSec() below for why this exists. */
+  private pressureClock = 0;
 
   constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {
     this.attackBias = Math.random();
@@ -252,6 +282,12 @@ export class RivalFightBrain {
     const idealRange = this.attacks.jab.range * 0.9;
     const effDiff = Math.min(0.92, this.difficulty + this.roundBonus);
 
+    // RIVAL-PRESSURE-FLOOR: the clock only runs inside the swing gate used
+    // below (dist <= attacks.heavy.range) and resets the moment it leaves
+    // range — the floor is measured from "in range", not total fight time.
+    const inSwingRange = dist <= this.attacks.heavy.range;
+    if (inSwingRange) this.pressureClock += dt; else this.pressureClock = 0;
+
     // Track punishable strings: a mash is three swings inside ~1.1 s.
     if (foeStriking && !this.wasFoeStriking) this.foeStrikeStreak += 1;
     this.wasFoeStriking = foeStriking;
@@ -261,6 +297,33 @@ export class RivalFightBrain {
       if (this.foeStrikeGap > 0.55) this.foeStrikeStreak = 0;
     }
     const stringRead = this.foeStrikeStreak >= 2 ? 0.22 : 0;
+
+    // RIVAL-PRESSURE-FLOOR: once the clock gets within a swing's startup of
+    // the per-difficulty ceiling, force a committed swing that is guaranteed
+    // to connect (dist <= chosen attack's range — the same "hit" the tests
+    // use) instead of rolling/circling/guarding this frame. This fires
+    // rarely (only seeds that would otherwise breach the floor) and never
+    // calls Math.random(), so every frame that was never close to breaching
+    // plays out byte-identical to before. attackBias (already rolled once at
+    // construction) still decides which covering move fires, so
+    // personalities keep their mix instead of collapsing onto one move
+    // under pressure.
+    //
+    // Uses this.difficulty (not effDiff) for the floor lookup: effDiff is a
+    // separate per-round ramp; the floor table is keyed to the base dial
+    // the sweep tests set.
+    if (inSwingRange) {
+      const floorSec = pressureFloorSec(this.difficulty);
+      const margin = this.attacks.heavy.startupMs / 1000;
+      if (floorSec - this.pressureClock <= margin) {
+        const candidates = (['heavy', 'kick', 'jab'] as const).filter((k) => this.attacks[k].range >= dist);
+        const forcedAttack = selfState.chi >= CHI_MAX ? 'heavy'
+          : candidates[Math.floor(this.attackBias * candidates.length) % candidates.length];
+        this.cooldown = 1.0 / Math.max(0.3, effDiff * this.press);
+        this.pressureClock = 0;
+        return { moveX: 0, moveY: 0, attack: forcedAttack, block: false };
+      }
+    }
 
     // REACTIVE GUARD — once per wind-up, not once per frame.
     //
@@ -320,6 +383,9 @@ export class RivalFightBrain {
       this.punishSec = 0;
       const attack = selfState.chi >= CHI_MAX ? 'heavy'
         : this.foeStrikeStreak >= 2 || Math.random() < 0.55 ? 'heavy' : 'kick';
+      // RIVAL-PRESSURE-FLOOR: a committed swing that already covers `dist`
+      // resets the clock, same as the forced branch above.
+      if (this.attacks[attack].range >= dist) this.pressureClock = 0;
       return { moveX: 0, moveY: 0, attack, block: false };
     }
 
@@ -330,6 +396,8 @@ export class RivalFightBrain {
       const roll = (Math.random() + this.attackBias) % 1;
       const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
         : roll < 0.32 ? 'jab' : roll < 0.68 ? 'kick' : 'heavy';
+      // RIVAL-PRESSURE-FLOOR: same reset as above.
+      if (this.attacks[attack].range >= dist) this.pressureClock = 0;
       return { moveX: 0, moveY: 0, attack, block: false };
     }
 
