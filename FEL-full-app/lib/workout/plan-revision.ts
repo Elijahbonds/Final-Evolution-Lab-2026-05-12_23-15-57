@@ -45,6 +45,7 @@ import type { Prisma, PrismaClient } from '@/public/_prisma/client';
 import { NO_FLIGHT_FALLBACK, PLAN_POOLS, isDepthDrop, landingOf, poolOf, swapInWeek, type PlanExercise } from './plan-generator';
 import type { Pillar } from './movement-screen';
 import { RELAUNCH_FREE_LINE } from './plan-sale';
+import { gapExceedsEighteenYears } from '@/lib/age/ageRules';
 
 /**
  * P1's mark (2026-09-25) on a week whose early depth drops it swapped, or whose later ones it held. Still recognised:
@@ -90,7 +91,9 @@ export type PlanAudience = 'adult' | 'youth';
  */
 export function planAudience(dobYear: number | null | undefined, now: Date = new Date()): PlanAudience {
   if (typeof dobYear !== 'number' || !Number.isFinite(dobYear) || dobYear < 1900) return 'youth';
-  return now.getFullYear() - dobYear > 18 ? 'adult' : 'youth';
+  // AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): threshold line shared via lib/age/ageRules.ts
+  // (STRICT, `> 18`, rule); this file's own unknown/invalid-year guard above is unchanged.
+  return gapExceedsEighteenYears(dobYear, now) ? 'adult' : 'youth';
 }
 
 /** A jump, bound, hop, skip, depth drop or landing drill: anything with a flight phase and a landing. */
