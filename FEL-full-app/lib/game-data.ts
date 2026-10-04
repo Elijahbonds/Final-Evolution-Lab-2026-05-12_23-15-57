@@ -1,4 +1,5 @@
 import { CARD_CATALOG } from './card-catalog';
+import { isUnlistedMode } from './unlisted-modes';
 
 export interface Venue {
   key: string;
@@ -246,4 +247,21 @@ export const LEGACY_MODE_KEYS: Readonly<Record<string, string>> = {
 export function canonicalModeKey(key: string | null | undefined): string {
   const k = String(key ?? '');
   return Object.prototype.hasOwnProperty.call(LEGACY_MODE_KEYS, k) ? LEGACY_MODE_KEYS[k] : k;
+}
+
+/**
+ * IRON-PARADISE-OUT (2026-10-03): the catalogue LISTING — MODE_INFO minus the parked modes (lib/unlisted-modes.ts,
+ * 'training' / Iron Paradise at Muscle Beach Gym today). MODE_INFO itself keeps every row: stored keys (a saved
+ * first-game pick, an open duel, a GameSession row) still resolve their name and venue through it. Only
+ * enumerations that OFFER a mode to a player read this list. There is no Muscle Beach Gym tile in VENUES — the
+ * venue grid never listed it — so the row above is the whole of that venue's listing; Beach Sprint keeps its own
+ * 'Muscle Beach Gym' venue line and stays listed.
+ */
+export function listedModeEntries(): [string, { name: string; venue: string; href: string }][] {
+  return Object.entries(MODE_INFO).filter(([key]) => !isUnlistedMode(key));
+}
+
+/** The listed mode keys (the catalogue a picker may offer), in MODE_INFO order. */
+export function listedModeKeys(): string[] {
+  return listedModeEntries().map(([key]) => key);
 }

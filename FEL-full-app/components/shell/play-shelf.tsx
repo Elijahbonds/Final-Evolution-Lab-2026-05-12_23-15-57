@@ -15,12 +15,15 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { FAMILIES, type Family } from '@/lib/nav/families';
 import { MODE_INFO } from '@/lib/game-data';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 type ModeRow = { key: string; name: string; venue: string; href: string };
 
 function modesOf(f: Family): ModeRow[] {
   const info = MODE_INFO as Record<string, { name?: string; venue?: string; href?: string } | undefined>;
   return f.modes
+    // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) never renders as a shelf row.
+    .filter((key) => !isUnlistedMode(key))
     .map((key) => {
       const m = info[key];
       return m ? { key, name: m.name ?? key, venue: m.venue ?? '', href: m.href ?? '/' } : null;

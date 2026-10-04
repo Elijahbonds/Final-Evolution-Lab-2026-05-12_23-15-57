@@ -13,6 +13,7 @@
 
 import { PALETTE } from '@/lib/design/palette';
 import { canonicalModeKey } from '@/lib/game-data';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 export type FamilyId = 'hoops' | 'combat' | 'board' | 'racing' | 'field' | 'party' | 'craft';
 
@@ -77,8 +78,11 @@ export const OFF_SHELF: Record<string, string> = {
   marketplace: 'the store is reached from Profile, where the wallet is',
 };
 
+// IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) can never reach the shelf, even if a
+// family list names it — the shelf is built without it. 'training' is in OFF_SHELF already; this is the guard
+// that holds for whatever the list parks next.
 const BY_MODE = new Map<string, Family>();
-for (const f of FAMILIES) for (const m of f.modes) BY_MODE.set(m, f);
+for (const f of FAMILIES) for (const m of f.modes) if (!isUnlistedMode(m)) BY_MODE.set(m, f);
 
 /** The family a mode belongs to, or null when it is deliberately off the shelf. */
 export function familyOf(modeKey: string): Family | null {
@@ -92,12 +96,12 @@ export function familyById(id: string): Family | null {
 
 /** Every mode key that appears on the Play shelf, in shelf order. */
 export function shelvedModes(): string[] {
-  return FAMILIES.flatMap((f) => f.modes);
+  return FAMILIES.flatMap((f) => f.modes).filter((m) => !isUnlistedMode(m));
 }
 
 /** How many modes the shelf actually carries. A hand-typed count in the page copy said twenty-eight while this
  *  was thirty-three; a number on screen that describes the data should be read from the data. */
-export const SHELF_MODE_COUNT: number = FAMILIES.reduce((n, f) => n + f.modes.length, 0);
+export const SHELF_MODE_COUNT: number = FAMILIES.reduce((n, f) => n + f.modes.filter((m) => !isUnlistedMode(m)).length, 0);
 
 /** The shelf's own one-liner, so the page and the dev view cannot drift apart or go stale again. */
 export const SHELF_LEDE = `${FAMILIES.length} families, ${SHELF_MODE_COUNT} modes. Open one to see what is inside.`;
