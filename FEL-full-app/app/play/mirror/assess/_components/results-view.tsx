@@ -54,8 +54,10 @@ export function checkCards(s: ScreenSummary): CheckCard[] {
 /** A row's plain name without the check it belongs to: "Knees cave in (overhead squat)" → "Knees cave in". */
 const rowName = (id: CheckId): string => checkById(id).name.replace(/\s*\([^)]*\)$/, '');
 
-export function ResultsView({ summary, age, onClear, onRunAgain }: {
+export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijahHref = null }: {
   summary: ScreenSummary; age: AgeBand | null; onClear: () => void; onRunAgain: () => void;
+  /** Set by the server only for a verified adult while the coach store is on. Hidden for a kid answer. */
+  trainWithElijahHref?: string | null;
 }) {
   const s = summary;
   if (isKid(age)) return <KidResults jumpIn={s.jumpBestIn} lastIn={null} onRunAgain={onRunAgain} />;
@@ -126,6 +128,11 @@ export function ResultsView({ summary, age, onClear, onRunAgain }: {
         {/* the one next step: a plain link (never next/link: no prefetch), a new tab, the address byte for byte */}
         <a href={KINDLE_BOOK_URL} target="_blank" rel="noopener noreferrer" data-cta="book" className={primaryBtn}>{KINDLE_BOOK_LABEL}</a>
       </div>
+      {trainWithElijahHref && !isKid(age) ? (
+        <p className="text-center text-[16px]">
+          <a href={trainWithElijahHref} data-train-with-elijah>Train with Elijah</a>
+        </p>
+      ) : null}
       <p data-screenshot-line className="pt-1 text-center text-[16px] text-white/70">{SCREENSHOT_LINE}</p>
       <p className="text-center text-[16px] text-white/60">
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>

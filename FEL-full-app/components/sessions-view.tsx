@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { CalendarDays, Loader2, Users, Lock, Check, Sparkles, Dumbbell } from 'lucide-react';
@@ -28,6 +29,7 @@ export function SessionsView() {
   const [hosting, setHosting] = useState<HostingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<string | null>(null);
+  const [coachStore, setCoachStore] = useState(false);
   const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([]);
   const [shareCoach, setShareCoach] = useState('');
   const [shareOn, setShareOn] = useState<Record<string, boolean>>({});
@@ -43,6 +45,7 @@ export function SessionsView() {
         setPrivateOpen(!!j.privateOpen);
         setMyBookings(j.myBookings ?? []);
         setHosting(j.hosting ?? []);
+        setCoachStore(!!j.coachStoreEnabled);
       }
       const status = await fetch('/api/account/scan-save');
       if (status.ok) {
@@ -161,8 +164,13 @@ export function SessionsView() {
         </div>
       </section>
 
-      {/* Private 1-on-1 */}
-      <section className="mb-8">
+      {/* Private 1-on-1. Hidden when the coach store is on; the store is the booking path. The route stays. */}
+      {coachStore ? (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-white/70">Private 1-on-1</h2>
+          <Link href="/coach/elijah" className="text-sm text-cyan-300 underline">Book with Elijah on the coach store</Link>
+        </section>
+      ) : <section className="mb-8">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/70"><Lock className="h-4 w-4 text-purple-300" /> Private 1-on-1 (18+)</h2>
         {privateOpen ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -183,7 +191,7 @@ export function SessionsView() {
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">Private 1-on-1 booking is closed for now. It opens again here automatically.</div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

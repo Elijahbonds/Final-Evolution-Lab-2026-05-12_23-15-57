@@ -77,5 +77,5 @@ export const COSMETIC_SKUS: Record<string, { name: string; priceUsd: number; des
   },
 };
 
-// Platform take rate on marketplace sales  // TUNE(elijah)
-export const PLATFORM_TAKE_RATE = 0.15; // 15%
+// Platform take rate on marketplace sales. Same 0.15 as lib/fees.ts. The referral tree's PLATFORM_TAKE stays 0.30.
+export { PLATFORM_FEE_RATE as PLATFORM_TAKE_RATE } from './fees';
