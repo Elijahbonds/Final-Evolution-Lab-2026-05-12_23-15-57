@@ -107,7 +107,8 @@ describe('capture HUD and review reel render', () => {
     );
     expect(html).toContain('data-testid="capture-stream"');
     expect(html).toContain('Stream on');
-    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('role="menuitemcheckbox"');
+    expect(html).toContain('aria-checked="true"');
     expect(html).toContain('data-testid="capture-hide"');
     expect(html).toContain('data-testid="rec-live"');
     expect(html).toContain('LIVE');

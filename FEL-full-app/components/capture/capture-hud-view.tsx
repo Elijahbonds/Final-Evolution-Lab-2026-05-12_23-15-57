@@ -102,7 +102,7 @@ export function CaptureHudView(props: CaptureHudViewProps) {
   // The machine says where focus goes; here is the only place that order is carried out.
   useEffect(() => {
     if (menu.focus === 'first-item') {
-      rootRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+      rootRef.current?.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"]')?.focus();
     } else if (menu.focus === 'trigger') {
       triggerRef.current?.focus();
     }
@@ -129,7 +129,7 @@ export function CaptureHudView(props: CaptureHudViewProps) {
   const onMenuKeyDown = (ev: ReactKeyboardEvent) => {
     if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
     ev.preventDefault();
-    const items = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+    const items = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])') ?? []);
     if (!items.length) return;
     const i = items.indexOf(document.activeElement as HTMLElement);
     const next = ev.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
@@ -182,7 +182,7 @@ export function CaptureHudView(props: CaptureHudViewProps) {
           <button type="button" role="menuitem" data-testid="capture-share" aria-label="Share the clip" onClick={activate(() => props.onShare(props.canShareTake ? 'take' : 'replay'))} disabled={!props.canShareTake && !props.canShareReplay} style={item}>
             Share
           </button>
-          <button type="button" role="menuitem" data-testid="capture-stream" aria-label={props.streamOn ? 'Turn stream mode off' : 'Turn stream mode on'} aria-pressed={props.streamOn} onClick={activate(props.onStream)} style={props.streamOn ? { ...on, textAlign: 'left', width: '100%' } : item}>
+          <button type="button" role="menuitemcheckbox" data-testid="capture-stream" aria-label={props.streamOn ? 'Turn stream mode off' : 'Turn stream mode on'} aria-checked={props.streamOn} onClick={activate(props.onStream)} style={props.streamOn ? { ...on, textAlign: 'left', width: '100%' } : item}>
             {props.streamOn ? 'Stream on' : 'Stream'}
           </button>
           {props.dunkFilm ? (
