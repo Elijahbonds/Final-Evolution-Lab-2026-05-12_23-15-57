@@ -7,8 +7,10 @@
 // SCREEN-SHIP (2026-09-29), SCREEN-FIX: portrait first, one step per screen, system font. Start → age (every new Start:
 // the last person's answer is reset first, audit 2.2) → "A grown-up is with me" (under 18, or an age not given) →
 // "Does anything hurt right now?" → the camera card → only then the camera → the checks → results.
-//   · NOTHING IS SENT. No server save in this ship (A2-3): the screen never calls POST /api/mirror/assessment, no PRQ
-//     write, no analytics, no crash report (SCREEN-FIX-2 amend 4). The age answer is kept in this tab's sessionStorage,
+//   · KIDS SEND NOTHING. This file has no fetch. Under 18 (and "rather not say") return before any save. A self-reported
+//     18+ result stays in this tab, and lib/privacy/screenHistoryClient.ts may POST numbers only after the server says
+//     the account is a verified adult who opted in. No assessment POST, no PRQ write, no analytics (SCREEN-FIX-2 amend 4).
+//     The age answer is kept in this tab's sessionStorage,
 //     so it is asked once per run (every new Start resets it first, AGE-RESET audit 2.2). 18 or older keep their results
 //     there too; UNDER 18 (and "rather not say") keep
 //     NOTHING ELSE: their number is shown from this page's memory, with the change since their last screen here
@@ -30,7 +32,7 @@
 //
 // The skeleton is One-Euro smoothed (lib/screen/ui SKELETON_EURO) and a joint under the confidence floor is hidden,
 // never drawn jittering (Squad gate 2). The runner grades the raw frames, as before.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Volume2, VolumeX } from 'lucide-react';
 import { makeFeedHandle, type PoseStatus } from '@/lib/pose/PoseService';
@@ -38,15 +40,18 @@ import { MIN_CAMERA_FPS } from '@/lib/pose/modelChoice';
 import { feedHookAllowed } from '@/lib/pose/feed';
 import { PoseFilter } from '@/lib/pose/oneEuro';
 import type { PoseFrame } from '@/lib/pose/landmarks';
-import { AssessRunner, type RunnerView } from '@/lib/assess/runner';
+import { AssessRunner, JUMP_PARTS, REST_PARTS, type RunnerView } from '@/lib/assess/runner';
+import type { TestResult } from '@/lib/assess/scoring';
 import type { Side } from '@/lib/assess/protocol';
+import { maybeSaveAdultScreen } from '@/lib/privacy/screenHistoryClient';
 import { summarize } from '@/lib/screen/checks';
 import {
-  LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
+  COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
 } from '@/lib/screen/copy';
-import type { AgeBand } from '@/lib/screen/age';
+import { isKid, type AgeBand } from '@/lib/screen/age';
 import { clearScreen, keepResult, localForClear, lockAge, readAge, resetAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
-import { PRE_START, preStep, type PreEvent, type PreState } from '@/lib/screen/flow';
+import { PRE_START, preStep, type PreEvent, type PreState, type ScreenKind } from '@/lib/screen/flow';
+import { forgetIntakeMemory } from '@/lib/health/intakeForget';
 import { ASSESS_PATH, RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
 import { DEVICE_AUTO_FPS, DEVICE_AUTO_MS } from '@/lib/screen/realtime-cues';
 import { SKELETON_EURO, SKELETON_MIN_VISIBILITY } from '@/lib/screen/ui';
@@ -57,10 +62,12 @@ import { KidResults } from './kid-results';
 import { screenPose } from './screen-pose';
 import { LiveHud } from './live-hud';
 import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep } from './gate-steps';
+import { JumpResult } from './jump-result';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
-type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'cameraError';
+type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError';
+interface JumpView { heightCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'cameraInfo', 'starting', 'device', 'running'];
 
@@ -73,9 +80,9 @@ declare global {
   interface Window { __FEL_ASSESS__?: AssessProbe }
 }
 
-export function AssessApp() {
+export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | null }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>('intro');
+  const [phase, setPhase] = useState<Phase>(initialRun ? 'age' : 'intro');
   const preRef = useRef<PreState>(PRE_START);
   const [status, setStatus] = useState<PoseStatus | null>(null);
   const [poseHz, setPoseHz] = useState(0);
@@ -100,6 +107,10 @@ export function AssessApp() {
   const smoothRef = useRef(new PoseFilter(SKELETON_EURO));
   const camRunRef = useRef(0);                                   // the current camera start; a newer one (or a back) cancels it
   const lastJumpRef = useRef<number | null>(null);
+  const modeRef = useRef<ScreenKind | 'rest'>(initialRun ?? 'full');
+  const carryRef = useRef<TestResult | null>(null);
+  const booted = useRef(false);
+  const [jumpView, setJumpView] = useState<JumpView | null>(null);
   const deviceOkSince = useRef<number | null>(null);
   const facingRef = useRef<'user' | 'environment'>('user');
 
@@ -181,7 +192,22 @@ export function AssessApp() {
   const finish = useCallback((v: RunnerView) => {
     cleanup();                                                   // the camera stops the moment the screen ends
     const summary = v.result ? summarize(v.result) : null;
-    if (!summary) { setPhase('stopped'); return; }               // pain: a referral, nothing kept
+    if (!summary || v.result?.pain) { setPhase('stopped'); return; }
+    if (modeRef.current === 'jump') {
+      const t5 = v.result?.tests.find((t) => t.id === 'T5') ?? null;
+      carryRef.current = t5;
+      const view: JumpView = {
+        heightCm: t5?.t5?.bestHeightCm ?? null,
+        attempts: t5?.t5?.jumps.length ?? 0,
+        jumpIn: summary.jumpBestIn,
+        lastIn: lastJumpRef.current,
+        kid: keepResult(tabStorage(), gateRef.current, summary) === 'kid',
+      };
+      if (view.kid) lastJumpRef.current = summary.jumpBestIn ?? lastJumpRef.current;
+      setJumpView(view);
+      setPhase('jumpResult');
+      return;
+    }
     // under 18 (or "rather not say"): nothing kept anywhere; their number, and the change since the last screen here
     if (keepResult(tabStorage(), gateRef.current, summary) === 'kid') {
       setKid({ jumpIn: summary.jumpBestIn, lastIn: lastJumpRef.current });
@@ -189,6 +215,9 @@ export function AssessApp() {
       setPhase('kidResults');
       return;
     }
+    // Adult branch only. The helper asks the server; kids never get here, and a self-reported 18+ who is not
+    // verified (or who has not opted in) is not saved.
+    void maybeSaveAdultScreen(summary);
     setPhase('toResults');                                        // 18 or older: kept in this tab (keepResult)
     router.replace(RESULTS_PATH);
   }, [cleanup, router]);
@@ -198,7 +227,12 @@ export function AssessApp() {
     const cam = svc.status.camera;
     const aspect = cam?.width && cam.height ? cam.width / cam.height : 4 / 3;
     previewRef.current?.(); previewRef.current = null;       // the runner draws from here on
-    const runner = new AssessRunner({ aspect, takeoffLeg: null, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current });
+    const kind = modeRef.current;
+    const runner = new AssessRunner({
+      aspect, takeoffLeg: null, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current,
+      ...(kind === 'jump' ? { parts: JUMP_PARTS } : {}),
+      ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined } : {}),
+    });
     runnerRef.current = runner;
     lastSayRef.current = 0;
     setPhase('running');
@@ -255,15 +289,17 @@ export function AssessApp() {
     // it the grown-up tick are cleared, so the question is asked again. The lock still holds WITHIN the run (lockAge).
     if (e.type === 'start') resetAge(tabStorage());
     // a start carries the tab's answer (none, after the reset above: the flow asks); a mid-run answer is locked (lockAge)
-    const ev: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()) }
+    const ev: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()), kind: e.kind }
       : e.type === 'age' ? { type: 'age', age: lockAge(tabStorage(), e.age) } : e;
+    if (e.type === 'age' && isKid(ev.type === 'age' ? ev.age : null)) forgetIntakeMemory();
     const next = preStep(preRef.current, ev);
     preRef.current = next;
     gateRef.current = next.gate;
+    if (e.type === 'start' && e.kind) modeRef.current = e.kind;
     if (next.step === 'camera') { void startCamera(); return; }
     setPhase(next.step);
   };
-  const startNew = () => { lastJumpRef.current = null; pre({ type: 'start' }); };
+  const startNew = (kind: ScreenKind = 'full') => { lastJumpRef.current = null; modeRef.current = kind; pre({ type: 'start', kind }); };
   const answerAge = (a: AgeBand) => pre({ type: 'age', age: a });
   const grownUp = () => pre({ type: 'grownUp' });
   const answerPainFirst = (hurts: boolean) => {
@@ -272,11 +308,25 @@ export function AssessApp() {
   };
   const cameraOn = () => pre({ type: 'cameraOn' });
   const resetRun = () => { camRunRef.current++; cleanup(); setView(null); viewRef.current = null; setCaption(''); highFpsRef.current = false; };
-  const restart = () => { resetRun(); setKid(null); pre({ type: 'restart' }); };
-  // "Run it again" from a kid's number: the same person, again, in the page (the last jump is kept for the change line)
-  const runAgain = () => { resetRun(); setKid(null); pre({ type: 'start' }); };
+  const restart = () => { resetRun(); setKid(null); setJumpView(null); pre({ type: 'restart' }); };
+  // "Run it again": a new Start (age is asked again). A jump-only result repeats the jump; after the full screen, the full screen.
+  const runAgain = () => {
+    const kind: ScreenKind = modeRef.current === 'jump' ? 'jump' : 'full';
+    resetRun(); setKid(null); setJumpView(null); modeRef.current = kind; pre({ type: 'start', kind });
+  };
+  // Continue this run through T1–T3. The jump already graded is carried. Age and pain are not asked again.
+  const doFull = () => { modeRef.current = 'rest'; setJumpView(null); void startCamera(); };
   // the camera off, back to the camera card (the flow's step before the camera)
   const cameraBack = () => { setStopAsk(false); resetRun(); pre({ type: 'back' }); };
+
+  // ?run= from /screen: start that kind before paint, so the start card does not flash.
+  useLayoutEffect(() => {
+    if (!initialRun || booted.current) return;
+    booted.current = true;
+    modeRef.current = initialRun;
+    lastJumpRef.current = null;
+    pre({ type: 'start', kind: initialRun });
+  }, [initialRun]);
 
   // the prompts inside the screen
   const now = () => performance.now();
@@ -296,7 +346,7 @@ export function AssessApp() {
   const back: string | (() => void) = phase === 'intro' || phase === 'toResults' ? introBack
     : phase === 'running' ? () => setStopAsk(true)
     : phase === 'starting' || phase === 'device' ? cameraBack
-    : phase === 'stopped' || phase === 'kidResults' ? restart
+    : phase === 'stopped' || phase === 'kidResults' || phase === 'jumpResult' ? restart
     : () => pre({ type: 'back' });
 
   if (phase === 'cameraError') return <CameraHelp why={status?.why ?? null} onRetry={() => void startCamera()} onBack={restart} />;
@@ -307,17 +357,17 @@ export function AssessApp() {
         <button type="button" onClick={() => {
           facingRef.current = facingRef.current === 'user' ? 'environment' : 'user';
           void screenPose().start({ facingMode: facingRef.current });
-        }} className="rounded-full border border-white/10 px-3 py-1.5 text-[12px] font-bold text-white/70">
+        }} className="inline-flex min-h-12 items-center rounded-full border border-white/10 px-3 text-[16px] font-bold text-white/70">
           Flip camera
         </button>
         <button type="button" onClick={() => voice.setOn(!voice.on)} aria-pressed={voice.on}
-          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-[12px] font-bold text-white/70">
+          className="inline-flex min-h-12 items-center gap-1.5 rounded-full border border-white/10 px-3 text-[16px] font-bold text-white/70">
           {voice.on ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           Voice {voice.on ? 'on' : 'off'}
         </button>
       </div>
     ) : undefined}>
-      {phase === 'intro' ? <StartStep onStart={startNew} /> : null}
+      {phase === 'intro' ? <StartStep onJump={() => startNew('jump')} onFull={() => startNew('full')} /> : null}
       {phase === 'age' ? <AgeStep onAnswer={answerAge} /> : null}
       {phase === 'grownUp' ? <GrownUpStep onContinue={grownUp} /> : null}
       {phase === 'pain' ? <PainStep onAnswer={answerPainFirst} /> : null}
@@ -327,7 +377,14 @@ export function AssessApp() {
         <StepCard testId="starting">
           <div className="flex items-center gap-3 text-white/75">
             <Loader2 className="h-5 w-5 animate-spin text-[#00E5FF]" />
-            {status?.state !== 'loading' ? 'Asking for the camera…' : tech ? 'Loading the pose model (6–9 MB the first time, kept after that)…' : 'Getting the camera ready…'}
+            {status?.state === 'loading' ? (
+              <span className="flex-1">
+                <span className="block text-[16px]">{COACH_READY}</span>
+                <span role="progressbar" aria-valuetext={COACH_READY} className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10">
+                  <span className="block h-full w-1/3 animate-pulse bg-[#00E5FF]" />
+                </span>
+              </span>
+            ) : <span className="text-[16px]">Asking for the camera…</span>}
           </div>
         </StepCard>
       ) : null}
@@ -335,7 +392,7 @@ export function AssessApp() {
         <StepCard testId="stopped">
           <h2 className="text-[21px] font-black">Screen stopped</h2>
           <p data-pain-stop className="mt-2 text-[16px] font-bold leading-snug text-[#FFB020]">{PAIN_STOP}</p>
-          <p className="mt-2 text-[13px] text-white/60">Nothing from this screen was kept.</p>
+          <p className="mt-2 text-[16px] text-white/60">Nothing from this screen was kept.</p>
           <button type="button" data-primary onClick={restart} className={`${quietBtn} mt-4`}>Back to the start</button>
         </StepCard>
       ) : null}
@@ -343,6 +400,9 @@ export function AssessApp() {
         <StepCard testId="to-results"><p className="text-white/70">Your results…</p></StepCard>
       ) : null}
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
+      {phase === 'jumpResult' && jumpView ? (
+        <JumpResult heightCm={jumpView.heightCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
+      ) : null}
 
       {live ? (
         <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: 'min(72vh, 100dvh - 12rem)' }}>
@@ -364,7 +424,7 @@ export function AssessApp() {
       {live ? (
         <div aria-live="polite" data-instruction className="mt-3 min-h-[3em] text-center">
           <p className="text-[18px] font-bold leading-snug text-white">{view?.instruction || caption}</p>
-          {caption && view?.instruction && caption !== view.instruction ? <p className="mt-1 text-[14px] text-white/65">{caption}</p> : null}
+          {caption && view?.instruction && caption !== view.instruction ? <p className="mt-1 text-[16px] text-white/65">{caption}</p> : null}
         </div>
       ) : null}
       {guard.asking ? <ConfirmCard title={LEAVE_TITLE} body={LEAVE_BODY} stay={LEAVE_STAY} go={LEAVE_GO} onStay={guard.stay} onGo={guard.leave} /> : null}
@@ -381,7 +441,7 @@ function ConfirmCard({ title, body, stay, go, onStay, onGo }: { title: string; b
     <div data-leave-dialog role="alertdialog" aria-modal="true" aria-labelledby="leave-title" className="fixed inset-0 z-[70] grid place-items-center bg-black/75 px-6">
       <div className="w-full max-w-[420px] rounded-3xl border border-white/15 bg-[#0b0b0b] p-5 text-white">
         <h2 id="leave-title" className="text-[21px] font-black leading-tight">{title}</h2>
-        <p className="mt-2 text-[14px] leading-snug text-white/75">{body}</p>
+        <p className="mt-2 text-[16px] leading-snug text-white/75">{body}</p>
         <button type="button" data-leave-stay onClick={onStay} className={`${primaryBtn} mt-4`}>{stay}</button>
         <button type="button" data-leave-go onClick={onGo} className={`${quietBtn} mt-2`}>{go}</button>
       </div>
@@ -403,25 +463,25 @@ function DeviceCheck({ status, poseHz, tech, onContinue, onLite, autoContinue, o
   }, [poseHz, autoContinue, okSinceRef]);
   return (
     <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-white/10 bg-black/75 p-4 backdrop-blur">
-      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/50">Camera check</p>
+      <p className="text-[16px] font-bold uppercase tracking-[0.16em] text-white/50">Camera check</p>
       {tech ? (
-        <ul data-device-tech className="mt-2 space-y-1 text-[14px] text-white/85">
+        <ul data-device-tech className="mt-2 space-y-1 text-[16px] text-white/85">
           <li>Camera: on{status?.camera ? ` · ${status.camera.width}×${status.camera.height}` : ''}{status?.camera?.frameRate ? ` · ${Math.round(status.camera.frameRate)} fps` : ''}</li>
           <li>Pose model: {status?.model ?? '…'}</li>
           <li className={slow ? 'text-[#FFB020]' : ''}>Pose rate: {poseHz ? `${Math.round(poseHz)} a second` : 'measuring…'}{slow ? ` (the screen needs ${MIN_CAMERA_FPS}; it may read less clearly)` : ''}</li>
         </ul>
       ) : (
-        <p data-device-plain className={slow ? 'mt-2 text-[14px] leading-snug text-[#FFB020]' : 'mt-2 text-[14px] leading-snug text-white/85'}>
+        <p data-device-plain className={slow ? 'mt-2 text-[16px] leading-snug text-[#FFB020]' : 'mt-2 text-[16px] leading-snug text-white/85'}>
           {!poseHz ? 'Checking the camera…' : slow ? SLOW_DEVICE_LINE : 'The camera is ready.'}
         </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" data-primary onClick={onContinue} disabled={!poseHz}
-          className="rounded-full bg-[#00E5FF] px-5 py-2.5 text-[15px] font-black text-black disabled:opacity-40">
+          className="inline-flex min-h-12 items-center rounded-full bg-[#00E5FF] px-5 text-[16px] font-black text-black disabled:opacity-40">
           {slow ? 'Continue anyway' : 'Continue'}
         </button>
         {slow && status?.model !== 'lite' ? (
-          <button type="button" onClick={onLite} className="rounded-full border border-white/20 px-5 py-2.5 text-[14px] font-bold text-white">Use the lighter model</button>
+          <button type="button" onClick={onLite} className="inline-flex min-h-12 items-center rounded-full border border-white/20 px-5 text-[16px] font-bold text-white">Use the lighter model</button>
         ) : null}
       </div>
     </div>

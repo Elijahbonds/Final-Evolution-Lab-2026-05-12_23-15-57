@@ -2,7 +2,7 @@
 // Racing). The rules live in AeroItems.ts; this draws them. Everything is a primitive in the house PBR paint with a
 // strong emissive, so a balloon's colour reads at 150 m against a red canyon, a blue lagoon or white snow alike.
 
-import { Color3, Mesh, MeshBuilder, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, TransformNode, Vector3 } from '@babylonjs/core';
 import type { PBRMaterial, Scene } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { BALLOON_COLOR, ITEM_KINDS, type Balloon, type Banana, type ItemKind, type Missile, type Mine } from './AeroItems';
@@ -21,6 +21,7 @@ const PARK_Y = -10000;
 export class AeroPickups {
   private root: TransformNode;
   private balloonMasters = new Map<ItemKind, Mesh>();
+  private mysteryMaster: Mesh;
   private balloonNodes: TransformNode[] = [];
   private bananaMaster: Mesh;
   private bananaNodes: TransformNode[] = [];
@@ -46,6 +47,24 @@ export class AeroPickups {
       merged.isPickable = false; merged.position.y = PARK_Y; merged.parent = this.root;
       this.balloonMasters.set(kind, merged);
     }
+    const mystery = MeshBuilder.CreateSphere('balloon_mystery', { diameter: 3.4, segments: 16 }, scene);
+    const tex = new DynamicTexture('balloon_q_tex', { width: 256, height: 128 }, scene, false);
+    const paint = tex.getContext() as CanvasRenderingContext2D;
+    paint.fillStyle = '#f2f2f2';
+    paint.fillRect(0, 0, 256, 128);
+    paint.fillStyle = '#161616';
+    paint.font = 'bold 92px sans-serif';
+    paint.textAlign = 'center';
+    paint.textBaseline = 'middle';
+    paint.fillText('?', 128, 68);
+    tex.update();
+    const mysteryMat = glow(scene, 'balloon_mat_mystery', '#f2f2f2', 0.2, 0.55);
+    mysteryMat.albedoTexture = tex;
+    mystery.material = mysteryMat;
+    mystery.isPickable = false;
+    mystery.position.y = PARK_Y;
+    mystery.parent = this.root;
+    this.mysteryMaster = mystery;
     // a banana: a fat curved tube, yellow with brown tips
     const path = Array.from({ length: 9 }, (_, i) => { const a = -0.9 + (i / 8) * 1.8; return new Vector3(Math.sin(a) * 1.1, Math.cos(a) * 1.1 - 1.1, 0); });
     this.bananaMaster = MeshBuilder.CreateTube('banana', { path, radiusFunction: (i) => 0.12 + 0.2 * Math.sin(Math.PI * (i / 8)), tessellation: 10, cap: Mesh.CAP_ALL }, scene);
@@ -77,7 +96,7 @@ export class AeroPickups {
   setBalloons(balloons: Balloon[]): void {
     for (const n of this.balloonNodes) n.dispose();
     this.balloonNodes = balloons.map((b) => {
-      const inst = this.balloonMasters.get(b.kind)!.createInstance(`balloon_${b.id}`);
+      const inst = (b.mystery ? this.mysteryMaster : this.balloonMasters.get(b.kind)!).createInstance(`balloon_${b.id}`);
       inst.position.copyFrom(b.pos); inst.parent = this.root; inst.isPickable = false; inst.scaling.setAll(this.scale);
       return inst;
     });

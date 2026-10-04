@@ -43,10 +43,12 @@ export interface CaptureHudViewProps {
   dunkFilm: boolean;
   canShareTake: boolean;
   canShareReplay: boolean;
+  busy: boolean;
   onRecord: () => void;
   onReplay: () => void;
   onAspect: (aspect: Aspect) => void;
   onShare: (which: 'take' | 'replay') => void;
+  onDiscard: () => void;
   onStream: () => void;
   onHide: () => void;
   onShow: () => void;
@@ -110,6 +112,8 @@ export function CaptureHudView(props: CaptureHudViewProps) {
 
   const recording = props.phase === 'recording';
   const buffering = props.phase === 'buffering';
+  const hasClip = props.canShareTake || props.canShareReplay;
+  const shareItem = props.busy ? { ...item, opacity: 0.55, cursor: 'wait' as const } : item;
   const ind = hudIndicator(props.phase, props.streamOn);
   const indicator = <RecLiveIndicator rec={ind.rec} live={ind.live} />;
 
@@ -152,6 +156,11 @@ export function CaptureHudView(props: CaptureHudViewProps) {
   return (
     <div ref={rootRef} data-testid="capture-hud" style={{ ...bar, position: 'relative' }}>
       {indicator}
+      {props.phase === 'error' ? (
+        <button type="button" data-testid="capture-reset" onClick={props.onDiscard} style={recOn}>
+          Reset recorder
+        </button>
+      ) : null}
       <button
         type="button"
         ref={triggerRef}
@@ -179,9 +188,26 @@ export function CaptureHudView(props: CaptureHudViewProps) {
           <button type="button" role="menuitem" data-testid="capture-aspect-169" aria-label="Landscape 16:9 export shape" onClick={activate(() => props.onAspect('16:9'))} style={props.aspect === '16:9' ? { ...on, textAlign: 'left', width: '100%' } : item}>
             16:9
           </button>
-          <button type="button" role="menuitem" data-testid="capture-share" aria-label="Share the clip" onClick={activate(() => props.onShare(props.canShareTake ? 'take' : 'replay'))} disabled={!props.canShareTake && !props.canShareReplay} style={item}>
-            Share
-          </button>
+          {props.canShareTake ? (
+            <button type="button" role="menuitem" data-testid="capture-share-take" aria-label="Share the take" onClick={activate(() => props.onShare('take'))} disabled={props.busy} style={shareItem}>
+              Share take
+            </button>
+          ) : null}
+          {props.canShareReplay ? (
+            <button type="button" role="menuitem" data-testid="capture-share-replay" aria-label="Share the last 30 seconds" onClick={activate(() => props.onShare('replay'))} disabled={props.busy} style={shareItem}>
+              Share 30s
+            </button>
+          ) : null}
+          {!hasClip ? (
+            <button type="button" role="menuitem" data-testid="capture-share" aria-label="Share the clip" onClick={activate(() => props.onShare('take'))} disabled style={item}>
+              Share
+            </button>
+          ) : null}
+          {hasClip || props.phase === 'error' ? (
+            <button type="button" role="menuitem" data-testid="capture-discard" aria-label="Discard the clip" onClick={activate(props.onDiscard)} style={item}>
+              Discard
+            </button>
+          ) : null}
           <button type="button" role="menuitemcheckbox" data-testid="capture-stream" aria-label={props.streamOn ? 'Turn stream mode off' : 'Turn stream mode on'} aria-checked={props.streamOn} onClick={activate(props.onStream)} style={props.streamOn ? { ...on, textAlign: 'left', width: '100%' } : item}>
             {props.streamOn ? 'Stream on' : 'Stream'}
           </button>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickNight, rollRival, rivalProgress, eventWinner, freshTally, bankEvent, nightChampion, nightBoard, EVENTS_PER_NIGHT } from './CarnivalNight';
+import { pickNight, rollRival, simulateRivalRun, rivalProgress, eventWinner, freshTally, bankEvent, nightChampion, nightBoard, EVENTS_PER_NIGHT } from './CarnivalNight';
 
 describe('carnival night rules', () => {
   it('draws a seeded four from the pool with no repeats', () => {
@@ -14,6 +14,9 @@ describe('carnival night rules', () => {
 
   it('rival roll stays inside its range; the ticker starts at 0, ends at the full score, surges mid-event', () => {
     for (let i = 0; i < 50; i++) { const v = rollRival([4, 9]); expect(v).toBeGreaterThanOrEqual(4); expect(v).toBeLessThanOrEqual(9); }
+    expect(simulateRivalRun([4, 9], () => 1)).toBe(4);
+    expect(simulateRivalRun([4, 9], () => 1)).toBe(rollRival([4, 9], () => 1));
+    expect(simulateRivalRun([4, 9], () => 0)).toBe(9);
     expect(rivalProgress(0)).toBe(0);
     expect(rivalProgress(1)).toBe(1);
     expect(rivalProgress(-1)).toBe(0);

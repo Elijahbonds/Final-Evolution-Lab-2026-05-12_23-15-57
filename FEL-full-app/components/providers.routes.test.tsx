@@ -68,7 +68,6 @@ const PAGES: Record<string, () => Promise<{ default: unknown }>> = {
 
 /** The page, rendered as its route does (a dynamic segment gets its params). */
 async function pageElement(file: string, route: string): Promise<ReactNode> {
-  if (file === 'screen/page.tsx') return null;                                // the QR address only redirects (below)
   const mod = await PAGES[file]();
   const lane = /\/screen\/program\/([^/]+)$/.exec(route)?.[1];
   return createElement(mod.default as never, (lane ? { params: { lane } } : {}) as never);
@@ -97,12 +96,26 @@ describe('every Quick Screen page renders under Providers with no SessionProvide
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('the QR address only redirects, to a quick-screen path', async () => {
+  it('the QR address is a quick-screen page and does not forward a query string', async () => {
     const { default: Entry } = await import('@/app/screen/page');
-    let to = '';
-    try { Entry({ searchParams: { src: 'qr' } }); } catch (e) { to = String((e as { digest?: string }).digest).split(';')[2]; }
-    expect(to).toBe('/play/mirror/assess?src=qr');
-    expect(isQuickScreenPath(new URL(to, 'http://x.test').pathname)).toBe(true);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    m.path = '/screen'; m.providerMounts = 0;
+    let threw = false;
+    let html = '';
+    try {
+      html = renderToStaticMarkup(createElement(Providers, null, createElement(Status), createElement(Entry)));
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+    expect(m.providerMounts).toBe(0);
+    expect(html).toContain('data-session="unauthenticated"');
+    expect(html).toContain('Just test my jump (about 1 min)');
+    expect(html).toContain('href="/play/mirror/assess?run=jump"');
+    expect(html).not.toContain('src=');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(isQuickScreenPath('/screen')).toBe(true);
   });
 
   it('a page off the screen still gets the SessionProvider (the control)', () => {

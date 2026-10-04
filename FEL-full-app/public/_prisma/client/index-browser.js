@@ -1220,6 +1220,19 @@ exports.Prisma.HealthConsentScalarFieldEnum = {
   revokedAt: 'revokedAt'
 };
 
+exports.Prisma.ScanSaveOptInScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  scope: 'scope',
+  granted: 'granted',
+  grantedAt: 'grantedAt',
+  revokedAt: 'revokedAt',
+  consentTextVersion: 'consentTextVersion',
+  coachShares: 'coachShares',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.ReadinessCheckInScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -1689,6 +1702,7 @@ exports.Prisma.ModelName = {
   HealthIntake: 'HealthIntake',
   PainCheckIn: 'PainCheckIn',
   HealthConsent: 'HealthConsent',
+  ScanSaveOptIn: 'ScanSaveOptIn',
   ReadinessCheckIn: 'ReadinessCheckIn',
   BreathLog: 'BreathLog',
   ShareLink: 'ShareLink',

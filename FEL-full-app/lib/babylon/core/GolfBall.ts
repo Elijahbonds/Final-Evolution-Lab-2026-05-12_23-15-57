@@ -122,6 +122,17 @@ export class GolfBallSim {
 
 /** Putting: the same three-click meter with tighter tolerances and a pure
  *  roll read — a putt is a ground ball with pace. */
+/**
+ * How the green breaks under a putt.
+ * assumption: the break is the ball's lateral offset from the hole, divided
+ * by 6 m and clamped to ±1. The live green is still a flat disc; this is the
+ * slope resolvePutt already knew how to read.
+ */
+export function greenBreakSlope(ballX: number, holeX: number): number {
+  const dx = (ballX - holeX) / 6;
+  return Math.max(-1, Math.min(1, dx));
+}
+
 export function resolvePutt(r: { power01: number; face01: number }, distM: number, breakSlope: number): {
   paceM: number; offlineRad: number; lips: boolean;
 } {

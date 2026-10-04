@@ -4,6 +4,8 @@
 // buttons on any pad (the mode reads A/B/X/Y). Results flow back through GameShell's onEnd like every other mode.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
@@ -23,10 +25,13 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('who_scene_it', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -40,7 +45,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         headline: won ? 'SCENE MASTER' : 'ROUND OVER',
         tallies: { hits: r.stats?.correct ?? 0, misses: Math.max(0, (r.stats?.total ?? 0) - (r.stats?.correct ?? 0)), dodges: 0, combos: r.stats?.bestStreak ?? 0 },
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;
@@ -49,10 +54,11 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-WSI] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -172,7 +178,20 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
           pause screen at all: a pad's START froze the quiz with no word, and nothing said both hands up bring it back. */}
       {phase === 'paused' && <PausedLayer onResume={tapStart} />}
       {phase === 'countdown' && countdown != null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="fel-heading text-7xl font-black text-white drop-shadow">{countdown}</span></div>}
-      {phase === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-6 text-center font-mono text-sm text-[var(--fel-red)]">{loadError}</div>}
+      {phase === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6 text-center">
+          <div className="fel-panel max-w-md rounded-2xl border-[var(--fel-red)]/50 px-6 py-5">
+            <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
+            <button
+              type="button"
+              onClick={tapStart}
+              className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
+            >
+              RETRY
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

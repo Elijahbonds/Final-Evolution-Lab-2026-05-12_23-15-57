@@ -27,9 +27,10 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS } from '../core/FightCore';
+import { RivalCombatBrain, chiResource, threatLandsIn } from '../core/RivalCombatBrain';
 import {
   StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove, bookMoveset, stringRule } from '../core/StrikeSystem';
-import { DefenseController, applyDefenseOutcome } from '../core/DefenseSystem';
+import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
 import { CombatMovement } from '../core/CombatMovement';
 import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';
 import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // phase 8: bullet time on R2, a clock per rig
@@ -200,7 +201,8 @@ export const DuelMode: ModeDefinition = (() => {
   let stringLabels: string[] = [];   // phase 9: the names of the links so far, for the COMBO banner
   const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
-  let foeReadThisSwing = false, foeGuardUntil = 0;   // phase 10
+  let foeGuardUntil = 0;
+  let rivalBrain = new RivalCombatBrain({ difficulty: 0.72 });
   let guardUp = false;
   // MOVEMENT PLAY P7: the body's fight read (the Showdown seam; a weapon swings on the plane rule)
   // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
@@ -504,6 +506,14 @@ export const DuelMode: ModeDefinition = (() => {
       meStrike = new StrikeController(styled(myWeapon));
       showWeapons(ctx);
       foeStrike = new StrikeController(RIVAL_MOVESET[foeWeapon]());   // the rival fights unstyled
+      rivalBrain = new RivalCombatBrain({
+        difficulty: 0.72,
+        moves: Object.entries(RIVAL_MOVESET[foeWeapon]()).map(([id, m]) => ({
+          id,
+          kind: m.weight === 'light' ? 'jab' as const : m.weight === 'medium' ? 'kick' as const : 'heavy' as const,
+          range: m.atk.range,
+        })),
+      });
       // phase 6 seam: seconds until the rival's swing lands (−1 = nothing in flight) — the probe's perfect driver reads it
       (ctx.scene.metadata ??= {}).fight = { landsIn: () => { const c = foeStrike.current; return c && c.phase === 'startup' ? c.secToActive : -1; } };
       meMove = new CombatMovement(); foeMove = new CombatMovement();
@@ -646,40 +656,39 @@ export const DuelMode: ModeDefinition = (() => {
         else { const step = Math.min(dt, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
       }
 
-      // rival AI: orbit + approach to weapon range, swing on cooldown
+      // rival AI: the shared brain approaches, picks from the whole moveset, and spends chi
       if (foeState.controllable && !foeStrike.busy) {
-        const dist = Vector3.Distance(rival.root.position, player.root.position);
-        const want = WEAPON_RANGE[foeWeapon] * 0.85;
-        const radial = dist > want + 0.3 ? 1 : dist < want - 0.5 ? -1 : 0;
-        const orbit = Math.sin(phaseSec * 0.7) > 0 ? 0.6 : -0.6;
-        foeMove.updateWithSelf(sdtRoom, orbit, radial, false, rival.root.position);
-        // AI RATES ARE PER SECOND NOW, NOT PER FRAME.
-        //
-        // These were `Math.random() < 0.02` evaluated once per rendered frame, which makes the rival's
-        // aggression a function of the player's REFRESH RATE: at 144 fps it rolls 2.4x as often as at 60, so
-        // the same opponent attacks more than twice as much on a better monitor. `1 - exp(-rate*dt)` is the
-        // same chance per second of wall-clock time at any frame rate. The rates below are the old per-frame
-        // numbers x 60, so a 60 fps game plays exactly as it did.
-        //
-        // NERVE rides the same line, on two DIFFERENT mechanisms as the module requires: `aggression` speeds
-        // the swing rate up, `mistake` cuts the reactive block down. Behind on rounds it comes forward more
-        // and guards less.
         const nrv = nerve(standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN)));
-        const chance = (perSec: number) => Math.random() < 1 - Math.exp(-perSec * sdtRoom);   // phase 8: the rival's nerve runs on the room clock
-        if (dist <= WEAPON_RANGE[foeWeapon] && chance(1.2 * nrv.aggression)) {
-          const ids = Object.keys(RIVAL_MOVESET[foeWeapon]());
-          foeStrike.request(ids[Math.floor(Math.random() * ids.length)], now());
-        }
-        // phase 10 — ONE READ PER WIND-UP (see showdown / FightCore): a 0.3 read on my startup, the guard stamped 200 ms early
-        // (a block, not a free parry) and held 0.6 s; one read in ten is a true GUARD IMPACT attempt on the press itself.
+        rivalBrain.setNerve(nrv.aggression, nrv.mistake);
         const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
-        if (!meWinding) foeReadThisSwing = false;
-        if (meWinding && !foeReadThisSwing) {
-          foeReadThisSwing = true;
-          const r = Math.random();
-          if (r < 0.3 / Math.max(0.5, nrv.mistake)) { const gi = r < 0.03; foeDef.pressBlock(gi ? now() : now() - 200, gi); foeState.pressBlock(gi ? now() : now() - 200); foeGuardUntil = now() + 600; console.info(`[DL-AI] read the wind-up — ${gi ? 'guard impact' : 'guard'}`); }
+        const incoming = meWinding && meStrike.current ? meStrike.current.secToActive : -1;
+        const dist = Vector3.Distance(rival.root.position, player.root.position);
+        const reach = meStrike.current?.move.atk.range ?? WEAPON_RANGE[foeWeapon];
+        const decision = rivalBrain.decide(
+          sdtRoom, rival.root.position, player.root.position, foeState, meWinding,
+          chiResource(foeState.chi, 12, SUBSTITUTION_CHI_COST),
+          threatLandsIn(dist, reach, incoming < 0 ? null : incoming),
+        );
+        const wishV = new Vector3(decision.moveX, 0, -decision.moveY);
+        const to = player.root.position.subtract(rival.root.position); to.y = 0;
+        const dir = to.length() > 0.05 ? to.normalize() : new Vector3(0, 0, 1);
+        const radial = Vector3.Dot(wishV, dir);
+        const orbit = Vector3.Dot(wishV, new Vector3(-dir.z, 0, dir.x));
+        foeMove.updateWithSelf(sdtRoom, orbit, radial, false, rival.root.position);
+        if (decision.spend === 'dash' && foeState.chi >= 12) {
+          foeState.chi -= 12;
+          rival.root.position.addInPlace(dir.scale(2.2));
         }
-        if (foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
+        if (decision.spend === 'ultimate') foeState.chi = 0;
+        if (decision.spend === 'substitution' && foeState.chi >= SUBSTITUTION_CHI_COST) {
+          foeState.chi -= SUBSTITUTION_CHI_COST;
+          rival.root.position.copyFrom(DefenseController.substitutionSpot(player.root.position, player.root.rotation.y));
+        }
+        if (decision.attackId) foeStrike.request(decision.attackId, now());
+        if (decision.block && !foeState.blockHeld) {
+          foeDef.pressBlock(now() - 200, false); foeState.pressBlock(now() - 200); foeGuardUntil = now() + 600;
+        }
+        if (!decision.block && foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
       } else {
         foeMove.updateWithSelf(sdtRoom, 0, 0, false, rival.root.position);
       }

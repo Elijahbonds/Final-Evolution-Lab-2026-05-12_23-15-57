@@ -32,10 +32,11 @@ const THIS_YEAR = new Date().getFullYear();
 const IP = '203.0.113.9';
 const UA = 'AgeScreenTest/1.0';
 // Advanced for intentional schema landings (MIRROR-COACH ServedExercise; ECONOMY-CAPS runId/agentRun;
-// COACH-STORE-V1 Instructor, ProgramAccess, Booking, CallSignal, CoachStoreReferral).
+// ADULT-OPTIN-AB04 ScanSaveOptIn at 9ca276ac; COACH-STORE-V1 Instructor, ProgramAccess, Booking, CallSignal,
+// CoachStoreReferral; pinned past the PR #161 lane sync merge that carries both).
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
-const PARENT = '19be09013400ab0c6dc26aa24b0f5994095c7efb';
+const PARENT = '9ca276ac19e2c03fe044789556bbd2a7a9116b42';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

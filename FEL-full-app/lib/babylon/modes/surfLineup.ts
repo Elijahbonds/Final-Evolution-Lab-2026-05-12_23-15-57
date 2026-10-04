@@ -95,6 +95,12 @@ export function sectionsOf(p: WaveProfile): WaveSection[] {
 }
 
 /** Which section of the wave the rider is in, by distance along the ride. */
+/** A barrel is open only on a wave that throws one, and only inside that section. Not an 18s clock. */
+export function barrelOpen(profile: WaveProfile, along: number): boolean {
+  if (profile.barrel <= 0) return false;
+  return sectionAt(profile, along)?.kind === 'barrel';
+}
+
 export function sectionAt(p: WaveProfile, along: number): WaveSection | null {
   return sectionsOf(p).find((s) => along >= s.from && along < s.to) ?? null;
 }

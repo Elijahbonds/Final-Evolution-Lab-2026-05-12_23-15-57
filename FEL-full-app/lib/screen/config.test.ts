@@ -58,6 +58,7 @@ describe('the free game is /try, the guest dunk contest', () => {
   it('a signed-in-only env route is rejected → /try', () => {
     for (const bad of [
       '/play/brain-brawl', '/play/brain-brawl?src=screen', '/login', '/login?next=%2Fplay', '/signup', '/account', '/account/settings',
+      '/create', '/create?from=cell',
       '/play', '/play/dunk', '/profile', '/api/guest', '/dev/brainbrawl', '/PLAY/brain-brawl', '/try/../play/brain-brawl',
       '/pl%61y/brain-brawl', '/wallet/', '/studio/x',
     ]) {

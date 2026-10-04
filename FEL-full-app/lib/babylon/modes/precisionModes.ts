@@ -33,7 +33,7 @@ import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
 import { assertSpawned } from '../core/FrameGuard';
 import {
-  spawnAthlete, Reticle, PowerMeter, Flight, swingQuality,
+  spawnAthlete, Reticle, PowerMeter, Flight, swingQuality, swingSide,
   buildTennisNet, buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
@@ -55,7 +55,7 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 // lines to gauge power. upgrade physics, weather") — the arrow + landing ring (AimArrow), the meter's carry lines and the
 // shot's launch (GolfAim), the flight itself (GolfBallSim: drag, Magnus, bounce, roll, wind through the air, wet turf),
 // and the weather (WeatherKit read from the start screen's chip, WeatherFx for what it looks like).
-import { GolfBallSim, type Surface as GolfSurface } from '../core/GolfBall';
+import { GolfBallSim, greenBreakSlope, resolvePutt, type Surface as GolfSurface } from '../core/GolfBall';
 import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
 import { mountAimArrow, type AimArrowHandle } from '../visual/AimArrow';
 import { WeatherKit } from '../core/WeatherKit';
@@ -484,7 +484,24 @@ export const GolfMode: ModeDefinition = (() => {
     // (sidespin the flight curves on — early on the meter hooks, late slices; the stick swing's lateral drift likewise),
     // divided by the club's forgiveness. Not a random lateral kick.
     const sideSign: -1 | 1 = sideErr >= 0 ? 1 : -1; const errMag = Math.min(1, Math.abs(sideErr));
-    const { vel, spin } = launchVelocity(c, pwr, aimYaw, errMag, sideSign);
+    let vel: Vector3;
+    let spin: Vector3;
+    if (onGreen()) {
+      const distM = Math.hypot(ball.position.x - holePos.x, ball.position.z - holePos.z);
+      const putt = resolvePutt(
+        { power01: pwr, face01: Math.max(0, 1 - errMag) },
+        distM,
+        greenBreakSlope(ball.position.x, holePos.x),
+      );
+      const yaw = aimYaw + putt.offlineRad;
+      const spd = putt.paceM / 1.15;
+      vel = new Vector3(Math.sin(yaw) * spd, 0.15, Math.cos(yaw) * spd);
+      spin = Vector3.Zero();
+    } else {
+      const launched = launchVelocity(c, pwr, aimYaw, errMag, sideSign);
+      vel = launched.vel;
+      spin = launched.spin;
+    }
     // PARKOUR GOLF: the launch pad augments the strike; a SLIDE PUTT is a little hotter and rides the bank harder; two flicks in the air
     if (pad) { vel.scaleInPlace(padMult(pad)); golfPark.pads++; console.info(`[GOLF-PARK] ${PAD[pad].label} ×${padMult(pad)}`); }
     if (c === PUTTER && slidePutt) { vel.scaleInPlace(1.12); golfPark.slidePutts++; console.info('[GOLF-PARK] slide putt'); }
@@ -632,7 +649,7 @@ export const GolfMode: ModeDefinition = (() => {
             backswing = Math.max(backswing, Math.min(1, -e.y));
           } else if (pulling && e.y >= SWING_STICK) {
             pulling = false;
-            strike(ctx, backswing, Math.max(-1, Math.min(1, e.x)));   // the lateral drift at the drive-through: left hooks, right slices
+            strike(ctx, backswing, 0);   // FLAG: the stick turns the aim; it no longer also hooks the swing. Direction is the arrow.
             backswing = 0;
           }
         }
@@ -1282,7 +1299,8 @@ export const DerbyMode: ModeDefinition = (() => {
         // PARKOUR DERBY: the KINETIC swing — the flow the warm-up filled grows the exit speed; the stick at the swing AIMS the
         // ball's bearing (a wall target's); the WALL decides the hit (settleHit), not the contact
         const ks = kineticSwing(flow / PARK_FLOW.full); flowAtSwing = flow; flow = 0;
-        const vx = Math.max(-1, Math.min(1, stickX)) * 17 + (Math.random() - 0.5) * 2;   // a full stick reaches the outer targets at ±32° (9 topped out near 20°, 15 at 28°, measured)
+        const side = swingSide(ball.position.z, 0.3, pitchSpeed, 0.3);   // FLAG: early pulls, late goes the other way. The stick still places the PCI.
+        const vx = side * 17 + (Math.random() - 0.5) * 2;
         flight.launch(ball.position, new Vector3(vx, (18 * launch * q + 4) * ks.exitMult, (16 + q * 18) * ks.exitMult));
         const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
         const cross = predictWallCross({ x: flight.vel.x, y: flight.vel.y, z: flight.vel.z }, { x: ball.position.x, y: ball.position.y, z: ball.position.z });
@@ -1483,9 +1501,12 @@ export const PenaltyMode: ModeDefinition = (() => {
     const kinetic = performance.now() - brk.kineticAt <= FLOW.kineticSec * 1000;
     const prof = shotProfile(brk.flow / FLOW.full, kinetic, kind);
     const high = stickY < -0.5 || kind === 'rainbow';
-    let curl = 0; let target = { x: Math.max(-1, Math.min(1, stickX)) * 3.0, y: high ? 1.9 : 0.85 };
-    if (kind === 'curler') { const sgn = stickX >= 0 ? 1 : -1; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
-    if (kind === 'rainbow') target = { x: Math.max(-1, Math.min(1, stickX)) * 2.2, y: 2.05 };
+    // FLAG: shot shape is when you strike, not where the run stick sits. Still far of the reach is a pull; in close is the other way.
+    const reach = Math.max(0.4, BREAK.strikeReach);
+    const signed = Math.max(-1, Math.min(1, (Vector3.Distance(ball.position, me.root.position) - reach * 0.55) / (reach * 0.55)));
+    let curl = 0; let target = { x: signed * 3.0, y: high || signed > 0.8 ? 1.9 : 0.85 };
+    if (kind === 'curler') { const sgn = signed >= 0 ? 1 : -1; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
+    if (kind === 'rainbow') target = { x: signed * 2.2, y: 2.05 };
     if (kind === 'bank') target = bankTarget(brk.wall === 0 ? 1 : brk.wall, target);
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
     const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: 0, rand: Math.random() });
@@ -1871,7 +1892,9 @@ export const PenaltyMode: ModeDefinition = (() => {
           // THE PES READ: the aim on the goal mouth, the power bar's zone (over the top one the ball clears the bar),
           // and the SHAPE off the stick at the strike — held across = a curled finesse shot, pushed up = the chip
           const wobble = (1 - p) * 0.5 + feints * FEINT_WOBBLE;
-          const curl = Math.abs(stickX) > 0.3 ? stickX : 0; const chip = stickY < -0.5;
+          // FLAG: the meter is the swing. Early curls one way, late the other, a late top chips. The stick still runs and aims the reticle.
+          const signed = (p - 0.5) * 2;
+          const curl = Math.abs(signed) > 0.2 ? signed : 0; const chip = signed > 0.75;
           const { vel, spin } = launchKick({ x: ball.position.x, y: ball.position.y, z: ball.position.z }, { x: reticle.pos.x, y: reticle.pos.y - 0.1 }, p, { curl, chip, wobble, rand: Math.random() });
           pendingKick = () => {
             SoundKit.play('whoosh');

@@ -64,7 +64,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
   return (
     <div data-screen-results className="space-y-3">
       <div className="space-y-2">
-        <p data-disclaimer className="text-[15px] font-bold leading-snug text-white">{DISCLAIMER}</p>
+        <p data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
         <StopLine />
         <PreviewLabel />
       </div>
@@ -75,30 +75,30 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
           <p className="mt-1.5 text-[18px] font-black leading-snug">{WIN_LINE}</p>
         </section>
       ) : !s.priorities.length ? (
-        <section data-no-pick className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[14px] leading-snug text-white/80">
+        <section data-no-pick className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[16px] leading-snug text-white/80">
           {NOTHING_TO_RANK}
         </section>
       ) : null}
 
       <section>
-        <h2 className="px-1 text-[13px] font-bold uppercase tracking-[0.14em] text-white/60">Your checks</h2>
+        <h2 className="px-1 text-[16px] font-bold uppercase tracking-[0.14em] text-white/60">Your checks</h2>
         <ul data-check-cards className="mt-2 space-y-2">
           {checkCards(s).map(({ test, band, row, top }) => {
             const word = band ?? 'unread';
             const pad = top ? 'p-3.5' : 'px-3.5 py-2.5';
-            const cueText = top ? 'text-[14px] text-white/85' : 'text-[13px] text-white/75';
+            const cueText = top ? 'text-[16px] text-white/85' : 'text-[16px] text-white/75';
             return (
               <li key={test} data-check-card={test} data-priority={top ? test : undefined} aria-label={`${SCREEN_TEST_NAMES[test]}: ${word === 'unread' ? 'not read' : word}`}
                 className={`rounded-2xl border border-white/10 bg-white/[0.03] ${pad}`} style={{ borderLeft: `4px solid ${BAND_COLOUR[word]}` }}>
-                {top ? <p data-top-priority className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">Top priority</p> : null}
-                <p className={top ? 'text-[16px] font-black leading-snug' : 'text-[14.5px] font-bold leading-snug'}>{SCREEN_TEST_NAMES[test]}</p>
+                {top ? <p data-top-priority className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Top priority</p> : null}
+                <p className={top ? 'text-[16px] font-black leading-snug' : 'text-[16px] font-bold leading-snug'}>{SCREEN_TEST_NAMES[test]}</p>
                 <div className="mt-0.5"><BandChip band={band} /></div>
                 {row ? (
                   <>
-                    <p data-check-row={row.id} className="mt-1 text-[13.5px] font-bold leading-snug text-white/90">
+                    <p data-check-row={row.id} className="mt-1 text-[16px] font-bold leading-snug text-white/90">
                       {rowName(row.id)}
                       {row.sides ? (
-                        <span className="ml-2 text-[12.5px] font-normal text-white/60">
+                        <span className="ml-2 text-[16px] font-normal text-white/60">
                           Left: <SideWord band={row.sides.left} /> · Right: <SideWord band={row.sides.right} />
                         </span>
                       ) : null}
@@ -107,7 +107,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                   </>
                 ) : null}
                 {top ? (
-                  <div data-demo-slot className="mt-2 flex items-center gap-2 rounded-xl border border-dashed border-white/20 px-3 py-2 text-[12.5px] text-white/60">
+                  <div data-demo-slot className="mt-2 flex items-center gap-2 rounded-xl border border-dashed border-white/20 px-3 py-2 text-[16px] text-white/60">
                     <Play aria-hidden className="h-4 w-4" /> {DEMO_COMING}
                   </div>
                 ) : null}
@@ -119,8 +119,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
 
       {s.jumpBestIn !== null ? (
         <section data-personal-best className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[14px] text-white/80">Your best jump: <b className="text-[18px] text-white">{s.jumpBestIn} in</b></p>
-          <p className="text-[12.5px] text-white/55">A personal best to beat next time.</p>
+          <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{s.jumpBestIn} in</b></p>
+          <p className="text-[16px] text-white/55">A personal best to beat next time.</p>
         </section>
       ) : null}
 
@@ -129,12 +129,12 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
         <a href={KINDLE_BOOK_URL} target="_blank" rel="noopener noreferrer" data-cta="book" className={primaryBtn}>{KINDLE_BOOK_LABEL}</a>
       </div>
       {trainWithElijahHref && !isKid(age) ? (
-        <p className="text-center text-[13px]">
+        <p className="text-center text-[16px]">
           <a href={trainWithElijahHref} data-train-with-elijah>Train with Elijah</a>
         </p>
       ) : null}
-      <p data-screenshot-line className="pt-1 text-center text-[13px] text-white/70">{SCREENSHOT_LINE}</p>
-      <p className="text-center text-[12.5px] text-white/60">
+      <p data-screenshot-line className="pt-1 text-center text-[16px] text-white/70">{SCREENSHOT_LINE}</p>
+      <p className="text-center text-[16px] text-white/60">
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
       </p>
       <button type="button" onClick={onClear} data-done-clear className={quietBtn}>{DONE_CLEAR}</button>

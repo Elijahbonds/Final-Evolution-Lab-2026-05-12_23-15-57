@@ -4,7 +4,7 @@
  *
  * Where `standing-suite.ts` runs a hand-maintained list, this runner DISCOVERS
  * every `scripts/*-tests.ts` plus the EXTRA_SUITES below (`ledger-invariants.ts`,
- * `smokeTest.ts`). Nothing can be added to the tree and silently skipped.
+ * `smokeTest.ts`, `mode-list-check.ts`). Nothing can be added to the tree and silently skipped.
  *
  * INTEGRATION NOTE (2026-09-16). This was written on 2026-09-10 and never merged;
  * it sat on claude/outstanding-tasks-deployment-helayq while the dev line moved
@@ -71,8 +71,11 @@ const DB_SUITES = new Set([
  * smokeTest.ts (HOTFIX, 2026-09-24): the M31 zero-black-screen gate — every /play route ships a page, every active mode
  * mounts a world, the harness arms and disarms the RenderWatchdog — matched no pattern here, so nothing had run it since
  * it was imported. It is static and green (10 checks).
+ *
+ * mode-list-check.ts: generated MASTER_MODE_LIST.md drift guard. It is not named
+ * `*-tests.ts`, but registry/doc drift is a release-quality blocker.
  */
-const EXTRA_SUITES = ['ledger-invariants.ts', 'smokeTest.ts'];
+const EXTRA_SUITES = ['ledger-invariants.ts', 'smokeTest.ts', 'mode-list-check.ts'];
 
 type Status = 'pass' | 'fail' | 'skip';
 interface Result {

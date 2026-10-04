@@ -11,6 +11,7 @@
 import { TransformNode, Vector3 } from '@babylonjs/core';
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { answerOwner, type LocalPress } from '../core/localPads';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { makeVenueShelf } from './whoSceneItVenues';
 import { WHO_SCENE_IT, type QuizPack, type QuizQuestion } from '../core/QuizCore';
@@ -34,12 +35,36 @@ export const WHO_SCENE_SWEEP = { radius: 8.5, height: 5.5, speed: 0.12 };
 type Phase = 'pick' | 'play' | 'board' | 'done';
 
 export function makeWhoSceneItMode(): ModeDefinition {
+  function pressFrom(e: FelInput): LocalPress | null {
+    if (e.t === 'button' && e.pressed) return 'face';
+    if (e.t === 'dpad' && e.pressed) return e.src === 'key' ? 'key-dpad' : 'dpad';
+    return null;
+  }
+  function seatAnswer(ctx: ModeContext, e: FelInput, slot: number): void {
+    const from = pressFrom(e);
+    if (!from) return;
+    const who = answerOwner({ pads: ctx.input.pads().length, slot, playerCount: players, from });
+    if (phase !== 'play') {
+      if (who === 0 && from === 'face') refuse(ctx, phase === 'board' ? 'NEXT SCENE…' : 'WAIT…');
+      return;
+    }
+    if (who === null) return;
+    if (who === 0 && from === 'face' && e.t === 'button') {
+      const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
+      if (i >= 0 && revealT > 0) refuse(ctx, 'NEXT SCENE…');
+      else if (i >= 0) answer(ctx, 0, i);
+    } else if (who === 1 && (from === 'dpad' || from === 'key-dpad') && e.t === 'dpad') {
+      const i = DPAD.indexOf(e.dir);
+      if (i >= 0) answer(ctx, 1, i);
+    }
+  }
   let venue: VenueHandle | null = null;
   let shelf = makeVenueShelf<{ root: { setEnabled(on: boolean): void }; dispose(): void; handle: VenueHandle }>(() => null);
   let anchor: TransformNode | null = null;   // a quiz has no hero; the frame guard still wants a subject — an anchor at the floor's centre
   let pack: QuizPack = WHO_SCENE_IT_PACK;
   let match: BuzzMatch | null = null;
   let players = 1;
+  let unseat: (() => void) | null = null;
   // BODIES AT THE PODIUMS (2026-09-13). Phase 0 booted this mode and measured ZERO skeletons: a card, a
   // venue sweep and nobody. That breaks the benchmark this mode was given — Mario Party readability, where a
   // spectator understands what is happening in three seconds — because the BUZZ is the whole mechanic of a
@@ -247,6 +272,11 @@ export function makeWhoSceneItMode(): ModeDefinition {
       players = Math.max(1, Math.min(MAX_PLAYERS, Number(q ?? 1) || 1));
       clock = WHO_SCENE_IT.timeLimit;
       mountFor(ctx, null);                       // the Scene Vault behind the player-count screen
+      unseat?.();
+      unseat = ctx.input.onSlot((ev, slot) => {
+        if (ctx.input.pads().length < 2) return;
+        seatAnswer(ctx, ev, slot);
+      });
       if (q) begin(ctx); else showPick(ctx);      // ?players= skips the screen
     },
 
@@ -259,18 +289,8 @@ export function makeWhoSceneItMode(): ModeDefinition {
         } else if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) begin(ctx);
         return;
       }
-      if (phase !== 'play') {
-        if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) refuse(ctx, phase === 'board' ? 'NEXT SCENE…' : 'WAIT…');   // MECHANICS PASS
-        return;
-      }
-      if (e.t === 'button' && e.pressed) {
-        const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
-        if (i >= 0 && revealT > 0) refuse(ctx, 'NEXT SCENE…');
-        else if (i >= 0) answer(ctx, 0, i);
-      } else if (e.t === 'dpad' && e.pressed && players > 1) {
-        const i = DPAD.indexOf(e.dir);
-        if (i >= 0) answer(ctx, 1, i);
-      }
+      if (ctx.input.pads().length >= 2) return;
+      seatAnswer(ctx, e, 0);
     },
 
     update(ctx: ModeContext, dt: number): void {
@@ -287,7 +307,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
       if (Math.floor((clock + dt) * 2) !== Math.floor(clock * 2)) hud(ctx);   // twice a second is plenty for a clock
     },
 
-    dispose(): void { shelf.dispose(); venue = null; anchor?.dispose(); anchor = null; match = null; cast?.dispose(); cast = null; },
+    dispose(): void { unseat?.(); unseat = null; shelf.dispose(); venue = null; anchor?.dispose(); anchor = null; match = null; cast?.dispose(); cast = null; },
   };
 }
 

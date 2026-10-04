@@ -109,6 +109,8 @@ model User {
   avatarLook      AvatarLook?
   ownedWearables  OwnedWearable[]
   sessionBookings SessionBooking[]
+  /// AB-04: one opt-in row for saving movement numbers (jump, Prove It, re-screen).
+  scanSaveOptIn   ScanSaveOptIn?
 
   // Camp Blueprint (Education pillar: Mentorship), 2026-09-03
   facilitatorProfile FacilitatorProfile?
@@ -2104,6 +2106,36 @@ model HealthConsent {
   coachId    String?
   grantedAt  DateTime
   revokedAt  DateTime?
+
+  @@index([userId, scope])
+}
+
+/// AB-04 (2026-10-03, Elijah): one row per account for saving movement NUMBERS.
+/// Scope `jump_numbers` is the only scope. It covers jump numbers, Prove It, and
+/// re-screen history together — not three consents. `granted` defaults false.
+/// `revokedAt` set means withdrawn; the row stays so the withdrawal has a time.
+/// Video, images, and pose frames are never stored under this grant.
+///
+/// `coachShares` is the per-booking "Share with my coach" list, JSON so this
+/// lane does not add columns to SessionBooking (that table is read on the
+/// sessions page; a missing column there would 500 a deploy that raced the SQL).
+/// Each entry is `{ bookingId, coachId, sharedAt, withdrawnAt }`. A withdrawn
+/// entry stays. COACH-STORE-V1 should call `adultOptedInAndSharedWithCoach`
+/// (lib/privacy/coachShare.ts) rather than reading this JSON itself.
+model ScanSaveOptIn {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'jump_numbers' — jump numbers, Prove It, and re-screen history.
+  scope              String    @default("jump_numbers")
+  granted            Boolean   @default(false)
+  grantedAt          DateTime?
+  revokedAt          DateTime?
+  consentTextVersion String
+  /// Per-booking coach shares. Null means none. See the model note.
+  coachShares        Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([userId, scope])
 }

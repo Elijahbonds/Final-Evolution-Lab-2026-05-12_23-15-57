@@ -30,4 +30,13 @@ describe('MiniTurbo', () => {
   it('not drifting and never slid releases nothing', () => {
     expect(stepMini(noMini(), false, 0, 0.1).released).toBeNull();
   });
+  it('releases when the drift button lets go, not when the slide physics ends', () => {
+    let s = noMini();
+    for (let t = 0; t < 1.0; t += 1 / 60) s = stepMini(s, true, 0.8, 1 / 60, true).state;
+    const stillHeld = stepMini(s, false, 0, 1 / 60, true);
+    expect(stillHeld.released).toBeNull();
+    expect(stillHeld.state.tier).toBe(s.tier);
+    const letGo = stepMini(stillHeld.state, true, 0.8, 1 / 60, false);
+    expect(letGo.released).toBe(1);
+  });
 });

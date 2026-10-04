@@ -1,4 +1,5 @@
-// Phase 9: retired modes must be dark for a LOGGED-IN player too.
+// Revived-mode route smoke: these modes were retired once, then deliberately
+// re-enabled. For a logged-in player they should behave like live play routes.
 import { request } from 'playwright-core';
 const BASE = process.env.BASE ?? 'http://localhost:3000';
 const rc = await request.newContext({ baseURL: BASE });
@@ -8,7 +9,7 @@ for (const r of ['sprint', 'showdown', 'duel', 'onevone']) {
   const res = await rc.get(`/play/${r}`, { maxRedirects: 0 }).catch((e) => ({ status: () => `ERR ${e.message.slice(0, 40)}`, headers: () => ({}), text: async () => '' }));
   const loc = (res.headers() as Record<string, string>)['location'] ?? '';
   const body = await res.text();
-  const hint = /retired|not found|404|no such mode|unknown mode/i.exec(body)?.[0] ?? '';
+  const hint = /loading|retired|not found|404|no such mode|unknown mode/i.exec(body)?.[0] ?? '';
   console.log(`${r.padEnd(9)} status ${res.status()} ${loc ? '→ ' + loc : ''} ${hint ? 'body: ' + hint : ''}`);
 }
 await rc.dispose();

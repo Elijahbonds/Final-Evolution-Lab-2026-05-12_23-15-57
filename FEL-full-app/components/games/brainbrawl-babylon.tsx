@@ -28,8 +28,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { replayBrainBrawl } from '@/lib/babylon/modes/BrainBrawlMode';
@@ -168,6 +170,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('brainbrawl', () => ({ phase, countdown, loadError, hud }), busRef.current);
   const [hostLive, setHostLive] = useState(false);
 
   useEffect(() => {
@@ -194,7 +197,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         resultSink,
         // GO AGAIN in place: the finish reports its card and the stage stays up for REPLAY (replayBrainBrawl)
         continuous: true, cardSink: resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-BRAINBRAWL] boot failed', e));
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-BRAINBRAWL] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
   }, []);
