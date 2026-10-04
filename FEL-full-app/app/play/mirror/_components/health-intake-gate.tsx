@@ -27,7 +27,12 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { PUBLIC_INTAKE_QUESTIONS, RED_FLAG_COPY, isValidBirthYear } from '@/lib/health/intake';
+import { INTAKE_IDS, PUBLIC_INTAKE_QUESTIONS, RED_FLAG_COPY, isValidBirthYear } from '@/lib/health/intake';
+import {
+  forgetIntakeMemory, intakeShortLines, readIntakeMemory, recallPlan, writeIntakeMemory, type IntakeMemoryAnswers,
+} from '@/lib/health/intakeMemory';
+import { isKid } from '@/lib/screen/age';
+import { readAge, tabStorage } from '@/lib/screen/store';
 import { ConsentBulletText } from '@/components/health/consent-bullet';
 import {
   BROWSER_ONLY_LINE, DECLINED_LINE, DECLINE_LABEL, LOCAL_CLEARED, NOTHING_SAVED_LINE, NOT_KEPT_LINE, clearOnce,
@@ -69,7 +74,7 @@ interface StatusResponse {
 
 type AnswerValue = boolean | number;
 // 'stopped_local' and 'ready_unsaved' are the browser-only path's stop and go (R-HEALTH-CLIENT): nothing was sent or saved.
-type Stage = 'loading' | 'error' | 'stopped' | 'consent' | 'question' | 'guardian_needed' | 'ready' | 'stopped_local' | 'ready_unsaved';
+type Stage = 'loading' | 'error' | 'stopped' | 'consent' | 'question' | 'guardian_needed' | 'ready' | 'stopped_local' | 'ready_unsaved' | 'recall' | 'pain';
 
 /** The one error code app/api/health/intake's POST returns when submitIntake() held the WHOLE submission because
  *  this athlete needs a guardian first (lib/health/intake.ts's own doc comment on submitIntake). Nothing was
@@ -123,14 +128,25 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
   const questions = browserOnly ? PUBLIC_INTAKE_QUESTIONS : status?.questions ?? [];
 
   useEffect(() => {
-    // browser-only: no status GET (the page's server render already read what this path needs)
+    // browser-only: no status GET. A kid, teen or unknown account never keeps the on-device answers.
+    if (!canWriteHealth) forgetIntakeMemory();
     if (!canWriteHealth) return;
     let cancelled = false;
     fetchStatus()
       .then((data) => {
         if (cancelled) return;
         setStatus(data);
-        setStage(data.hardStopped ? 'stopped' : data.needsIntake ? 'consent' : 'ready');
+        const band = readAge(tabStorage());
+        if (band !== null && isKid(band)) forgetIntakeMemory();
+        const memory = band !== null && isKid(band) ? null : readIntakeMemory();
+        const plan = data.hardStopped || !data.needsIntake ? 'none' : recallPlan(band, true, memory);
+        if (memory && plan !== 'none') setAnswers(memory.answers);
+        if (plan === 'pain' && memory) {
+          const rest = { ...memory.answers };
+          delete rest[INTAKE_IDS.currentPain];
+          setAnswers(rest);
+        }
+        setStage(data.hardStopped ? 'stopped' : !data.needsIntake ? 'ready' : plan === 'one-tap' ? 'recall' : plan === 'pain' ? 'pain' : plan === 'full' ? 'question' : 'consent');
       })
       .catch(() => {
         if (!cancelled) setStage('error');
@@ -162,6 +178,8 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
       const data = outcome.data;
       setStatus((s) => (s ? { ...s, hardStopped: data.hardStopped, redFlagCopy: data.redFlagCopy, latest: data.intake as LatestIntake } : s));
     }
+    // The local copy is this device only. It is written after a verified adult's save, never sent as its own request.
+    if (!browserOnly && outcome.stage === 'ready') writeIntakeMemory(finalAnswers as IntakeMemoryAnswers, readAge(tabStorage()), canWriteHealth);
   }
 
   async function markCleared() {
@@ -196,7 +214,9 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
   }
 
   function advance(nextAnswers: Record<string, AnswerValue>) {
-    setYearInput('');
+    const nextQ = questions[qIndex + 1];
+    if (nextQ?.type === 'birth_year' && typeof nextAnswers[nextQ.id] === 'number') setYearInput(String(nextAnswers[nextQ.id]));
+    else setYearInput('');
     if (qIndex + 1 < questions.length) {
       setAnswers(nextAnswers);
       setQIndex(qIndex + 1);
@@ -283,6 +303,36 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
         <button type="button" onClick={markCleared} className={`${quietBtn} mt-4`}>
           I&apos;ve checked — mark cleared
         </button>
+      </GateShell>
+    );
+  }
+
+  if (stage === 'recall') {
+    const lines = intakeShortLines(answers as IntakeMemoryAnswers);
+    return (
+      <GateShell>
+        <h2 className="text-[20px] font-black leading-tight text-white">Same as last time?</h2>
+        <ul className="mt-3 space-y-1 text-[16px] leading-snug text-white/80">
+          {lines.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+        <button type="button" onClick={() => setStage('ready')} className={`${primaryBtn} mt-4 min-h-12`}>Yes</button>
+        <button type="button" onClick={() => { setQIndex(0); setStage('question'); }} className={`${quietBtn} mt-2 min-h-12`}>Change something</button>
+        <button type="button" onClick={() => { forgetIntakeMemory(); setAnswers({}); setQIndex(0); setStage('consent'); }} className={`${quietBtn} mt-2 min-h-12`}>Forget my answers</button>
+      </GateShell>
+    );
+  }
+
+  if (stage === 'pain' && (browserOnly || status)) {
+    const q = questions[0];
+    return (
+      <GateShell>
+        <h2 className="mt-2 text-[19px] font-black leading-tight text-white">{q?.prompt}</h2>
+        <div className="mt-4 space-y-2.5">
+          <button type="button" disabled={busy} onClick={() => void submitAnswers({ ...answers, [INTAKE_IDS.currentPain]: true })} className={`${primaryBtn} min-h-12`}>Yes</button>
+          <button type="button" disabled={busy} onClick={() => void submitAnswers({ ...answers, [INTAKE_IDS.currentPain]: false })} className={`${quietBtn} min-h-12`}>No</button>
+        </div>
+        <button type="button" disabled={busy} onClick={() => void submitAnswers(answers)} className={`${quietBtn} mt-2 min-h-12`}>Skip</button>
+        {error && <p className="mt-2 text-[16px] text-red-400">{error}</p>}
       </GateShell>
     );
   }

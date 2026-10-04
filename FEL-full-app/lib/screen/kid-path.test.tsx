@@ -245,6 +245,6 @@ describe('the kid view: their number, the change, the save line, "Run it again";
     expect(app).toMatch(/const lastJumpRef = useRef<number \| null>\(null\);/);
     expect(app).toMatch(/if \(keepResult\(tabStorage\(\), gateRef\.current, summary\) === 'kid'\)/);
     // the start card's Start is a new screen (maybe a new person on a shared phone): the last number goes
-    expect(app).toMatch(/const startNew = \(\) => \{ lastJumpRef\.current = null; pre\(\{ type: 'start' \}\); \};/);
+    expect(app).toMatch(/const startNew = \(kind: ScreenKind = 'full'\) => \{ lastJumpRef\.current = null; modeRef\.current = kind; pre\(\{ type: 'start', kind \}\); \};/);
   });
 });
