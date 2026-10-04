@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { ACCOUNT_SETTINGS_PATH } from '@/lib/account/paths';
 import { AccountSettings } from '@/components/account/account-settings';
+import Link from 'next/link';
 import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
 
@@ -23,6 +24,7 @@ export default async function AccountPage() {
     >
       <ScanSaveAccount />
       <AccountSettings email={session.user.email ?? ''} />
+      <p className="mt-4 text-sm"><Link href="/account/coaching">Coaching</Link></p>
     </TabPage>
   );
 }

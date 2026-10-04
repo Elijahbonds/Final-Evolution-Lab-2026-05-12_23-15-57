@@ -64,9 +64,9 @@ describe('the 3PT mode wires it', () => {
     expect(body('resetState')).toMatch(/S\.playoff = 0;/);
   });
 
-  it('the bar desync stays inside the 0..1 sweep (×π read up to 3.14 for a frame, and a press there was graded on it)', () => {
-    expect(SRC).not.toMatch(/S\.barT = Math\.random\(\) \* Math\.PI/);
-    expect([...SRC.matchAll(/S\.barT = Math\.random\(\);/g)].length).toBe(2);
+  it('the old sweeping bar is retired: no S.barT left, and the shared ShotMeter desyncs from exactly the two rack-entry points (HOOPS-10PHASE-2 phase 2)', () => {
+    expect(SRC).not.toMatch(/S\.barT/);
+    expect([...SRC.matchAll(/beginShootPhase\(\);/g)].length).toBe(2);
   });
 
   it('the mic probe\'s timings: the money ball is called now or never, the clock and the last rack wait for the booth', () => {

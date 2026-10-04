@@ -140,6 +140,29 @@ export function choosePassType(passer: Vector3, target: Vector3, defenders: Vect
   return corridorBlocked ? 'bounce' : 'chest';
 }
 
+/** Base ball speed per pass type, m/s before a speed multiplier (the sling, HOOPS KINETIC 3v3) — the same numbers
+ *  PassFlight.start already used inline; named here so leadPoint can solve against the real flight speed instead
+ *  of guessing one. */
+export const PASS_SPEED: Record<PassType, number> = { chest: 14, lob: 9, bounce: 10 };
+
+/**
+ * HOOPS-10PHASE-2 phase 6: lead a moving target. Thrown AT a cutter's current spot, the ball arrives behind him —
+ * he has to break stride or reach back for it. A real pass leads the runner: aim where he WILL be when the ball
+ * gets there. The catch is that "when it gets there" depends on the distance, which depends on the lead point —
+ * circular, so this iterates the flight-time equation (duration = distance / speed) a few times against the
+ * predicted position; it converges to sub-centimetre on a court in 3 passes. A standing target (targetVel ≈ 0)
+ * converges to itself on the first pass, so this is a strict superset of "no lead" rather than a separate mode.
+ */
+export function leadPoint(from: Vector3, targetPos: Vector3, targetVel: Vector3, passSpeed: number): Vector3 {
+  let lead = targetPos.clone();
+  for (let i = 0; i < 3; i++) {
+    const dist = Vector3.Distance(from, lead);
+    const t = passSpeed > 0 ? dist / passSpeed : 0;
+    lead = targetPos.add(targetVel.scale(t));
+  }
+  return lead;
+}
+
 /** Real pass flight — chest is flat and fast, bounce dips to the floor at
  *  the midpoint and skips up. step() returns true on arrival (catch). */
 export class PassFlight {
@@ -151,7 +174,7 @@ export class PassFlight {
     this.from.copyFrom(from); this.to.copyFrom(to);
     this.type = type;
     const dist = Vector3.Distance(from, to);
-    this.duration = Math.max(0.14, dist / ((type === 'chest' ? 14 : type === 'lob' ? 9 : 10) * speedMult));
+    this.duration = Math.max(0.14, dist / (PASS_SPEED[type] * speedMult));
     this.t = 0;
     this.active = true;
   }

@@ -31,7 +31,7 @@ import { BandChip, EarlyTag, ParentCard, PreviewLabel, ScreenFrame, StepCard, St
 /** What the page read from the tab: the result (or none) and the tab's age answer (or none). */
 export type LaneState = { s: ScreenSummary | null; age: AgeBand | null } | 'reading';
 
-export function ProgramLane({ lane }: { lane: LaneSlug }) {
+export function ProgramLane({ lane, dunkHref = null }: { lane: LaneSlug; dunkHref?: string | null }) {
   const router = useRouter();
   const [state, setState] = useState<LaneState>('reading');
   useEffect(() => {
@@ -44,13 +44,13 @@ export function ProgramLane({ lane }: { lane: LaneSlug }) {
 
   return (
     <ScreenFrame back={RESULTS_PATH} title="Your Dunk Program">
-      <ProgramLaneView lane={lane} state={state} />
+      <ProgramLaneView lane={lane} state={state} dunkHref={dunkHref} />
     </ScreenFrame>
   );
 }
 
 /** The page's body for what the tab holds. Pure: the tests render it for every age answer. */
-export function ProgramLaneView({ lane, state }: { lane: LaneSlug; state: LaneState }) {
+export function ProgramLaneView({ lane, state, dunkHref = null }: { lane: LaneSlug; state: LaneState; dunkHref?: string | null }) {
   if (state === 'reading') return <StepCard testId="reading"><p className="text-white/60">Reading your results…</p></StepCard>;
   if (state.age && !linksAllowed(state.age)) {
     return (
@@ -65,10 +65,10 @@ export function ProgramLaneView({ lane, state }: { lane: LaneSlug; state: LaneSt
     );
   }
   if (!state.s) return <NotSavedCard />;
-  return <LaneBody lane={lane} s={state.s} />;
+  return <LaneBody lane={lane} s={state.s} dunkHref={dunkHref} />;
 }
 
-export function LaneBody({ lane, s }: { lane: LaneSlug; s: ScreenSummary }) {
+export function LaneBody({ lane, s, dunkHref = null }: { lane: LaneSlug; s: ScreenSummary; dunkHref?: string | null }) {
   const L = LANES[lane];
   if (!s.lane) {
     return (
@@ -105,6 +105,7 @@ export function LaneBody({ lane, s }: { lane: LaneSlug; s: ScreenSummary }) {
       <section data-coming-soon className="rounded-2xl border border-dashed border-white/20 p-4">
         <p className="text-[16px] font-black">{PROGRAM_COMING}</p>
         <p className="mt-1 text-[16px] text-white/60">A full plan built from your screen. Nothing is saved or sent from this page.</p>
+        {dunkHref && lane === 'dunking' ? <a href={dunkHref} data-build-dunk>Build my Dunk Program</a> : null}
       </section>
       <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={quietBtn}>{BACK_TO_RESULTS}</Link>
     </div>

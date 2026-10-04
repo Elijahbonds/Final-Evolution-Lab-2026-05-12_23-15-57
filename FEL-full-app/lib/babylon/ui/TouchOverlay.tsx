@@ -35,7 +35,7 @@ function safeCapture(el: Element, pointerId: number): void {
 const SAFE_LEFT: React.CSSProperties = { left: 'max(0.75rem, env(safe-area-inset-left))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
 const SAFE_RIGHT: React.CSSProperties = { right: 'max(0.75rem, env(safe-area-inset-right))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
 
-export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: boolean }) {
+export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: boolean; overrides?: Partial<Record<'A' | 'B' | 'X' | 'Y', Partial<VerbButton>>> }) {
   const cfg = MODE_VERBS[props.modeId] ?? MODE_VERBS.default;
   const [landscape, setLandscape] = useState(window.innerWidth > window.innerHeight);
 
@@ -47,6 +47,13 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
 
   if (!props.visible || props.bus.gamepadActive) return null;
 
+  // CALL FOR THE BALL (Elijah item 2): a mode can retitle (never re-emit) a slot per frame — e.g. 3v3's PASS
+  // becomes BALL! off the ball. The emit, hold and hollow-socket rules are untouched; only label/color move.
+  const ov = props.overrides;
+  const buttons = (ov
+    ? (['A', 'B', 'X', 'Y'] as const).map((k, i) => (ov[k] ? { ...cfg.buttons[i], ...ov[k] } : cfg.buttons[i]))
+    : cfg.buttons) as [VerbButton, VerbButton, VerbButton, VerbButton];
+
   return (
     <div data-touch-deck className={landscape
       ? 'pointer-events-none absolute inset-0 z-30'
@@ -57,7 +64,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       </div>
       <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={SAFE_RIGHT}>
         {cfg.boost && <BoostPill bus={props.bus} />}
-        <ButtonDiamond bus={props.bus} buttons={cfg.buttons} />
+        <ButtonDiamond bus={props.bus} buttons={buttons} />
         {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
       </div>
     </div>
