@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { CARNIVAL_EXTERNAL_POOL } from './carnival-run';
 import { MODE_INFO, canonicalModeKey } from './game-data';
+import { isUnlistedMode } from './unlisted-modes';
 
 export interface ModeMenuMeta {
   icon: LucideIcon;
@@ -94,7 +95,9 @@ export function modeMenuMetaFor(key: string): ModeMenuMeta {
 }
 
 export function visibleModeEntries() {
-  return Object.entries(MODE_INFO).filter(([key]) => !HIDDEN_FROM_MODE_MENU.has(key));
+  // IRON-PARADISE-OUT (2026-10-03): parked modes (lib/unlisted-modes.ts) are not menu entries either. Their
+  // MODE_MENU_META rows stay, so the tile's copy is still here when the mode comes back.
+  return Object.entries(MODE_INFO).filter(([key]) => !HIDDEN_FROM_MODE_MENU.has(key) && !isUnlistedMode(key));
 }
 
 export function missingModeMenuMetaKeys(): string[] {
