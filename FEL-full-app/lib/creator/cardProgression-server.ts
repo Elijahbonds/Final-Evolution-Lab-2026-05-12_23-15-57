@@ -21,14 +21,19 @@ import { loadSharedProfile } from '../profile/profileServer';
 import { PLATFORM_PROTOCOLS } from '../profile/protocol';
 import { CURRICULUM_VERSION } from '../curriculum/blueprint';
 import { projectCard, type CardProgression } from './cardProgression';
+import { isAdultAtLeast18 } from '@/lib/age/ageRules';
 
 type Db = PrismaClient;
 
-/** Adults only, and unknown counts as not-adult. */
-export function isAdult(dobYear: number | null | undefined, now: Date = new Date()): boolean {
-  if (!dobYear) return false;
-  return now.getFullYear() - dobYear >= 18;
-}
+/**
+ * Adults only, and unknown counts as not-adult.
+ *
+ * AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): this is a thin re-export of lib/age/ageRules.ts's
+ * isAdultAtLeast18 (the AT-LEAST-18, `>= 18`, rule) — same body, kept under this name so every existing import of
+ * `isAdult` keeps working unchanged. See that file's header for why this did NOT get unified with the STRICT
+ * `> 18` rule other age helpers use.
+ */
+export const isAdult = isAdultAtLeast18;
 
 /**
  * Build the progression block for a public card.
