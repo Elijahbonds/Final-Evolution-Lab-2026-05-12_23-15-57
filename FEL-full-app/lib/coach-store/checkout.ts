@@ -5,7 +5,8 @@ import { getStripe } from '@/lib/stripe';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { isVerifiedAdult } from './adult';
 import { isAllowlistedCoach } from './coaches';
-import { productsGrantedBy } from './entitlement';
+import * as bundlePolicy from './bundlePolicy';
+import { missingBundleParts, productsGrantedBy } from './entitlement';
 import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
@@ -266,14 +267,26 @@ async function buyAccess(
   if (existing && (existing.status === 'ACTIVE' || existing.status === 'PAST_DUE')) {
     return NextResponse.json({ error: 'already_owned' }, { status: 409 });
   }
-  // Buying the bundle while already owning some of its members is allowed (full price, no proration — a
-  // pricing question for Elijah, see the PR body), so the cross-listing guard only applies to single-product
-  // purchases (program/course/series), not to the bundle itself.
-  const products = productsGrantedBy(manifest);
-  if (manifest.kind !== 'bundle' && products.length) {
+  // Double-charge guards (./bundlePolicy). A single product (program/course/series) the buyer already owns via
+  // another active/past-due listing (e.g. the bundle) is always 409 already_owned. The bundle, under the default
+  // 'block_if_any_owned', is 409 already_owned when any member is already owned, and the response lists the
+  // missing parts with their individual prices. Memberships are never blocked by these guards.
+  if (manifest.kind === 'program' || manifest.kind === 'course' || manifest.kind === 'series') {
+    const products = productsGrantedBy(manifest);
+    if (products.length) {
+      const owned = await ownedProductsFor(userId, beneficiary, listing.id);
+      if (products.some((p) => owned.has(p))) {
+        return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+      }
+    }
+  } else if (manifest.kind === 'bundle' && bundlePolicy.bundleOwnedPartsMode === 'block_if_any_owned') {
     const owned = await ownedProductsFor(userId, beneficiary, listing.id);
-    if (products.some((p) => owned.has(p))) {
-      return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+    const ownedParts = manifest.members.filter((m) => owned.has(m));
+    if (ownedParts.length) {
+      return NextResponse.json(
+        { error: 'already_owned', owned: ownedParts, missing: missingBundleParts(manifest.members, owned) },
+        { status: 409 },
+      );
     }
   }
   const row = existing
