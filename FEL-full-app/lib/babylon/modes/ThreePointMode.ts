@@ -51,7 +51,7 @@ import { BeatOwner } from '../anim/beatOwner';   // HOOPS MOTION phase 3d: one o
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01 } from '../core/BallHandling';
-import { releaseFrameOf } from '../anim/opponentMotion';
+import { releaseFrameOf, riseStartOf } from '../anim/opponentMotion';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths
@@ -449,6 +449,33 @@ function pushHud(ctx: ModeContext, banner?: string): void {
   });
 }
 
+/**
+ * HOOPS-10PHASE-2 phase 1 (2026-10-03): ONE PRESS = ONE SHOT. A press is an EDGE, not a level — the latch spends on the
+ * rising edge and re-arms only when the release edge arrives. A press delivered twice (a touch control's pointerdown AND
+ * click both normalising to FelInput, a double-registered listener) used to be able to fire twice: the second delivery
+ * landed after advanceBall re-armed S.fired and took a second shot the player never asked for. S.fired stays as the
+ * per-ball guard; this is the per-press guard, in front of it.
+ */
+export class ShotLatch {
+  private armed = true;
+  /** The rising edge. True = this press may act; false = a re-delivery of a press already spent — never a second shot. */
+  press(): boolean {
+    if (!this.armed) return false;
+    this.armed = false;
+    return true;
+  }
+  /** The falling edge re-arms the next press. */
+  release(): void { this.armed = true; }
+  get isArmed(): boolean { return this.armed; }
+}
+const shotLatch = new ShotLatch();
+
+/** Seconds from the press to the ball leaving the hand: the clip enters at `start01` (the rise — its own load is the set
+ *  the shooter is holding) and releases at `release01`, paced by `speedRatio`. */
+export function releaseDelaySec(release01: number, start01: number, durationSec: number, speedRatio: number): number {
+  return Math.max(0, release01 - start01) * durationSec / speedRatio;
+}
+
 /** Release the loaded ball, grading on how close the bar was to the sweet spot. */
 function fire(ctx: ModeContext, power?: number): void {
   if (S.phase !== 'shoot' || S.fired || !player || !ball || !arc) return;
@@ -485,8 +512,14 @@ function fire(ctx: ModeContext, power?: number): void {
   // 'jumpshot' is a real registered clip; SPORT_CLIP has no shooting alias. BIOMECH-HOOPS-WAVE1: the clip is CUT at its
   // release frame into the authored FOLLOW-THROUGH (update → flight: the ball leaves the hand there) — chained after the
   // clip's END it crossfaded from arms-down into the overhead first key, through a T (8–10 T frames a ball, measured).
-  beats?.beat('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, holdEnd: true });   // S2: the rise fades out of the SET; cut at the release (a late end holds its last frame)
-  releaseIn = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01) * (player.animator.durationOf('jumpshot') ?? 0.9) / SHOT_CLIP_SPEED;
+  // HOOPS-10PHASE-2 phase 1: the capture's own dip is cut too (from01 = the rise start) — the set the shooter is holding
+  // IS the load, and replaying it read as a SECOND arm-raise, two shots from one press. One press now reads as one
+  // motion: set (held) → rise → release → follow-through → absorb.
+  const release01 = releaseFrameOf(player.animator, 'jumpshot', RELEASE_FRAME_01);
+  const rise01 = Math.min(riseStartOf(player.animator, 'jumpshot', 0), release01);
+  beats?.beat('jumpshot', { speedRatio: SHOT_CLIP_SPEED, fadeSec: 0.08, holdEnd: true, from01: rise01 });   // S2: the rise fades out of the SET; cut at the release (a late end holds its last frame)
+  releaseIn = releaseDelaySec(release01, rise01, player.animator.durationOf('jumpshot') ?? 0.9, SHOT_CLIP_SPEED);
+  console.info(`[3PT-SHOT] one press: set(held) → jumpshot ${rise01.toFixed(2)}→${release01.toFixed(2)} (${releaseIn.toFixed(2)} s to the release) → follow-through → absorb`);
   pendingMade = made;
   {   // RIM PLAY: what this timing earned on the iron — early is short, late is long; a make inside the good window can rattle
     pendingPlay = verdict3.play;
@@ -814,6 +847,7 @@ export const ThreePointMode: ModeDefinition = {
   async load(ctx: ModeContext): Promise<void> {
     loadCount += 1;
     resetState();
+    shotLatch.release();   // HOOPS-10PHASE-2 phase 1: a fresh contest starts armed
     // THE MIC: made before the first await, so a newer load always owns the one mic (an older load resuming later never
     // replaces it; a stale teardown skips it with the rest)
     mic?.dispose(); mic = new ModeMic(ctx, { groups: ['three', 'names'], court: ctx.location });
@@ -966,7 +1000,11 @@ export const ThreePointMode: ModeDefinition = {
     }
     // A press is the release: keyboard Space, touch SHOOT, or a phone flick all
     // arrive here identically because they all normalise to FelInput.
-    if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X')) {   // X too: SQUARE shoots in the 2K map every other hoops mode plays by
+    // HOOPS-10PHASE-2 phase 1: through the latch — one press EDGE acts once, however many times the delivery layer
+    // repeats it; the latch re-arms on the release edge alone.
+    if (e.t === 'button' && (e.btn === 'A' || e.btn === 'B' || e.btn === 'X')) {   // X too: SQUARE shoots in the 2K map every other hoops mode plays by
+      if (!e.pressed) { shotLatch.release(); return; }
+      if (!shotLatch.press()) return;   // a duplicate delivery of a press already spent — not a shot, not a refusal
       // MECHANICS PASS (2026-09-15): 43 % of SHOOT presses were silent — pressed while the ball was in the air or the next
       // one was still coming off the rack. Answered now, with where the ball is.
       if (S.phase === 'shoot' && S.fired) refuse(ctx, "BALL'S IN THE AIR");
