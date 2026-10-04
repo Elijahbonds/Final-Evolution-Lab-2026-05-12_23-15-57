@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function CoachPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(`/login?next=${encodeURIComponent('/coach')}`);
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <CoachView />

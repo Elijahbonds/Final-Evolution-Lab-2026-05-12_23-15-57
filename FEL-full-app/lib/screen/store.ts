@@ -3,9 +3,11 @@
 //   · NOTHING IS SENT. No server save in this ship (A2-3): no fetch, no POST, no analytics; results stay on the device.
 //   · sessionStorage ONLY. Never localStorage, IndexedDB or a cookie. Every key starts SCREEN_PREFIX, so "Done, clear
 //     my results" can remove every one of them.
-//   · THE AGE ANSWER IS THE ONE KEY WRITTEN BEFORE A RESULT (SCREEN-FIX Cyber 2). lockAge() writes the band once, the
-//     moment it is answered, and it is then read back for the rest of the tab (lib/screen/age.ts): the question is not
-//     asked again, and a second answer cannot change it. Clearing keeps it; closing the tab ends it.
+//   · THE AGE ANSWER IS THE ONE KEY WRITTEN BEFORE A RESULT (SCREEN-FIX Cyber 2). lockAge() writes the band the moment
+//     it is answered and locks it FOR THE RUN: a second answer in the same run can only tighten it (strictestAge), never
+//     loosen it. A NEW RUN ASKS AGAIN (AGE-RESET, audit 2.2, 2026-10-03): on a shared phone the next person is not the
+//     last one, so every new Start and every new Film dunk session calls resetAge() first and the question comes back.
+//     "Done, clear my results" keeps the answer; closing the tab ends it.
 //   · UNDER 18 KEEP THE AGE ANSWER AND NOTHING ELSE (SCREEN-FIX-2; FE PM + Research, 2026-09-29 11:50 AM PT). Under
 //     13, 13–17 and "rather not say" (age.ts isKid) never have a result, takeoff leg or gate record written, grown-up
 //     ticked or not: their number lives in the page's memory only (assess-app.tsx). Only 18 or older keep a result in
@@ -18,7 +20,7 @@
 //
 // The storage is injected (a tab's window.sessionStorage in the page, a map in tests). Pure otherwise.
 import { GROWN_UP_TEXT_VERSION } from './copy';
-import { isAgeBand, isKid, type AgeBand } from './age';
+import { isAgeBand, isKid, strictestAge, type AgeBand } from './age';
 import { SUMMARY_VERSION, type ScreenSummary } from './checks';
 import { GRADED_CHECKS, THRESHOLDS_VERSION, type BandWord } from './PROPOSED-thresholds';
 import { isLaneSlug } from './PROPOSED-program-lanes';
@@ -101,15 +103,29 @@ export function readAge(s: StorageLike | null): AgeBand | null {
 }
 
 /**
- * Lock this tab's age answer and return the band that holds: the first answer is written and kept; any later answer
- * is refused and the first one comes back. This is the one key written before a result.
+ * Lock this run's age answer and return the band that holds. The first answer is written and kept. A later answer in
+ * the same run can only TIGHTEN it (AGE-RESET, audit 2.2: stricter-only, never looser): the strictestAge of the held
+ * answer and the new one comes back, and a stricter outcome is written over the held one. This is the one key written
+ * before a result.
  */
 export function lockAge(s: StorageLike | null, band: AgeBand): AgeBand {
   const had = readAge(s);
-  if (had) return had;
-  ageMemory = band;
-  try { s?.setItem(KEYS.age, band); } catch { /* refused: the page's memory holds it */ }
-  return band;
+  const holds = strictestAge(had, band)!;
+  if (holds === had) return holds;
+  ageMemory = holds;
+  try { s?.setItem(KEYS.age, holds); } catch { /* refused: the page's memory holds it */ }
+  return holds;
+}
+
+/**
+ * A new run is maybe a new person (shared phones, audit 2.2): the age answer and with it the grown-up tick are asked
+ * again. Called on every new Start (assess-app.tsx) and every new Film dunk session (dunk-film.tsx). "Done, clear my
+ * results" is NOT this: clearing keeps the answer (clearScreen), so clearing is not a way to answer again. Only a key
+ * that is there is removed: a clean device sees no call at all.
+ */
+export function resetAge(s: StorageLike | null): void {
+  ageMemory = null;
+  try { if (s && s.getItem(KEYS.age) !== null) s.removeItem(KEYS.age); } catch { /* no storage: the page's memory was cleared above */ }
 }
 
 /** Tests only: a new tab (a fresh page's memory). */
