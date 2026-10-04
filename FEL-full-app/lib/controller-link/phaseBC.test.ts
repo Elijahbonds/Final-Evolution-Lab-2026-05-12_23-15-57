@@ -163,9 +163,10 @@ describe('TV MODE WIDENS THE REAL WINDOW', () => {
   it('3PT actually applies it rather than importing it decoratively', () => {
     const src = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/ThreePointMode.ts'), 'utf8'));
     expect(src).toMatch(/readDisplaySetting/);
-    expect(src).toMatch(/perfectBand\(\)/);
-    expect(src).toMatch(/goodBand\(\)/);
-    // and the raw constants are no longer what the judging reads
+    // HOOPS-10PHASE-2 phase 2: 3PT moved onto the shared BasketballCore.ShotMeter (the SAME meter 1v1/3v3 grade
+    // by) instead of its own perfectBand()/goodBand() pair; TV mode now widens that meter directly via
+    // ShotMeter.widenBy, so the judging reads the meter's own window, never a raw constant.
+    expect(src).toMatch(/shotMeter\.widenBy\(shotFactor\)/);
     expect(src).not.toMatch(/err < PERFECT_BAND/);
   });
 
