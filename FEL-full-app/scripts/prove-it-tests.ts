@@ -231,6 +231,26 @@ function runDunk(opts: {
   ok(tracker.includes("import { G } from '../babylon/core/IRLCore'"), 'the tracker imports G, not its own constant');
 }
 
+// ── re-arm keeps the floor (SESSION-SETUP-V1) ──────────────────────────────
+{
+  const first = runDunk({ flightMs: 500 });
+  ok(first.metrics !== null && first.tracker.state === 'ready', 'a measured dunk leaves the tracker ready');
+  first.tracker.rearm();
+  ok(first.tracker.state === 'ready', 'rearm stays ready when a floor was calibrated');
+  let t = 10000;
+  let second: import('../lib/irl/dunkTracker').DunkMetrics | null = null;
+  const step = (o: PoseOpts) => { t += 33; const r = first.tracker.feed(frame(t, o)); if (r) second = r; };
+  const air = Math.floor(500 / 33);
+  for (let i = 0; i < air; i++) {
+    const k = i / Math.max(1, air - 1);
+    step({ ankleRise: 0.06 + Math.sin(k * Math.PI) * 0.06 });
+  }
+  for (let i = 0; i < 20; i++) step({});
+  ok(second !== null, 'the next dunk measures without a fresh floor calibration');
+  first.tracker.reset();
+  ok(first.tracker.state === 'idle', 'reset still clears the floor');
+}
+
 if (fail.length) {
   console.error(`prove-it-tests: ${fail.length} FAILED of ${checks}`);
   for (const f of fail) console.error(`  ✗ ${f}`);
