@@ -46,17 +46,18 @@ import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
 
 const STILL_MS = 900;
-const QUICK_MOVES: readonly TestId[] = ['T1', 'T2', 'T3', 'T5'];
 
-function moveOf(part: PartId | null): { index: number; total: number; name: string; cue: string } | null {
+function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
   if (!part) return null;
-  const test = QUICK_PARTS.find((p) => p.id === part)?.test ?? null;
+  const test = parts.find((p) => p.id === part)?.test ?? null;
   if (!test) return null;
-  const index = QUICK_MOVES.indexOf(test) + 1;
+  const order: TestId[] = [];
+  for (const p of parts) if (!order.includes(p.test)) order.push(p.test);
+  const index = order.indexOf(test) + 1;
   const def = testDef(test);
   const cue = part === 'T1-side' ? 'Turn side-on, left to the camera' : part.includes('right') && part.startsWith('T2')
     ? 'Right side to the camera' : part.includes('right') && part.startsWith('T3') ? 'Right leg' : def.setup.split('.')[0];
-  return { index, total: QUICK_MOVES.length, name: def.short, cue };
+  return { index, total: order.length, name: def.short, cue };
 }
 
 // ── the session result (the live flow and the replay grade the same way) ──
@@ -88,8 +89,12 @@ export interface SessionResult {
 
 const QUICK_ORDER: TestId[] = ['T1', 'T2', 'T3', 'T5'];
 
-/** Grade a whole Quick Screen from its captures. Deterministic: the same captures give an equal result. */
-export function gradeSession(cap: SessionCapture): SessionResult {
+/**
+ * Grade a whole Quick Screen from its captures. Deterministic: the same captures give an equal result.
+ * `prior` fills a test that has no capture (a jump already graded, carried into the rest of the screen).
+ * A capture always grades fresh. The prior object is kept as-is when it is used.
+ */
+export function gradeSession(cap: SessionCapture, prior?: Partial<Record<TestId, TestResult>>): SessionResult {
   const ctx = { calibration: cap.calibration, aspect: cap.calibration.aspect, ...(cap.poseHz ? { poseHz: cap.poseHz } : {}) };
   const tests: TestResult[] = [];
   let stopped = false;
@@ -100,6 +105,7 @@ export function gradeSession(cap: SessionCapture): SessionResult {
     else if (id === 'T2' && cap.T2) t = gradeT2(cap.T2, ctx);
     else if (id === 'T3' && cap.T3) t = gradeT3(cap.T3, ctx);
     else if (id === 'T5' && cap.T5) t = gradeT5(cap.T5, { ...ctx, poseHz: undefined, cameraFps: cap.cameraFps ?? null });
+    else if (prior?.[id]) t = prior[id]!;
     else t = skipped(id);
     if (cap.painAfter === id) { t = { ...t, status: 'painStop', score03: 0, frozen: [] }; stopped = true; }
     tests.push(t);
@@ -158,6 +164,11 @@ export const QUICK_PARTS: readonly PartDef[] = [
   { id: 'T3-right', test: 'T3', view: 'front', side: 'right', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'RIGHT LEG', setup: `Now on your right leg. Same thing, ${countWord(th('t3.reps'))} times.` },
   { id: 'T5', test: 'T5', view: 'front', target: th('t5.reps'), maxAttempts: TRIES.T5, maxMs: LIMIT.T5, label: null, highFps: true, setup: `Jump. ${testDef('T5').setup}` },
 ];
+
+/** T5 only: the jump-only screen. */
+export const JUMP_PARTS: readonly PartDef[] = QUICK_PARTS.filter((p) => p.test === 'T5');
+/** T1–T3: the rest of the full screen after a jump that is already graded. */
+export const REST_PARTS: readonly PartDef[] = QUICK_PARTS.filter((p) => p.test !== 'T5');
 
 export type RunnerStep =
   | 'framing' | 'pain' | 'takeoff' | 'calibrate' | 'calibrateSide' | 'position' | 'countdown' | 'active' | 'paused'
@@ -261,6 +272,8 @@ export interface RunnerOptions {
   handsFree?: boolean;
   aspect: number;
   parts?: readonly PartDef[];
+  /** Tests already graded this run (the jump), used when this pass has no capture for them. */
+  priorTests?: Partial<Record<TestId, TestResult>>;
   cameraFps?: () => number | null;
 }
 
@@ -703,7 +716,7 @@ export class AssessRunner {
       T2: Object.keys(this.captures.T2).length ? this.captures.T2 : undefined,
       T3: Object.keys(this.captures.T3).length ? this.captures.T3 : undefined,
       T5: this.captures.T5 ?? undefined, painAfter: this.painAfter, takeoffLeg: this.takeoff, cameraFps: this.o.cameraFps?.() ?? null,
-    });
+    }, this.o.priorTests);
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
     this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
@@ -759,7 +772,7 @@ export class AssessRunner {
       progress: { done: this.partIdx, total: this.parts.length },
       flash,
       rejection: this.rejection,
-      move: moveOf(def?.id ?? this.donePart?.part ?? null),
+      move: moveOf(def?.id ?? this.donePart?.part ?? null, this.parts),
       setupReady: (this.step === 'framing' || this.step === 'position') && !!this.lastFraming?.ok && !this.lastFraming?.issues.some((i) => i !== 'dim'),
       dimWarning: this.dimWarning,
       retryMessage: this.retryMessage,
