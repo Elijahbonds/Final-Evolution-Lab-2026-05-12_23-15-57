@@ -4,12 +4,13 @@
 // a 2-D skeleton on two canvases flipped together as a mirror, and the runner deciding what happens next. No Babylon
 // anywhere on this route.
 //
-// SCREEN-SHIP (2026-09-29), SCREEN-FIX: portrait first, one step per screen, system font. Start → age (once per tab)
-// → "A grown-up is with me" (under 18, or an age not given) → "Does anything hurt right now?" → the camera card →
-// only then the camera → the checks → results.
+// SCREEN-SHIP (2026-09-29), SCREEN-FIX: portrait first, one step per screen, system font. Start → age (every new Start:
+// the last person's answer is reset first, audit 2.2) → "A grown-up is with me" (under 18, or an age not given) →
+// "Does anything hurt right now?" → the camera card → only then the camera → the checks → results.
 //   · NOTHING IS SENT. No server save in this ship (A2-3): the screen never calls POST /api/mirror/assessment, no PRQ
 //     write, no analytics, no crash report (SCREEN-FIX-2 amend 4). The age answer is kept in this tab's sessionStorage,
-//     so it is asked once per tab. 18 or older keep their results there too; UNDER 18 (and "rather not say") keep
+//     so it is asked once per run (every new Start resets it first, AGE-RESET audit 2.2). 18 or older keep their results
+//     there too; UNDER 18 (and "rather not say") keep
 //     NOTHING ELSE: their number is shown from this page's memory, with the change since their last screen here
 //     (lastJumpRef), and "Run it again" (SCREEN-FIX-2 item 3; lib/screen/store.ts keepResult). Never localStorage: the
 //     camera's model memory is this page's too (screen-pose.ts, Cyber F5).
@@ -44,7 +45,7 @@ import {
   LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
 } from '@/lib/screen/copy';
 import type { AgeBand } from '@/lib/screen/age';
-import { clearScreen, keepResult, localForClear, lockAge, readAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
+import { clearScreen, keepResult, localForClear, lockAge, readAge, resetAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
 import { PRE_START, preStep, type PreEvent, type PreState } from '@/lib/screen/flow';
 import { ASSESS_PATH, RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
 import { DEVICE_AUTO_FPS, DEVICE_AUTO_MS } from '@/lib/screen/realtime-cues';
@@ -250,7 +251,10 @@ export function AssessApp() {
   // the steps before the camera (lib/screen/flow.ts): the camera is asked for only from the camera card's button
   const pre = (e: PreEvent) => {
     if (e.type === 'start') clearScreen(tabStorage(), localForClear());   // a new screen wipes the last one first (shared devices)
-    // the age is asked once per tab: a start carries the tab's answer, and a second answer is refused (lockAge)
+    // AGE-RESET (audit 2.2, 2026-10-03): a new Start is maybe a new person on a shared phone — the stored age and with
+    // it the grown-up tick are cleared, so the question is asked again. The lock still holds WITHIN the run (lockAge).
+    if (e.type === 'start') resetAge(tabStorage());
+    // a start carries the tab's answer (none, after the reset above: the flow asks); a mid-run answer is locked (lockAge)
     const ev: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()) }
       : e.type === 'age' ? { type: 'age', age: lockAge(tabStorage(), e.age) } : e;
     const next = preStep(preRef.current, ev);

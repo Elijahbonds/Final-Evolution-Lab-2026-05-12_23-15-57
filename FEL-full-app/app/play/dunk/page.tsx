@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function DunkPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(`/login?next=${encodeURIComponent('/play/dunk')}`);
   return <DunkLoader />;
 }

@@ -37,7 +37,7 @@ describe('every age band → the right next step', () => {
   });
 });
 
-describe('the age is asked once per tab', () => {
+describe('the age is asked once per run', () => {
   it('a start that carries the tab\'s locked answer skips the question', () => {
     expect(run([{ type: 'start', locked: '18+' }]).step).toBe('pain');
     for (const locked of ['13-17', 'under-13', 'unknown'] as const) expect(run([{ type: 'start', locked }]).step, locked).toBe('grownUp');
@@ -83,7 +83,9 @@ describe('nothing skips the grown-up step, and the camera waits for the camera c
     expect(calls).toBe(3);      // the camera step, the lighter-model restart and the camera card's retry: nothing earlier
     // a new screen wipes the last one before anything else
     expect(app).toMatch(/if \(e\.type === 'start'\) clearScreen\(tabStorage\(\), localForClear\(\)\);/);
-    // the age answer is locked as it is given, and a start reads the lock
+    // AGE-RESET (audit 2.2): a new Start also clears the last person's age answer, so it is asked again
+    expect(app).toMatch(/if \(e\.type === 'start'\) resetAge\(tabStorage\(\)\);/);
+    // the age answer is locked as it is given, and a start reads the lock (now always none, after the reset above)
     expect(app).toMatch(/\{ type: 'age', age: lockAge\(tabStorage\(\), e\.age\) \}/);
     expect(app).toMatch(/\{ type: 'start', locked: readAge\(tabStorage\(\)\) \}/);
   });

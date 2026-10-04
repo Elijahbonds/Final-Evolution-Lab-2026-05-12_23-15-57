@@ -5,7 +5,8 @@
 //     the camera card included), and a whole screen played through the client pipeline — runner → summary → this tab's
 //     storage — calls fetch 0 times and touches the (mocked) database 0 times, for every age band and a signed-in adult;
 //   · SCREEN-FIX Cyber 2 changed one rule, narrowly: the AGE ANSWER is written to this tab's sessionStorage before the
-//     camera (it is locked for the tab). Nothing else is written before a result, and nothing at all is sent;
+//     camera (it is locked for the run; every new Start asks it again — AGE-RESET, audit 2.2). Nothing else is written
+//     before a result, and nothing at all is sent;
 //   · SCREEN-FIX-2 (FE PM + Research 11:50 AM PT): under 18 keep the age answer and NOTHING ELSE, grown-up ticked or not;
 //   · the route stays unwired from the screen: a guest still gets 401, and anyone but a verified, opted-in adult 403
 //     (TEEN-WRITE-BLOCK-2, FE PM 23:05 PT; it was 412 for a possible minor without a guardian), each with no database write;
@@ -49,7 +50,7 @@ import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, standFront, synthetic
 import { mediaIn, toRecord } from '@/lib/assess/prqWrite';
 import { summarize } from './checks';
 import { preStep, PRE_START, type PreEvent } from './flow';
-import { KEYS, forgetAgeForTests, keepResult, lockAge, readAge, readResult, writeResult, writeTakeoff, type StorageLike } from './store';
+import { KEYS, clearScreen, forgetAgeForTests, keepResult, lockAge, readAge, readResult, resetAge, writeResult, writeTakeoff, type StorageLike } from './store';
 import { AGE_BANDS, type AgeBand } from './age';
 
 const cal = syntheticCalibration();
@@ -79,8 +80,12 @@ afterEach(() => { vi.unstubAllGlobals(); });
 /** The client pipeline, as the page runs it: the steps before the camera, the runner, the summary, this tab's storage. */
 function playScreen(events: PreEvent[], tab = new MemStore()) {
   let pre = PRE_START;
-  // as the page does: a start reads the tab's locked age, and an answer is locked as it is given
-  for (const e of events) pre = preStep(pre, e.type === 'start' ? { type: 'start', locked: readAge(tab) } : e.type === 'age' ? { type: 'age', age: lockAge(tab, e.age) } : e);
+  // as the page does: a start clears the old screen and the age lock (AGE-RESET: the next person answers again), and
+  // an answer is locked as it is given
+  for (const e of events) {
+    if (e.type === 'start') { clearScreen(tab); resetAge(tab); }
+    pre = preStep(pre, e.type === 'start' ? { type: 'start', locked: readAge(tab) } : e.type === 'age' ? { type: 'age', age: lockAge(tab, e.age) } : e);
+  }
   const stored = { beforeCamera: [...tab.writes] };
   if (pre.step !== 'camera') return { tab, pre, stored };
   const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, takeoffLeg: null, cameraFps: () => 30 });
@@ -151,12 +156,19 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
     expect(m.writes).toEqual([]);
   });
 
-  it('a second screen in the same tab skips the age question and keeps the first answer', () => {
+  it('a second screen in the same tab asks the age again (AGE-RESET, audit 2.2): the new answer is the one that holds', () => {
     const tab = new MemStore();
     playScreen(whole('under-13'), tab);
-    const again = playScreen([{ type: 'start' }, { type: 'age', age: '18+' }], tab);
-    expect(again.pre).toMatchObject({ step: 'grownUp', age: 'under-13' });
-    expect(tab.writes.filter((k) => k === KEYS.age)).toHaveLength(1);
+    // an adult after a kid: the reset means the adult answers for themselves — the kid's answer is not inherited
+    const adult = playScreen([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }], tab);
+    expect(adult.pre.step).toBe('camera');
+    expect(adult.pre.age).toBe('18+');
+    // and a kid after an adult — the case that mattered: kid handling, the grown-up step, nothing kept
+    const kid = playScreen([{ type: 'start' }, { type: 'age', age: 'under-13' }], tab);
+    expect(kid.pre.step).toBe('grownUp');
+    expect(kid.pre.age).toBe('under-13');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(m.writes).toEqual([]);
   });
 
   it('a signed-in adult: the screen still never posts (no save in this ship)', () => {

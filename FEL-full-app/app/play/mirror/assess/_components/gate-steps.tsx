@@ -5,10 +5,11 @@
 // hurt right now?" → the camera card.
 //
 // NOTHING IS SENT, EVER, and nothing is stored before the age answer. The answer itself is the one key written then
-// (lib/screen/store.ts lockAge), so the question is asked once per tab. The gate record (age band, grown-up checkbox,
-// timestamp, text version) is written to this tab's sessionStorage only with the result, and only after the grown-up
-// step. A "yes" to pain ends the screen: no camera, no checks, nothing kept. The camera card says what the camera is
-// for, and only its button asks the browser for the camera.
+// (lib/screen/store.ts lockAge), so the question is asked once per run — every new Start resets it first (AGE-RESET,
+// audit 2.2), so the next person on a shared phone answers for themselves. The gate record (age band, grown-up
+// checkbox, timestamp, text version) is written to this tab's sessionStorage only with the result, and only after the
+// grown-up step. A "yes" to pain ends the screen: no camera, no checks, nothing kept. The camera card says what the
+// camera is for, and only its button asks the browser for the camera.
 import { useState } from 'react';
 import Link from 'next/link';
 import {
