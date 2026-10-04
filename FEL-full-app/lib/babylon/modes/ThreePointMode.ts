@@ -83,6 +83,23 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
+// HOOPS-10PHASE-2 (3PT corner camera): CameraDirector.clampToBounds derives its camera-roaming
+// box from any VENUE_SHELL-named mesh in the scene — here that is basketball_h2h's 16x19
+// venue_ground alone (no wall_/venue_box dressing in this venue spec). That box is barely
+// wider than the court itself, while the camera's 'hoops' preset wants to stand WELL outside
+// the sideline to frame a corner shooter opposite the rim (verified with a geometry probe: the
+// camera's natural, unclamped vantage for the 30/150 deg corner racks sits ~13m out in X — more
+// than the real NBA court is wide). The clamp then crushes that position back onto the sideline,
+// which collapses the subject-to-rim viewing angle from ~5 deg to ~22-26 deg — inside a desktop
+// lens but OUTSIDE a portrait phone's much narrower horizontal FOV (vertical-fixed FOV narrows
+// horizontally below 1:1 aspect), so the rim fell out of frame on exactly the devices this app is
+// built for. An invisible, unpickable, un-rendered box gives the camera that extra roaming room
+// without moving the painted floor, without touching gameplay bounds, and without altering the
+// 'hoops' preset or the per-frame follow math racks 2-5 ease through during the jog.
+let camBoundsMesh: Mesh | null = null;
+/** Exported so the rim-in-frame regression test builds the IDENTICAL box the mode mounts, not a guess at it. */
+export const CAM_BOUNDS_SIZE = { width: 34, height: 6, depth: 30 } as const;
+export const CAM_BOUNDS_CENTER = new Vector3(0, 3, 7);
 
 // ── EXACT tuned constants (verbatim from the proven 2D/R3F shootout) ──
 const RACKS = 5;
@@ -104,10 +121,10 @@ export const RACK_ANGLES = [30, 60, 90, 120, 150].map((d) => (d * Math.PI) / 180
 export const rackRadius = threePointRadius;
 
 /** Rim position matches VenueKit.buildCourt's hoop. */
-const RIM = new Vector3(0, 3.05, -0.6);
+export const RIM = new Vector3(0, 3.05, -0.6);
 
 /** Rack stations swept along the arc in FRONT of the rim (+z side). */
-const RACK_POS = RACK_ANGLES.map(
+export const RACK_POS = RACK_ANGLES.map(
   (a) => new Vector3(RIM.x + rackRadius(a) * Math.cos(a), 0, RIM.z + rackRadius(a) * Math.sin(a)),
 );
 
@@ -1042,6 +1059,18 @@ export const ThreePointMode: ModeDefinition = {
     S.from.copyFrom(RACK_POS[0]);
     S.prevPos.copyFrom(player.root.position);
 
+    // 3PT CORNER CAMERA (see camBoundsMesh above): widen the camera's roaming box past the
+    // painted court so the 'hoops' preset can retreat far enough to frame a corner shooter
+    // opposite the rim. Invisible, unpickable (never an occlusion hit or a wall), disposed with
+    // the mode. Sized past every rack's natural camera vantage (checked against the geometry
+    // probe up to x +/-13m, z 15.2m) with headroom for CameraDirector's own 1.2m bounds margin.
+    camBoundsMesh?.dispose();
+    camBoundsMesh = MeshBuilder.CreateBox('venue_box_3pt_cam_bounds', CAM_BOUNDS_SIZE, ctx.scene);
+    camBoundsMesh.position.copyFrom(CAM_BOUNDS_CENTER);
+    camBoundsMesh.isVisible = false;
+    camBoundsMesh.isPickable = false;
+    ctx.camDirector.invalidateBounds();
+
     // ModeHarness constructs the CameraDirector but does NOT drive it — each
     // mode owns its own framing. Without these calls the camera stays at its
     // construction default (0, 3, -8), which sits behind the hoop looking out
@@ -1255,6 +1284,7 @@ export const ThreePointMode: ModeDefinition = {
   dispose(): void {
 
     modeVenue?.dispose?.(); modeVenue = null;
+    camBoundsMesh?.dispose(); camBoundsMesh = null;
     disposeCount += 1;
     // A newer instance has already loaded — this teardown belongs to an older
     // one and must not touch the live objects.
